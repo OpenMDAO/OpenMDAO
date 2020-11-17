@@ -508,7 +508,7 @@ class _TotalJacInfo(object):
                 # a constraint or an objective.
                 meta = vois[name]
                 if meta['distributed'] is True:
-                    if self.get_remote:
+                    if True:  # self.get_remote:
                         end += meta['global_size']
                     else:
                         end += meta['size']
@@ -539,25 +539,25 @@ class _TotalJacInfo(object):
 
                 if in_idxs is None:
                     # if the var is not distributed, global_size == local size
-                    if self.get_remote:
+                    if True:  # self.get_remote:
                         irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                     else:
                         irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
                 else:
                     irange = in_idxs.copy()
                     # correct for any negative indices
-                    if self.get_remote:
+                    if True:  # self.get_remote:
                         irange[in_idxs < 0] += in_var_meta['global_size']
                     else:
                         irange[in_idxs < 0] += in_var_meta['size']
 
             else:  # name is not a design var or response  (should only happen during testing)
-                if self.get_remote:
+                if True:  # self.get_remote:
                     end += in_var_meta['global_size']
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
                     end += in_var_meta['size']
-                    irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)                    
+                    irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
 
@@ -742,7 +742,7 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if MPI and meta['distributed'] and model.comm.size > 1:
+                    if MPI and meta['distributed'] and model.comm.size > 1 and self.get_remote:
                         if indices is not None:
                             if name in self._dist_driver_vars:
                                 local_idx, sizes_idx, _ = self._dist_driver_vars[name]
@@ -759,11 +759,11 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes[:myproc, var_idx])
                             inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE))
-                            jac_inds.append(np.arange(jstart, jstart + sizes[myproc, var_idx], 
-                                                      dtype=INT_DTYPE))                            
-                            #jac_inds.append(np.arange(jstart + dist_offset,
-                                            #jstart + dist_offset + sizes[myproc, var_idx],
-                                            #dtype=INT_DTYPE))
+                            # jac_inds.append(np.arange(jstart, jstart + sizes[myproc, var_idx],
+                            #                           dtype=INT_DTYPE))
+                            jac_inds.append(np.arange(jstart + dist_offset,
+                                            jstart + dist_offset + sizes[myproc, var_idx],
+                                            dtype=INT_DTYPE))
                             if fwd:
                                 name2jinds[name] = jac_inds[-1]
                     else:
@@ -1205,15 +1205,15 @@ class _TotalJacInfo(object):
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         deriv_val = self.output_vec[mode][vecname]._data
-        self.J = self.J.flatten()
+        #self.J = self.J.flatten()
         if mode == 'fwd':
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
-            self.J[jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
-            if self.get_remote:
-                gathered_J_vals = self.comm.gather(self.J, root = 0)
-                if gathered_J_vals:
-                    self.J_vals.append(gathered_J_vals[i])
+            self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+            # if self.get_remote:
+            #     gathered_J_vals = self.comm.gather(self.J, root = 0)
+            #     if gathered_J_vals:
+            #         self.J_vals.append(gathered_J_vals[i])
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1257,7 +1257,7 @@ class _TotalJacInfo(object):
 
         #else:
             #scratch = self.jac_scratch['rev'][1]
-            #scratch[:] = self.J[i]               
+            #scratch[:] = self.J[i]
 
     def par_deriv_jac_setter(self, inds, mode):
         """
