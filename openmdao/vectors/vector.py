@@ -640,8 +640,10 @@ class Vector(object):
         #     arr = None
 
         self._under_complex_step = active
-        if not active:
-            self._data.imag[:] = 0.0
+        # if not active:
+        #     self._data.imag[:] = 0.0
+        #     if not keep_real:
+        #         self._data.real[:] = 0.0
 
         # if arr is not None:
         #     self.set_val(arr)

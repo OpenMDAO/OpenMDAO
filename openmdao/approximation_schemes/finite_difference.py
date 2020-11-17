@@ -232,7 +232,7 @@ class FiniteDifference(ApproximationScheme):
         array
             The givan array, unchanged.
         """
-        return array
+        return array.real
 
     def _run_point(self, system, idx_info, data, results_array, total):
         """
