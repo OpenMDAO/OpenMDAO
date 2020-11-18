@@ -194,7 +194,6 @@ class ComplexStep(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                # vec._data.imag[:] = 0.0
                 vec.iadd(delta, idxs)
 
         if total:
