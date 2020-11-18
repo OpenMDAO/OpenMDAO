@@ -205,7 +205,6 @@ class Vector(object):
         else:
             return [v.real for n, v in self._views.items() if n in self._names]
 
-
     def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
@@ -559,26 +558,18 @@ class Vector(object):
         value = np.asarray(val)
 
         try:
-            if self._under_complex_step:
-                if flat:
-                    self._views_flat[abs_name][idxs] = value.flat
-                else:
-                    self._views[abs_name][idxs] = value
+            if flat:
+                self._views_flat[abs_name][idxs] = value.flat
             else:
-                if flat:
-                    self._views_flat[abs_name][idxs].real = value.flat
-                else:
-                    self._views[abs_name][idxs].real = value
+                self._views[abs_name][idxs] = value
+
         except Exception as err:
             try:
                 value = value.reshape(self._views[abs_name][idxs].shape)
             except Exception:
                 raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                  f"'{name}': {str(err)}.")
-            if self._under_complex_step:
-                self._views[abs_name][idxs] = value
-            else:
-                self._views[abs_name][idxs].real = value
+            self._views[abs_name][idxs] = value
 
     def dot(self, vec):
         """

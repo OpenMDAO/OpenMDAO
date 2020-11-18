@@ -119,6 +119,10 @@ class ComplexStep(ApproximationScheme):
             self._fd.compute_approximations(system, jac, total=total)
             return
 
+        saved_inputs = system._inputs._get_data().copy()
+        saved_outputs = system._outputs._get_data().copy()
+        saved_resids = system._residuals._get_data().copy()
+
         # Turn on complex step.
         system._set_complex_step_mode(True)
 
@@ -126,6 +130,10 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
+
+        system._inputs.set_val(saved_inputs)
+        system._outputs.set_val(saved_outputs)
+        system._residuals.set_val(saved_resids)
 
     def _get_multiplier(self, delta):
         """
