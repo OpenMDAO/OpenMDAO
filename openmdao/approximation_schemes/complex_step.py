@@ -120,8 +120,11 @@ class ComplexStep(ApproximationScheme):
             return
 
         saved_inputs = system._inputs._get_data().copy()
+        system._inputs._data.imag[:] = 0.0
         saved_outputs = system._outputs._get_data().copy()
+        system._outputs._data.imag[:] = 0.0
         saved_resids = system._residuals._get_data().copy()
+        system._residuals._data.imag[:] = 0.0
 
         # Turn on complex step.
         system._set_complex_step_mode(True)
@@ -191,6 +194,7 @@ class ComplexStep(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
+                # vec._data.imag[:] = 0.0
                 vec.iadd(delta, idxs)
 
         if total:
