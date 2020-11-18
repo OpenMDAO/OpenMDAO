@@ -610,7 +610,7 @@ class Vector(object):
         raise NotImplementedError('_in_matvec_context not defined for vector type %s' %
                                   type(self).__name__)
 
-    def set_complex_step_mode(self, active, keep_real=False):
+    def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
 
@@ -621,23 +621,5 @@ class Vector(object):
         ----------
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
-
-        keep_real : bool
-            When this flag is True, keep the real value when turning off complex step. You only
-            need to do this when temporarily disabling complex step for guess_nonlinear.
         """
-        # if active:
-        #     arr = self._data
-        # elif keep_real:
-        #     arr = self._data.real
-        # else:
-        #     arr = None
-
         self._under_complex_step = active
-        # if not active:
-        #     self._data.imag[:] = 0.0
-        #     if not keep_real:
-        #         self._data.real[:] = 0.0
-
-        # if arr is not None:
-        #     self.set_val(arr)

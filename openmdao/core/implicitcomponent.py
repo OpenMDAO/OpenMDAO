@@ -105,9 +105,9 @@ class ImplicitComponent(Component):
             try:
                 with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                     if complex_step:
-                        self._inputs.set_complex_step_mode(False, keep_real=True)
-                        self._outputs.set_complex_step_mode(False, keep_real=True)
-                        self._residuals.set_complex_step_mode(False, keep_real=True)
+                        self._inputs.set_complex_step_mode(False)
+                        self._outputs.set_complex_step_mode(False)
+                        self._residuals.set_complex_step_mode(False)
 
                     with self._call_user_function('guess_nonlinear', protect_residuals=True):
                         if self._discrete_inputs or self._discrete_outputs:

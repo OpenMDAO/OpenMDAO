@@ -59,9 +59,6 @@ class DefaultVector(Vector):
 
         data = root_vec._data[myslice]
 
-        # # Extract view for complex storage too.
-        # cplx_data = root_vec._cplx_data[myslice] if self._alloc_complex else None
-
         scaling = {}
         if self._do_scaling:
             scaling['phys'] = {}
@@ -75,7 +72,7 @@ class DefaultVector(Vector):
                 else:
                     scaling[typ] = (rs0[myslice], root_scale[1][myslice])
 
-        # return data, cplx_data, scaling
+        # return data, scaling
         return data, scaling
 
     def _initialize_data(self, root_vector):
@@ -104,11 +101,6 @@ class DefaultVector(Vector):
                 else:
                     self._scaling['phys'] = (None, np.ones(data.size))
                     self._scaling['norm'] = (None, np.ones(data.size))
-
-            # # Allocate imaginary for complex step
-            # if self._alloc_complex:
-            #     self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
-
         else:
             self._data, self._scaling = self._extract_root_data()
 
@@ -133,10 +125,6 @@ class DefaultVector(Vector):
         self._views = views = {}
         self._views_flat = views_flat = {}
 
-        # # alloc_complex = self._alloc_complex
-        # self._cplx_views = cplx_views = {}
-        # self._cplx_views_flat = cplx_views_flat = {}
-
         abs2meta = system._var_abs2meta[io]
         start = end = 0
         for abs_name in system._var_relevant_names[self._name][io]:
@@ -153,13 +141,6 @@ class DefaultVector(Vector):
                 v = v.view()
                 v.shape = shape
             views[abs_name] = v
-
-            # if alloc_complex:
-            #     cplx_views_flat[abs_name] = v = self._cplx_data[start:end]
-            #     if shape != v.shape:
-            #         v = v.view()
-            #         v.shape = shape
-            #     cplx_views[abs_name] = v
 
             if do_scaling:
                 for scaleto in ('phys', 'norm'):
