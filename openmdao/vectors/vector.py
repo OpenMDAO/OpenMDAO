@@ -70,6 +70,9 @@ class Vector(object):
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
         Total length of data vector (including shared memory parts).
+    _get_data : method or None
+        Reference to the function to retrieve the _data array or the real part of it depending
+        on the value of _under_complex_step.
     """
 
     # Listing of relevant citations that should be referenced when
