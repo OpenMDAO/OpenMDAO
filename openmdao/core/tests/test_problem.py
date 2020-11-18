@@ -855,6 +855,26 @@ class TestProblem(unittest.TestCase):
 
         prob.check_totals(method='cs')
 
+    def test_set_cs_error_messages(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+
+        msg = "Problem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+        msg = "Problem: set_complex_step_mode cannot be called before `Problem.run_model()`, " + \
+            "`Problem.run_driver()`, or `Problem.final_setup()`."
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_feature_run_driver(self):
         import numpy as np
 
@@ -2108,13 +2128,18 @@ class NestedProblemTestCase(unittest.TestCase):
             def __init__(self):
                 super().__init__()
                 self._problem = None
-                self._totals = None
 
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
 
                 self.add_output('f_xy', val=0.0)
+
+                # Setup sub-problem
+                self._problem = prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('parab', Paraboloid(), promotes=['*'])
+                prob.setup(force_alloc_complex=True)
 
             def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
@@ -2123,16 +2148,8 @@ class NestedProblemTestCase(unittest.TestCase):
                 prob = self._problem
                 under_cs = self.under_complex_step
 
-                if prob is None:
-                    self._problem = prob = om.Problem()
-                    model = prob.model
-                    model.add_subsystem('parab', Paraboloid(), promotes=['*'])
-
-                    # If the parent problem has been allocated complex, then do it to our subproblem.
-                    prob.setup(force_alloc_complex=inputs._alloc_complex)
-
                 if under_cs:
-                    prob._set_complex_step_mode(True)
+                    prob.set_complex_step_mode(True)
 
                 # Set inputs
                 prob.set_val('x', inputs['x'])
@@ -2145,15 +2162,10 @@ class NestedProblemTestCase(unittest.TestCase):
                 outputs['f_xy'] = prob.get_val('f_xy')
 
                 if under_cs:
-                    prob._set_complex_step_mode(False)
-
-                else:
-                    # Save total derivs.
-                    # Don't try to compute these when we are under complex step.
-                    self._totals = prob.compute_totals(of='f_xy', wrt=['x', 'y'])
+                    prob.set_complex_step_mode(False)
 
             def compute_partials(self, inputs, partials):
-                totals = self._totals
+                totals = self._problem.compute_totals(of='f_xy', wrt=['x', 'y'])
                 partials['f_xy', 'x'] = totals['f_xy', 'x']
                 partials['f_xy', 'y'] = totals['f_xy', 'y']
 

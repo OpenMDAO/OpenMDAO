@@ -1874,7 +1874,7 @@ class Problem(object):
             logger.info('checking %s' % c)
             _all_checks[c](self, logger)
 
-    def _set_complex_step_mode(self, active):
+    def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
 
@@ -1883,6 +1883,17 @@ class Problem(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        if self._metadata is None or \
+           self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            raise RuntimeError(f"{self.msginfo}: set_complex_step_mode cannot be called before "
+                               "`Problem.run_model()`, `Problem.run_driver()`, or "
+                               "`Problem.final_setup()`.")
+
+        if active and not self._metadata['force_alloc_complex']:
+            raise RuntimeError(f"{self.msginfo}: To enable complex step, specify "
+                               "'force_alloc_complex=True' when calling setup on the problem, "
+                               "e.g. 'problem.setup(force_alloc_complex=True)'")
+
         self.model._set_complex_step_mode(active)
 
 
