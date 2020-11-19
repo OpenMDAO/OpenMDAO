@@ -17,6 +17,23 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
+    def _get_data(self):
+        """
+        Return either the data array or its real part.
+
+        Note that this is intended to return only the _data array and not, for example,
+        to return a combined array in the case of an input vector that shares entries with
+        a connected output vector (for no-copy transfers).
+
+        Returns
+        -------
+        ndarray
+            The data array or its real part.
+        """
+        if self._under_complex_step:
+            return self._data
+        return self._data.real
+
     def _create_data(self):
         """
         Allocate data array.
@@ -181,9 +198,9 @@ class DefaultVector(Vector):
             self + vec
         """
         if isinstance(vec, Vector):
-            self.iadd(vec._get_data())
+            self.iadd(vec.asarray())
         else:
-            data = self._get_data()
+            data = self.asarray()
             data += vec
         return self
 
@@ -202,9 +219,9 @@ class DefaultVector(Vector):
             self - vec
         """
         if isinstance(vec, Vector):
-            self.isub(vec._get_data())
+            self.isub(vec.asarray())
         else:
-            data = self._get_data()
+            data = self.asarray()
             data -= vec
         return self
 
@@ -223,9 +240,9 @@ class DefaultVector(Vector):
             self * vec
         """
         if isinstance(vec, Vector):
-            self.imul(vec._get_data())
+            self.imul(vec.asarray())
         else:
-            data = self._get_data()
+            data = self.asarray()
             data *= vec
         return self
 
@@ -240,8 +257,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        data = self._get_data()
-        data += (val * vec._get_data())
+        data = self.asarray()
+        data += (val * vec.asarray())
 
     def set_vec(self, vec):
         """
@@ -252,8 +269,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        data = self._get_data()
-        data[:] = vec._get_data()
+        data = self.asarray()
+        data[:] = vec.asarray()
 
     def set_val(self, val, idxs=_full_slice):
         """
@@ -266,7 +283,7 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        data = self._get_data()
+        data = self.asarray()
         data[idxs] = val
 
     def scale(self, scale_to):
@@ -279,7 +296,7 @@ class DefaultVector(Vector):
             Values are "phys" or "norm" to scale to physical or normalized.
         """
         adder, scaler = self._scaling[scale_to]
-        data = self._get_data()
+        data = self.asarray()
         if self._ncol == 1:
             data *= scaler
             if adder is not None:  # nonlinear only
@@ -305,10 +322,15 @@ class DefaultVector(Vector):
         ndarray
             Array representation of this vector.
         """
-        if copy:
-            return self._get_data().copy()
+        if self._under_complex_step:
+            arr = self._data
+        else:
+            arr = self._data.real
 
-        return self._get_data()
+        if copy:
+            return arr.copy()
+
+        return arr
 
     def iscomplex(self):
         """
@@ -334,7 +356,7 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        data = self._get_data()
+        data = self.asarray()
         data[idxs] += val
 
     def isub(self, val, idxs=_full_slice):
@@ -348,7 +370,7 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        data = self._get_data()
+        data = self.asarray()
         data[idxs] -= val
 
     def imul(self, val, idxs=_full_slice):
@@ -362,7 +384,7 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
-        data = self._get_data()
+        data = self.asarray()
         data[idxs] *= val
 
     def dot(self, vec):
@@ -379,7 +401,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._get_data(), vec.asarray())
+        return np.dot(self.asarray(), vec.asarray())
 
     def get_norm(self):
         """
@@ -390,7 +412,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.linalg.norm(self._get_data())
+        return np.linalg.norm(self.asarray())
 
     def get_slice_dict(self):
         """

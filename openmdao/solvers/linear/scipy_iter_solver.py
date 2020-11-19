@@ -154,9 +154,9 @@ class ScipyKrylov(LinearSolver):
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
-        # print('out', b_vec._get_data())
+        # print('out', b_vec.asarray())
 
-        return b_vec._get_data()
+        return b_vec.asarray()
 
     def _monitor(self, res):
         """
@@ -215,7 +215,7 @@ class ScipyKrylov(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            x_vec_combined = x_vec._get_data()
+            x_vec_combined = x_vec.asarray()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)

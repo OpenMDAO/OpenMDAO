@@ -184,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs._get_data()) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()

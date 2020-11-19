@@ -70,9 +70,6 @@ class Vector(object):
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
         Total length of data vector (including shared memory parts).
-    _get_data : method or None
-        Reference to the function to retrieve the _data array or the real part of it depending
-        on the value of _under_complex_step.
     """
 
     # Listing of relevant citations that should be referenced when
@@ -121,11 +118,6 @@ class Vector(object):
         self._alloc_complex = alloc_complex
         self._under_complex_step = False
 
-        if alloc_complex:
-            self._get_data = self._get_data_cs
-        else:
-            self._get_data = self._get_data_real
-
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
                             (kind == 'residual' and system._has_resid_scaling))
@@ -163,14 +155,6 @@ class Vector(object):
             Total flattened length of this vector.
         """
         return self._len
-
-    def _get_data_real(self):
-        return self._data
-
-    def _get_data_cs(self):
-        if self._under_complex_step:
-            return self._data
-        return self._data.real
 
     def _copy_views(self):
         """

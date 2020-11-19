@@ -101,7 +101,7 @@ class NonlinearBlockGS(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs._get_data()) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -144,7 +144,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= outputs._get_data()
+            delta_outputs_n -= outputs.asarray()
             delta_outputs_n *= -1
 
             if self._iter_count >= 2:
@@ -203,7 +203,7 @@ class NonlinearBlockGS(NonlinearSolver):
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
             with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals.set_val(outputs._get_data() - outputs_n)
+                residuals.set_val(outputs.asarray() - outputs_n)
 
     def _run_apply(self):
         """
@@ -242,7 +242,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
-                residuals.set_val(outputs._get_data() - outputs_n)
+                residuals.set_val(outputs.asarray() - outputs_n)
 
     def _mpi_print_header(self):
         """

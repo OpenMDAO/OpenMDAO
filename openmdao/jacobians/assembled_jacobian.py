@@ -394,21 +394,19 @@ class AssembledJacobian(Jacobian):
                     mask = ext_mtx._create_mask_cache(d_inputs)
                     self._mask_caches[(d_inputs._names, mode)] = mask
 
-            dresids = d_residuals._get_data()
+            dresids = d_residuals.asarray()
 
             if mode == 'fwd':
                 if d_outputs._names:
-                    dresids += int_mtx._prod(d_outputs._get_data(), mode)
+                    dresids += int_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    dresids += ext_mtx._prod(d_inputs._get_data(), mode, mask=mask)
+                    dresids += ext_mtx._prod(d_inputs.asarray(), mode, mask=mask)
 
             else:  # rev
                 if d_outputs._names:
-                    data = d_outputs._get_data()
-                    data += int_mtx._prod(dresids, mode)
+                    d_outputs += int_mtx._prod(dresids, mode)
                 if do_mask:
-                    data = d_inputs._get_data()
-                    data += ext_mtx._prod(dresids, mode, mask=mask)
+                    d_inputs += ext_mtx._prod(dresids, mode, mask=mask)
 
     def set_complex_step_mode(self, active):
         """

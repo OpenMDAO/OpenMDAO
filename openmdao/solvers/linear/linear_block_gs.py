@@ -161,7 +161,7 @@ class LinearBlockGS(BlockLinearSolver):
                 theta_n = self.options['aitken_initial_factor']
 
                 # compute the change in the outputs after the NLBGS iteration
-                delta_d_n[vec_name] -= d_out_vec._get_data()
+                delta_d_n[vec_name] -= d_out_vec.asarray()
                 delta_d_n[vec_name] *= -1
 
                 if self._iter_count >= 2:

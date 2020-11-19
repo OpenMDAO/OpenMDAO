@@ -550,7 +550,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._get_data()
+    u_data = u.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
@@ -594,8 +594,8 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._get_data()
-    du_data = du._get_data()
+    u_data = u.asarray()
+    du_data = du.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
