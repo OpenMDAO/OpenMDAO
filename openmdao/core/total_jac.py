@@ -269,6 +269,9 @@ class _TotalJacInfo(object):
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode], \
                     self.seeds[mode] = self._create_in_idx_map(mode)
                 if not self.get_remote:
+                    # If we're running with only a local total jacobian, then we need to keep
+                    # track of which rows/cols actually exist in our local jac and what the
+                    # mapping is between the global row/col index and our local index.
                     locs = np.nonzero(self.in_loc_idxs[mode] != -1)[0]
                     arr = np.full(self.in_loc_idxs[mode].size, -1.0, dtype=INT_DTYPE)
                     arr[locs] = np.arange(locs.size, dtype=INT_DTYPE)
@@ -508,23 +511,13 @@ class _TotalJacInfo(object):
                 abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
                 name = model._conn_global_abs_in2out[abs_in]
             in_var_meta = abs2meta_out[name]
-            
-            in_var_idx = abs2idx[rhsname][name]
-            sizes = var_sizes[rhsname]['output']
-            offsets = var_offsets[rhsname]['output']
-            gstart = np.sum(sizes[:iproc, in_var_idx])
-            gend = gstart + sizes[iproc, in_var_idx]
-           
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
                 # a constraint or an objective.
                 meta = vois[name]
                 if meta['distributed'] is True:
-                    if True:  # self.get_remote:
-                        end += meta['global_size']
-                    else:
-                        end += meta['size']
+                    end += meta['global_size']
                 else:
                     end += meta['size']
 
@@ -552,27 +545,23 @@ class _TotalJacInfo(object):
 
                 if in_idxs is None:
                     # if the var is not distributed, global_size == local size
-                    if True:  # self.get_remote:
-                        irange = np.arange(gstart, gend, dtype=INT_DTYPE)
-                    else:
-                        irange = np.arange(gstart, gend, dtype=INT_DTYPE)
+                    irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
                     irange = in_idxs.copy()
                     # correct for any negative indices
-                    if True:  # self.get_remote:
-                        irange[in_idxs < 0] += in_var_meta['global_size']
-                    else:
-                        irange[in_idxs < 0] += in_var_meta['size']
+                    irange[in_idxs < 0] += in_var_meta['global_size']
 
             else:  # name is not a design var or response  (should only happen during testing)
-                if True:  # self.get_remote:
-                    end += in_var_meta['global_size']
-                    irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
-                else:
-                    end += in_var_meta['size']
-                    irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
+                end += in_var_meta['global_size']
+                irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
+
+            in_var_idx = abs2idx[rhsname][name]
+            sizes = var_sizes[rhsname]['output']
+            offsets = var_offsets[rhsname]['output']
+            gstart = np.sum(sizes[:iproc, in_var_idx])
+            gend = gstart + sizes[iproc, in_var_idx]
 
             if in_var_meta['distributed']:
                 ndups = 1
@@ -1229,7 +1218,7 @@ class _TotalJacInfo(object):
         ----------
         i : int
             Total jacobian row or column index.
-        mode : str 
+        mode : str
             Direction of derivative solution.
         """
         if mode == 'fwd':

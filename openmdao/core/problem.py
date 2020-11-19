@@ -1584,6 +1584,8 @@ class Problem(object):
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
             Set to True when passing in absolute names to skip some translation steps.
+        get_remote : bool
+            If True, the default, the full distributed total jacobian will be retrieved.
 
         Returns
         -------

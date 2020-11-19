@@ -118,40 +118,6 @@ class MyComp(om.ExplicitComponent):
         J['y', 'x1'] = np.array([4.0])
         J['y', 'x2'] = np.array([40])
 
-class DistribParaboloid(om.ExplicitComponent):
-
-    def setup(self):
-        self.options['distributed'] = True
-
-        if self.comm.rank == 0:
-            ndvs = 3
-        else:
-            ndvs = 2
-
-        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
-
-        self.add_output('y', shape=1) # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=ndvs) # distributed output
-        self.declare_partials('y', 'x')
-        self.declare_partials('y', 'w')
-        self.declare_partials('z', 'x')
-
-    def compute(self, inputs, outputs):
-        x = inputs['x']
-        local_y = np.sum((x-5)**2)
-        y_g = np.zeros(self.comm.size)
-        self.comm.Allgather(local_y, y_g)
-        outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
-        outputs['z'] = x**2
-
-    def compute_partials(self, inputs, J):
-        x = inputs['x']
-        J['y', 'x'] = 2*(x-5)
-        J['y', 'w'] = 2*(inputs['w']-10)
-        J['z', 'x'] = np.diag(2*x)
-
-
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
@@ -2320,6 +2286,41 @@ class TestCheckPartialsFeature(unittest.TestCase):
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 
 
+class DistribParaboloid(om.ExplicitComponent):
+
+    def setup(self):
+        self.options['distributed'] = True
+
+        if self.comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+
+        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+
+        self.add_output('y', shape=2) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        val = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['y'] = np.array([val, val*3.])
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x']
+        J['y', 'x'] = np.array([2*(x-5), 6*(x-5)])
+        J['y', 'w'] = np.array([2*(inputs['w']-10), 6*(inputs['w']-10)])
+        J['z', 'x'] = np.diag(2*x)
+
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestProblemComputeTotals(unittest.TestCase):
 
@@ -2357,6 +2358,7 @@ class TestProblemComputeTotals(unittest.TestCase):
 
         # Check the values of the gradient array
         assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
 
 class TestProblemCheckTotals(unittest.TestCase):
 
