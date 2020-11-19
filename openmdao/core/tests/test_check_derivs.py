@@ -2325,7 +2325,7 @@ class TestProblemComputeTotals(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_compute_totals(self):        
+    def test_compute_totals_get_remote_false(self):
         comm = MPI.COMM_WORLD
 
         p = om.Problem()

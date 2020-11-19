@@ -508,6 +508,13 @@ class _TotalJacInfo(object):
                 abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
                 name = model._conn_global_abs_in2out[abs_in]
             in_var_meta = abs2meta_out[name]
+            
+            in_var_idx = abs2idx[rhsname][name]
+            sizes = var_sizes[rhsname]['output']
+            offsets = var_offsets[rhsname]['output']
+            gstart = np.sum(sizes[:iproc, in_var_idx])
+            gend = gstart + sizes[iproc, in_var_idx]
+           
 
             if name in vois:
                 # if name is in vois, then it has been declared as either a design var or
@@ -546,9 +553,9 @@ class _TotalJacInfo(object):
                 if in_idxs is None:
                     # if the var is not distributed, global_size == local size
                     if True:  # self.get_remote:
-                        irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
+                        irange = np.arange(gstart, gend, dtype=INT_DTYPE)
                     else:
-                        irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
+                        irange = np.arange(gstart, gend, dtype=INT_DTYPE)
                 else:
                     irange = in_idxs.copy()
                     # correct for any negative indices
@@ -566,12 +573,6 @@ class _TotalJacInfo(object):
                     irange = np.arange(in_var_meta['size'], dtype=INT_DTYPE)
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
-
-            in_var_idx = abs2idx[rhsname][name]
-            sizes = var_sizes[rhsname]['output']
-            offsets = var_offsets[rhsname]['output']
-            gstart = np.sum(sizes[:iproc, in_var_idx])
-            gend = gstart + sizes[iproc, in_var_idx]
 
             if in_var_meta['distributed']:
                 ndups = 1

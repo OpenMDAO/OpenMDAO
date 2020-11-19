@@ -1397,7 +1397,10 @@ class System(object):
             for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
-                    global_size = np.sum(sizes[:, idx])
+                    if len(local_shape) > 1:
+                        global_size = sizes[:, idx][self.comm.rank]
+                    else:
+                        global_size = np.sum(sizes[:, idx])
                     mymeta['global_size'] = global_size
 
                     # assume that all but the first dimension of the shape of a
