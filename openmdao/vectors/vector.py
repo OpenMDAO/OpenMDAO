@@ -598,9 +598,6 @@ class Vector(object):
         """
         Turn on or off complex stepping mode.
 
-        When turned on, the default real ndarray is replaced with a complex ndarray and all
-        pointers are updated to point to it.
-
         Parameters
         ----------
         active : bool
