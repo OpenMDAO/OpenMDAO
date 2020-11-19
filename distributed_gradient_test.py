@@ -9,25 +9,21 @@ from openmdao.utils.assert_utils import assert_near_equal
 class DistribParaboloid(om.ExplicitComponent):
 
     def setup(self):
-        
+
         comm = self.comm
         rank = comm.rank
-        
+
         if rank == 0:
             ndvs = 3
             two_d = (3,3)
-            start = 0
-            end = 9
         else:
             ndvs = 2
-            two_d = (2,2) 
-            start = 9
-            end = 13
-            
+            two_d = (2,2)
+
         self.options['distributed'] = True
 
         self.add_input('w', val=1., src_indices=np.array([1])) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=two_d, src_indices=np.arange(start, end, dtype=int).reshape(two_d), flat_src_indices=True) # this will connect to a distributed IVC
+        self.add_input('x', shape=two_d) # this will connect to a distributed IVC
 
         self.add_output('y', shape=two_d) # all-gathered output, duplicated on all procs
         self.add_output('z', shape=two_d) # distributed output
@@ -74,8 +70,6 @@ if __name__ == "__main__":
 
     p.model.add_design_var('x', lower=-100, upper=100)
     p.model.add_objective('y')
-
-    #import wingdbstub
 
     p.setup()
     p.run_model()
