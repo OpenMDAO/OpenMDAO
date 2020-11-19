@@ -855,6 +855,26 @@ class TestProblem(unittest.TestCase):
 
         prob.check_totals(method='cs')
 
+    def test_set_cs_error_messages(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+
+        msg = "Problem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+        msg = "Problem: set_complex_step_mode cannot be called before `Problem.run_model()`, " + \
+            "`Problem.run_driver()`, or `Problem.final_setup()`."
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_feature_run_driver(self):
         import numpy as np
 
@@ -2100,6 +2120,69 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
         p.run_model()
+
+    def test_cs_across_nested(self):
+
+        class NestedAnalysis(om.ExplicitComponent):
+
+            def __init__(self):
+                super().__init__()
+                self._problem = None
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+                # Setup sub-problem
+                self._problem = prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('parab', Paraboloid(), promotes=['*'])
+                prob.setup(force_alloc_complex=True)
+
+            def setup_partials(self):
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                prob = self._problem
+                under_cs = self.under_complex_step
+
+                if under_cs:
+                    prob.set_complex_step_mode(True)
+
+                # Set inputs
+                prob.set_val('x', inputs['x'])
+                prob.set_val('y', inputs['y'])
+
+                # Run model
+                prob.run_model()
+
+                # Extract outputs
+                outputs['f_xy'] = prob.get_val('f_xy')
+
+                if under_cs:
+                    prob.set_complex_step_mode(False)
+
+            def compute_partials(self, inputs, partials):
+                totals = self._problem.compute_totals(of='f_xy', wrt=['x', 'y'])
+                partials['f_xy', 'x'] = totals['f_xy', 'x']
+                partials['f_xy', 'y'] = totals['f_xy', 'y']
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('nested', NestedAnalysis(), promotes=['*'])
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.set_val('x', 3.5)
+        prob.set_val('y', 1.5)
+
+        prob.run_model()
+
+        totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):

@@ -49,3 +49,12 @@ Recording and Reading Data
     :maxdepth: 1
 
     advanced_case_recording.rst
+
+--------------------------------------------
+Using OpenMDAO as a Part of a Larger Process
+--------------------------------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    euler_integration_example.rst
