@@ -860,6 +860,7 @@ class Component(System):
         added_src_inds = set()
         for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
             if iname in abs2meta_in and abs2meta_in[iname]['src_indices'] is None:
+                meta_in = abs2meta_in[iname]
                 src = abs_in2out[iname]
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
@@ -877,12 +878,18 @@ class Component(System):
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
                                            f"automatically for input '{iname}'. They must be "
                                            "supplied manually.")
-                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
-                               "added without src_indices. Setting src_indices to "
-                               f"range({offset}, {end}).")
-                abs2meta_in[iname]['src_indices'] = np.arange(offset, end, dtype=INT_DTYPE)
+
+                inds = np.arange(offset, end, dtype=INT_DTYPE)
+                if meta_in['shape'] != inds.shape:
+                    inds = inds.reshape(meta_in['shape'])
+                meta_in['src_indices'] = inds
+                meta_in['flat_src_indices'] = True
                 all_abs2meta_in[iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
+
+                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
+                               "added without src_indices. Setting src_indices to "
+                               f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
 
         return added_src_inds
 
