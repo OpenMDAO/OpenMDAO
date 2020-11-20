@@ -698,7 +698,6 @@ class DiscreteTestCase(unittest.TestCase):
         prob.add_recorder(rec)
 
         prob.setup()
-
         msg = ("DeprecationWarning: The truth value of an empty array is ambiguous. Returning"
                "False, but in future this will result in an error. Use `array.size > 0` to check "
                "that an array is not empty.")
