@@ -247,7 +247,7 @@ class DirectSolver(LinearSolver):
                                  scope_out, scope_in)
 
             # put new value in out_vec
-            mtx[:, i] = bvec._data
+            mtx[:, i] = bvec.asarray()
 
         # Restore the backed-up vectors
         bvec.set_val(b_data)
@@ -430,13 +430,13 @@ class DirectSolver(LinearSolver):
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
-            x_vec = d_outputs._data
-            b_vec = d_residuals._data
+            x_vec = d_outputs.asarray()
+            b_vec = d_residuals.asarray()
             trans_lu = 0
             trans_splu = 'N'
         else:  # rev
-            x_vec = d_residuals._data
-            b_vec = d_outputs._data
+            x_vec = d_residuals.asarray()
+            b_vec = d_outputs.asarray()
             trans_lu = 1
             trans_splu = 'T'
 

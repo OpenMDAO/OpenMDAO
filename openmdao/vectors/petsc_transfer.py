@@ -283,15 +283,16 @@ class PETScTransfer(DefaultTransfer):
             # the petsc vector does not directly reference the _data.
 
             if in_vec._alloc_complex:
-                in_petsc.array = in_vec._data
+                in_petsc.array = in_vec._get_data()
 
             if out_vec._alloc_complex:
-                out_petsc.array = out_vec._data
+                out_petsc.array = out_vec._get_data()
 
             self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             if in_vec._alloc_complex:
-                in_vec._data[:] = in_petsc.array
+                data = in_vec._get_data()
+                data[:] = in_petsc.array
 
     def _multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
@@ -330,17 +331,21 @@ class PETScTransfer(DefaultTransfer):
                     in_vec._data[:, i] = in_petsc.array + in_petsc_imag.array * 1j
 
             else:
+                in_data = in_vec._get_data()
+                out_data = out_vec._get_data()
                 for i in range(in_vec._ncol):
-                    in_petsc.array = in_vec._data[:, i]
-                    out_petsc.array = out_vec._data[:, i]
+                    in_petsc.array = in_data[:, i]
+                    out_petsc.array = out_data[:, i]
                     self._scatter(out_petsc, in_petsc, addv=False, mode=False)
-                    in_vec._data[:, i] = in_petsc.array
+                    in_data[:, i] = in_petsc.array
 
         elif mode == 'rev':
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
+            in_data = in_vec._get_data()
+            out_data = out_vec._get_data()
             for i in range(in_vec._ncol):
-                in_petsc.array = in_vec._data[:, i]
-                out_petsc.array = out_vec._data[:, i]
+                in_petsc.array = in_data[:, i]
+                out_petsc.array = out_data[:, i]
                 self._scatter(in_petsc, out_petsc, addv=True, mode=True)
-                out_vec._data[:, i] = out_petsc.array
+                out_data[:, i] = out_petsc.array

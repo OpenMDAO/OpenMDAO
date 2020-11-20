@@ -2631,14 +2631,9 @@ class Group(System):
         complex_step = self._inputs._under_complex_step
 
         if complex_step:
-            self._inputs.set_complex_step_mode(False, keep_real=True)
-            self._residuals.set_complex_step_mode(False, keep_real=True)
-
-            # The Group outputs vector contains imaginary numbers from other components, so we need
-            # to save a cache and restore it later.
-            imag_cache = np.empty(len(self._outputs._data))
-            imag_cache[:] = self._outputs._data.imag
-            self._outputs.set_complex_step_mode(False, keep_real=True)
+            self._inputs.set_complex_step_mode(False)
+            self._residuals.set_complex_step_mode(False)
+            self._outputs.set_complex_step_mode(False)
 
         if self._discrete_inputs or self._discrete_outputs:
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
@@ -2647,15 +2642,9 @@ class Group(System):
             self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
         if complex_step:
-            # Note: passing in False swaps back to the complex vector, which is valid since
-            # the inputs and residuals value cannot be edited by guess_nonlinear.
-            self._inputs.set_complex_step_mode(False)
-            self._residuals.set_complex_step_mode(False)
-            self._inputs._under_complex_step = True
-            self._residuals._under_complex_step = True
-
+            self._inputs.set_complex_step_mode(True)
+            self._residuals.set_complex_step_mode(True)
             self._outputs.set_complex_step_mode(True)
-            self._outputs.iadd(imag_cache * 1j)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
