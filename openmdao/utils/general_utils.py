@@ -943,10 +943,8 @@ def default_noraise(o):
         return o.item()
     elif isinstance(o, (str, float, int)):
         return o
-    elif isinstance(o, bool) or np.iscomplex(o):
+    elif isinstance(o, bool) or isinstance(o, complex):
         return str(o)
-    elif hasattr(o, '__dict__'):
-        return o.__class__.__name__
     elif o is None:
         return None
     else:
