@@ -675,9 +675,30 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Comp1.x']
 
-        # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='rev')
+        p.run_model()
+
+        J = p.compute_totals(of, wrt, return_format='dict')
+
+        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
+
+    def test_feature_fwd(self):
+        import time
+
+        import numpy as np
+
+        import openmdao.api as om
+        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
+
+        size = 4
+
+        of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
+        wrt = ['Comp1.x']
+
+        p = om.Problem(model=PartialDependGroup())
+        p.setup(mode='fwd')
         p.run_model()
 
         J = p.compute_totals(of, wrt, return_format='dict')
@@ -698,30 +719,30 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Comp1.x']
 
-        # run first in fwd mode
+        # run in rev mode
+        p = om.Problem(model=PartialDependGroup())
+        p.setup(mode='rev')
+
+        p.run_model()
+
+        elapsed_rev = time.time()
+        Jrev = p.compute_totals(of, wrt, return_format='dict')
+        elapsed_rev = time.time() - elapsed_rev
+
+        # run in fwd mode and compare times for deriv calculation
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()
 
         elapsed_fwd = time.time()
-        J = p.compute_totals(of, wrt, return_format='dict')
+        Jfwd = p.compute_totals(of, wrt, return_format='dict')
         elapsed_fwd = time.time() - elapsed_fwd
 
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(Jfwd['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(Jfwd['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
-        # now run in rev mode and compare times for deriv calculation
-        p = om.Problem(model=PartialDependGroup())
-        p.setup(check=False, mode='rev')
-
-        p.run_model()
-
-        elapsed_rev = time.time()
-        J = p.compute_totals(of, wrt, return_format='dict')
-        elapsed_rev = time.time() - elapsed_rev
-
-        assert_near_equal(J['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
-        assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
+        assert_near_equal(Jrev['ParallelGroup1.Con1.y']['Comp1.x'][0], np.ones(size)*2., 1e-6)
+        assert_near_equal(Jrev['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
         # make sure that rev mode is faster than fwd mode
         self.assertGreater(elapsed_fwd / elapsed_rev, 1.0)
