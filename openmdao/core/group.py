@@ -242,7 +242,7 @@ class Group(System):
             Sets of output and input variables.
         """
         try:
-            return self._scope_cache[excl_sub]
+            return self._scope_cache[id(excl_sub)]
         except KeyError:
             pass
 
@@ -268,7 +268,7 @@ class Group(System):
                         scope_in.add(abs_in)
             scope_in = frozenset(scope_in)
 
-        self._scope_cache[excl_sub] = (scope_out, scope_in)
+        self._scope_cache[id(excl_sub)] = (scope_out, scope_in)
         return scope_out, scope_in
 
     def _compute_root_scale_factors(self):
