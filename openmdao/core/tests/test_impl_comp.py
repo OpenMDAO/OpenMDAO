@@ -7,6 +7,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
@@ -200,7 +201,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
         expected = {
-            'x': {'value': [0.]}
+            'x': {'value': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
@@ -215,9 +216,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
         self.assertEqual(dict(c2_outputs), {})
 
-        # specifying residuals_tol should not cause an error
+        # specifying residuals_tol should not cause an error. However this will be empty because
+        # of the residuals_tol
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(c2_outputs), expected)
+        self.assertEqual(dict(c2_outputs), {})
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
@@ -363,6 +365,33 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('value'), 0)
         self.assertEqual(text.count('resids'), 1)
 
+    def test_list_residuals_with_tol(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
+
+        prob.setup()
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        stdout = StringIO()
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        text = stdout.getvalue().split('\n')
+        # P1 and D1 should not appear in the outputs section. This is being checked below
+        self.assertEqual(text[14], 'd2')
+        self.assertFalse('d1' in text)
+
 
 class ImplicitCompGuessTestCase(unittest.TestCase):
 
@@ -443,7 +472,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, resids):
 
-                if outputs._data.dtype == np.complex:
+                if outputs.asarray().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # Default initial state of zero for x takes us to x=1 solution.

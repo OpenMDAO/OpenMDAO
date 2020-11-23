@@ -292,7 +292,7 @@ class TestJacobian(unittest.TestCase):
         # fwd apply_linear test
         d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals.set_val(d_residuals._data - check_vec)
+        d_residuals.set_val(d_residuals.asarray() - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
@@ -312,7 +312,7 @@ class TestJacobian(unittest.TestCase):
         # rev apply_linear test
         d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs.set_val(d_outputs._data - check_vec)
+        d_outputs.set_val(d_outputs.asarray() - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test

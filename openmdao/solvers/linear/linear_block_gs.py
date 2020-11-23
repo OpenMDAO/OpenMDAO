@@ -120,7 +120,7 @@ class LinearBlockGS(BlockLinearSolver):
                     if vec_name in subsys._rel_vec_names:
                         b_vec = system._vectors['residual'][vec_name]
                         b_vec *= -1.0
-                        b_vec._data += self._rhs_vecs[vec_name]
+                        b_vec += self._rhs_vecs[vec_name]
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
         else:  # rev
@@ -161,7 +161,7 @@ class LinearBlockGS(BlockLinearSolver):
                 theta_n = self.options['aitken_initial_factor']
 
                 # compute the change in the outputs after the NLBGS iteration
-                delta_d_n[vec_name] -= d_out_vec._data
+                delta_d_n[vec_name] -= d_out_vec.asarray()
                 delta_d_n[vec_name] *= -1
 
                 if self._iter_count >= 2:
@@ -209,7 +209,7 @@ class LinearBlockGS(BlockLinearSolver):
                 d_out_vec.set_val(d_n[vec_name])
 
                 # compute relaxed outputs
-                d_out_vec._data += theta_n * delta_d_n[vec_name]
+                d_out_vec += theta_n * delta_d_n[vec_name]
 
                 # save update to use in next iteration
                 delta_d_n_1[vec_name][:] = delta_d_n[vec_name]

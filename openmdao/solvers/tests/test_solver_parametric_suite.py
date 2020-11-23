@@ -62,13 +62,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             d_residuals.set_val(2.0)
             d_outputs.set_val(0.0)
             prob.model.run_solve_linear(['linear'], 'fwd')
-            result = d_outputs._data
+            result = d_outputs.asarray()
             assert_near_equal(result, [-2., 2.])
 
             d_outputs.set_val(2.0)
             d_residuals.set_val(0.0)
             prob.model.run_solve_linear(['linear'], 'rev')
-            result = d_residuals._data
+            result = d_residuals.asarray()
             assert_near_equal(result, [2., -2.])
 
     def test_direct_solver_group(self):
@@ -92,13 +92,13 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
         prob.model.run_solve_linear(['linear'], 'fwd')
-        result = d_outputs._data
+        result = d_outputs.asarray()
         assert_near_equal(result, prob.model.expected_solution, 1e-15)
 
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         prob.model.run_solve_linear(['linear'], 'rev')
-        result = d_residuals._data
+        result = d_residuals.asarray()
         assert_near_equal(result, prob.model.expected_solution, 1e-15)
 
     @parametric_suite(

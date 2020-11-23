@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
 from itertools import chain
+from enum import IntEnum
 
 import re
 from fnmatch import fnmatchcase
@@ -27,7 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -35,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op
+    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -92,6 +93,25 @@ allowed_meta_names = {
 }
 allowed_meta_names.update(global_meta_names['input'])
 allowed_meta_names.update(global_meta_names['output'])
+
+
+class _MatchType(IntEnum):
+    """
+    Class used to define different types of promoted name matches.
+
+    Attributes
+    ----------
+    NAME : int
+        Literal name match.
+    RENAME : int
+        Rename match.
+    PATTERN : int
+        Glob pattern match.
+    """
+
+    NAME = 0
+    RENAME = 1
+    PATTERN = 2
 
 
 class System(object):
@@ -152,8 +172,8 @@ class System(object):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_promotes_src_indices : dict
-        Dictionary mapping promoted input names/wildcards to (src_indices, flat_src_indices)
+    _var_prom2inds : dict
+        Maps promoted name to src_indices in scope of system.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -374,9 +394,9 @@ class System(object):
         self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
-        self._var_promotes_src_indices = {}
 
         self._var_allprocs_prom2abs_list = None
+        self._var_prom2inds = {}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
@@ -470,13 +490,13 @@ class System(object):
         str
             Either our instance pathname or class name.
         """
-        if self.pathname == '':
-            return '<model> <class {}>'.format(type(self).__name__)
         if self.pathname is not None:
-            return "'{}' <class {}>".format(self.pathname, type(self).__name__)
+            if self.pathname == '':
+                return f"<model> <class {type(self).__name__}>"
+            return f"'{self.pathname}' <class {type(self).__name__}>"
         if self.name:
-            return "'{}' <class {}>".format(self.name, type(self).__name__)
-        return type(self).__name__
+            return f"'{self.name}' <class {type(self).__name__}>"
+        return f"<class {type(self).__name__}>"
 
     def _get_inst_id(self):
         return self.pathname
@@ -1358,6 +1378,7 @@ class System(object):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
+        self._var_prom2inds = {}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
@@ -1812,102 +1833,99 @@ class System(object):
         for abs_name, meta in self._var_abs2meta['output'].items():
             self._outputs.set_var(abs_name, meta['value'])
 
-    def _get_maps(self, prom_names):
+    def _get_promotion_maps(self):
         """
         Define variable maps based on promotes lists.
 
-        Parameters
-        ----------
-        prom_names : {'input': [], 'output': []}
-            Lists of promoted input and output names.
-
         Returns
         -------
-        dict of {'input': {str:str, ...}, 'output': {str:str, ...}}
+        dict of {'input': {str:(str, info), ...}, 'output': {str:(str, info), ...}}
             dictionary mapping input/output variable names
-            to promoted variable names.
+            to (promoted name, promotion_info) tuple.
         """
+        prom_names = self._var_allprocs_prom2abs_list
         gname = self.name + '.' if self.name else ''
 
         def split_list(lst):
             """
-            Return names, patterns, and renames found in lst.
+            Yield match type, name/pattern/tuple info, and src_indices info.
 
             Parameters
             ----------
             lst : list
                 List of names, patterns and/or tuples specifying promotes.
 
-            Returns
-            -------
-            names : list
-                list of names
-            patterns : list
-                list of patterns
-            renames : dict
-                dictionary of name mappings
+            Yields
+            ------
+            Enum
+                match type
+            str
+                name or pattern string
+            (str, _PromotesInfo)
+                name/rename/pattern, promotion info (src_indices, etc.)
             """
-            names = []
-            patterns = []
-            renames = {}
             for entry in lst:
-                if isinstance(entry, str):
+                key, pinfo = entry
+                if isinstance(key, str):
                     # note, conditional here is faster than using precompiled regex
-                    if '*' in entry or '?' in entry or '[' in entry:
-                        patterns.append(entry)
+                    if '*' in key or '?' in key or '[' in key:
+                        yield _MatchType.PATTERN, key, entry
                     else:
-                        names.append(entry)
-                elif isinstance(entry, tuple) and len(entry) == 2:
-                    renames[entry[0]] = entry[1]
+                        yield _MatchType.NAME, key, entry
+                elif isinstance(key, tuple) and len(key) == 2:
+                    yield _MatchType.RENAME, key[0], (key[1], pinfo)
                 else:
-                    raise TypeError("when adding subsystem '%s', entry '%s'"
-                                    " is not a string or tuple of size 2" %
-                                    (self.pathname, entry))
-            return names, patterns, renames
+                    raise TypeError(f"when adding subsystem '{self.pathname}', entry '{key}'"
+                                    " is not a string or tuple of size 2.")
 
-        def update_src_indices(name, key):
+        def _dup(io, matches, match_type, name, tup):
             """
-            Update metadata for promoted inputs that have had src_indices specified.
+            Report error or warning when attempting to promote a variable twice.
 
             Parameters
             ----------
+            matches : dict {'input': ..., 'output': ...}
+                Dict of promoted names and associated info.
+            match_type : IntEnum
+                Indicates whether match is an explicit name, rename, or pattern match.
             name : str
-                Name of an input variable that may have associated src_indices.
-            key : str or tuple
-                Name, pattern or tuple by which src_indices would have been specified
-                when the input variable was promoted.
+                Name of promoted variable that is specified multiple times.
+            tup : tuple (?, _PromotesInfo)
+                First entry can be name, rename, or pattern depending on the match type.
+
+            Returns
+            -------
+            bool
+                If True, ignore the new match, else replace the old with the new.
             """
-            if key in self._var_promotes_src_indices:
-                src_indices, flat_src_indices = self._var_promotes_src_indices[key]
+            old_name, old_key, old_info, old_match_type = matches[io][name]
+            _, info = tup
+            if old_match_type == _MatchType.RENAME:
+                old_key = (old_name, old_key)
+            else:
+                old_using = f"'{old_key}'"
+            if match_type == _MatchType.RENAME:
+                new_using = (name, tup[0])
+            else:
+                new_using = f"'{tup[0]}'"
 
-                for abs_in in self._var_allprocs_prom2abs_list['input'][name]:
-                    meta = self._var_abs2meta['input'][abs_in]
+            mismatch = info.compare(old_info) if info is not None else ()
+            if mismatch:
+                raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                                   f"{new_using}, was already promoted using {old_using} with "
+                                   f"different values for {mismatch}.")
 
-                    _, _, src_indices = ensure_compatible(name, meta['value'], meta['shape'],
-                                                          src_indices)
+            if old_match_type != _MatchType.PATTERN:
+                if old_key != tup[0]:
+                    raise RuntimeError(f"{self.msginfo}: Can't alias promoted {io} '{name}' to "
+                                       f"'{tup[0]}' because '{name}' has already been promoted as "
+                                       f"'{old_key}'.")
 
-                    is_array = isinstance(src_indices, np.ndarray)
-                    if is_array and 'src_indices' in meta and meta['src_indices'] is not None:
-                        if not np.array_equal(meta['src_indices'], src_indices):
-                            raise RuntimeError(f"{self.msginfo}: Trying to promote input '{name}' "
-                                               f"with src_indices {str(src_indices)},"
-                                               f" but src_indices have already been specified as "
-                                               f"{str(meta['src_indices'])}.")
-                    if 'flat_src_indices' in meta and meta['flat_src_indices'] is not None:
-                        if not meta['flat_src_indices'] == flat_src_indices:
-                            raise RuntimeError(f"{self.msginfo}: Trying to promote input '{name}' "
-                                               f"with flat_src_indices={str(flat_src_indices)} but "
-                                               f"flat_src_indices has already been specified as"
-                                               f" {str(meta['flat_src_indices'])}.")
+            if old_key != '*':
+                simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using "
+                               f"{new_using}, was already promoted using {old_using}.")
 
-                    meta['src_indices'] = src_indices
-                    if _is_slicer_op(src_indices):
-                        meta['src_slice'] = src_indices
-                        if flat_src_indices is not None:
-                            simple_warning(f"{self.msginfo}: Input '{name}' was promoted with "
-                                           "slice src_indices, so flat_src_indices is ignored.")
-                        flat_src_indices = True
-                    meta['flat_src_indices'] = flat_src_indices
+            return match_type == _MatchType.PATTERN
 
         def resolve(to_match, io_types, matches, proms):
             """
@@ -1916,46 +1934,44 @@ class System(object):
             This is called once for promotes or separately for promotes_inputs and promotes_outputs.
             """
             if not to_match:
-                for typ in io_types:
-                    if gname:
-                        matches[typ] = {name: gname + name for name in proms[typ]}
-                    else:
-                        matches[typ] = {name: name for name in proms[typ]}
-                return True
+                return
 
-            found = set()
-            names, patterns, renames = split_list(to_match)
+            # always add '*' and so we won't report if it matches nothing (in the case where the
+            # system has no variables of that io type)
+            found = set(('*',))
 
-            for typ in io_types:
-                is_input = typ == 'input'
-                pmap = matches[typ]
-                for name in proms[typ]:
-                    if name in names:
-                        pmap[name] = name
-                        found.add(name)
-                        if is_input:
-                            update_src_indices(name, name)
-                    elif name in renames:
-                        pmap[name] = renames[name]
-                        found.add(name)
-                        if is_input:
-                            update_src_indices(name, (name, renames[name]))
-                    else:
-                        for pattern in patterns:
-                            # if name matches, promote that variable to parent
-                            if pattern == '*' or fnmatchcase(name, pattern):
-                                pmap[name] = name
-                                found.add(pattern)
-                                if is_input:
-                                    update_src_indices(name, pattern)
-                                break
+            for match_type, key, tup in split_list(to_match):
+                s, pinfo = tup
+                if match_type == _MatchType.PATTERN:
+                    for io in io_types:
+                        if io == 'output':
+                            pinfo = None
+                        if key == '*' and not matches[io]:  # special case. add everything
+                            matches[io] = pmap = {n: (n, key, pinfo, match_type) for n in proms[io]}
                         else:
-                            # Default: prepend the parent system's name
-                            pmap[name] = gname + name if gname else name
-                            if is_input:
-                                update_src_indices(name, name)
+                            pmap = matches[io]
+                            nmatch = len(pmap)
+                            for n in proms[io]:
+                                if fnmatchcase(n, key):
+                                    if not (n in pmap and _dup(io, matches, match_type, n, tup)):
+                                        pmap[n] = (n, key, pinfo, match_type)
+                            if len(pmap) > nmatch:
+                                found.add(key)
+                else:  # NAME or RENAME
+                    for io in io_types:
+                        if io == 'output':
+                            pinfo = None
+                        pmap = matches[io]
+                        if key in proms[io]:
+                            if key in pmap:
+                                _dup(io, matches, match_type, key, tup)
+                            pmap[key] = (s, key, pinfo, match_type)
+                            if match_type == _MatchType.NAME:
+                                found.add(key)
+                            else:
+                                found.add((key, s))
 
-            not_found = (set(names).union(renames).union(patterns)) - found
+            not_found = set(n for n, _ in to_match) - found
             if not_found:
                 if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
                         isinstance(self, openmdao.core.group.Group)):
@@ -1967,27 +1983,9 @@ class System(object):
                 else:
                     call = 'promotes_%ss' % io_types[0]
 
-                for p in patterns:
-                    for name, alias in renames.items():
-                        if fnmatchcase(name, p):
-                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
-                                               "to '%s'." % (self.msginfo, call, p, name,
-                                                             name, alias))
-
-                    for i in names:
-                        if fnmatchcase(i, p):
-                            break
-                    else:
-                        if p != '*':
-                            raise RuntimeError("%s: '%s' failed to find any matches for the "
-                                               "following pattern: '%s'.%s" %
-                                               (self.msginfo, call, p, empty_group_msg))
-                    if p == patterns[-1]:
-                        break
-                else:
-                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                       "names or patterns: %s.%s" %
-                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
+                not_found = sorted(not_found, key=lambda x: x if isinstance(x, str) else x[0])
+                raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
+                                   f"following names or patterns: {not_found}.{empty_group_msg}")
 
         maps = {'input': {}, 'output': {}}
 
@@ -3631,7 +3629,13 @@ class System(object):
                 expl_outputs = list(expl_outputs.items())
 
         if implicit:
-            impl_outputs = {n: m for n, m in outputs.items() if n in states}
+            impl_outputs = {}
+            if residuals_tol:
+                for n, m in outputs.items():
+                    if "resids" in m and n in states and m['resids'] > residuals_tol:
+                        impl_outputs[n] = m
+            else:
+                impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
@@ -4386,13 +4390,14 @@ class System(object):
             return self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat,
                                      from_root=True)
 
+        if scope_sys is None:
+            scope_sys = self
+
         # if we have multiple promoted inputs that are explicitly connected to an output and units
         # have not been specified, look for group input to disambiguate
         if units is None and len(abs_ins) > 1:
             if abs_name not in self._var_allprocs_discrete['input']:
-                # can't get here unless self is a Group because len(abs_ins) always == 1 for comp
-                if scope_sys is None:
-                    scope_sys = self
+                # can't get here unless Group because len(abs_ins) always == 1 for comp
                 try:
                     units = scope_sys._group_inputs[name][0]['units']
                 except (KeyError, IndexError):
@@ -4405,18 +4410,44 @@ class System(object):
         if abs_name in self._var_abs2meta['input']:  # input is local
             vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
-            has_src_indices = src_indices is not None
-            distrib = vmeta['distributed']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
             src_indices = None  # FIXME: remote var could have src_indices
-            has_src_indices = vmeta['has_src_indices']
-            distrib = vmeta['distributed']
-            if distrib and get_remote is None:
-                raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
-                                   "variable. You can retrieve values from all processes "
-                                   "using `get_val(<name>, get_remote=True)` or from the "
-                                   "local process using `get_val(<name>, get_remote=False)`.")
+
+        distrib = vmeta['distributed']
+        vshape = vmeta['shape']
+        has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
+                              for n in abs_ins)
+
+        # see if we have any 'intermediate' level src_indices when using a promoted name
+        if name in scope_sys._var_prom2inds:
+            src_shape, inds, flat = scope_sys._var_prom2inds[name]
+            if inds is None:
+                if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
+                    src_indices = None
+                    vshape = None
+                    has_src_indices = False
+                is_slice = _is_slicer_op(src_indices)
+            else:
+                is_slice = _is_slicer_op(inds)
+                shp = shape_from_idx(src_shape, inds, flat)
+                if not flat and not _is_slicer_op(inds):
+                    inds = _flatten_src_indices(inds, shp,
+                                                src_shape, np.product(src_shape))
+                src_indices = inds
+                has_src_indices = True
+                if len(abs_ins) > 1 or name != abs_name:
+                    vshape = shp
+        else:
+            is_slice = _is_slicer_op(src_indices)
+            shpname = 'global_shape' if get_remote else 'shape'
+            src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
+
+        if distrib and get_remote is None:
+            raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                               "variable. You can retrieve values from all processes "
+                               "using `get_val(<name>, get_remote=True)` or from the "
+                               "local process using `get_val(<name>, get_remote=False)`.")
 
         smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
@@ -4433,7 +4464,8 @@ class System(object):
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if _is_slicer_op(src_indices):
+                if is_slice:
+                    val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
                 elif distrib and (sdistrib or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
@@ -4478,10 +4510,10 @@ class System(object):
 
             if distrib and get_remote:
                 val.shape = self._var_allprocs_abs2meta['input'][abs_name]['global_shape']
-            elif val.size > 0:
-                val.shape = vmeta['shape']
-        else:
-            val = val.reshape(vmeta['shape'])
+            elif not flat and val.size > 0:
+                val.shape = vshape
+        elif vshape is not None:
+            val = val.reshape(vshape)
 
         if indices is not None:
             val = val[indices]
@@ -4502,7 +4534,7 @@ class System(object):
 
     def _get_src_inds_array(self, varname):
         """
-        Return the src_indices, if any, for input 'varname', converting from slice if needed.
+        Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
 
         Parameters
         ----------

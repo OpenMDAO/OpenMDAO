@@ -272,7 +272,7 @@ class DefaultTransfer(Transfer):
 
         else:  # rev
             if out_vec._ncol == 1:
-                out_vec.iadd(np.bincount(self._out_inds, in_vec._data[self._in_inds],
+                out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
                                          minlength=out_vec._data.size))
             else:  # matrix-matrix   (bincount only works with 1d arrays)
-                np.add.at(out_vec._data, self._out_inds, in_vec._data[self._in_inds])
+                np.add.at(out_vec.asarray(), self._out_inds, in_vec._get_data()[self._in_inds])

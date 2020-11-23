@@ -190,7 +190,7 @@ div.info-panel {
 }
 
 .node-value-title::after {
-    content: ' Initial Value';
+    content: ' Value';
 }
 
 .close-value-window-button {

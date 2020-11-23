@@ -32,7 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_system_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
-    _is_slicer_op
+    _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
@@ -524,22 +524,34 @@ class Problem(object):
                             src.rsplit('.', 1)[0] == '_auto_ivc' and
                             all_meta['output'][src]['distributed']):
                         pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices'] and n_proms < 2:
+                    elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
                             src_indices = tlocmeta['src_indices']
-                            if tmeta['distributed']:
-                                ssizes = model._var_sizes['nonlinear']['output']
-                                sidx = model._var_allprocs_abs2idx['nonlinear'][src]
-                                ssize = ssizes[myrank, sidx]
-                                start = np.sum(ssizes[:myrank, sidx])
-                                end = start + ssize
-                                if np.any(src_indices < start) or np.any(src_indices >= end):
-                                    raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
-                                                       "src_indices refer "
-                                                       "to out-of-process array entries.")
-                                if start > 0:
-                                    src_indices = src_indices - start
-                            model._outputs.set_var(src, value, src_indices[indices])
+                            flat = False
+                            if name in model._var_prom2inds:
+                                sshape, inds, flat = model._var_prom2inds[name]
+                                if inds is not None:
+                                    if _is_slicer_op(inds):
+                                        inds = _slice_indices(inds, np.prod(sshape), sshape).ravel()
+                                        value = value.ravel()
+                                        flat = True
+                                src_indices = inds
+                            if src_indices is None:
+                                model._outputs.set_var(src, value, None, flat)
+                            else:
+                                if tmeta['distributed']:
+                                    ssizes = model._var_sizes['nonlinear']['output']
+                                    sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                    ssize = ssizes[myrank, sidx]
+                                    start = np.sum(ssizes[:myrank, sidx])
+                                    end = start + ssize
+                                    if np.any(src_indices < start) or np.any(src_indices >= end):
+                                        raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+                                                           "src_indices refer "
+                                                           "to out-of-process array entries.")
+                                    if start > 0:
+                                        src_indices = src_indices - start
+                                model._outputs.set_var(src, value, src_indices[indices], flat)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
@@ -711,7 +723,8 @@ class Problem(object):
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
-        rvec._data *= -1.
+        data = rvec.asarray()
+        data *= -1.
 
         self.model.run_solve_linear(['linear'], mode)
 
@@ -885,8 +898,8 @@ class Problem(object):
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
             'lin_vec_names': None,  # names of linear vectors
-            'model_ref': weakref.ref(model)  # ref to the model (needed to get out-of-scope
-                                             # src data for inputs)
+            'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
+                                              # src data for inputs)
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1861,6 +1874,28 @@ class Problem(object):
                 continue
             logger.info('checking %s' % c)
             _all_checks[c](self, logger)
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if self._metadata is None or \
+           self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            raise RuntimeError(f"{self.msginfo}: set_complex_step_mode cannot be called before "
+                               "`Problem.run_model()`, `Problem.run_driver()`, or "
+                               "`Problem.final_setup()`.")
+
+        if active and not self._metadata['force_alloc_complex']:
+            raise RuntimeError(f"{self.msginfo}: To enable complex step, specify "
+                               "'force_alloc_complex=True' when calling setup on the problem, "
+                               "e.g. 'problem.setup(force_alloc_complex=True)'")
+
+        self.model._set_complex_step_mode(active)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

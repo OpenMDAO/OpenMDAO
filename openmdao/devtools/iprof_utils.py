@@ -143,7 +143,7 @@ def _setup_func_group():
             ('_set_initial_conditions', (Problem,)),
             ('_build', (Matrix,)),
             ('_add_submat', (Matrix,)),
-            ('_get_maps', (System,)),
+            ('_get_promotion_maps', (System,)),
             ('_set_approx_partials_meta', (System,)),
             ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
