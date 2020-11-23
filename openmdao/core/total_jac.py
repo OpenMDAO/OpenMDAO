@@ -2,6 +2,7 @@
 Helper class for total jacobian computation.
 """
 from collections import OrderedDict, defaultdict
+from itertools import chain
 from copy import deepcopy
 import os
 import pprint
@@ -13,7 +14,7 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning, prom2ivc_src_dict
 
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
 # Attempt to import petsc4py.
@@ -192,6 +193,14 @@ class _TotalJacInfo(object):
             else:
                 of_name = name
             of.append(of_name)
+
+        if not get_remote and self.comm.size > 1:
+            with multi_proc_exception_check(self.comm):
+                remotes = [n for n in chain(of, wrt) if not n in model._var_abs2meta['output']]
+                if remotes:
+                    raise RuntimeError("compute_totals was called with get_remote=False but "
+                                       f"the following of/wrt variables, {sorted(remotes)} are "
+                                       f"remote on rank {self.comm.rank}.")
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
@@ -516,7 +525,7 @@ class _TotalJacInfo(object):
                 # if name is in vois, then it has been declared as either a design var or
                 # a constraint or an objective.
                 meta = vois[name]
-                if meta['distributed'] is True:
+                if meta['distributed']:
                     end += meta['global_size']
                 else:
                     end += meta['size']
@@ -813,11 +822,8 @@ class _TotalJacInfo(object):
             if name in vois:
                 voi = vois[name]
                 # this 'size' already takes indices into account
-                if voi['distributed'] is True:
-                    if get_remote:
-                        size = voi['global_size']
-                    else:
-                        size = voi['size']
+                if get_remote and voi['distributed']:
+                    size = voi['global_size']
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
@@ -1321,7 +1327,6 @@ class _TotalJacInfo(object):
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
         vecname, _, _ = self.in_idx_map[mode][inds[0]]
-        # ncol = self.output_vec[mode][vecname]._ncol
         dist = self.comm.size > 1 and self.get_remote
         fwd = mode == 'fwd'
         J = self.J
@@ -1442,6 +1447,9 @@ class _TotalJacInfo(object):
                                 model._solve_linear(vecnames_par_deriv, mode, rel_systems)
                             else:
                                 model._solve_linear(model._lin_vec_names, mode, rel_systems)
+                                #print("inds:", inds)
+                                #for n in model._var_abs2meta['output']:
+                                    #print(n, "output:", model._vectors['output']['linear'][n], "resid:", model._vectors['residual']['linear'][n])
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n', flush=True)

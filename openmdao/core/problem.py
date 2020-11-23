@@ -966,7 +966,7 @@ class Problem(object):
             self._set_initial_conditions()
 
         if self._check:
-            if self._check is True:
+            if self._check:
                 checks = _default_checks
             else:
                 checks = self._check
@@ -1139,8 +1139,7 @@ class Problem(object):
                         for inp in in_list:
                             inp_abs = rel_name2abs_name(comp, inp)
                             if mode == 'fwd':
-                                directional = inp in local_opts and \
-                                    local_opts[inp]['directional'] is True
+                                directional = inp in local_opts and local_opts[inp]['directional']
                             else:
                                 directional = c_name in mfree_directions
 

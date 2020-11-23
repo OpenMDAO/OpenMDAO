@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
-from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
@@ -2359,12 +2359,12 @@ class DistribParaboloid2D(om.ExplicitComponent):
         J['z', 'x'] = np.diag(2*x)
 
 
-@unittest.skipUnless(MPI, "MPI is required.")
-class TestProblemComputeTotals(unittest.TestCase):
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_compute_totals_get_remote_false(self):
+    def _do_compute_totals(self, mode):
         comm = MPI.COMM_WORLD
 
         p = om.Problem()
@@ -2386,7 +2386,7 @@ class TestProblemComputeTotals(unittest.TestCase):
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
 
-        p.setup()
+        p.setup(mode=mode)
         p.run_model()
 
         dv_vals = p.driver.get_design_var_values(get_remote=False)
@@ -2398,7 +2398,13 @@ class TestProblemComputeTotals(unittest.TestCase):
         assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
         assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
 
-    def test_compute_totals_get_remote_false_2D(self):
+    def test_distrib_compute_totals_fwd(self):
+        self._do_compute_totals('fwd')
+
+    def test_distrib_compute_totals_rev(self):
+        self._do_compute_totals('rev')
+
+    def _do_compute_totals_2D(self, mode):
         # this test has some non-flat variables
         comm = MPI.COMM_WORLD
 
@@ -2424,19 +2430,92 @@ class TestProblemComputeTotals(unittest.TestCase):
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
 
-        p.setup()
+        p.setup(mode=mode)
         p.run_model()
 
         dv_vals = p.driver.get_design_var_values(get_remote=False)
 
         # Compute totals and check the length of the gradient array on each proc
         objcongrad = p.compute_totals(get_remote=False)
-        # print("Rank {0}: Length of dy/dx = {1}".format(comm.rank, len(objcongrad[('dp.y', 'distrib_ivc.x')][0])))
-        # print("Rank {0}: Length of dy/dx should be = {1}".format(comm.rank, ndvs))
 
         # Check the values of the gradient array
         assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
 
+    def test_distrib_compute_totals_2D_fwd(self):
+        self._do_compute_totals_2D('fwd')
+
+    def test_distrib_compute_totals_2D_rev(self):
+        self._do_compute_totals_2D('rev')
+
+    def test_remotevar_compute_totals_fwd(self):
+        prob = om.Problem()
+        prob.model = Diamond()
+
+        print("FWD")
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
+        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
+
+        indep_list = ['iv.x']
+        unknown_list = [
+            'c1.y1',
+            'c1.y2',
+            'sub.c2.y1',
+            'sub.c3.y1',
+            'c4.y1',
+            'c4.y2',
+        ]
+        reduced_unknowns = [n for n in unknown_list if n in prob.model._var_abs2meta['output']]
+
+        full_expected = {
+            ('c1.y1', 'iv.x'): [[8.]],
+            ('c1.y2', 'iv.x'): [[3.]],
+            ('sub.c2.y1', 'iv.x'): [[4.]],
+            ('sub.c3.y1', 'iv.x'): [[10.5]],
+            ('c4.y1', 'iv.x'): [[25.]],
+            ('c4.y2', 'iv.x'): [[-40.5]],
+        }
+        
+        reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
+
+        #import wingdbstub
+
+        #J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        #for key, val in full_expected.items():
+            #assert_near_equal(J[key], val, 1e-6)
+
+        J = prob.compute_totals(of=reduced_unknowns, wrt=indep_list, get_remote=False)
+        import pprint
+        pprint.pprint(J)
+        for key, val in reduced_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+        self.assertEqual(len(J), len(reduced_expected))
+
+        print("REV")
+        
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
+        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
+
+        #J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        #for key, val in full_expected.items():
+            #assert_near_equal(J[key], val, 1e-6)
+
+        from openmdao.devtools.debug import trace_mpi
+        trace_mpi()
+            
+
+        J = prob.compute_totals(of=reduced_unknowns, wrt=indep_list, get_remote=False)
+        pprint.pprint(J)
+        for key, val in reduced_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+        self.assertEqual(len(J), len(reduced_expected))
 
 class TestProblemCheckTotals(unittest.TestCase):
 
