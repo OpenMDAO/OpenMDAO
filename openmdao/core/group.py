@@ -241,7 +241,10 @@ class Group(System):
         (set, set)
             Sets of output and input variables.
         """
-        cache_key = excl_sub.msginfo
+        if excl_sub is None:
+            cache_key = None
+        else:
+            cache_key = excl_sub.pathname
 
         try:
             io_vars = self._scope_cache[cache_key]
