@@ -241,8 +241,10 @@ class Group(System):
         (set, set)
             Sets of output and input variables.
         """
+        cache_key = excl_sub.msginfo
+
         try:
-            io_vars = self._scope_cache[excl_sub.pathname]
+            io_vars = self._scope_cache[cache_key]
 
             # Make sure they're the same subsystem instance before returning
             if io_vars[2] is excl_sub:
@@ -275,7 +277,7 @@ class Group(System):
         # Use the pathname as the dict key instead of the object itself. When
         # the object is used as the key, memory leaks result from multiple
         # calls to setup(). 
-        self._scope_cache[excl_sub.pathname] = (scope_out, scope_in, excl_sub)
+        self._scope_cache[cache_key] = (scope_out, scope_in, excl_sub)
         return scope_out, scope_in
 
     def _compute_root_scale_factors(self):
