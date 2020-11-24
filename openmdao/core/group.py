@@ -279,7 +279,7 @@ class Group(System):
 
         # Use the pathname as the dict key instead of the object itself. When
         # the object is used as the key, memory leaks result from multiple
-        # calls to setup(). 
+        # calls to setup().
         self._scope_cache[cache_key] = (scope_out, scope_in, excl_sub)
         return scope_out, scope_in
 
