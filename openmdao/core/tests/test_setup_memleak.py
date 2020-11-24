@@ -11,7 +11,7 @@ ITERS = [ 10, 100 ]
 # The code with the leak problem would report a difference of memory
 # used between 10 and 100 iter runs of 36.9MiB. After fixing, it was
 # 0.2 KiB.
-MAX_MEM_DIFF_KB = 10
+MAX_MEM_DIFF_KB = 200
 
 class TestSetupMemLeak(unittest.TestCase):
     """ Test for memory leaks when calling setup() multiple times """
