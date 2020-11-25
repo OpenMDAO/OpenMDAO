@@ -966,7 +966,7 @@ class Problem(object):
             self._set_initial_conditions()
 
         if self._check:
-            if self._check:
+            if self._check is True:
                 checks = _default_checks
             else:
                 checks = self._check

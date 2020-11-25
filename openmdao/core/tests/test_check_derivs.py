@@ -2447,19 +2447,7 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
     def test_distrib_compute_totals_2D_rev(self):
         self._do_compute_totals_2D('rev')
 
-    def test_remotevar_compute_totals_fwd(self):
-        prob = om.Problem()
-        prob.model = Diamond()
-
-        print("FWD")
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
-        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
-
+    def _remotevar_compute_totals(self, mode):
         indep_list = ['iv.x']
         unknown_list = [
             'c1.y1',
@@ -2469,7 +2457,6 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
             'c4.y1',
             'c4.y2',
         ]
-        reduced_unknowns = [n for n in unknown_list if n in prob.model._var_abs2meta['output']]
 
         full_expected = {
             ('c1.y1', 'iv.x'): [[8.]],
@@ -2479,43 +2466,33 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
             ('c4.y1', 'iv.x'): [[25.]],
             ('c4.y2', 'iv.x'): [[-40.5]],
         }
-        
-        reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
 
-        #import wingdbstub
+        prob = om.Problem()
+        prob.model = Diamond()
 
-        #J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        #for key, val in full_expected.items():
-            #assert_near_equal(J[key], val, 1e-6)
-
-        J = prob.compute_totals(of=reduced_unknowns, wrt=indep_list, get_remote=False)
-        import pprint
-        pprint.pprint(J)
-        for key, val in reduced_expected.items():
-            assert_near_equal(J[key], val, 1e-6)
-        self.assertEqual(len(J), len(reduced_expected))
-
-        print("REV")
-        
-        prob.setup(check=False, mode='rev')
+        prob.setup(mode=mode)
+        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
         assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
 
-        #J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        #for key, val in full_expected.items():
-            #assert_near_equal(J[key], val, 1e-6)
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        for key, val in full_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
 
-        from openmdao.devtools.debug import trace_mpi
-        trace_mpi()
-            
+        reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
 
-        J = prob.compute_totals(of=reduced_unknowns, wrt=indep_list, get_remote=False)
-        pprint.pprint(J)
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, get_remote=False)
         for key, val in reduced_expected.items():
             assert_near_equal(J[key], val, 1e-6)
         self.assertEqual(len(J), len(reduced_expected))
+
+    def test_remotevar_compute_totals_fwd(self):
+        self._remotevar_compute_totals('fwd')
+
+    def test_remotevar_compute_totals_rev(self):
+        self._remotevar_compute_totals('rev')
 
 class TestProblemCheckTotals(unittest.TestCase):
 
