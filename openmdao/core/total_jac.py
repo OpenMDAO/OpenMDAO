@@ -198,7 +198,7 @@ class _TotalJacInfo(object):
             self.remote_vois = frozenset(n for n in chain(of, wrt)
                                          if n not in model._var_abs2meta['output'])
         else:
-            self.remote_vois = set()
+            self.remote_vois = frozenset()
 
         # raise an exception if we depend on any discrete outputs
         if model._var_allprocs_discrete['output']:
