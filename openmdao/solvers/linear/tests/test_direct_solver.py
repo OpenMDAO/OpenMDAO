@@ -129,7 +129,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
@@ -140,7 +140,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_rev_mode_bug(self):

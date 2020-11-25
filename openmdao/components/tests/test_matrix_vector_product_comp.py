@@ -491,7 +491,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             mvp.add_product('b', 'B', 'y')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Multiple definition of output 'b'.")
 
     def test_input_as_output(self):
@@ -500,7 +500,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             mvp.add_product('x', 'A', 'b')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "'x' specified as an output, but it has already been "
                          "defined as an input.")
 
@@ -510,7 +510,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             mvp.add_product('c', 'b', 'A')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "'b' specified as an input, but it has already been "
                          "defined as an output.")
 
@@ -520,7 +520,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             mvp.add_product('c', 'A', 'b')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "'b' specified as an input, but it has already been "
                          "defined as an output.")
 
@@ -530,7 +530,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'A', 'y', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Conflicting vec_size=10 specified for matrix 'A', "
                          "which has already been defined with vec_size=1.")
 
@@ -540,7 +540,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'A', 'y', A_shape=(5, 5))
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Conflicting shape (5, 5) specified for matrix 'A', "
                          "which has already been defined with shape (3, 3).")
 
@@ -550,7 +550,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'A', 'y', A_units='ft')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Conflicting units 'ft' specified for matrix 'A', "
                          "which has already been defined with units 'None'.")
 
@@ -560,7 +560,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'B', 'x', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Conflicting vec_size=10 specified for vector 'x', "
                          "which has already been defined with vec_size=1.")
 
@@ -570,7 +570,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'B', 'x', A_shape=(5, 5))
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Matrix shape (5, 5) is incompatible with vector 'x', "
                          "which has already been defined with 3 column(s).")
 
@@ -580,7 +580,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             mvp.add_product('c', 'A', 'x', x_units='ft')
 
-        self.assertEqual(str(ctx.exception), "MatrixVectorProductComp: "
+        self.assertEqual(str(ctx.exception), "<class MatrixVectorProductComp>: "
                          "Conflicting units 'ft' specified for vector 'x', "
                          "which has already been defined with units 'None'.")
 

@@ -103,7 +103,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined for easier testing of coloring of approx partials
     def apply_nonlinear(self, inputs, outputs, residuals):
-        prod = self.sparsity.dot(inputs._data) - outputs._data
+        prod = self.sparsity.dot(inputs.asarray()) - outputs.asarray()
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -114,7 +114,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
     def solve_nonlinear(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -138,7 +138,7 @@ class SparseCompExplicit(ExplicitComponent):
         setup_vars(self, ofs='*', wrts='*')
 
     def compute(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i

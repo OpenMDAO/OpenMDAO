@@ -104,3 +104,26 @@ Promote specific inputs and outputs from the configure function
 .. embed-code::
     openmdao.core.tests.test_group.TestFeatureAddSubsystem.test_promotes_inputs_and_outputs
     :layout: interleave
+
+
+Specifying source shape and source indices for promoted inputs of a group
+-------------------------------------------------------------------------
+
+The arg `src_shape` can be passed to `promotes` or `set_input_defaults` calls in order to
+specify the shape of the source that the input is expecting.  This allows an output having
+a different shape to be connected to an input by specifying `src_indices` in the `connect`
+or `promotes` call, even if there are other `src_indices` specified at lower levels in the
+system tree for the same input(s).  This basically allows you to specify the 'connection interface'
+for a given Group, making it easier to use that Group in other models without having to modify
+its internal `src_indices` based on the shape of whatever sources are connected to its inputs
+in a given model.
+
+Note that if multiple inputs are promoted to the same name then their `src_shape` must match,
+but their `src_indices` may be different.
+
+Below is an example of applying multiple `src_indices` to the same promoted input at different
+system tree levels.
+
+.. embed-code::
+    openmdao.core.tests.test_src_indices.SrcIndicesFeatureTestCase.test_multi_promotes
+    :layout: interleave

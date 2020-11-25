@@ -1263,7 +1263,7 @@ class _TotalJacInfo(object):
         """
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        deriv_val = self.output_vec[mode][vecname]._data
+        deriv_val = self.output_vec[mode][vecname].asarray()
         if not self.get_remote:
             loc_idx = self.loc_jac_idxs[mode][i]
             if loc_idx >= 0:
@@ -1367,7 +1367,7 @@ class _TotalJacInfo(object):
         # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
         # deriv coloring, vecname will always be 'linear', and we don't need to check
         # vecname for each index.
-        deriv_val = self.output_vec[mode]['linear']._data
+        deriv_val = self.output_vec[mode]['linear'].asarray()
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs['linear']]
         else:
@@ -1406,7 +1406,7 @@ class _TotalJacInfo(object):
 
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         jac_inds = jac_idxs[vecname]
-        outvec = self.output_vec[mode][vecname]._data
+        outvec = self.output_vec[mode][vecname].asarray()
         ilen = len(inds)
         if fwd:
             for col, i in enumerate(inds):
@@ -1687,7 +1687,7 @@ class _TotalJacInfo(object):
         else:
             lin_sol_cache[key] = lin_sol = []
             for vec_name in vec_names:
-                lin_sol.append(deepcopy(self.output_vec[mode][vec_name]._data))
+                lin_sol.append(deepcopy(self.output_vec[mode][vec_name].asarray()))
 
     def _save_linear_solution(self, vec_names, key, mode):
         """
@@ -1704,9 +1704,7 @@ class _TotalJacInfo(object):
         """
         lin_sol = self.lin_sol_cache[key]
         for i, vec_name in enumerate(vec_names):
-            save_vec = lin_sol[i]
-            doutputs = self.output_vec[mode][vec_name]
-            save_vec[:] = doutputs._data
+            lin_sol[i][:] = self.output_vec[mode][vec_name].asarray()
 
     def _do_driver_scaling(self, J):
         """

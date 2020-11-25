@@ -38,13 +38,12 @@ Alternatively, variables can be promoted when a group is configured:
 
 There are a few important details to note:
 
-    * The promoted name of an output has to be unique within that level of the hierarchy 
+    * The promoted name of an output has to be unique within that level of the hierarchy
       (i.e. you can't have two outputs with the same name)
-    * You are allowed to have multiple inputs promoted to the same name, but in order for a connection
-      to be made there must also be an output with the same name. Otherwise, no connection is made.
+    * You are allowed to have multiple inputs promoted to the same name.
     * You can use `glob <https://en.wikipedia.org/wiki/Glob_(programming)>`_ patterns to promote lots of
       variables without specifying them all, but try to limit your usage of :code:`promotes=['*']`.
-      Though it may seem like a convenient way to do things, it can make it difficult for other people who 
+      Though it may seem like a convenient way to do things, it can make it difficult for other people who
       are reading your code to understand which variables are connected to each other.
       It is acceptable to use :code:`promotes=['*']` in cases where it won't cause confusion, for example
       with :code:`cycle`, which only exists to allow for the nonlinear solver to converge the two components.

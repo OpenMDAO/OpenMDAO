@@ -311,7 +311,7 @@ class PETScKrylov(LinearSolver):
                              scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
-        result.array[:] = b_vec._data
+        result.array[:] = b_vec.asarray()
 
     def _linearize_children(self):
         """
@@ -431,7 +431,7 @@ class PETScKrylov(LinearSolver):
             self._solver_info.pop()
 
             # stuff resulting value of x vector into result for KSP
-            result.array[:] = x_vec._data
+            result.array[:] = x_vec.asarray()
         else:
             # no preconditioner, just pass back the incoming vector
             result.array[:] = _get_petsc_vec_array(in_vec)

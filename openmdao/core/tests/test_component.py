@@ -8,8 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_near_equal
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 class TestExplicitComponent(unittest.TestCase):
 
@@ -138,13 +137,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # Test some forbidden names.
         invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
-        invalid_error = "ExplicitComponent: '%s' is not a valid %s name."
+        invalid_error = "<class ExplicitComponent>: '%s' is not a valid %s name."
 
         nostr_names = [3, None, object, object()]
-        nostr_error = "ExplicitComponent: The name argument should be a string."
+        nostr_error = "<class ExplicitComponent>: The name argument should be a string."
 
-        empty_in_error = "ExplicitComponent: '' is not a valid input name."
-        empty_out_error = "ExplicitComponent: '' is not a valid output name."
+        empty_in_error = "<class ExplicitComponent>: '' is not a valid input name."
+        empty_out_error = "<class ExplicitComponent>: '' is not a valid output name."
 
         for func in add_input_methods:
             for name in invalid_names:
@@ -352,7 +351,13 @@ class TestRangePartials(unittest.TestCase):
         comp = RangePartialsComp()
 
         prob = Problem(model=comp)
-        prob.setup()
+
+        with assert_warning(DeprecationWarning,
+                            f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input` is"
+                            "deprecated and will become an error in a future release.  Add "
+                            "`src_indices` to a `promotes` or `connect` call instead."):
+            prob.setup()
+
         prob.run_model()
 
         assert_near_equal(prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)

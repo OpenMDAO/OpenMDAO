@@ -550,7 +550,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
+    u_data = u.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
@@ -564,9 +564,8 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     change_upper = 0. if upper_bounds is None else np.minimum(u_data, upper_bounds) - u_data
 
     change = change_lower + change_upper
-
     u_data += change
-    du._data += change / alpha
+    du += change / alpha
 
 
 def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
@@ -595,8 +594,8 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
-    du_data = du._data
+    u_data = u.asarray()
+    du_data = du.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
