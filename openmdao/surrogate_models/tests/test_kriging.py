@@ -155,10 +155,10 @@ class TestKrigingSurrogate(unittest.TestCase):
                       [10., 12.], [7., 13.5], [2.5, 15.]])
         y = np.array([[branin(case)] for case in x])
 
-        surrogate_before = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache_output='test_cache.npz')
+        surrogate_before = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache='test_cache.npz')
         surrogate_before.train(x, y)
 
-        surrogate = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache_input='test_cache.npz')
+        surrogate = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache='test_cache.npz')
         surrogate.train(x, y)
 
         for x0, y0 in zip(x, y):
