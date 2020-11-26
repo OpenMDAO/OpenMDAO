@@ -1,6 +1,7 @@
 """Surrogate model based on Kriging."""
 import numpy as np
 import scipy.linalg as linalg
+import os.path
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
@@ -92,13 +93,10 @@ class KrigingSurrogate(SurrogateModel):
                                   "or 'gesvd' which is slower but more reliable."
                                   "'gesvd' is the default.")
 
-        self.options.declare('training_cache_output', types=str, default=None,
+        self.options.declare('training_cache', types=str, default=None,
                              desc="Cache the trained model to avoid repeating "
-                                  "training and write it to the given file.")
-
-        self.options.declare('training_cache_input', types=str, default=None,
-                             desc="Fetch the cached training weights to avoid "
-                                  "repeating training from given file.")
+                                  "training and write it to the given file. "
+                                  "If the specified file exists, it will be used to load the weights")
 
     def train(self, x, y):
         """
@@ -114,11 +112,10 @@ class KrigingSurrogate(SurrogateModel):
         super().train(x, y)
         x, y = np.atleast_2d(x, y)
 
-        cache_input = self.options['training_cache_input']
-        cache_output = self.options['training_cache_output']
+        cache = self.options['training_cache']
 
-        if cache_input:
-            with np.load(cache_input, allow_pickle=False) as data:
+        if cache and os.path.exists(cache):
+            with np.load(cache, allow_pickle=False) as data:
                 try:
                     self.n_samples = data['n_samples']
                     self.n_dims = data['n_dims']
@@ -174,7 +171,7 @@ class KrigingSurrogate(SurrogateModel):
 
         options = {'eps': 1e-3}
 
-        if cache_output:
+        if cache:
             # Enable logging since we expect the model to take long to train
             options['disp'] = True
             options['iprint'] = 2
@@ -195,7 +192,7 @@ class KrigingSurrogate(SurrogateModel):
         self.sigma2 = params['sigma2']
 
         # Save data to cache if specified
-        if cache_output:
+        if cache:
             data = {
                 'n_samples': self.n_samples,
                 'n_dims': self.n_dims,
@@ -213,7 +210,7 @@ class KrigingSurrogate(SurrogateModel):
                 'sigma2': self.sigma2
             }
 
-            with open(cache_output, 'wb') as f:
+            with open(cache, 'wb') as f:
                 np.savez_compressed(f, **data)
 
     def _calculate_reduced_likelihood_params(self, thetas=None):
