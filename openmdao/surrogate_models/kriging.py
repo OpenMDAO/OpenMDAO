@@ -2,6 +2,7 @@
 import numpy as np
 import scipy.linalg as linalg
 import os.path
+from hashlib import md5
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
@@ -112,7 +113,13 @@ class KrigingSurrogate(SurrogateModel):
         super().train(x, y)
         x, y = np.atleast_2d(x, y)
 
+        data_hash = md5()
+        data_hash.update(x.flatten())
+        data_hash.update(y.flatten())
+        training_data_hash = data_hash.hexdigest()
+
         cache = self.options['training_cache']
+        cache_hash = ''
 
         if cache and os.path.exists(cache):
             with np.load(cache, allow_pickle=False) as data:
@@ -131,12 +138,14 @@ class KrigingSurrogate(SurrogateModel):
                     self.S_inv = np.array(data['S_inv'])
                     self.Vh = np.array(data['Vh'])
                     self.sigma2 = np.array(data['sigma2'])
+                    cache_hash = str(data['hash'])
                 except KeyError as e:
                     msg = ("An error occurred while loading KrigingSurrogate Cache: %s. "
                            "Ignoring and training from scratch.")
                     simple_warning(msg % str(e))
 
-                # Exit out of method to avoid fallthrough
+            # if the loaded data passes the hash check with the current training data, we exit
+            if cache_hash == training_data_hash:
                 return
 
         # Training fallthrough
@@ -195,7 +204,7 @@ class KrigingSurrogate(SurrogateModel):
         if cache:
             data = {
                 'n_samples': self.n_samples,
-                'n_dims': self.n_dims,
+                'n_dims':  self.n_dims,
                 'X': self.X,
                 'Y': self.Y,
                 'X_mean': self.X_mean,
@@ -207,11 +216,13 @@ class KrigingSurrogate(SurrogateModel):
                 'U': self.U,
                 'S_inv': self.S_inv,
                 'Vh': self.Vh,
-                'sigma2': self.sigma2
+                'sigma2': self.sigma2,
+                'hash': training_data_hash
             }
 
-            with open(cache, 'wb') as f:
-                np.savez_compressed(f, **data)
+            if not os.path.exists(cache) or cache_hash != training_data_hash:
+                with open(cache, 'wb') as f:
+                    np.savez_compressed(f, **data)
 
     def _calculate_reduced_likelihood_params(self, thetas=None):
         """
