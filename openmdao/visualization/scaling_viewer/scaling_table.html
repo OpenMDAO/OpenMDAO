@@ -35,18 +35,18 @@
 
     <tabulator_style>
 </style>
-<title>Connection Viewer</title>
+<title>Scaling Viewer</title>
 </head>
 <body>
-    <h2 id="conn_title"></h2>
-    <div id="connection-table"></div>
+    <h2 id="scaling_title"></h2>
+    <div id="scaling-table"></div>
 <script type="text/javascript">
 
-var data = <connection_data>;
+var data = <scaling_data>;
 var tabledata = data.table;
 
 document.title = data.title;
-document.getElementById("conn_title").innerHTML = data.title
+document.getElementById("scaling_title").innerHTML = data.title
 
 if(data.show_values == true) {
     valstr = "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>";
@@ -56,7 +56,7 @@ else {
 }
 
 var table =
-    new Tabulator("#connection-table", {
+    new Tabulator("#scaling-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         height: 650,
