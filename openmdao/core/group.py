@@ -2082,8 +2082,8 @@ class Group(System):
                                 fail = True
                     else:
                         for d in range(source_dimensions):
-                            if all_abs_out['distributed'] is True or \
-                               allprocs_abs2meta_in[abs_in]['distributed'] is True:
+                            if all_abs_out['distributed'] or \
+                               allprocs_abs2meta_in[abs_in]['distributed']:
                                 d_size = out_shape[d] * self.comm.size
                             else:
                                 d_size = out_shape[d]

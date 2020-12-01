@@ -1152,8 +1152,7 @@ class Problem(object):
                         for inp in in_list:
                             inp_abs = rel_name2abs_name(comp, inp)
                             if mode == 'fwd':
-                                directional = inp in local_opts and \
-                                    local_opts[inp]['directional'] is True
+                                directional = inp in local_opts and local_opts[inp]['directional']
                             else:
                                 directional = c_name in mfree_directions
 
@@ -1573,7 +1572,7 @@ class Problem(object):
         return data['']
 
     def compute_totals(self, of=None, wrt=None, return_format='flat_dict', debug_print=False,
-                       driver_scaling=False, use_abs_names=False):
+                       driver_scaling=False, use_abs_names=False, get_remote=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -1597,6 +1596,8 @@ class Problem(object):
             add_constraint were called on the model. Default is False, which is unscaled.
         use_abs_names : bool
             Set to True when passing in absolute names to skip some translation steps.
+        get_remote : bool
+            If True, the default, the full distributed total jacobian will be retrieved.
 
         Returns
         -------
@@ -1625,7 +1626,8 @@ class Problem(object):
             return total_info.compute_totals_approx(initialize=True)
         else:
             total_info = _TotalJacInfo(self, of, wrt, use_abs_names, return_format,
-                                       debug_print=debug_print, driver_scaling=driver_scaling)
+                                       debug_print=debug_print, driver_scaling=driver_scaling,
+                                       get_remote=get_remote)
             return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
