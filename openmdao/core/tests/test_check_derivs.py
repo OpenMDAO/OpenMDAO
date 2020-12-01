@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
-from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
@@ -117,7 +117,6 @@ class MyComp(om.ExplicitComponent):
         J = partials
         J['y', 'x1'] = np.array([4.0])
         J['y', 'x2'] = np.array([40])
-
 
 class TestProblemCheckPartials(unittest.TestCase):
 
@@ -2286,6 +2285,214 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 
+
+class DistribParaboloid(om.ExplicitComponent):
+
+    def setup(self):
+        self.options['distributed'] = True
+
+        if self.comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+
+        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+
+        self.add_output('y', shape=2) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        val = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['y'] = np.array([val, val*3.])
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x']
+        J['y', 'x'] = np.array([2*(x-5), 6*(x-5)])
+        J['y', 'w'] = np.array([2*(inputs['w']-10), 6*(inputs['w']-10)])
+        J['z', 'x'] = np.diag(2*x)
+
+
+class DistribParaboloid2D(om.ExplicitComponent):
+
+    def setup(self):
+
+        comm = self.comm
+        rank = comm.rank
+
+        if rank == 0:
+            vshape = (3,2)
+        else:
+            vshape = (2,2)
+
+        self.options['distributed'] = True
+
+        self.add_input('w', val=1., src_indices=np.array([1])) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=vshape) # this will connect to a distributed IVC
+
+        self.add_output('y') # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=vshape) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x'].flatten()
+        J['y', 'x'] = 2*(x-5)
+        J['y', 'w'] = 2*(inputs['w']-10)
+        J['z', 'x'] = np.diag(2*x)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def _do_compute_totals(self, mode):
+        comm = MPI.COMM_WORLD
+
+        p = om.Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                    om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+        if comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    om.IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DistribParaboloid(), promotes=['*'])
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode=mode)
+        p.run_model()
+
+        dv_vals = p.driver.get_design_var_values(get_remote=False)
+
+        # Compute totals and check the length of the gradient array on each proc
+        objcongrad = p.compute_totals(get_remote=False)
+
+        # Check the values of the gradient array
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
+
+    def test_distrib_compute_totals_fwd(self):
+        self._do_compute_totals('fwd')
+
+    def test_distrib_compute_totals_rev(self):
+        self._do_compute_totals('rev')
+
+    def _do_compute_totals_2D(self, mode):
+        # this test has some non-flat variables
+        comm = MPI.COMM_WORLD
+
+        p = om.Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                    om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+        if comm.rank == 0:
+            ndvs = 6
+            two_d = (3,2)
+        else:
+            ndvs = 4
+            two_d = (2,2)
+
+        d_ivc.add_output('x', 2*np.ones(two_d))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    om.IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DistribParaboloid2D(), promotes=['*'])
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode=mode)
+        p.run_model()
+
+        dv_vals = p.driver.get_design_var_values(get_remote=False)
+
+        # Compute totals and check the length of the gradient array on each proc
+        objcongrad = p.compute_totals(get_remote=False)
+
+        # Check the values of the gradient array
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+
+    def test_distrib_compute_totals_2D_fwd(self):
+        self._do_compute_totals_2D('fwd')
+
+    def test_distrib_compute_totals_2D_rev(self):
+        self._do_compute_totals_2D('rev')
+
+    def _remotevar_compute_totals(self, mode):
+        indep_list = ['iv.x']
+        unknown_list = [
+            'c1.y1',
+            'c1.y2',
+            'sub.c2.y1',
+            'sub.c3.y1',
+            'c4.y1',
+            'c4.y2',
+        ]
+
+        full_expected = {
+            ('c1.y1', 'iv.x'): [[8.]],
+            ('c1.y2', 'iv.x'): [[3.]],
+            ('sub.c2.y1', 'iv.x'): [[4.]],
+            ('sub.c3.y1', 'iv.x'): [[10.5]],
+            ('c4.y1', 'iv.x'): [[25.]],
+            ('c4.y2', 'iv.x'): [[-40.5]],
+        }
+
+        prob = om.Problem()
+        prob.model = Diamond()
+
+        prob.setup(mode=mode)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
+        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        for key, val in full_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+
+        reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, get_remote=False)
+        for key, val in reduced_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+        self.assertEqual(len(J), len(reduced_expected))
+
+    def test_remotevar_compute_totals_fwd(self):
+        self._remotevar_compute_totals('fwd')
+
+    def test_remotevar_compute_totals_rev(self):
+        self._remotevar_compute_totals('rev')
 
 class TestProblemCheckTotals(unittest.TestCase):
 

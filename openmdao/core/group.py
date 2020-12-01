@@ -329,8 +329,17 @@ class Group(System):
         (set, set)
             Sets of output and input variables.
         """
+        if excl_sub is None:
+            cache_key = None
+        else:
+            cache_key = excl_sub.pathname
+
         try:
-            return self._scope_cache[excl_sub]
+            io_vars = self._scope_cache[cache_key]
+
+            # Make sure they're the same subsystem instance before returning
+            if io_vars[2] is excl_sub:
+                return (io_vars[:2])
         except KeyError:
             pass
 
@@ -356,7 +365,10 @@ class Group(System):
                         scope_in.add(abs_in)
             scope_in = frozenset(scope_in)
 
-        self._scope_cache[excl_sub] = (scope_out, scope_in)
+        # Use the pathname as the dict key instead of the object itself. When
+        # the object is used as the key, memory leaks result from multiple
+        # calls to setup().
+        self._scope_cache[cache_key] = (scope_out, scope_in, excl_sub)
         return scope_out, scope_in
 
     def _compute_root_scale_factors(self):
@@ -2070,8 +2082,8 @@ class Group(System):
                                 fail = True
                     else:
                         for d in range(source_dimensions):
-                            if all_abs_out['distributed'] is True or \
-                               allprocs_abs2meta_in[abs_in]['distributed'] is True:
+                            if all_abs_out['distributed'] or \
+                               allprocs_abs2meta_in[abs_in]['distributed']:
                                 d_size = out_shape[d] * self.comm.size
                             else:
                                 d_size = out_shape[d]
