@@ -3007,6 +3007,7 @@ class System(object):
                             meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
+                meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
                 if src_name in abs2idx:
                     meta = abs2meta_out[src_name]
