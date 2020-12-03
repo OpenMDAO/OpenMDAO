@@ -8,6 +8,7 @@ from collections import defaultdict
 
 import numpy as np
 
+import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
@@ -53,8 +54,8 @@ def _getdef(val, default):
     return val
 
 
-def view_driver_scaling(problem, outfile='driver_scaling.html', show_browser=True,
-                        precision=6, title=None):
+def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
+                        precision=6, title=None, jac=True):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -62,8 +63,8 @@ def view_driver_scaling(problem, outfile='driver_scaling.html', show_browser=Tru
 
     Parameters
     ----------
-    problem : Problem
-        The Problem containing the driver.
+    driver : Driver
+        The driver used for the scaling report.
 
     outfile : str, optional
         The name of the output html file.  Defaults to 'connections.html'.
@@ -77,21 +78,27 @@ def view_driver_scaling(problem, outfile='driver_scaling.html', show_browser=Tru
 
     title : str, optional
         Sets the title of the web page.
+
+    jac : bool
+        If True, show jacobian information.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
-
-    driver = problem.driver
 
     dv_table = []
     con_table = []
     obj_table = []
 
     dv_vals = driver.get_design_var_values(get_remote=True)
-    con_vals = driver.get_constraint_values(driver_scaling=True)
     obj_vals = driver.get_objective_values(driver_scaling=True)
+    con_vals = driver.get_constraint_values(driver_scaling=True)
 
     default = ''
+
+    coloring = driver._get_static_coloring()
+    if coloring_mod._use_total_sparsity and jac:
+        if coloring is None and driver._coloring_info['dynamic']:
+            coloring_mod.dynamic_total_coloring(driver)
 
     idx = 1  # unique ID for use by Tabulator
     for name, meta in driver._designvars.items():
@@ -166,7 +173,57 @@ def view_driver_scaling(problem, outfile='driver_scaling.html', show_browser=Tru
         'obj_table': obj_table,
     }
 
-    viewer = 'scaling_table.html'
+    if jac:
+        # assemble data for jacobian visualization
+        data['oflabels'] = list(chain(obj_vals, con_vals))
+        data['wrtlabels'] = list(dv_vals)
+
+        start = end = 0
+        data['ofslices'] = slices = []
+        for v in chain(obj_vals.values(), con_vals.values()):
+            end += v.size
+            slices.append([start, end])
+            start = end
+
+        start = end = 0
+        data['wrtslices'] = slices = []
+        for v in dv_vals.values():
+            end += v.size
+            slices.append([start, end])
+            start = end
+
+        matrix = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                        return_format='array')
+
+        norm_mat = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+
+        def mat_magnitude(mat):
+            mag = np.log10(np.abs(mat))
+            finite = mag[np.isfinite(mag)]
+            max_mag = np.max(finite)
+            min_mag = np.min(finite)
+            cap = np.abs(min_mag)
+            if max_mag > cap:
+                cap = max_mag
+            mag[np.isinf(mag)] = -cap
+            return mag
+
+        for i, of in enumerate(chain(obj_vals, con_vals)):
+            ofstart, ofend = data['ofslices'][i]
+            for j, wrt in enumerate(dv_vals):
+                wrtstart, wrtend = data['wrtslices'][j]
+                norm_mat[i, j] = np.linalg.norm(matrix[ofstart:ofend, wrtstart:wrtend])
+
+        data['norm_matrix'] = mat_magnitude(norm_mat)
+        data['matrix'] = mat_magnitude(matrix).tolist()
+
+        print("norm_matrix")
+        print(norm_mat)
+        print("----")
+        print(data['norm_matrix'])
+
+    # viewer = 'scaling_table.html'
+    viewer = 'matrix_heatv6.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
     libs_dir = os.path.join(code_dir, 'libs')
@@ -184,9 +241,9 @@ def view_driver_scaling(problem, outfile='driver_scaling.html', show_browser=Tru
     jsontxt = json.dumps(data, default=default_noraise)
 
     with open(outfile, 'w') as f:
-        s = template.replace("<scaling_data>", jsontxt)
-        s = s.replace("<tabulator_src>", tabulator_src)
+        s = template.replace("<tabulator_src>", tabulator_src)
         s = s.replace("<tabulator_style>", tabulator_style)
+        s = s.replace("<scaling_data>", jsontxt)
         f.write(s)
 
     if show_browser:
@@ -203,13 +260,14 @@ def _scaling_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default='connections.html', action='store', dest='outfile',
+    parser.add_argument('-o', default='driver_scaling_report.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('-t', '--title', action='store', dest='title',
                         help='title of web page.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
+    parser.add_argument('--no-jac', action='store_true', dest='nojac', help="Don't show jacobian info")
 
 
 def _scaling_cmd(options, user_args):
@@ -223,13 +281,15 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _scaling(prob):
+    def _scaling(problem):
+        hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
+        driver = problem.driver
         if options.title:
             title = options.title
         else:
             title = "Driver scaling for %s" % os.path.basename(options.file[0])
-        view_driver_scaling(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                            title=title)
+        view_driver_scaling(driver, outfile=options.outfile, show_browser=not options.no_browser,
+                            title=title, jac=not options.nojac)
         exit()
 
     # register the hook

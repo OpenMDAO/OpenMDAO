@@ -192,6 +192,14 @@ class Driver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+    def _get_inst_id(self):
+        if self._problem is None:
+            return None
+        probid = self._problem()._get_inst_id()
+        if probid is None:
+            return "driver"
+        return f"{probid}.driver"
+
     @property
     def msginfo(self):
         """
