@@ -4489,7 +4489,7 @@ class System(object):
                 else:
                     val = val.ravel()[src_indices]
 
-            if get_remote:
+            if get_remote and self.comm.size > 1:
                 if distrib:
                     if rank is None:
                         parts = self.comm.allgather(val)
