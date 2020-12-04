@@ -16,18 +16,18 @@ as well as a few performance tweaks.
 
 ## New Features:
 
-- Allow user to complex step across a Problem. [#1777](https://github.com/OpenMDAO/dymos/pull/1777)
-- Internal refactor of vector to have real and complex step modes share memory. [#1778](https://github.com/OpenMDAO/dymos/pull/1778)
-- Fixed deprecation warning when user passed a pandas dataframe to discrete input [#1780](https://github.com/OpenMDAO/dymos/pull/1780)
-- Added a 'get_remote' arg to compute_totals [#1783](https://github.com/OpenMDAO/dymos/pull/1783)
+- Allow user to complex step across a Problem. [#1777](https://github.com/OpenMDAO/OpenMDAO/pull/1777)
+- Internal refactor of vector to have real and complex step modes share memory. [#1778](https://github.com/OpenMDAO/OpenMDAO/pull/1778)
+- Fixed deprecation warning when user passed a pandas dataframe to discrete input [#1780](https://github.com/OpenMDAO/OpenMDAO/pull/1780)
+- Added a 'get_remote' arg to compute_totals [#1783](https://github.com/OpenMDAO/OpenMDAO/pull/1783)
 
 ## Bug Fixes:
 
-- Fixed setup() memory leak [#1782](https://github.com/OpenMDAO/dymos/pull/1782)
-- Fixed an indexing bug dealing with src_indices in view_connections [#1788](https://github.com/OpenMDAO/dymos/pull/1788)
+- Fixed setup() memory leak [#1782](https://github.com/OpenMDAO/OpenMDAO/pull/1782)
+- Fixed an indexing bug dealing with src_indices in view_connections [#1788](https://github.com/OpenMDAO/OpenMDAO/pull/1788)
 
 ## Miscellaneous:
-- Rearranged an mpi test and added fwd test [#1781](https://github.com/OpenMDAO/dymos/pull/1781)
+- Rearranged an mpi test and added fwd test [#1781](https://github.com/OpenMDAO/OpenMDAO/pull/1781)
 
 **********************************
 # Release Notes for OpenMDAO 3.4.1
