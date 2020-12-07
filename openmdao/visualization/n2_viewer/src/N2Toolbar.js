@@ -214,7 +214,7 @@ class N2Toolbar {
 
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
-     * @param {N2UserInterface} n2ui A reference to the UI object 
+     * @param {N2UserInterface} n2ui A reference to the UI object
      */
     _setupButtonFunctions(n2ui) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
@@ -292,6 +292,12 @@ class N2Toolbar {
             ["Show legend", "Hide legend"],
             pred => { return n2ui.legend.hidden; },
             e => { n2ui.toggleLegend(); }
+        );
+
+        new N2ToolbarButtonToggle('#desvar-button', tooltipBox,
+            ["Show design variables", "Hide design variables"],
+            pred => { return n2ui.desVars; },
+            e => { n2ui.toggleDesVars(); }
         );
 
         new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox, "Set text height");
