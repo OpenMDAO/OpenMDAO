@@ -370,13 +370,6 @@
     opacity: 0.7;
 }
 
-#desvar-button {
-    font-size: 30px !important;
-    color: white;
-    opacity: 1;
-    transition: opacity 0.5s, color 0.5s;
-}
-
 #question-button {
     font-size: 30px !important;
     opacity: 1;

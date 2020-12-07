@@ -644,8 +644,6 @@ class N2Diagram {
         }
     }
 
-    nodes = modelData.tree.children;
-
     showDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
             item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', true)

@@ -225,7 +225,6 @@ class N2Legend {
                 .on("mouseup", e => {
                     dragDiv.style('cursor', 'grab');
                     w.on("mousemove", null).on("mouseup", null);
-
                 });
 
             d3.event.preventDefault();
