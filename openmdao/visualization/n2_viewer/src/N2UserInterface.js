@@ -604,8 +604,8 @@ class N2UserInterface {
             this.desVars = true;
         }
 
-        d3.select('#desvars').attr('class',
-            this.desVars ? 'fas icon-des-vars' : 'fas icon-des-vars ');
+        d3.select('#desvars-button').attr('class',
+            this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
     }
 
     /** Show or hide the node info panel button */

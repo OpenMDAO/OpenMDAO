@@ -647,19 +647,19 @@ class N2Diagram {
     nodes = modelData.tree.children;
 
     showDesignVars() {
-        console.log("Showing Des Vars")
-        for (const dv in modelData.design_vars) {
-            // console.log("#" + dv.replace(".", "_"))
-            d3.selectAll("#" + dv.replace(".", "_")).classed('opt-vars', true)
-        }
-
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', true)
+            );
+        // for (const dv in [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat()) {
+        //     // d3.selectAll("#" + dv.replace(".", "_")).classed('opt-vars', true)
+        //     console.log(dv)
+        // }
     }
 
     hideDesignVars() {
-        console.log("Hiding Design Vars")
-        for (const dv in modelData.design_vars) {
-            d3.selectAll("#" + dv.replace(".", "_")).classed('opt-vars', false)
-        }
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', false)
+            );
     }
 
     delay(time) {

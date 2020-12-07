@@ -294,7 +294,7 @@ class N2Toolbar {
             e => { n2ui.toggleLegend(); }
         );
 
-        new N2ToolbarButtonToggle('#desvar-button', tooltipBox,
+        new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show design variables", "Hide design variables"],
             pred => { return n2ui.desVars; },
             e => { n2ui.toggleDesVars(); }
