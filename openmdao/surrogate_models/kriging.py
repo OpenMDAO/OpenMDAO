@@ -95,9 +95,9 @@ class KrigingSurrogate(SurrogateModel):
                                   "'gesvd' is the default.")
 
         self.options.declare('training_cache', types=str, default=None,
-                             desc="Cache the trained model to avoid repeating "
-                                  "training and write it to the given file. "
-                                  "If the specified file exists, it will be used to load the weights")
+                             desc="Cache the trained model to avoid repeating training and write "
+                                  "it to the given file. If the specified file exists, it will be "
+                                  "used to load the weights")
 
     def train(self, x, y):
         """
@@ -204,7 +204,7 @@ class KrigingSurrogate(SurrogateModel):
         if cache:
             data = {
                 'n_samples': self.n_samples,
-                'n_dims':  self.n_dims,
+                'n_dims': self.n_dims,
                 'X': self.X,
                 'Y': self.Y,
                 'X_mean': self.X_mean,
