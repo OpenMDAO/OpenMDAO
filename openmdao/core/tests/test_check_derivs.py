@@ -2586,6 +2586,56 @@ class TestProblemCheckTotals(unittest.TestCase):
         lines = stream.getvalue()
         self.assertFalse("Checking derivatives with respect to" in lines)
 
+    def test_show_progress_write_error(self):
+
+        class Discipline(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp0', om.ExecComp('y=x**2'))
+                self.add_subsystem('comp1', om.ExecComp('z=2*external_input'),
+                                   promotes_inputs=['external_input'])
+
+                self.add_subsystem('balance', om.BalanceComp('x', lhs_name='y', rhs_name='z'),
+                                   promotes_outputs=['x'])
+
+                self.connect('comp0.y', 'balance.y')
+                self.connect('comp1.z', 'balance.z')
+
+                self.connect('x', 'comp0.x')
+
+                self.nonlinear_solver = om.NewtonSolver(iprint=2, solve_subsystems=True)
+                self.linear_solver = om.DirectSolver()
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+
+                if outputs.asarray().dtype == np.complex:
+                    raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
+
+                # inputs are addressed using full path name, regardless of promotion
+                external_input = inputs['comp1.external_input']
+
+                # balance drives x**2 = 2*external_input
+                x_guess = (2*external_input)**.5
+
+                # outputs are addressed by the their promoted names
+                outputs['x'] = x_guess # perfect guess should converge in 0 iterations
+
+        p = om.Problem()
+
+        p.model.add_subsystem('parameters', om.IndepVarComp('input_value', 1.))
+        p.model.add_subsystem('discipline', Discipline())
+
+        p.model.connect('parameters.input_value', 'discipline.external_input')
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
+        self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
+
+        assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
+
+        totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', show_progress=True)
+
     def test_desvar_as_obj(self):
         prob = om.Problem()
         prob.model = SellarDerivatives()
