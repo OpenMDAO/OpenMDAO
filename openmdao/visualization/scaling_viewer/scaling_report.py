@@ -222,8 +222,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         print("----")
         print(data['norm_matrix'])
 
-    # viewer = 'scaling_table.html'
-    viewer = 'matrix_heatv6.html'
+    viewer = 'scaling_table.html'
+    # viewer = 'matrix_heatv6.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
     libs_dir = os.path.join(code_dir, 'libs')
@@ -238,11 +238,15 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
         tabulator_style = f.read()
 
+    with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r") as f:
+        d3_src = f.read()
+
     jsontxt = json.dumps(data, default=default_noraise)
 
     with open(outfile, 'w') as f:
         s = template.replace("<tabulator_src>", tabulator_src)
         s = s.replace("<tabulator_style>", tabulator_style)
+        s = s.replace("<d3_src>", d3_src)
         s = s.replace("<scaling_data>", jsontxt)
         f.write(s)
 

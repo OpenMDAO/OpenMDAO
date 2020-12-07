@@ -6,6 +6,9 @@
 <script type="text/javascript">
     <tabulator_src>
 </script>
+<script type="text/javascript">
+        <d3_src>
+</script>
 <style>
     .unitnomatch {
         color: red;
@@ -42,12 +45,15 @@
     <div id="dv-table"></div>
     <div id="con-table"></div>
     <div id="obj-table"></div>
+    <div id="norm-jac"></div>
 <script type="text/javascript">
 
 var data = <scaling_data>;
 var dv_tabledata = data.dv_table;
 var con_tabledata = data.con_table;
 var obj_tabledata = data.obj_table;
+var jac_data = data.matrix;
+var jac_norm_data = data.norm_matrix;
 
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
@@ -95,7 +101,7 @@ var dvtable =
               ],
           },
         ],
-});
+    });
 
 
 var contable =
@@ -155,7 +161,7 @@ var contable =
               ],
           },
         ],
-});
+    });
 
 
 var objtable =
@@ -192,7 +198,7 @@ var objtable =
               ],
           },
         ],
-});
+    });
 
 
 function col_toggle(tbl, name) {
@@ -200,6 +206,85 @@ function col_toggle(tbl, name) {
     tbl.redraw();
 }
 
+
+        // Labels of row and columns
+        var gnames = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+            var base = "sdfgakjsyegfasekyfgasejfygasefjy"
+            var gbase = "fygasefjy"
+        var vnames = ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]
+        var myVars = vnames.map(function (v, i, arr) {
+            return base + v;
+        });
+        var myGroups = gnames.map(function(v, i, arr) {
+            return gbase + v;
+        });
+
+        var viewport_width = document.documentElement.clientWidth * .95;
+        var viewport_height = document.documentElement.clientHeight * .75;
+
+        var leftmargin = d3.max(myVars, s => s.length) * 5;
+        var bottommargin = d3.max(myGroups, s => s.length) * 6;
+
+        // set the dimensions and margins of the graph
+        var margin = {top: 30, right: 30, bottom: bottommargin, left: leftmargin },
+            width = viewport_width - margin.left - margin.right,
+            height = viewport_height - margin.top - margin.bottom;
+
+        var w = width + margin.left + margin.right;
+        var h = height + margin.top + margin.bottom;
+
+        // append the svg object to the body of the page
+        var svg = d3.select("#norm-jac")
+            .append("svg")
+            .attr("viewBox", "0 0 " + w + " " + h)
+            .attr("preserveAspectRatio", "xMidYMid meet")
+        .append("g")
+            .attr("transform",
+                "translate(" + margin.left + "," + margin.top + ")");
+
+        // Build X scales and axis:
+        var x = d3.scaleBand()
+            .range([0, width])
+            .domain(myGroups)
+            .padding(0.01);
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x))
+                .selectAll("text")
+                .style("text-anchor", "start")
+                .attr("dx", ".8em")
+                .attr("dy", "-.5em")
+                .attr("transform", "rotate(90)");
+
+        // Build Y scales and axis:
+        var y = d3.scaleBand()
+            .range([height, 0])
+            .domain(myVars)
+            .padding(0.01);
+        svg.append("g")
+            .call(d3.axisLeft(y));
+
+        // Build color scale
+        var myColor = d3.scaleLinear()
+            .range(["white", "#69b3a2"])
+            .domain([1, 100])
+
+        var array = [];
+        for (i = 0; i < myVars.length; i++) {
+            for (j = 0; j < myGroups.length; j ++) {
+                    array.push({ 'value': i * j, 'group': myGroups[j], 'variable': myVars[i] });
+            }
+        }
+
+        svg.selectAll()
+            .data(array, function (d) { return d.group + ':' + d.variable; })
+            .enter()
+            .append("rect")
+            .attr("x", function (d) { return x(d.group) })
+            .attr("y", function (d) { return y(d.variable) })
+            .attr("width", x.bandwidth())
+            .attr("height", y.bandwidth())
+            .style("fill", function (d) { return myColor(d.value) })
 
 // data format for adjacency matrix
 // {
