@@ -36,7 +36,7 @@
     <div id="con-table"></div>
     <h2>Objectives</h2>
     <div id="obj-table"></div>
-    <div id="norm-jac"></div>
+    <div id="jac_div"></div>
 <script type="text/javascript">
 
 var dv_tabledata = data.dv_table;
@@ -47,10 +47,8 @@ var jac_norm_data = data.norm_matrix;
 var wrtVars = data.wrtlabels;
 var ofVars = data.oflabels;
 
-
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
-
 
 var dvtable =
     new Tabulator("#dv-table", {
@@ -163,112 +161,114 @@ function col_toggle(tbl, name) {
 }
 
 
-        var viewport_width = document.documentElement.clientWidth * .95;
-        var viewport_height = document.documentElement.clientHeight * .75;
+var viewport_width = document.documentElement.clientWidth * .95;
+var viewport_height = document.documentElement.clientHeight * .75;
 
-        var leftmargin = d3.max(ofVars, s => s.length) * 5.5;
-        var bottommargin = d3.max(wrtVars, s => s.length) * 6;
+var leftmargin = d3.max(ofVars, s => s.length) * 5.5;
+var bottommargin = d3.max(wrtVars, s => s.length) * 6;
 
-        // set the dimensions and margins of the graph
-        var margin = {top: 30, right: 30, bottom: bottommargin, left: leftmargin },
-            width = viewport_width - margin.left - margin.right,
-            height = viewport_height - margin.top - margin.bottom;
+// set the dimensions and margins of the graph
+var margin = {top: 30, right: 30, bottom: bottommargin, left: leftmargin };
+var width = viewport_width - margin.left - margin.right;
+var height = viewport_height - margin.top - margin.bottom;
 
-        var w = width + margin.left + margin.right;
-        var h = height + margin.top + margin.bottom;
+var w = width + margin.left + margin.right;
+var h = height + margin.top + margin.bottom;
 
-        // append the svg object to the body of the page
-        var svg = d3.select("#norm-jac")
-            .append("svg")
-            .attr("viewBox", "0 0 " + w + " " + h)
-            .attr("preserveAspectRatio", "xMidYMid meet")
-        .append("g")
-            .attr("transform",
-                "translate(" + margin.left + "," + margin.top + ")");
+var jac_parent = d3.select("#jac_div")
+    .append("h2")
+    .html("Jacobian Info")
 
-        // Build X scales and axis:
-        var x = d3.scaleBand()
-            .range([0, width])
-            .domain(wrtVars)
-            .padding(0.01);
-        svg.append("g")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(x))
-                .selectAll("text")
-                .style("text-anchor", "start")
-                .attr("dx", ".8em")
-                .attr("dy", "-.5em")
-                .attr("transform", "rotate(90)");
+// append the svg object to the body of the page
+var svg = d3.select("#jac_div")
+    .append("div")
+    .attr("id", "norm-jac")
+    .append("svg")
+    .attr("viewBox", "0 0 " + w + " " + h)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-        // Build Y scales and axis:
-        var y = d3.scaleBand()
-            .range([0, height])
-            .domain(ofVars)
-            .padding(0.01);
-        svg.append("g")
-            .call(d3.axisLeft(y));
+// Build X scales and axis:
+var x = d3.scaleBand()
+    .range([0, width])
+    .domain(wrtVars)
+    .padding(0.01);
 
-        // create a tooltip
-        var tooltip = d3.select("#norm-jac")
-            .append("div")
-            .style("opacity", 0)
-            .attr("class", "tooltip")
-            // .style("background-color", "white")
-            // .style("border", "solid")
-            // .style("border-width", "2px")
-            // .style("border-radius", "5px")
-            .style("padding", "5px");
+svg.append("g")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(x))
+        .selectAll("text")
+        .style("text-anchor", "start")
+        .attr("dx", ".8em")
+        .attr("dy", "-.5em")
+        .attr("transform", "rotate(90)");
 
-        var mouseover = function(event, d) {
-            event.stopPropagation();
-            tooltip.style("opacity", 1);
-            d3.select(this)
-                .style("stroke", "black")
-                .style("opacity", 1);
-        }
+// Build Y scales and axis:
+var y = d3.scaleBand()
+    .range([0, height])
+    .domain(ofVars)
+    .padding(0.01);
 
-        var mousemove = function(event, d) {
-            event.stopPropagation();
-            tooltip
-                .html(d.value)
-                .style("left", event.pageX + 10 + "px")
-                .style("top", event.pageY - 15 + "px");
-        }
+svg.append("g")
+    .call(d3.axisLeft(y));
 
-        var mouseleave = function(event, d) {
-            event.stopPropagation();
-            tooltip.style("opacity", 0)
-            d3.select(this)
-                .style("stroke", "none")
-                .style("opacity", 0.8);
-        }
+// create a tooltip
+var tooltip = d3.select("#norm-jac")
+    .append("div")
+    .style("opacity", 0)
+    .attr("class", "tooltip");
 
-        var array = [];
-        for (i = 0; i < ofVars.length; i++) {
-            for (j = 0; j < wrtVars.length; j ++) {
-                    array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
-            }
-        }
+var mouseover = function(event, d) {
+    event.stopPropagation();
+    tooltip.style("opacity", 1);
+    d3.select(this)
+        .style("stroke", "black")
+        .style("opacity", 1);
+}
 
-        var maxcolor = Math.abs(d3.max(array, s => s.value));
+var mousemove = function(event, d) {
+    event.stopPropagation();
+    tooltip
+        .html(d.value)
+        .style("left", event.pageX + 10 + "px")
+        .style("top", event.pageY - 15 + "px");
+}
 
-        // Build color scale
-        var myColor = d3.scaleDiverging()
-            .interpolator(d3.interpolateRdYlBu)
-            .domain([-maxcolor, 0, maxcolor]);
+var mouseleave = function(event, d) {
+    event.stopPropagation();
+    tooltip.style("opacity", 0)
+    d3.select(this)
+        .style("stroke", "none")
+        .style("opacity", 0.8);
+}
 
-        svg.selectAll()
-            .data(array, function (d) { return d.group + ':' + d.variable; })
-            .enter()
-            .append("rect")
-            .attr("x", function (d) { return x(d.group) })
-            .attr("y", function (d) { return y(d.variable) })
-            .attr("width", x.bandwidth())
-            .attr("height", y.bandwidth())
-            .style("fill", function (d) { return myColor(d.value) })
-            .on("mouseover", mouseover)
-            .on("mousemove", mousemove)
-            .on("mouseleave", mouseleave);
+var array = [];
+for (i = 0; i < ofVars.length; i++) {
+    for (j = 0; j < wrtVars.length; j ++) {
+        array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
+    }
+}
+
+var maxcolor = Math.abs(d3.max(array, s => s.value));
+
+// Build color scale
+var subjacColor = d3.scaleDiverging()
+    .interpolator(d3.interpolateRdYlBu)
+    .domain([-maxcolor, 0, maxcolor]);
+
+svg.selectAll()
+    .data(array, function (d) { return d.group + ':' + d.variable; })
+    .enter()
+    .append("rect")
+    .attr("x", function (d) { return x(d.group) })
+    .attr("y", function (d) { return y(d.variable) })
+    .attr("width", x.bandwidth())
+    .attr("height", y.bandwidth())
+    .style("fill", function (d) { return subjacColor(d.value) })
+    .on("mouseover", mouseover)
+    .on("mousemove", mousemove)
+    .on("mouseleave", mouseleave);
 
 </script>
 </body>
