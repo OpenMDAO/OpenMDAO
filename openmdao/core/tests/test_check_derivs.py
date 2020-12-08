@@ -18,7 +18,8 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
+    assert_no_warning
 from openmdao.utils.mpi import MPI
 
 try:
@@ -2634,7 +2635,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         assert_near_equal(p['discipline.x'], 1.41421356, 1e-6)
 
-        totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', show_progress=True)
+        msg = "'_ReprClass' object has no attribute 'write'"
+        with assert_no_warning(AttributeError, msg):
+            p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'],
+                                method='cs', show_progress=True)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()
