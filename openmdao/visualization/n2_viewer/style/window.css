@@ -1,0 +1,162 @@
+#n2-windows {
+    width: 100vw;
+    height: 100vw;
+}
+
+#n2-windows>div {
+    position: absolute;
+}
+
+.main-window {
+    width: 100%;
+    height: 100%;
+}
+
+.window-contents {
+    width: 100%;
+    height: 100%;
+}
+
+.window-inactive {
+    display: none;
+}
+
+.window-active {
+    display: block;
+}
+
+/* vvv Begin N2 Window resizing styles vvv */
+:root {
+    --resize-overflow: -2px;
+    --resize-edge-size: 5px;
+    --resize-corner-size: 10px;
+}
+
+.resize {
+    position: absolute;
+    top: var(--resize-overflow);
+    left: var(--resize-overflow);
+    right: var(--resize-overflow);
+    bottom: var(--resize-overflow);
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.resize>div {
+    position: absolute;
+    pointer-events: auto;
+}
+
+.rsz-horizontal {
+    height: var(--resize-edge-size);
+    left: var(--resize-corner-size);
+    right: var(--resize-corner-size);
+}
+.rsz-horizontal:hover { cursor: ns-resize; }
+
+.rsz-top { top: 0; }
+.rsz-bottom { bottom: 0; }
+
+.rsz-vertical {
+    width: var(--resize-edge-size);
+    top: var(--resize-corner-size);
+    bottom: var(--resize-corner-size);
+}
+.rsz-vertical:hover { cursor: ew-resize; }
+
+.rsz-right { right: 0; }
+.rsz-left { left: 0; }
+
+.rsz-corner {
+    height: var(--resize-corner-size);
+    width: var(--resize-corner-size);
+}
+
+.rsz-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.rsz-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.rsz-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.rsz-top-left { top: 0; left: 0; cursor: nwse-resize; }
+
+/* ^^^ End N2 Window resizing styles ^^^ */
+
+
+/* vvv Begin Default N2 Window theme vvv */
+.window-theme-default {
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    opacity: 0.95;
+}
+
+.window-theme-default>.window-header {
+    background-color: #42926b;
+    margin: 0;
+    padding: 5px;
+    font-size: 11pt;
+    text-align: right;
+    cursor: grab;
+    white-space: nowrap;
+    height: 20px;
+}
+
+.window-theme-default>.window-header>.window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-default>.window-header>.window-close-button {
+    color: black;
+    float: right;
+    font-size: 11pt;
+    font-weight: bold;
+    margin-left: 5px;
+    margin-right: 5px;
+    line-height: 20px;
+}
+
+.window-theme-default>.window-header>.window-close-button:hover,
+.window-theme-default>.window-header>.window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transform: translate(-1px, -1px)
+}
+
+.window-theme-default>.window-header>.window-title {
+    color: white;
+    display: block;
+    position: relative;
+    font-weight: bold;
+    line-height: 20px;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+.window-theme-default>.window-body {
+    height: auto;
+    width: 100%;
+    background-color: white;
+    color: black;
+    top: 30px;
+    border: 0;
+}
+
+.window-theme-default>.window-footer {
+    height: 30px;
+    width: 100%;
+    background-color: darkgreen;
+    color: white;
+    bottom: 30px;
+    left: 0;
+}
+
+/* ^^^ End Default N2 Window theme ^^^ */

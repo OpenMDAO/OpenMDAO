@@ -223,7 +223,7 @@
             </table>
             <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
         </div>
-        
+
         <!-- all the node value containers and tables will be put inside this div -->
         <div class="node-value" id="node-value-containers">
             <div id='template' class='node-value-container node-value-hidden'>
@@ -243,25 +243,49 @@
             </div>
         </div>
 
+        <div id='n2-windows'>
+            <!-- Window template for all N2 windows -->
+            <div id='window-template' class='window-inactive' style='z-index: 10'>
+                <div class='main-window'>
+                    <div class='window-contents window-theme-default'>
+                        <div class='window-header'>
+                            <span class='window-close-button'></span>
+                            <span class='window-title'>N2 Information</span>
+                        </div>
+                        <div class='window-body'></div>
+                        <div class='window-footer window-inactive'></div>
+                    </div>
+                    <div class='resize'>
+                        <div class='rsz-horizontal rsz-top'></div>
+                        <div class='rsz-corner rsz-top-right'></div>
+                        <div class='rsz-vertical rsz-right'></div>
+                        <div class='rsz-corner rsz-bottom-right'></div>
+                        <div class='rsz-horizontal rsz-bottom'></div>
+                        <div class='rsz-corner rsz-bottom-left'></div>
+                        <div class='rsz-vertical rsz-left'></div>
+                        <div class='rsz-corner rsz-top-left'></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<!-- Need this off window element to put values that can then be put on the pastebuffer -->
-<textarea id="input-for-pastebuffer"></textarea>
+    <!-- Need this off window element to put values that can then be put on the pastebuffer -->
+    <textarea id="input-for-pastebuffer"></textarea>
 
-<div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
-<div id="top" class="offgrid" style="visibility: hidden;"></div>
-<div id="left" class="offgrid" style="visibility: hidden;"></div>
-<div id="right" class="offgrid" style="visibility: hidden;"></div>
-<div id="bottom" class="offgrid" style="visibility: hidden;"></div>
+    <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
+    <div id="top" class="offgrid" style="visibility: hidden;"></div>
+    <div id="left" class="offgrid" style="visibility: hidden;"></div>
+    <div id="right" class="offgrid" style="visibility: hidden;"></div>
+    <div id="bottom" class="offgrid" style="visibility: hidden;"></div>
 
-<div id="logo-container">
-    <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
-</div>
+    <div id="logo-container">
+        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
+    </div>
 
-{d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
-{{model_data}}
-{utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
-{n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
-{n2search_lib} {n2toolbar_lib} {n2diagram_lib}
-{nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}
+    {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
+    {{model_data}}
+    {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
+    {n2window_lib} {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib}
+    {n2arrow_lib} {n2search_lib} {n2toolbar_lib} {n2diagram_lib}
+    {nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}

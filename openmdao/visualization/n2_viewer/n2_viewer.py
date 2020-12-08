@@ -521,6 +521,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2TreeNode', \
         'ModelData', \
         'N2Style', \
+        'N2Window', \
         'N2Layout', \
         'N2MatrixCell', \
         'N2Legend', \
@@ -537,6 +538,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     srcs = read_files(src_names, src_dir, 'js')
 
     style_names = \
+        'window', \
         'partition_tree', \
         'icon', \
         'toolbar', \
