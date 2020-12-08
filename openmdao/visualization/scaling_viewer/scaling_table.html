@@ -9,6 +9,7 @@
 <script type="text/javascript">
         <d3_src>
 </script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <script>
     var data = <scaling_data>;
 </script>
@@ -42,8 +43,8 @@
 var dv_tabledata = data.dv_table;
 var con_tabledata = data.con_table;
 var obj_tabledata = data.obj_table;
-var jac_data = data.matrix;
-var jac_norm_data = data.norm_matrix;
+var jac_data = data.mat_list;
+var jac_norm_data = data.var_mat_list;
 var wrtVars = data.wrtlabels;
 var ofVars = data.oflabels;
 
@@ -55,31 +56,28 @@ var dvtable =
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
-        title: "foo",
         data:dv_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         // footerElement:"<p class='middle'>" +
         //                     "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"units\")'>units</input></span>" +
         //                     "</p>",
         columns:[ //Define Table Columns
-          {
-              title: "Design Variables",
-              columns: [
-                {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
-                {title: "units", field:"units", align:"center", headerFilter:false, visible:true,},
-                {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
-                {title: "value (scaled)", field:"scaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "value (unscaled)", field:"unscaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-                {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-                {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-                {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
-                {title: "upper (scaled)", field:"scaled_upper", align:"right", visible:true, headerFilter:false,},
-                {title: "upper (unscaled)", field:"unscaled_upper", align:"right", visible:true, headerFilter:false,},
-                {title: "lower (scaled)", field:"scaled_lower", align:"right", visible:true, headerFilter:false,},
-                {title: "lower (unscaled)", field:"unscaled_lower", align:"right", visible:true, headerFilter:false,},
-              ],
-          },
+            {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
+            {title: "Driver", columns: [
+                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", columns: [
+                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
+            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
+            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
+            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
+            {title: "upper", field:"upper", align:"right", visible:true, headerFilter:false,},
+            {title: "lower", field:"lower", align:"right", visible:true, headerFilter:false,},
         ],
     });
 
@@ -89,7 +87,6 @@ var contable =
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
-        title: "foo",
         data:con_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         // could use a row formatter to make row a color instead of adding another column for 'linear'
@@ -99,31 +96,28 @@ var contable =
         //         row.getElement().style.backgroundColor = "#A6A6DF"; //apply css change to row element
         //     }
         // },
-        columns:[ //Define Table Columns
-          {
-              title: "Constraints",
-              columns: [
-                {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
-                {title: "units", field:"units", align:"center", headerFilter:false, visible:true,},
-                {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
-                {title: "value (scaled)", field:"scaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "value (unscaled)", field:"unscaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-                {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-                {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-                {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
-                {title: "upper (scaled)", field:"scaled_upper", align:"right", visible:true, headerFilter:false,},
-                {title: "upper (unscaled)", field:"unscaled_upper", align:"right", visible:true, headerFilter:false,},
-                {title: "lower (scaled)", field:"scaled_lower", align:"right", visible:true, headerFilter:false,},
-                {title: "lower (unscaled)", field:"unscaled_lower", align:"right", visible:true, headerFilter:false,},
-                {title: "equals (scaled)", field:"scaled_equals", align:"right", visible:true, headerFilter:false,},
-                {title: "equals (unscaled)", field:"unscaled_equals", align:"right", visible:true, headerFilter:false,},
-                {title: "linear", field:"linear", align:"center", visible:true, formatter:"tickCross",
-                formatterParams: {
-                    crossElement: false,  // gets rid of 'x' elements so only check marks show
-                }, headerFilter:false,},
-              ],
-          },
+        columns: [ //Define Table Columns
+            {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
+            {title: "Driver", columns: [
+                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", columns: [
+                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
+            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
+            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
+            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
+            {title: "upper", field:"upper", align:"right", visible:true, headerFilter:false,},
+            {title: "lower", field:"lower", align:"right", visible:true, headerFilter:false,},
+            {title: "equals", field:"equals", align:"right", visible:true, headerFilter:false,},
+            {title: "linear", field:"linear", align:"center", visible:true, formatter:"tickCross",
+            formatterParams: {
+                crossElement: false,  // gets rid of 'x' elements so only check marks show
+            }, headerFilter:false,},
         ],
     });
 
@@ -133,24 +127,23 @@ var objtable =
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
-        title: "foo",
         data:obj_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         columns:[ //Define Table Columns
-          {
-                title: "Objectives",
-              columns: [
-                {title: "name", field:"name", align:"left", visible:true, headerFilter:false,},
-                {title: "units", field:"units", align:"center", visible:true, headerFilter:false,},
-                {title: "size", field:"size", align:"center", visible:true, headerFilter:false,},
-                {title: "value (scaled)", field:"scaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "value (unscaled)", field:"unscaled_val", align:"right", visible:true, headerFilter:false,},
-                {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-                {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-                {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-                {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
-              ],
-          },
+            {title: "name", field:"name", align:"left", visible:true, headerFilter:false,},
+            {title: "size", field:"size", align:"center", visible:true, headerFilter:false,},
+            {title: "Driver", columns: [
+                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", columns: [
+                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
+                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
+            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
+            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
+            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
         ],
     });
 
@@ -221,6 +214,9 @@ var tooltip = d3.select("#norm-jac")
 
 var mouseover = function(event, d) {
     event.stopPropagation();
+    if (d.value == null) {
+        return;
+    }
     tooltip.style("opacity", 1);
     d3.select(this)
         .style("stroke", "black")
@@ -229,6 +225,9 @@ var mouseover = function(event, d) {
 
 var mousemove = function(event, d) {
     event.stopPropagation();
+    if (d.value == null) {
+        return;
+    }
     tooltip
         .html(d.value)
         .style("left", event.pageX + 10 + "px")
@@ -237,6 +236,9 @@ var mousemove = function(event, d) {
 
 var mouseleave = function(event, d) {
     event.stopPropagation();
+    if (d.value == null) {
+        return;
+    }
     tooltip.style("opacity", 0)
     d3.select(this)
         .style("stroke", "none")
@@ -244,11 +246,14 @@ var mouseleave = function(event, d) {
 }
 
 var array = [];
-for (i = 0; i < ofVars.length; i++) {
-    for (j = 0; j < wrtVars.length; j ++) {
-        array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
-    }
+for (lst of jac_norm_data) {
+    array.push({ 'value': lst[2], 'group': wrtVars[lst[1]], 'variable': ofVars[lst[0]] });
 }
+// for (let i = 0; i < ofVars.length; i++) {
+//     for (let j = 0; j < wrtVars.length; j ++) {
+//         array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
+//     }
+// }
 
 var maxcolor = Math.abs(d3.max(array, s => s.value));
 
@@ -256,6 +261,10 @@ var maxcolor = Math.abs(d3.max(array, s => s.value));
 var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
+
+function donothing(event, d) {
+    console.print("do nothing");
+}
 
 svg.selectAll()
     .data(array, function (d) { return d.group + ':' + d.variable; })
@@ -265,7 +274,7 @@ svg.selectAll()
     .attr("y", function (d) { return y(d.variable) })
     .attr("width", x.bandwidth())
     .attr("height", y.bandwidth())
-    .style("fill", function (d) { return subjacColor(d.value) })
+    .style("fill", d => d.value == null ? "gray" : subjacColor(d.value))
     .on("mouseover", mouseover)
     .on("mousemove", mousemove)
     .on("mouseleave", mouseleave);

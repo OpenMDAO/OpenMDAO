@@ -93,33 +93,33 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     obj_vals = driver.get_objective_values(driver_scaling=True)
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
-    default = ''
+    mod_meta = driver._problem().model._var_allprocs_abs2meta['output']
 
-    coloring = driver._get_static_coloring()
-    if coloring_mod._use_total_sparsity and jac:
-        if coloring is None and driver._coloring_info['dynamic']:
-            coloring_mod.dynamic_total_coloring(driver)
+    default = ''
 
     idx = 1  # unique ID for use by Tabulator
     for name, meta in driver._designvars.items():
+        src_name = meta['ivc_source']
         val = dv_vals[name]  # dv_vals are unscaled
         scaler = meta['total_scaler']
         adder = meta['total_adder']
+
+        # TODO: convert scaler/adder to ref/ref0 if needed...
+
         dv_table.append({
             'id': idx,
             'name': name,
-            'units': _getdef(meta['units'], default),
             'size': meta['size'],
-            'unscaled_val': val,
-            'scaled_val': _scale(val, scaler, adder, default),
+            'driver_val': _scale(val, scaler, adder, default),
+            'driver_units': _getdef(meta['units'], default),
+            'model_val': val,
+            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
             'scaler': _getdef(scaler, default),
             'adder': _getdef(adder, default),
-            'unscaled_lower': _unscale(meta['lower'], scaler, adder, default),
-            'scaled_lower': _getdef(meta['lower'], default),
-            'unscaled_upper': _unscale(meta['upper'], scaler, adder, default),
-            'scaled_upper': _getdef(meta['upper'], default),
+            'lower': _getdef(meta['lower'], default),  # scaled
+            'upper': _getdef(meta['upper'], default),  # scaled
         })
         idx += 1
 
@@ -127,25 +127,34 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         val = con_vals[name]
         scaler = meta['total_scaler']
         adder = meta['total_adder']
-        con_table.append({
+        dct = {
             'id': idx,
             'name': name,
-            'units': _getdef(meta['units'], default),
             'size': meta['size'],
-            'unscaled_val': val,
-            'scaled_val': _scale(val, scaler, adder, default),
+            'driver_val': _scale(val, scaler, adder, default),
+            'driver_units': _getdef(meta['units'], default),
+            'model_val': val,
+            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
             'scaler': _getdef(scaler, default),
             'adder': _getdef(adder, default),
-            'unscaled_lower': _unscale(meta['lower'], scaler, adder, default),
-            'scaled_lower': _getdef(meta['lower'], default),
-            'unscaled_upper': _unscale(meta['upper'], scaler, adder, default),
-            'scaled_upper': _getdef(meta['upper'], default),
-            'unscaled_equals': _unscale(meta['equals'], scaler, adder, default),
-            'scaled_equals': _getdef(meta['equals'], default),
+            'lower': _getdef(meta['lower'], default),  # scaled
+            'upper': _getdef(meta['upper'], default),  # scaled
+            'equals': _getdef(meta['equals'], default), # scaled
             'linear': meta['linear'],
-        })
+        }
+        if dct['upper'] != default and dct['lower'] != default:
+            # add separate rows for upper and lower
+            # TODO: must also copy child rows if it's an array
+            d = dct.copy()
+            d['lower'] = default
+            con_table.append(d)
+            d = dct.copy()
+            d['upper'] = default
+            con_table.append(d)
+        else:
+            con_table.append(dct)
         idx += 1
 
     for name, meta in driver._objs.items():
@@ -155,10 +164,11 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         obj_table.append({
             'id': idx,
             'name': name,
-            'units': _getdef(meta['units'], default),
             'size': meta['size'],
-            'unscaled_val': _unscale(val, scaler, adder, default),
-            'scaled_val': val,
+            'driver_val': val,
+            'driver_units': _getdef(meta['units'], default),
+            'model_val': _unscale(val, scaler, adder, default),
+            'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
             'scaler': _getdef(scaler, default),
@@ -174,26 +184,36 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     }
 
     if jac:
+        coloring = driver._get_static_coloring()
+        if coloring_mod._use_total_sparsity and jac:
+            if coloring is None and driver._coloring_info['dynamic']:
+                coloring = coloring_mod.dynamic_total_coloring(driver)
+
         # assemble data for jacobian visualization
         data['oflabels'] = list(chain(obj_vals, con_vals))
         data['wrtlabels'] = list(dv_vals)
 
+        totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                        return_format='array')
+
+        rownames = [None] * totals.shape[0]
+        colnames = [None] * totals.shape[1]
+
         start = end = 0
         data['ofslices'] = slices = []
-        for v in chain(obj_vals.values(), con_vals.values()):
+        for n, v in chain(obj_vals.items(), con_vals.items()):
             end += v.size
             slices.append([start, end])
+            rownames[start:end] = [n] * (end - start)
             start = end
 
         start = end = 0
         data['wrtslices'] = slices = []
-        for v in dv_vals.values():
+        for n, v in dv_vals.items():
             end += v.size
             slices.append([start, end])
+            colnames[start:end] = [n] * (end - start)
             start = end
-
-        matrix = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
-                                        return_format='array')
 
         norm_mat = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
 
@@ -212,17 +232,60 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             ofstart, ofend = data['ofslices'][i]
             for j, wrt in enumerate(dv_vals):
                 wrtstart, wrtend = data['wrtslices'][j]
-                norm_mat[i, j] = np.linalg.norm(matrix[ofstart:ofend, wrtstart:wrtend])
+                norm_mat[i, j] = np.linalg.norm(totals[ofstart:ofend, wrtstart:wrtend])
 
-        data['norm_matrix'] = mat_magnitude(norm_mat)
-        data['matrix'] = mat_magnitude(matrix).tolist()
+        var_matrix = mat_magnitude(norm_mat)
+        matrix = mat_magnitude(totals)
 
-        print("norm_matrix")
+        if coloring is not None: # factor in the sparsity
+            mask = np.ones(totals.shape, dtype=bool)
+            mask[coloring._nzrows, coloring._nzcols] = 0
+            matrix[mask] = np.inf  # we know matrix cannot contain infs by this point
+
+        # create matrix data that includes sparsity
+        nonempty_submats = set()  # submats with any nonzero values (inf now indicates zero entries)
+        linear_cons = [n for n in driver._cons if driver._cons[n]['linear']]
+        # coloring._nzrows/cols don't contain linear constraints, so add them to nonempty_submats
+        for con in linear_cons:
+            for dv in data['wrtlabels']:
+                nonempty_submats.add((con, dv))
+
+        matlist = [None] * matrix.size
+        idx = 0
+        for i in range(matrix.shape[0]):
+            for j in range(matrix.shape[1]):
+                val = matrix[i, j]
+                if np.isinf(val):
+                    val = None
+                else:
+                    nonempty_submats.add((rownames[i], colnames[j]))
+                matlist[idx] = [i, j, val]
+                idx += 1
+
+        data['mat_list'] = matlist
+
+        varmatlist = [None] * var_matrix.size
+
+        # setup up sparsity of var matrix
+        idx = 0
+        for i, of in enumerate(data['oflabels']):
+            for j, wrt in enumerate(data['wrtlabels']):
+                val = None if (of, wrt) not in nonempty_submats else var_matrix[i, j]
+                varmatlist[idx] = [i, j, val]
+                idx += 1
+
+        data['var_mat_list'] = varmatlist
+
+        print("var_matrix")
         print(norm_mat)
         print("----")
-        print("of:", data['oflabels'])
-        print("wrt:", data['wrtlabels'])
-        print(data['norm_matrix'])
+        print(var_matrix)
+        print("var_mat_list")
+        import pprint
+        pprint.pprint(varmatlist)
+        print("obj", list(obj_vals))
+        print("con", list(con_vals))
+        print("dv", list(dv_vals))
 
     viewer = 'scaling_table.html'
 
