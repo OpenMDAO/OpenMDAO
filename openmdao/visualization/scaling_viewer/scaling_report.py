@@ -220,10 +220,11 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         print("norm_matrix")
         print(norm_mat)
         print("----")
+        print("of:", data['oflabels'])
+        print("wrt:", data['wrtlabels'])
         print(data['norm_matrix'])
 
     viewer = 'scaling_table.html'
-    # viewer = 'matrix_heatv6.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
     libs_dir = os.path.join(code_dir, 'libs')

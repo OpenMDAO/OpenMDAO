@@ -9,51 +9,44 @@
 <script type="text/javascript">
         <d3_src>
 </script>
+<script>
+    var data = <scaling_data>;
+</script>
 <style>
-    .unitnomatch {
-        color: red;
-        font-weight: bold;
-    }
-
-    .promoted {
-        color: blue;
-    }
-
-    .middle {
-        text-align: center;
-        width: 100%;
-        display:table;
-    }
-
-    .toggle {
-        width: 5%;
-        display:table-cell;
-        text-align: center;
-    }
-
-    input {
-        margin: 3px 5px 3px 5px;
-    }
-
-
     <tabulator_style>
+    div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 120px;
+        height: 28px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: lightsteelblue;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+    }
 </style>
-<title>Scaling Viewer</title>
 </head>
 <body>
-    <h2 id="scaling_title"></h2>
+    <h1 id="scaling_title"></h1>
+    <h2>Design Variables</h2>
     <div id="dv-table"></div>
+    <h2>Constraints</h2>
     <div id="con-table"></div>
+    <h2>Objectives</h2>
     <div id="obj-table"></div>
     <div id="norm-jac"></div>
 <script type="text/javascript">
 
-var data = <scaling_data>;
 var dv_tabledata = data.dv_table;
 var con_tabledata = data.con_table;
 var obj_tabledata = data.obj_table;
 var jac_data = data.matrix;
 var jac_norm_data = data.norm_matrix;
+var wrtVars = data.wrtlabels;
+var ofVars = data.oflabels;
+
 
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
@@ -67,20 +60,9 @@ var dvtable =
         title: "foo",
         data:dv_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
-        footerElement:"<p class='middle'>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"units\")'>units</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"size\")'>size</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"scaled_val\")'>scaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"unscaled_val\")'>unscaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"ref\")'>ref</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"ref0\")'>ref0</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"scaler\")'>scaler</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"adder\")'>adder</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"scaled_upper\")'>scaled upper</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"unscaled_upper\")'>unscaled upper</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"scaled_lower\")'>scaled lower</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"unscaled_lower\")'>unscaled lower</input></span>" +
-                            "</p>",
+        // footerElement:"<p class='middle'>" +
+        //                     "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"units\")'>units</input></span>" +
+        //                     "</p>",
         columns:[ //Define Table Columns
           {
               title: "Design Variables",
@@ -112,22 +94,6 @@ var contable =
         title: "foo",
         data:con_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
-        footerElement:"<p class='middle'>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"units\")'>units</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"size\")'>size</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"scaled_val\")'>scaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"unscaled_val\")'>unscaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"ref\")'>ref</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"ref0\")'>ref0</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"scaler\")'>scaler</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"adder\")'>adder</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"scaled_upper\")'>scaled upper</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"unscaled_upper\")'>unscaled upper</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"scaled_lower\")'>scaled lower</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"unscaled_lower\")'>unscaled lower</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"scaled_equals\")'>scaled equals</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(contable, \"unscaled_equals\")'>unscaled equals</input></span>" +
-                            "</p>",
         // could use a row formatter to make row a color instead of adding another column for 'linear'
         // rowFormatter:function(row){
         //     var pos = row.getPosition(false);
@@ -137,7 +103,7 @@ var contable =
         // },
         columns:[ //Define Table Columns
           {
-                title: "Constraints",
+              title: "Constraints",
               columns: [
                 {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
                 {title: "units", field:"units", align:"center", headerFilter:false, visible:true,},
@@ -166,29 +132,19 @@ var contable =
 
 var objtable =
     new Tabulator("#obj-table", {
-                // set height of table (in CSS or here), this enables the Virtual DOM and
-                // improves render speed dramatically (can be any valid css height value)
-                // height: 650,
-                title: "foo",
+        // set height of table (in CSS or here), this enables the Virtual DOM and
+        // improves render speed dramatically (can be any valid css height value)
+        // height: 650,
+        title: "foo",
         data:obj_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
-        footerElement:"<p class='middle'>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"units\")'>units</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"size\")'>size</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"scaled_val\")'>scaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"unscaled_val\")'>unscaled value</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"ref\")'>ref</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"ref0\")'>ref0</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"scaler\")'>scaler</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(objtable, \"adder\")'>adder</input></span>" +
-                            "</p>",
         columns:[ //Define Table Columns
           {
                 title: "Objectives",
               columns: [
-                {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
-                {title: "units", field:"units", align:"center", headerFilter:false, visible:true,},
-                {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
+                {title: "name", field:"name", align:"left", visible:true, headerFilter:false,},
+                {title: "units", field:"units", align:"center", visible:true, headerFilter:false,},
+                {title: "size", field:"size", align:"center", visible:true, headerFilter:false,},
                 {title: "value (scaled)", field:"scaled_val", align:"right", visible:true, headerFilter:false,},
                 {title: "value (unscaled)", field:"unscaled_val", align:"right", visible:true, headerFilter:false,},
                 {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
@@ -207,23 +163,11 @@ function col_toggle(tbl, name) {
 }
 
 
-        // Labels of row and columns
-        var gnames = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-            var base = "sdfgakjsyegfasekyfgasejfygasefjy"
-            var gbase = "fygasefjy"
-        var vnames = ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]
-        var myVars = vnames.map(function (v, i, arr) {
-            return base + v;
-        });
-        var myGroups = gnames.map(function(v, i, arr) {
-            return gbase + v;
-        });
-
         var viewport_width = document.documentElement.clientWidth * .95;
         var viewport_height = document.documentElement.clientHeight * .75;
 
-        var leftmargin = d3.max(myVars, s => s.length) * 5;
-        var bottommargin = d3.max(myGroups, s => s.length) * 6;
+        var leftmargin = d3.max(ofVars, s => s.length) * 5.5;
+        var bottommargin = d3.max(wrtVars, s => s.length) * 6;
 
         // set the dimensions and margins of the graph
         var margin = {top: 30, right: 30, bottom: bottommargin, left: leftmargin },
@@ -245,7 +189,7 @@ function col_toggle(tbl, name) {
         // Build X scales and axis:
         var x = d3.scaleBand()
             .range([0, width])
-            .domain(myGroups)
+            .domain(wrtVars)
             .padding(0.01);
         svg.append("g")
             .attr("transform", "translate(0," + height + ")")
@@ -258,23 +202,60 @@ function col_toggle(tbl, name) {
 
         // Build Y scales and axis:
         var y = d3.scaleBand()
-            .range([height, 0])
-            .domain(myVars)
+            .range([0, height])
+            .domain(ofVars)
             .padding(0.01);
         svg.append("g")
             .call(d3.axisLeft(y));
 
-        // Build color scale
-        var myColor = d3.scaleLinear()
-            .range(["white", "#69b3a2"])
-            .domain([1, 100])
+        // create a tooltip
+        var tooltip = d3.select("#norm-jac")
+            .append("div")
+            .style("opacity", 0)
+            .attr("class", "tooltip")
+            // .style("background-color", "white")
+            // .style("border", "solid")
+            // .style("border-width", "2px")
+            // .style("border-radius", "5px")
+            .style("padding", "5px");
+
+        var mouseover = function(event, d) {
+            event.stopPropagation();
+            tooltip.style("opacity", 1);
+            d3.select(this)
+                .style("stroke", "black")
+                .style("opacity", 1);
+        }
+
+        var mousemove = function(event, d) {
+            event.stopPropagation();
+            tooltip
+                .html(d.value)
+                .style("left", event.pageX + "px")
+                .style("top", event.pageY + "px");
+        }
+
+        var mouseleave = function(event, d) {
+            event.stopPropagation();
+            tooltip.style("opacity", 0)
+            d3.select(this)
+                .style("stroke", "none")
+                .style("opacity", 0.8);
+        }
 
         var array = [];
-        for (i = 0; i < myVars.length; i++) {
-            for (j = 0; j < myGroups.length; j ++) {
-                    array.push({ 'value': i * j, 'group': myGroups[j], 'variable': myVars[i] });
+        for (i = 0; i < ofVars.length; i++) {
+            for (j = 0; j < wrtVars.length; j ++) {
+                    array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
             }
         }
+
+        var maxcolor = Math.abs(d3.max(array, s => s.value));
+
+        // Build color scale
+        var myColor = d3.scaleDiverging()
+            .interpolator(d3.interpolateRdYlBu)
+            .domain([-maxcolor, 0, maxcolor]);
 
         svg.selectAll()
             .data(array, function (d) { return d.group + ':' + d.variable; })
@@ -285,18 +266,9 @@ function col_toggle(tbl, name) {
             .attr("width", x.bandwidth())
             .attr("height", y.bandwidth())
             .style("fill", function (d) { return myColor(d.value) })
-
-// data format for adjacency matrix
-// {
-//     "nodes": [
-//         {"id": "Bob", "group": 3},
-//         ...
-//     ],
-//     'links': [
-//             {"source": "Napoleon", "target": "Myriel", "value": 1},
-//             ...
-//     ]
-// }
+            .on("mouseover", mouseover)
+            .on("mousemove", mousemove)
+            .on("mouseleave", mouseleave);
 
 </script>
 </body>
