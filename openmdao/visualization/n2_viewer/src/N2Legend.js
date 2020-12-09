@@ -18,6 +18,7 @@ class N2Legend {
             'group': false,
             'component': false,
             'input': false,
+            'desvars': false,
             'unconnectedInput': false,
             'autoivcInput': false,
             'outputExplicit': false,
@@ -79,6 +80,7 @@ class N2Legend {
             const {
                 group,
                 component,
+                desvar,
                 input,
                 unconnectedInput,
                 outputExplicit,
@@ -163,6 +165,13 @@ class N2Legend {
                     this.sysAndVar.push({
                         'name': 'Unconnected Input',
                         'color': N2Style.color.unconnectedInput
+                    })
+                }
+                else if (!this.showSysVar.desvar) {
+                    this.showSysVar.desvar = true;
+                    this.sysAndVar.push({
+                        'name': 'Design Variables, Constraints, Objectives',
+                        'color': N2Style.color.desvar
                     })
                 }
             }

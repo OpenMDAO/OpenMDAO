@@ -91,7 +91,7 @@ class N2TreeNode {
         this.prevRootIndex = this.rootIndex;
     }
 
-    /** 
+    /**
      * Determine if the children array exists and has members.
      * @param {string} [childrenPropName = 'children'] Usually children, but
      *   sometimes 'subsystem_children'
@@ -171,7 +171,7 @@ class N2TreeNode {
                 return true;
             }
         }
-        
+
         return false;
     }
 
