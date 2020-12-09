@@ -648,10 +648,6 @@ class N2Diagram {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
             item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', true)
             );
-        // for (const dv in [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat()) {
-        //     // d3.selectAll("#" + dv.replace(".", "_")).classed('opt-vars', true)
-        //     console.log(dv)
-        // }
     }
 
     hideDesignVars() {
