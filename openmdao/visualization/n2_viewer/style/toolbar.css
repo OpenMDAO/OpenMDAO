@@ -324,6 +324,14 @@
     font-size: 24px;
 }
 
+.icon-backward {
+    font-size: 13px !important;
+}
+
+.icon-forward {
+	font-size: 13px !important;
+}
+
 .toolbar .fas {
     margin: 7px 0;
     color: white;

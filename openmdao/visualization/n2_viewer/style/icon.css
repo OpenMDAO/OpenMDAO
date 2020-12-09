@@ -57,10 +57,6 @@ Instructions on editing the icons used for the toolbar.
 	content: "\e900";
   }
 
-  .icon-backward {
-	font-size: 13px !important;
-  }
-
   .icon-bezier-curve:before {
 	content: "\e901";
   }
@@ -91,10 +87,6 @@ Instructions on editing the icons used for the toolbar.
 
   .icon-forward:before {
 	content: "\e908";
-  }
-
-  .icon-forward {
-	font-size: 13px !important;
   }
 
   .icon-hide-connections:before {
