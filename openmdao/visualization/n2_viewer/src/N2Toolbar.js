@@ -295,7 +295,7 @@ class N2Toolbar {
         );
 
         new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
-            ["Show design variables", "Hide design variables"],
+            ["Show optimization variables", "Hide optimization variables"],
             pred => { return n2ui.desVars; },
             e => { n2ui.toggleDesVars(); }
         );
