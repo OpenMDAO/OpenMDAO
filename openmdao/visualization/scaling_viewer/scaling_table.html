@@ -51,11 +51,14 @@ var ofVars = data.oflabels;
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
 
+
 var dvtable =
     new Tabulator("#dv-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
+        dataTree:true,
+        dataTreeStartExpanded:false,
         data:dv_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         // footerElement:"<p class='middle'>" +
@@ -87,6 +90,8 @@ var contable =
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
+        dataTree:true,
+        dataTreeStartExpanded:false,
         data:con_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         // could use a row formatter to make row a color instead of adding another column for 'linear'
@@ -127,12 +132,14 @@ var objtable =
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
+        dataTree:true,
+        dataTreeStartExpanded:false,
         data:obj_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         columns:[ //Define Table Columns
             {title: "name", field:"name", align:"left", visible:true, headerFilter:false,},
             {title: "size", field:"size", align:"center", visible:true, headerFilter:false,},
-            {title: "Driver", columns: [
+            {title: "Driver", headerHozAlign:"center", columns: [
                 {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
                 {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
             ]},

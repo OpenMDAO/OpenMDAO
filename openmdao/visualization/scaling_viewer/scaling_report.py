@@ -54,6 +54,29 @@ def _getdef(val, default):
     return val
 
 
+def _getnorm(val):
+    if np.isscalar(val) or val.size == 1:
+        return val
+    return np.linalg.norm(val)
+    # return f"|| {np.linalg.norm(val):.2e} ||"
+
+
+def _add_child_rows(row, mval, dval):
+    if not (np.isscalar(mval) or mval.size == 1):
+        rowchild = row.copy()
+        children = row['_children'] = []
+        rowchild['name'] = ''
+        rowchild['size'] = ''
+        dval_flat = dval.flatten()
+        mval_flat = mval.flatten()
+        for i in range(dval.size):
+            d = rowchild.copy()
+            d['index'] = i
+            d['driver_val'] = dval_flat[i]
+            d['model_val'] = mval_flat[i]
+            children.append(d)
+
+
 def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
                         precision=6, title=None, jac=True):
     """
@@ -98,21 +121,26 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     default = ''
 
     idx = 1  # unique ID for use by Tabulator
+
+    # set up design vars table data
     for name, meta in driver._designvars.items():
-        src_name = meta['ivc_source']
-        val = dv_vals[name]  # dv_vals are unscaled
+        mval = dv_vals[name]  # dv_vals are unscaled
         scaler = meta['total_scaler']
         adder = meta['total_adder']
 
+        dval = _scale(mval, scaler, adder, default)
+        dval_norm = _getnorm(dval)
+        mval_norm = _getnorm(mval)
+
         # TODO: convert scaler/adder to ref/ref0 if needed...
 
-        dv_table.append({
+        dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'driver_val': _scale(val, scaler, adder, default),
+            'driver_val': dval_norm,
             'driver_units': _getdef(meta['units'], default),
-            'model_val': val,
+            'model_val': mval_norm,
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
@@ -120,20 +148,32 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             'adder': _getdef(adder, default),
             'lower': _getdef(meta['lower'], default),  # scaled
             'upper': _getdef(meta['upper'], default),  # scaled
-        })
+            'index': '',
+        }
+
+        dv_table.append(dct)
+
+        _add_child_rows(dct, mval, dval)
+
         idx += 1
 
+    # set up constraints table data
     for name, meta in driver._cons.items():
-        val = con_vals[name]
         scaler = meta['total_scaler']
         adder = meta['total_adder']
+
+        dval = con_vals[name]
+        mval = _unscale(dval, scaler, adder, default)
+        dval_norm = _getnorm(dval)
+        mval_norm = _getnorm(mval)
+
         dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'driver_val': _scale(val, scaler, adder, default),
+            'driver_val': dval_norm,
             'driver_units': _getdef(meta['units'], default),
-            'model_val': val,
+            'model_val': mval_norm,
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
@@ -150,30 +190,45 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             d = dct.copy()
             d['lower'] = default
             con_table.append(d)
+            _add_child_rows(d, mval, dval)
+
             d = dct.copy()
             d['upper'] = default
             con_table.append(d)
+            _add_child_rows(d, mval, dval)
         else:
             con_table.append(dct)
+            _add_child_rows(dct, mval, dval)
+
         idx += 1
 
+    # set up objectives table data
     for name, meta in driver._objs.items():
-        val = obj_vals[name]
         scaler = meta['total_scaler']
         adder = meta['total_adder']
-        obj_table.append({
+
+        dval = obj_vals[name]
+        mval = _unscale(dval, scaler, adder, default)
+        dval_norm = _getnorm(dval)
+        mval_norm = _getnorm(mval)
+
+        dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'driver_val': val,
+            'driver_val': dval_norm,
             'driver_units': _getdef(meta['units'], default),
-            'model_val': _unscale(val, scaler, adder, default),
+            'model_val': mval_norm,
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
             'ref': _getdef(meta['ref'], default),
             'ref0': _getdef(meta['ref0'], default),
             'scaler': _getdef(scaler, default),
             'adder': _getdef(adder, default),
-        })
+        }
+
+        obj_table.append(dct)
+        _add_child_rows(dct, mval, dval)
+
         idx += 1
 
     data = {
@@ -335,7 +390,8 @@ def _scaling_setup_parser(parser):
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
-    parser.add_argument('--no-jac', action='store_true', dest='nojac', help="Don't show jacobian info")
+    parser.add_argument('--no-jac', action='store_true', dest='nojac',
+                        help="Don't show jacobian info")
 
 
 def _scaling_cmd(options, user_args):

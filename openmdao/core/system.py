@@ -2525,17 +2525,23 @@ class System(object):
         # determine adder and scaler based on args
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
-        # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                         flatten=True)
+        if lower is None:
+            lower = -openmdao.INF_BOUND
+        else:
+            # Convert lower to ndarray/float as necessary
+            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
+                                             flatten=True)
+            # Apply scaler/adder
+            lower = (lower + adder) * scaler
 
-        # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                         flatten=True)
-
-        # Apply scaler/adder to lower and upper
-        lower = (lower + adder) * scaler
-        upper = (upper + adder) * scaler
+        if upper is None:
+            upper = openmdao.INF_BOUND
+        else:
+            # Convert upper to ndarray/float as necessary
+            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+                                             flatten=True)
+            # Apply scaler/adder
+            upper = (upper + adder) * scaler
 
         if self._static_mode:
             design_vars = self._static_design_vars
@@ -2698,8 +2704,12 @@ class System(object):
 
             # Convert lower to ndarray/float as necessary
             try:
-                lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                                 flatten=True)
+                if lower is None:
+                    lower = -openmdao.INF_BOUND
+                else:
+                    lower = format_as_float_or_array('lower', lower,
+                                                     val_if_none=-openmdao.INF_BOUND, flatten=True)
+                    lower = (lower + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
                                 "specify a variable as lower bound. You can only provide constant "
@@ -2707,8 +2717,12 @@ class System(object):
 
             # Convert upper to ndarray/float as necessary
             try:
-                upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                                 flatten=True)
+                if upper is None:
+                    upper = openmdao.INF_BOUND
+                else:
+                    upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+                                                     flatten=True)
+                    upper = (upper + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
                                 "specify a variable as upper bound. You can only provide constant "
@@ -2721,15 +2735,6 @@ class System(object):
                     raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
                                     "not specify a variable as equals bound. You can only provide "
                                     "constant float values".format(equals))
-
-            # Scale the bounds
-            if lower is not None:
-                lower = (lower + adder) * scaler
-
-            if upper is not None:
-                upper = (upper + adder) * scaler
-
-            if equals is not None:
                 equals = (equals + adder) * scaler
 
             resp['lower'] = lower
