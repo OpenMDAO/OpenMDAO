@@ -646,13 +646,13 @@ class N2Diagram {
 
     showDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
-            item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', true)
+            item => d3.selectAll("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
             );
     }
 
     hideDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
-            item => d3.selectAll("#" + item.replace(".", "_")).classed('opt-vars', false)
+            item => d3.selectAll("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
             );
     }
 
