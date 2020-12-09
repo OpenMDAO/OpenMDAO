@@ -563,16 +563,36 @@ class N2UserInterface {
      * React to the toggle-solver-name button press and show non-linear if linear
      * is currently shown, and vice-versa.
      */
-    toggleSolverNamesCheckboxChange() {
-        testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+    // toggleSolverNamesCheckboxChange() {
+    //     testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+    //
+    //     this.n2Diag.toggleSolverNameType();
+    //     // this.n2Diag.dom.parentDiv.querySelector(
+    //     //     '#linear-solver-button'
+    //     // ).className = !this.n2Diag.showLinearSolverNames ?
+    //     //         'fas icon-nonlinear-solver solver-button' :
+    //     //         'fas icon-linear-solver solver-button';
+    //
+    //     this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
+    //
+    //     if (this.legend.shown)
+    //         this.legend.show(
+    //             this.n2Diag.showLinearSolverNames,
+    //             this.n2Diag.style.solvers
+    //         );
+    //     this.n2Diag.update();
+    // }
 
-        this.n2Diag.toggleSolverNameType();
-        this.n2Diag.dom.parentDiv.querySelector(
-            '#linear-solver-button'
-        ).className = !this.n2Diag.showLinearSolverNames ?
-                'fas icon-nonlinear-solver solver-button' :
-                'fas icon-linear-solver solver-button';
+    /**
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
+     */
+    setSolvers(linear) {
 
+        // Update the diagram
+        this.n2Diag.showLinearSolverNames = linear;
+
+        // update the legend
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
         if (this.legend.shown)
@@ -582,6 +602,34 @@ class N2UserInterface {
             );
         this.n2Diag.update();
     }
+
+        /**
+     * React to the toggle-solver-name button press and show non-linear if linear
+     * is currently shown, and vice-versa.
+     */
+    showSolvers() {
+        // d3.select('#solver_tree').style('display','block');
+        n2Diag.showSolvers = true;
+        this.n2Diag.update();
+        }
+    hideSolvers() {
+        // d3.select('#solver_tree').style('display','none');
+        // d3.select('#solver_tree').attr('width',0);
+        n2Diag.showSolvers = false;
+        this.n2Diag.update();
+        }
+    //         // id is solver_tree
+    //         d3.select('#solver_tree').attr('display') == 'none' or block
+    // }
+    //
+    //
+    //     this.hidden = (this._div.style('visibility') == 'hidden');
+    //
+
+
+
+
+
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {

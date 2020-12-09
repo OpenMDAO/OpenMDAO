@@ -38,10 +38,11 @@ class N2Diagram {
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
         this.showLinearSolverNames = true;
+        this.showSolvers = true ;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement,
-            this.showLinearSolverNames, this.dims);
+            this.showLinearSolverNames, this.showSolvers, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
         this.ui = new N2UserInterface(this);
         // Keep track of arrows to show and hide them
@@ -676,7 +677,7 @@ class N2Diagram {
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement,
-                this.showLinearSolverNames, this.dims);
+                this.showLinearSolverNames, this.showSolvers, this.dims);
 
             this.ui.updateClickedIndices();
 
