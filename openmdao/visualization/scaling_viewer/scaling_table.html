@@ -188,14 +188,16 @@ var viewport_height = document.documentElement.clientHeight * .75;
 
 var leftmargin = d3.max(ofVars, s => s.length) * 5.5;
 var bottommargin = d3.max(wrtVars, s => s.length) * 6;
+var legendwidth = 10;
+var legendloc = 20;
 
 // set the dimensions and margins of the graph
-var margin = {top: 30, right: 30, bottom: bottommargin, left: leftmargin };
+var margin = {top: 30, right: 50 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
 var width = viewport_width - margin.left - margin.right;
 var height = viewport_height - margin.top - margin.bottom;
 
-var w = width + margin.left + margin.right;
-var h = height + margin.top + margin.bottom;
+// var w = width + margin.left + margin.right;
+// var h = height + margin.top + margin.bottom;
 
 var jac_parent = d3.select("#jac_div")
     .append("h2")
@@ -206,7 +208,8 @@ var svg = d3.select("#jac_div")
     .append("div")
     .attr("id", "norm-jac")
     .append("svg")
-    .attr("viewBox", "0 0 " + w + " " + h)
+    .attr("id", "jac_svg")
+    .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
     .attr("preserveAspectRatio", "xMidYMid meet")
     .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
@@ -278,35 +281,56 @@ var array = [];
 for (lst of jac_norm_data) {
     array.push({ 'value': lst[2], 'group': wrtVars[lst[1]], 'variable': ofVars[lst[0]] });
 }
-// for (let i = 0; i < ofVars.length; i++) {
-//     for (let j = 0; j < wrtVars.length; j ++) {
-//         array.push({ 'value': jac_norm_data[i][j], 'group': wrtVars[j], 'variable': ofVars[i] });
-//     }
-// }
 
-var maxcolor = Math.abs(d3.max(array, s => s.value));
+
+var maxcolor = d3.max(array, s => Math.abs(s.value));
 
 // Build color scale
 var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
 
-function donothing(event, d) {
-    console.print("do nothing");
-}
-
 svg.selectAll()
     .data(array, function (d) { return d.group + ':' + d.variable; })
     .enter()
     .append("rect")
-    .attr("x", function (d) { return x(d.group) })
-    .attr("y", function (d) { return y(d.variable) })
+    .attr("x", function (d) { return x(d.group); })
+    .attr("y", function (d) { return y(d.variable); })
     .attr("width", x.bandwidth())
     .attr("height", y.bandwidth())
     .style("fill", d => d.value == null ? "gray" : subjacColor(d.value))
     .on("mouseover", mouseover)
     .on("mousemove", mousemove)
     .on("mouseleave", mouseleave);
+
+
+// create the legend
+var leg_axis = d3.scaleLinear()
+    .domain([maxcolor, -maxcolor])
+    .range([0, height])
+    .nice();
+
+var legend = d3.select("#jac_svg")
+    .append("g")
+    .attr("transform", "translate(" + (margin.left + width) + "," + margin.top + ")");
+
+legend.append("g")
+    .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
+    .call(d3.axisRight(leg_axis));
+
+var scale = d3.scaleLinear()
+    .domain([0, 20])
+    .range([-maxcolor, maxcolor]);
+
+legend.selectAll()
+    .data(d3.map(d3.range(20, 0, -1), d => scale(d)))
+    .enter()
+    .append("rect")
+    .attr("x", legendloc)
+    .attr("y", d => leg_axis(d))
+    .attr("width", legendwidth)
+    .attr("height", legendwidth)
+    .style("fill", d => subjacColor(d));
 
 </script>
 </body>
