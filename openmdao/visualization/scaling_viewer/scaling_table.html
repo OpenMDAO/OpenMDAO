@@ -290,6 +290,12 @@ var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
 
+var grad_data = [
+    {"color": subjacColor(-maxcolor), "value": -maxcolor},
+    {"color": subjacColor(0), "value": 0},
+    {"color": subjacColor(maxcolor), "value": maxcolor},
+];
+
 svg.selectAll()
     .data(array, function (d) { return d.group + ':' + d.variable; })
     .enter()
@@ -307,8 +313,21 @@ svg.selectAll()
 // create the legend
 var leg_axis = d3.scaleLinear()
     .domain([maxcolor, -maxcolor])
-    .range([0, height])
-    .nice();
+    .range([0, height]);
+
+var defs = svg.append("defs");
+var grad = defs.append("linearGradient")
+    .attr('x1', '0%')
+    .attr('y1', '100%')
+    .attr('x2', '0%')
+    .attr('y2', '0%')
+    .attr("id", "lingrad");
+
+grad.selectAll("stop")
+    .data(grad_data)
+    .enter().append("stop")
+    .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+    .attr("stop-color", d => d.color);
 
 var legend = d3.select("#jac_svg")
     .append("g")
@@ -318,19 +337,12 @@ legend.append("g")
     .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
     .call(d3.axisRight(leg_axis));
 
-var scale = d3.scaleLinear()
-    .domain([0, 20])
-    .range([-maxcolor, maxcolor]);
+legend.append("rect")
+        .attr("x", legendloc)
+        .attr("width", legendwidth)
+        .attr("height", height)
+        .style("fill", "url(#lingrad)");
 
-legend.selectAll()
-    .data(d3.map(d3.range(20, 0, -1), d => scale(d)))
-    .enter()
-    .append("rect")
-    .attr("x", legendloc)
-    .attr("y", d => leg_axis(d))
-    .attr("width", legendwidth)
-    .attr("height", legendwidth)
-    .style("fill", d => subjacColor(d));
 
 </script>
 </body>
