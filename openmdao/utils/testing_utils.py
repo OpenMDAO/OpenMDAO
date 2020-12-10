@@ -90,3 +90,22 @@ class _ModelViewerDataTreeEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+_letters = 'abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+_letters_numbers = _letters + '01234567890'
+
+
+def random_name_iter(num_names, max_depth=5, min_len=1, max_len=50):
+    """
+    Yield random unique dotted names.
+
+    Parameters
+    ----------
+    num_names : int
+        The number of names desired.
+    min_len : int
+        Mininum name length.
+    max_len : int
+        Maximum name length.
+    """

@@ -30,7 +30,8 @@
 </style>
 </head>
 <body>
-    <h1 id="scaling_title"></h1>
+
+<h1 id="scaling_title"></h1>
     <h2>Design Variables</h2>
     <div id="dv-table"></div>
     <h2>Constraints</h2>
@@ -51,6 +52,40 @@ var ofVars = data.oflabels;
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
 
+var d3_format = d3.format(".6~g");
+
+var arr_format = function(num) {
+    return "| " + d3_format(num) + " |";
+}
+
+var val_formatter = function(cell, formatterParams, onRendered) {
+    // cell value is actually [value, size]
+    let val = cell.getValue();
+    if (val[1] > 1) {
+        return arr_format(val[0]);
+    }
+    if (val[0] == "") {
+        return "";
+    }
+    return d3_format(val[0]);
+};
+
+
+var val_sorter = function(a, b, aRow, bRow, column, dir, sorterParams) {
+    if (a == "") {
+        a = [-1e99, 0];
+    }
+    if (b == "") {
+        b = [-1e99, 0];
+    }
+    return a[0] - b[0];
+}
+
+
+var numrow = function(title, field) {
+    return {title:title, field:field, hozAlign:"right", visible:true, headerFilter:false, formatter:val_formatter, sorter:val_sorter}
+}
+
 
 var dvtable =
     new Tabulator("#dv-table", {
@@ -60,27 +95,25 @@ var dvtable =
         dataTree:true,
         dataTreeStartExpanded:false,
         data:dv_tabledata, //assign data to table
-        layout:"fitColumns", //"fitDataFill",
-        // footerElement:"<p class='middle'>" +
-        //                     "<span class='toggle'><input type='checkbox' checked='true' onclick='col_toggle(dvtable, \"units\")'>units</input></span>" +
-        //                     "</p>",
+        layout:"fitDataFill", //"fitColumns", "fitDataFill",
         columns:[ //Define Table Columns
-            {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
-            {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
-            {title: "Driver", columns: [
-                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
             ]},
-            {title: "Model", columns: [
-                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
             ]},
-            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
-            {title: "upper", field:"upper", align:"right", visible:true, headerFilter:false,},
-            {title: "lower", field:"lower", align:"right", visible:true, headerFilter:false,},
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
+            numrow("upper", "upper"),
+            numrow("lower", "lower"),
         ],
     });
 
@@ -93,33 +126,27 @@ var contable =
         dataTree:true,
         dataTreeStartExpanded:false,
         data:con_tabledata, //assign data to table
-        layout:"fitColumns", //"fitDataFill",
-        // could use a row formatter to make row a color instead of adding another column for 'linear'
-        // rowFormatter:function(row){
-        //     var pos = row.getPosition(false);
-        //     if (con_tabledata[pos]["linear"]){
-        //         row.getElement().style.backgroundColor = "#A6A6DF"; //apply css change to row element
-        //     }
-        // },
+        layout:"fitDataFill", //"fitColumns", "fitDataFill",
         columns: [ //Define Table Columns
-            {title: "name", field:"name", align:"left", headerFilter:false, visible:true,},
-            {title: "size", field:"size", align:"center", headerFilter:false, visible:true,},
-            {title: "Driver", columns: [
-                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
             ]},
-            {title: "Model", columns: [
-                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
             ]},
-            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
-            {title: "upper", field:"upper", align:"right", visible:true, headerFilter:false,},
-            {title: "lower", field:"lower", align:"right", visible:true, headerFilter:false,},
-            {title: "equals", field:"equals", align:"right", visible:true, headerFilter:false,},
-            {title: "linear", field:"linear", align:"center", visible:true, formatter:"tickCross",
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
+            numrow("upper", "upper"),
+            numrow("lower", "lower"),
+            numrow("equals", "equals"),
+            {title: "linear", field:"linear", hozAlign:"center", visible:true, formatter:"tickCross",
             formatterParams: {
                 crossElement: false,  // gets rid of 'x' elements so only check marks show
             }, headerFilter:false,},
@@ -137,28 +164,23 @@ var objtable =
         data:obj_tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         columns:[ //Define Table Columns
-            {title: "name", field:"name", align:"left", visible:true, headerFilter:false,},
-            {title: "size", field:"size", align:"center", visible:true, headerFilter:false,},
-            {title: "Driver", headerHozAlign:"center", columns: [
-                {title: "value", field:"driver_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"driver_units", align:"center", headerFilter:false, visible:true,},
+            {title: "name", field:"name", hozAlign:"left", visible:true, headerFilter:false,},
+            {title: "size", field:"size", hozAlign:"center", visible:true, headerFilter:false,},
+            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,headerSort:false,},
             ]},
-            {title: "Model", columns: [
-                {title: "value", field:"model_val", align:"right", visible:true, headerFilter:false,},
-                {title: "units", field:"model_units", align:"center", headerFilter:false, visible:true,},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
             ]},
-            {title: "ref", field:"ref", align:"right", visible:true, headerFilter:false,},
-            {title: "ref0", field:"ref0", align:"right", visible:true, headerFilter:false,},
-            {title: "scaler", field:"scaler", align:"right", visible:true, headerFilter:false,},
-            {title: "adder", field:"adder", align:"right", visible:true, headerFilter:false,},
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
         ],
     });
-
-
-function col_toggle(tbl, name) {
-    tbl.toggleColumn(name);
-    tbl.redraw();
-}
 
 
 var viewport_width = document.documentElement.clientWidth * .95;
