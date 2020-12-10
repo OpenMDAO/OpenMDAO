@@ -224,7 +224,7 @@ N2Style.color = {
     'connection': 'gray',
     'outputImplicit': '#C7D06D',
     'outputExplicit': '#9FC4C6',
-    'desvar': '#ffbb78',
+    'desvar': '#c5b0d5',
     'componentBox': '#555',
     'background': '#eee',
     'gridline': 'white',
