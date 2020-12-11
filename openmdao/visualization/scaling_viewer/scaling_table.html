@@ -27,6 +27,10 @@
         border-radius: 8px;
         pointer-events: none;
     }
+
+    #sub_svg {
+        dislplay: none;
+    }
 </style>
 </head>
 <body>
@@ -38,7 +42,13 @@
     <div id="con-table"></div>
     <h2>Objectives</h2>
     <div id="obj-table"></div>
-    <div id="jac_div"></div>
+    <div id="jac_div">
+        <h2>Jacobian Info</h2>
+        <div id="norm-jac">
+            <svg id="jac_svg">
+            </svg>
+        </div>
+    </div>
 <script type="text/javascript">
 
 var dv_tabledata = data.dv_table;
@@ -183,67 +193,6 @@ var objtable =
     });
 
 
-var viewport_width = document.documentElement.clientWidth * .95;
-var viewport_height = document.documentElement.clientHeight * .75;
-
-var leftmargin = d3.max(ofVars, s => s.length) * 5.5;
-var bottommargin = d3.max(wrtVars, s => s.length) * 6;
-var legendwidth = 10;
-var legendloc = 20;
-
-// set the dimensions and margins of the graph
-var margin = {top: 30, right: 50 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
-var width = viewport_width - margin.left - margin.right;
-var height = viewport_height - margin.top - margin.bottom;
-
-// var w = width + margin.left + margin.right;
-// var h = height + margin.top + margin.bottom;
-
-var jac_parent = d3.select("#jac_div")
-    .append("h2")
-    .html("Jacobian Info")
-
-// append the svg object to the body of the page
-var svg = d3.select("#jac_div")
-    .append("div")
-    .attr("id", "norm-jac")
-    .append("svg")
-    .attr("id", "jac_svg")
-    .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
-    .attr("preserveAspectRatio", "xMidYMid meet")
-    .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
-// Build X scales and axis:
-var x = d3.scaleBand()
-    .range([0, width])
-    .domain(wrtVars)
-    .padding(0.01);
-
-svg.append("g")
-    .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x))
-        .selectAll("text")
-        .style("text-anchor", "start")
-        .attr("dx", ".8em")
-        .attr("dy", "-.5em")
-        .attr("transform", "rotate(90)");
-
-// Build Y scales and axis:
-var y = d3.scaleBand()
-    .range([0, height])
-    .domain(ofVars)
-    .padding(0.01);
-
-svg.append("g")
-    .call(d3.axisLeft(y));
-
-// create a tooltip
-var tooltip = d3.select("#norm-jac")
-    .append("div")
-    .style("opacity", 0)
-    .attr("class", "tooltip");
-
 var mouseover = function(event, d) {
     event.stopPropagation();
     if (d.value == null) {
@@ -277,71 +226,128 @@ var mouseleave = function(event, d) {
         .style("opacity", 0.8);
 }
 
-var array = [];
-for (lst of jac_norm_data) {
-    array.push({ 'value': lst[2], 'group': wrtVars[lst[1]], 'variable': ofVars[lst[0]] });
+
+var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, dom_id) {
+    var viewport_width = document.documentElement.clientWidth * .95;
+    var viewport_height = document.documentElement.clientHeight * .75;
+
+    var leftmargin = d3.max(ofEntries, s => s.length) * 5.5;
+    var bottommargin = d3.max(wrtEntries, s => s.length) * 6;
+    var legendwidth = 10;
+    var legendloc = 20;
+
+    // set the dimensions and margins of the graph
+    var margin = {top: 30, right: 50 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
+    var width = viewport_width - margin.left - margin.right;
+    var height = viewport_height - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select(dom_id)
+        .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    // Build X scales and axis:
+    var x = d3.scaleBand()
+        .range([0, width])
+        .domain(wrtEntries)
+        .padding(0.01);
+
+    svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x))
+            .selectAll("text")
+            .style("text-anchor", "start")
+            .attr("dx", ".8em")
+            .attr("dy", "-.5em")
+            .attr("transform", "rotate(90)");
+
+    // Build Y scales and axis:
+    var y = d3.scaleBand()
+        .range([0, height])
+        .domain(ofEntries)
+        .padding(0.01);
+
+    svg.append("g")
+        .call(d3.axisLeft(y));
+
+    var array = [];
+    for (lst of jac_norm_data) {
+                        array.push({ 'value': lst[2], 'group': wrtEntries[lst[1]], 'variable': ofEntries[lst[0]] });
 }
 
 
-var maxcolor = d3.max(array, s => Math.abs(s.value));
+    var maxcolor = d3.max(array, s => Math.abs(s.value));
 
-// Build color scale
-var subjacColor = d3.scaleDiverging()
-    .interpolator(d3.interpolateRdYlBu)
-    .domain([-maxcolor, 0, maxcolor]);
+    // Build color scale
+    var subjacColor = d3.scaleDiverging()
+        .interpolator(d3.interpolateRdYlBu)
+        .domain([-maxcolor, 0, maxcolor]);
 
-var grad_data = [
-    {"color": subjacColor(-maxcolor), "value": -maxcolor},
-    {"color": subjacColor(0), "value": 0},
-    {"color": subjacColor(maxcolor), "value": maxcolor},
-];
+    var grad_data = [
+        {"color": subjacColor(-maxcolor), "value": -maxcolor},
+        {"color": subjacColor(0), "value": 0},
+        {"color": subjacColor(maxcolor), "value": maxcolor},
+    ];
 
-svg.selectAll()
-    .data(array, function (d) { return d.group + ':' + d.variable; })
-    .enter()
-    .append("rect")
-    .attr("x", function (d) { return x(d.group); })
-    .attr("y", function (d) { return y(d.variable); })
-    .attr("width", x.bandwidth())
-    .attr("height", y.bandwidth())
-    .style("fill", d => d.value == null ? "gray" : subjacColor(d.value))
-    .on("mouseover", mouseover)
-    .on("mousemove", mousemove)
-    .on("mouseleave", mouseleave);
+    svg.selectAll()
+        .data(array, function (d) { return d.group + ':' + d.variable; })
+        .enter()
+        .append("rect")
+        .attr("x", function (d) { return x(d.group); })
+        .attr("y", function (d) { return y(d.variable); })
+        .attr("width", x.bandwidth())
+        .attr("height", y.bandwidth())
+        .style("fill", d => d.value == null ? "gray" : subjacColor(d.value))
+        .on("mouseover", mouseover)
+        .on("mousemove", mousemove)
+        .on("mouseleave", mouseleave);
 
 
-// create the legend
-var leg_axis = d3.scaleLinear()
-    .domain([maxcolor, -maxcolor])
-    .range([0, height]);
+    // create the legend
+    var leg_axis = d3.scaleLinear()
+        .domain([maxcolor, -maxcolor])
+        .range([0, height]);
 
-var defs = svg.append("defs");
-var grad = defs.append("linearGradient")
-    .attr('x1', '0%')
-    .attr('y1', '100%')
-    .attr('x2', '0%')
-    .attr('y2', '0%')
-    .attr("id", "lingrad");
+    var defs = svg.append("defs");
+    var grad = defs.append("linearGradient")
+        .attr('x1', '0%')
+        .attr('y1', '100%')
+        .attr('x2', '0%')
+        .attr('y2', '0%')
+        .attr("id", "lingrad");
 
-grad.selectAll("stop")
-    .data(grad_data)
-    .enter().append("stop")
-    .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
-    .attr("stop-color", d => d.color);
+    grad.selectAll("stop")
+        .data(grad_data)
+        .enter().append("stop")
+        .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+        .attr("stop-color", d => d.color);
 
-var legend = d3.select("#jac_svg")
-    .append("g")
-    .attr("transform", "translate(" + (margin.left + width) + "," + margin.top + ")");
+    var legend = d3.select("#jac_svg")
+        .append("g")
+        .attr("transform", "translate(" + (margin.left + width) + "," + margin.top + ")");
 
-legend.append("g")
-    .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
-    .call(d3.axisRight(leg_axis));
+    legend.append("g")
+        .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
+        .call(d3.axisRight(leg_axis));
 
-legend.append("rect")
-        .attr("x", legendloc)
-        .attr("width", legendwidth)
-        .attr("height", height)
-        .style("fill", "url(#lingrad)");
+    legend.append("rect")
+            .attr("x", legendloc)
+            .attr("width", legendwidth)
+            .attr("height", height)
+            .style("fill", "url(#lingrad)");
+
+}
+
+// create a tooltip
+var tooltip = d3.select("#norm-jac")
+    .append("div")
+    .style("opacity", 0)
+    .attr("class", "tooltip");
+
+
+heatmap("", ofVars, wrtVars, "#jac_svg");
 
 
 </script>
