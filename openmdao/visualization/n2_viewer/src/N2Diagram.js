@@ -457,7 +457,6 @@ class N2Diagram {
 
         let selection = self.dom.pSolverTreeGroup.selectAll(".solver_group")
             .data(self.layout.zoomedSolverNodes, function (d) {
-                console.log(d)
                 return d.id;
             });
 
@@ -654,9 +653,9 @@ class N2Diagram {
 
     hideDesignVars() {
         [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
-            item => d3.selectAll("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
             );
-        d3.selectAll("#_auto_ivc").classed('opt-vars', false)
+        d3.select("#_auto_ivc").classed('opt-vars', false)
     }
 
     delay(time) {

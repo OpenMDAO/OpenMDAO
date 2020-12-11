@@ -12,6 +12,7 @@ The N2 diagram has a number of sections:
 * Toolbar
 * Search bar
 * Legend
+* Show/Hide Optimization Variables
 
 This page will go into the details of each section.
 
@@ -341,6 +342,33 @@ Here are explanations of the sections in the legend:
 
     * The Solvers section shows the colors used for the different solvers on the right side of the N2. Either the
       Linear or Nonlinear solvers are shown depending on the state of the Toggle Solver Names button.
+
+
+
+Show/Hide Optimization Variables
+--------------------------------
+Selecting this button allows you to see your model's design variables, constraints, and objectives which are highlighted in
+purple. If your optimization variable is an Auto IVC, the Auto IVC cell will be highlighted as well.
+
+.. |hide| image:: images/model_opt_not_selected.png
+    :align: middle
+
+.. |show| image:: images/model_opt_selected.png
+    :align: middle
+
+|
+
+.. table:: Show and Hide Optimization Variables
+   :widths: auto
+   :align: left
+
+   +--------+--------+
+   | Hidden | Shown  |
+   +--------+--------+
+   | |hide| | |show| |
+   +--------+--------+
+
+|
 
 
 
