@@ -181,6 +181,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
+        metadata['surrogate_name'] = surrogate.options._parent_name
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
