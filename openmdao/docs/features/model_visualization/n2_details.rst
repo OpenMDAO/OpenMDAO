@@ -348,7 +348,7 @@ Here are explanations of the sections in the legend:
 Show/Hide Optimization Variables
 --------------------------------
 Selecting this button allows you to see your model's design variables, constraints, and objectives which are highlighted in
-purple. If your optimization variable is an Auto IVC, the Auto IVC cell will be highlighted as well.
+purple. If your optimization variable is an Auto IVC, the Auto IVC cell will be highlighted as well which can be seen below.
 
 .. |hide| image:: images/model_opt_not_selected.png
     :align: middle
