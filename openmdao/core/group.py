@@ -1727,7 +1727,7 @@ class Group(System):
                                     knowns.add(inp)
                         elif not meta['copy_shape']:
                             raise RuntimeError(f"{self.msginfo}: 'shape_by_conn' was set for "
-                                               f"unconnected variable '{u}'.")
+                                               f"unconnected variable '{name}'.")
 
                 if meta['copy_shape']:
                     # variable whose shape is being copied must be on the same component, and
