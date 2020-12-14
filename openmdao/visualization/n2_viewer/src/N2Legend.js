@@ -170,7 +170,7 @@ class N2Legend {
                 else if (!this.showSysVar.desvar) {
                     this.showSysVar.desvar = true;
                     this.sysAndVar.push({
-                        'name': 'Design Variables, Constraints, Objectives',
+                        'name': 'Optimization Variables',
                         'color': N2Style.color.desvar
                     })
                 }
