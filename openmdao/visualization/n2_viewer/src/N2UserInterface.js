@@ -110,7 +110,11 @@ class N2UserInterface {
                     box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
-                    handle.attr('class', 'inactive-resizer-handle');
+                    if (n2Diag.showSolvers) {
+                        handle.attr('class', 'inactive-resizer-handle');
+                    } else {
+                        handle.attr('class', 'inactive-resizer-handle-without-solvers');
+                    }
                     box.attr('class', 'inactive-resizer-box');
 
                     // Get rid of the drag event handlers
@@ -611,12 +615,16 @@ class N2UserInterface {
         // d3.select('#solver_tree').style('display','block');
         n2Diag.showSolvers = true;
         this.n2Diag.update();
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
         }
     hideSolvers() {
         // d3.select('#solver_tree').style('display','none');
         // d3.select('#solver_tree').attr('width',0);
         n2Diag.showSolvers = false;
         this.n2Diag.update();
+        // const handle = d3.select('#n2-resizer-handle');
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
+        // n2-resizer-handle
         }
     //         // id is solver_tree
     //         d3.select('#solver_tree').attr('display') == 'none' or block
