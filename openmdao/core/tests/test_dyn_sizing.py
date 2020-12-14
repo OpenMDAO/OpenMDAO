@@ -666,6 +666,19 @@ class TestDynShapes(unittest.TestCase):
         msg = "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist."
         self.assertEqual(str(cm.exception), msg)
 
+    def test_unconnected_var_dyn_shape(self):
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
+        p.model.add_subsystem('sink', om.ExecComp('y1 = x1*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  y1={'shape_by_conn': True}))
+        p.model.connect('indep.x1', 'sink.x1')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg = "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."
+        self.assertEqual(str(cm.exception), msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDynShapes(unittest.TestCase):
