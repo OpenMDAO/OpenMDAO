@@ -261,15 +261,11 @@ class N2Toolbar {
                 self._setRootButton(target);
             });
 
-
-
-        // new herb qqq - new way of doing solvers display
         new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
             "Control Solver Tree Display",
             function (target) {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();
-                // self._setRootButton(target);
             });
 
         new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
@@ -294,17 +290,6 @@ class N2Toolbar {
                 n2ui.hideSolvers();
                 self._setRootButton(target);
             });
-
-
-
-
-
-
-        // new N2ToolbarButtonToggle('#linear-solver-button', tooltipBox,
-        //     ["Show linear solvers", "Show non-linear solvers"],
-        //     pred => { return !n2ui.n2Diag.showLinearSolverNames; },
-        //     e => { n2ui.toggleSolverNamesCheckboxChange(); }
-        // );
 
         new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],

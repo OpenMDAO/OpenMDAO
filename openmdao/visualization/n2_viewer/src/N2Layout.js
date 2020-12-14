@@ -53,11 +53,11 @@ class N2Layout {
         this._computeColumnWidths();
         stopTimer('N2Layout._computeColumnWidths');
 
-        startTimer('N2Layout._computeSolverColumnWidths');
         if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverColumnWidths');
             this._computeSolverColumnWidths();
+            stopTimer('N2Layout._computeSolverColumnWidths');
         }
-        stopTimer('N2Layout._computeSolverColumnWidths');
 
         startTimer('N2Layout._setColumnLocations');
         this._setColumnLocations();
@@ -69,11 +69,11 @@ class N2Layout {
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        startTimer('N2Layout._computeSolverNormalizedPositions');
         if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverNormalizedPositions');
             this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
+            stopTimer('N2Layout._computeSolverNormalizedPositions');
         }
-        stopTimer('N2Layout._computeSolverNormalizedPositions');
         if (this.showSolvers) {
             if (this.zoomedElement.parent)
                 this.zoomedSolverNodes.push(this.zoomedElement.parent);
