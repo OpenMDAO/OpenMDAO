@@ -274,6 +274,10 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    :align: middle
    :scale: 40 %
 
+.. |model_opt_button| image:: images/model_opt_button.png
+   :align: middle
+   :scale: 20 %
+
 .. |font_size| image:: images/font_size.png
    :align: middle
    :scale: 40 %
@@ -305,6 +309,8 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    | |toggle_solver_names| | Toggle Solver Names             | Switch between displaying the linear and non-linear solvers for the Systems                        |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | |show_legend|         | Show legend / Hide legend       | Show the legend explaining the colors and icons in the diagram                                     |
+   +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
+   | |model_opt_button|    | Show opt vars / Hide opt vars   | Show the optimization variables in the diagram                                                     |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | |font_size|           | Font Size                       | Set the font size for the text in the diagram                                                      |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
@@ -347,7 +353,7 @@ Here are explanations of the sections in the legend:
 
 Show/Hide Optimization Variables
 --------------------------------
-Selecting this button allows you to see your model's design variables, constraints, and objectives which are highlighted in
+Selecting this button |model_opt_button| allows you to see your model's design variables, constraints, and objectives which are highlighted in
 purple. If your optimization variable is an Auto IVC, the Auto IVC cell will be highlighted as well which can be seen below.
 
 .. |hide| image:: images/model_opt_not_selected.png
