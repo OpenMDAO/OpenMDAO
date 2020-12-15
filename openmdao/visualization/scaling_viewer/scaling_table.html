@@ -91,6 +91,7 @@
 
     <div id="entry-tab" class="tabcontent">
         <div id="sub-jac">
+            <h3 id="sub-jac-title"></h3>
             <svg class="heatmap">
             </svg>
         </div>
@@ -273,8 +274,7 @@ var mouseleave = function(event, d) {
 
 
 var openSubjac = function(event, subdata) {
-    // data: y (of),  x (wrt), value
-    console.log(subdata[0] + " wrt ", subdata[1]);
+    // subdata: [ofname,  wrtname, value]  (value not used here)
     var ofslice = data.ofslices[subdata[0]];
     var wrtslice = data.wrtslices[subdata[1]];
     var filtered = data.mat_list.filter(function(d) {
@@ -285,8 +285,8 @@ var openSubjac = function(event, subdata) {
     xnames = shifted.map(d => d[1].toString());
 
     d3.select("#subjac-button").style("display", "block").node().click();
-
-    heatmap(subdata[0] + " wrt " + subdata[1], ynames, xnames, shifted, d3.select("#sub-jac"), false);
+    d3.select("#subjac-button").html(subdata[0] + " <b>wrt</b> " + subdata[1])
+    heatmap(ynames, xnames, shifted, d3.select("#sub-jac"), false);
 }
 
 
@@ -298,12 +298,31 @@ function openJac(evt, ident) {
 }
 
 
-var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent, addmouse) {
+function textSize(text) {
+    var container = d3.select('body').append('svg');
+    container.append('text')
+        .attr("x", -99999)
+        .attr("y", -99999)
+        .text(text);
+    var bbox = container.node().getBBox();
+    container.remove();
+    return bbox;
+}
+
+
+function sizeOfLongest(strings, start) {
+    var longest = strings.reduce((accum, val) => accum.length < val.length ? val : accum, start);
+    return textSize(longest);
+}
+
+var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent, addmouse) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .75;
 
-    var leftmargin = d3.max(ofEntries, s => s.length) * 5.8;
-    var bottommargin = d3.max(wrtEntries, s => s.length) * 6.3;
+    // var leftmargin = Math.max(d3.max(ofEntries, s => s.length), 4) * 5.5;
+    // var bottommargin = Math.max(d3.max(wrtEntries, s => s.length), 4) * 6;
+    var leftmargin = sizeOfLongest(ofEntries, "9999").width;
+    var bottommargin = sizeOfLongest(wrtEntries, "9999").width;
     var legendwidth = 10;
     var legendloc = 20;
 
@@ -415,7 +434,7 @@ grad.selectAll("stop")
     .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
     .attr("stop-color", d => d.color);
 
-heatmap("", ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"), true);
+heatmap(ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"), true);
 
 function startup() {
     d3.select("#varjac-button").node().click();
