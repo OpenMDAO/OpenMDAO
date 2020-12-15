@@ -498,13 +498,11 @@ class TemplateWriter(object):
     """
     Writes HTML files using templates.
 
-    Opens an HTML template files, text can be inserted into the template, and writes a new HTML
+    Opens an HTML template file, text can be inserted into the template, and writes a new HTML
     file with the replacements.
 
     Attributes
     ----------
-    filename : str
-        Filename of file to write to.
     template : str
         Contents of template file.
     """
@@ -516,7 +514,7 @@ class TemplateWriter(object):
         Parameters
         ----------
         filename : str
-            Filename of file to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
@@ -524,9 +522,8 @@ class TemplateWriter(object):
         styles : dict
             Dictionary of CSS styles.
         """
-        self.filename = filename
         # Load template
-        with open(self.filename, "r") as f:
+        with open(filename, "r") as f:
             self.template = template = f.read()
 
         if styles is not None:
@@ -598,7 +595,7 @@ class DiagramWriter(TemplateWriter):
         Parameters
         ----------
         filename : str
-            Filename to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
