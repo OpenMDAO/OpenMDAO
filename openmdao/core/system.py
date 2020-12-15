@@ -3638,7 +3638,7 @@ class System(object):
                                 if i > residuals_tol:
                                     impl_outputs[n] = m
                                     break
-                        elif m['reids'] > residuals_tol:
+                        elif m['resids'] > residuals_tol:
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
