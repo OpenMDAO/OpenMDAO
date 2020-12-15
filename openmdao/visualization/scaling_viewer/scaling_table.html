@@ -18,7 +18,7 @@
     div.tooltip {
         position: absolute;
         text-align: center;
-        width: 120px;
+        width: 80px;
         height: 28px;
         padding: 2px;
         font: 12px sans-serif;
@@ -26,10 +26,7 @@
         border: 0px;
         border-radius: 8px;
         pointer-events: none;
-    }
-
-    #sub_svg {
-        dislplay: none;
+        opacity: 0;
     }
 
     /* Style the tab */
@@ -71,13 +68,15 @@
 </head>
 <body onload="startup()">
 
-<h1 id="scaling_title"></h1>
+    <h1 id="scaling_title"></h1>
     <h2>Design Variables</h2>
     <div id="dv-table"></div>
     <h2>Constraints</h2>
     <div id="con-table"></div>
     <h2>Objectives</h2>
     <div id="obj-table"></div>
+    <div class="tooltip"></div>
+
     <div class="tab">
         <button id="varjac-button" class="tablinks" onclick="openJac(event, '#variable-tab')">Sensitivity by Variable</button>
         <button id="subjac-button" class="tablinks" onclick="openJac(event, '#entry-tab')">Sensitivity by Entry</button>
@@ -111,7 +110,7 @@ document.getElementById("scaling_title").innerHTML = data.title
 var d3_format = d3.format(".6~g");
 
 var arr_format = function(num) {
-    return "| " + d3_format(num) + " |";
+    return "<b>|</b> <i>" + d3_format(num) + "</i> <b>|</b>";
 }
 
 var val_formatter = function(cell, formatterParams, onRendered) {
@@ -241,35 +240,29 @@ var objtable =
 
 var mouseover = function(event, d) {
     event.stopPropagation();
-    if (d[2] == null) {
-        return;
-    }
+    if (d[2] == null) return;
     tooltip.style("opacity", 1);
-    d3.select(this)
-        .style("stroke", "black")
-        .style("opacity", 1);
+    d3.select(this).style("stroke", "black");
 }
 
 var mousemove = function(event, d) {
     event.stopPropagation();
-    if (d[2] == null) {
-        return;
-    }
+    if (d[2] == null) return;
+    var txt = d3_format(d[2]);
+    var tshape = textSize(txt, 0);
     tooltip
-        .html(d[2])
+        .attr("width", tshape.width)
+        .attr("height", tshape.height)
+        .html(txt)
         .style("left", event.pageX + 10 + "px")
         .style("top", event.pageY - 15 + "px");
 }
 
 var mouseleave = function(event, d) {
     event.stopPropagation();
-    if (d[2] == null) {
-        return;
-    }
+    if (d[2] == null) return;
     tooltip.style("opacity", 0)
-    d3.select(this)
-        .style("stroke", "none")
-        .style("opacity", 0.8);
+    d3.select(this).style("stroke", "none");
 }
 
 
@@ -286,7 +279,7 @@ var openSubjac = function(event, subdata) {
 
     d3.select("#subjac-button").style("display", "block").node().click();
     d3.select("#subjac-button").html(subdata[0] + " <b>wrt</b> " + subdata[1])
-    heatmap(ynames, xnames, shifted, d3.select("#sub-jac"), false);
+    heatmap(ynames, xnames, shifted, "#sub-jac", false);
 }
 
 
@@ -298,11 +291,12 @@ function openJac(evt, ident) {
 }
 
 
-function textSize(text) {
+function textSize(text, rotate) {
     var container = d3.select('body').append('svg');
     container.append('text')
         .attr("x", -99999)
         .attr("y", -99999)
+        .attr("transform", "rotate(" + rotate + ")")
         .text(text);
     var bbox = container.node().getBBox();
     container.remove();
@@ -310,19 +304,19 @@ function textSize(text) {
 }
 
 
-function sizeOfLongest(strings, start) {
+function sizeOfLongest(strings, start, rotate) {
     var longest = strings.reduce((accum, val) => accum.length < val.length ? val : accum, start);
-    return textSize(longest);
+    return textSize(longest, rotate);
 }
 
-var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent, addmouse) {
-    var viewport_width = document.documentElement.clientWidth * .95;
-    var viewport_height = document.documentElement.clientHeight * .75;
 
-    // var leftmargin = Math.max(d3.max(ofEntries, s => s.length), 4) * 5.5;
-    // var bottommargin = Math.max(d3.max(wrtEntries, s => s.length), 4) * 6;
-    var leftmargin = sizeOfLongest(ofEntries, "9999").width;
-    var bottommargin = sizeOfLongest(wrtEntries, "9999").width;
+var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmouse) {
+    var viewport_width = document.documentElement.clientWidth * .95;
+    var viewport_height = document.documentElement.clientHeight * .95;
+
+    var parent = d3.select(parent_id);
+    var leftmargin = sizeOfLongest(ofEntries, "9999", 0).width;
+    var bottommargin = sizeOfLongest(wrtEntries, "9999", 90).height;
     var legendwidth = 10;
     var legendloc = 20;
 
@@ -380,6 +374,28 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent, addmouse
         .filter(d => addmouse && d[2] != null)  // don't add mouse handling to 0 entries
         .on("click", openSubjac, this);
 
+        // create the gradient
+        var grad_data = [
+            {"color": subjacColor(-maxcolor), "value": -maxcolor},
+            {"color": subjacColor(0), "value": 0},
+            {"color": subjacColor(maxcolor), "value": maxcolor},
+        ];
+
+        var grad_id = parent_id + "-lingrad";
+        var defs = parent.select(".heatmap").append("defs");
+        var grad = defs.append("linearGradient")
+            .attr('x1', '0%')
+            .attr('y1', '100%')
+            .attr('x2', '0%')
+            .attr('y2', '0%')
+            .attr("id", grad_id);
+
+        grad.selectAll("stop")
+            .data(grad_data)
+            .enter().append("stop")
+            .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+            .attr("stop-color", d => d.color);
+
     // create the legend
     var leg_axis = d3.scaleLinear()
         .domain([maxcolor, -maxcolor])
@@ -397,14 +413,12 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent, addmouse
             .attr("x", legendloc)
             .attr("width", legendwidth)
             .attr("height", height)
-            .style("fill", "url(#lingrad)");
+            .style("fill", "url(#" + grad_id + ")");
 }
 
 // create a tooltip
-var tooltip = d3.select("#norm-jac")
-    .append("div")
-    .style("opacity", 0)
-    .attr("class", "tooltip");
+var tooltip = d3.select(".tooltip")
+    .style("opacity", 0);
 
 var maxcolor = d3.max(data.var_mat_list, s => s == null ? 0 : Math.abs(s[2]));
 
@@ -413,28 +427,7 @@ var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
 
-// create the gradient
-var defs = d3.select("#norm-svg").append("defs");
-var grad = defs.append("linearGradient")
-    .attr('x1', '0%')
-    .attr('y1', '100%')
-    .attr('x2', '0%')
-    .attr('y2', '0%')
-    .attr("id", "lingrad");
-
-var grad_data = [
-    {"color": subjacColor(-maxcolor), "value": -maxcolor},
-    {"color": subjacColor(0), "value": 0},
-    {"color": subjacColor(maxcolor), "value": maxcolor},
-];
-
-grad.selectAll("stop")
-    .data(grad_data)
-    .enter().append("stop")
-    .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
-    .attr("stop-color", d => d.color);
-
-heatmap(ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"), true);
+heatmap(ofVars, wrtVars, data.var_mat_list, "#norm-jac", true);
 
 function startup() {
     d3.select("#varjac-button").node().click();
