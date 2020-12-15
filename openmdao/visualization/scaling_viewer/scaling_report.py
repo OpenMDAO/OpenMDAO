@@ -296,18 +296,18 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         colnames = [None] * totals.shape[1]
 
         start = end = 0
-        data['ofslices'] = slices = []
+        data['ofslices'] = slices = {}
         for n, v in chain(obj_vals.items(), con_vals.items()):
             end += v.size
-            slices.append([start, end])
+            slices[n] = [start, end]
             rownames[start:end] = [n] * (end - start)
             start = end
 
         start = end = 0
-        data['wrtslices'] = slices = []
+        data['wrtslices'] = slices = {}
         for n, v in dv_vals.items():
             end += v.size
-            slices.append([start, end])
+            slices[n] = [start, end]
             colnames[start:end] = [n] * (end - start)
             start = end
 
@@ -325,9 +325,9 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             return mag
 
         for i, of in enumerate(chain(obj_vals, con_vals)):
-            ofstart, ofend = data['ofslices'][i]
+            ofstart, ofend = data['ofslices'][of]
             for j, wrt in enumerate(dv_vals):
-                wrtstart, wrtend = data['wrtslices'][j]
+                wrtstart, wrtend = data['wrtslices'][wrt]
                 norm_mat[i, j] = np.linalg.norm(totals[ofstart:ofend, wrtstart:wrtend])
 
         var_matrix = mat_magnitude(norm_mat)
@@ -367,7 +367,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         for i, of in enumerate(data['oflabels']):
             for j, wrt in enumerate(data['wrtlabels']):
                 val = None if (of, wrt) not in nonempty_submats else var_matrix[i, j]
-                varmatlist[idx] = [i, j, val]
+                varmatlist[idx] = [of, wrt, val]
                 idx += 1
 
         data['var_mat_list'] = varmatlist

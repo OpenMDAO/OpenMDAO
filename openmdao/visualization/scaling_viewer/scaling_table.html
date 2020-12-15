@@ -31,9 +31,45 @@
     #sub_svg {
         dislplay: none;
     }
+
+    /* Style the tab */
+    .tab {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #ccc;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+        display: none;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+    }
 </style>
 </head>
-<body>
+<body onload="startup()">
 
 <h1 id="scaling_title"></h1>
     <h2>Design Variables</h2>
@@ -42,20 +78,30 @@
     <div id="con-table"></div>
     <h2>Objectives</h2>
     <div id="obj-table"></div>
-    <div id="jac_div">
+    <div class="tab">
+        <button id="varjac-button" class="tablinks" onclick="openJac(event, '#variable-tab')">Sensitivity by Variable</button>
+        <button id="subjac-button" class="tablinks" onclick="openJac(event, '#entry-tab')">Sensitivity by Entry</button>
+    </div>
+    <div id="variable-tab" class="tabcontent">
         <h2>Jacobian Info</h2>
         <div id="norm-jac">
-            <svg id="jac_svg">
+            <svg id="norm-svg" class="heatmap">
             </svg>
         </div>
     </div>
+
+    <div id="entry-tab" class="tabcontent">
+        <div id="sub-jac">
+            <svg class="heatmap">
+            </svg>
+        </div>
+    </div>
+
 <script type="text/javascript">
 
 var dv_tabledata = data.dv_table;
 var con_tabledata = data.con_table;
 var obj_tabledata = data.obj_table;
-var jac_data = data.mat_list;
-var jac_norm_data = data.var_mat_list;
 var wrtVars = data.wrtlabels;
 var ofVars = data.oflabels;
 
@@ -195,7 +241,7 @@ var objtable =
 
 var mouseover = function(event, d) {
     event.stopPropagation();
-    if (d.value == null) {
+    if (d[2] == null) {
         return;
     }
     tooltip.style("opacity", 1);
@@ -206,18 +252,18 @@ var mouseover = function(event, d) {
 
 var mousemove = function(event, d) {
     event.stopPropagation();
-    if (d.value == null) {
+    if (d[2] == null) {
         return;
     }
     tooltip
-        .html(d.value)
+        .html(d[2])
         .style("left", event.pageX + 10 + "px")
         .style("top", event.pageY - 15 + "px");
 }
 
 var mouseleave = function(event, d) {
     event.stopPropagation();
-    if (d.value == null) {
+    if (d[2] == null) {
         return;
     }
     tooltip.style("opacity", 0)
@@ -227,7 +273,39 @@ var mouseleave = function(event, d) {
 }
 
 
-var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, dom_id) {
+var openSubjac = function(event, subdata) {
+    // data: y (of),  x (wrt), value
+    console.log(subdata[0] + " wrt ", subdata[1]);
+    var ofslice = data.ofslices[subdata[0]];
+    var wrtslice = data.wrtslices[subdata[1]];
+    var subdata = data.mat_list.filter(function(d) {
+        return d[0] >= ofslice[0] && d[0] < ofslice[1] && d[1] >= wrtslice[0] && d[1] < wrtslice[1];
+    });
+    ynames = [];
+    for (i=0; i < ofVars.length; i++) {
+        ynames[i] = i.toString();
+    }
+
+    xnames = [];
+    for (i=0; i < wrtVars.length; i++) {
+        xnames[i] = i.toString();
+    }
+
+    d3.select("#subjac-button").style("display", "block").node().click();
+
+    heatmap(subdata[0] + " wrt " + subdata[1], ynames, xnames, subdata, d3.select("#sub-jac"));
+}
+
+
+function openJac(evt, ident) {
+    d3.selectAll(".tabcontent").style("display", "none");
+    d3.selectAll(".tablinks").classed("active", false);
+    d3.select(ident).style("display", "block");
+    evt.currentTarget.className += " active";
+}
+
+
+var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .75;
 
@@ -242,7 +320,7 @@ var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, dom_id) {
     var height = viewport_height - margin.top - margin.bottom;
 
     // append the svg object to the body of the page
-    var svg = d3.select(dom_id)
+    var svg = parent.select(".heatmap")
         .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
         .attr("preserveAspectRatio", "xMidYMid meet")
         .append("g")
@@ -272,59 +350,30 @@ var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, dom_id) {
     svg.append("g")
         .call(d3.axisLeft(y));
 
-    var array = [];
-    for (lst of jac_norm_data) {
-                        array.push({ 'value': lst[2], 'group': wrtEntries[lst[1]], 'variable': ofEntries[lst[0]] });
-}
-
-
-    var maxcolor = d3.max(array, s => Math.abs(s.value));
-
-    // Build color scale
-    var subjacColor = d3.scaleDiverging()
-        .interpolator(d3.interpolateRdYlBu)
-        .domain([-maxcolor, 0, maxcolor]);
-
-    var grad_data = [
-        {"color": subjacColor(-maxcolor), "value": -maxcolor},
-        {"color": subjacColor(0), "value": 0},
-        {"color": subjacColor(maxcolor), "value": maxcolor},
-    ];
-
     svg.selectAll()
-        .data(array, function (d) { return d.group + ':' + d.variable; })
+        .data(jac_data, function (d) { return d[1] + ':' + d[0]; })
         .enter()
         .append("rect")
-        .attr("x", function (d) { return x(d.group); })
-        .attr("y", function (d) { return y(d.variable); })
+        .attr("x", function (d) {
+            console.log("x " + x(d[1]));
+            console.log("d " + d);
+            return x(d[1]);
+        })
+        .attr("y", function (d) { return y(d[0]); })
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
-        .style("fill", d => d.value == null ? "gray" : subjacColor(d.value))
+        .style("fill", d => d[2] == null ? "gray" : subjacColor(d[2]))
+        .on("click", openSubjac)
         .on("mouseover", mouseover)
         .on("mousemove", mousemove)
         .on("mouseleave", mouseleave);
-
 
     // create the legend
     var leg_axis = d3.scaleLinear()
         .domain([maxcolor, -maxcolor])
         .range([0, height]);
 
-    var defs = svg.append("defs");
-    var grad = defs.append("linearGradient")
-        .attr('x1', '0%')
-        .attr('y1', '100%')
-        .attr('x2', '0%')
-        .attr('y2', '0%')
-        .attr("id", "lingrad");
-
-    grad.selectAll("stop")
-        .data(grad_data)
-        .enter().append("stop")
-        .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
-        .attr("stop-color", d => d.color);
-
-    var legend = d3.select("#jac_svg")
+    var legend = parent.select(".heatmap")
         .append("g")
         .attr("transform", "translate(" + (margin.left + width) + "," + margin.top + ")");
 
@@ -337,7 +386,6 @@ var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, dom_id) {
             .attr("width", legendwidth)
             .attr("height", height)
             .style("fill", "url(#lingrad)");
-
 }
 
 // create a tooltip
@@ -347,8 +395,40 @@ var tooltip = d3.select("#norm-jac")
     .attr("class", "tooltip");
 
 
-heatmap("", ofVars, wrtVars, "#jac_svg");
+var maxcolor = d3.max(data.var_mat_list, s => s == null ? 0 : Math.abs(s[2]));
 
+// Build color scale
+var subjacColor = d3.scaleDiverging()
+    .interpolator(d3.interpolateRdYlBu)
+    .domain([-maxcolor, 0, maxcolor]);
+
+// create the gradient
+var defs = d3.select("#norm-svg").append("defs");
+var grad = defs.append("linearGradient")
+    .attr('x1', '0%')
+    .attr('y1', '100%')
+    .attr('x2', '0%')
+    .attr('y2', '0%')
+    .attr("id", "lingrad");
+
+var grad_data = [
+    {"color": subjacColor(-maxcolor), "value": -maxcolor},
+    {"color": subjacColor(0), "value": 0},
+    {"color": subjacColor(maxcolor), "value": maxcolor},
+];
+
+grad.selectAll("stop")
+    .data(grad_data)
+    .enter().append("stop")
+    .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+    .attr("stop-color", d => d.color);
+
+heatmap("", ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"));
+
+function startup() {
+    d3.select("#varjac-button").node().click();
+    d3.select("#subjac-button").style("display", "none");
+}
 
 </script>
 </body>
