@@ -83,7 +83,6 @@
         <button id="subjac-button" class="tablinks" onclick="openJac(event, '#entry-tab')">Sensitivity by Entry</button>
     </div>
     <div id="variable-tab" class="tabcontent">
-        <h2>Jacobian Info</h2>
         <div id="norm-jac">
             <svg id="norm-svg" class="heatmap">
             </svg>
@@ -278,22 +277,16 @@ var openSubjac = function(event, subdata) {
     console.log(subdata[0] + " wrt ", subdata[1]);
     var ofslice = data.ofslices[subdata[0]];
     var wrtslice = data.wrtslices[subdata[1]];
-    var subdata = data.mat_list.filter(function(d) {
+    var filtered = data.mat_list.filter(function(d) {
         return d[0] >= ofslice[0] && d[0] < ofslice[1] && d[1] >= wrtslice[0] && d[1] < wrtslice[1];
     });
-    ynames = [];
-    for (i=0; i < ofVars.length; i++) {
-        ynames[i] = i.toString();
-    }
-
-    xnames = [];
-    for (i=0; i < wrtVars.length; i++) {
-        xnames[i] = i.toString();
-    }
+    var shifted = filtered.map(d => [d[0] - ofslice[0], d[1] - wrtslice[0], d[2]]);
+    ynames = shifted.map(d => d[0].toString());
+    xnames = shifted.map(d => d[1].toString());
 
     d3.select("#subjac-button").style("display", "block").node().click();
 
-    heatmap(subdata[0] + " wrt " + subdata[1], ynames, xnames, subdata, d3.select("#sub-jac"));
+    heatmap(subdata[0] + " wrt " + subdata[1], ynames, xnames, shifted, d3.select("#sub-jac"), false);
 }
 
 
@@ -305,12 +298,12 @@ function openJac(evt, ident) {
 }
 
 
-var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent) {
+var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent, addmouse) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .75;
 
-    var leftmargin = d3.max(ofEntries, s => s.length) * 5.5;
-    var bottommargin = d3.max(wrtEntries, s => s.length) * 6;
+    var leftmargin = d3.max(ofEntries, s => s.length) * 5.8;
+    var bottommargin = d3.max(wrtEntries, s => s.length) * 6.3;
     var legendwidth = 10;
     var legendloc = 20;
 
@@ -319,8 +312,11 @@ var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent
     var width = viewport_width - margin.left - margin.right;
     var height = viewport_height - margin.top - margin.bottom;
 
+    var heatmap = parent.select(".heatmap");
+    heatmap.selectAll("g").remove();
+
     // append the svg object to the body of the page
-    var svg = parent.select(".heatmap")
+    var svg = heatmap
         .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
         .attr("preserveAspectRatio", "xMidYMid meet")
         .append("g")
@@ -351,22 +347,19 @@ var heatmap = function heatmap(jactitle, ofEntries, wrtEntries, jac_data, parent
         .call(d3.axisLeft(y));
 
     svg.selectAll()
-        .data(jac_data, function (d) { return d[1] + ':' + d[0]; })
+        .data(jac_data, d => d[1] + ':' + d[0])
         .enter()
         .append("rect")
-        .attr("x", function (d) {
-            console.log("x " + x(d[1]));
-            console.log("d " + d);
-            return x(d[1]);
-        })
-        .attr("y", function (d) { return y(d[0]); })
+        .attr("x", d => x(d[1]))
+        .attr("y", d => y(d[0]))
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
         .style("fill", d => d[2] == null ? "gray" : subjacColor(d[2]))
-        .on("click", openSubjac)
         .on("mouseover", mouseover)
         .on("mousemove", mousemove)
-        .on("mouseleave", mouseleave);
+        .on("mouseleave", mouseleave)
+        .filter(d => addmouse && d[2] != null)  // don't add mouse handling to 0 entries
+        .on("click", openSubjac, this);
 
     // create the legend
     var leg_axis = d3.scaleLinear()
@@ -393,7 +386,6 @@ var tooltip = d3.select("#norm-jac")
     .append("div")
     .style("opacity", 0)
     .attr("class", "tooltip");
-
 
 var maxcolor = d3.max(data.var_mat_list, s => s == null ? 0 : Math.abs(s[2]));
 
@@ -423,7 +415,7 @@ grad.selectAll("stop")
     .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
     .attr("stop-color", d => d.color);
 
-heatmap("", ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"));
+heatmap("", ofVars, wrtVars, data.var_mat_list, d3.select("#norm-jac"), true);
 
 function startup() {
     d3.select("#varjac-button").node().click();
