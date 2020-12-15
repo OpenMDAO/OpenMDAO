@@ -5,7 +5,7 @@
  */
 class N2Legend {
     /**
-     * Initializes the legend object. 
+     * Initializes the legend object.
      * @param {ModelData} modelData Symbols are only displayed if they're in the model
      */
     constructor(modelData) {
@@ -18,6 +18,7 @@ class N2Legend {
             'group': false,
             'component': false,
             'input': false,
+            'desvars': false,
             'unconnectedInput': false,
             'autoivcInput': false,
             'outputExplicit': false,
@@ -67,8 +68,8 @@ class N2Legend {
         this.closeDiv
             .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
             .on('mouseout', e => { self.closeButton.style('color', 'black'); })
-            .on('click', e => { 
-                self.hide(); 
+            .on('click', e => {
+                self.hide();
                 self.closeButton.style('color', 'black');
                 d3.select('#legend-button').attr('class', 'fas icon-key');
             })
@@ -79,6 +80,7 @@ class N2Legend {
             const {
                 group,
                 component,
+                desvar,
                 input,
                 unconnectedInput,
                 outputExplicit,
@@ -165,6 +167,13 @@ class N2Legend {
                         'color': N2Style.color.unconnectedInput
                     })
                 }
+                else if (!this.showSysVar.desvar) {
+                    this.showSysVar.desvar = true;
+                    this.sysAndVar.push({
+                        'name': 'Optimization Variables',
+                        'color': N2Style.color.desvar
+                    })
+                }
             }
         }
     }
@@ -209,11 +218,11 @@ class N2Legend {
             let dragDiv = d3.select(this);
             dragDiv.style('cursor', 'grabbing')
                 // top style needs to be set explicitly before releasing bottom:
-                .style('top', dragDiv.style('top'))   
+                .style('top', dragDiv.style('top'))
                 .style('bottom', 'initial');
 
             self._startPos = [d3.event.clientX, d3.event.clientY]
-            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')), 
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
                 d3.event.clientY - parseInt(dragDiv.style('top'))];
 
             let w = d3.select(window)
@@ -225,7 +234,6 @@ class N2Legend {
                 .on("mouseup", e => {
                     dragDiv.style('cursor', 'grab');
                     w.on("mousemove", null).on("mouseup", null);
-                    
                 });
 
             d3.event.preventDefault();
