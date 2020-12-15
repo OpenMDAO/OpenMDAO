@@ -3633,7 +3633,7 @@ class System(object):
             if residuals_tol:
                 for n, m in outputs.items():
                     if "resids" in m and n in states:
-                        if isinstance(m['resids'], np.ndarray):
+                        if len(m['resids']) > 1:
                             for i in m['resids']:
                                 if i > residuals_tol:
                                     impl_outputs[n] = m
