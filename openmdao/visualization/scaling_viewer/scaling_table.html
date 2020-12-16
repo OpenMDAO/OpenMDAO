@@ -64,19 +64,59 @@
         border: 1px solid #ccc;
         border-top: none;
     }
+
+    .spacer {
+        width: 100%;
+        height: 30px;
+    }
+
+    #help-text {
+        display: none;
+    }
 </style>
 </head>
 <body onload="startup()">
 
-    <h1 id="scaling_title"></h1>
-    <h2>Design Variables</h2>
+    <h2 id="scaling_title"></h2>
+    <button id="help-button" onclick="toggleHelp(event)">Show help</button>
+    <div id="help-text">
+        <h2>Scaling Process</h2 >
+        <p>All scaling in OpenMDAO results in the following linear transformation:</p>
+        <p><em>Variable<sub>driver</sub> = m * Variable<sub>model</sub> + b</em></p>
+        <p>The computed values for <em>m</em> and <em>b</em> depend on how you specify the scaling, and
+            whether or not you specify units that the
+            driver sees which are different from the units in the model.</p>
+        <h3>If you use driver units</h3>
+        <p>If your model variable is in units of <em>m</em> and you choose to use <em>cm</em> for the driver value then you have a unit_factor of
+        100. This conversion is done before anything else. All other scaling is done relative to the driver unit values. If your
+        model value was 5.2 meters, then the driver value is 520 centimeters. You would then give ref and ref0 or scaler and adder
+        relative to that.</p>
+        <p>In general, unit conversions can include both a multiplicative factor and an offset (thank you, Celsius to Fahrenheit).</p>
+        <p>Given a variable from the model (<em>x<sub>model</sub></em>), the unit converted value (<em>x<sub>driver</sub></em>) is computed by</p>
+        <p><em>x<sub>driver</sub> = unit_factor * (x<sub>model</sub> + offset)</em></p>
+        <h3>If you use ref and ref0:</h3>
+        <p>The ref and ref0 values represent the model values that will get scaled to 1 and 0 respectively.</p>
+        <p><em>1 = m * (ref + b)<br>0 = m * (ref0 + b)</em></p>
+        <p>This gives the following for <em>m</em> and <em>b</em>:</p>
+        <p><em>b = -ref0<br>m = 1/(ref - ref0)</em></p>
+        <h3>If you use scaler and adder:</h3>
+        <p>You are specifying the slope and offset for the scaling directly.</p>
+        <p><em>b = adder<br>m = scaler</em></p>
+        <h3>Full unit scaling equation</h3>
+        <p>All of the scaling combined gives a linear map between the driver scaled value (<em>x<sub>driver</sub></em>),
+            the unit scaled value, and the actual model value (<em>x<sub>model</sub></em>).</p>
+        <p><em>x<sub>driver</sub> = m * (unit_factor * (x<sub>model</sub> + offset) + b)</em></p>
+        <p><em>x<sub>driver</sub> = (m * unit_factor) * (x<sub>model</sub> + offset + b/unit_factor)</em></p>
+        <p>So the overall scaler is (<em>m * unit_factor</em>) and the overall adder is
+            (<em>offset + b/unit_factor</em>).</p>
+    </div>
+    <h3>Design Variables</h3>
     <div id="dv-table"></div>
-    <h2>Constraints</h2>
+    <h3>Constraints</h3>
     <div id="con-table"></div>
-    <h2>Objectives</h2>
+    <h3>Objectives</h3>
     <div id="obj-table"></div>
-    <div class="tooltip"></div>
-
+    <div class="spacer"></div>
     <div class="tab">
         <button id="varjac-button" class="tablinks" onclick="openJac(event, '#variable-tab')">Sensitivity by Variable</button>
         <button id="subjac-button" class="tablinks" onclick="openJac(event, '#entry-tab')">Sensitivity by Entry</button>
@@ -95,6 +135,7 @@
             </svg>
         </div>
     </div>
+    <div class="tooltip"></div>
 
 <script type="text/javascript">
 
@@ -110,7 +151,7 @@ document.getElementById("scaling_title").innerHTML = data.title
 var d3_format = d3.format(".6~g");
 
 var arr_format = function(num) {
-    return "<b>|</b> <i>" + d3_format(num) + "</i> <b>|</b>";
+    return "<b>&lt</b> " + d3_format(num) + " <b>&gt</b>";
 }
 
 var val_formatter = function(cell, formatterParams, onRendered) {
@@ -251,8 +292,8 @@ var mousemove = function(event, d) {
     var txt = d3_format(d[2]);
     var tshape = textSize(txt, 0);
     tooltip
-        .attr("width", tshape.width)
-        .attr("height", tshape.height)
+        .attr("width", tshape.width + "px")
+        .attr("height", tshape.height + "px")
         .html(txt)
         .style("left", event.pageX + 10 + "px")
         .style("top", event.pageY - 15 + "px");
@@ -266,7 +307,18 @@ var mouseleave = function(event, d) {
 }
 
 
-var openSubjac = function(event, subdata) {
+function toggleHelp(event) {
+    let txt = d3.select("#help-text");
+    if (txt.node().style.display === "block") {
+        txt.style("display", "none");
+    }
+    else {
+        txt.style("display", "block");
+    }
+}
+
+
+function openSubjac(event, subdata) {
     // subdata: [ofname,  wrtname, value]  (value not used here)
     var ofslice = data.ofslices[subdata[0]];
     var wrtslice = data.wrtslices[subdata[1]];
@@ -309,6 +361,10 @@ function sizeOfLongest(strings, start, rotate) {
     return textSize(longest, rotate);
 }
 
+
+function expFormat(d) {
+    return "1e" + d;
+}
 
 var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmouse) {
     var viewport_width = document.documentElement.clientWidth * .95;
@@ -374,32 +430,33 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmo
         .filter(d => addmouse && d[2] != null)  // don't add mouse handling to 0 entries
         .on("click", openSubjac, this);
 
-        // create the gradient
-        var grad_data = [
-            {"color": subjacColor(-maxcolor), "value": -maxcolor},
-            {"color": subjacColor(0), "value": 0},
-            {"color": subjacColor(maxcolor), "value": maxcolor},
-        ];
+    // create the gradient
+    var grad_data = [
+        {"color": subjacColor(-maxcolor), "value": -maxcolor},
+        {"color": subjacColor(0), "value": 0},
+        {"color": subjacColor(maxcolor), "value": maxcolor},
+    ];
 
-        var grad_id = parent_id + "-lingrad";
-        var defs = parent.select(".heatmap").append("defs");
-        var grad = defs.append("linearGradient")
-            .attr('x1', '0%')
-            .attr('y1', '100%')
-            .attr('x2', '0%')
-            .attr('y2', '0%')
-            .attr("id", grad_id);
+    var grad_id = parent_id + "-lingrad";
+    var defs = parent.select(".heatmap").append("defs");
+    var grad = defs.append("linearGradient")
+        .attr('x1', '0%')
+        .attr('y1', '100%')
+        .attr('x2', '0%')
+        .attr('y2', '0%')
+        .attr("id", grad_id);
 
-        grad.selectAll("stop")
-            .data(grad_data)
-            .enter().append("stop")
-            .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
-            .attr("stop-color", d => d.color);
+    grad.selectAll("stop")
+        .data(grad_data)
+        .enter().append("stop")
+        .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+        .attr("stop-color", d => d.color);
 
     // create the legend
     var leg_axis = d3.scaleLinear()
         .domain([maxcolor, -maxcolor])
-        .range([0, height]);
+        .range([0, height])
+        .nice();
 
     var legend = parent.select(".heatmap")
         .append("g")
@@ -407,7 +464,7 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmo
 
     legend.append("g")
         .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
-        .call(d3.axisRight(leg_axis));
+        .call(d3.axisRight(leg_axis).tickFormat(expFormat));
 
     legend.append("rect")
             .attr("x", legendloc)
