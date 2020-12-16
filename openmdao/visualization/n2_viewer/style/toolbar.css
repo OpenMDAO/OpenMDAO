@@ -124,7 +124,7 @@
 .toolbar-hide-container {
     background-color: white;
     width: 15px;
-    height: 35px;
+    height: 33px;
     border-top-right-radius: 25%;
     border-bottom-right-radius: 25%;
 
@@ -324,16 +324,20 @@
     font-size: 24px;
 }
 
+.icon-backward {
+    font-size: 13px !important;
+}
+
+.icon-forward {
+	font-size: 13px !important;
+}
+
 .toolbar .fas {
     margin: 7px 0;
     color: white;
     font-size: 20px;
     cursor: pointer;
     transition: color 0.2s;
-}
-
-.solver-button {
-    font-size: 25px !important;
 }
 
 .active-tab-icon {
