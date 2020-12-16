@@ -482,7 +482,6 @@ ValueInfo.TRUNCATE_LIMIT = 80;
  * @typedef NodeInfo
  */
 class NodeInfo {
-
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
