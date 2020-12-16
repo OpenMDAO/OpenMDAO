@@ -118,6 +118,9 @@ def _get_var_dict(system, typ, name, is_parallel):
     else:
         is_distributed = False
 
+    if 'surrogate_name' in meta:
+        var_dict['surrogate_name'] = meta['surrogate_name']
+
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:

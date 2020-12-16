@@ -51,7 +51,7 @@ class InfoPropDefault {
 }
 
 /**
- * Output a Yes or No to display. 
+ * Output a Yes or No to display.
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
@@ -389,7 +389,7 @@ class ValueInfo {
         // larger than full size
         this.initial_width = parseInt(this.table.style('width'));
         this.initial_height = parseInt(this.table.style('height'));
-        
+
         titleSpan.style('max-width', `${this.initial_width - 50}px`);
         titleSpan.text(this.name);
     }
@@ -495,6 +495,7 @@ class NodeInfo {
             new InfoPropDefault('promotedName', 'Promoted Name'),
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
+            new InfoPropDefault('surrogate_name', 'Surrogate'),
             new InfoPropDefault('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
 

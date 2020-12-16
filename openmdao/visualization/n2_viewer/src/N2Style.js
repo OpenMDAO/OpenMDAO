@@ -224,6 +224,7 @@ N2Style.color = {
     'connection': 'gray',
     'outputImplicit': '#C7D06D',
     'outputExplicit': '#9FC4C6',
+    'desvar': '#c5b0d5',
     'componentBox': '#555',
     'background': '#eee',
     'gridline': 'white',
@@ -244,7 +245,7 @@ N2Style.color = {
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
 
-/* 
+/*
 * This is how we want to map solvers to colors and CSS classes
 *    Linear             Nonlinear
 *    ---------          ---------
