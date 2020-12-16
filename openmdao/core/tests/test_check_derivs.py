@@ -2587,9 +2587,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         lines = stream.getvalue()
         self.assertFalse("Checking derivatives with respect to" in lines)
 
-        msg = "'_ReprClass' object has no attribute 'write'"
-        with assert_no_warning(AttributeError, msg):
-            prob.check_totals(method='fd', show_progress=True)
+        prob.check_totals(method='fd', show_progress=True)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()
