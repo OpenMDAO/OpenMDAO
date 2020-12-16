@@ -367,3 +367,7 @@ rect.outputHighlight {
     z-index: 999990;
     background: none;
 }
+
+.opt-vars {
+    fill: #c5b0d5 !important;
+}

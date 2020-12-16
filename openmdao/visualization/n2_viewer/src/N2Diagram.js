@@ -102,7 +102,7 @@ class N2Diagram {
     }
 
     /**
-     * Switch back and forth between showing the linear or non-linear solver names. 
+     * Switch back and forth between showing the linear or non-linear solver names.
      */
     toggleSolverNameType() {
         this.showLinearSolverNames = !this.showLinearSolverNames;
@@ -150,7 +150,7 @@ class N2Diagram {
         this.layout.zoomedElement = this.zoomedElement;
     }
 
-    /** 
+    /**
      * Setup internal references to D3 objects so we can avoid running
      * d3.select() over and over later.
      */
@@ -645,8 +645,22 @@ class N2Diagram {
         }
     }
 
+    showDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
+            );
+        d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
+    }
+
+    hideDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            );
+        d3.select("#_auto_ivc").classed('opt-vars', false)
+    }
+
     delay(time) {
-        return new Promise(function(resolve) { 
+        return new Promise(function(resolve) {
             setTimeout(resolve, time)
         });
      }
@@ -701,6 +715,8 @@ class N2Diagram {
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
+
+        if (!this.ui.desVars) this.showDesignVars()
     }
 
     /**

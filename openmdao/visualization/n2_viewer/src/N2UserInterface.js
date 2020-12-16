@@ -26,6 +26,7 @@ class N2UserInterface {
         this.leftClickIsForward = true;
         this.findRootOfChangeFunction = null;
         this.callSearchFromEnterKeyPressed = false;
+        this.desVars = true;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
@@ -610,6 +611,21 @@ class N2UserInterface {
 
         d3.select('#legend-button').attr('class',
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
+    }
+
+    toggleDesVars() {
+        testThis(this, 'N2UserInterface', 'toggleDesVars');
+
+        if (this.desVars) {
+            this.n2Diag.showDesignVars();
+            this.desVars = false;
+        } else {
+            this.n2Diag.hideDesignVars();
+            this.desVars = true;
+        }
+
+        d3.select('#desvars-button').attr('class',
+            this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
     }
 
     /** Show or hide the node info panel button */
