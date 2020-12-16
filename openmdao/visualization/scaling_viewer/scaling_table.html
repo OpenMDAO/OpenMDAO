@@ -9,7 +9,6 @@
 <script type="text/javascript">
         <d3_src>
 </script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <script>
     var data = <scaling_data>;
 </script>
@@ -17,15 +16,16 @@
     <tabulator_style>
     div.tooltip {
         position: absolute;
-        text-align: center;
-        width: 80px;
-        height: 28px;
-        padding: 2px;
+        text-align: left;
+        padding: 4px;
         font: 12px sans-serif;
         background: lightsteelblue;
-        border: 0px;
+        border: 3px;
         border-radius: 8px;
         pointer-events: none;
+        -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
         opacity: 0;
     }
 
@@ -78,7 +78,7 @@
 <body onload="startup()">
 
     <h2 id="scaling_title"></h2>
-    <button id="help-button" onclick="toggleHelp(event)">Show help</button>
+    <button id="help-button" onclick="toggleHelp(event)">Help</button>
     <div id="help-text">
         <h2>Scaling Process</h2 >
         <p>All scaling in OpenMDAO results in the following linear transformation:</p>
@@ -279,27 +279,35 @@ var objtable =
     });
 
 
-var mouseover = function(event, d) {
+function mouseover(event, d) {
     event.stopPropagation();
     if (d[2] == null) return;
     tooltip.style("opacity", 1);
     d3.select(this).style("stroke", "black");
 }
 
-var mousemove = function(event, d) {
+
+function mousemove(event, d) {
     event.stopPropagation();
     if (d[2] == null) return;
-    var txt = d3_format(d[2]);
-    var tshape = textSize(txt, 0);
+
+    if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
+        var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + d3_format(Math.pow(10, d[2]));
+    }
+    else {  // for var wrt var jac, show shape along with value
+        var oslc = data.ofslices[d[0]];
+        var wrtslc = data.wrtslices[d[1]];
+        var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "norm" : "value";
+        var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + d3_format(Math.pow(10, d[2]));
+    }
     tooltip
-        .attr("width", tshape.width + "px")
-        .attr("height", tshape.height + "px")
         .html(txt)
         .style("left", event.pageX + 10 + "px")
         .style("top", event.pageY - 15 + "px");
 }
 
-var mouseleave = function(event, d) {
+
+function mouseleave(event, d) {
     event.stopPropagation();
     if (d[2] == null) return;
     tooltip.style("opacity", 0)
@@ -363,21 +371,23 @@ function sizeOfLongest(strings, start, rotate) {
 
 
 function expFormat(d) {
-    return "1e" + d;
+    return d3_format(Math.pow(10, d));
+    // return "1e" + d;
 }
 
-var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmouse) {
+
+var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, istop) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .95;
 
     var parent = d3.select(parent_id);
-    var leftmargin = sizeOfLongest(ofEntries, "9999", 0).width;
-    var bottommargin = sizeOfLongest(wrtEntries, "9999", 90).height;
-    var legendwidth = 10;
+    var leftmargin = istop ? sizeOfLongest(ofEntries, "9999", 0).width : 10;
+    var bottommargin = istop ? sizeOfLongest(wrtEntries, "9999", 90).height : 10;
+    var legendwidth = 20;
     var legendloc = 20;
 
     // set the dimensions and margins of the graph
-    var margin = {top: 30, right: 50 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
+    var margin = {top: 30, right: 70 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
     var width = viewport_width - margin.left - margin.right;
     var height = viewport_height - margin.top - margin.bottom;
 
@@ -397,14 +407,16 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmo
         .domain(wrtEntries)
         .padding(0.01);
 
-    svg.append("g")
-        .attr("transform", "translate(0," + height + ")")
-        .call(d3.axisBottom(x))
+    if (istop) {
+        svg.append("g")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x))
             .selectAll("text")
             .style("text-anchor", "start")
             .attr("dx", ".8em")
             .attr("dy", "-.5em")
             .attr("transform", "rotate(90)");
+    }
 
     // Build Y scales and axis:
     var y = d3.scaleBand()
@@ -412,8 +424,10 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmo
         .domain(ofEntries)
         .padding(0.01);
 
-    svg.append("g")
-        .call(d3.axisLeft(y));
+    if (istop) {
+        svg.append("g")
+            .call(d3.axisLeft(y));
+    }
 
     svg.selectAll()
         .data(jac_data, d => d[1] + ':' + d[0])
@@ -427,7 +441,7 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, addmo
         .on("mouseover", mouseover)
         .on("mousemove", mousemove)
         .on("mouseleave", mouseleave)
-        .filter(d => addmouse && d[2] != null)  // don't add mouse handling to 0 entries
+        .filter(d => istop && d[2] != null)  // don't add mouse handling to 0 or subjac entries
         .on("click", openSubjac, this);
 
     // create the gradient
