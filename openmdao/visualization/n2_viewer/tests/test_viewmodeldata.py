@@ -356,7 +356,7 @@ class TestViewModelData(unittest.TestCase):
         prob.setup()
         model_viewer_data = _get_viewer_data(prob)
         np.testing.assert_equal(model_viewer_data['tree']['children'][1]['options']['arr'],
-                                   np.ones(2))
+                                np.ones(2))
 
     def test_n2_from_problem(self):
         """
