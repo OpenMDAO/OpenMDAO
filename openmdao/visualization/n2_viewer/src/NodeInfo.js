@@ -482,7 +482,6 @@ ValueInfo.TRUNCATE_LIMIT = 80;
  * @typedef NodeInfo
  */
 class NodeInfo {
-    static initial_val_msg = 'Non-local values are not available under MPI, showing initial value.';
 
     /**
      * Build a list of the properties we care about and set up
@@ -502,7 +501,8 @@ class NodeInfo {
             new InfoPropDefault('units', 'Units'),
             new InfoPropDefault('shape', 'Shape'),
             new InfoPropYesNo('is_discrete', 'Discrete'),
-            new InfoPropMessage('initial_value', '** Note **', NodeInfo.initial_val_msg),
+            new InfoPropMessage('initial_value', '** Note **',
+                                'Non-local values are not available under MPI, showing initial value.'),
             new InfoPropYesNo('distributed', 'Distributed'),
             new InfoPropArray('value', 'Value', this.values),
 
