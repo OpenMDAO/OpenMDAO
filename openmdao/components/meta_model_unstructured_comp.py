@@ -205,7 +205,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         if surrogate:
             metadata['surrogate'] = surrogate
             metadata['default_surrogate'] = False
-            metadata['surrogate_name'] = surrogate.options._parent_name
+            metadata['surrogate_name'] = type(surrogate).__name__
         else:
             metadata['default_surrogate'] = True
 
