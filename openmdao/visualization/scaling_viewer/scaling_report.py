@@ -58,7 +58,6 @@ def _getdef(val, unset):
 
 
 def _getnorm(val, unset=''):
-    # return norm and the size of the value
     val = _getdef(val, unset)
     if np.isscalar(val) or val.size == 1:
         return val
@@ -120,6 +119,85 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
             if equals_flat is not None:
                 d['equals'] = [equals_flat[i], 1]
             children.append(d)
+
+
+def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
+    rownames = [None] * totals.shape[0]
+    colnames = [None] * totals.shape[1]
+
+    start = end = 0
+    data['ofslices'] = slices = {}
+    for n, v in response_vals.items():
+        end += v.size
+        slices[n] = [start, end]
+        rownames[start:end] = [n] * (end - start)
+        start = end
+
+    start = end = 0
+    data['wrtslices'] = slices = {}
+    for n, v in dv_vals.items():
+        end += v.size
+        slices[n] = [start, end]
+        colnames[start:end] = [n] * (end - start)
+        start = end
+
+    norm_mat = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+
+    for i, of in enumerate(response_vals):
+        ofstart, ofend = data['ofslices'][of]
+        for j, wrt in enumerate(dv_vals):
+            wrtstart, wrtend = data['wrtslices'][wrt]
+            norm_mat[i, j] = np.linalg.norm(totals[ofstart:ofend, wrtstart:wrtend])
+
+    def mat_magnitude(mat):
+        mag = np.log10(np.abs(mat))
+        finite = mag[np.isfinite(mag)]
+        max_mag = np.max(finite)
+        min_mag = np.min(finite)
+        cap = np.abs(min_mag)
+        if max_mag > cap:
+            cap = max_mag
+        mag[np.isinf(mag)] = -cap
+        return mag
+
+    var_matrix = mat_magnitude(norm_mat)
+    matrix = mat_magnitude(totals)
+
+    if coloring is not None: # factor in the sparsity
+        mask = np.ones(totals.shape, dtype=bool)
+        mask[coloring._nzrows, coloring._nzcols] = 0
+        matrix[mask] = np.inf  # we know matrix cannot contain infs by this point
+
+    nonempty_submats = set()  # submats with any nonzero values
+
+    matlist = [None] * matrix.size
+    idx = 0
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            val = matrix[i, j]
+            if np.isinf(val):
+                val = None
+            else:
+                nonempty_submats.add((rownames[i], colnames[j]))
+            matlist[idx] = [i, j, val]
+            idx += 1
+
+    data['mat_list'] = matlist
+
+    varmatlist = [None] * var_matrix.size
+
+    # setup up sparsity of var matrix
+    idx = 0
+    for i, of in enumerate(data['oflabels']):
+        for j, wrt in enumerate(data['wrtlabels']):
+            if coloring is not None and (of, wrt) not in nonempty_submats:
+                val = None
+            else:
+                val = var_matrix[i, j]
+            varmatlist[idx] = [of, wrt, val]
+            idx += 1
+
+    data['var_mat_list'] = varmatlist
 
 
 def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
@@ -196,7 +274,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             'index': '',
         }
 
-        print(name, "ref=", dct['ref'])
         dv_table.append(dct)
 
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
@@ -286,99 +363,41 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
                 coloring = coloring_mod.dynamic_total_coloring(driver)
 
         # assemble data for jacobian visualization
-        data['oflabels'] = list(chain(obj_vals, con_vals))
+        data['oflabels'] = driver._get_ordered_nl_responses()
         data['wrtlabels'] = list(dv_vals)
 
         totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                         return_format='array')
 
-        rownames = [None] * totals.shape[0]
-        colnames = [None] * totals.shape[1]
+        data['linear'] = lindata = {}
+        lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
+        lindata['wrtlabels'] = data['wrtlabels']
 
-        start = end = 0
-        data['ofslices'] = slices = {}
-        for n, v in chain(obj_vals.items(), con_vals.items()):
-            end += v.size
-            slices[n] = [start, end]
-            rownames[start:end] = [n] * (end - start)
-            start = end
+        # check for separation of linear constraints
+        if lindata['oflabels']:
+            if set(lindata['oflabels']).difference(data['oflabels']):
+                # linear cons are found in data['oflabels'] so they're not separated
+                lindata['oflabbels'] = []
+                lindata['wrtlables'] = []
 
-        start = end = 0
-        data['wrtslices'] = slices = {}
-        for n, v in dv_vals.items():
-            end += v.size
-            slices[n] = [start, end]
-            colnames[start:end] = [n] * (end - start)
-            start = end
+        # print("var_matrix")
+        # print(norm_mat)
+        # print("----")
+        # print(var_matrix)
+        # print("obj", list(obj_vals))
+        # print("con", list(con_vals))
+        # print("dv", list(dv_vals))
 
-        norm_mat = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+        full_response_vals = con_vals.copy()
+        full_response_vals.update(obj_vals)
+        response_vals = {n: full_response_vals[n] for n in data['oflabels']}
 
-        def mat_magnitude(mat):
-            mag = np.log10(np.abs(mat))
-            finite = mag[np.isfinite(mag)]
-            max_mag = np.max(finite)
-            min_mag = np.min(finite)
-            cap = np.abs(min_mag)
-            if max_mag > cap:
-                cap = max_mag
-            mag[np.isinf(mag)] = -cap
-            return mag
-
-        for i, of in enumerate(chain(obj_vals, con_vals)):
-            ofstart, ofend = data['ofslices'][of]
-            for j, wrt in enumerate(dv_vals):
-                wrtstart, wrtend = data['wrtslices'][wrt]
-                norm_mat[i, j] = np.linalg.norm(totals[ofstart:ofend, wrtstart:wrtend])
-
-        var_matrix = mat_magnitude(norm_mat)
-        matrix = mat_magnitude(totals)
-
-        if coloring is not None: # factor in the sparsity
-            mask = np.ones(totals.shape, dtype=bool)
-            mask[coloring._nzrows, coloring._nzcols] = 0
-            matrix[mask] = np.inf  # we know matrix cannot contain infs by this point
-
-        # create matrix data that includes sparsity
-        nonempty_submats = set()  # submats with any nonzero values (inf now indicates zero entries)
-        linear_cons = [n for n in driver._cons if driver._cons[n]['linear']]
-        # coloring._nzrows/cols don't contain linear constraints, so add them to nonempty_submats
-        for con in linear_cons:
-            for dv in data['wrtlabels']:
-                nonempty_submats.add((con, dv))
-
-        matlist = [None] * matrix.size
-        idx = 0
-        for i in range(matrix.shape[0]):
-            for j in range(matrix.shape[1]):
-                val = matrix[i, j]
-                if np.isinf(val):
-                    val = None
-                else:
-                    nonempty_submats.add((rownames[i], colnames[j]))
-                matlist[idx] = [i, j, val]
-                idx += 1
-
-        data['mat_list'] = matlist
-
-        varmatlist = [None] * var_matrix.size
-
-        # setup up sparsity of var matrix
-        idx = 0
-        for i, of in enumerate(data['oflabels']):
-            for j, wrt in enumerate(data['wrtlabels']):
-                val = None if (of, wrt) not in nonempty_submats else var_matrix[i, j]
-                varmatlist[idx] = [of, wrt, val]
-                idx += 1
-
-        data['var_mat_list'] = varmatlist
-
-        print("var_matrix")
-        print(norm_mat)
-        print("----")
-        print(var_matrix)
-        print("obj", list(obj_vals))
-        print("con", list(con_vals))
-        print("dv", list(dv_vals))
+        compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
+        if lindata['oflabels']:
+            lintotals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                               return_format='array')
+            lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
+            compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
     viewer = 'scaling_table.html'
 
