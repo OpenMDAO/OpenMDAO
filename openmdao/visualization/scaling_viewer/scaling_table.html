@@ -43,7 +43,7 @@
         border: none;
         outline: none;
         cursor: pointer;
-        padding: 14px 16px;
+        padding: 10px 16px;
         transition: 0.3s;
     }
 
@@ -64,6 +64,15 @@
         border: 1px solid #ccc;
         border-top: none;
     }
+
+    /* Style the close button */
+    .topright {
+        float: right;
+        cursor: pointer;
+        font-size: 28px;
+    }
+
+    .topright:hover {color: red;}
 
     .spacer {
         width: 100%;
@@ -118,7 +127,7 @@
     <div id="obj-table"></div>
     <div class="spacer"></div>
     <div id="tab-bar" class="tab">
-        <button id="varjac-button" class="tablinks" onclick="showJac(event, '#variable-tab')">Sensitivity by Variable</button>
+        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')">Sensitivity by Variable</button>
     </div>
     <div id="jac-tabs">
         <div id="variable-tab" class="tabcontent">
@@ -192,30 +201,29 @@ function add_sub_tab(rowname, colname) {
         .append("button")
         .attr("id", name + "-button")
         .classed("tablinks", true)
-        .html(rowname + " <b>wrt</b> " + colname);
+        .html(rowname + " <b>wrt</b> " + colname)
+        .on("click", function(evt) {
+            showJac(evt, name);
+        })
 
-        // .on("click", showJac, "#" + name + "-tab");
-    btn.node().onclick = function(evt) {
-        showJac(evt, "#" + name + "-tab");
-    }
-
-    d3.select("#jac-tabs")
+    var dv = d3.select("#jac-tabs")
         .append("div")
         .attr("id", name + "-tab")
-        .classed("tabcontent", true)
-        .append("div")
-        .attr("id", name + "-jac")
-        .append("svg")
-        .classed("heatmap", true);
+        .classed("tabcontent", true);
 
-    // button to make subjac view go away
-    spn.append("button")
-        .html("x")
-        .node().onclick = function(evt) {
+    dv.append("span")
+        .classed("topright", true)
+        .html("&times")
+        .on("click", function (evt) {
             spn.remove();
             d3.select("#" + name + "-tab").remove();
             d3.select("#varjac-button").node().click();
-        }
+        });
+
+    dv.append("div")
+        .attr("id", name + "-jac")
+        .append("svg")
+        .classed("heatmap", true);
 
     btn.node().click();
 }
@@ -324,7 +332,7 @@ var objtable =
 
 function mouseover(event, d) {
     event.stopPropagation();
-    if (d[2] == null) return;
+    // if (d[2] == null) return;
     tooltip.style("opacity", 1);
     d3.select(this).style("stroke", "black");
 }
@@ -332,16 +340,16 @@ function mouseover(event, d) {
 
 function mousemove(event, d) {
     event.stopPropagation();
-    if (d[2] == null) return;
+    var val = (d[2] == null) ? 0. : d3_format(Math.pow(10, d[2]));
 
     if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
-        var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + d3_format(Math.pow(10, d[2]));
+        var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
     }
     else {  // for var wrt var jac, show shape along with value
         var oslc = data.ofslices[d[0]];
         var wrtslc = data.wrtslices[d[1]];
         var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "norm" : "value";
-        var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + d3_format(Math.pow(10, d[2]));
+        var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + val;
     }
     tooltip
         .html(txt)
@@ -352,7 +360,7 @@ function mousemove(event, d) {
 
 function mouseleave(event, d) {
     event.stopPropagation();
-    if (d[2] == null) return;
+    // if (d[2] == null) return;
     tooltip.style("opacity", 0)
     d3.select(this).style("stroke", "none");
 }
@@ -388,8 +396,8 @@ function openSubjac(event, subdata) {
 function showJac(evt, ident) {
     d3.selectAll(".tabcontent").style("display", "none");
     d3.selectAll(".tablinks").classed("active", false);
-    d3.select(ident).style("display", "block");
-    evt.currentTarget.className += " active";
+    d3.select("#" + ident + "-tab").style("display", "block");
+    d3.select("#" + ident + "-button").classed("active", true);
 }
 
 
