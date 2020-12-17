@@ -117,22 +117,14 @@
     <h3>Objectives</h3>
     <div id="obj-table"></div>
     <div class="spacer"></div>
-    <div class="tab">
-        <button id="varjac-button" class="tablinks" onclick="openJac(event, '#variable-tab')">Sensitivity by Variable</button>
-        <button id="subjac-button" class="tablinks" onclick="openJac(event, '#entry-tab')">Sensitivity by Entry</button>
+    <div id="tab-bar" class="tab">
+        <button id="varjac-button" class="tablinks" onclick="showJac(event, '#variable-tab')">Sensitivity by Variable</button>
     </div>
-    <div id="variable-tab" class="tabcontent">
-        <div id="norm-jac">
-            <svg id="norm-svg" class="heatmap">
-            </svg>
-        </div>
-    </div>
-
-    <div id="entry-tab" class="tabcontent">
-        <div id="sub-jac">
-            <h3 id="sub-jac-title"></h3>
-            <svg class="heatmap">
-            </svg>
+    <div id="jac-tabs">
+        <div id="variable-tab" class="tabcontent">
+            <div id="norm-jac">
+                <svg id="norm-svg" class="heatmap"></svg>
+            </div>
         </div>
     </div>
     <div class="tooltip"></div>
@@ -145,16 +137,27 @@ var obj_tabledata = data.obj_table;
 var wrtVars = data.wrtlabels;
 var ofVars = data.oflabels;
 
+var vname_map = {}  // maps all vnames to and id for use in selectors
+var vname_count = 0;
+
+function get_vname_id(vname) {
+    if (vname_map[vname] === undefined) {
+        vname_map[vname] = vname_count;
+        vname_count = vname_count + 1;
+    }
+    return "varname" + vname_map[vname];
+}
+
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
 
 var d3_format = d3.format(".6~g");
 
-var arr_format = function(num) {
+function arr_format(num) {
     return "<b>&lt</b> " + d3_format(num) + " <b>&gt</b>";
 }
 
-var val_formatter = function(cell, formatterParams, onRendered) {
+function val_formatter(cell, formatterParams, onRendered) {
     // cell value is actually [value, size]
     let val = cell.getValue();
     if (val[1] > 1) {
@@ -167,7 +170,7 @@ var val_formatter = function(cell, formatterParams, onRendered) {
 };
 
 
-var val_sorter = function(a, b, aRow, bRow, column, dir, sorterParams) {
+function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
     if (a == "") {
         a = [-1e99, 0];
     }
@@ -178,7 +181,47 @@ var val_sorter = function(a, b, aRow, bRow, column, dir, sorterParams) {
 }
 
 
-var numrow = function(title, field) {
+function add_sub_tab(rowname, colname) {
+    var name = get_vname_id(rowname) + "-" + get_vname_id(colname);
+    var tabname = name + "-tab";
+
+    var spn = d3.select("#tab-bar")
+        .append("span");
+
+    var btn = spn
+        .append("button")
+        .attr("id", name + "-button")
+        .classed("tablinks", true)
+        .html(rowname + " <b>wrt</b> " + colname);
+
+        // .on("click", showJac, "#" + name + "-tab");
+    btn.node().onclick = function(evt) {
+        showJac(evt, "#" + name + "-tab");
+    }
+
+    d3.select("#jac-tabs")
+        .append("div")
+        .attr("id", name + "-tab")
+        .classed("tabcontent", true)
+        .append("div")
+        .attr("id", name + "-jac")
+        .append("svg")
+        .classed("heatmap", true);
+
+    // button to make subjac view go away
+    spn.append("button")
+        .html("x")
+        .node().onclick = function(evt) {
+            spn.remove();
+            d3.select("#" + name + "-tab").remove();
+            d3.select("#varjac-button").node().click();
+        }
+
+    btn.node().click();
+}
+
+
+function numrow(title, field) {
     return {title:title, field:field, hozAlign:"right", visible:true, headerFilter:false, formatter:val_formatter, sorter:val_sorter}
 }
 
@@ -337,13 +380,12 @@ function openSubjac(event, subdata) {
     ynames = shifted.map(d => d[0].toString());
     xnames = shifted.map(d => d[1].toString());
 
-    d3.select("#subjac-button").style("display", "block").node().click();
-    d3.select("#subjac-button").html(subdata[0] + " <b>wrt</b> " + subdata[1])
-    heatmap(ynames, xnames, shifted, "#sub-jac", false);
+    add_sub_tab(subdata[0], subdata[1]);
+    heatmap(ynames, xnames, shifted, "#" + get_vname_id(subdata[0]) + "-" + get_vname_id(subdata[1]) + "-tab", false);
 }
 
 
-function openJac(evt, ident) {
+function showJac(evt, ident) {
     d3.selectAll(".tabcontent").style("display", "none");
     d3.selectAll(".tablinks").classed("active", false);
     d3.select(ident).style("display", "block");
@@ -376,13 +418,13 @@ function expFormat(d) {
 }
 
 
-var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, istop) {
+var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .95;
 
     var parent = d3.select(parent_id);
-    var leftmargin = istop ? sizeOfLongest(ofEntries, "9999", 0).width : 10;
-    var bottommargin = istop ? sizeOfLongest(wrtEntries, "9999", 90).height : 10;
+    var leftmargin = is_top ? sizeOfLongest(ofEntries, "9999", 0).width : 10;
+    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "9999", 90).height : 10;
     var legendwidth = 20;
     var legendloc = 20;
 
@@ -407,7 +449,7 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, istop
         .domain(wrtEntries)
         .padding(0.01);
 
-    if (istop) {
+    if (is_top) {
         svg.append("g")
             .attr("transform", "translate(0," + height + ")")
             .call(d3.axisBottom(x))
@@ -424,7 +466,7 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, istop
         .domain(ofEntries)
         .padding(0.01);
 
-    if (istop) {
+    if (is_top) {
         svg.append("g")
             .call(d3.axisLeft(y));
     }
@@ -441,8 +483,8 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, istop
         .on("mouseover", mouseover)
         .on("mousemove", mousemove)
         .on("mouseleave", mouseleave)
-        .filter(d => istop && d[2] != null)  // don't add mouse handling to 0 or subjac entries
-        .on("click", openSubjac, this);
+        .filter(d => is_top && d[2] != null)  // don't add mouse handling to 0 or subjac entries
+        .on("click", openSubjac, d => d);
 
     // create the gradient
     var grad_data = [
@@ -502,7 +544,7 @@ heatmap(ofVars, wrtVars, data.var_mat_list, "#norm-jac", true);
 
 function startup() {
     d3.select("#varjac-button").node().click();
-    d3.select("#subjac-button").style("display", "none");
+    // d3.select("#subjac-button").style("display", "none");
 }
 
 </script>
