@@ -73,8 +73,6 @@ class N2Layout {
             startTimer('N2Layout._computeSolverNormalizedPositions');
             this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
             stopTimer('N2Layout._computeSolverNormalizedPositions');
-        }
-        if (this.showSolvers) {
             if (this.zoomedElement.parent)
                 this.zoomedSolverNodes.push(this.zoomedElement.parent);
         }
