@@ -371,13 +371,13 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
-        lindata['wrtlabels'] = data['wrtlabels']
+        lindata['wrtlabels'] = data['wrtlabels']  # needs to mimic data structure
 
         # check for separation of linear constraints
         if lindata['oflabels']:
-            if set(lindata['oflabels']).difference(data['oflabels']):
+            if set(lindata['oflabels']).intersection(data['oflabels']):
                 # linear cons are found in data['oflabels'] so they're not separated
-                lindata['oflabbels'] = []
+                lindata['oflabels'] = []
                 lindata['wrtlables'] = []
 
         # print("var_matrix")

@@ -143,8 +143,6 @@
 var dv_tabledata = data.dv_table;
 var con_tabledata = data.con_table;
 var obj_tabledata = data.obj_table;
-var wrtVars = data.wrtlabels;
-var ofVars = data.oflabels;
 
 var vname_map = {}  // maps all vnames to and id for use in selectors
 var vname_count = 0;
@@ -187,45 +185,6 @@ function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
         b = [-1e99, 0];
     }
     return a[0] - b[0];
-}
-
-
-function add_sub_tab(rowname, colname) {
-    var name = get_vname_id(rowname) + "-" + get_vname_id(colname);
-    var tabname = name + "-tab";
-
-    var spn = d3.select("#tab-bar")
-        .append("span");
-
-    var btn = spn
-        .append("button")
-        .attr("id", name + "-button")
-        .classed("tablinks", true)
-        .html(rowname + " <b>wrt</b> " + colname)
-        .on("click", function(evt) {
-            showJac(evt, name);
-        })
-
-    var dv = d3.select("#jac-tabs")
-        .append("div")
-        .attr("id", name + "-tab")
-        .classed("tabcontent", true);
-
-    dv.append("span")
-        .classed("topright", true)
-        .html("&times")
-        .on("click", function (evt) {
-            spn.remove();
-            d3.select("#" + name + "-tab").remove();
-            d3.select("#varjac-button").node().click();
-        });
-
-    dv.append("div")
-        .attr("id", name + "-jac")
-        .append("svg")
-        .classed("heatmap", true);
-
-    btn.node().click();
 }
 
 
@@ -377,8 +336,43 @@ function toggleHelp(event) {
 }
 
 
+function add_sub_tab(rowname, colname) {
+    var name = get_vname_id(rowname) + "-" + get_vname_id(colname);
+
+    var btn = d3.select("#tab-bar")
+        .append("button")
+        .attr("id", name + "-button")
+        .classed("tablinks", true)
+        .html(rowname + " <b>wrt</b> " + colname)
+        .on("click", function(evt) {
+            showJac(evt, name);
+        })
+
+    var dv = d3.select("#jac-tabs")
+        .append("div")
+        .attr("id", name + "-tab")
+        .classed("tabcontent", true);
+
+    dv.append("span")
+        .classed("topright", true)
+        .html("&times")
+        .on("click", function (evt) {
+            btn.remove();
+            d3.select("#" + name + "-tab").remove();
+            d3.select("#varjac-button").node().click();
+        });
+
+    dv.append("div")
+        .attr("id", name + "-jac")
+        .append("svg")
+        .classed("heatmap", true);
+
+    btn.node().click();
+}
+
+
 function openSubjac(event, subdata) {
-    // subdata: [ofname,  wrtname, value]  (value not used here)
+    // subdata: [ofname,  wrtname, value]
     var ofslice = data.ofslices[subdata[0]];
     var wrtslice = data.wrtslices[subdata[1]];
     var filtered = data.mat_list.filter(function(d) {
@@ -548,11 +542,31 @@ var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
 
-heatmap(ofVars, wrtVars, data.var_mat_list, "#norm-jac", true);
+heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
+if (data.linear.oflabels.length > 0) {
+    var btn = d3.select("#tab-bar")
+        .append("button")
+        .attr("id", "linear-button")
+        .classed("tablinks", true)
+        .html("linear constraints")
+        .on("click", function(evt) {
+            showJac(evt, "linear");
+        })
+
+        var dv = d3.select("#jac-tabs")
+        .append("div")
+        .attr("id", "linear-tab")
+        .classed("tabcontent", true)
+        .append("div")
+        .attr("id", "linear-jac")
+        .append("svg")
+        .classed("heatmap", true);
+
+    heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
+}
 
 function startup() {
     d3.select("#varjac-button").node().click();
-    // d3.select("#subjac-button").style("display", "none");
 }
 
 </script>
