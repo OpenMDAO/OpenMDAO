@@ -289,19 +289,6 @@ var objtable =
     });
 
 
-function mouseover(event, d) {
-    event.stopPropagation();
-    tooltip.style("opacity", 1);
-    d3.select(this).style("stroke", "black");
-}
-
-function mouseleave(event, d) {
-    event.stopPropagation();
-    tooltip.style("opacity", 0)
-    d3.select(this).style("stroke", "none");
-}
-
-
 function toggleHelp(event) {
     let txt = d3.select("#help-text");
     if (txt.node().style.display === "block") {
@@ -459,7 +446,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
         .style("fill", d => d[2] == null ? "gray" : subjacColor(d[2]))
-        .on("mouseover", mouseover)
+        .on("mouseover", function () {
+            event.stopPropagation(event);
+            tooltip.style("opacity", 1);
+            d3.select(this).style("stroke", "black");
+        })
         .on("mousemove", function(event, d) {
             event.stopPropagation();
             var val = (d[2] == null) ? 0. : d3_format(Math.pow(10, d[2]));
@@ -479,7 +470,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
                 .style("left", event.pageX + 10 + "px")
                 .style("top", event.pageY - 15 + "px");
         })
-        .on("mouseleave", mouseleave)
+        .on("mouseleave", function(event) {
+            event.stopPropagation();
+            tooltip.style("opacity", 0)
+            d3.select(this).style("stroke", "none");
+        })
         .filter(d => is_top && d[2] != null)  // don't add mouse handling to 0 or subjac entries
         .on("click", function () {
             openSubjac(this.__data__, parent_id);
