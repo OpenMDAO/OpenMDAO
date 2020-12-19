@@ -127,7 +127,7 @@
     <div id="obj-table"></div>
     <div class="spacer"></div>
     <div id="tab-bar" class="tab">
-        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')">Sensitivity by Variable</button>
+        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')">nonlinear responses wrt DVs</button>
     </div>
     <div id="jac-tabs">
         <div id="variable-tab" class="tabcontent">
@@ -291,35 +291,12 @@ var objtable =
 
 function mouseover(event, d) {
     event.stopPropagation();
-    // if (d[2] == null) return;
     tooltip.style("opacity", 1);
     d3.select(this).style("stroke", "black");
 }
 
-
-function mousemove(event, d) {
-    event.stopPropagation();
-    var val = (d[2] == null) ? 0. : d3_format(Math.pow(10, d[2]));
-
-    if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
-        var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
-    }
-    else {  // for var wrt var jac, show shape along with value
-        var oslc = data.ofslices[d[0]];
-        var wrtslc = data.wrtslices[d[1]];
-        var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "norm" : "value";
-        var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + val;
-    }
-    tooltip
-        .html(txt)
-        .style("left", event.pageX + 10 + "px")
-        .style("top", event.pageY - 15 + "px");
-}
-
-
 function mouseleave(event, d) {
     event.stopPropagation();
-    // if (d[2] == null) return;
     tooltip.style("opacity", 0)
     d3.select(this).style("stroke", "none");
 }
@@ -371,11 +348,12 @@ function add_sub_tab(rowname, colname) {
 }
 
 
-function openSubjac(event, subdata) {
+function openSubjac(subdata, parent_id) {
     // subdata: [ofname,  wrtname, value]
-    var ofslice = data.ofslices[subdata[0]];
-    var wrtslice = data.wrtslices[subdata[1]];
-    var filtered = data.mat_list.filter(function(d) {
+    var dat = (parent_id == "#norm-jac") ? data : data.linear;
+    var ofslice = dat.ofslices[subdata[0]];
+    var wrtslice = dat.wrtslices[subdata[1]];
+    var filtered = dat.mat_list.filter(function(d) {
         return d[0] >= ofslice[0] && d[0] < ofslice[1] && d[1] >= wrtslice[0] && d[1] < wrtslice[1];
     });
     var shifted = filtered.map(d => [d[0] - ofslice[0], d[1] - wrtslice[0], d[2]]);
@@ -416,11 +394,10 @@ function sizeOfLongest(strings, start, rotate) {
 
 function expFormat(d) {
     return d3_format(Math.pow(10, d));
-    // return "1e" + d;
 }
 
 
-var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
+function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .95;
 
@@ -483,10 +460,30 @@ var heatmap = function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_to
         .attr("height", y.bandwidth())
         .style("fill", d => d[2] == null ? "gray" : subjacColor(d[2]))
         .on("mouseover", mouseover)
-        .on("mousemove", mousemove)
+        .on("mousemove", function(event, d) {
+            event.stopPropagation();
+            var val = (d[2] == null) ? 0. : d3_format(Math.pow(10, d[2]));
+
+            if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
+                var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
+            }
+            else {  // for var wrt var jac, show shape along with value
+                var dat = (parent_id == "#norm-jac") ? data : data.linear;
+                var oslc = dat.ofslices[d[0]];
+                var wrtslc = dat.wrtslices[d[1]];
+                var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "norm" : "value";
+                var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + val;
+            }
+            tooltip
+                .html(txt)
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY - 15 + "px");
+        })
         .on("mouseleave", mouseleave)
         .filter(d => is_top && d[2] != null)  // don't add mouse handling to 0 or subjac entries
-        .on("click", openSubjac, d => d);
+        .on("click", function () {
+            openSubjac(this.__data__, parent_id);
+        });
 
     // create the gradient
     var grad_data = [
@@ -548,7 +545,7 @@ if (data.linear.oflabels.length > 0) {
         .append("button")
         .attr("id", "linear-button")
         .classed("tablinks", true)
-        .html("linear constraints")
+        .html("linear constraints wrt DVs")
         .on("click", function(evt) {
             showJac(evt, "linear");
         })
