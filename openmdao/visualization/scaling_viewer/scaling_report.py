@@ -443,6 +443,9 @@ def _scaling_setup_parser(parser):
                         help="Don't show jacobian info")
 
 
+_run_driver_called = False
+
+
 def _scaling_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao driver_scaling'.
@@ -454,8 +457,18 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
+    def _set_flag(problem):
+        global _run_driver_called
+        _run_driver_called = True
+
+    def _scaling_check(problem):
+        if _run_driver_called:
+            # If run_driver has been called, we know no more user changes are coming.
+            _scaling(problem)
+
     def _scaling(problem):
         hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
+        hooks._unregister_hook('run_driver', 'Problem')
         driver = problem.driver
         if options.title:
             title = options.title
@@ -465,9 +478,12 @@ def _scaling_cmd(options, user_args):
                             title=title, jac=not options.nojac)
         exit()
 
-    # register the hook
+    # register the hooks
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
-                         post=_scaling)
+                         post=_scaling_check)
+
+    hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
+                         pre=_set_flag)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)

@@ -319,7 +319,14 @@ function toggleHelp(event) {
 
 
 function add_sub_tab(rowname, colname) {
+    // returns true if the button is already there
     var name = get_vname_id(rowname) + "-" + get_vname_id(colname);
+
+    var sel = d3.select("#" + name + "-button");
+    if (!sel.empty()) {
+        sel.node().click();
+        return true;
+    }
 
     var btn = d3.select("#tab-bar")
         .append("button")
@@ -350,11 +357,17 @@ function add_sub_tab(rowname, colname) {
         .classed("heatmap", true);
 
     btn.node().click();
+
+    return false;
 }
 
 
 function openSubjac(subdata, parent_id) {
     // subdata: [ofname,  wrtname, value]
+    if (add_sub_tab(subdata[0], subdata[1])) {
+        return;
+    }
+
     var dat = (parent_id == "#norm-jac") ? data : data.linear;
     var ofslice = dat.ofslices[subdata[0]];
     var wrtslice = dat.wrtslices[subdata[1]];
@@ -365,7 +378,6 @@ function openSubjac(subdata, parent_id) {
     ynames = shifted.map(d => d[0].toString());
     xnames = shifted.map(d => d[1].toString());
 
-    add_sub_tab(subdata[0], subdata[1]);
     heatmap(ynames, xnames, shifted, "#" + get_vname_id(subdata[0]) + "-" + get_vname_id(subdata[1]) + "-tab", false);
 }
 
@@ -417,11 +429,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var width = viewport_width - margin.left - margin.right;
     var height = viewport_height - margin.top - margin.bottom;
 
-    var heatmap = parent.select(".heatmap");
-    heatmap.selectAll("g").remove();
+    var hmap = parent.select(".heatmap");
+    hmap.selectAll("g").remove();
 
     // append the svg object to the body of the page
-    var svg = heatmap
+    var svg = hmap
         .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
         .attr("preserveAspectRatio", "xMidYMid meet")
         .append("g")
@@ -493,7 +505,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             tooltip.style("opacity", 0)
             d3.select(this).style("stroke", "none");
         })
-        .filter(d => is_top && d[2] != null)  // don't add mouse handling to 0 or subjac entries
+        .filter(d => is_top && d[2] != null)  // don't add sub creation to 0 or subjac entries
         .on("click", function () {
             openSubjac(this.__data__, parent_id);
         });
