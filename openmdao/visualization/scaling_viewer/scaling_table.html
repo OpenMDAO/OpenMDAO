@@ -554,7 +554,7 @@ var subjacColor = d3.scaleDiverging()
 
 heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
 if (data.linear.oflabels.length > 0) {
-    d3.selct("#varjac-button").html("nonlinear responses wrt DVs");
+    d3.select("#varjac-button").html("nonlinear responses wrt DVs");
 
     var btn = d3.select("#tab-bar")
         .append("button")
@@ -577,7 +577,7 @@ if (data.linear.oflabels.length > 0) {
     heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
 }
 else {
-    d3.selct("#varjac-button").html("responses wrt DVs");
+    d3.select("#varjac-button").html("responses wrt DVs");
 }
 
 function startup() {
