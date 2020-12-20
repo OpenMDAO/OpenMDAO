@@ -244,7 +244,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     default = ''
 
     idx = 1  # unique ID for use by Tabulator
-
+    
     # set up design vars table data
     for name, meta in driver._designvars.items():
         scaler = meta['total_scaler']
@@ -379,14 +379,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
                 # linear cons are found in data['oflabels'] so they're not separated
                 lindata['oflabels'] = []
                 lindata['wrtlables'] = []
-
-        # print("var_matrix")
-        # print(norm_mat)
-        # print("----")
-        # print(var_matrix)
-        # print("obj", list(obj_vals))
-        # print("con", list(con_vals))
-        # print("dv", list(dv_vals))
 
         full_response_vals = con_vals.copy()
         full_response_vals.update(obj_vals)

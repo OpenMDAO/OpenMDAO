@@ -119,15 +119,21 @@
         <p>So the overall scaler is (<em>m * unit_factor</em>) and the overall adder is
             (<em>offset + b/unit_factor</em>).</p>
     </div>
-    <h3>Design Variables</h3>
-    <div id="dv-table"></div>
-    <h3>Constraints</h3>
-    <div id="con-table"></div>
-    <h3>Objectives</h3>
-    <div id="obj-table"></div>
+    <div id="dvstuff">
+        <h3>Design Variables</h3>
+        <div id="dv-table"></div>
+    </div>
+    <div id="constuff">
+        <h3>Constraints</h3>
+        <div id="con-table"></div>
+    </div>
+    <div id="objstuff">
+        <h3>Objectives</h3>
+        <div id="obj-table"></div>
+    </div>
     <div class="spacer"></div>
     <div id="tab-bar" class="tab">
-        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')">nonlinear responses wrt DVs</button>
+        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')"></button>
     </div>
     <div id="jac-tabs">
         <div id="variable-tab" class="tabcontent">
@@ -193,8 +199,8 @@ function numrow(title, field) {
 }
 
 
-var dvtable =
-    new Tabulator("#dv-table", {
+if (dv_tabledata.length > 0) {
+    var dvtable = new Tabulator("#dv-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
@@ -222,10 +228,14 @@ var dvtable =
             numrow("lower", "lower"),
         ],
     });
+}
+else {
+    d3.select("#dvstuff").style("display", "none");
+}
 
 
-var contable =
-    new Tabulator("#con-table", {
+if (con_tabledata.length > 0) {
+    var contable = new Tabulator("#con-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
@@ -258,10 +268,14 @@ var contable =
             }, headerFilter:false,},
         ],
     });
+}
+else {
+    d3.select("#constuff").style("display", "none");
+}
 
 
-var objtable =
-    new Tabulator("#obj-table", {
+if (obj_tabledata.length > 0) {
+    var objtable = new Tabulator("#obj-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
         // height: 650,
@@ -287,6 +301,10 @@ var objtable =
             numrow("adder", "adder"),
         ],
     });
+}
+else {
+    d3.select("#objstuff").style("display", "none");
+}
 
 
 function toggleHelp(event) {
@@ -536,6 +554,8 @@ var subjacColor = d3.scaleDiverging()
 
 heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
 if (data.linear.oflabels.length > 0) {
+    d3.selct("#varjac-button").html("nonlinear responses wrt DVs");
+
     var btn = d3.select("#tab-bar")
         .append("button")
         .attr("id", "linear-button")
@@ -555,6 +575,9 @@ if (data.linear.oflabels.length > 0) {
         .classed("heatmap", true);
 
     heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
+}
+else {
+    d3.selct("#varjac-button").html("responses wrt DVs");
 }
 
 function startup() {
