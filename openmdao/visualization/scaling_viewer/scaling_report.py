@@ -122,15 +122,15 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
 
 
 def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
-    rownames = [None] * totals.shape[0]
-    colnames = [None] * totals.shape[1]
+    if coloring is not None: # factor in the sparsity
+        mask = np.zeros(totals.shape, dtype=bool)
+        mask[coloring._nzrows, coloring._nzcols] = 1
 
     start = end = 0
     data['ofslices'] = slices = {}
     for n, v in response_vals.items():
         end += v.size
         slices[n] = [start, end]
-        rownames[start:end] = [n] * (end - start)
         start = end
 
     start = end = 0
@@ -138,47 +138,35 @@ def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     for n, v in dv_vals.items():
         end += v.size
         slices[n] = [start, end]
-        colnames[start:end] = [n] * (end - start)
         start = end
 
-    norm_mat = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+    nonempty_submats = set()  # submats with any nonzero values
+
+    var_matrix = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
+
+    matrix = np.abs(totals)
 
     for i, of in enumerate(response_vals):
         ofstart, ofend = data['ofslices'][of]
         for j, wrt in enumerate(dv_vals):
             wrtstart, wrtend = data['wrtslices'][wrt]
-            norm_mat[i, j] = np.linalg.norm(totals[ofstart:ofend, wrtstart:wrtend])
-
-    def mat_magnitude(mat):
-        mag = np.log10(np.abs(mat))
-        finite = mag[np.isfinite(mag)]
-        max_mag = np.max(finite)
-        min_mag = np.min(finite)
-        cap = np.abs(min_mag)
-        if max_mag > cap:
-            cap = max_mag
-        mag[np.isinf(mag)] = -cap
-        return mag
-
-    var_matrix = mat_magnitude(norm_mat)
-    matrix = mat_magnitude(totals)
-
-    if coloring is not None: # factor in the sparsity
-        mask = np.ones(totals.shape, dtype=bool)
-        mask[coloring._nzrows, coloring._nzcols] = 0
-        matrix[mask] = np.inf  # we know matrix cannot contain infs by this point
-
-    nonempty_submats = set()  # submats with any nonzero values
+            # var_matrix[i, j] = np.linalg.norm(matrix[ofstart:ofend, wrtstart:wrtend])
+            var_matrix[i, j] = np.max(matrix[ofstart:ofend, wrtstart:wrtend])
+            print(of, wrt, "max:", var_matrix[i, j])
+            if var_matrix[i, j] > 0. or (coloring and
+                                         np.any(mask[ofstart:ofend, wrtstart:wrtend])):
+                nonempty_submats.add((of, wrt))
 
     matlist = [None] * matrix.size
     idx = 0
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             val = matrix[i, j]
-            if np.isinf(val):
+            if coloring and not mask[i, j]:
                 val = None
             else:
-                nonempty_submats.add((rownames[i], colnames[j]))
+                if val == 0.:
+                    val = 0  # set to int 0
             matlist[idx] = [i, j, val]
             idx += 1
 
@@ -244,7 +232,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     default = ''
 
     idx = 1  # unique ID for use by Tabulator
-    
+
     # set up design vars table data
     for name, meta in driver._designvars.items():
         scaler = meta['total_scaler']
@@ -384,11 +372,28 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         full_response_vals.update(obj_vals)
         response_vals = {n: full_response_vals[n] for n in data['oflabels']}
 
+        # print("TOTALS:")
+        # import pprint
+        # sv = driver._total_jac
+        # driver._total_jac = None
+        # pprint.pprint(driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels']))
+        # driver._total_jac = sv
         compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
+
         if lindata['oflabels']:
-            lintotals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+            # prevent reuse of nonlinear totals
+            sv = driver._total_jac
+            driver._total_jac = None
+            lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
                                                return_format='array')
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
+            driver._total_jac = sv
+
+            # print("lin TOTALS:")
+            # sv = driver._total_jac
+            # driver._total_jac = None
+            # pprint.pprint(driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels']))
+            # driver._total_jac = sv
             compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
     viewer = 'scaling_table.html'

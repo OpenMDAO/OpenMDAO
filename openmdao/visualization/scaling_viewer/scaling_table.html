@@ -82,6 +82,7 @@
     #help-text {
         display: none;
     }
+
 </style>
 </head>
 <body onload="startup()">
@@ -180,7 +181,11 @@ function val_formatter(cell, formatterParams, onRendered) {
         return "";
     }
     return d3_format(val[0]);
-};
+}
+
+function exp_format(num) {
+    return "1e" + num;
+}
 
 
 function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
@@ -335,21 +340,29 @@ function add_sub_tab(rowname, colname) {
         .html(rowname + " <b>wrt</b> " + colname)
         .on("click", function(evt) {
             showJac(evt, name);
-        })
+        });
+
+    // right click to remove tab (until I add an svg button with an 'x')
+    d3.select("#" + name + "-button").on("contextmenu", function(evt) {
+        evt.preventDefault();
+        btn.remove();
+        d3.select("#" + name + "-tab").remove();
+        d3.select("#varjac-button").node().click();
+    });
 
     var dv = d3.select("#jac-tabs")
         .append("div")
         .attr("id", name + "-tab")
         .classed("tabcontent", true);
 
-    dv.append("span")
-        .classed("topright", true)
-        .html("&times")
-        .on("click", function (evt) {
-            btn.remove();
-            d3.select("#" + name + "-tab").remove();
-            d3.select("#varjac-button").node().click();
-        });
+    // dv.append("span")
+    //     .classed("topright", true)
+    //     .html("&times")
+    //     .on("click", function (evt) {
+    //         btn.remove();
+    //         d3.select("#" + name + "-tab").remove();
+    //         d3.select("#varjac-button").node().click();
+    //     });
 
     dv.append("div")
         .attr("id", name + "-jac")
@@ -409,18 +422,13 @@ function sizeOfLongest(strings, start, rotate) {
 }
 
 
-function expFormat(d) {
-    return d3_format(Math.pow(10, d));
-}
-
-
 function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var viewport_width = document.documentElement.clientWidth * .95;
     var viewport_height = document.documentElement.clientHeight * .95;
 
     var parent = d3.select(parent_id);
-    var leftmargin = is_top ? sizeOfLongest(ofEntries, "9999", 0).width : 10;
-    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "9999", 90).height : 10;
+    var leftmargin = is_top ? sizeOfLongest(ofEntries, "XXXX", 0).width : 10;
+    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "XXXX", 90).height : 10;
     var legendwidth = 20;
     var legendloc = 20;
 
@@ -475,7 +483,19 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .attr("y", d => y(d[0]))
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
-        .style("fill", d => d[2] == null ? "gray" : subjacColor(d[2]))
+        .style("fill", function(d) {
+            if (d[2] == null) {
+                return "darkgray";  // colored zero
+            }
+            else {
+                if (d[2] == 0) {
+                    return "lightgray";  // computed zero
+                }
+                else {
+                    return subjacColor(Math.log10(d[2]));
+                }
+            }
+        })
         .on("mouseover", function () {
             event.stopPropagation(event);
             tooltip.style("opacity", 1);
@@ -483,7 +503,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         })
         .on("mousemove", function(event, d) {
             event.stopPropagation();
-            var val = (d[2] == null) ? 0. : d3_format(Math.pow(10, d[2]));
+            var val = (d[2] == null) ? 0 : d3_format(d[2]);
 
             if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
                 var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
@@ -492,7 +512,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
                 var dat = (parent_id == "#norm-jac") ? data : data.linear;
                 var oslc = dat.ofslices[d[0]];
                 var wrtslc = dat.wrtslices[d[1]];
-                var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "norm" : "value";
+                var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "max abs" : "value";
                 var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + val;
             }
             tooltip
@@ -505,7 +525,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             tooltip.style("opacity", 0)
             d3.select(this).style("stroke", "none");
         })
-        .filter(d => is_top && d[2] != null)  // don't add sub creation to 0 or subjac entries
+        .filter(d => is_top && d[2] != null && d[2] != 0)  // don't add sub creation to 0 or subjac entries
         .on("click", function () {
             openSubjac(this.__data__, parent_id);
         });
@@ -544,7 +564,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
 
     legend.append("g")
         .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
-        .call(d3.axisRight(leg_axis).tickFormat(expFormat));
+        .call(d3.axisRight(leg_axis).tickFormat(exp_format));
 
     legend.append("rect")
             .attr("x", legendloc)
@@ -557,7 +577,19 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
 var tooltip = d3.select(".tooltip")
     .style("opacity", 0);
 
-var maxcolor = d3.max(data.var_mat_list, s => s == null ? 0 : Math.abs(s[2]));
+
+function loggable(v) {
+    return !(v[2] == null || v[2] === 0);
+}
+
+
+var maxcolor = d3.max(data.var_mat_list.filter(loggable).map(s => s[2]).map(Math.log10).map(Math.abs));
+if (data.linear.oflabels.length > 0) {
+    let linmaxcolor = d3.max(data.linear.var_mat_list.filter(loggable).map(s => s[2]).map(Math.log10).map(Math.abs));
+    if (maxcolor < linmaxcolor) {
+        maxcolor = linmaxcolor;
+    }
+}
 
 // Build color scale
 var subjacColor = d3.scaleDiverging()
