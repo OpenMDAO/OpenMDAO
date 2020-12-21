@@ -132,14 +132,16 @@
         <h3>Objectives</h3>
         <div id="obj-table"></div>
     </div>
-    <div class="spacer"></div>
-    <div id="tab-bar" class="tab">
-        <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')"></button>
-    </div>
-    <div id="jac-tabs">
-        <div id="variable-tab" class="tabcontent">
-            <div id="norm-jac">
-                <svg id="norm-svg" class="heatmap"></svg>
+    <div class="jac-info">
+        <h3>Jacobian Info</h3>
+        <div id="tab-bar" class="tab">
+            <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')"></button>
+        </div>
+        <div id="jac-tabs">
+            <div id="variable-tab" class="tabcontent">
+                <div id="norm-jac">
+                    <svg id="norm-svg" class="heatmap"></svg>
+                </div>
             </div>
         </div>
     </div>
@@ -355,15 +357,6 @@ function add_sub_tab(rowname, colname) {
         .attr("id", name + "-tab")
         .classed("tabcontent", true);
 
-    // dv.append("span")
-    //     .classed("topright", true)
-    //     .html("&times")
-    //     .on("click", function (evt) {
-    //         btn.remove();
-    //         d3.select("#" + name + "-tab").remove();
-    //         d3.select("#varjac-button").node().click();
-    //     });
-
     dv.append("div")
         .attr("id", name + "-jac")
         .append("svg")
@@ -427,8 +420,8 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var viewport_height = document.documentElement.clientHeight * .95;
 
     var parent = d3.select(parent_id);
-    var leftmargin = is_top ? sizeOfLongest(ofEntries, "XXXX", 0).width : 10;
-    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "XXXX", 90).height : 10;
+    var leftmargin = is_top ? sizeOfLongest(ofEntries, "XXXX", 45).width : 10;
+    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "XXXX", 45).height : 10;
     var legendwidth = 20;
     var legendloc = 20;
 
@@ -458,10 +451,10 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             .attr("transform", "translate(0," + height + ")")
             .call(d3.axisBottom(x))
             .selectAll("text")
-            .style("text-anchor", "start")
-            .attr("dx", ".8em")
-            .attr("dy", "-.5em")
-            .attr("transform", "rotate(90)");
+            .style("text-anchor", "end")
+            .attr("transform", "rotate(-45)")
+            .attr("dx", "-.5em")
+            .attr("dy", ".3em");
     }
 
     // Build Y scales and axis:
@@ -472,7 +465,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
 
     if (is_top) {
         svg.append("g")
-            .call(d3.axisLeft(y));
+            .call(d3.axisLeft(y))
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("transform", "rotate(-45)")
+            .attr("dy", "-.5em");
     }
 
     svg.selectAll()
@@ -596,36 +593,41 @@ var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
     .domain([-maxcolor, 0, maxcolor]);
 
-heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
-if (data.linear.oflabels.length > 0) {
-    d3.select("#varjac-button").html("nonlinear responses wrt DVs");
-
-    var btn = d3.select("#tab-bar")
-        .append("button")
-        .attr("id", "linear-button")
-        .classed("tablinks", true)
-        .html("linear constraints wrt DVs")
-        .on("click", function(evt) {
-            showJac(evt, "linear");
-        })
-
-        var dv = d3.select("#jac-tabs")
-        .append("div")
-        .attr("id", "linear-tab")
-        .classed("tabcontent", true)
-        .append("div")
-        .attr("id", "linear-jac")
-        .append("svg")
-        .classed("heatmap", true);
-
-    heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
-}
-else {
-    d3.select("#varjac-button").html("responses wrt DVs");
-}
 
 function startup() {
-    d3.select("#varjac-button").node().click();
+    if (data.oflabels.length > 0) {
+        heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
+        if (data.linear.oflabels.length > 0) {
+            d3.select("#varjac-button").html("nonlinear responses wrt DVs");
+
+            var btn = d3.select("#tab-bar")
+                .append("button")
+                .attr("id", "linear-button")
+                .classed("tablinks", true)
+                .html("linear constraints wrt DVs")
+                .on("click", function(evt) {
+                                    showJac(evt, "linear");
+                })
+
+                var dv = d3.select("#jac-tabs")
+                .append("div")
+                .attr("id", "linear-tab")
+                .classed("tabcontent", true)
+                .append("div")
+                .attr("id", "linear-jac")
+                .append("svg")
+                .classed("heatmap", true);
+
+            heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
+        }
+        else {
+            d3.select("#varjac-button").html("responses wrt DVs");
+        }
+        d3.select("#varjac-button").node().click();
+    }
+    else {  // jacobian display disabled
+        d3.select(".jac-info").style("display", "none");
+    }
 }
 
 </script>

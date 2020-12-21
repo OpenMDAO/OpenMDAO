@@ -342,6 +342,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         'dv_table': dv_table,
         'con_table': con_table,
         'obj_table': obj_table,
+        'oflabels': [],
+        'wrtlabels': [],
+        'var_mat_list': [],
+        'linear': {
+            'oflabels': [],
+        }
     }
 
     if jac:
