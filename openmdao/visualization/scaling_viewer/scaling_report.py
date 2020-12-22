@@ -9,6 +9,7 @@ from collections import defaultdict
 import numpy as np
 
 import openmdao
+from openmdao.core.constants import _SetupStatus
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
@@ -71,12 +72,14 @@ def _getnorm_and_size(val, unset=''):
     return [np.linalg.norm(val), val.size]
 
 
-def _get_flat(val, size):
+def _get_flat(val, size, unset=''):
     if val is None:
         return val
-    elif np.isscalar(val):
+    if np.isscalar(val):
+        if (val == openmdao.INF_BOUND or val == -openmdao.INF_BOUND):
+            val = unset
         return np.full(size, val)
-    elif val.size > 1:
+    if val.size > 1:
         return val.flatten()
     return np.full(size, val[0])
 
@@ -219,6 +222,10 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     con_vals = driver.get_constraint_values(driver_scaling=True)
 
     mod_meta = driver._problem().model._var_allprocs_abs2meta['output']
+
+    if driver._problem()._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+        raise RuntimeError("Driver scaling report cannot be generated before calling final_setup "
+                           "on the Problem.")
 
     default = ''
 
@@ -369,28 +376,18 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         full_response_vals.update(obj_vals)
         response_vals = {n: full_response_vals[n] for n in data['oflabels']}
 
-        # print("TOTALS:")
-        # import pprint
-        # sv = driver._total_jac
-        # driver._total_jac = None
-        # pprint.pprint(driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels']))
-        # driver._total_jac = sv
         compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
 
         if lindata['oflabels']:
             # prevent reuse of nonlinear totals
-            sv = driver._total_jac
+            save = driver._total_jac
             driver._total_jac = None
+
             lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
                                                return_format='array')
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
-            driver._total_jac = sv
+            driver._total_jac = save
 
-            # print("lin TOTALS:")
-            # sv = driver._total_jac
-            # driver._total_jac = None
-            # pprint.pprint(driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels']))
-            # driver._total_jac = sv
             compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
     viewer = 'scaling_table.html'
@@ -422,6 +419,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
     if show_browser:
         webview(outfile)
+
+    return data
 
 
 def _scaling_setup_parser(parser):

@@ -207,10 +207,12 @@ function numrow(title, field) {
 
 
 if (dv_tabledata.length > 0) {
+    let dvheight = (dv_tabledata.length > 15) ? 450 : null;
+
     var dvtable = new Tabulator("#dv-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
-        // height: 650,
+        height: dvheight,
         dataTree:true,
         dataTreeStartExpanded:false,
         data:dv_tabledata, //assign data to table
@@ -242,10 +244,12 @@ else {
 
 
 if (con_tabledata.length > 0) {
+    let conheight = (con_tabledata.length > 15) ? 450 : null;
+
     var contable = new Tabulator("#con-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
-        // height: 650,
+        height: conheight,
         dataTree:true,
         dataTreeStartExpanded:false,
         data:con_tabledata, //assign data to table
@@ -282,10 +286,11 @@ else {
 
 
 if (obj_tabledata.length > 0) {
+    let objheight = (obj_tabledata.length > 15) ? 450 : null;
     var objtable = new Tabulator("#obj-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
-        // height: 650,
+        height: objheight,
         dataTree:true,
         dataTreeStartExpanded:false,
         data:obj_tabledata, //assign data to table
@@ -482,11 +487,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .attr("height", y.bandwidth())
         .style("fill", function(d) {
             if (d[2] == null) {
-                return "darkgray";  // colored zero
+                return "#666";  // dark gray - colored zero
             }
             else {
                 if (d[2] == 0) {
-                    return "lightgray";  // computed zero
+                    return "#CCC";  // light gray - computed zero
                 }
                 else {
                     return subjacColor(Math.log10(d[2]));

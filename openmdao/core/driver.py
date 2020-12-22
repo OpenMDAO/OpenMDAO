@@ -1119,7 +1119,8 @@ class Driver(object):
         jac : bool
             If True, show jacobian information.
         """
-        view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac, title=title)
+        return view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac,
+                                   title=title)
 
     def _pre_run_model_debug_print(self):
         """
