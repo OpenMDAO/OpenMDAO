@@ -18,6 +18,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
+from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -1097,6 +1098,28 @@ class Driver(object):
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
+
+    def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
+                       jac=True):
+        """
+        Generate a self-contained html file containing a detailed connection viewer.
+
+        Optionally pops up a web browser to view the file.
+
+        Parameters
+        ----------
+        driver : Driver
+            The driver used for the scaling report.
+        outfile : str, optional
+            The name of the output html file.  Defaults to 'driver_scaling_report.html'.
+        title : str, optional
+            Sets the title of the web page.
+        show_browser : bool, optional
+            If True, pop up a browser to view the generated html file. Defaults to True.
+        jac : bool
+            If True, show jacobian information.
+        """
+        view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac, title=title)
 
     def _pre_run_model_debug_print(self):
         """

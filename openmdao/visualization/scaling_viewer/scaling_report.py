@@ -11,7 +11,6 @@ import numpy as np
 import openmdao
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
-from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -152,7 +151,6 @@ def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
             wrtstart, wrtend = data['wrtslices'][wrt]
             # var_matrix[i, j] = np.linalg.norm(matrix[ofstart:ofend, wrtstart:wrtend])
             var_matrix[i, j] = np.max(matrix[ofstart:ofend, wrtstart:wrtend])
-            print(of, wrt, "max:", var_matrix[i, j])
             if var_matrix[i, j] > 0. or (coloring and
                                          np.any(mask[ofstart:ofend, wrtstart:wrtend])):
                 nonempty_submats.add((of, wrt))
@@ -189,7 +187,7 @@ def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
 
 
 def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
-                        precision=6, title=None, jac=True):
+                        title=None, jac=True):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -199,20 +197,13 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     ----------
     driver : Driver
         The driver used for the scaling report.
-
     outfile : str, optional
         The name of the output html file.  Defaults to 'connections.html'.
-
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
-
-    precision : int, optional
-        Sets the precision for displaying array values.
-
     title : str, optional
         Sets the title of the web page.
-
     jac : bool
         If True, show jacobian information.
     """
@@ -457,6 +448,12 @@ def _scaling_setup_parser(parser):
 _run_driver_called = False
 
 
+def _exitfunc():
+    if not _run_driver_called:
+        print("\n\nNo driver scaling report was generated because run_driver() was not called "
+              "on the required Problem.\n")
+
+
 def _scaling_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao driver_scaling'.
@@ -495,6 +492,10 @@ def _scaling_cmd(options, user_args):
 
     hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
                          pre=_set_flag)
+
+    # register an atexit function to check if scaling report was triggered during the script
+    import atexit
+    atexit.register(_exitfunc)
 
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
