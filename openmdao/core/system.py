@@ -4184,7 +4184,7 @@ class System(object):
             if get_remote:
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
-            else:
+            elif self.comm.size > 1:
                 vars_to_gather = self._problem_meta['vars_to_gather']
                 if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
@@ -4454,7 +4454,7 @@ class System(object):
         sdistrib = smeta['distributed']
         slocal = src in model_ref._var_abs2meta['output']
 
-        if MPI:
+        if self.comm.size > 1:
             if distrib and get_remote is None:
                 raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
                                    "variable. You can retrieve values from all processes "

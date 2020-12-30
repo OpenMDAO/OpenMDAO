@@ -413,6 +413,25 @@ class DistributedIO(unittest.TestCase):
             self.assertEqual(model_size, ndvs)
 
 
+class NoMPITests(unittest.TestCase):
+
+    def test_dist_to_nondist_no_err(self):
+        size = 5
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
+        model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
+        model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
+        model.connect('indep.x', 'Cdist.invec')
+        model.connect('Cdist.outvec', 'Cserial.invec')
+        p.setup()
+        p.run_model()
+
+        p['Cserial.invec']
+        p.get_val('Cserial.invec')
+        p.get_val('Cserial.invec', get_remote=False)
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
