@@ -51,7 +51,7 @@ follows:
 .. code-block:: python
 
     self.add_input('x', shape_by_conn=True, copy_shape='y')
-    self.add_input('y', shape_by_conn=True, copy_shape='x')
+    self.add_output('y', shape_by_conn=True, copy_shape='x')
 
 
 This way, `y` can be used to determine the shape of `x`, or `x` can determine the shape of `y`.

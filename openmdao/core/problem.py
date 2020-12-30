@@ -1471,6 +1471,9 @@ class Problem(object):
             For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
                 forward - fd, adjoint - fd, forward - adjoint.
         """
+        if out_stream == _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(self.msginfo + ": run_model must be called before total "
                                "derivatives can be checked.")

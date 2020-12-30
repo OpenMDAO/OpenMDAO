@@ -3632,8 +3632,14 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states and m['resids'] > residuals_tol:
-                        impl_outputs[n] = m
+                    if "resids" in m and n in states:
+                        if not np.isscalar(m['resids']) and len(m['resids']) > 1:
+                            for i in m['resids']:
+                                if i > residuals_tol:
+                                    impl_outputs[n] = m
+                                    break
+                        elif m['resids'] > residuals_tol:
+                            impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
