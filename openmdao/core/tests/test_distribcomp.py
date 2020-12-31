@@ -413,25 +413,6 @@ class DistributedIO(unittest.TestCase):
             self.assertEqual(model_size, ndvs)
 
 
-class NoMPITests(unittest.TestCase):
-
-    def test_dist_to_nondist_no_err(self):
-        size = 5
-        p = om.Problem()
-        model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
-        model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
-        model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
-        model.connect('indep.x', 'Cdist.invec')
-        model.connect('Cdist.outvec', 'Cserial.invec')
-        p.setup()
-        p.run_model()
-
-        p['Cserial.invec']
-        p.get_val('Cserial.invec')
-        p.get_val('Cserial.invec', get_remote=False)
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
@@ -862,6 +843,27 @@ class MPITests(unittest.TestCase):
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)
+
+
+class NonParallelTests(unittest.TestCase):
+
+    def test_dist_to_nondist_no_err(self):
+        size = 5
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
+        model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
+        model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
+        model.connect('indep.x', 'Cdist.invec')
+        model.connect('Cdist.outvec', 'Cserial.invec')
+        p.setup()
+        p.run_model()
+
+        # When model with distributed comp is run on a single processor,
+        # it is not required to use get_remote=True
+        assert_near_equal(p['Cserial.invec'], [2, 2, 2, 2, 2])
+        assert_near_equal(p.get_val('Cserial.invec'), [2, 2, 2, 2, 2])
+        assert_near_equal(p.get_val('Cserial.invec', get_remote=False), [2, 2, 2, 2, 2])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
