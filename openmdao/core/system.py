@@ -26,7 +26,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, unit_conversion
+from openmdao.utils.units import is_compatible, unit_conversion, valid_units, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op, shape_from_idx
+    simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -2518,6 +2518,16 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
+                                f"design_var '{name}'.")
+
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
+                                 f"design_var '{name}'.")
+            units = simplify_unit(units)
+
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -2661,6 +2671,17 @@ class System(object):
         elif type_ not in ('con', 'obj'):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '
                              'Got \'{}\' instead'.format(self.msginfo, name))
+
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
+                                f"response '{name}'.")
+
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
+                                 f"response '{name}'.")
+
+            units = simplify_unit(units)
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
