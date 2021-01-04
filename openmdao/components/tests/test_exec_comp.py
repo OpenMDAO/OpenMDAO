@@ -5,6 +5,7 @@ import math
 import numpy as np
 from numpy.testing import assert_almost_equal
 import scipy
+from io import StringIO
 
 from distutils.version import LooseVersion
 
@@ -1160,6 +1161,40 @@ class TestExecComp(unittest.TestCase):
 
         assert_near_equal(prob.get_val('comp.y'), [2., 4.], 0.00001)
 
+    def test_list_outputs_resids_tol(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem(
+            "quad_1",
+            om.ExecComp(
+                "y = a * x ** 2 + b * x + c",
+                a={"value": 2.0},
+                b={"value": 5.0},
+                c={"value": 3.0},
+                x={"shape": (2,)},
+                y={"shape": (2,)},
+            ),
+        )
+
+        balance = model.add_subsystem("balance", om.BalanceComp())
+        balance.add_balance("x_1", val=np.array([1, -1]), rhs_val=np.array([0., 0.]))
+        model.connect("balance.x_1", "quad_1.x")
+        model.connect("quad_1.y", "balance.lhs:x_1")
+
+        prob.model.linear_solver = om.ScipyKrylov()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
+
+        prob.setup()
+        prob.model.nonlinear_solver.options["maxiter"] = 0
+        prob.run_model()
+
+        stream = StringIO()
+        outputs = prob.model.list_outputs(residuals=True, residuals_tol=1e-5, out_stream=stream)
+
+        text = stream.getvalue()
+        self.assertTrue("balance" in text)
+        self.assertTrue("x_1" in text)
 
 class TestExecCompParameterized(unittest.TestCase):
 
