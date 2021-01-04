@@ -3632,8 +3632,14 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states and m['resids'] > residuals_tol:
-                        impl_outputs[n] = m
+                    if "resids" in m and n in states:
+                        if not np.isscalar(m['resids']) and len(m['resids']) > 1:
+                            for i in m['resids']:
+                                if i > residuals_tol:
+                                    impl_outputs[n] = m
+                                    break
+                        elif m['resids'] > residuals_tol:
+                            impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
@@ -4178,7 +4184,7 @@ class System(object):
             if get_remote:
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
-            else:
+            elif self.comm.size > 1:
                 vars_to_gather = self._problem_meta['vars_to_gather']
                 if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
@@ -4443,19 +4449,22 @@ class System(object):
             shpname = 'global_shape' if get_remote else 'shape'
             src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
-        if distrib and get_remote is None:
-            raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
-                               "variable. You can retrieve values from all processes "
-                               "using `get_val(<name>, get_remote=True)` or from the "
-                               "local process using `get_val(<name>, get_remote=False)`.")
-
-        smeta = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output'][src]
+        model_ref = self._problem_meta['model_ref']()
+        smeta = model_ref._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
-        slocal = src in self._problem_meta['model_ref']()._var_abs2meta['output']
-        if sdistrib and not distrib and not get_remote:
-            raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{abs_name}' has "
-                               f"a distributed source, '{src}', so you must retrieve its value "
-                               "using 'get_remote=True'.")
+        slocal = src in model_ref._var_abs2meta['output']
+
+        if self.comm.size > 1:
+            if distrib and get_remote is None:
+                raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
+                                   "variable. You can retrieve values from all processes "
+                                   "using `get_val(<name>, get_remote=True)` or from the "
+                                   "local process using `get_val(<name>, get_remote=False)`.")
+
+            if sdistrib and not distrib and not get_remote:
+                raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{abs_name}' has "
+                                   f"a distributed source, '{src}', so you must retrieve its value "
+                                   "using 'get_remote=True'.")
 
         # get value of the source
         val = self._abs_get_val(src, get_remote, rank, vec_name, 'output', flat, from_root=True)
@@ -4489,7 +4498,7 @@ class System(object):
                 else:
                     val = val.ravel()[src_indices]
 
-            if get_remote:
+            if get_remote and self.comm.size > 1:
                 if distrib:
                     if rank is None:
                         parts = self.comm.allgather(val)

@@ -51,7 +51,7 @@ class InfoPropDefault {
 }
 
 /**
- * Output a Yes or No to display. 
+ * Output a Yes or No to display.
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
@@ -479,6 +479,7 @@ class NodeInfo extends N2Window {
             new InfoPropDefault('promotedName', 'Promoted Name'),
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
+            new InfoPropDefault('surrogate_name', 'Surrogate'),
             new InfoPropDefault('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
 
