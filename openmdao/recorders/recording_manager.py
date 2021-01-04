@@ -269,8 +269,20 @@ def record_system_options(problem):
             problem._system_options_recorded = True
 
         for recorder in recorders:
-            for sub in problem.model.system_iter(recurse=True, include_self=True):
+            for system in problem.model.system_iter(recurse=True, include_self=True):
+                # record system metadata (options)
                 if problem._run_counter >= 1:
-                    recorder.record_metadata_system(sub, problem._run_counter)
+                    recorder.record_metadata_system(system, problem._run_counter)
                 else:
-                    recorder.record_metadata_system(sub)
+                    recorder.record_metadata_system(system)
+
+                # record solver metadata (options) for this system's solvers
+                nl = system._nonlinear_solver
+                if nl:
+                    recorder.record_metadata_solver(nl)
+                    if hasattr(nl, 'linesearch') and nl.linesearch:
+                        recorder.record_metadata_solver(nl.linesearch)
+
+                ln = system._linear_solver
+                if ln:
+                    recorder.record_metadata_solver(ln)

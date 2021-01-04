@@ -248,11 +248,13 @@ class TestSqliteRecorder(unittest.TestCase):
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
+
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
         driver.recording_options['includes'] = ['*']
+
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -2592,10 +2594,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         metadata = cr.solver_metadata
 
         self.assertEqual(sorted(metadata.keys()), [
-            'd1.NonlinearBlockGS', 'root.NonlinearBlockGS'
+            'd1.NonlinearBlockGS', 'root.NonlinearBlockGS', 'root.ScipyKrylov',
         ])
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
+        self.assertEqual(metadata['root.ScipyKrylov']['solver_options']['maxiter'], 1000)
 
     def test_feature_recording_system_options(self):
         import openmdao.api as om

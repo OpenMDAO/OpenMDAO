@@ -663,14 +663,16 @@ class SqliteRecorder(CaseRecorder):
             scaling_factors = sqlite3.Binary(scaling_factors)
             pickled_metadata = sqlite3.Binary(pickled_metadata)
 
-            # Need to use OR IGNORE in here because if the user does run_driver more than once
-            #   the current OpenMDAO code will call this function each time and there will be
-            #   SQL errors for "UNIQUE constraint failed: system_metadata.id"
-            # Future versions of OpenMDAO will handle this better.
             if run_counter is None:
                 name = path
             else:
                 name = "{}_{}".format(path, str(run_counter))
+
+            # Need to use OR IGNORE here because metadata is recorded in final setup, which can be
+            # called more than once. Multiple calls to final setup would result in the SQL error
+            # "UNIQUE constraint failed: system_metadata.id" because we only record one instance
+            # of metadata for each system.
+            # Future Work: Handle changes to options/metadata between runs
             with self.connection as c:
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
@@ -695,9 +697,14 @@ class SqliteRecorder(CaseRecorder):
 
             solver_options = pickle.dumps(recording_requester.options, self._pickle_version)
 
+            # Need to use OR IGNORE here because metadata is recorded in final setup, which can be
+            # called more than once. Multiple calls to final setup would result in the SQL error
+            # "UNIQUE constraint failed: solver_metadata.id" because we only record one instance
+            # of metadata for each solver.
+            # Future Work: Handle changes to options/metadata between runs
             with self.connection as c:
-                c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
-                          "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+                c.execute("INSERT OR IGNORE INTO solver_metadata(id, solver_options, solver_class)"
+                          " VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def record_derivatives_driver(self, recording_requester, data, metadata):
         """

@@ -474,9 +474,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            ['d1.NonlinearBlockGS', 'root.NonlinearBlockGS']
+            ['d1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS']
         )
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['root.LinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
 
     def test_reading_driver_recording_with_system_vars(self):
