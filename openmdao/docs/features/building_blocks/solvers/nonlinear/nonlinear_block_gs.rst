@@ -52,7 +52,7 @@ Aitken relaxation
 This solver implements Aitken relaxation, as described in Algorithm 1 of this paper on aerostructual design optimization_.
 The relaxation is turned off by default, but it may help convergence for more tightly coupled models.
 
-.. _optimization: http://mdolab.engin.umich.edu/content/scalable-parallel-approach-aeroelastic-analysis-and-derivative
+.. _optimization: http://www.umich.edu/~mdolaboratory/pdf/Kenway2014a.pdf
 
 Residual Calculation
 --------------------

@@ -84,18 +84,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for t, meta in all_vars['input']:
-            if t in system._var_abs2meta['input']:
-                idxs = meta['src_indices']
-            else:
-                idxs = None
-
             s = connections[t]
             if show_values:
                 if s.startswith('_auto_ivc.'):
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True,
+                    val = system.get_val(t, flat=True, get_remote=True,
                                          from_src=False)
                 else:
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True)
+                    val = system.get_val(t, flat=True, get_remote=True)
 
                     # if there's a unit conversion, express the value in the
                     # units of the target
