@@ -152,7 +152,8 @@ def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
         ofstart, ofend = data['ofslices'][of]
         for j, wrt in enumerate(dv_vals):
             wrtstart, wrtend = data['wrtslices'][wrt]
-            # var_matrix[i, j] = np.linalg.norm(matrix[ofstart:ofend, wrtstart:wrtend])
+            # use max of abs value here instead of norm to keep coloring consistent between
+            # top level jac and subjacs
             var_matrix[i, j] = np.max(matrix[ofstart:ofend, wrtstart:wrtend])
             if var_matrix[i, j] > 0. or (coloring and
                                          np.any(mask[ofstart:ofend, wrtstart:wrtend])):

@@ -7,7 +7,7 @@
     <tabulator_src>
 </script>
 <script type="text/javascript">
-        <d3_src>
+    <d3_src>
 </script>
 <script>
     var data = <scaling_data>;
@@ -164,20 +164,27 @@ function get_vname_id(vname) {
     return "varname" + vname_map[vname];
 }
 
+
+function get_subjac_id(ofname, wrtname) {
+    return get_vname_id(ofname) + "-" + get_vname_id(wrtname);
+}
+
+
 document.title = data.title;
 document.getElementById("scaling_title").innerHTML = data.title
 
 var d3_format = d3.format(".6~g");
 
-function arr_format(num) {
-    return "<b>&lt</b> " + d3_format(num) + " <b>&gt</b>";
+function norm_format(num) {
+    return "||<em><b> " + d3_format(num) + " </b></em>||";
 }
 
-function val_formatter(cell, formatterParams, onRendered) {
+
+function val_cell_formatter(cell, formatterParams, onRendered) {
     // cell value is actually [value, size]
     let val = cell.getValue();
     if (val[1] > 1) {
-        return arr_format(val[0]);
+        return norm_format(val[0]);
     }
     if (val[0] == "") {
         return "";
@@ -202,7 +209,15 @@ function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
 
 
 function numrow(title, field) {
-    return {title:title, field:field, hozAlign:"right", visible:true, headerFilter:false, formatter:val_formatter, sorter:val_sorter}
+    return {
+        title:title,
+        field:field,
+        hozAlign:"right",
+        visible:true,
+        headerFilter:false,
+        formatter:val_cell_formatter,
+        sorter:val_sorter,
+    }
 }
 
 
@@ -247,8 +262,6 @@ if (con_tabledata.length > 0) {
     let conheight = (con_tabledata.length > 15) ? 450 : null;
 
     var contable = new Tabulator("#con-table", {
-        // set height of table (in CSS or here), this enables the Virtual DOM and
-        // improves render speed dramatically (can be any valid css height value)
         height: conheight,
         dataTree:true,
         dataTreeStartExpanded:false,
@@ -288,8 +301,6 @@ else {
 if (obj_tabledata.length > 0) {
     let objheight = (obj_tabledata.length > 15) ? 450 : null;
     var objtable = new Tabulator("#obj-table", {
-        // set height of table (in CSS or here), this enables the Virtual DOM and
-        // improves render speed dramatically (can be any valid css height value)
         height: objheight,
         dataTree:true,
         dataTreeStartExpanded:false,
@@ -332,7 +343,7 @@ function toggleHelp(event) {
 
 function add_sub_tab(rowname, colname) {
     // returns true if the button is already there
-    var name = get_vname_id(rowname) + "-" + get_vname_id(colname);
+    var name = get_subjac_id(rowname, colname);
 
     var sel = d3.select("#" + name + "-button");
     if (!sel.empty()) {
@@ -389,7 +400,7 @@ function openSubjac(subdata, parent_id) {
     ynames = shifted.map(d => d[0].toString());
     xnames = shifted.map(d => d[1].toString());
 
-    heatmap(ynames, xnames, shifted, "#" + get_vname_id(subdata[0]) + "-" + get_vname_id(subdata[1]) + "-tab", false);
+    heatmap(ynames, xnames, shifted, "#" + get_subjac_id(subdata[0], subdata[1]) + "-tab", false);
 }
 
 
@@ -499,7 +510,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             }
         })
         .on("mouseover", function () {
-            event.stopPropagation(event);
+            event.stopPropagation();
             tooltip.style("opacity", 1);
             d3.select(this).style("stroke", "black");
         })
@@ -527,7 +538,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             tooltip.style("opacity", 0)
             d3.select(this).style("stroke", "none");
         })
-        .filter(d => is_top && d[2] != null && d[2] != 0)  // don't add sub creation to 0 or subjac entries
+        .filter(d => is_top && d[2] != null)  // don't add sub creation to 0 or subjac entries
         .on("click", function () {
             openSubjac(this.__data__, parent_id);
         });
