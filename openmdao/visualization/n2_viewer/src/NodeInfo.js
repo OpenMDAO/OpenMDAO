@@ -373,7 +373,7 @@ class ValueInfo {
         // larger than full size
         this.initial_width = parseInt(this.table.style('width'));
         this.initial_height = parseInt(this.table.style('height'));
-        
+
         titleSpan.style('max-width', `${this.initial_width - 50}px`);
         titleSpan.text(this.name);
     }
@@ -465,12 +465,13 @@ ValueInfo.TRUNCATE_LIMIT = 80;
  * visible or not.
  * @typedef NodeInfo
  */
-class NodeInfo {
+class NodeInfo extends N2Window {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
      */
     constructor(ui) {
+        super();
         this.values = {};
 
         // Potential properties
@@ -506,33 +507,35 @@ class NodeInfo {
         ];
 
         this.ui = ui;
-        this.container = d3.select('#node-info-container');
-        this.table = this.container.select('.node-info-table');
-        this.thead = this.table.select('thead');
-        this.tbody = this.table.select('tbody');
+        this.table = this._body.append('table').attr('class', 'node-info-table');
+        this.tbody = this.table.append('tbody');
         this.toolbarButton = d3.select('#info-button');
-        this.dataDiv = this.container.select('div.node-info-data');
-        this.hidden = true;
+        this.dataDiv = this._main.append('div').attr('class', 'node-info-data');
+        this.showFooter();
+        this.active = false; // Becomes active when node info mode is selected on toolbar
+        this.set('width', '200px').set('height', '200px')
     }
 
     /** Make the info box visible if it's hidden */
-    show() {
-        this.toolbarButton.classed('active-tab-icon', true);
+    activate() {
+        this.active = true;
         this.hidden = false;
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
+        return this;
     }
 
     /** Make the info box hidden if it's visible */
-    hide() {
-        this.toolbarButton.classed('active-tab-icon', false);
+    deactivate() {
+        this.active = false;
         this.hidden = true;
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
+        return this;
     }
 
-    /** Toggle the visibility setting */
+    /** Toggle the active mode */
     toggle() {
-        if (this.hidden) this.show();
-        else this.hide();
+        this.active = !this.active;
+        this.hidden = this.active;
     }
 
     pin() {
@@ -540,6 +543,23 @@ class NodeInfo {
 
         new PersistentNodeInfo(this);
         this.clear();
+        return this;
+    }
+
+    /** Wipe the contents of the table body */
+    clear() {
+        if (!this.active) return;
+        // this.hidden = true;
+        this.set('width', '320px').set('height', '320px');
+        this.table.style('width', '100%').style('height', '100%');
+
+        this.dataDiv.html('');
+        this.tbody.html('');
+
+        // Don't just replace with {} because some InfoProps rely
+        // on the reference to this.values:
+        // wipeObj(this.values);
+        return this;
     }
 
     /**
@@ -551,14 +571,12 @@ class NodeInfo {
      * @param {Boolean} [isSolver = false] Whether to use solver properties or not.
      */
     update(event, node, color, isSolver = false) {
-        if (this.hidden) return;
+        if (!this.active) return;
 
         this.clear();
 
-
-
         this.name = node.absPathName;
-        this.table.select('tfoot th').style('background-color', color);
+        this.ribbonColor(color);
 
         if (DebugFlags.info && node.hasChildren()) {
             InfoPropDefault.addRowWithVal(this.tbody, 'Children', node.children.length);
@@ -573,77 +591,22 @@ class NodeInfo {
             prop.addRow(this.tbody, node);
         }
 
-        const scrollWidth = this.table.node().scrollWidth,
-            scrollHeight = this.table.node().scrollHeight;
+        const scrollWidth = this._window.node().scrollWidth,
+            scrollHeight = this._window.node().scrollHeight;
 
         // Solidify the size of the table after populating so that
         // it can be positioned reliably by move().
-        this.table
+        /*
+        this._window
             .style('width', `${scrollWidth}px`)
             .style('height', `${scrollHeight}px`)
+        */
 
         // Put the name in the title
-        this.table.select('thead th')
-            .style('background-color', color)
-            .select('.node-info-title')
-            .style('max-width', `${scrollWidth - 100}px`)
-            .text(node.name);
-
+        this.title(node.name);
         this.move(event);
-        this.container.classed('info-hidden', false).classed('info-visible', true);
-    }
+        this.hidden = false;
 
-    /** Wipe the contents of the table body */
-    clear() {
-        if (this.hidden) return;
-        this.container
-            .classed('info-visible', false)
-            .classed('info-hidden', true)
-            .style('width', 'auto')
-            .style('height', 'auto');
-
-        this.table
-            .style('width', 'auto')
-            .style('height', 'auto')
-            .select('thead th span').text('');
-
-        this.dataDiv.html('');
-        this.tbody.html('');
-
-        // Don't just replace with {} because some InfoProps rely
-        // on the reference to this.values:
-        wipeObj(this.values);
-    }
-
-    /**
-     * Relocate the table to a position near the mouse
-     * @param {Object} event The triggering event containing the position.
-     */
-    move(event) {
-        if (this.hidden) return;
-        const offset = 30;
-
-        // Mouse is in left half of window, put box to right of mouse
-        if (event.clientX < window.innerWidth / 2) {
-            this.container.style('right', 'auto');
-            this.container.style('left', (event.clientX + offset) + 'px')
-        }
-        // Mouse is in right half of window, put box to left of mouse
-        else {
-            this.container.style('left', 'auto');
-            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px');
-        }
-
-        // Mouse is in top half of window, put box below mouse
-        if (event.clientY < window.innerHeight / 2) {
-            this.container.style('bottom', 'auto');
-            this.container.style('top', (event.clientY - offset) + 'px');
-        }
-        // Mouse is in bottom half of window, put box above mouse
-        else {
-            this.container.style('top', 'auto');
-            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px');
-        }
     }
 }
 

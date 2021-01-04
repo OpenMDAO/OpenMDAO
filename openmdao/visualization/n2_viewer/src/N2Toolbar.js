@@ -302,8 +302,8 @@ class N2Toolbar {
             "Save to SVG", e => { n2ui.n2Diag.saveSvg() });
 
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
-            ["Show detailed node information", "Hide detailed node information"],
-            pred => { return n2ui.nodeInfoBox.hidden; },
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
             e => {
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();

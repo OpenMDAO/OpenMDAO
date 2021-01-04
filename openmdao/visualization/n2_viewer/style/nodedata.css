@@ -8,6 +8,15 @@ div.info-panel {
 .node-info-table {
 	overflow: hidden;
 	background-color: white;
+    min-width: 200px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/*
+.node-info-table {
+	overflow: hidden;
+	background-color: white;
 	border-radius: 10px;
 	border: 1px solid #a0a0a0;
     transition: opacity 0.25s;
@@ -35,7 +44,6 @@ div.info-panel {
 }
 
 .node-info-title {
-    /* Stuff to prevent title bar from being too long */
     display: block;
     position: relative;
     text-overflow: ellipsis;
@@ -46,7 +54,7 @@ div.info-panel {
     margin-left: 15px;
     margin-right: 15px;
 }
-
+*/
 .node-info-table tbody th {
     text-align: right;
     font-size: 9pt;
@@ -75,11 +83,13 @@ div.info-panel {
     white-space: nowrap;
 }
 
+/*
 .node-info-table tfoot th {
     background-color: #42926b;
     padding: 2px;
     font-size: 11pt;
 }
+*/
 
 .caps {
     text-transform: capitalize;

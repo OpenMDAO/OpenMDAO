@@ -1,28 +1,40 @@
 #n2-windows {
+    position: absolute;
     width: 100vw;
     height: 100vw;
 }
 
-#n2-windows>div {
+#n2-windows div {
     position: absolute;
+    width: auto;
+    height: auto;
 }
 
 .main-window {
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .window-contents {
-    width: 100%;
-    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .window-inactive {
     display: none;
 }
 
+/*
 .window-active {
     display: block;
+}
+*/
+.window-draggable-header {
+    cursor: grab;
 }
 
 /* vvv Begin N2 Window resizing styles vvv */
@@ -33,7 +45,6 @@
 }
 
 .resize {
-    position: absolute;
     top: var(--resize-overflow);
     left: var(--resize-overflow);
     right: var(--resize-overflow);
@@ -44,7 +55,6 @@
 }
 
 .resize>div {
-    position: absolute;
     pointer-events: auto;
 }
 
@@ -88,18 +98,21 @@
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     overflow: hidden;
-    opacity: 0.95;
+    --header-height: 30px;
+    --footer-height: 0;
 }
 
 .window-theme-default>.window-header {
     background-color: #42926b;
     margin: 0;
-    padding: 5px;
     font-size: 11pt;
     text-align: right;
-    cursor: grab;
     white-space: nowrap;
-    height: 20px;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
 }
 
 .window-theme-default>.window-header>.window-close-button::before {
@@ -113,7 +126,7 @@
     font-weight: bold;
     margin-left: 5px;
     margin-right: 5px;
-    line-height: 20px;
+    line-height: var(--header-height);
 }
 
 .window-theme-default>.window-header>.window-close-button:hover,
@@ -127,9 +140,9 @@
 .window-theme-default>.window-header>.window-title {
     color: white;
     display: block;
-    position: relative;
     font-weight: bold;
-    line-height: 20px;
+    line-height: var(--header-height);
+    position: relative;
 
     /* Stuff to prevent title bar from being too long */
     text-overflow: ellipsis;
@@ -142,21 +155,27 @@
 }
 
 .window-theme-default>.window-body {
-    height: auto;
-    width: 100%;
     background-color: white;
     color: black;
-    top: 30px;
     border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
 }
 
 .window-theme-default>.window-footer {
-    height: 30px;
-    width: 100%;
-    background-color: darkgreen;
+    background-color: #42926b;
     color: white;
-    bottom: 30px;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
     left: 0;
+    right: 0;
 }
 
 /* ^^^ End Default N2 Window theme ^^^ */
