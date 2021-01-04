@@ -5,9 +5,8 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_equal
 
-from openmdao.components.interp_util.interp import InterpND
+from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
 
@@ -36,18 +35,18 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         interp = InterpND(method='akima', points=xcp, x_interp=x, delta_x=0.1)
         y = interp.evaluate_spline(ycp)
 
-        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
-                            12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
-                            13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
-                            14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
-                            15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
-                            16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
-                            17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
-                            19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
-                            20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
-                            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
-
-        assert_near_equal(akima_y.flatten(), y.flatten(), tolerance=1e-6)
+        assert_near_equal(y,
+                          np.array([ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
+                                     12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
+                                     13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
+                                     14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
+                                     15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
+                                     16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
+                                     17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
+                                     19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
+                                     20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+                                     24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]),
+                          tolerance=1e-6)
 
     def test_interp_spline_akima_derivs(self):
         import numpy as np
@@ -62,18 +61,18 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         interp = InterpND(method='akima', points=xcp, x_interp=x, delta_x=0.1)
         y, dy_dycp = interp.evaluate_spline(ycp, compute_derivative=True)
 
-        deriv = np.array([[ 1.00000000e+00,  0.00000000e+00,  0.00000000e+00,
-                            0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
-                        [-1.86761492e-06,  3.31278014e-02,  1.05874907e+00,
-                        -9.18750000e-02,  0.00000000e+00,  0.00000000e+00],
-                        [ 0.00000000e+00,  0.00000000e+00, -2.10964627e-01,
-                            1.19119941e+00,  2.02602810e-02, -4.95062934e-04],
-                        [ 0.00000000e+00,  0.00000000e+00, -2.64126732e-01,
-                            5.82784977e-01,  6.83151998e-01, -1.81024253e-03],
-                        [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
-                            0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-
-        assert_near_equal(deriv, dy_dycp, tolerance=1e-6)
+        assert_near_equal(dy_dycp,
+                          np.array([[ 1.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+                                      0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                                    [-1.86761492e-06,  3.31278014e-02,  1.05874907e+00,
+                                     -9.18750000e-02,  0.00000000e+00,  0.00000000e+00],
+                                    [ 0.00000000e+00,  0.00000000e+00, -2.10964627e-01,
+                                      1.19119941e+00,  2.02602810e-02, -4.95062934e-04],
+                                    [ 0.00000000e+00,  0.00000000e+00, -2.64126732e-01,
+                                      5.82784977e-01,  6.83151998e-01, -1.81024253e-03],
+                                    [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+                                      0.00000000e+00,  0.00000000e+00,  1.00000000e+00]]),
+                          tolerance=1e-6)
 
     def test_interp_spline_bsplines(self):
         import numpy as np
@@ -89,18 +88,18 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
         y = interp.evaluate_spline(ycp)
 
-        akima_y = np.array([[ 9.21614583,  9.90911525, 10.52244151, 11.06231159, 11.53491244,
-                              11.94643105, 12.30305438, 12.61096939, 12.87636305, 13.10542234,
-                              13.30433422, 13.47928566, 13.63646363, 13.7820551 , 13.92203064,
-                              14.05954727, 14.19579437, 14.33192094, 14.46907599, 14.60840854,
-                              14.75106758, 14.89820214, 15.05096121, 15.2104938 , 15.37794893,
-                              15.5544756 , 15.74122282, 15.9393396 , 16.14997495, 16.37427787,
-                              16.61339737, 16.86848247, 17.14102103, 17.43486416, 17.75486932,
-                              18.10589772, 18.49281052, 18.92046894, 19.39373414, 19.91746734,
-                              20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
-                              24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]])
-
-        assert_near_equal(akima_y.flatten(), y.flatten(), tolerance=1e-6)
+        assert_near_equal(y,
+                          np.array([ 9.21614583,  9.90911525, 10.52244151, 11.06231159, 11.53491244,
+                                     11.94643105, 12.30305438, 12.61096939, 12.87636305, 13.10542234,
+                                     13.30433422, 13.47928566, 13.63646363, 13.7820551 , 13.92203064,
+                                     14.05954727, 14.19579437, 14.33192094, 14.46907599, 14.60840854,
+                                     14.75106758, 14.89820214, 15.05096121, 15.2104938 , 15.37794893,
+                                     15.5544756 , 15.74122282, 15.9393396 , 16.14997495, 16.37427787,
+                                     16.61339737, 16.86848247, 17.14102103, 17.43486416, 17.75486932,
+                                     18.10589772, 18.49281052, 18.92046894, 19.39373414, 19.91746734,
+                                     20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
+                                     24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]),
+                          tolerance=1e-6)
 
     def test_table_interp(self):
         import numpy as np
@@ -126,6 +125,56 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
         assert_near_equal(f, actual, tolerance=1e-7)
         assert_near_equal(df_dx, deriv_actual, tolerance=1e-7)
+
+    def test_cs_across_interp(self):
+        # The standalone interpolator is used inside of components, so the imaginary part must
+        # be carried through all operations to the outputs.
+        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        ycp = np.array([[5.0 + 1j, 12.0, 14.0, 16.0, 21.0, 29.0],
+                        [5.0, 12.0 + 1j, 14.0, 16.0, 21.0, 29.0]])
+
+        for method in SPLINE_METHODS:
+
+            # complex step not supported on scipy methods
+            if method.startswith('scipy'):
+                continue
+
+            interp = InterpND(method=method, points=xcp, x_interp=x)
+            y, dy = interp.evaluate_spline(ycp, compute_derivative=True)
+
+            self.assertTrue(y.dtype == np.complex)
+
+            if method in ['akima']:
+                # Derivs depend on values only for akima.
+                self.assertTrue(dy.dtype == np.complex)
+
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f = np.sqrt(P1) + P2 * P3
+
+        x = np.array([[55.12 + 1j, -2.14, 0.323],
+                      [55.12, -2.14 + 1j, 0.323],
+                      [55.12, -2.14, 0.323 + 1j]])
+
+        for method in TABLE_METHODS:
+
+            # complex step not supported on scipy methods
+            if method.startswith('scipy'):
+                continue
+
+            interp = InterpND(method=method, points=(p1, p2, p3), values=f)
+            y, dy = interp.interpolate(x, compute_derivative=True)
+
+            self.assertTrue(y.dtype == np.complex)
+            self.assertTrue(dy.dtype == np.complex)
 
 
 class TestInterpNDPython(unittest.TestCase):
