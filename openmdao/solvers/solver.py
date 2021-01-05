@@ -604,11 +604,11 @@ class NonlinearSolver(Solver):
                     self.linesearch.options['print_bound_enforce'] = True
 
                     msg = ("Your model has stalled three times and may be violating the "
-                            "bounds. In the future, turn on print_bound_enforce in your "
-                            "solver options to see. For example:\n"
-                            "'prob.model.nonlinear_solver.linesearch.options"
-                            "['print_bound_enforce']=True'. \nThe bound(s) being violated "
-                            "now are:\n")
+                           "bounds. In the future, turn on print_bound_enforce in your "
+                           "solver options to see. For example:\n"
+                           "'prob.model.nonlinear_solver.linesearch.options"
+                           "['print_bound_enforce']=True'. \nThe bound(s) being violated "
+                           "now are:\n")
                     simple_warning(msg)
 
                     self._single_iteration()
