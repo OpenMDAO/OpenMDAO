@@ -37,8 +37,7 @@ This function creates a dictionary of the latest model options available that we
 Solver Metadata
 ---------------
 
-Solvers record the solver options as metadata. Note that, because more than
-one solver's metadata may be recorded, each solver's metadata must be accessed through
+Solver options are recorded as metadata. Each solver's metadata is accessed using
 its absolute name within :code:`solver_metadata`, as shown in the example below.
 
 .. embed-code::
