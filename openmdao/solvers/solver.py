@@ -592,12 +592,27 @@ class NonlinearSolver(Solver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         stalled = False
+        stall_count = 0
         if stall_limit > 0:
-            stall_count = 0
             stall_norm = norm0
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
+
+                if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+
+                    self.linesearch.options['print_bound_enforce'] = True
+
+                    msg = ("Your model has stalled three times and may be violating the "
+                            "bounds. In the future, turn on print_bound_enforce in your "
+                            "solver options to see. For example:\n"
+                            "'prob.model.nonlinear_solver.linesearch.options"
+                            "['print_bound_enforce']=True'. \nThe bound(s) being violated "
+                            "now are:\n")
+                    simple_warning(msg)
+
+                    self.linesearch.options['print_bound_enforce'] = False
+
                 self._single_iteration()
                 self._iter_count += 1
                 self._run_apply()
@@ -617,19 +632,6 @@ class NonlinearSolver(Solver):
                         stall_count += 1
                         if stall_count >= stall_limit:
                             stalled = True
-                        if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
-                            self.linesearch.options['print_bound_enforce'] = True
-
-                            msg = ("Your model has stalled three times and may be violating the "
-                                   "bounds. In the future, turn on print_bound_enforce in your "
-                                   "solver options to see. For example:\n"
-                                   "'prob.model.nonlinear_solver.linesearch.options"
-                                   "['print_bound_enforce']=True'. \nThe bound(s) being violated "
-                                   "now are:\n")
-                            simple_warning(msg)
-
-                            self._single_iteration()
-                            self.linesearch.options['print_bound_enforce'] = False
                     else:
                         stall_count = 0
                         stall_norm = rel_norm
