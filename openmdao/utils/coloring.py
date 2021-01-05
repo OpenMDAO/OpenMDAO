@@ -21,7 +21,8 @@ from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
-from openmdao.utils.general_utils import simple_warning, prom2ivc_src_dict
+from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
+    _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
@@ -1435,8 +1436,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         prob.run_model(reset_iter_counts=False)
 
     if of is None or wrt is None:
-        desvars = prom2ivc_src_dict(driver._designvars)
-        driver_wrt = list(desvars)
+        driver_wrt = list(_prom2ivc_src_name_iter(driver._designvars))
         driver_of = driver._get_ordered_nl_responses()
         if not driver_wrt or not driver_of:
             raise RuntimeError("When computing total jacobian sparsity, either 'of' and 'wrt' "
@@ -1566,7 +1566,7 @@ def _write_sparsity(sparsity, stream):
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):
-    desvars = prom2ivc_src_dict(driver._designvars)
+    desvars = _prom2ivc_src_dict(driver._designvars)
 
     if names is None:
         abs_names = list(desvars)
@@ -2215,20 +2215,20 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
             driver_resp = driver._dist_driver_vars
-            for key, val in driver._responses.items():
-                if val['indices'] is not None:
-                    if val['distributed'] and key in driver_resp:
+            for key, meta in driver._responses.items():
+                if meta['indices'] is not None:
+                    if meta['distributed'] and key in driver_resp:
                         of_idx[key] = driver_resp[key][0]
                     else:
-                        of_idx[key] = val['indices']
+                        of_idx[key] = meta['indices']
         else:
             model._owns_approx_of_idx = {
-                key: val['indices'] for key, val in driver._responses.items()
-                if val['indices'] is not None
+                key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(driver._responses)
+                if meta['indices'] is not None
             }
         model._owns_approx_wrt_idx = {
-            key: val['indices'] for key, val in design_vars.items()
-            if val['indices'] is not None
+            key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(design_vars)
+            if meta['indices'] is not None
         }
 
 

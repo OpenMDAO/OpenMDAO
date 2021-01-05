@@ -12,7 +12,8 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation, prom2ivc_src_dict
+from openmdao.utils.general_utils import simple_warning, warn_deprecation, _prom2ivc_src_dict, \
+    _prom2ivc_src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -284,11 +285,6 @@ class Driver(object):
         self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
 
-        src_design_vars = prom2ivc_src_dict(self._designvars)
-        src_cons = prom2ivc_src_dict(self._cons)
-        src_objs = prom2ivc_src_dict(self._objs)
-        responses = prom2ivc_src_dict(self._responses)
-
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
             dist_vars = []
@@ -317,10 +313,13 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
+            src_design_vars = _prom2ivc_src_dict(self._designvars)
+            responses = _prom2ivc_src_dict(self._responses)
+
             local_out_vars = set(model._outputs._abs_iter())
             remote_dvs = set(src_design_vars) - local_out_vars
-            remote_cons = set(src_cons) - local_out_vars
-            remote_objs = set(src_objs) - local_out_vars
+            remote_cons = set(_prom2ivc_src_name_iter(self._cons)) - local_out_vars
+            remote_objs = set(_prom2ivc_src_name_iter(self._objs)) - local_out_vars
 
             all_remote_vois = model.comm.allgather(
                 (remote_dvs, remote_cons, remote_objs))
