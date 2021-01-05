@@ -6,8 +6,9 @@
 
 #n2-windows div {
     position: absolute;
+    /*
     width: auto;
-    height: auto;
+    height: auto; */
 }
 
 .main-window {
@@ -28,16 +29,11 @@
     display: none;
 }
 
-/*
-.window-active {
-    display: block;
-}
-*/
 .window-draggable-header {
     cursor: grab;
 }
 
-/* vvv Begin N2 Window resizing styles vvv */
+/* vvvvvvvvvv Begin N2 Window resizing styles vvvvvvvvvv */
 :root {
     --resize-overflow: -2px;
     --resize-edge-size: 5px;
@@ -88,18 +84,19 @@
 .rsz-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
 .rsz-top-left { top: 0; left: 0; cursor: nwse-resize; }
 
-/* ^^^ End N2 Window resizing styles ^^^ */
+/* ^^^^^^^^^^ End N2 Window resizing styles ^^^^^^^^^^ */
 
 
-/* vvv Begin Default N2 Window theme vvv */
+/* vvvvvvvvvv Begin Default N2 Window theme vvvvvvvvvv */
 .window-theme-default {
+    background-color: white;
     border: 1px solid #a0a0a0;
     transition: opacity 0.25s;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     overflow: hidden;
     --header-height: 30px;
-    --footer-height: 0;
+    --footer-height: 30px;
 }
 
 .window-theme-default>.window-header {
@@ -155,7 +152,6 @@
 }
 
 .window-theme-default>.window-body {
-    background-color: white;
     color: black;
     border: 0;
     margin: 0;
@@ -178,4 +174,147 @@
     right: 0;
 }
 
-/* ^^^ End Default N2 Window theme ^^^ */
+/* ^^^^^^^^^^ End Default N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin N2 Window resizing styles vvvvvvvvvv */
+:root {
+    --resize-overflow: -2px;
+    --resize-edge-size: 5px;
+    --resize-corner-size: 10px;
+}
+
+.resize {
+    top: var(--resize-overflow);
+    left: var(--resize-overflow);
+    right: var(--resize-overflow);
+    bottom: var(--resize-overflow);
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.resize>div {
+    pointer-events: auto;
+}
+
+.rsz-horizontal {
+    height: var(--resize-edge-size);
+    left: var(--resize-corner-size);
+    right: var(--resize-corner-size);
+}
+.rsz-horizontal:hover { cursor: ns-resize; }
+
+.rsz-top { top: 0; }
+.rsz-bottom { bottom: 0; }
+
+.rsz-vertical {
+    width: var(--resize-edge-size);
+    top: var(--resize-corner-size);
+    bottom: var(--resize-corner-size);
+}
+.rsz-vertical:hover { cursor: ew-resize; }
+
+.rsz-right { right: 0; }
+.rsz-left { left: 0; }
+
+.rsz-corner {
+    height: var(--resize-corner-size);
+    width: var(--resize-corner-size);
+}
+
+.rsz-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.rsz-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.rsz-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.rsz-top-left { top: 0; left: 0; cursor: nwse-resize; }
+
+/* ^^^^^^^^^^ End N2 Window resizing styles ^^^^^^^^^^ */
+
+
+/* vvvvvvvvvv Begin Node Info N2 Window theme vvvvvvvvvv */
+.window-theme-node-info {
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    --header-height: 25px;
+    --footer-height: 15px;
+}
+
+.window-theme-node-info>.window-header {
+    background-color: #42926b;
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-node-info>.window-header>.window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-node-info>.window-header>.window-close-button {
+    color: black;
+    float: right;
+    font-size: 11pt;
+    font-weight: bold;
+    margin-left: 5px;
+    margin-right: 5px;
+    line-height: var(--header-height);
+}
+
+.window-theme-node-info>.window-header>.window-close-button:hover,
+.window-theme-node-info>.window-header>.window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transform: translate(-1px, -1px)
+}
+
+.window-theme-node-info>.window-header>.window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+.window-theme-node-info>.window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+}
+
+.window-theme-node-info>.window-footer {
+    background-color: #42926b;
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* ^^^^^^^^^^ End Node Info N2 Window theme ^^^^^^^^^^ */

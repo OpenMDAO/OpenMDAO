@@ -512,15 +512,18 @@ class NodeInfo extends N2Window {
         this.tbody = this.table.append('tbody');
         this.toolbarButton = d3.select('#info-button');
         this.dataDiv = this._main.append('div').attr('class', 'node-info-data');
+        this.theme('node-info');
         this.showFooter();
-        this.active = false; // Becomes active when node info mode is selected on toolbar
-        this.set('width', '200px').set('height', '200px')
+
+        // Becomes active when node info mode is selected on toolbar
+        this.active = false; 
     }
 
     /** Make the info box visible if it's hidden */
     activate() {
         this.active = true;
         this.hidden = false;
+        this.toolbarButton.classed('active-tab-icon', true);
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
         return this;
     }
@@ -529,14 +532,15 @@ class NodeInfo extends N2Window {
     deactivate() {
         this.active = false;
         this.hidden = true;
+        this.toolbarButton.classed('active-tab-icon', false);
         d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
         return this;
     }
 
     /** Toggle the active mode */
     toggle() {
-        this.active = !this.active;
-        this.hidden = this.active;
+        if (this.active) this.deactivate();
+        else this.activate();
     }
 
     pin() {
@@ -551,9 +555,9 @@ class NodeInfo extends N2Window {
     clear() {
         if (!this.active) return;
         // this.hidden = true;
-        this.set('width', '320px').set('height', '320px');
-        this.table.style('width', '100%').style('height', '100%');
 
+        this.setList({width: null, height: null, left: null, right: null,
+            top: null, bottom: null})
         this.dataDiv.html('');
         this.tbody.html('');
 
@@ -592,18 +596,9 @@ class NodeInfo extends N2Window {
             prop.addRow(this.tbody, node);
         }
 
-        const scrollWidth = this._window.node().scrollWidth,
-            scrollHeight = this._window.node().scrollHeight;
+        this.sizeToContent();
 
-        // Solidify the size of the table after populating so that
-        // it can be positioned reliably by move().
-        /*
-        this._window
-            .style('width', `${scrollWidth}px`)
-            .style('height', `${scrollHeight}px`)
-        */
-
-        // Put the name in the title
+        // Put the name of the node in the title
         this.title(node.name);
         this.move(event);
         this.hidden = false;

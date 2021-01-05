@@ -7,7 +7,6 @@ class N2Window {
      */
     static zIndex = 10;
     static container = null;
-    static winSettings = ['width', 'height', 'top', 'right', 'bottom', 'left'];
 
     /**
      * Clone the template window defined in index.html, setup some
@@ -37,12 +36,16 @@ class N2Window {
         this.bringToFront(true);
     }
 
+    get header() { return this._header; }
+    get body() { return this._body; }
+    get footer() { return this._footer; }
+
     /**
      * Compute the position of all four sides of the window relative to the container.
      * @returns {Object} Each key represents the position in pixels.
      */
-    _getPos() {
-        const parentPos = N2Window.container.node().getBoundingClientRect(),
+    _getPos(container = N2Window.container.node()) {
+        const parentPos = container.getBoundingClientRect(),
             childPos = this._window.node().getBoundingClientRect();
 
         let posInfo = {
@@ -62,7 +65,7 @@ class N2Window {
     _setPos(newPos) {
         // All of the values need to be set because some may have started as "auto"
         for (const s of ['top', 'right', 'bottom', 'left', 'width', 'height']) {
-            this._window.style(s, `${newPos[s]}px`);
+            this.set(s, `${newPos[s]}px`);
         }
     }
 
@@ -100,37 +103,56 @@ class N2Window {
     /**
      * Change the styling of the window to a preset theme and/or return it.
      * @param {String} [newTheme = null] The name of the theme to change to. No change if null.
-     * @returns {String} The name of the theme.
+     * @returns if newTheme is null, a string with the current theme name;
+     *  otherwise a reference to this
      */
     theme(newTheme = null) {
-        const classes = this._window.attr('class');
-        const curTheme = classes.replace(/^.*(window-theme-\S+).*$/, "$1")
+        const contents = this._window.select('div.window-contents'),
+            classes = contents.attr('class'),
+            curTheme = classes.replace(/^.*(window-theme-\S+).*$/, "$1")
 
-        if (newTheme && newTheme != curTheme) {
-            this._window
+        if (newTheme) {
+            contents
                 .classed(`window-theme-${curTheme}`, false)
                 .classed(`window-theme-${newTheme}`, true)
         }
         else {
-            newTheme = curTheme;
+            return curTheme;
         }
 
-        return newTheme;
+        return this;
     }
 
-    set(options) {
+    /**
+     * Set a style or special property for the window. Recognized special
+     * properties: title, theme.
+     * @param {String} opt The name of the style/property to set
+     * @param {String} val The value to set it to.
+     * @returns {Object} Reference to this.
+     */
+    set(opt, val) {
+        switch (opt) {
+            case 'title':
+                this.title(val);
+                break;
+            case 'theme':
+                this.theme(val);
+                break;
+            default:
+                this._window.style(opt, val);
+        }
+
+        return this;
+    }
+
+    /**
+     * Iterate over a list of styles/properties w/values and set them.
+     * @param {Object} options Dictionary of style/value pairs.
+     * @returns {Object} Reference to this.
+     */
+    setList(options) {
         for (const optName in options) {
-            // Handle all simple accepted style settings the same way
-            if (N2Window.winSettings.includes(optName)) {
-                this._window.style(optName, options[optName]);
-            }
-            else {
-                switch (optName) {
-                    case 'title':
-                        this.title(options[optName]);
-                        break;
-                }
-            }
+            this.set(optName, options[optName]);
         }
 
         return this;
@@ -160,40 +182,50 @@ class N2Window {
     /**
      * Relocate the window to a position near the mouse
      * @param {Object} event The triggering event containing the position.
+     * @param {Number} [offset = 15] Distance from mouse to place window.
      */
-    move(event) {
+    move(event, offset = 15) {
         if (!this.active) return;
-        const offset = 30;
 
         let pos = this._getPos();
 
         // Mouse is in left half of browser, put window to right of mouse
         if (event.clientX < window.innerWidth / 2) {
-            pos.left = event.clientX + offset;
+            pos.left = event.pageX + offset;
             pos.right = pos.left + pos.width;
-            // this.set('right', 'auto');
-            // this.set('left', (event.clientX + offset) + 'px')
         }
         // Mouse is in right half of browser, put window to left of mouse
         else {
-            pos.right = 
-            this.set('left', 'auto');
-            this.set('right', (window.innerWidth - event.clientX + offset) + 'px');
+            pos.right = event.pageX - offset;
+            pos.left = pos.right - pos.width;
         }
 
         // Mouse is in top half of browser, put window below mouse
         if (event.clientY < window.innerHeight / 2) {
-            this.set('bottom', 'auto');
-            this.set('top', (event.clientY - offset) + 'px');
+            pos.top = event.pageY + offset;
+            pos.bottom = pos.top + pos.height;
         }
         // Mouse is in bottom half of browser, put window above mouse
         else {
-            this.set('top', 'auto');
-            this.set('bottom', (window.innerHeight - event.clientY - offset) + 'px');
+            pos.bottom = event.pageY - offset;
+            pos.top = pos.bottom - pos.height;
         }
 
         this._setPos(pos);
         return this;
+    }
+
+    sizeToContent() {
+        const contentWidth = this.body.node().scrollWidth,
+            contentHeight = this.body.node().scrollHeight,
+            headerHeight = this._header.node().scrollHeight,
+            footerHeight = this._footer.classed('window-inactive')?
+                parseInt(this._window.select('.window-contents').style('border-radius')) :
+                this._footer.node().scrollHeight;
+
+        const totalHeight = contentHeight + headerHeight + footerHeight + 2;
+
+        this.setList({width: contentWidth + 'px', height: totalHeight + 'px'});
     }
 }
 

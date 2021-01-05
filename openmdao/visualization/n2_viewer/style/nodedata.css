@@ -1,9 +1,10 @@
 /******************* Node Data styling *******************/
-div.info-panel {
+/* div.info-panel {
     position: absolute;
     z-index: 20;
     height: auto;
 }
+*/
 
 .node-info-table {
 	overflow: hidden;
@@ -11,6 +12,8 @@ div.info-panel {
     min-width: 200px;
     border-collapse: separate;
     border-spacing: 0;
+    width: fit-content;
+    height: fit-content;
 }
 
 /*
@@ -112,6 +115,7 @@ div.info-panel {
     cursor: context-menu;
 }
 
+/*
 #node-info-pin {
     position: absolute;
     top: 5px;
@@ -124,7 +128,6 @@ div.info-panel {
     width: 18px;
     height: 18px;
     padding: 0 2px 0 2px;
-    /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
     border-radius: 3px;
 }
 
@@ -133,6 +136,7 @@ div.info-panel {
     right: 9px;
     box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
 }
+*/
 
 /******************* Node Value Window styling *******************/
 
