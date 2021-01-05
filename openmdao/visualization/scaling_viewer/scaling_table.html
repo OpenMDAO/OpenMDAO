@@ -176,7 +176,7 @@ document.getElementById("scaling_title").innerHTML = data.title
 var d3_format = d3.format(".6~g");
 
 function norm_format(num) {
-    return "||<em><b> " + d3_format(num) + " </b></em>||";
+    return "||<b> " + d3_format(num) + " </b>||";
 }
 
 
@@ -235,7 +235,7 @@ if (dv_tabledata.length > 0) {
         columns:[ //Define Table Columns
             {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
             {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
-            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
                 {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
@@ -270,7 +270,7 @@ if (con_tabledata.length > 0) {
         columns: [ //Define Table Columns
             {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
             {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
-            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
                 {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
@@ -309,7 +309,7 @@ if (obj_tabledata.length > 0) {
         columns:[ //Define Table Columns
             {title: "name", field:"name", hozAlign:"left", visible:true, headerFilter:false,},
             {title: "size", field:"size", hozAlign:"center", visible:true, headerFilter:false,},
-            {title: "index", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
                 {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,headerSort:false,},
@@ -355,7 +355,7 @@ function add_sub_tab(rowname, colname) {
         .append("button")
         .attr("id", name + "-button")
         .classed("tablinks", true)
-        .html(rowname + " <b>wrt</b> " + colname)
+        .html("<em>" + rowname + "</em>" + " <b>wrt</b> " + "<em>" + colname + "</em>")
         .on("click", function(evt) {
             showJac(evt, name);
         });

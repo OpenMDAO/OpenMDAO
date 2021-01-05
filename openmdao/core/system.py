@@ -1555,10 +1555,11 @@ class System(object):
         for name, meta in dv.items():
 
             units = meta['units']
-            dv[name]['total_adder'] = dv[name]['adder']
-            dv[name]['total_scaler'] = dv[name]['scaler']
 
-            if units is not None:
+            if units is None:
+                dv[name]['total_adder'] = dv[name]['adder']
+                dv[name]['total_scaler'] = dv[name]['scaler']
+            else:
                 # If derivatives are not being calculated, then you reach here before ivc_source
                 # is placed in the meta.
                 try:

@@ -57,19 +57,12 @@ def _getdef(val, unset):
     return val
 
 
-def _getnorm(val, unset=''):
-    val = _getdef(val, unset)
-    if np.isscalar(val) or val.size == 1:
-        return val
-    return np.linalg.norm(val)
-
-
-def _getnorm_and_size(val, unset=''):
-    # return norm and the size of the value
+def _get_val_and_size(val, unset=''):
+    # return val (or max abs val) and the size of the value
     val = _getdef(val, unset)
     if np.isscalar(val) or val.size == 1:
         return [val, 1]
-    return [np.linalg.norm(val), val.size]
+    return [np.max(np.abs(val)), val.size]
 
 
 def _get_flat(val, size, unset=''):
@@ -85,7 +78,7 @@ def _get_flat(val, size, unset=''):
 
 
 def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=None,
-                    lower=None, upper=None, equals=None):
+                    lower=None, upper=None, equals=None, inds=None):
     if not (np.isscalar(mval) or mval.size == 1):
         rowchild = row.copy()
         children = row['_children'] = []
@@ -101,9 +94,14 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
         lower_flat = _get_flat(lower, mval.size)
         equals_flat = _get_flat(equals, mval.size)
 
-        for i in range(dval.size):
+        if inds is None:
+            inds = list(range(dval.size))
+        else:
+            inds = np.atleast_1d(inds).flatten()
+
+        for i, idx in enumerate(inds):
             d = rowchild.copy()
-            d['index'] = i
+            d['index'] = idx
             d['driver_val'] = [dval_flat[i], 1]
             d['model_val'] = [mval_flat[i], 1]
             if scaler_flat is not None:
@@ -241,30 +239,38 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         lower = meta['lower']
         upper = meta['upper']
 
-        mval = dv_vals[name]  # dv_vals are unscaled
-        dval = _scale(mval, scaler, adder, default)
+        dval = dv_vals[name]
+        mval = _unscale(dval, scaler, adder, default)
+
+        if dval.size == 1:
+            index = meta['indices']
+            if index is not None:
+                index = index[0]
+            index = _getdef(index, '')
+        else:
+            index = ''
 
         dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'driver_val': _getnorm_and_size(dval),
+            'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta['units'], default),
-            'model_val': _getnorm_and_size(mval),
+            'model_val': _get_val_and_size(mval),
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
-            'ref': _getnorm_and_size(ref, default),
-            'ref0': _getnorm_and_size(ref0, default),
-            'scaler': _getnorm_and_size(scaler, default),
-            'adder': _getnorm_and_size(adder, default),
-            'lower': _getnorm_and_size(lower, default),  # scaled
-            'upper': _getnorm_and_size(upper, default),  # scaled
-            'index': '',
+            'ref': _get_val_and_size(ref, default),
+            'ref0': _get_val_and_size(ref0, default),
+            'scaler': _get_val_and_size(scaler, default),
+            'adder': _get_val_and_size(adder, default),
+            'lower': _get_val_and_size(lower, default),  # scaled
+            'upper': _get_val_and_size(upper, default),  # scaled
+            'index': index,
         }
 
         dv_table.append(dct)
 
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
-                        lower=lower, upper=upper)
+                        lower=lower, upper=upper, inds=meta['indices'])
 
         idx += 1
 
@@ -281,28 +287,36 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
+        if dval.size == 1:
+            index = meta['indices']
+            if index is not None:
+                index = index[0]
+            index = _getdef(index, '')
+        else:
+            index = ''
+
         dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'index': '',
-            'driver_val': _getnorm_and_size(dval),
+            'index': index,
+            'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta['units'], default),
-            'model_val': _getnorm_and_size(mval),
+            'model_val': _get_val_and_size(mval),
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
-            'ref': _getnorm_and_size(meta['ref'], default),
-            'ref0': _getnorm_and_size(meta['ref0'], default),
-            'scaler': _getnorm_and_size(scaler, default),
-            'adder': _getnorm_and_size(adder, default),
-            'lower': _getnorm_and_size(meta['lower'], default),  # scaled
-            'upper': _getnorm_and_size(meta['upper'], default),  # scaled
-            'equals': _getnorm_and_size(meta['equals'], default), # scaled
+            'ref': _get_val_and_size(meta['ref'], default),
+            'ref0': _get_val_and_size(meta['ref0'], default),
+            'scaler': _get_val_and_size(scaler, default),
+            'adder': _get_val_and_size(adder, default),
+            'lower': _get_val_and_size(meta['lower'], default),  # scaled
+            'upper': _get_val_and_size(meta['upper'], default),  # scaled
+            'equals': _get_val_and_size(meta['equals'], default), # scaled
             'linear': meta['linear'],
         }
 
         con_table.append(dct)
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
-                        lower=lower, upper=upper, equals=equals)
+                        lower=lower, upper=upper, equals=equals, inds=meta['indices'])
 
         idx += 1
 
@@ -316,23 +330,32 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         dval = obj_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
+        if dval.size == 1:
+            index = meta['indices']
+            if index is not None:
+                index = index[0]
+            index = _getdef(index, '')
+        else:
+            index = ''
+
         dct = {
             'id': idx,
             'name': name,
             'size': meta['size'],
-            'index': '',
-            'driver_val': _getnorm_and_size(dval),
+            'index': index,
+            'driver_val': _get_val_and_size(dval),
             'driver_units': _getdef(meta['units'], default),
-            'model_val': _getnorm_and_size(mval),
+            'model_val': _get_val_and_size(mval),
             'model_units': _getdef(mod_meta[meta['ivc_source']]['units'], default),
-            'ref': _getnorm_and_size(meta['ref'], default),
-            'ref0': _getnorm_and_size(meta['ref0'], default),
-            'scaler': _getnorm_and_size(scaler, default),
-            'adder': _getnorm_and_size(adder, default),
+            'ref': _get_val_and_size(meta['ref'], default),
+            'ref0': _get_val_and_size(meta['ref0'], default),
+            'scaler': _get_val_and_size(scaler, default),
+            'adder': _get_val_and_size(adder, default),
         }
 
         obj_table.append(dct)
-        _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0)
+        _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
+                        inds=meta['indices'])
 
         idx += 1
 
@@ -348,6 +371,10 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             'oflabels': [],
         }
     }
+
+    if jac and not driver._problem().model._use_derivatives:
+        print("\nCan't display jacobian because derivatives are turned off.\n")
+        jac = False
 
     if jac:
         coloring = driver._get_static_coloring()
@@ -391,35 +418,37 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
             compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
-    viewer = 'scaling_table.html'
+    if driver._problem().comm.rank == 0:
 
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-    libs_dir = os.path.join(code_dir, 'libs')
-    style_dir = os.path.join(code_dir, 'style')
+        viewer = 'scaling_table.html'
 
-    with open(os.path.join(code_dir, viewer), "r") as f:
-        template = f.read()
+        code_dir = os.path.dirname(os.path.abspath(__file__))
+        libs_dir = os.path.join(code_dir, 'libs')
+        style_dir = os.path.join(code_dir, 'style')
 
-    with open(os.path.join(libs_dir, 'tabulator.min.js'), "r") as f:
-        tabulator_src = f.read()
+        with open(os.path.join(code_dir, viewer), "r") as f:
+            template = f.read()
 
-    with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
-        tabulator_style = f.read()
+        with open(os.path.join(libs_dir, 'tabulator.min.js'), "r") as f:
+            tabulator_src = f.read()
 
-    with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r") as f:
-        d3_src = f.read()
+        with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
+            tabulator_style = f.read()
 
-    jsontxt = json.dumps(data, default=default_noraise)
+        with open(os.path.join(libs_dir, 'd3.v6.min.js'), "r") as f:
+            d3_src = f.read()
 
-    with open(outfile, 'w') as f:
-        s = template.replace("<tabulator_src>", tabulator_src)
-        s = s.replace("<tabulator_style>", tabulator_style)
-        s = s.replace("<d3_src>", d3_src)
-        s = s.replace("<scaling_data>", jsontxt)
-        f.write(s)
+        jsontxt = json.dumps(data, default=default_noraise)
 
-    if show_browser:
-        webview(outfile)
+        with open(outfile, 'w') as f:
+            s = template.replace("<tabulator_src>", tabulator_src)
+            s = s.replace("<tabulator_style>", tabulator_style)
+            s = s.replace("<d3_src>", d3_src)
+            s = s.replace("<scaling_data>", jsontxt)
+            f.write(s)
+
+        if show_browser:
+            webview(outfile)
 
     return data
 
