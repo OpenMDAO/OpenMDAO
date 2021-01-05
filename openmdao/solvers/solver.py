@@ -600,13 +600,11 @@ class NonlinearSolver(Solver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         stalled = False
-        stall_helper = False
         if stall_limit > 0:
             stall_count = 0
             stall_norm = norm0
 
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled \
-                and not stall_helper:
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
                 self._run_solver()
                 norm = self._iter_get_norm()
