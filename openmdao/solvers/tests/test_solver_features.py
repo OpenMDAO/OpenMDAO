@@ -4,7 +4,7 @@ import unittest
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -83,8 +83,35 @@ class TestSolverFeatures(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as context:
             prob.run_model()
 
-        msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
+        msg = "Solver 'NL: Newton' on system '' stalled after 5 iterations."
         self.assertEqual(str(context.exception), msg)
+
+    def test_nonlinear_solver_bounds_stall_warning(self):
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
+
+        balance = prob.model.add_subsystem('balance', om.BalanceComp(), promotes=['*'])
+        balance.add_balance('x', lower=-.1, upper=10, rhs_val=0, lhs_name='y')
+
+        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        newton.options['solve_subsystems'] = True
+        newton.options['stall_limit'] = 5
+        newton.options['stall_tol'] = 1e-8
+        newton.options['maxiter'] = 100
+        newton.options['err_on_non_converge'] = False
+
+        prob.model.linear_solver = om.DirectSolver()
+
+        prob.setup()
+
+        msg = ("Your model has stalled three times and may be violating the bounds. In the "
+                "future, turn on print_bound_enforce in your solver options to see. For "
+                "example:\n'prob.model.nonlinear_solver.linesearch.options"
+                "['print_bound_enforce']=True'. \nThe bound(s) being violated now are:\n")
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
 
     def test_feature_stall_detection_newton(self):
         import openmdao.api as om

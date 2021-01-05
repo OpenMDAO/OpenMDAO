@@ -15,6 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.general_utils import simple_warning
 from openmdao.core.component import Component
 
 _emptyset = set()
@@ -570,6 +571,14 @@ class NonlinearSolver(Solver):
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
+    def _run_solver(self):
+        """
+        Run a single iteration and increment.
+        """
+        self._single_iteration()
+        self._iter_count += 1
+        self._run_apply()
+
     def _solve(self):
         """
         Run the iterative solver.
@@ -591,15 +600,15 @@ class NonlinearSolver(Solver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         stalled = False
+        stall_helper = False
         if stall_limit > 0:
             stall_count = 0
             stall_norm = norm0
 
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled \
+                and not stall_helper:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
-                self._iter_count += 1
-                self._run_apply()
+                self._run_solver()
                 norm = self._iter_get_norm()
 
                 # Save the norm values in the context manager so they can also be recorded.
@@ -616,6 +625,20 @@ class NonlinearSolver(Solver):
                         stall_count += 1
                         if stall_count >= stall_limit:
                             stalled = True
+                        if stall_count == 3:
+                            self.linesearch.options['print_bound_enforce'] = True
+
+                            msg = ("Your model has stalled three times and may be violating the "
+                                   "bounds. In the future, turn on print_bound_enforce in your "
+                                   "solver options to see. For example:\n"
+                                   "'prob.model.nonlinear_solver.linesearch.options"
+                                   "['print_bound_enforce']=True'. \nThe bound(s) being violated "
+                                   "now are:\n")
+                            simple_warning(msg)
+
+                            self._run_solver()
+
+                            self.linesearch.options['print_bound_enforce'] = False
                     else:
                         stall_count = 0
                         stall_norm = rel_norm
