@@ -120,7 +120,6 @@ class TestSolverFeatures(unittest.TestCase):
         with assert_no_warning(UserWarning, msg):
             prob.run_model()
 
-
     def test_feature_stall_detection_newton(self):
         import openmdao.api as om
 

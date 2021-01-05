@@ -611,9 +611,11 @@ class NonlinearSolver(Solver):
                             "now are:\n")
                     simple_warning(msg)
 
+                    self._single_iteration()
                     self.linesearch.options['print_bound_enforce'] = False
+                else:
+                    self._single_iteration()
 
-                self._single_iteration()
                 self._iter_count += 1
                 self._run_apply()
                 norm = self._iter_get_norm()
