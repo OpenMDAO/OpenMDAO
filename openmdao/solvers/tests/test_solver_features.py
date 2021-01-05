@@ -4,7 +4,7 @@ import unittest
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 
@@ -112,6 +112,14 @@ class TestSolverFeatures(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.run_model()
+
+        newton.linesearch.options['print_bound_enforce'] = True
+
+        prob.setup()
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
 
     def test_feature_stall_detection_newton(self):
         import openmdao.api as om

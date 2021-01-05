@@ -617,7 +617,7 @@ class NonlinearSolver(Solver):
                         stall_count += 1
                         if stall_count >= stall_limit:
                             stalled = True
-                        if stall_count == 3:
+                        if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
                             self.linesearch.options['print_bound_enforce'] = True
 
                             msg = ("Your model has stalled three times and may be violating the "
