@@ -1203,8 +1203,8 @@ class TestSqliteRecorder(unittest.TestCase):
         nl = model.nonlinear_solver = om.NewtonSolver()
         nl.options['solve_subsystems'] = True
         nl.options['max_sub_solves'] = 4
+        nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
-        ls = nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         model.add_recorder(self.recorder)
 
         try:
@@ -2568,37 +2568,38 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
     def test_feature_solver_metadata(self):
         import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivativesGrouped())
         prob.setup()
 
-        # create recorder
-        recorder = om.SqliteRecorder("cases.sql")
+        # configure Newton solver with line search
+        nl = prob.model.mda.nonlinear_solver = om.NewtonSolver()
+        nl.options['solve_subsystems'] = True
+        nl.options['max_sub_solves'] = 4
+        nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
-        # add recorder to the nonlinear solver for the model
-        prob.model.nonlinear_solver = om.NonlinearBlockGS()
-        prob.model.nonlinear_solver.add_recorder(recorder)
-
-        # add recorder to the nonlinear solver for Component 'd1'
-        d1 = prob.model.d1
-        d1.nonlinear_solver = om.NonlinearBlockGS()
-        d1.nonlinear_solver.options['maxiter'] = 5
-        d1.nonlinear_solver.add_recorder(recorder)
-
+        # add recorder and run model
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.run_model()
         prob.cleanup()
 
+        # access recorded solver metadata/options
         cr = om.CaseReader("cases.sql")
-
         metadata = cr.solver_metadata
 
         self.assertEqual(sorted(metadata.keys()), [
-            'd1.NonlinearBlockGS', 'root.NonlinearBlockGS', 'root.ScipyKrylov',
+            'mda.ArmijoGoldsteinLS', 'mda.NewtonSolver', 'mda.ScipyKrylov',
+            'root.NonlinearBlockGS', 'root.ScipyKrylov'
         ])
-        self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(metadata['root.ScipyKrylov']['solver_options']['maxiter'], 1000)
+
+        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['maxiter'], 10)
+        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['solve_subsystems'], True)
+        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['max_sub_solves'], 4)
+
+        self.assertEqual(metadata['mda.ArmijoGoldsteinLS']['solver_options']['bound_enforcement'], 'vector')
 
     def test_feature_recording_system_options(self):
         import openmdao.api as om
@@ -2624,7 +2625,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(sorted(options.keys()),
                          sorted(['root']))
 
-        # options for system 'root'
+        self.assertEqual(sorted(options['root'].keys()),
+                         sorted(prob.model.options._dict.keys()))
+
         self.assertEqual(options['root']['ln_maxiter'], None)
 
     def test_feature_system_recording_options(self):
@@ -3238,7 +3241,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(design_vars['z'][1], 1.25035459e-15, 1e-8)
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
         assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
-
 
     def test_feature_problem_recorder(self):
         import openmdao.api as om
