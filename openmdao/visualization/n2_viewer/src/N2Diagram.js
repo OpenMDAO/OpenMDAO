@@ -172,8 +172,7 @@ class N2Diagram {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
                 'n2Matrix': d3.select("#n2MatrixClip > rect"),
                 'solverTree': d3.select("#solverTreeClip > rect")
-            },
-
+            }
         };
 
         let n2Groups = {};
@@ -191,8 +190,6 @@ class N2Diagram {
             offgrid[name] = d3elem;
         })
         this.dom.n2Groups.offgrid = offgrid;
-
-
     }
 
     /**
@@ -667,7 +664,6 @@ class N2Diagram {
     /** Display an animation while the transition is in progress */
     showWaiter() {
         this.dom.waiter.attr('class', 'show');
-
     }
 
     /** Hide the animation after the transition completes */
