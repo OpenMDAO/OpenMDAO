@@ -2625,9 +2625,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(sorted(options.keys()),
                          sorted(['root']))
 
-        self.assertEqual(sorted(options['root'].keys()),
-                         sorted(prob.model.options._dict.keys()))
-
+        # options for system 'root'
         self.assertEqual(options['root']['ln_maxiter'], None)
 
     def test_feature_system_recording_options(self):
