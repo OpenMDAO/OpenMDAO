@@ -83,7 +83,7 @@ class TestSolverFeatures(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as context:
             prob.run_model()
 
-        msg = "Solver 'NL: Newton' on system '' stalled after 5 iterations."
+        msg = "Solver 'NL: Newton' on system '' stalled after 4 iterations."
         self.assertEqual(str(context.exception), msg)
 
     def test_nonlinear_solver_bounds_stall_warning(self):

@@ -571,14 +571,6 @@ class NonlinearSolver(Solver):
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
 
-    def _run_solver(self):
-        """
-        Run a single iteration and increment.
-        """
-        self._single_iteration()
-        self._iter_count += 1
-        self._run_apply()
-
     def _solve(self):
         """
         Run the iterative solver.
@@ -606,7 +598,9 @@ class NonlinearSolver(Solver):
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._run_solver()
+                self._single_iteration()
+                self._iter_count += 1
+                self._run_apply()
                 norm = self._iter_get_norm()
 
                 # Save the norm values in the context manager so they can also be recorded.
@@ -634,8 +628,7 @@ class NonlinearSolver(Solver):
                                    "now are:\n")
                             simple_warning(msg)
 
-                            self._run_solver()
-
+                            self._single_iteration()
                             self.linesearch.options['print_bound_enforce'] = False
                     else:
                         stall_count = 0
