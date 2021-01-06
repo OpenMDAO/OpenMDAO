@@ -238,11 +238,11 @@ if (dv_tabledata.length > 0) {
             {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
-                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             {title: "Model", headerHozAlign: "center", columns: [
                 numrow("value", "model_val"),
-                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
@@ -273,11 +273,11 @@ if (con_tabledata.length > 0) {
             {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
-                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             {title: "Model", headerHozAlign: "center", columns: [
                 numrow("value", "model_val"),
-                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
@@ -312,11 +312,11 @@ if (obj_tabledata.length > 0) {
             {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
             {title: "Driver", headerHozAlign: "center", columns: [
                 numrow("value", "driver_val"),
-                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,headerSort:false,},
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             {title: "Model", headerHozAlign: "center", columns: [
                 numrow("value", "model_val"),
-                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true, headerSort:false,},
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
@@ -611,7 +611,7 @@ if (data.linear.oflabels.length > 0) {
 // Build color scale
 var subjacColor = d3.scaleDiverging()
     .interpolator(d3.interpolateRdYlBu)
-    .domain([-maxcolor, 0, maxcolor]);
+    .domain([maxcolor, 0, -maxcolor]);
 
 
 function startup() {
