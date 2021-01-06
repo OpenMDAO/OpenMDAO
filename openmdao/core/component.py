@@ -10,11 +10,11 @@ from scipy.sparse import issparse
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names
-from openmdao.core.constants import _UNDEFINED, INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.units import valid_units
+from openmdao.utils.units import valid_units, simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
@@ -477,6 +477,8 @@ class Component(System):
             if not valid_units(units):
                 raise ValueError("%s: The units '%s' are invalid." % (self.msginfo, units))
 
+            units = simplify_unit(units)
+
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
@@ -686,14 +688,22 @@ class Component(System):
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if res_units is not None and not isinstance(res_units, str):
-            raise TypeError('%s: The res_units argument should be a str or None' % self.msginfo)
+        if res_units is not None:
+            if not isinstance(res_units, str):
+                msg = '%s: The res_units argument should be a str or None' % self.msginfo
+                raise TypeError(msg)
+            if not valid_units(res_units):
+                raise ValueError("%s: The res_units '%s' are invalid" % (self.msginfo, res_units))
+
+            res_units = simplify_unit(res_units)
 
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
             if not valid_units(units):
                 raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
+
+            units = simplify_unit(units)
 
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
