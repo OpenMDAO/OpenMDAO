@@ -284,6 +284,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         upper = meta['upper']
         equals = meta['equals']
 
+        print(name, "EQUALS:", _get_val_and_size(meta['equals'], default))
+
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 

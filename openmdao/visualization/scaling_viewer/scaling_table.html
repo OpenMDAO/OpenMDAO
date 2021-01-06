@@ -186,7 +186,7 @@ function val_cell_formatter(cell, formatterParams, onRendered) {
     if (val[1] > 1) {
         return norm_format(val[0]);
     }
-    if (val[0] == "") {
+    if (val[0] === "") {
         return "";
     }
     return d3_format(val[0]);
@@ -198,10 +198,10 @@ function exp_format(num) {
 
 
 function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
-    if (a == "") {
+    if (a === "") {
         a = [-1e99, 0];
     }
-    if (b == "") {
+    if (b === "") {
         b = [-1e99, 0];
     }
     return a[0] - b[0];
@@ -390,13 +390,17 @@ function openSubjac(subdata, parent_id) {
         return;
     }
 
-    var dat = (parent_id == "#norm-jac") ? data : data.linear;
-    var ofslice = dat.ofslices[subdata[0]];
-    var wrtslice = dat.wrtslices[subdata[1]];
-    var filtered = dat.mat_list.filter(function(d) {
-        return d[0] >= ofslice[0] && d[0] < ofslice[1] && d[1] >= wrtslice[0] && d[1] < wrtslice[1];
+    let dat = (parent_id == "#norm-jac") ? data : data.linear;
+    let ofslice = dat.ofslices[subdata[0]];
+    let oflow = ofslice[0];
+    let ofhigh = ofslice[1];
+    let wrtslice = dat.wrtslices[subdata[1]];
+    let wrtlow = wrtslice[0];
+    let wrthigh = wrtslice[1];
+    let filtered = dat.mat_list.filter(function(d) {
+        return d[0] >= oflow && d[0] < ofhigh && d[1] >= wrtlow && d[1] < wrthigh;
     });
-    var shifted = filtered.map(d => [d[0] - ofslice[0], d[1] - wrtslice[0], d[2]]);
+    let shifted = filtered.map(d => [d[0] - oflow, d[1] - wrtlow, d[2]]);
     ynames = shifted.map(d => d[0].toString());
     xnames = shifted.map(d => d[1].toString());
 
@@ -497,11 +501,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .attr("width", x.bandwidth())
         .attr("height", y.bandwidth())
         .style("fill", function(d) {
-            if (d[2] == null) {
+            if (d[2] === null) {
                 return "#666";  // dark gray - colored zero
             }
             else {
-                if (d[2] == 0) {
+                if (d[2] === 0) {
                     return "#CCC";  // light gray - computed zero
                 }
                 else {
@@ -516,7 +520,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         })
         .on("mousemove", function(event, d) {
             event.stopPropagation();
-            var val = (d[2] == null) ? 0 : d3_format(d[2]);
+            var val = (d[2] === null) ? 0 : d3_format(d[2]);
 
             if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
                 var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
@@ -592,7 +596,7 @@ var tooltip = d3.select(".tooltip")
 
 
 function loggable(v) {
-    return !(v[2] == null || v[2] === 0);
+    return !(v[2] === null || v[2] === 0);
 }
 
 
