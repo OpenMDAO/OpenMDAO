@@ -1570,6 +1570,8 @@ class System(object):
                 var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
+                    dv[name]['total_adder'] = dv[name]['adder']
+                    dv[name]['total_scaler'] = dv[name]['scaler']
                     continue
 
                 if var_units is None:

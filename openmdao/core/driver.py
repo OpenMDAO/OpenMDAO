@@ -1108,8 +1108,6 @@ class Driver(object):
 
         Parameters
         ----------
-        driver : Driver
-            The driver used for the scaling report.
         outfile : str, optional
             The name of the output html file.  Defaults to 'driver_scaling_report.html'.
         title : str, optional
@@ -1118,6 +1116,11 @@ class Driver(object):
             If True, pop up a browser to view the generated html file. Defaults to True.
         jac : bool
             If True, show jacobian information.
+
+        Returns
+        -------
+        dict
+            Data used to create html file.
         """
         return view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac,
                                    title=title)

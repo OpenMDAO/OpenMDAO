@@ -121,8 +121,8 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
             children.append(d)
 
 
-def compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
-    if coloring is not None: # factor in the sparsity
+def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
+    if coloring is not None:  # factor in the sparsity
         mask = np.zeros(totals.shape, dtype=bool)
         mask[coloring._nzrows, coloring._nzcols] = 1
 
@@ -208,6 +208,11 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         Sets the title of the web page.
     jac : bool
         If True, show jacobian information.
+
+    Returns
+    -------
+    dict
+        Data to used to generate html file.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -312,7 +317,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             'adder': _get_val_and_size(adder, default),
             'lower': _get_val_and_size(meta['lower'], default),  # scaled
             'upper': _get_val_and_size(meta['upper'], default),  # scaled
-            'equals': _get_val_and_size(meta['equals'], default), # scaled
+            'equals': _get_val_and_size(meta['equals'], default),  # scaled
             'linear': meta['linear'],
         }
 
@@ -406,7 +411,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         full_response_vals.update(obj_vals)
         response_vals = {n: full_response_vals[n] for n in data['oflabels']}
 
-        compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
+        _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring)
 
         if lindata['oflabels']:
             # prevent reuse of nonlinear totals
@@ -418,7 +423,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
             driver._total_jac = save
 
-            compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
+            _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
     if driver._problem().comm.rank == 0:
 
