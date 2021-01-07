@@ -1,3 +1,8 @@
+/**
+ * @typedef N2Window
+ * Create a clone of the #window-template defined in index.html and provide
+ * management functions such as setting size, position, ribbon color, etc.
+ */
 class N2Window {
     /**
      * Keep increasing z-index of the focused window to keep it on top.
@@ -12,33 +17,39 @@ class N2Window {
      * Clone the template window defined in index.html, setup some
      * references to various elements.
      * @param {String} [newId = null] HTML id for the new window. A UUID is generated if null.
+     * @param {String} [cloneId = '#window-template'] The id of a window to clone other than
+     *  the original template.
      */
-    constructor(newId = null) {
-        this._window = d3.select('#window-template')
+    constructor(newId = null, cloneId = '#window-template') {
+        // The primary reference for the new window
+        this._window = d3.select(cloneId)
             .clone(true)
-            .attr('style', null)
-            .attr('id', newId ? newId : uuidv4())
+            .attr('id', newId ? newId : 'win' + uuidv4());
 
         if (!N2Window.container) {
             N2Window.container = d3.select('#n2-windows');
         }
 
-        this._main = this._window.select('.main-window');
+        this._main = this._window.select('.main-window'); // Not referenced very often
         this._header = this._window.select('.window-header');
         this._title = this._header.select('.window-title');
-        this._closeButton = this._header.select('.window-close-button');
+        this._closeButton = this._window.select('.window-close-button');
         this._body = this._window.select('.window-body');
         this._footer = this._window.select('.window-footer');
 
         const self = this;
         this._closeButton.on('click', e => { self.close(); })
-        
+
         this.bringToFront(true);
     }
 
+    // Read-only access to stored references
+    get main() { return this._main; }
+    get window() { return this._window; }
     get header() { return this._header; }
     get body() { return this._body; }
     get footer() { return this._footer; }
+    get closeButton() { return this._closeButton; }
 
     /**
      * Compute the position of all four sides of the window relative to the container.
@@ -46,7 +57,7 @@ class N2Window {
      */
     _getPos(container = N2Window.container.node()) {
         const parentPos = container.getBoundingClientRect(),
-            childPos = this._window.node().getBoundingClientRect();
+            childPos = this.window.node().getBoundingClientRect();
 
         let posInfo = {
             top: childPos.top - parentPos.top,
@@ -62,42 +73,70 @@ class N2Window {
         return posInfo;
     }
 
+    /**
+     * Update the window geometry with new info.
+     * @param {Object} newPos Contains the bounding box data.
+     * @returns {N2Window} Reference to this.
+     */
     _setPos(newPos) {
         // All of the values need to be set because some may have started as "auto"
         for (const s of ['top', 'right', 'bottom', 'left', 'width', 'height']) {
             this.set(s, `${newPos[s]}px`);
         }
+
+        return this;
     }
 
-    get hidden() { return this._window.classed('window-inactive'); }
-    
-    set hidden(hide) { 
+    /** Return whether the window is displayed or not. */
+    get hidden() { return this.window.classed('window-inactive'); }
+
+    /**
+     * Change whether the windows is displayed or not.
+     * @param {Boolean} hide The new state of the window.
+     */
+    set hidden(hide) {
         if (!hide) this.bringToFront();
-        this._window.classed('window-inactive', hide);
+        this.window.classed('window-inactive', hide);
     }
 
+    /**
+     * Make the window the highest z-index we know of, and increment that afterwards.
+     * @param {Boolean} force Do it even if the current z-index is already highest.
+     * @return {N2Window} Reference to this.
+     */
     bringToFront(force = false) {
-        if (force || this._window.style('z-index') < N2Window.zIndex) {
+        if (force || this.window.style('z-index') < N2Window.zIndex) {
             N2Window.zIndex++;
-            this._window.style('z-index', N2Window.zIndex);
+            this.window.style('z-index', N2Window.zIndex);
         }
+
+        return this;
     }
 
+    /** Make the window visible and return a self-reference */
     show() {
         this.hidden = false;
         return this;
     }
 
+    /** Make the window invisible and return a self-reference */
     hide() {
         this.hidden = true;
         return this;
     }
 
+    /**
+     * Set the title if specified or return the current one.
+     * @param {String} [newTitle = null] The optional new title.
+     * @returns Reference to this if new title set; otherwise String with the current title.
+     */
     title(newTitle = null) {
-        if (newTitle) this._title.html(newTitle);
-        else newTitle = this._title.html();
+        if (newTitle) {
+            this._title.html(newTitle);
+            return this;
+        }
 
-        return newTitle;
+        return this._title.html();
     }
 
     /**
@@ -107,7 +146,7 @@ class N2Window {
      *  otherwise a reference to this
      */
     theme(newTheme = null) {
-        const contents = this._window.select('div.window-contents'),
+        const contents = this.window.select('div.window-contents'),
             classes = contents.attr('class'),
             curTheme = classes.replace(/^.*(window-theme-\S+).*$/, "$1")
 
@@ -139,7 +178,7 @@ class N2Window {
                 this.theme(val);
                 break;
             default:
-                this._window.style(opt, val);
+                this.window.style(opt, val);
         }
 
         return this;
@@ -158,13 +197,27 @@ class N2Window {
         return this;
     }
 
+    /** Delete the window element from the document and remove the event handler. */
     close() {
-        this._closeButton.on('click', null);
-        this._window.remove();
+        this.closeButton.on('click', null);
+        this.window.remove();
     }
 
+    /** Make the close button invisibile and return a reference to this */
+    hideCloseButton() {
+        this.closeButton.classed('window-inactive', true);
+        return this;
+    }
+
+    /** Make the close button visibile and return a reference to this */
+    showCloseButton() {
+        this.closeButton.classed('window-inactive', false);
+        return this;
+    }
+
+    /** Display the footer ribbon */
     showFooter() {
-        this._footer.classed('window-inactive', false);
+        this.footer.classed('window-inactive', false);
         return this;
     }
 
@@ -173,8 +226,8 @@ class N2Window {
      * @param {String} color An HTML-compatible color value
      */
     ribbonColor(color) {
-        this._header.style('background-color', color);
-        this._footer.style('background-color', color);
+        this.header.style('background-color', color);
+        this.footer.style('background-color', color);
 
         return this;
     }
@@ -215,29 +268,44 @@ class N2Window {
         return this;
     }
 
+    /**
+     * Since the window is absolutely-positioned with top, left, bottom, right set, we have
+     * to manually adjust things if we want the contents to determine the width and height.
+     * This should be called anytime content is added and the size is expected to change.
+     * TODO: Create a flag and event handler to do this automatically, maybe via
+     * MutationObserver.
+     * @returns {N2Window} Reference to this.
+     */
     sizeToContent() {
         const contentWidth = this.body.node().scrollWidth,
             contentHeight = this.body.node().scrollHeight,
-            headerHeight = this._header.node().scrollHeight,
-            footerHeight = this._footer.classed('window-inactive')?
-                parseInt(this._window.select('.window-contents').style('border-radius')) :
-                this._footer.node().scrollHeight;
+            headerHeight = this.header.node().scrollHeight,
+            footerHeight = this.footer.classed('window-inactive') ?
+                parseInt(this.window.select('.window-contents').style('border-radius')) :
+                this.footer.node().scrollHeight;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
-        this.setList({width: contentWidth + 'px', height: totalHeight + 'px'});
+        this.setList({ width: contentWidth + 'px', height: totalHeight + 'px' });
+
+        return this;
     }
 }
 
+/**
+ * @typedef N2WindowDraggable
+ * Extends N2Window by allowing the window to be dragged with a mousedown on the header/title.
+ */
 class N2WindowDraggable extends N2Window {
     /** Execute the base class constructor and set up drag event handler */
-    constructor(newId = null) {
-        super(newId);
+    constructor(newId = null, cloneId = '#window-template') {
+        super(newId, cloneId);
         this._setupDrag();
     }
 
+    /** Remove the mousedown event handler and call the superclass close() */
     close() {
-        this._header.on('mousedown', null);
+        this.header.on('mousedown', null);
         super.close();
     }
 
@@ -248,44 +316,49 @@ class N2WindowDraggable extends N2Window {
     _setupDrag() {
         const self = this;
 
-        this._header
+        this.header
             .classed('window-draggable-header', true)
             .on('mousedown', function () {
-            const dragDiv = self._window;
+                const dragDiv = self.window;
 
-            self.bringToFront();
-            dragDiv.style('cursor', 'grabbing')
-                .select('.window-header').style('cursor', 'grabbing');
+                self.bringToFront();
+                dragDiv.style('cursor', 'grabbing')
+                    .select('.window-header').style('cursor', 'grabbing');
 
-            const dragStart = [d3.event.pageX, d3.event.pageY];
-            let newTrans = [0, 0];
+                const dragStart = [d3.event.pageX, d3.event.pageY];
+                let newTrans = [0, 0];
 
-            const w = d3.select(window)
-                .on("mousemove", e => {
-                    newTrans = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
-                    dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
-                })
-                .on("mouseup", e => {
-                    // Convert the translate to style position
-                    self._setPos(self._getPos());
+                const w = d3.select(window)
+                    .on("mousemove", e => {
+                        newTrans = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
+                        dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
+                    })
+                    .on("mouseup", e => {
+                        // Convert the translate to style position
+                        self._setPos(self._getPos());
 
-                    dragDiv.style('cursor', 'auto')
-                        .style('transform', null)
-                        .select('.window-header')
-                        .style('cursor', 'grab');
+                        dragDiv.style('cursor', 'auto')
+                            .style('transform', null)
+                            .select('.window-header')
+                            .style('cursor', 'grab');
 
-                    // Remove event listeners
-                    w.on("mousemove", null).on("mouseup", null);
-                });
+                        // Remove event listeners
+                        w.on("mousemove", null).on("mouseup", null);
+                    });
 
-            d3.event.preventDefault();
-        });
+                d3.event.preventDefault();
+            });
     }
 }
 
+/**
+ * @typedef N2WindowDraggable
+ * Extends N2WindowDraggable by setting up 8 divs around the perimeter of the window
+ * that change the cursor with mouseover, and allow resizing with mousedown.
+ */
 class N2WindowResizable extends N2WindowDraggable {
-    constructor(newId = null) {
-        super(newId);
+    constructor(newId = null, cloneId = '#window-template') {
+        super(newId, cloneId);
         this._setupResizers();
     }
 
@@ -307,7 +380,7 @@ class N2WindowResizable extends N2WindowDraggable {
         }
 
         // Add div to contain the 8 resizer elements
-        const resizerDiv = this._window.select('.main-window')
+        const resizerDiv = this.window.select('.main-window')
             .append('div')
             .attr('class', 'resize');
 
@@ -359,4 +432,27 @@ class N2WindowResizable extends N2WindowDraggable {
             });
         }
     }
+}
+
+function wintest() {
+    const content = '<p style="margin: 10px; padding: 10px; border: 25px solid red; ">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed justo mauris, porttitor sed nibh non, interdum aliquet tellus. Duis eget est lectus. In ultrices finibus semper. Nullam dictum, tortor non placerat convallis, nibh diam sagittis risus, non ultricies diam nisi nec neque. Phasellus dapibus convallis metus. Proin cursus, metus quis ullamcorper suscipit, neque mauris dictum ex, a mattis velit lorem ac erat. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Praesent a ligula ut arcu rutrum venenatis. Morbi nec sapien turpis. Nunc tincidunt maximus venenatis. Phasellus facilisis imperdiet velit, nec cursus elit tincidunt pretium. Duis ligula metus, rutrum nec ullamcorper a, pretium eu massa. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam condimentum, urna in congue dignissim, mi risus maximus lectus, interdum cursus neque turpis sed libero. Cras iaculis ornare accumsan. Sed tempor pretium est, eget aliquam purus feugiat ac.</p>';
+    myWin = new N2Window();
+    myWin.setList({ width: '300px', height: '300px', title: 'This is a very, very, very, very long title indeed', top: '100px', left: '10px' });
+    myWin.show();
+    myWin.body.html(content);
+    myWin.sizeToContent();
+
+    myWin2 = new N2WindowDraggable();
+    myWin2.setList({ width: '300px', height: '300px', title: 'Draggable Window', top: '100px', left: '350px' });
+    myWin2.show();
+    myWin2.body.html(content);
+    myWin2.sizeToContent();
+
+    myWin3 = new N2WindowResizable();
+    myWin3.setList({ width: '300px', height: '300px', title: 'Resizable Window', top: '100px', left: '700px' });
+    myWin3.showFooter();
+    myWin3.show();
+    myWin3.body.html(content);
+    myWin3.sizeToContent();
+
 }

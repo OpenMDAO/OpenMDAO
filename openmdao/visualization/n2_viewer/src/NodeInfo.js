@@ -508,11 +508,12 @@ class NodeInfo extends N2Window {
         ];
 
         this.ui = ui;
-        this.table = this._body.append('table').attr('class', 'node-info-table');
+        this.table = this.body.append('table').attr('class', 'node-info-table');
         this.tbody = this.table.append('tbody');
         this.toolbarButton = d3.select('#info-button');
-        this.dataDiv = this._main.append('div').attr('class', 'node-info-data');
+        this.dataDiv = this.main.append('div').attr('class', 'node-info-data');
         this.theme('node-info');
+        this.hideCloseButton();
         this.showFooter();
 
         // Becomes active when node info mode is selected on toolbar
@@ -547,7 +548,8 @@ class NodeInfo extends N2Window {
         if (this.tbody.html() == '') return; // Was already pinned so is empty
 
         new PersistentNodeInfo(this);
-        this.clear();
+        this.hidden = true;
+        this.clear();        
         return this;
     }
 
@@ -596,13 +598,10 @@ class NodeInfo extends N2Window {
             prop.addRow(this.tbody, node);
         }
 
-        this.sizeToContent();
-
-        // Put the name of the node in the title
-        this.title(node.name);
-        this.move(event);
-        this.hidden = false;
-
+        this.sizeToContent()
+            .title(node.name)
+            .move(event)
+            .show();
     }
 }
 
@@ -610,45 +609,18 @@ class NodeInfo extends N2Window {
  * Make a persistent copy of the NodeInfo panel and handle its drag/close events
  * @typedef PersistentNodeInfo
  */
-class PersistentNodeInfo {
+class PersistentNodeInfo extends N2WindowDraggable {
     constructor(nodeInfo) {
-        this.orig = nodeInfo.container;
+        super(null, '#' + nodeInfo.window.attr('id'));
+
         // Avoid just copying the reference because nodeInfo.values will be wiped:
         this.values = JSON.parse(JSON.stringify(nodeInfo.values));
         this.ui = nodeInfo.ui;
-        this.container = this.orig.clone(true);
-        this.container.classed('persistent-panel', true);
-        this.container.attr('id', uuidv4());
 
-        this.bringToFront();
-
-        this.thead = this.container.select('thead');
-        this.translate = [0, 0];
-
-        const self = this;
-        this.pinButton = this.container.select('#node-info-pin')
-            .on('click', e => { self.unpin(); })
-        this.pinButton.attr('class', 'info-visible');
-
-        this._setupShowMoreButtons(nodeInfo.name);
-        this._setupCopyButtons();
-        this._setupDrag();
-    }
-
-    /**
-     * Keep increasing z-index of original info panel to keep it on top.
-     * Max z-index is 2147483647. It will be unusual here for it to climb
-     * above 100, and even extreme cases (e.g. a diagram that's been in use
-     * for weeks with lots of info panels pinned) shouldn't get above a few
-     * thousand.
-     */
-    bringToFront() {
-        // Assign ourselves the current highest info panel z-index and
-        // increment that of the original info panel.
-        const mainPanel = d3.select('#node-info-container');
-        const zIndex = parseInt(mainPanel.style('z-index'));
-        mainPanel.style('z-index', zIndex + 1)
-        this.container.style('z-index', zIndex);
+        this._setupShowMoreButtons(nodeInfo.name)
+            ._setupCopyButtons()
+            .showCloseButton()
+            .show();
     }
 
     /** Set up event handlers for any "Show More" buttons in the panel */
@@ -657,11 +629,13 @@ class PersistentNodeInfo {
 
         for (const valName in this.values) {
             if (this.values[valName].isTruncated) {
-                this.container.select(`button#${valName}.show_value_button`).on('click', c => {
+                this.window.select(`button#${valName}.show_value_button`).on('click', c => {
                     self.ui.valueInfoManager.add(name, this.values[valName].val);
                 })
             }
         }
+
+        return this;
     }
 
     /** Set up event handlers for any "Copy" buttons in the panel */
@@ -669,7 +643,7 @@ class PersistentNodeInfo {
         const self = this;
 
         for (const valName in this.values) {
-            this.container.select(`button#${valName}.copy_value_button`).on('click', c => {
+            this.window.select(`button#${valName}.copy_value_button`).on('click', c => {
                 const copyText = d3.select("#input-for-pastebuffer");
                 copyText.text(this.values[valName].copyStr);
                 copyText.node().select();
@@ -677,47 +651,6 @@ class PersistentNodeInfo {
             })
         }
 
-    }
-
-    /** Listen for the event to begin dragging a persistent info panel */
-    _setupDrag() {
-        const self = this;
-
-        this.thead.on('mousedown', function () {
-            const dragDiv = self.container;
-
-            self.bringToFront();
-            dragDiv.style('cursor', 'grabbing')
-                .select('th').style('cursor', 'grabbing');
-
-            const dragStart = [d3.event.pageX, d3.event.pageY];
-            let newTrans = [...self.translate];
-
-            const w = d3.select(window)
-                .on("mousemove", e => {
-                    newTrans = [
-                        self.translate[0] + d3.event.pageX - dragStart[0],
-                        self.translate[1] + d3.event.pageY - dragStart[1]
-                    ];
-
-                    dragDiv.style('transform', `translate(${newTrans[0]}px, ${newTrans[1]}px)`)
-                })
-                .on("mouseup", e => {
-                    self.translate = [...newTrans];
-
-                    dragDiv.style('cursor', 'text')
-                        .select('th').style('cursor', 'grab');
-                    w.on("mousemove", null).on("mouseup", null);
-                });
-
-            d3.event.preventDefault();
-        });
-    }
-
-    /** Destroy this instance of the persistent info panel */
-    unpin() {
-        this.thead.on('mousedown', null);
-        this.pinButton.on('click', null);
-        this.container.remove();
+        return this;
     }
 }

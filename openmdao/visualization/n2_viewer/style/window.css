@@ -6,9 +6,6 @@
 
 #n2-windows div {
     position: absolute;
-    /*
-    width: auto;
-    height: auto; */
 }
 
 .main-window {
@@ -89,18 +86,21 @@
 
 /* vvvvvvvvvv Begin Default N2 Window theme vvvvvvvvvv */
 .window-theme-default {
+    --header-height: 30px;
+    --footer-height: 30px;
+    --outer-color: #42926b;
+
     background-color: white;
     border: 1px solid #a0a0a0;
     transition: opacity 0.25s;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+
     border-radius: 10px;
     overflow: hidden;
-    --header-height: 30px;
-    --footer-height: 30px;
 }
 
 .window-theme-default>.window-header {
-    background-color: #42926b;
+    background-color: var(--outer-color);
     margin: 0;
     font-size: 11pt;
     text-align: right;
@@ -112,26 +112,30 @@
     bottom: auto;
 }
 
-.window-theme-default>.window-header>.window-close-button::before {
+.window-theme-default>.window-close-button::before {
     content: '\2715'
 }
 
-.window-theme-default>.window-header>.window-close-button {
-    color: black;
-    float: right;
-    font-size: 11pt;
+.window-theme-default>.window-close-button {
+    color: none;
+    opacity: 0.5;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
     font-weight: bold;
-    margin-left: 5px;
-    margin-right: 5px;
     line-height: var(--header-height);
+    padding: 0;
 }
 
-.window-theme-default>.window-header>.window-close-button:hover,
-.window-theme-default>.window-header>.window-close-button:focus {
+.window-theme-default>.window-close-button:hover,
+.window-theme-default>.window-close-button:focus {
     color: #333;
     text-decoration: none;
     cursor: pointer;
-    transform: translate(-1px, -1px)
 }
 
 .window-theme-default>.window-header>.window-title {
@@ -148,7 +152,7 @@
     direction: rtl;
     text-align: center;
     margin-left: 15px;
-    margin-right: 15px;
+    margin-right: 25px;
 }
 
 .window-theme-default>.window-body {
@@ -164,7 +168,7 @@
 }
 
 .window-theme-default>.window-footer {
-    background-color: #42926b;
+    background-color: var(--outer-color);
     color: white;
 
     height: var(--footer-height);
@@ -232,18 +236,20 @@
 
 /* vvvvvvvvvv Begin Node Info N2 Window theme vvvvvvvvvv */
 .window-theme-node-info {
+    --header-height: 26px;
+    --footer-height: 15px;
+    --outer-color: #42926b;
+
     background-color: white;
     border: 1px solid #a0a0a0;
     transition: opacity 0.25s;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     overflow: hidden;
-    --header-height: 25px;
-    --footer-height: 15px;
 }
 
 .window-theme-node-info>.window-header {
-    background-color: #42926b;
+    background-color: var(--outer-color);
     margin: 0;
     font-size: 11pt;
     text-align: right;
@@ -255,26 +261,30 @@
     bottom: auto;
 }
 
-.window-theme-node-info>.window-header>.window-close-button::before {
+.window-theme-node-info>.window-close-button::before {
     content: '\2715'
 }
 
-.window-theme-node-info>.window-header>.window-close-button {
-    color: black;
-    float: right;
-    font-size: 11pt;
+.window-theme-node-info>.window-close-button {
+    color: none;
+    opacity: 0.7;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
     font-weight: bold;
-    margin-left: 5px;
-    margin-right: 5px;
     line-height: var(--header-height);
+    padding: 0;
 }
 
-.window-theme-node-info>.window-header>.window-close-button:hover,
-.window-theme-node-info>.window-header>.window-close-button:focus {
+.window-theme-node-info>.window-close-button:hover,
+.window-theme-node-info>.window-close-button:focus {
     color: #333;
     text-decoration: none;
     cursor: pointer;
-    transform: translate(-1px, -1px)
 }
 
 .window-theme-node-info>.window-header>.window-title {
@@ -291,7 +301,7 @@
     direction: rtl;
     text-align: center;
     margin-left: 15px;
-    margin-right: 15px;
+    margin-right: 25px;
 }
 
 .window-theme-node-info>.window-body {
@@ -307,7 +317,7 @@
 }
 
 .window-theme-node-info>.window-footer {
-    background-color: #42926b;
+    background-color: var(--outer-color);
     color: white;
 
     height: var(--footer-height);
