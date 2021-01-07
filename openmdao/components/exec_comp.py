@@ -75,27 +75,6 @@ class ExecComp(ExplicitComponent):
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
     """
-
-    def initialize(self):
-        """
-        Declare options.
-        """
-        self.options.declare('has_diag_partials', types=bool, default=False,
-                             desc='If True, treat all array/array partials as diagonal if both '
-                                  'arrays have size > 1. All arrays with size > 1 must have the '
-                                  'same flattened size or an exception will be raised.')
-
-        self.options.declare('units', types=str, allow_none=True, default=None,
-                             desc='Units to be assigned to all variables in this component. '
-                                  'Default is None, which means units are provided for variables '
-                                  'individually.',
-                             check_valid=check_option)
-
-        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
-                             desc='Shape to be assigned to all variables in this component. '
-                                  'Default is None, which means shape is provided for variables '
-                                  'individually.')
-
     def __init__(self, exprs=[], **kwargs):
         r"""
         Create a <Component> using only an expression string.
@@ -224,6 +203,32 @@ class ExecComp(ExplicitComponent):
 
         self._no_check_partials = True
 
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('has_diag_partials', types=bool, default=False,
+                             desc='If True, treat all array/array partials as diagonal if both '
+                                  'arrays have size > 1. All arrays with size > 1 must have the '
+                                  'same flattened size or an exception will be raised.')
+
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means units are provided for variables '
+                                  'individually.',
+                             check_valid=check_option)
+
+        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
+                             desc='Shape to be assigned to all variables in this component. '
+                                  'Default is None, which means shape is provided for variables '
+                                  'individually.')
+
+    @classmethod
+    def register(cls, fname, func, complex_safe=False):
+        global _expr_dict
+        _expr_dict[fname] = func
+
+
     def setup(self):
         """
         Set up variable name and metadata lists.
@@ -346,9 +351,9 @@ class ExecComp(ExplicitComponent):
                             inds = np.arange(oval.size, dtype=int)
                         else:
                             inds = None
-                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds, method='cs')
                     else:
-                        self.declare_partials(of=out, wrt=inp)
+                        self.declare_partials(of=out, wrt=inp, method='cs')
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -434,122 +439,122 @@ class ExecComp(ExplicitComponent):
                 raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
                                    % (self.msginfo, self._exprs[i], str(err)))
 
-    def compute_partials(self, inputs, partials):
-        """
-        Use complex step method to update the given Jacobian.
+    # def compute_partials(self, inputs, partials):
+    #     """
+    #     Use complex step method to update the given Jacobian.
 
-        Parameters
-        ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters. (p)
+    #     Parameters
+    #     ----------
+    #     inputs : `VecWrapper`
+    #         `VecWrapper` containing parameters. (p)
 
-        partials : `Jacobian`
-            Contains sub-jacobians.
-        """
-        step = self.complex_stepsize * 1j
-        out_names = self._var_rel_names['output']
-        inv_stepsize = 1.0 / self.complex_stepsize
-        has_diag_partials = self.options['has_diag_partials']
+    #     partials : `Jacobian`
+    #         Contains sub-jacobians.
+    #     """
+    #     step = self.complex_stepsize * 1j
+    #     out_names = self._var_rel_names['output']
+    #     inv_stepsize = 1.0 / self.complex_stepsize
+    #     has_diag_partials = self.options['has_diag_partials']
 
-        for input in inputs:
+    #     for input in inputs:
 
-            pwrap = _TmpDict(inputs)
-            pval = inputs[input]
-            psize = pval.size
-            pwrap[input] = np.asarray(pval, npcomplex)
+    #         pwrap = _TmpDict(inputs)
+    #         pval = inputs[input]
+    #         psize = pval.size
+    #         pwrap[input] = np.asarray(pval, npcomplex)
 
-            if has_diag_partials or psize == 1:
-                # set a complex input value
-                pwrap[input] += step
+    #         if has_diag_partials or psize == 1:
+    #             # set a complex input value
+    #             pwrap[input] += step
 
-                uwrap = _TmpDict(self._outputs, return_complex=True)
+    #             uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                # solve with complex input value
-                self._residuals.set_val(0.0)
-                self.compute(pwrap, uwrap)
+    #             # solve with complex input value
+    #             self._residuals.set_val(0.0)
+    #             self.compute(pwrap, uwrap)
 
-                for u in out_names:
-                    if (u, input) in self._declared_partials:
-                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
+    #             for u in out_names:
+    #                 if (u, input) in self._declared_partials:
+    #                     partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
-                # restore old input value
-                pwrap[input] -= step
-            else:
-                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
-                    # set a complex input value
-                    pwrap[input][idx] += step
+    #             # restore old input value
+    #             pwrap[input] -= step
+    #         else:
+    #             for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+    #                 # set a complex input value
+    #                 pwrap[input][idx] += step
 
-                    uwrap = _TmpDict(self._outputs, return_complex=True)
+    #                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                    # solve with complex input value
-                    self._residuals.set_val(0.0)
-                    self.compute(pwrap, uwrap)
+    #                 # solve with complex input value
+    #                 self._residuals.set_val(0.0)
+    #                 self.compute(pwrap, uwrap)
 
-                    for u in out_names:
-                        if (u, input) in self._declared_partials:
-                            # set the column in the Jacobian entry
-                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+    #                 for u in out_names:
+    #                     if (u, input) in self._declared_partials:
+    #                         # set the column in the Jacobian entry
+    #                         partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
-                    # restore old input value
-                    pwrap[input][idx] -= step
+    #                 # restore old input value
+    #                 pwrap[input][idx] -= step
 
 
-class _TmpDict(object):
-    """
-    Dict wrapper that allows modification without changing the wrapped dict.
+# class _TmpDict(object):
+#     """
+#     Dict wrapper that allows modification without changing the wrapped dict.
 
-    It will allow getting of values
-    from its inner dict unless those values get modified via
-    __setitem__.  After values have been modified they are managed
-    thereafter by the wrapper.  This protects the inner dict from
-    modification.
+#     It will allow getting of values
+#     from its inner dict unless those values get modified via
+#     __setitem__.  After values have been modified they are managed
+#     thereafter by the wrapper.  This protects the inner dict from
+#     modification.
 
-    Attributes
-    ----------
-    _inner : dict-like
-        The dictionary to be wrapped.
-    _changed : dict-like
-        The key names for the values that were changed.
-    _complex : bool
-        If True, return a complex version of values from __getitem__.
-    """
+#     Attributes
+#     ----------
+#     _inner : dict-like
+#         The dictionary to be wrapped.
+#     _changed : dict-like
+#         The key names for the values that were changed.
+#     _complex : bool
+#         If True, return a complex version of values from __getitem__.
+#     """
 
-    def __init__(self, inner, return_complex=False):
-        """
-        Construct the dictionary object.
+#     def __init__(self, inner, return_complex=False):
+#         """
+#         Construct the dictionary object.
 
-        Parameters
-        ----------
-        inner : dict-like
-            The dictionary to be wrapped.
-        return_complex : bool, optional
-            If True, return a complex version of values from __getitem__
-        """
-        self._inner = inner
-        self._changed = {}
-        self._complex = return_complex
+#         Parameters
+#         ----------
+#         inner : dict-like
+#             The dictionary to be wrapped.
+#         return_complex : bool, optional
+#             If True, return a complex version of values from __getitem__
+#         """
+#         self._inner = inner
+#         self._changed = {}
+#         self._complex = return_complex
 
-    def __getitem__(self, name):
-        if name in self._changed:
-            return self._changed[name]
-        elif self._complex:
-            val = self._inner[name]
-            if isinstance(val, ndarray):
-                self._changed[name] = np.asarray(val, dtype=npcomplex)
-            else:
-                self._changed[name] = npcomplex(val)
-            return self._changed[name]
-        else:
-            return self._inner[name]
+#     def __getitem__(self, name):
+#         if name in self._changed:
+#             return self._changed[name]
+#         elif self._complex:
+#             val = self._inner[name]
+#             if isinstance(val, ndarray):
+#                 self._changed[name] = np.asarray(val, dtype=npcomplex)
+#             else:
+#                 self._changed[name] = npcomplex(val)
+#             return self._changed[name]
+#         else:
+#             return self._inner[name]
 
-    def __setitem__(self, name, value):
-        self._changed[name] = value
+#     def __setitem__(self, name, value):
+#         self._changed[name] = value
 
-    def __contains__(self, name):
-        return name in self._inner or name in self._changed
+#     def __contains__(self, name):
+#         return name in self._inner or name in self._changed
 
-    def __getattr__(self, name):
-        return getattr(self._inner, name)
+#     def __getattr__(self, name):
+#         return getattr(self._inner, name)
 
 
 class _IODict(object):
