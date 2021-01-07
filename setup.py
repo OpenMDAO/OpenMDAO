@@ -105,6 +105,7 @@ setup(
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
