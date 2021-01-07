@@ -4705,7 +4705,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self.get_var_meta(name, 'units')
+        base_units = self._get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4736,7 +4736,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self.get_var_meta(name, 'units')
+        base_units = self._get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4780,7 +4780,7 @@ class System(object):
 
         return (val + offset) * scale
 
-    def get_var_meta(self, name, key):
+    def _get_var_meta(self, name, key):
         """
         Get metadata for a variable.
 
