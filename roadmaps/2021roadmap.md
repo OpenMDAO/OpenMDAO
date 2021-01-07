@@ -69,59 +69,48 @@ Most of these POEMS came from the devs, but we've found them to be a useful way 
 
 # Model Visualization and Data Post Processing
 
-Overall, we feel that this is an area of OpenMDAO that can still
-use significant improvement. The 2020 N2 refactor improved things somewhat,
-but we think that tighter integration with case recorder data will greatly
-enhance the user experience.
+Overall, we feel that this is an area of OpenMDAO that can still use significant improvement. 
+The 2020 N2 refactor improved things somewhat, but we think that tighter integration with case recorder data will greatly enhance the user experience.
 
 ## 1) Integrated case data into N2
 
 ### Goal:
 Allow users to view the numerical values for all variables from a single case, or a set of cases within the N2 viewer.
+
 ### Potential Challenges:
 The value of the stand-alone HTML based N2 has been clearly demonstrated.
 It is portable and easily shared. We don't want to give up that functionality.
-We can definitely integrate data from a single case within that
-stand-alone HTML structure. However, enabling multiple cases will be more
-challenging because file size will quickly get out of control and performance may be an issue.
+We can definitely integrate data from a single case within that stand-alone HTML structure. 
+However, enabling multiple cases will be more challenging because file size will quickly get out of control and performance may be an issue.
 We'll be forced to consider an external application for the N2.
-We have the prototype based on Electron already, but are also considering
-a Jupyter based solution. Regardless, some kind of additional application
-will be required for multi-case capability.
+We have the prototype based on Electron already, but are also considering a Jupyter based solution.  
+Regardless, some kind of additional application will be required for multi-case capability.
 
 ## 2) Plotting tool for case data
 
 ### Goal:
-Improve the usability of the case recorder databases,
-and allow rapid navigation and plotting of results.
-We've noticed that users can sometimes struggle with our case databases,
-and we hope a graphical navigation tool for post processing and simple
-plotting will help with that.
+Improve the usability of the case recorder databases, and allow rapid navigation and plotting of results.
+We've noticed that users can sometimes struggle with our case databases, and we hope a graphical navigation tool for post processing and simple plotting will help with that.
 
 ### Potential Challenges
-Similar to the multi-case data N2 concept, this functionality will
-likely be built into a separate stand alone application.
-We have also considered a reduced functionality version of this feature
-built into the OpenMDAO command line tool, based on matplotlib.
-This liter version may be done instead of a stand alone tool or in addition to it.
+Similar to the multi-case data N2 concept, this functionality will likely be built into a separate stand alone application.
+We have also considered a reduced functionality version of this feature built into the OpenMDAO command line tool, based on matplotlib or bokeh.
+This lighter version may be done instead of a stand alone tool or in addition to it.
 
 # Building and OpenMDAO Training Course
-We've seen that as users get more comfortable with OpenMDAO
-the size of the models they can build grows quickly, both in terms of
-the number of components and the complexity of their couplings.
-One problem can then arise when the problem complexity grows to the point that
-converging the solver or the optimizers becomes a real bottle neck.
-We can and will provide better debugging tools, but there is a certain amount of practical
-knowledge and experience about solvers and optimizers that is still required.
+We've seen that as users get more comfortable with OpenMDAO the size of the models they can build grows quickly, 
+both in terms of the number of components and the complexity of their couplings.
+One problem can then arise when the problem complexity grows to the point that converging the solver or the optimizers becomes a real bottle neck.
+We can and will provide better debugging tools, but there is a certain amount of practical knowledge and experience about solvers and optimizers that is still required.
 Since OpenMDAO has enabled users to build models of this level of complexity,
 we think some practical training is needed to make those models more useful for them.
 
 ## 1) Develop a class for building implicit models and improving their convergence
 
 ### Goal:
-Provide users with a functional introduction to implicit systems, with a focus on
-when and how to apply specific kinds of solvers.
-Specifically focus on the use of BalanceComps, their role in model building, and how to enhance convergence. Also focus on techniques for debugging a model when it won't converge.
+Provide users with a functional introduction to implicit systems, with a focus on when and how to apply specific kinds of solvers.
+Specifically focus on the use of BalanceComps, their role in model building, and how to enhance convergence. 
+Also focus on techniques for debugging a model when it won't converge.
 
 ## 2) Develop a class for practical optimization based around OpenMDAO
 Having a flexible optimization framework is a bit of a double edges sword,
@@ -132,5 +121,42 @@ the optimization inevitably doesn't do what you want it to!
 
 # Benchmarking OpenMDAO Performance for large scale HPC applications
 Initial benchmarking results comparing OpenMDAO based shape optimization
-to a stand-alone implementation have shown that f…
+to a stand-alone implementation have shown that for smallish aerodynamic optimization problems 
+OpenMDAO is about 10% slower than a more tailored implementation. 
+
+This comparison was not a formal benchmark, more of a general sanity check. 
+It gives us a sense that we are in the right ballpark, 
+but more work is needed to properly characterize our performance in these applications. 
+The ongoing Mphys effort, led by Kevin Jacobson provides a good opportunity to develop more rigorous benchmarks and look for bottlenecks. 
+
+## 1) General performance improvements 
+
+Though they are hard to predict, we expect to find several places where we can reduce the overhead and improve the efficiency of OpenMDAO. 
+To find these, we'll be running larger test cases using Mphys and looking at performance profiling. 
+
+## 2) No-copy transfers
+
+## Goal: 
+
+One source of potential wasted memory comes from the current implementation for data transfers. 
+The OpenMDAO framework takes a highly general approach to data transfers that requires separate copies for outputs and input vectors. 
+This is needed for situations where the output and input are not located on the same processor, because the data must be sent via MPI across from one location to the other. 
+Another situation where copies are needed arises when using Jacobi style convergences. 
+
+However, in many normal use cases you do not need to have separate copy of the output and inputs. 
+In these cases, no-copy transfers could be implemented that would both save memory and compute overhead (no actual copying is done)
+We have developed a theoretical way to make this work, 
+but practical implementation will take some more effort. 
+
+We think that this will offer some meaningful savings, especially for high fidelity use cases where we can avoid passing large state vectors between two components that are running sequentially and on the same processor. 
+
+### Potential Challenges: 
+
+It's possible that the implementation complexity of this solution will be too high to justify its gains. 
+We'll need detailed profiling to test this. 
+
+It's also possible that this transfer scheme will work well for high-fidelity tools but poorly for lower-fidelity tools. 
+This has yet to be seen, but its a risk we recognize. 
+Comparative benchmarking for a range of use cases will need to be done to test this. 
+
 
