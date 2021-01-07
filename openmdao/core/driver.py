@@ -18,7 +18,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
-from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -1122,6 +1121,7 @@ class Driver(object):
         dict
             Data used to create html file.
         """
+        from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
         return view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac,
                                    title=title)
 
