@@ -90,7 +90,3 @@ class _ModelViewerDataTreeEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-
-
-_letters = 'abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-_letters_numbers = _letters + '01234567890'

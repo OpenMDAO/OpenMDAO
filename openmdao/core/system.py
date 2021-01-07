@@ -1555,11 +1555,10 @@ class System(object):
         for name, meta in dv.items():
 
             units = meta['units']
+            dv[name]['total_adder'] = dv[name]['adder']
+            dv[name]['total_scaler'] = dv[name]['scaler']
 
-            if units is None:
-                dv[name]['total_adder'] = dv[name]['adder']
-                dv[name]['total_scaler'] = dv[name]['scaler']
-            else:
+            if units is not None:
                 # If derivatives are not being calculated, then you reach here before ivc_source
                 # is placed in the meta.
                 try:
@@ -1570,8 +1569,6 @@ class System(object):
                 var_units = abs2meta[units_src]['units']
 
                 if var_units == units:
-                    dv[name]['total_adder'] = dv[name]['adder']
-                    dv[name]['total_scaler'] = dv[name]['scaler']
                     continue
 
                 if var_units is None:
@@ -2529,20 +2526,20 @@ class System(object):
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
         if lower is None:
+            # if not set, set lower to -INF_BOUND and don't apply adder/scaler
             lower = -openmdao.INF_BOUND
         else:
             # Convert lower to ndarray/float as necessary
-            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                             flatten=True)
+            lower = format_as_float_or_array('lower', lower, flatten=True)
             # Apply scaler/adder
             lower = (lower + adder) * scaler
 
         if upper is None:
+            # if not set, set upper to INF_BOUND and don't apply adder/scaler
             upper = openmdao.INF_BOUND
         else:
             # Convert upper to ndarray/float as necessary
-            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                             flatten=True)
+            upper = format_as_float_or_array('upper', upper, flatten=True)
             # Apply scaler/adder
             upper = (upper + adder) * scaler
 
@@ -2708,10 +2705,10 @@ class System(object):
             # Convert lower to ndarray/float as necessary
             try:
                 if lower is None:
+                    # don't apply adder/scaler if lower not set
                     lower = -openmdao.INF_BOUND
                 else:
-                    lower = format_as_float_or_array('lower', lower,
-                                                     val_if_none=-openmdao.INF_BOUND, flatten=True)
+                    lower = format_as_float_or_array('lower', lower, flatten=True)
                     lower = (lower + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -2721,10 +2718,10 @@ class System(object):
             # Convert upper to ndarray/float as necessary
             try:
                 if upper is None:
+                    # don't apply adder/scaler if upper not set
                     upper = openmdao.INF_BOUND
                 else:
-                    upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                                     flatten=True)
+                    upper = format_as_float_or_array('upper', upper, flatten=True)
                     upper = (upper + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "

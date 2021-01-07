@@ -280,7 +280,7 @@ class Component(System):
         for io in ('input', 'output'):
             sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
                                                                 len(self._var_rel_names[io])),
-                                                                dtype=int)
+                                                                dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']
@@ -322,7 +322,7 @@ class Component(System):
                 sizes[vec_name] = {}
                 for io in ('input', 'output'):
                     sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
-                                                        dtype=int)
+                                                        dtype=INT_DTYPE)
                     # Variables for this vec_name are a subset of those for nonlinear, so just
                     # take columns of the nonlinear sizes array
                     for idx, abs_name in enumerate(relnames[io]):

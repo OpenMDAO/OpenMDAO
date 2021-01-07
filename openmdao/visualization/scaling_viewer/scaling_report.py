@@ -430,8 +430,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         viewer = 'scaling_table.html'
 
         code_dir = os.path.dirname(os.path.abspath(__file__))
-        libs_dir = os.path.join(code_dir, 'libs')
-        style_dir = os.path.join(code_dir, 'style')
+        libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
+        style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
         with open(os.path.join(code_dir, viewer), "r") as f:
             template = f.read()

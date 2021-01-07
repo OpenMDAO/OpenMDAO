@@ -477,8 +477,7 @@ _command_map = {
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
-    'scaling': (_scaling_setup_parser, _scaling_cmd,
-                'View driver variable scaling report.'),
+    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 
 
