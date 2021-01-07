@@ -110,6 +110,10 @@ setup(
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
+        'openmdao.visualization' : [
+            'common/libs/*.js',
+            'common/style/*.css'
+        ],
         'openmdao.visualization.n2_viewer': [
             'assets/*',
             'libs/*.js',
@@ -122,8 +126,6 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
-            'libs/*.js',
-            'style/*.css'
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
