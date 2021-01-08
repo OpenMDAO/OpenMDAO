@@ -17,5 +17,5 @@ function n2main() {
     n2Diag.update(false);
 }
 
-// wintest();
-n2main();
+wintest();
+// n2main();

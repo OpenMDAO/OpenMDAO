@@ -1,7 +1,7 @@
 /**
- * @typedef N2Window
  * Create a clone of the #window-template defined in index.html and provide
  * management functions such as setting size, position, ribbon color, etc.
+ * @typedef N2Window
  */
 class N2Window {
     /**
@@ -293,8 +293,8 @@ class N2Window {
 }
 
 /**
- * @typedef N2WindowDraggable
  * Extends N2Window by allowing the window to be dragged with a mousedown on the header/title.
+ * @typedef N2WindowDraggable
  */
 class N2WindowDraggable extends N2Window {
     /** Execute the base class constructor and set up drag event handler */
@@ -352,15 +352,24 @@ class N2WindowDraggable extends N2Window {
 }
 
 /**
- * @typedef N2WindowDraggable
  * Extends N2WindowDraggable by setting up 8 divs around the perimeter of the window
  * that change the cursor with mouseover, and allow resizing with mousedown.
+ * @typedef N2WindowDraggable
  */
 class N2WindowResizable extends N2WindowDraggable {
-    constructor(newId = null, cloneId = '#window-template') {
+    constructor(newId = null, cloneId = '#window-template', minWidth = 200, minHeight = 200) {
         super(newId, cloneId);
+        this.min = { width: minWidth, height: minHeight };
         this._setupResizers();
     }
+
+    // Read-only getters
+    get minWidth() { return this.min.width; }
+    get minHeight() { return this.min.height; }
+
+    // Write-only setters
+    set minWidth(val) { this.min.width = val; }
+    set minHeight(val) { this.min.height = val; }
 
     /**
      * Add event handlers for each of the 8 resizer elements surrounding the window.
@@ -386,11 +395,12 @@ class N2WindowResizable extends N2WindowDraggable {
 
         // For each side, 'mult' refers to whether a coordinate is to be added or subtracted.
         // 'idx' refers to the index of the delta x or y value of the new mouse position.
+        // 'min' is the direction name to check for the minimum size.
         const dirVals = {
-            top: { mult: 1, idx: 1 },
-            right: { mult: -1, idx: 0 },
-            bottom: { mult: -1, idx: 1 },
-            left: { mult: 1, idx: 0 }
+            top: { mult: 1, idx: 1, min: 'height' },
+            right: { mult: -1, idx: 0, min: 'width' },
+            bottom: { mult: -1, idx: 1, min: 'height' },
+            left: { mult: 1, idx: 0, min: 'width' }
         }
 
         // Set up a mousedown event listener for each of the 8 elements.
@@ -408,7 +418,7 @@ class N2WindowResizable extends N2WindowDraggable {
 
                 const dragStart = [d3.event.pageX, d3.event.pageY];
                 let newPos = [0, 0]; // Delta values of the current mouse position vs. start position
-                let newSize = {}; // Object to store newly computed positions in
+                let newSize = { }; // Object to store newly computed positions in
 
                 const w = d3.select(window)
                     .on("mousemove", e => {
@@ -416,8 +426,19 @@ class N2WindowResizable extends N2WindowDraggable {
                         Object.assign(newSize, startSize)
 
                         for (let i in dirs) {
-                            newSize[dirs[i]] = startSize[dirs[i]] +
-                                (newPos[dirVals[dirs[i]].idx] * dirVals[dirs[i]].mult);
+                            const dv = dirVals[dirs[i]];
+                            
+                            // Calculate the amount the dimension can increase to without
+                            // violating the minumum width or height of the window.
+                            const dimLimit = startSize[dirs[i]] + startSize[dv.min] -
+                                self.min[dv.min];
+                            
+                            // Calculate the new potential position of the size from the
+                            // starting position and the position of the mouse.
+                            const newVal = startSize[dirs[i]] + (newPos[dv.idx] * dv.mult);
+
+                            // Make sure the side hasn't moved beyond its limit.
+                            newSize[dirs[i]] = newVal > dimLimit? dimLimit : newVal;
                         }
                         newSize.width = startSize.parentWidth - (newSize.right + newSize.left);
                         newSize.height = startSize.parentHeight - (newSize.top + newSize.bottom);

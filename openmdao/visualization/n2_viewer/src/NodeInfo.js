@@ -250,7 +250,7 @@ class ValueInfoManager {
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
  */
-class ValueInfo {
+class ValueInfo extends N2WindowResizable {
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
@@ -258,25 +258,33 @@ class ValueInfo {
      * @param {Number} val Variable value.
      */
     constructor(name, val, ui) {
+        super();
         this.name = name;
         this.val = val;
 
+
+
         /* Construct the DOM elements that make up the window */
+        /*
         this.container = d3.select('div#node-value-containers div#template').clone(true);
         this.container.classed('node-value-hidden', false)
             .attr('id', 'node-value-' + uuidv4());
         this.header = this.container.select('.node-value-header');
         this.table = this.container.select('table');
         this.title = this.container.select('.node-value-title');
-
         this.container.select('.close-value-window-button')
             .on('click', function () { ui.valueInfoManager.remove(name); });
 
         this.bringToFront();
+        */
 
+        this.table = this.body.append('table').attr('class', 'node-value-table');
+        this.tbody = this.table.append('tbody');
         this.update();
+        /*
         this._setupDrag();
         this._setupResizerDrag();
+        */
     }
 
     /**
@@ -321,11 +329,11 @@ class ValueInfo {
     }
 
     update() {
-        const titleSpan = this.container.select('.node-value-title');
+        // const titleSpan = this.header.select('.node-value-title');
 
         // Capture the width of the header before the table is created
         // We use this to limit how small the window can be as the user resizes
-        this.header_width = parseInt(this.header.style('width'));
+        this.headerWidth = parseInt(this.header.style('width'));
 
         // Check to see if the data is a 2d array since the rest of the code assumes that it is an Array
         // If only 1d, make it a 2d with one row
@@ -444,7 +452,7 @@ class ValueInfo {
                     newHeight = Math.min(newHeight, this.initial_height);
 
                     // Don't let it get too small or things get weird
-                    newWidth = Math.max(newWidth, this.header_width);
+                    newWidth = Math.max(newWidth, this.headerWidth);
 
                     tableDiv.style('width', newWidth + 'px');
                     tableDiv.style('height', newHeight + 'px');
