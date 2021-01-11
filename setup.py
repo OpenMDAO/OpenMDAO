@@ -18,6 +18,9 @@ optional_dependencies = {
         'redbaron',
         'sphinx>=1.8.5',
     ],
+    'notebooks': [
+        'tabulate'
+    ],
     'visualization': [
         'bokeh>=1.3.4',
         'colorama',

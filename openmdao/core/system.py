@@ -480,6 +480,8 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
+        self.notebook = False
+
     @property
     def msginfo(self):
         """
@@ -3639,7 +3641,11 @@ class System(object):
 
         states = set(self._list_states())
 
-        if explicit:
+        if self.notebook:
+            for key, val in outputs.items():
+                self.tabulate_output = [[key, val['value']] for key, val in outputs.items() if n not in states]
+
+        if explicit and not self.notebook:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
@@ -3649,7 +3655,7 @@ class System(object):
             else:
                 expl_outputs = list(expl_outputs.items())
 
-        if implicit:
+        if implicit and not self.notebook:
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
