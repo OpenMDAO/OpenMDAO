@@ -96,7 +96,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """

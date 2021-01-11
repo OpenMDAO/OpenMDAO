@@ -1,6 +1,7 @@
 """Define the ExecComp class, a component that evaluates an expression."""
 import re
 from itertools import product
+from contextlib import contextmanager
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
@@ -19,7 +20,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn'}
 
 
 def check_option(option, value):
@@ -74,7 +75,10 @@ class ExecComp(ExplicitComponent):
         Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
+    _manual_decl_partials : bool
+        If True, at least one partial has been declared by the user.
     """
+
     def __init__(self, exprs=[], **kwargs):
         r"""
         Create a <Component> using only an expression string.
@@ -201,6 +205,7 @@ class ExecComp(ExplicitComponent):
         self._codes = None
         self._kwargs = kwargs
 
+        self._manual_decl_partials = False
         self._no_check_partials = True
 
     def initialize(self):
@@ -223,11 +228,35 @@ class ExecComp(ExplicitComponent):
                                   'Default is None, which means shape is provided for variables '
                                   'individually.')
 
-    @classmethod
-    def register(cls, fname, func, complex_safe=False):
-        global _expr_dict
-        _expr_dict[fname] = func
+        self.options.declare('shape_by_conn', types=bool, default=False,
+                             desc='If True, shape all inputs and outputs based on their '
+                                  'connection. Default is False, which means shape_by_conn is '
+                                  'provided for variables individually.')
 
+    @classmethod
+    def register(cls, name, callable_obj):
+        """
+        Register a callable to be used within an ExecComp expression.
+
+        Parameters
+        ----------
+        name : str
+            Name of the callable.
+        callable_obj : callable
+            The callable.
+        """
+        global _expr_dict
+        if not callable(callable_obj):
+            raise TypeError(f"{cls.__name__}: '{name}' passed to register() of type "
+                            f"'{type(callable_obj).__name__}' is not callable.")
+        if name in _expr_dict:
+            raise NameError(f"{cls.__name__}: '{name}' has already been registered.")
+
+        if name in _disallowed_names:
+            raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
+                            "it's a reserved keyword.")
+
+        _expr_dict[name] = callable_obj
 
     def setup(self):
         """
@@ -243,6 +272,10 @@ class ExecComp(ExplicitComponent):
 
         units = self.options['units']
         shape = self.options['shape']
+        shape_by_conn = self.options['shape_by_conn']
+
+        if shape is not None and shape_by_conn:
+            raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
@@ -297,7 +330,7 @@ class ExecComp(ExplicitComponent):
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
 
-                if 'shape_by_conn' in val or 'copy_shape' in val:
+                if shape_by_conn or 'shape_by_conn' in val or 'copy_shape' in val:
                     if val.get('shape') is not None or val.get('value') is not None:
                         raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'value' for "
                                            f"variable '{arg}' along with 'copy_shape' or "
@@ -316,44 +349,52 @@ class ExecComp(ExplicitComponent):
                 init_vals[arg] = val
 
         for var in sorted(allvars):
-            meta = kwargs2.get(var, {'units': units, 'shape': shape})
+            meta = kwargs2.get(var, {
+                'units': units,
+                'shape': shape,
+                'shape_by_conn': shape_by_conn})
 
             # if user supplied an initial value, use it, otherwise set to 1.0
             if var in init_vals:
                 val = init_vals[var]
             else:
-                init_vals[var] = val = 1.0
+                val = 1.0
 
             if var in outs:
-                self.add_output(var, val, **meta)
+                dct = self.add_output(var, val, **meta)
             else:
-                self.add_input(var, val, **meta)
+                dct = self.add_input(var, val, **meta)
 
-        for expr in self._exprs:
-            lhs, _ = expr.split('=', 1)
-            outs = self._parse_for_out_vars(lhs)
-            all = self._parse_for_vars(expr)  # gets in and out
-            ins = sorted(set(all) - set(outs))
-            outs = sorted(outs)
-            for out in outs:
-                for inp in ins:
-                    if self.options['has_diag_partials']:
-                        ival = init_vals[inp]
-                        iarray = isinstance(ival, ndarray) and ival.size > 1
-                        oval = init_vals[out]
-                        if iarray and isinstance(oval, ndarray) and oval.size > 1:
-                            if oval.size != ival.size:
-                                raise RuntimeError(
-                                    "%s: has_diag_partials is True but partial(%s, %s) "
-                                    "is not square (shape=(%d, %d))." %
-                                    (self.msginfo, out, inp, oval.size, ival.size))
-                            # partial will be declared as diagonal
-                            inds = np.arange(oval.size, dtype=int)
+            if var not in init_vals:
+                init_vals[var] = dct['value']
+
+        if not self._manual_decl_partials:
+            decl_partials = super().declare_partials
+            for expr in self._exprs:
+                lhs, _ = expr.split('=', 1)
+                outs = self._parse_for_out_vars(lhs)
+                all = self._parse_for_vars(expr)  # gets in and out
+                ins = sorted(set(all) - set(outs))
+                outs = sorted(outs)
+                for out in outs:
+                    for inp in ins:
+                        if self.options['has_diag_partials']:
+                            ival = init_vals[inp]
+                            iarray = isinstance(ival, ndarray) and ival.size > 1
+                            oval = init_vals[out]
+                            if iarray and isinstance(oval, ndarray) and oval.size > 1:
+                                if oval.size != ival.size:
+                                    raise RuntimeError(
+                                        "%s: has_diag_partials is True but partial(%s, %s) "
+                                        "is not square (shape=(%d, %d))." %
+                                        (self.msginfo, out, inp, oval.size, ival.size))
+                                # partial will be declared as diagonal
+                                inds = np.arange(oval.size, dtype=int)
+                            else:
+                                inds = None
+                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
                         else:
-                            inds = None
-                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds, method='cs')
-                    else:
-                        self.declare_partials(of=out, wrt=inp, method='cs')
+                            decl_partials(of=out, wrt=inp)
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -390,9 +431,10 @@ class ExecComp(ExplicitComponent):
                 if callable(expvar):
                     raise NameError("%s: cannot use '%s' as a variable because "
                                     "it's already defined as an internal "
-                                    "function." % (self.msginfo, v))
+                                    "function or constant." % (self.msginfo, v))
                 else:
                     to_remove.append(v)
+
         return vnames.difference(to_remove)
 
     def __getstate__(self):
@@ -420,6 +462,33 @@ class ExecComp(ExplicitComponent):
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
+    def declare_partials(self, *args, **kwargs):
+        """
+        Declare information about this component's subjacobians.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args to be passed to base class version of declare_partials.
+        **kwargs : dict
+            Keyword args  to be passed to base class version of declare_partials.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the specified partial(s).
+        """
+        if 'method' not in kwargs or kwargs['method'] == 'exact':
+            raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method='cs' "
+                               "or method='fd'.")
+        if self.options['has_diag_partials']:
+            raise RuntimeError(f"{self.msginfo}: declare_partials cannot be called manually if "
+                               "has_diag_partials has been set.")
+
+        self._manual_decl_partials = True
+        self._no_check_partials = False
+        return super().declare_partials(*args, **kwargs)
+
     def compute(self, inputs, outputs):
         """
         Execute this component's assignment statements.
@@ -436,125 +505,128 @@ class ExecComp(ExplicitComponent):
             try:
                 exec(expr, _expr_dict, _IODict(outputs, inputs))
             except Exception as err:
-                raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
-                                   % (self.msginfo, self._exprs[i], str(err)))
+                raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
+                                   f"\n{err}")
 
-    # def compute_partials(self, inputs, partials):
-    #     """
-    #     Use complex step method to update the given Jacobian.
+    def compute_partials(self, inputs, partials):
+        """
+        Use complex step method to update the given Jacobian.
 
-    #     Parameters
-    #     ----------
-    #     inputs : `VecWrapper`
-    #         `VecWrapper` containing parameters. (p)
+        Parameters
+        ----------
+        inputs : `VecWrapper`
+            `VecWrapper` containing parameters. (p)
 
-    #     partials : `Jacobian`
-    #         Contains sub-jacobians.
-    #     """
-    #     step = self.complex_stepsize * 1j
-    #     out_names = self._var_rel_names['output']
-    #     inv_stepsize = 1.0 / self.complex_stepsize
-    #     has_diag_partials = self.options['has_diag_partials']
+        partials : `Jacobian`
+            Contains sub-jacobians.
+        """
+        if self._manual_decl_partials:
+            return
 
-    #     for input in inputs:
+        step = self.complex_stepsize * 1j
+        out_names = self._var_rel_names['output']
+        inv_stepsize = 1.0 / self.complex_stepsize
+        has_diag_partials = self.options['has_diag_partials']
 
-    #         pwrap = _TmpDict(inputs)
-    #         pval = inputs[input]
-    #         psize = pval.size
-    #         pwrap[input] = np.asarray(pval, npcomplex)
+        for input in inputs:
 
-    #         if has_diag_partials or psize == 1:
-    #             # set a complex input value
-    #             pwrap[input] += step
+            pwrap = _TmpDict(inputs)
+            pval = inputs[input]
+            psize = pval.size
+            pwrap[input] = np.asarray(pval, npcomplex)
 
-    #             uwrap = _TmpDict(self._outputs, return_complex=True)
+            if has_diag_partials or psize == 1:
+                # set a complex input value
+                pwrap[input] += step
 
-    #             # solve with complex input value
-    #             self._residuals.set_val(0.0)
-    #             self.compute(pwrap, uwrap)
+                uwrap = _TmpDict(self._outputs, return_complex=True)
 
-    #             for u in out_names:
-    #                 if (u, input) in self._declared_partials:
-    #                     partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
+                # solve with complex input value
+                self._residuals.set_val(0.0)
+                self.compute(pwrap, uwrap)
 
-    #             # restore old input value
-    #             pwrap[input] -= step
-    #         else:
-    #             for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
-    #                 # set a complex input value
-    #                 pwrap[input][idx] += step
+                for u in out_names:
+                    if (u, input) in self._declared_partials:
+                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
-    #                 uwrap = _TmpDict(self._outputs, return_complex=True)
+                # restore old input value
+                pwrap[input] -= step
+            else:
+                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                    # set a complex input value
+                    pwrap[input][idx] += step
 
-    #                 # solve with complex input value
-    #                 self._residuals.set_val(0.0)
-    #                 self.compute(pwrap, uwrap)
+                    uwrap = _TmpDict(self._outputs, return_complex=True)
 
-    #                 for u in out_names:
-    #                     if (u, input) in self._declared_partials:
-    #                         # set the column in the Jacobian entry
-    #                         partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                    # solve with complex input value
+                    self._residuals.set_val(0.0)
+                    self.compute(pwrap, uwrap)
 
-    #                 # restore old input value
-    #                 pwrap[input][idx] -= step
+                    for u in out_names:
+                        if (u, input) in self._declared_partials:
+                            # set the column in the Jacobian entry
+                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+
+                    # restore old input value
+                    pwrap[input][idx] -= step
 
 
-# class _TmpDict(object):
-#     """
-#     Dict wrapper that allows modification without changing the wrapped dict.
+class _TmpDict(object):
+    """
+    Dict wrapper that allows modification without changing the wrapped dict.
 
-#     It will allow getting of values
-#     from its inner dict unless those values get modified via
-#     __setitem__.  After values have been modified they are managed
-#     thereafter by the wrapper.  This protects the inner dict from
-#     modification.
+    It will allow getting of values
+    from its inner dict unless those values get modified via
+    __setitem__.  After values have been modified they are managed
+    thereafter by the wrapper.  This protects the inner dict from
+    modification.
 
-#     Attributes
-#     ----------
-#     _inner : dict-like
-#         The dictionary to be wrapped.
-#     _changed : dict-like
-#         The key names for the values that were changed.
-#     _complex : bool
-#         If True, return a complex version of values from __getitem__.
-#     """
+    Attributes
+    ----------
+    _inner : dict-like
+        The dictionary to be wrapped.
+    _changed : dict-like
+        The key names for the values that were changed.
+    _complex : bool
+        If True, return a complex version of values from __getitem__.
+    """
 
-#     def __init__(self, inner, return_complex=False):
-#         """
-#         Construct the dictionary object.
+    def __init__(self, inner, return_complex=False):
+        """
+        Construct the dictionary object.
 
-#         Parameters
-#         ----------
-#         inner : dict-like
-#             The dictionary to be wrapped.
-#         return_complex : bool, optional
-#             If True, return a complex version of values from __getitem__
-#         """
-#         self._inner = inner
-#         self._changed = {}
-#         self._complex = return_complex
+        Parameters
+        ----------
+        inner : dict-like
+            The dictionary to be wrapped.
+        return_complex : bool, optional
+            If True, return a complex version of values from __getitem__
+        """
+        self._inner = inner
+        self._changed = {}
+        self._complex = return_complex
 
-#     def __getitem__(self, name):
-#         if name in self._changed:
-#             return self._changed[name]
-#         elif self._complex:
-#             val = self._inner[name]
-#             if isinstance(val, ndarray):
-#                 self._changed[name] = np.asarray(val, dtype=npcomplex)
-#             else:
-#                 self._changed[name] = npcomplex(val)
-#             return self._changed[name]
-#         else:
-#             return self._inner[name]
+    def __getitem__(self, name):
+        if name in self._changed:
+            return self._changed[name]
+        elif self._complex:
+            val = self._inner[name]
+            if isinstance(val, ndarray):
+                self._changed[name] = np.asarray(val, dtype=npcomplex)
+            else:
+                self._changed[name] = npcomplex(val)
+            return self._changed[name]
+        else:
+            return self._inner[name]
 
-#     def __setitem__(self, name, value):
-#         self._changed[name] = value
+    def __setitem__(self, name, value):
+        self._changed[name] = value
 
-#     def __contains__(self, name):
-#         return name in self._inner or name in self._changed
+    def __contains__(self, name):
+        return name in self._inner or name in self._changed
 
-#     def __getattr__(self, name):
-#         return getattr(self._inner, name)
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
 
 
 class _IODict(object):
@@ -717,3 +789,17 @@ class _NumpyMsg(object):
 
 _expr_dict['np'] = _NumpyMsg('np')
 _expr_dict['numpy'] = _NumpyMsg('numpy')
+
+
+@contextmanager
+def _temporary_expr_dict():
+    """
+    During a test, it's useful to be able to save and restore the _expr_dict.
+    """
+    global _expr_dict
+
+    save = _expr_dict.copy()
+
+    yield
+
+    _expr_dict = save

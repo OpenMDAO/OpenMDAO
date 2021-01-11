@@ -52,7 +52,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -105,7 +105,7 @@ class TestMPIScatter(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=-15.0)
-
+        
         prob.setup()
         prob.run_driver()
 

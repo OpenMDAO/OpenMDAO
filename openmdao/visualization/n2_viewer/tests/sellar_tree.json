@@ -399,7 +399,8 @@
                 "distributed": false,
                 "has_diag_partials": false,
                 "units": null,
-                "shape": null
+                "shape": null,
+                "shape_by_conn": false
             }
         },
         {
@@ -447,7 +448,8 @@
                 "distributed": false,
                 "has_diag_partials": false,
                 "units": null,
-                "shape": null
+                "shape": null,
+                "shape_by_conn": false
             }
         },
         {
@@ -495,7 +497,8 @@
                 "distributed": false,
                 "has_diag_partials": false,
                 "units": null,
-                "shape": null
+                "shape": null,
+                "shape_by_conn": false
             }
         }
     ],

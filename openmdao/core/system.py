@@ -973,8 +973,10 @@ class System(object):
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
                     from openmdao.core.component import Component
+                    from openmdao.components.exec_comp import ExecComp
                     for s in self.system_iter(recurse=True, typ=Component):
-                        s.declare_partials('*', '*', method=self._coloring_info['method'])
+                        if not isinstance(s, ExecComp):
+                            s.declare_partials('*', '*', method=self._coloring_info['method'])
                 self._setup_partials()
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])

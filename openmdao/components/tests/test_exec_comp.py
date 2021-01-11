@@ -15,7 +15,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 import openmdao.api as om
-from openmdao.components.exec_comp import _expr_dict
+from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.utils import cs_safe
 
@@ -358,7 +358,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
         self.assertEqual(str(context.exception),
                          "'C1' <class ExecComp>: cannot use 'sin' as a variable because it's already defined "
-                         "as an internal function.")
+                         "as an internal function or constant.")
 
     def test_mixed_type(self):
         prob = om.Problem()
@@ -622,7 +622,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "'C1' <class ExecComp>: Error occurred evaluating 'y2=np.cos(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y2=np.cos(x)':\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'np' prefix.\n"
             "    'cos' is supported (See the documentation).")
 
@@ -635,7 +635,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.sin(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.sin(x)':\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
             "    'sin' is supported (See the documentation).")
 
@@ -648,7 +648,7 @@ class TestExecComp(unittest.TestCase):
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.fft(x)'\n"
+            "'C1' <class ExecComp>: Error occurred evaluating 'y=numpy.fft(x)':\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
             "    'fft' is not supported (See the documentation).")
 
@@ -1066,6 +1066,25 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
         assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
 
+    def test_feature_multi_output2(self):
+        # verify that expressions can have multiple LHS variables.
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', om.ExecComp(['y1, y2 = x+1., x-1.']), promotes=['x'])
+
+        prob.setup()
+
+        prob.set_val('x', 2.0)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
+
     def test_feature_array(self):
         import numpy as np
 
@@ -1195,6 +1214,134 @@ class TestExecComp(unittest.TestCase):
         text = stream.getvalue()
         self.assertTrue("balance" in text)
         self.assertTrue("x_1" in text)
+
+
+class TestFunctionRegistration(unittest.TestCase):
+
+    def test_register_simple(self):
+        with _temporary_expr_dict():
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)'))
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            self.assertEqual(p['comp.area_square'], 9.)
+            J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
+            self.assertEqual(J['comp.area_square', 'comp.x'], 6.)
+
+    def test_register_simple_arr(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+
+    def test_register_simple_arr_manual_partials_cs(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            comp.declare_partials('area_square', 'x', method='cs')
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+
+    def test_register_simple_arr_manual_partials_fd(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            comp.declare_partials('area_square', 'x', method='fd')
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+
+    def test_register_simple_arr_diag(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size, has_diag_partials=True))
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+
+    def test_register_shape_by_conn(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('part', lambda x: x[2:])
+            p = om.Problem()
+            p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
+            p.model.add_subsystem('comp', om.ExecComp('y = part(x) * 3.', shape_by_conn=True))
+            p.model.add_subsystem('sink', om.ExecComp('y=x', shape=size-2))
+            p.model.connect("indeps.x", "comp.x")
+            p.model.connect("comp.y", "sink.x")
+            p.setup()
+            p['indeps.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.x'], np.ones(size) * 3., 1e-6)
+            assert_near_equal(p['comp.y'], np.ones(size-2) * 9., 1e-6)
+            assert_near_equal(p['sink.y'], np.ones(size-2) * 9., 1e-6)
+            J = p.compute_totals(of=['sink.y'], wrt=['indeps.x'])
+            assert_near_equal(J['sink.y', 'indeps.x'], np.eye(size)[2:, :] * 3., 1e-6)
+
+    def test_register_shape_by_conn_err(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('double', lambda x: x * 2)
+            p = om.Problem()
+            p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
+            p.model.add_subsystem('comp', om.ExecComp('y = double(x) * 3.', shape_by_conn=True))
+            p.model.add_subsystem('sink', om.ExecComp('y=x', shape=size-2))
+            p.model.connect("indeps.x", "comp.x")
+            p.model.connect("comp.y", "sink.x")
+            p.setup()
+            p['indeps.x'] = 3.
+            # if shape_by_conn results in inputs and outputs being different shapes, we can't detect if that's
+            # an error or not because we don't know how the expressions evaluate, so we have to wait until
+            # compute runs and just report as an error during expression evaluation.
+            with self.assertRaises(Exception) as cm:
+                p.run_model()
+            self.assertEquals(cm.exception.args[0], 
+                              "'comp' <class ExecComp>: Error occurred evaluating 'y = double(x) * 3.':\n'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast input array from shape (10) into shape (8).")
+
+    def test_register_err_keyword(self):
+        with _temporary_expr_dict():
+            with self.assertRaises(Exception) as cm:
+                om.ExecComp.register('shape', lambda x: x)
+            self.assertEquals(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
+                              "it's a reserved keyword.")
+
+    def test_register_err_not_callable(self):
+        with _temporary_expr_dict():
+            with self.assertRaises(Exception) as cm:
+                om.ExecComp.register('foo', 99)
+            self.assertEquals(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
+
+    def test_register_err_dup(self):
+        with _temporary_expr_dict():
+            with self.assertRaises(Exception) as cm:
+                om.ExecComp.register('exp', lambda x: x)
+            self.assertEquals(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
+
 
 class TestExecCompParameterized(unittest.TestCase):
 
