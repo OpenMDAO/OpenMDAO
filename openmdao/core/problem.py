@@ -618,8 +618,6 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -655,8 +653,6 @@ class Problem(object):
         if self.model.iter_count > 0 and reset_iter_counts:
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
-
-        self._run_counter += 1
 
         self.final_setup()
         self.model._clear_iprint()
@@ -924,6 +920,8 @@ class Problem(object):
         are created and populated, the drivers and solvers are initialized, and the recorders are
         started, and the rest of the framework is prepared for execution.
         """
+        self._run_counter += 1
+
         driver = self.driver
 
         response_size, desvar_size = driver._update_voi_meta(self.model)

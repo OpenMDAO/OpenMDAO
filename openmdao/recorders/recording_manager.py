@@ -259,30 +259,26 @@ def record_system_options(problem):
     problem : Problem
         The problem for which all its systems' options are to be recorded.
     """
-    # get all recorders in the problem
     recorders = set(_get_all_recorders(problem))
-    if recorders:
-        if problem._system_options_recorded:
-            simple_warning("The model is being run again, if the options or scaling of any "
-                           "components has changed then only their new values will be recorded.")
-        else:
-            problem._system_options_recorded = True
 
+    for system in problem.model.system_iter(recurse=True, include_self=True):
         for recorder in recorders:
-            for system in problem.model.system_iter(recurse=True, include_self=True):
-                # record system metadata (options)
-                if problem._run_counter >= 1:
-                    recorder.record_metadata_system(system, problem._run_counter)
-                else:
-                    recorder.record_metadata_system(system)
+            run_number = problem._run_counter
 
-                # record solver metadata (options) for this system's solvers
-                nl = system._nonlinear_solver
-                if nl:
-                    recorder.record_metadata_solver(nl)
-                    if hasattr(nl, 'linesearch') and nl.linesearch:
-                        recorder.record_metadata_solver(nl.linesearch)
+            # for backward compatibility, the first run does not have a run number
+            if run_number < 1:
+                run_number = None
 
-                ln = system._linear_solver
-                if ln:
-                    recorder.record_metadata_solver(ln)
+            # record system metadata (options)
+            recorder.record_metadata_system(system, run_number)
+
+            # record solver metadata (options) for this system's solvers
+            nl = system._nonlinear_solver
+            if nl:
+                recorder.record_metadata_solver(nl, run_number)
+                if hasattr(nl, 'linesearch') and nl.linesearch:
+                    recorder.record_metadata_solver(nl.linesearch, run_number)
+
+            ln = system._linear_solver
+            if ln:
+                recorder.record_metadata_solver(ln, run_number)

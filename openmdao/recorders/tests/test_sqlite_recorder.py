@@ -11,8 +11,6 @@ from shutil import rmtree
 from tempfile import mkdtemp
 
 import openmdao.api as om
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.assert_utils import assert_no_warning
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
@@ -27,11 +25,14 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, \
+    assert_warning, assert_no_warning
 from openmdao.utils.general_utils import determine_adder_scaler, remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
@@ -317,9 +318,12 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(out_stream=stream)
+        cr.list_model_options(system='root', out_stream=stream)
 
         text = stream.getvalue().split('\n')
+
+        from pprint import pprint
+        pprint(text)
 
         expected = [
             "Run Number: 0",
@@ -375,7 +379,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(out_stream=stream)
+        cr.list_model_options(system='root', out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -675,21 +679,25 @@ class TestSqliteRecorder(unittest.TestCase):
         value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
-    def test_warning__system_options_overwriting(self):
+    def test_warning_system_options_overwriting(self):
 
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         prob.add_recorder(self.recorder)
+
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
         prob.record('final')
 
-        prob.setup()
+        prob.final_setup()
+
+        # this warning has been removed, since multiple runs (i.e. calls to final_setup)
+        # are now properly handled by keeping track of run numbers
         msg = "The model is being run again, if the options or scaling of any components " \
               "has changed then only their new values will be recorded."
 
-        with assert_warning(UserWarning, msg):
+        with assert_no_warning(UserWarning, msg):
             prob.run_driver()
 
     def test_without_n2_data(self):
@@ -2605,7 +2613,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivativesGrouped(ln_maxiter=999))
 
         prob.setup()
 
@@ -2620,13 +2628,19 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         # options for all the systems in the model
-        options = cr.list_model_options()
+        options = cr.list_model_options(out_stream=None)
 
         self.assertEqual(sorted(options.keys()),
-                         sorted(['root']))
+                         sorted(['root', '_auto_ivc', 'con_cmp1', 'con_cmp2',
+                                 'mda', 'mda.d1', 'mda.d2', 'obj_cmp']))
 
-        # options for system 'root'
-        self.assertEqual(options['root']['ln_maxiter'], None)
+        self.assertEqual(sorted(options['root'].keys()),
+                         sorted(prob.model.options._dict.keys()))
+
+        self.assertEqual(options['root']['ln_maxiter'], 999)
+
+        self.assertEqual(sorted(options['con_cmp1'].keys()),
+                         sorted(prob.model.con_cmp1.options._dict.keys()))
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
