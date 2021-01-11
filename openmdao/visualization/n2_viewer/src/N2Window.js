@@ -17,12 +17,12 @@ class N2Window {
      * Clone the template window defined in index.html, setup some
      * references to various elements.
      * @param {String} [newId = null] HTML id for the new window. A UUID is generated if null.
-     * @param {String} [cloneId = '#window-template'] The id of a window to clone other than
+     * @param {String} [cloneId = null] The id of a window to clone other than
      *  the original template.
      */
-    constructor(newId = null, cloneId = '#window-template') {
+    constructor(newId = null, cloneId = null) {
         // The primary reference for the new window
-        this._window = d3.select(cloneId)
+        this._window = d3.select(cloneId? cloneId : '#window-template')
             .clone(true)
             .attr('id', newId ? newId : 'win' + uuidv4());
 
@@ -298,7 +298,7 @@ class N2Window {
  */
 class N2WindowDraggable extends N2Window {
     /** Execute the base class constructor and set up drag event handler */
-    constructor(newId = null, cloneId = '#window-template') {
+    constructor(newId = null, cloneId = null) {
         super(newId, cloneId);
         this._setupDrag();
     }
@@ -357,19 +357,33 @@ class N2WindowDraggable extends N2Window {
  * @typedef N2WindowDraggable
  */
 class N2WindowResizable extends N2WindowDraggable {
-    constructor(newId = null, cloneId = '#window-template', minWidth = 200, minHeight = 200) {
+    constructor(newId = null, cloneId = null, sizeOpts = {}) {
         super(newId, cloneId);
-        this.min = { width: minWidth, height: minHeight };
+
+        this.min = { 
+            width: exists(sizeOpts.minWidth)? sizeOpts.minWidth : 200, 
+            height: exists(sizeOpts.minHeight)? sizeOpts.minHeight: 200
+        };
+
+        this.max = {
+            width: exists(sizeOpts.maxWidth)? sizeOpts.maxWidth : window.innerWidth, 
+            height: exists(sizeOpts.maxHeight)? sizeOpts.maxHeight : window.innerHeight
+        };
+
         this._setupResizers();
     }
 
     // Read-only getters
     get minWidth() { return this.min.width; }
     get minHeight() { return this.min.height; }
+    get maxWidth() { return this.max.width; }
+    get maxHeight() { return this.max.height; }
 
     // Write-only setters
     set minWidth(val) { this.min.width = val; }
     set minHeight(val) { this.min.height = val; }
+    set maxWidth(val) { this.max.width = val; }
+    set maxHeight(val) { this.max.height = val; }
 
     /**
      * Add event handlers for each of the 8 resizer elements surrounding the window.
@@ -395,12 +409,12 @@ class N2WindowResizable extends N2WindowDraggable {
 
         // For each side, 'mult' refers to whether a coordinate is to be added or subtracted.
         // 'idx' refers to the index of the delta x or y value of the new mouse position.
-        // 'min' is the direction name to check for the minimum size.
+        // 'dir' is the direction name to check for the min/max size.
         const dirVals = {
-            top: { mult: 1, idx: 1, min: 'height' },
-            right: { mult: -1, idx: 0, min: 'width' },
-            bottom: { mult: -1, idx: 1, min: 'height' },
-            left: { mult: 1, idx: 0, min: 'width' }
+            top: { mult: 1, idx: 1, dir: 'height' },
+            right: { mult: -1, idx: 0, dir: 'width' },
+            bottom: { mult: -1, idx: 1, dir: 'height' },
+            left: { mult: 1, idx: 0, dir: 'width' }
         }
 
         // Set up a mousedown event listener for each of the 8 elements.
@@ -412,7 +426,7 @@ class N2WindowResizable extends N2WindowDraggable {
 
             const dirs = name.split('-'); // From class name, figure out which directions to handle
             resizer.on('mousedown', function () {
-                const startSize = self._getPos();
+                const startDims = self._getPos();
 
                 self.bringToFront();
 
@@ -423,25 +437,32 @@ class N2WindowResizable extends N2WindowDraggable {
                 const w = d3.select(window)
                     .on("mousemove", e => {
                         newPos = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
-                        Object.assign(newSize, startSize)
+                        Object.assign(newSize, startDims)
 
-                        for (let i in dirs) {
-                            const dv = dirVals[dirs[i]];
+                        for (let i in dirs) { // One iter for straight, two for diag
+                            const dv = dirVals[dirs[i]],
+                                startPos = startDims[dirs[i]],
+                                startSize = startDims[dv.dir];
                             
-                            // Calculate the amount the dimension can increase to without
-                            // violating the minumum width or height of the window.
-                            const dimLimit = startSize[dirs[i]] + startSize[dv.min] -
-                                self.min[dv.min];
+                            // Calculate the amount the dimension can change to without
+                            // violating the set width or height limits of the window.
+                            const dimMin = Math.max(0, startPos + startSize - self.min[dv.dir]),
+                                dimMax = Math.max(0, startPos + startSize - self.max[dv.dir]);
                             
-                            // Calculate the new potential position of the size from the
-                            // starting position and the position of the mouse.
-                            const newVal = startSize[dirs[i]] + (newPos[dv.idx] * dv.mult);
+                            // Calculate the new potential position of the edge from the
+                            // original position and the current position of the mouse.
+                            const newVal = startPos + (newPos[dv.idx] * dv.mult);
 
-                            // Make sure the side hasn't moved beyond its limit.
-                            newSize[dirs[i]] = newVal > dimLimit? dimLimit : newVal;
+                            // Make sure the edge won't move beyond its limits.
+                            if (newVal > startPos) { // Decreasing size (farther from window edge)
+                                newSize[dirs[i]] = newVal > dimMin? dimMin : newVal;
+                            }
+                            else { // Increasing size (closer to window edge)
+                                newSize[dirs[i]] = newVal < dimMax? dimMax : newVal;
+                            }
                         }
-                        newSize.width = startSize.parentWidth - (newSize.right + newSize.left);
-                        newSize.height = startSize.parentHeight - (newSize.top + newSize.bottom);
+                        newSize.width = startDims.parentWidth - (newSize.right + newSize.left);
+                        newSize.height = startDims.parentHeight - (newSize.top + newSize.bottom);
 
                         self._setPos(newSize);
                     })
@@ -469,7 +490,7 @@ function wintest() {
     myWin2.body.html(content);
     myWin2.sizeToContent();
 
-    myWin3 = new N2WindowResizable();
+    myWin3 = new N2WindowResizable(null, null, { maxWidth: 500, maxHeight: 1000 });
     myWin3.setList({ width: '300px', height: '300px', title: 'Resizable Window', top: '100px', left: '700px' });
     myWin3.showFooter();
     myWin3.show();

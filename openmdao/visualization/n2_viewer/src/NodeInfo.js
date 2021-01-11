@@ -315,6 +315,7 @@ class ValueInfo extends N2WindowResizable {
      * for weeks with lots of info panels pinned) shouldn't get above a few
      * thousand.
      */
+    /*
     bringToFront() {
         // Assign ourselves the current highest info panel z-index and
         // increment that of the original info panel.
@@ -327,7 +328,7 @@ class ValueInfo extends N2WindowResizable {
     clear() {
         this.container.remove();
     }
-
+*/
     update() {
         // const titleSpan = this.header.select('.node-value-title');
 
@@ -387,6 +388,7 @@ class ValueInfo extends N2WindowResizable {
     }
 
     /** Listen for the event to begin dragging the value window */
+    /*
     _setupDrag() {
         const self = this;
 
@@ -420,8 +422,10 @@ class ValueInfo extends N2WindowResizable {
             d3.event.preventDefault();
         })
     }
+    */
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
+    /*
     _setupResizerDrag() {
         const handle = this.container.select('.node-value-resizer-handle');
         const body = d3.select('body');
@@ -462,6 +466,7 @@ class ValueInfo extends N2WindowResizable {
         });
 
     }
+    */
 }
 
 // "Class" variable and function for ValueInfo
