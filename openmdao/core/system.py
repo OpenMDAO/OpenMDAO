@@ -3511,7 +3511,13 @@ class System(object):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        if out_stream:
+        if out_stream and not self.notebook:
+            self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+        elif ipython and tab_pkg:
+            inputs_nb_format = [[key, val['value']] for key, val in inputs.items()]
+            display(HTML(tabulate(inputs_nb_format,
+                                  headers=["Explicit_Variable", "Value"], tablefmt='html')))
+        elif out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
         if self.pathname:
