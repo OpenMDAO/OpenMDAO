@@ -41,7 +41,7 @@ def rastrigin(x):
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
 
-class DummyComp(om.ExecComp):
+class DummyComp(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -105,7 +105,7 @@ class TestMPIScatter(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', lower=-15.0)
-        
+
         prob.setup()
         prob.run_driver()
 

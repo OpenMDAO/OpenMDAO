@@ -2071,15 +2071,19 @@ class System(object):
             for vec in residuals:
                 vec.scale('phys')
 
-        yield
+        try:
 
-        if self._has_output_scaling:
-            for vec in outputs:
-                vec.scale('norm')
+            yield
 
-        if self._has_resid_scaling:
-            for vec in residuals:
-                vec.scale('norm')
+        finally:
+
+            if self._has_output_scaling:
+                for vec in outputs:
+                    vec.scale('norm')
+
+            if self._has_resid_scaling:
+                for vec in residuals:
+                    vec.scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
@@ -2093,14 +2097,18 @@ class System(object):
             for vec in self._vectors['residual'].values():
                 vec.scale('norm')
 
-        yield
+        try:
 
-        if self._has_output_scaling:
-            for vec in self._vectors['output'].values():
-                vec.scale('phys')
-        if self._has_resid_scaling:
-            for vec in self._vectors['residual'].values():
-                vec.scale('phys')
+            yield
+
+        finally:
+
+            if self._has_output_scaling:
+                for vec in self._vectors['output'].values():
+                    vec.scale('phys')
+            if self._has_resid_scaling:
+                for vec in self._vectors['residual'].values():
+                    vec.scale('phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -2157,11 +2165,12 @@ class System(object):
             if scope_in is not None:
                 d_inputs._names = scope_in.intersection(d_inputs._abs_iter())
 
-            yield d_inputs, d_outputs, d_residuals
-
-            # reset _names so users will see full vector contents
-            d_inputs._names = old_ins
-            d_outputs._names = old_outs
+            try:
+                yield d_inputs, d_outputs, d_residuals
+            finally:
+                # reset _names so users will see full vector contents
+                d_inputs._names = old_ins
+                d_outputs._names = old_outs
 
     @contextmanager
     def _call_user_function(self, fname, protect_inputs=True,

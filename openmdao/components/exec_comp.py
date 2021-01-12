@@ -234,7 +234,7 @@ class ExecComp(ExplicitComponent):
                                   'provided for variables individually.')
 
     @classmethod
-    def register(cls, name, callable_obj, complex_safe=False):
+    def register(cls, name, callable_obj, complex_safe):
         """
         Register a callable to be used within an ExecComp expression.
 
@@ -276,9 +276,6 @@ class ExecComp(ExplicitComponent):
         if not self._exprs:
             raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
                                % (self.msginfo, self._exprs))
-        outs = set()
-        allvars = set()
-        allfuncs = set()
         exprs = self._exprs
         kwargs = self._kwargs
 
@@ -289,23 +286,30 @@ class ExecComp(ExplicitComponent):
         if shape is not None and shape_by_conn:
             raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
-        allvarlist = [None] * len(exprs)
-        outlist = [None] * len(exprs)
+        outs = set()
+        allvars = set()
+
+        exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
+                       self._parse_for_names(expr)) for expr in exprs]
+
+        self._requires_fd = {}
 
         # find all of the variables and which ones are outputs
-        for i, expr in enumerate(exprs):
-            lhs, _ = expr.split('=', 1)
-            o = self._parse_for_out_vars(lhs)
-            outs.update(o)
-            vs, fs = self._parse_for_names(expr)
-            allvars.update(vs)
-            allfuncs.update(fs)
-            allvarlist[i] = vs
-            outlist[i] = o
+        for i, (onames, names) in enumerate(exprs_info):
+            outs.update(onames)
+            allvars.update(names[0])
+            if _not_complex_safe.intersection(names[1]):
+                for o in onames:
+                    self._requires_fd[o] = names
 
-        if allfuncs.intersection(_not_complex_safe):
+        if self._requires_fd:
+            inps = []
+            for out, (rhsvars, funcs) in self._requires_fd.items():
+                iset = rhsvars.difference(outs)
+                self._requires_fd[out] = (iset, funcs)
+                inps.extend(iset)
             self._no_check_partials = False
-            self.set_check_partial_options(wrt=['*'], method='fd')
+            self.set_check_partial_options(wrt=inps, method='fd')
 
         kwargs2 = {}
         init_vals = {}
@@ -394,10 +398,11 @@ class ExecComp(ExplicitComponent):
 
         if not self._manual_decl_partials:
             decl_partials = super().declare_partials
-            for i, expr in enumerate(self._exprs):
-                lhs, _ = expr.split('=', 1)
-                ins = sorted(set(allvarlist[i]).difference(outlist[i]))
-                for out in sorted(outlist[i]):
+            for i, tup in enumerate(exprs_info):
+                outs = tup[0]
+                vs, funcs = tup[1]
+                ins = sorted(set(vs).difference(outs))
+                for out in sorted(outs):
                     for inp in ins:
                         if self.options['has_diag_partials']:
                             ival = init_vals[inp]
@@ -533,6 +538,34 @@ class ExecComp(ExplicitComponent):
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
+
+    def _linearize(self, jac=None, sub_do_ln=False):
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        jac : Jacobian or None
+            Ignored.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
+        """
+        if self._requires_fd:
+            if 'fd' in self._approx_schemes:
+                fdins = {tup[0].rsplit('.', 1)[1] for tup in self._approx_schemes['fd']._exec_dict}
+            else:
+                fdins = set()
+
+            for _, (inps, funcs) in self._requires_fd.items():
+                diff = inps.difference(fdins)
+                if diff:
+                    raise RuntimeError(f"{self.msginfo}: expression contains functions "
+                                       f"{sorted(funcs)} that are not complex safe. To fix this, "
+                                       f"call declare_partials('*', {sorted(diff)}, method='fd') "
+                                       f"on this component prior to setup.")
+            self._requires_fd = False  # only need to do this check the first time around
+
+        super()._linearize(jac, sub_do_ln)
 
     def compute_partials(self, inputs, partials):
         """
@@ -826,6 +859,7 @@ def _temporary_expr_dict():
 
     save = (_expr_dict.copy(), _not_complex_safe.copy())
 
-    yield
-
-    _expr_dict, _not_complex_safe = save
+    try:
+        yield
+    finally:
+        _expr_dict, _not_complex_safe = save

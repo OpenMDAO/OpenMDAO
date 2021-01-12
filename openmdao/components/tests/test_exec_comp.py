@@ -1220,7 +1220,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
     def test_register_simple(self):
         with _temporary_expr_dict():
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)'))
             p.setup()
@@ -1233,7 +1233,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_simple_arr(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
             p.setup()
@@ -1246,9 +1246,10 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_check_partials_not_safe(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=False)
             p = om.Problem()
-            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            comp.declare_partials('*', '*', method='fd')
             p.setup()
             p['comp.x'] = 3.
             p.run_model()
@@ -1256,6 +1257,65 @@ class TestFunctionRegistration(unittest.TestCase):
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
+
+    def test_register_check_partials_not_safe_err(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=False)
+            p = om.Problem()
+            comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            p.setup()
+            p['comp.x'] = 3.
+            # calling run_model should NOT raise an exception
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+
+            with self.assertRaises(Exception) as cm:
+                data = p.check_partials(out_stream=None)
+            self.assertEquals(cm.exception.args[0], 
+                              "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
+
+    def test_register_check_partials_not_safe_mult_expr(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('unsafe', lambda x: x**2, complex_safe=False)
+            om.ExecComp.register('safe', lambda x: x**2, complex_safe=True)
+            p = om.Problem()
+            comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
+                                                              'out2 = safe(y) + z'], shape=size))
+            comp.declare_partials('*', ['x', 'z'], method='fd')
+            p.setup()
+            p['comp.x'] = 3.
+            p['comp.y'] = 4.
+            p['comp.z'] = 5.
+            p.run_model()
+            assert_near_equal(p['comp.out1'], np.ones(size) * 45., 1e-6)
+            assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
+
+            data = p.check_partials(out_stream=None)
+            self.assertEqual(list(data), ['comp'])
+
+    def test_register_check_partials_not_safe_mult_expr_err(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('unsafe', lambda x: x**2, complex_safe=False)
+            om.ExecComp.register('safe', lambda x: x**2, complex_safe=True)
+            p = om.Problem()
+            comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
+                                                              'out2 = safe(y) + z'], shape=size))
+            comp.declare_partials('*', ['x'], method='fd')
+            p.setup()
+            p['comp.x'] = 3.
+            p['comp.y'] = 4.
+            p['comp.z'] = 5.
+            p.run_model()
+            assert_near_equal(p['comp.out1'], np.ones(size) * 45., 1e-6)
+            assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
+
+            with self.assertRaises(Exception) as cm:
+                data = p.check_partials(out_stream=None)
+            self.assertEquals(cm.exception.args[0], 
+                              "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_safe(self):
         with _temporary_expr_dict():
@@ -1274,7 +1334,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_simple_arr_manual_partials_cs(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
             comp.declare_partials('area_square', 'x', method='cs')
@@ -1288,7 +1348,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_simple_arr_manual_partials_fd(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=False)
             p = om.Problem()
             comp = p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
             comp.declare_partials('area_square', 'x', method='fd')
@@ -1302,7 +1362,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_simple_arr_diag(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('area', lambda x: x**2)
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size, has_diag_partials=True))
             p.setup()
@@ -1315,7 +1375,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_shape_by_conn(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('part', lambda x: x[2:])
+            om.ExecComp.register('part', lambda x: x[2:], complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
             p.model.add_subsystem('comp', om.ExecComp('y = part(x) * 3.', shape_by_conn=True))
@@ -1334,7 +1394,7 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_shape_by_conn_err(self):
         with _temporary_expr_dict():
             size = 10
-            om.ExecComp.register('double', lambda x: x * 2)
+            om.ExecComp.register('double', lambda x: x * 2, complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
             p.model.add_subsystem('comp', om.ExecComp('y = double(x) * 3.', shape_by_conn=True))
@@ -1354,20 +1414,20 @@ class TestFunctionRegistration(unittest.TestCase):
     def test_register_err_keyword(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
-                om.ExecComp.register('shape', lambda x: x)
+                om.ExecComp.register('shape', lambda x: x, complex_safe=True)
             self.assertEquals(cm.exception.args[0], "ExecComp: cannot register name 'shape' because "
                               "it's a reserved keyword.")
 
     def test_register_err_not_callable(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
-                om.ExecComp.register('foo', 99)
+                om.ExecComp.register('foo', 99, complex_safe=True)
             self.assertEquals(cm.exception.args[0], "ExecComp: 'foo' passed to register() of type 'int' is not callable.")
 
     def test_register_err_dup(self):
         with _temporary_expr_dict():
             with self.assertRaises(Exception) as cm:
-                om.ExecComp.register('exp', lambda x: x)
+                om.ExecComp.register('exp', lambda x: x, complex_safe=True)
             self.assertEquals(cm.exception.args[0], "ExecComp: 'exp' has already been registered.")
 
 
