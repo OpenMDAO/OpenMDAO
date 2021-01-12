@@ -17,6 +17,18 @@ from numbers import Integral
 import numpy as np
 import networkx as nx
 
+try:
+    from IPython.display import HTML, display
+    ipython = True
+except ImportError:
+    ipython = False
+
+try:
+    from tabulate import tabulate
+    tab_pkg = True
+except ImportError:
+    tab_pkg = False
+
 import openmdao
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
@@ -480,7 +492,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
-        self.notebook = False
+        self.notebook = openmdao.api.notebook
 
     @property
     def msginfo(self):
@@ -3645,17 +3657,26 @@ class System(object):
             for key, val in outputs.items():
                 self.tabulate_output = [[key, val['value']] for key, val in outputs.items() if n not in states]
 
-        if explicit and not self.notebook:
+        if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
-            if out_stream:
+            if out_stream and not self.notebook:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
+            elif ipython and tab_pkg:
+                expl_outputs_nb_format = [[key, val['value']] for key, val in
+                                          expl_outputs.items() if n not in states]
+                display(HTML(tabulate(expl_outputs_nb_format,
+                                      headers=["Explicit_Variable", "Value"], tablefmt='html')))
+            elif out_stream:
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
+
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
             else:
                 expl_outputs = list(expl_outputs.items())
 
-        if implicit and not self.notebook:
+        if implicit:
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
@@ -3669,7 +3690,15 @@ class System(object):
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
-            if out_stream:
+            if out_stream and not self.notebook:
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
+            elif ipython and tab_pkg:
+                impl_outputs_nb_format = [[key, val['value']] for key, val in
+                                          impl_outputs.items() if n not in states]
+                display(HTML(tabulate(impl_outputs_nb_format,
+                                      headers=["Implicit_Variable", "Value"], tablefmt='html')))
+            elif out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
             if self.name:  # convert to relative name

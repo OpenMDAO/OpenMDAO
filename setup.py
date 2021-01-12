@@ -19,6 +19,7 @@ optional_dependencies = {
         'sphinx>=1.8.5',
     ],
     'notebooks': [
+        'notebook',
         'tabulate'
     ],
     'visualization': [
