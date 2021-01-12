@@ -1243,6 +1243,34 @@ class TestFunctionRegistration(unittest.TestCase):
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
             assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
 
+    def test_register_check_partials_not_safe(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2)
+            p = om.Problem()
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+
+            data = p.check_partials(out_stream=None)
+            self.assertEqual(list(data), ['comp'])
+
+    def test_register_check_partials_safe(self):
+        with _temporary_expr_dict():
+            size = 10
+            om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
+            p = om.Problem()
+            p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
+            p.setup()
+            p['comp.x'] = 3.
+            p.run_model()
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+
+            data = p.check_partials(out_stream=None)
+            self.assertEqual(list(data), [])
+
     def test_register_simple_arr_manual_partials_cs(self):
         with _temporary_expr_dict():
             size = 10
@@ -1320,7 +1348,7 @@ class TestFunctionRegistration(unittest.TestCase):
             # compute runs and just report as an error during expression evaluation.
             with self.assertRaises(Exception) as cm:
                 p.run_model()
-            self.assertEquals(cm.exception.args[0], 
+            self.assertEquals(cm.exception.args[0],
                               "'comp' <class ExecComp>: Error occurred evaluating 'y = double(x) * 3.':\n'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast input array from shape (10) into shape (8).")
 
     def test_register_err_keyword(self):

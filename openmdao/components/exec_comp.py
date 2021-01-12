@@ -234,7 +234,7 @@ class ExecComp(ExplicitComponent):
                                   'provided for variables individually.')
 
     @classmethod
-    def register(cls, name, callable_obj):
+    def register(cls, name, callable_obj, complex_safe=False):
         """
         Register a callable to be used within an ExecComp expression.
 
@@ -244,8 +244,11 @@ class ExecComp(ExplicitComponent):
             Name of the callable.
         callable_obj : callable
             The callable.
+        complex_safe : bool
+            If True, the given callable works correctly with complex numbers.
         """
-        global _expr_dict
+        global _expr_dict, _not_complex_safe
+
         if not callable(callable_obj):
             raise TypeError(f"{cls.__name__}: '{name}' passed to register() of type "
                             f"'{type(callable_obj).__name__}' is not callable.")
@@ -256,17 +259,26 @@ class ExecComp(ExplicitComponent):
             raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
                             "it's a reserved keyword.")
 
+        if '.' in name:
+            raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
+                            "it contains '.'.")
         _expr_dict[name] = callable_obj
+
+        if not complex_safe:
+            _not_complex_safe.add(name)
 
     def setup(self):
         """
         Set up variable name and metadata lists.
         """
+        global _not_complex_safe
+
         if not self._exprs:
             raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
                                % (self.msginfo, self._exprs))
         outs = set()
         allvars = set()
+        allfuncs = set()
         exprs = self._exprs
         kwargs = self._kwargs
 
@@ -277,11 +289,23 @@ class ExecComp(ExplicitComponent):
         if shape is not None and shape_by_conn:
             raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
+        allvarlist = [None] * len(exprs)
+        outlist = [None] * len(exprs)
+
         # find all of the variables and which ones are outputs
-        for expr in exprs:
+        for i, expr in enumerate(exprs):
             lhs, _ = expr.split('=', 1)
-            outs.update(self._parse_for_out_vars(lhs))
-            allvars.update(self._parse_for_vars(expr))
+            o = self._parse_for_out_vars(lhs)
+            outs.update(o)
+            vs, fs = self._parse_for_names(expr)
+            allvars.update(vs)
+            allfuncs.update(fs)
+            allvarlist[i] = vs
+            outlist[i] = o
+
+        if allfuncs.intersection(_not_complex_safe):
+            self._no_check_partials = False
+            self.set_check_partial_options(wrt=['*'], method='fd')
 
         kwargs2 = {}
         init_vals = {}
@@ -370,13 +394,10 @@ class ExecComp(ExplicitComponent):
 
         if not self._manual_decl_partials:
             decl_partials = super().declare_partials
-            for expr in self._exprs:
+            for i, expr in enumerate(self._exprs):
                 lhs, _ = expr.split('=', 1)
-                outs = self._parse_for_out_vars(lhs)
-                all = self._parse_for_vars(expr)  # gets in and out
-                ins = sorted(set(all) - set(outs))
-                outs = sorted(outs)
-                for out in outs:
+                ins = sorted(set(allvarlist[i]).difference(outlist[i]))
+                for out in sorted(outlist[i]):
                     for inp in ins:
                         if self.options['has_diag_partials']:
                             ival = init_vals[inp]
@@ -418,9 +439,10 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_vars(self, s):
-        vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
-                      if not x.endswith('(') and not x.startswith('.')])
+    def _parse_for_names(self, s):
+        names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
+        vnames = set([n for n in names if not n.endswith('(')])
+        fnames = [n[:-1] for n in names if n[-1] == '(']
         to_remove = []
         for v in vnames:
             if v in _disallowed_names:
@@ -435,7 +457,12 @@ class ExecComp(ExplicitComponent):
                 else:
                     to_remove.append(v)
 
-        return vnames.difference(to_remove)
+        for f in fnames:
+            if f not in _expr_dict:
+                raise NameError(f"{self.msginfo}: can't use '{f}' as a function because "
+                                "it hasn't been registered.")
+
+        return vnames.difference(to_remove), fnames
 
     def __getstate__(self):
         """
@@ -486,7 +513,6 @@ class ExecComp(ExplicitComponent):
                                "has_diag_partials has been set.")
 
         self._manual_decl_partials = True
-        self._no_check_partials = False
         return super().declare_partials(*args, **kwargs)
 
     def compute(self, inputs, outputs):
@@ -528,16 +554,16 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
-        for input in inputs:
+        for inp in inputs:
 
             pwrap = _TmpDict(inputs)
-            pval = inputs[input]
+            pval = inputs[inp]
             psize = pval.size
-            pwrap[input] = np.asarray(pval, npcomplex)
+            pwrap[inp] = np.asarray(pval, npcomplex)
 
             if has_diag_partials or psize == 1:
-                # set a complex input value
-                pwrap[input] += step
+                # set a complex inpup value
+                pwrap[inp] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
@@ -546,15 +572,15 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    if (u, input) in self._declared_partials:
-                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
+                    if (u, inp) in self._declared_partials:
+                        partials[(u, inp)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old input value
-                pwrap[input] -= step
+                pwrap[inp] -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                for i, idx in enumerate(array_idx_iter(pwrap[inp].shape)):
                     # set a complex input value
-                    pwrap[input][idx] += step
+                    pwrap[inp][idx] += step
 
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
@@ -563,12 +589,12 @@ class ExecComp(ExplicitComponent):
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
-                        if (u, input) in self._declared_partials:
+                        if (u, inp) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                            partials[(u, inp)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
                     # restore old input value
-                    pwrap[input][idx] -= step
+                    pwrap[inp][idx] -= step
 
 
 class _TmpDict(object):
@@ -697,8 +723,8 @@ def _import_functs(mod, dct, names=None):
             dct[alias] = dct[name]
 
 
-# this dict will act as the local scope when we eval our expressions
-_expr_dict = {}
+_expr_dict = {}  # this dict will act as the local scope when we eval our expressions
+_not_complex_safe = set()  # this is the set of registered functions that are not complex safe
 
 
 _import_functs(np, _expr_dict,
@@ -796,10 +822,10 @@ def _temporary_expr_dict():
     """
     During a test, it's useful to be able to save and restore the _expr_dict.
     """
-    global _expr_dict
+    global _expr_dict, _not_complex_safe
 
-    save = _expr_dict.copy()
+    save = (_expr_dict.copy(), _not_complex_safe.copy())
 
     yield
 
-    _expr_dict = save
+    _expr_dict, _not_complex_safe = save
