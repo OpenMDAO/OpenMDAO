@@ -63,7 +63,6 @@ class N2TreeNode {
             'width': 1e-6,
             'height': 1e-6
         };
-
     }
 
     /** Run when a node is collapsed. */

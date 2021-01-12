@@ -710,7 +710,7 @@ class DynPartialsComp(om.ExplicitComponent):
         self.add_output('y', shape_by_conn=True, copy_shape='x')
 
     def setup_partials(self):
-        size = self.get_var_meta('x', 'size')
+        size = self._get_var_meta('x', 'size')
         self.mat = np.eye(size) * 3.
         rng = np.arange(size)
         self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)

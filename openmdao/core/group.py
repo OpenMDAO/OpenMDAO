@@ -24,10 +24,10 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
 from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
-    conditional_error, _is_slicer_op, _slice_indices, ensure_compatible, convert_src_inds, \
+    conditional_error, _is_slicer_op, _slice_indices, convert_src_inds, \
     shape_from_idx, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, valid_units
+    _is_unitless, valid_units, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -294,9 +294,12 @@ class Group(System):
             elif isinstance(val, Number):
                 src_shape = (1,)
         if units is not None:
+            if not isinstance(units, str):
+                raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
             if not valid_units(units):
                 raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
-            meta['units'] = units
+            meta['units'] = simplify_unit(units)
+
         if src_shape is not None:
             meta['src_shape'] = src_shape
 

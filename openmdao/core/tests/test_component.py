@@ -129,6 +129,14 @@ class TestExplicitComponent(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_units=val)
 
+    def test_unit_simplify(self):
+        comp = Component()
+        comp.add_input('y', units='ft*ft/ft')
+        comp.add_output('z', units='ft*ft/ft')
+
+        self.assertEqual(comp._static_var_rel2meta['y']['units'], 'ft')
+        self.assertEqual(comp._static_var_rel2meta['z']['units'], 'ft')
+
     def test_invalid_name(self):
         comp = ExplicitComponent()
 

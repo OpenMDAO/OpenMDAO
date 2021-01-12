@@ -1164,7 +1164,49 @@ def _slice_indices(slicer, arr_size, arr_shape):
     return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
-def prom2ivc_src_dict(prom_dict):
+def _prom2ivc_src_name_iter(prom_dict):
+    """
+    Yield keys from prom_dict with promoted input names converted to ivc source names.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Yields
+    ------
+    str
+        name
+    """
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            yield meta['ivc_source']
+        else:
+            yield name
+
+
+def _prom2ivc_src_item_iter(prom_dict):
+    """
+    Yield items from prom_dict with promoted input names converted to ivc source names.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Yields
+    ------
+    tuple
+        name, metadata
+    """
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            yield meta['ivc_source'], meta
+        else:
+            yield name, meta
+
+
+def _prom2ivc_src_dict(prom_dict):
     """
     Convert a dictionary with promoted input names into one with ivc source names.
 
@@ -1178,15 +1220,7 @@ def prom2ivc_src_dict(prom_dict):
     dict
         New dict with ivc source pathnames.
     """
-    src_dict = {}
-    for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
-            src_name = meta['ivc_source']
-            src_dict[src_name] = meta
-        else:
-            src_dict[name] = meta
-
-    return src_dict
+    return {name: meta for name, meta in _prom2ivc_src_item_iter(prom_dict)}
 
 
 def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):

@@ -78,6 +78,22 @@ class InfoPropYesNo extends InfoPropDefault {
     }
 }
 
+/**
+ * Output a message if the value is True. 
+ * @typedef InfoPropMessage
+ */
+class InfoPropMessage extends InfoPropYesNo {
+    constructor(key, desc, message, showIfFalse = false) {
+        super(key, desc, false);
+        this.message = message;
+    }
+
+    /** Return message when value is True */
+    output(boolVal) { 
+        return boolVal ? this.message : ''; 
+    }
+}
+
 /** Display a subsection of options values in the info panel */
 class InfoPropOptions extends InfoPropDefault {
     constructor(key, desc, solverType = null) {
@@ -485,6 +501,8 @@ class NodeInfo {
             new InfoPropDefault('units', 'Units'),
             new InfoPropDefault('shape', 'Shape'),
             new InfoPropYesNo('is_discrete', 'Discrete'),
+            new InfoPropMessage('initial_value', '** Note **',
+                                'Non-local values are not available under MPI, showing initial value.'),
             new InfoPropYesNo('distributed', 'Distributed'),
             new InfoPropArray('value', 'Value', this.values),
 
@@ -555,8 +573,6 @@ class NodeInfo {
         if (this.hidden) return;
 
         this.clear();
-
-
 
         this.name = node.absPathName;
         this.table.select('tfoot th').style('background-color', color);

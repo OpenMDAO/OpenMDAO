@@ -2651,6 +2651,28 @@ class TestGroupAddInput(unittest.TestCase):
 
         self.assertEqual(testlogger.get('warning')[1], msg)
 
+    def test_units_checking(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+
+        with self.assertRaises(ValueError) as cm:
+            G1.set_input_defaults('x', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.set_input_defaults('x', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # Simplification
+        G1.set_input_defaults('x', units='ft*ft/ft')
+        self.assertEqual(G1._static_group_inputs['x'][0]['units'], 'ft')
+
     def test_sub_sub_override(self):
         p = om.Problem()
         model = p.model

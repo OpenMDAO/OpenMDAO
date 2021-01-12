@@ -1096,6 +1096,30 @@ def _has_val_mismatch(units1, val1, units2, val2):
         return np.linalg.norm(val2 - val1) / norm1 > rtol
 
 
+def simplify_unit(old_unit_str):
+    """
+    Simplify unit string using built-in naming method.
+
+    Unit string 'ft*s/s' becomes 'ft'.
+
+    Parameters
+    ----------
+    old_unit_str : str
+        Unit string to simplify.
+
+    Returns
+    -------
+    str
+        Simplified unit string.
+    """
+    new_str = _find_unit(old_unit_str).name()
+    if new_str == '1':
+        # Special Case. Unity always becomes None.
+        new_str = None
+
+    return new_str
+
+
 # Load in the default unit library
 file_path = open(os.path.join(os.path.dirname(__file__), 'unit_library.ini'))
 with file_path as default_lib:

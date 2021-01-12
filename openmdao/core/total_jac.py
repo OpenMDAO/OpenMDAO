@@ -12,7 +12,7 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, simple_warning, prom2ivc_src_dict
+from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
@@ -147,8 +147,8 @@ class _TotalJacInfo(object):
 
         # convert designvar and response dicts to use src names
         # keys will all be absolute names after conversion
-        design_vars = prom2ivc_src_dict(driver._designvars)
-        responses = prom2ivc_src_dict(driver._responses)
+        design_vars = _prom2ivc_src_dict(driver._designvars)
+        responses = _prom2ivc_src_dict(driver._responses)
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -1621,8 +1621,11 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
+                    ofidx = of_idx[output_name] if output_name in of_idx else None
+                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else None
+
                     totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                               prom_out, prom_in, of_idx, wrt_idx,
+                                                               prom_out, prom_in, ofidx, wrtidx,
                                                                dist_resp, comm)
 
         elif return_format in ('dict', 'array'):
@@ -1642,14 +1645,17 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
+                    ofidx = of_idx[output_name] if output_name in of_idx else None
+                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else None
+
                     if prom_out == prom_in and isinstance(tot[prom_in], dict):
                         rows, cols, data = tot[prom_in]['coo']
                         data[:] = _get_subjac(approx_jac[output_name, input_name],
-                                              prom_out, prom_in, of_idx, wrt_idx,
+                                              prom_out, prom_in, ofidx, wrtidx,
                                               dist_resp, comm)[rows, cols]
                     else:
                         tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                      prom_out, prom_in, of_idx, wrt_idx,
+                                                      prom_out, prom_in, ofidx, wrtidx,
                                                       dist_resp, comm)
         else:
             msg = "Unsupported return format '%s." % return_format
@@ -1807,10 +1813,10 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
         Promoted output name.
     prom_in : str
         Promoted input name.
-    of_idx : dict
-        Mapping of promoted output name to indices.
-    wrt_idx : dict
-        Mapping of promoted input name to indices.
+    of_idx : ndarray or None
+        Output indices, if any.
+    wrt_idx : ndarray or None
+        Input indices, if any.
     dist_resp : None or tuple
         Tuple containing indices and sizes if this response is distributed.
     comm : MPI.Comm or <FakeComm>
@@ -1824,10 +1830,10 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     if jac_meta['rows'] is not None:  # sparse list format
         # This is a design variable that was declared as an obj/con.
         tot = np.eye(len(jac_meta['value']))
-        if prom_out in of_idx:
-            tot = tot[of_idx[prom_out], :]
-        if prom_in in wrt_idx:
-            tot = tot[:, wrt_idx[prom_in]]
+        if of_idx is not None:
+            tot = tot[of_idx, :]
+        if wrt_idx is not None:
+            tot = tot[:, wrt_idx]
     else:
         tot = jac_meta['value']
 
