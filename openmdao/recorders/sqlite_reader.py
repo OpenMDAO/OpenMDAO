@@ -9,6 +9,19 @@ from io import StringIO
 import sys
 import numpy as np
 
+try:
+    from IPython.display import HTML, display
+    ipython = True
+except ImportError:
+    ipython = False
+
+try:
+    from tabulate import tabulate
+    tab_pkg = True
+except ImportError:
+    tab_pkg = False
+
+import openmdao.api as om
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
 
@@ -141,6 +154,8 @@ class SqliteCaseReader(BaseCaseReader):
         # if requested, load all the iteration data into memory
         if pre_load:
             self._load_cases()
+
+        self.notebook = om.notebook
 
     def _collect_metadata(self, cur):
         """
@@ -342,12 +357,15 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if out_stream:
+        if out_stream and not self.notebook:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
             for source in sources:
                 out_stream.write('{}\n'.format(source))
+
+        elif ipython and tab_pkg:
+            display(HTML(tabulate([sources], headers=["Source"], tablefmt='html')))
 
         return sources
 

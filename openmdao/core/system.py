@@ -3516,7 +3516,7 @@ class System(object):
         elif ipython and tab_pkg:
             inputs_nb_format = [[key, val['value']] for key, val in inputs.items()]
             display(HTML(tabulate(inputs_nb_format,
-                                  headers=["Explicit_Variable", "Value"], tablefmt='html')))
+                                  headers=["Inputs", "Value"], tablefmt='html')))
         elif out_stream:
             self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
@@ -3672,7 +3672,7 @@ class System(object):
                 expl_outputs_nb_format = [[key, val['value']] for key, val in
                                           expl_outputs.items() if n not in states]
                 display(HTML(tabulate(expl_outputs_nb_format,
-                                      headers=["Explicit_Variable", "Value"], tablefmt='html')))
+                                      headers=["Explicit Output", "Value"], tablefmt='html')))
             elif out_stream:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
@@ -3703,7 +3703,7 @@ class System(object):
                 impl_outputs_nb_format = [[key, val['value']] for key, val in
                                           impl_outputs.items() if n not in states]
                 display(HTML(tabulate(impl_outputs_nb_format,
-                                      headers=["Implicit_Variable", "Value"], tablefmt='html')))
+                                      headers=["Implicit Output", "Value"], tablefmt='html')))
             elif out_stream:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   all_procs, out_stream)
