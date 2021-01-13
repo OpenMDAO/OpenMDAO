@@ -173,7 +173,7 @@ class ExecComp(ExplicitComponent):
 
             import numpy
             import openmdao.api as om
-            excomp = om.ExecComp('y=sum(x)', x=numpy.ones(10,dtype=float))
+            excomp = om.ExecComp('y=sum(x)', x=numpy.ones(10, dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 1.0, while 'x' would be
@@ -185,7 +185,7 @@ class ExecComp(ExplicitComponent):
         .. code-block:: python
 
             excomp = ExecComp('y=sum(x)',
-                              x={'value': numpy.ones(10,dtype=float),
+                              x={'value': numpy.ones(10, dtype=float),
                                  'units': 'ft'})
         """
         options = {}
@@ -219,19 +219,18 @@ class ExecComp(ExplicitComponent):
 
         self.options.declare('units', types=str, allow_none=True, default=None,
                              desc='Units to be assigned to all variables in this component. '
-                                  'Default is None, which means units are provided for variables '
-                                  'individually.',
+                                  'Default is None, which means units may be provided for variables'
+                                  ' individually.',
                              check_valid=check_option)
 
         self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
                              desc='Shape to be assigned to all variables in this component. '
-                                  'Default is None, which means shape is provided for variables '
-                                  'individually.')
+                                  'Default is None, which means shape may be provided for variables'
+                                  ' individually.')
 
         self.options.declare('shape_by_conn', types=bool, default=False,
                              desc='If True, shape all inputs and outputs based on their '
-                                  'connection. Default is False, which means shape_by_conn is '
-                                  'provided for variables individually.')
+                                  'connection. Default is False.')
 
     @classmethod
     def register(cls, name, callable_obj, complex_safe):

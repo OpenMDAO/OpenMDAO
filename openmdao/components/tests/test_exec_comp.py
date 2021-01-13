@@ -1218,6 +1218,40 @@ class TestExecComp(unittest.TestCase):
 
 class TestFunctionRegistration(unittest.TestCase):
 
+    # These 2 tests don't run normally unless you run testflo with a -m "featuretest_*"
+    # I don't want to include them in our normal tests because they don't contain
+    # the _temporary_expr_dict contextmanager (to avoid user confusion)
+    # which keeps the contents of the ExecComp _expr_dict clean
+    def featuretest_register_simple(self):
+        import openmdao.api as om
+
+        om.ExecComp.register("myfunc", lambda x: x * x, complex_safe=True)
+        p = om.Problem()
+        comp = p.model.add_subsystem("comp", om.ExecComp("y = 2 * myfunc(x)"))
+
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'])
+        assert_near_equal(J['comp.y', 'comp.x'][0][0], 4., 1e-10)
+
+    def featuretest_register_simple_unsafe(self):
+        import openmdao.api as om
+
+        # the following function isn't really complex unsafe, but we'll call it unsafe anyway
+        # for demonstration purposes
+        om.ExecComp.register("unsafe", lambda x: x * x, complex_safe=False)
+        p = om.Problem()
+        comp = p.model.add_subsystem("comp", om.ExecComp("y = 2 * unsafe(x)"))
+
+        # because our function is complex unsafe, we must declare that the partials
+        # with respect to 'x' use 'fd' instead of 'cs'
+        comp.declare_partials('*', 'x', method='fd')
+
+        p.setup()
+        p.run_model()
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'])
+        assert_near_equal(J['comp.y', 'comp.x'][0][0], 4., 1e-5)
+
     def test_register_simple(self):
         with _temporary_expr_dict():
             om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
@@ -1272,7 +1306,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = p.check_partials(out_stream=None)
-            self.assertEquals(cm.exception.args[0], 
+            self.assertEquals(cm.exception.args[0],
                               "'comp' <class ExecComp>: expression contains functions ['area'] that are not complex safe. To fix this, call declare_partials('*', ['x'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_not_safe_mult_expr(self):
@@ -1314,7 +1348,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
             with self.assertRaises(Exception) as cm:
                 data = p.check_partials(out_stream=None)
-            self.assertEquals(cm.exception.args[0], 
+            self.assertEquals(cm.exception.args[0],
                               "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
     def test_register_check_partials_safe(self):
