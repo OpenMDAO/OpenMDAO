@@ -113,15 +113,17 @@ class KrigingSurrogate(SurrogateModel):
         super().train(x, y)
         x, y = np.atleast_2d(x, y)
 
-        data_hash = md5()
-        data_hash.update(x.flatten())
-        data_hash.update(y.flatten())
-        training_data_hash = data_hash.hexdigest()
-
         cache = self.options['training_cache']
-        cache_hash = ''
+
+        if cache:
+            data_hash = md5()
+            data_hash.update(x.flatten())
+            data_hash.update(y.flatten())
+            training_data_hash = data_hash.hexdigest()
+            cache_hash = ''
 
         if cache and os.path.exists(cache):
+
             with np.load(cache, allow_pickle=False) as data:
                 try:
                     self.n_samples = data['n_samples']
