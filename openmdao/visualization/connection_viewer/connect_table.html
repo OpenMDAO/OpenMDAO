@@ -35,7 +35,7 @@
 
     <tabulator_style>
 </style>
-<title>Connectione Viewer</title>
+<title>Connection Viewer</title>
 </head>
 <body>
     <h2 id="conn_title"></h2>
@@ -71,12 +71,12 @@ var table =
                             "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
                             "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
         columns:[ //Define Table Columns
-                {title: "Output (absolute)", field:"src", align:"left", headerFilter:true,
+                {title: "Output (absolute)", field:"src", hozAlign:"left", headerFilter:true,
                     visible:false, minWidth:300,
                 tooltip:function(cell){
                     return cell.getData().sprom;
                 }},
-                {title: "Output (promoted)", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                {title: "Output (promoted)", field:"sprom", hozAlign:"left", headerFilter:true, minWidth:300,
                     formatter:function(cell, formmaterParams, onRendered) {
                     var promname = cell.getData().sprom;
                     if (promname == cell.getData().src) {
@@ -89,7 +89,7 @@ var table =
                 tooltip:function(cell){
                     return cell.getData().src;
                 }},
-                {title: "Units", field:"sunits", align:"center", headerFilter:true,
+                {title: "Units", field:"sunits", hozAlign:"center", headerFilter:true,
                     formatter:function(cell, formatterParams){
                     var value = cell.getValue();
                     if(value.startsWith("!")){
@@ -98,8 +98,8 @@ var table =
                         return value;
                     }
                     }},
-                {title: "Value", visible:data.show_values, field:"val", align:"center", headerFilter:true},
-                {title: "Units", field:"tunits", align:"center", headerFilter:true,
+                {title: "Value", visible:data.show_values, field:"val", hozAlign:"center", headerFilter:true},
+                {title: "Units", field:"tunits", hozAlign:"center", headerFilter:true,
                     formatter:function(cell, formatterParams){
                         var value = cell.getValue();
                         if(value.startsWith("!")){
@@ -109,12 +109,12 @@ var table =
                         }
                     }
                 },
-                {title: "Input (absolute)", field:"tgt", align:"left", headerFilter:true,
+                {title: "Input (absolute)", field:"tgt", hozAlign:"left", headerFilter:true,
                     visible:false, minWidth:300,
                     tooltip:function(cell){
                     return cell.getData().tprom;
                     }},
-                {title: "Input (promoted)", field:"tprom", align:"left", headerFilter:true,
+                {title: "Input (promoted)", field:"tprom", hozAlign:"left", headerFilter:true,
                     minWidth:300,
                     formatter:function(cell, formmaterParams, onRendered) {
                     var promname = cell.getData().tprom;
