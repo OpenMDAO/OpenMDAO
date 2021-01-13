@@ -12,6 +12,7 @@ The N2 diagram has a number of sections:
 * Toolbar
 * Search bar
 * Legend
+* Show/Hide Optimization Variables
 
 This page will go into the details of each section.
 
@@ -92,8 +93,35 @@ Solver Hierarchy
 Each System in a model can potentially have a linear and nonlinear solver associated with it. On the right side
 of the N2 diagram, the hierarchy of the solvers is shown. This time the hierarchy goes from right to left with the root
 of the model on the right.
-You can switch between showing the names of the linear or nonlinear
-solvers using the button |toggle_solver_names| in the toolbar.
+
+There are three states of the solver hierarchy display. Use these buttons to switch between them. Hiding the
+solver hierarchy creates more space for the rest of the N2 display.
+
+.. |show_nonlinear_solvers| image:: images/show_nonlinear_solvers.png
+   :align: middle
+   :scale: 40 %
+
+.. |show_linear_solvers| image:: images/show_linear_solvers.png
+   :align: middle
+   :scale: 80 %
+
+.. |hide_solvers| image:: images/hide_solvers.png
+   :align: middle
+   :scale: 80 %
+
+.. table:: Buttons to Control Solver Hierarchy Display
+   :widths: auto
+   :align: left
+
+   +--------------------------+-------------------------+---------------------------------------------+
+   | Button                   | Title                   | Description                                 |
+   +==========================+=========================+=============================================+
+   | |show_linear_solvers|    | Show linear solvers     | Show linear solvers in solver hierarchy     |
+   +--------------------------+-------------------------+---------------------------------------------+
+   | |show_nonlinear_solvers| | Show non-linear solvers | Show non-linear solvers in solver hierarchy |
+   +--------------------------+-------------------------+---------------------------------------------+
+   | |hide_solvers|           | Hide Solvers            | Hide the solver hierarchy                   |
+   +--------------------------+-------------------------+---------------------------------------------+
 
 The colors indicate the type of solver. The colors are shown in the legend. The section of the legend showing
 the colors of the solver types changes depending on which are displayed in the solver structure.
@@ -123,7 +151,8 @@ Here is what the section of the legend looks like for both linear and non-linear
     When a System has a Newton non-linear solver and the `solve_subsystems` option is set to True for that solver,
     the Solver hierarchy box for that System has the text `NL: Newton (sub_solve)`.
 
-As in the model hierarchy, you can also do zooming, collapsing, and expanding in the Solver hierarchy using left and right mouse clicks.
+As in the model hierarchy, you can also do zooming, collapsing, and expanding in the Solver hierarchy using left and
+right mouse clicks.
 
 .. _toolbar:
 
@@ -265,13 +294,13 @@ Remaining Toolbar Buttons
 
 The buttons in the remaining part of the toolbar offer a variety of other options:
 
-.. |toggle_solver_names| image:: images/toggle_solver_names.png
-   :align: middle
-   :scale: 40 %
-
 .. |show_legend| image:: images/show_legend.png
    :align: middle
    :scale: 40 %
+
+.. |model_opt_button| image:: images/model_opt_button.png
+   :align: middle
+   :scale: 20 %
 
 .. |font_size| image:: images/font_size.png
    :align: middle
@@ -301,9 +330,9 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | Button                | Title                           | Description                                                                                        |
    +=======================+=================================+====================================================================================================+
-   | |toggle_solver_names| | Toggle Solver Names             | Switch between displaying the linear and non-linear solvers for the Systems                        |
-   +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | |show_legend|         | Show legend / Hide legend       | Show the legend explaining the colors and icons in the diagram                                     |
+   +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
+   | |model_opt_button|    | Show opt vars / Hide opt vars   | Show the optimization variables in the diagram                                                     |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
    | |font_size|           | Font Size                       | Set the font size for the text in the diagram                                                      |
    +-----------------------+---------------------------------+----------------------------------------------------------------------------------------------------+
@@ -341,6 +370,33 @@ Here are explanations of the sections in the legend:
 
     * The Solvers section shows the colors used for the different solvers on the right side of the N2. Either the
       Linear or Nonlinear solvers are shown depending on the state of the Toggle Solver Names button.
+
+
+
+Show/Hide Optimization Variables
+--------------------------------
+Selecting this button |model_opt_button| allows you to see your model's design variables, constraints, and objectives which are highlighted in
+purple. If your optimization variable is an Auto IVC, the Auto IVC cell will be highlighted as well which can be seen below.
+
+.. |hide| image:: images/model_opt_not_selected.png
+    :align: middle
+
+.. |show| image:: images/model_opt_selected.png
+    :align: middle
+
+|
+
+.. table:: Show and Hide Optimization Variables
+   :widths: auto
+   :align: left
+
+   +--------+--------+
+   | Hidden | Shown  |
+   +--------+--------+
+   | |hide| | |show| |
+   +--------+--------+
+
+|
 
 
 

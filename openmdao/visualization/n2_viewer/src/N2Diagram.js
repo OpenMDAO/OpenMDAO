@@ -38,10 +38,11 @@ class N2Diagram {
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
         this.showLinearSolverNames = true;
+        this.showSolvers = true ;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement,
-            this.showLinearSolverNames, this.dims);
+            this.showLinearSolverNames, this.showSolvers, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
         this.ui = new N2UserInterface(this);
         // Keep track of arrows to show and hide them
@@ -101,7 +102,7 @@ class N2Diagram {
     }
 
     /**
-     * Switch back and forth between showing the linear or non-linear solver names. 
+     * Switch back and forth between showing the linear or non-linear solver names.
      */
     toggleSolverNameType() {
         this.showLinearSolverNames = !this.showLinearSolverNames;
@@ -149,7 +150,7 @@ class N2Diagram {
         this.layout.zoomedElement = this.zoomedElement;
     }
 
-    /** 
+    /**
      * Setup internal references to D3 objects so we can avoid running
      * d3.select() over and over later.
      */
@@ -172,8 +173,7 @@ class N2Diagram {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
                 'n2Matrix': d3.select("#n2MatrixClip > rect"),
                 'solverTree': d3.select("#solverTreeClip > rect")
-            },
-
+            }
         };
 
         let n2Groups = {};
@@ -191,8 +191,6 @@ class N2Diagram {
             offgrid[name] = d3elem;
         })
         this.dom.n2Groups.offgrid = offgrid;
-
-
     }
 
     /**
@@ -644,8 +642,22 @@ class N2Diagram {
         }
     }
 
+    showDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
+            );
+        d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
+    }
+
+    hideDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            );
+        d3.select("#_auto_ivc").classed('opt-vars', false)
+    }
+
     delay(time) {
-        return new Promise(function(resolve) { 
+        return new Promise(function(resolve) {
             setTimeout(resolve, time)
         });
      }
@@ -653,7 +665,6 @@ class N2Diagram {
     /** Display an animation while the transition is in progress */
     showWaiter() {
         this.dom.waiter.attr('class', 'show');
-
     }
 
     /** Hide the animation after the transition completes */
@@ -676,7 +687,7 @@ class N2Diagram {
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement,
-                this.showLinearSolverNames, this.dims);
+                this.showLinearSolverNames, this.showSolvers, this.dims);
 
             this.ui.updateClickedIndices();
 
@@ -700,6 +711,8 @@ class N2Diagram {
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
+
+        if (!this.ui.desVars) this.showDesignVars()
     }
 
     /**

@@ -89,8 +89,8 @@ class InterpBSplines(InterpAlgorithm):
         ndarray
             Derivative of interpolated values with respect to grid.
         """
-        n_cp = self.values.shape[-1]
         if self._jac is None:
+            n_cp = self.values.shape[-1]
             self._jac = self.get_bspline_mtx(n_cp, x / x[-1],
                                              order=self.options['order']).tocoo()
 

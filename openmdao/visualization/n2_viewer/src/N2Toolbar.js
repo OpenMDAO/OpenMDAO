@@ -214,7 +214,7 @@ class N2Toolbar {
 
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
-     * @param {N2UserInterface} n2ui A reference to the UI object 
+     * @param {N2UserInterface} n2ui A reference to the UI object
      */
     _setupButtonFunctions(n2ui) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
@@ -261,37 +261,46 @@ class N2Toolbar {
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Remove all connection arrows",
+        new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
+            "Control Solver Tree Display",
             function (target) {
-                n2ui.n2Diag.clearArrows();
+                n2ui.setSolvers(true);
+                n2ui.showSolvers();
+            });
+
+        new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
+            "Show linear solvers",
+            function (target) {
+                n2ui.setSolvers(true);
+                n2ui.showSolvers();
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
-            "Remove all connection arrows",
+        new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
+            "Show non-linear solvers",
             function (target) {
-                n2ui.n2Diag.clearArrows();
+                n2ui.setSolvers(false);
+                n2ui.showSolvers();
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
-            "Show all connections in view",
+        new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
+            "Hide solvers",
             function (target) {
-                n2ui.n2Diag.showAllArrows();
+                n2ui.hideSolvers();
                 self._setRootButton(target);
             });
-
-        new N2ToolbarButtonToggle('#linear-solver-button', tooltipBox,
-            ["Show linear solvers", "Show non-linear solvers"],
-            pred => { return !n2ui.n2Diag.showLinearSolverNames; },
-            e => { n2ui.toggleSolverNamesCheckboxChange(); }
-        );
 
         new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],
             pred => { return n2ui.legend.hidden; },
             e => { n2ui.toggleLegend(); }
+        );
+
+        new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
+            ["Show optimization variables", "Hide optimization variables"],
+            pred => { return n2ui.desVars; },
+            e => { n2ui.toggleDesVars(); }
         );
 
         new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox, "Set text height");

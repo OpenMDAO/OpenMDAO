@@ -56,13 +56,23 @@ toolbar_script = [
         "waitForTransition": False
     },
     {
-        "desc": "Toggle Solver Names (on) button",
-        "id": "linear-solver-button",
+        "desc": "Non-linear solver names button",
+        "id": "non-linear-solver-button",
         "waitForTransition": False
     },
     {
-        "desc": "Toggle Solver Names (off) button",
-        "id": "linear-solver-button",
+        "desc": "Linear solver names button",
+        "id": "linear-solver-button-2",
+        "waitForTransition": True
+    },
+    {
+        "desc": "Toggle solver visibility button (off)",
+        "id": "no-solver-button",
+        "waitForTransition": True
+    },
+    {
+        "desc": "Toggle solver visibility button (on)",
+        "id": "no-solver-button",
         "waitForTransition": True
     },
     {

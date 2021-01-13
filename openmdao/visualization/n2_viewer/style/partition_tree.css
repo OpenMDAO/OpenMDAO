@@ -82,8 +82,6 @@ body {
 
 #n2-resizer-handle {
     position: absolute;
-    right: -2px;
-    bottom: 0px;
     margin: 0;
     height: 18px;
     cursor: nwse-resize;
@@ -97,6 +95,29 @@ body {
 
 .inactive-resizer-handle {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 54%, rgba(255, 255, 255, 1) 55%, rgba(255, 255, 255, 1) 100%);
+    font-size: 20px;
+    right: 0;
+    bottom: 0px;
+    border: 0;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -moz-background-clip: text;
+    -moz-text-fill-color: transparent;
+    font-weight: bold;
+    text-align: right;
+    vertical-align: bottom;
+    width: 18px;
+    padding: 0;
+}
+
+.inactive-resizer-handle-without-solvers::before {
+    content: '\25a8';
+}
+
+.inactive-resizer-handle-without-solvers {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 54%, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 1) 100%);
+    right: 13px;
+    bottom: 1px;
     font-size: 20px;
     border: 0;
     -webkit-background-clip: text;
@@ -345,4 +366,8 @@ rect.outputHighlight {
     position: relative;
     z-index: 999990;
     background: none;
+}
+
+.opt-vars {
+    fill: #c5b0d5 !important;
 }

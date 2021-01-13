@@ -51,7 +51,7 @@ class InfoPropDefault {
 }
 
 /**
- * Output a Yes or No to display. 
+ * Output a Yes or No to display.
  * @typedef InfoPropYesNo
  */
 class InfoPropYesNo extends InfoPropDefault {
@@ -75,6 +75,22 @@ class InfoPropYesNo extends InfoPropDefault {
         const valIsFalse = this.isFalse(node);
         const showAble = (!valIsFalse || (valIsFalse && this.showIfFalse));
         return (super.canShow(node) && showAble);
+    }
+}
+
+/**
+ * Output a message if the value is True. 
+ * @typedef InfoPropMessage
+ */
+class InfoPropMessage extends InfoPropYesNo {
+    constructor(key, desc, message, showIfFalse = false) {
+        super(key, desc, false);
+        this.message = message;
+    }
+
+    /** Return message when value is True */
+    output(boolVal) { 
+        return boolVal ? this.message : ''; 
     }
 }
 
@@ -373,7 +389,7 @@ class ValueInfo {
         // larger than full size
         this.initial_width = parseInt(this.table.style('width'));
         this.initial_height = parseInt(this.table.style('height'));
-        
+
         titleSpan.style('max-width', `${this.initial_width - 50}px`);
         titleSpan.text(this.name);
     }
@@ -478,12 +494,15 @@ class NodeInfo {
             new InfoPropDefault('promotedName', 'Promoted Name'),
             new InfoPropDefault('absPathName', 'Absolute Name'),
             new InfoPropDefault('class', 'Class'),
+            new InfoPropDefault('surrogate_name', 'Surrogate'),
             new InfoPropDefault('type', 'Type', true),
             new InfoPropDefault('dtype', 'DType'),
 
             new InfoPropDefault('units', 'Units'),
             new InfoPropDefault('shape', 'Shape'),
             new InfoPropYesNo('is_discrete', 'Discrete'),
+            new InfoPropMessage('initial_value', '** Note **',
+                                'Non-local values are not available under MPI, showing initial value.'),
             new InfoPropYesNo('distributed', 'Distributed'),
             new InfoPropArray('value', 'Value', this.values),
 
@@ -554,8 +573,6 @@ class NodeInfo {
         if (this.hidden) return;
 
         this.clear();
-
-
 
         this.name = node.absPathName;
         this.table.select('tfoot th').style('background-color', color);
