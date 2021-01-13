@@ -1,9 +1,12 @@
 **********************************
-# Release Notes for OpenMDAO 3.5.1
+# Release Notes for OpenMDAO 3.6.0
 
 January 15, 2020
 
-OpenMDAO 3.5.1 provides several bug fixes as well as documentation and visualization updates.
+OpenMDAO 3.6.0 provides new features, several bug fixes, as well as
+documentation and visualization updates.
+
+Thank you to users @Dakror and @cfe316 for contributing to this release.
 
 ## Backwards Incompatible API Changes:
 
@@ -15,6 +18,8 @@ OpenMDAO 3.5.1 provides several bug fixes as well as documentation and visualiza
 
 ## New Features:
 
+- (POEM_032) Implemented a new scaling report feature that is intended to provide the user with some information as to how well their problem is scaled. [#1820](https://github.com/OpenMDAO/OpenMDAO/pull/1820)
+- (POEM_036) Implemented Serialization of Kriging training weights [#1830](https://github.com/OpenMDAO/OpenMDAO/pull/1830)
 - Added button to n2 to show or hide desvars, constraints, and objectives [#1793](https://github.com/OpenMDAO/OpenMDAO/pull/1793)
 - Units are now simplified upon creation. [#1796](https://github.com/OpenMDAO/OpenMDAO/pull/1796)
 - Added info about surrogate in n2 [#1800](https://github.com/OpenMDAO/OpenMDAO/pull/1800)
