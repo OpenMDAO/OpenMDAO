@@ -393,8 +393,15 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         data['oflabels'] = driver._get_ordered_nl_responses()
         data['wrtlabels'] = list(dv_vals)
 
-        totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
-                                        return_format='array')
+        # save old totals
+        save = driver._total_jac
+        driver._total_jac = None
+
+        try:
+            totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                            return_format='array')
+        finally:
+            driver._total_jac = save
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
@@ -418,10 +425,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             save = driver._total_jac
             driver._total_jac = None
 
-            lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
-                                               return_format='array')
-            lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
-            driver._total_jac = save
+            try:
+                lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
+                                                   return_format='array')
+                lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
+            finally:
+                driver._total_jac = save
 
             _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
