@@ -1112,6 +1112,9 @@ def simplify_unit(old_unit_str):
     str
         Simplified unit string.
     """
+    if old_unit_str is None:
+        return None
+
     new_str = _find_unit(old_unit_str).name()
     if new_str == '1':
         # Special Case. Unity always becomes None.

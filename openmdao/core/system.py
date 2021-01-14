@@ -39,7 +39,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import unit_conversion
+from openmdao.utils.units import unit_conversion, simplify_unit
 
 
 _empty_frozen_set = frozenset()
@@ -4356,8 +4356,8 @@ class System(object):
             else:
                 # src is outside of this system so get the value from the model
                 caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
-                                              get_remote=get_remote, rank=rank,
+            return caller._get_input_from_src(name, abs_names, conns, units=simplify_unit(units),
+                                              indices=indices, get_remote=get_remote, rank=rank,
                                               vec_name='nonlinear', flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
@@ -4366,7 +4366,7 @@ class System(object):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_names[0], val, units)
+                val = self.convert2units(abs_names[0], val, simplify_unit(units))
 
         return val
 

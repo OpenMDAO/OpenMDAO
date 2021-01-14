@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_prom_or_abs
-from openmdao.utils.units import unit_conversion
+from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
 _AMBIGOUS_PROM_NAME = object()
@@ -266,16 +266,17 @@ class Case(object):
 
         if units is not None:
             base_units = self._get_units(name)
+            simp_units = simplify_unit(units)
 
             if base_units is None:
                 msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(name, units))
+                raise TypeError(msg.format(name, simp_units))
 
             try:
-                scale, offset = unit_conversion(base_units, units)
+                scale, offset = unit_conversion(base_units, simp_units)
             except TypeError:
                 msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                raise TypeError(msg.format(name, base_units, simp_units))
 
             val = (val + offset) * scale
 
