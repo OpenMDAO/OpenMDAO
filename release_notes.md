@@ -19,7 +19,7 @@ Thank you to users @Dakror and @cfe316 for contributing to this release.
 ## New Features:
 
 - (POEM_032) Implemented a new scaling report feature that is intended to provide the user with some information as to how well their problem is scaled. [#1820](https://github.com/OpenMDAO/OpenMDAO/pull/1820)
-- (POEM_036) Implemented Serialization of Kriging training weights [#1830](https://github.com/OpenMDAO/OpenMDAO/pull/1830)
+- (POEM_036) Implemented caching of the Kriging training weights by serializing them and saving them to a file so they can be used in later runs to save computation time. [#1830](https://github.com/OpenMDAO/OpenMDAO/pull/1830)
 - Added button to n2 to show or hide desvars, constraints, and objectives [#1793](https://github.com/OpenMDAO/OpenMDAO/pull/1793)
 - Units are now simplified upon creation. [#1796](https://github.com/OpenMDAO/OpenMDAO/pull/1796)
 - Added info about surrogate in n2 [#1800](https://github.com/OpenMDAO/OpenMDAO/pull/1800)
