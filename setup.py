@@ -105,11 +105,16 @@ setup(
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
+        'openmdao.visualization' : [
+            'common/libs/*.js',
+            'common/style/*.css'
+        ],
         'openmdao.visualization.n2_viewer': [
             'assets/*',
             'libs/*.js',
@@ -122,8 +127,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
-            'libs/*.js',
-            'style/*.css'
+        ],
+        'openmdao.visualization.scaling_viewer': [
+            '*.html',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
