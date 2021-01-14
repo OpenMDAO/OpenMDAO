@@ -545,7 +545,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'partition_tree', \
         'icon', \
         'toolbar', \
-        'nodedata', \
         'legend', \
         'awesomplete'
 

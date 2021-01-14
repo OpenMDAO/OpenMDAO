@@ -88,7 +88,7 @@
 .window-theme-default {
     --header-height: 30px;
     --footer-height: 30px;
-    --outer-color: #42926b;
+    --ribbon-color: #42926b;
 
     background-color: white;
     border: 1px solid #a0a0a0;
@@ -99,8 +99,8 @@
     overflow: hidden;
 }
 
-.window-theme-default>.window-header {
-    background-color: var(--outer-color);
+.window-theme-default .window-header {
+    background-color: var(--ribbon-color);
     margin: 0;
     font-size: 11pt;
     text-align: right;
@@ -112,11 +112,11 @@
     bottom: auto;
 }
 
-.window-theme-default>.window-close-button::before {
+.window-theme-default .window-close-button::before {
     content: '\2715'
 }
 
-.window-theme-default>.window-close-button {
+.window-theme-default .window-close-button {
     color: none;
     opacity: 0.5;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
@@ -131,14 +131,14 @@
     padding: 0;
 }
 
-.window-theme-default>.window-close-button:hover,
-.window-theme-default>.window-close-button:focus {
+.window-theme-default .window-close-button:hover,
+.window-theme-default .window-close-button:focus {
     color: #333;
     text-decoration: none;
     cursor: pointer;
 }
 
-.window-theme-default>.window-header>.window-title {
+.window-theme-default .window-header .window-title {
     color: white;
     display: block;
     font-weight: bold;
@@ -155,7 +155,7 @@
     margin-right: 25px;
 }
 
-.window-theme-default>.window-body {
+.window-theme-default .window-body {
     color: black;
     border: 0;
     margin: 0;
@@ -167,8 +167,8 @@
     bottom: var(--footer-height);
 }
 
-.window-theme-default>.window-footer {
-    background-color: var(--outer-color);
+.window-theme-default .window-footer {
+    background-color: var(--ribbon-color);
     color: white;
 
     height: var(--footer-height);
@@ -238,7 +238,7 @@
 .window-theme-node-info {
     --header-height: 26px;
     --footer-height: 15px;
-    --outer-color: #42926b;
+    --ribbon-color: #42926b;
 
     background-color: white;
     border: 1px solid #a0a0a0;
@@ -248,8 +248,8 @@
     overflow: hidden;
 }
 
-.window-theme-node-info>.window-header {
-    background-color: var(--outer-color);
+.window-theme-node-info .window-header {
+    background-color: var(--ribbon-color);
     margin: 0;
     font-size: 11pt;
     text-align: right;
@@ -261,11 +261,11 @@
     bottom: auto;
 }
 
-.window-theme-node-info>.window-close-button::before {
+.window-theme-node-info .window-close-button::before {
     content: '\2715'
 }
 
-.window-theme-node-info>.window-close-button {
+.window-theme-node-info .window-close-button {
     color: none;
     opacity: 0.7;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
@@ -280,14 +280,14 @@
     padding: 0;
 }
 
-.window-theme-node-info>.window-close-button:hover,
-.window-theme-node-info>.window-close-button:focus {
+.window-theme-node-info .window-close-button:hover,
+.window-theme-node-info .window-close-button:focus {
     color: #333;
     text-decoration: none;
     cursor: pointer;
 }
 
-.window-theme-node-info>.window-header>.window-title {
+.window-theme-node-info .window-header .window-title {
     color: white;
     display: block;
     font-weight: bold;
@@ -304,7 +304,7 @@
     margin-right: 25px;
 }
 
-.window-theme-node-info>.window-body {
+.window-theme-node-info .window-body {
     color: black;
     border: 0;
     margin: 0;
@@ -316,8 +316,8 @@
     bottom: var(--footer-height);
 }
 
-.window-theme-node-info>.window-footer {
-    background-color: var(--outer-color);
+.window-theme-node-info .window-footer {
+    background-color: var(--ribbon-color);
     color: white;
 
     height: var(--footer-height);
@@ -327,4 +327,233 @@
     right: 0;
 }
 
+.window-theme-node-info table {
+	overflow: hidden;
+	background-color: white;
+    min-width: 200px;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: fit-content;
+    height: fit-content;
+}
+
+.window-theme-node-info table tbody th {
+    text-align: right;
+    font-size: 9pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.window-theme-node-info table tbody .options-header {
+    background-color: #eeeeee;
+    text-align: center;
+}
+
+.window-theme-node-info table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.caps {
+    text-transform: capitalize;
+}
+
+.node-info-data {
+    display: none;
+}
+
+.info-header {
+	background-color: #42926b;
+}
+
+.info-header p {
+	color: white;
+	text-align: center;
+}
+
+.node-data-cursor {
+    cursor: context-menu;
+}
+
 /* ^^^^^^^^^^ End Node Info N2 Window theme ^^^^^^^^^^ */
+
+
+/* vvvvvvvvvv Begin Value Info N2 Window theme vvvvvvvvvv */
+.window-theme-value-info {
+    --header-height: 26px;
+    --footer-height: 15px;
+    --ribbon-color: #42926b;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    /* transition: opacity 0.25s; */
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    
+    overflow: hidden;
+    min-width: 200px;
+    min-height: calc(var(--header-height) + var(--footer-height) + 22pt)
+    
+}
+
+.window-theme-value-info .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-value-info .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-value-info .window-close-button {
+    color: none;
+    opacity: 0.7;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-value-info .window-close-button:hover,
+.window-theme-value-info .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-value-info .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 25px;
+}
+
+.window-theme-value-info .window-header .window-title::after {
+    content: ' Value';
+}
+
+.window-theme-value-info .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+    overflow: auto;
+}
+
+.window-theme-value-info .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* Value window table */
+.window-theme-value-info .window-body table {
+	overflow: hidden;
+	background-color: white;
+    min-width: 200px;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: fit-content;
+    height: fit-content;
+}
+
+.window-theme-value-info .window-body table tbody th {
+    text-align: center;
+    font-size: 8pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    background-color: #c0c0c0;
+    padding: 3px;
+    white-space: nowrap;
+
+    color: #202020;
+    min-width: 30px;
+    font-weight: 300;
+}
+
+.window-theme-value-info .window-body table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;    
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.window-theme-value-info .window-body table tbody tr.even td {
+    background-color:white;
+}
+
+.window-theme-value-info .window-body table tbody tr.odd td {
+    background-color: #e8ffe8;
+}
+
+.show_value_button {
+    background-color: #c1c1c1;
+ }
+ 
+ .copy_value_button {
+    background-color: #c1c1c1;
+ }
+
+ /* this is an off screen element that is used in the strange way you
+   need to put content on the clipboard.
+   It has to have visibility of visible to work
+ */
+#input-for-pastebuffer {
+    visibility: visible;
+    position: absolute;
+    left: -999em;
+}
+
+/* ^^^^^^^^^^ End Node Value N2 Window theme ^^^^^^^^^^ */

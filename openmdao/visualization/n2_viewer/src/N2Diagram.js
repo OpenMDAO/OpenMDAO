@@ -346,7 +346,7 @@ class N2Diagram {
                 self.ui.nodeInfoBox.clear();
             })
             .on("mousemove", function () {
-                self.ui.nodeInfoBox.move(d3.event);
+                self.ui.nodeInfoBox.moveNearMouse(d3.event);
             });
 
         nodeEnter.append("rect")
@@ -504,7 +504,7 @@ class N2Diagram {
                 }
             })
             .on("mousemove", function () {
-                self.ui.nodeInfoBox.move(d3.event);
+                self.ui.nodeInfoBox.moveNearMouse(d3.event);
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
@@ -784,7 +784,7 @@ class N2Diagram {
      */
     mouseMoveOnDiagonal(cell) {
         if (this.matrix.cellExists(cell)) {
-            this.ui.nodeInfoBox.move(d3.event);
+            this.ui.nodeInfoBox.moveNearMouse(d3.event);
         }
     }
 

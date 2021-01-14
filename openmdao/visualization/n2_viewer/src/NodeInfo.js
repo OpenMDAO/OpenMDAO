@@ -235,8 +235,7 @@ class ValueInfoManager {
     add(name, val) {
         // Check to see if already exists before opening a new one
         if (!this.valueInfoWindows[name]) {
-            let valueInfoBox = new ValueInfo(name, val, this.ui);
-            this.valueInfoWindows[name] = valueInfoBox;
+            this.valueInfoWindows[name] = new ValueInfo(name, val, this.ui);
         }
     }
 
@@ -251,40 +250,46 @@ class ValueInfoManager {
  * @typedef ValueInfo
  */
 class ValueInfo extends N2WindowResizable {
+
+    /** Maintain a list of existing ValueInfo windows so only one of each is shown */
+    static existingValueWindows = {};
+
+    /**
+     * Add a new value window if it doesn't already exist.
+     * @param {String} name Variable name.
+     * @param {Number} val Variable value.
+     * @returns {ValueInfo} The newly constructed window.
+     */
+    static add(name, val) {
+        if (!this.existingValueWindows[name]) {
+            this.existingValueWindows[name] = true;
+            return new ValueInfo(name, val);
+        }
+    }
+
+    /** Remove the name of the window from the list of existing ones. */
+    static del(name) {
+        if (this.existingValueWindows[name]) {
+            delete this.existingValueWindows[name];
+        }
+    }
+
     /**
      * Build a list of the properties we care about and set up
      * references to the HTML elements.
      * @param {String} name Variable name.
      * @param {Number} val Variable value.
      */
-    constructor(name, val, ui) {
-        super();
+    constructor(name, val) {
+        super('valueInfo-' + uuidv4());
         this.name = name;
         this.val = val;
 
-
-
-        /* Construct the DOM elements that make up the window */
-        /*
-        this.container = d3.select('div#node-value-containers div#template').clone(true);
-        this.container.classed('node-value-hidden', false)
-            .attr('id', 'node-value-' + uuidv4());
-        this.header = this.container.select('.node-value-header');
-        this.table = this.container.select('table');
-        this.title = this.container.select('.node-value-title');
-        this.container.select('.close-value-window-button')
-            .on('click', function () { ui.valueInfoManager.remove(name); });
-
-        this.bringToFront();
-        */
-
-        this.table = this.body.append('table').attr('class', 'node-value-table');
+        this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
-        this.update();
-        /*
-        this._setupDrag();
-        this._setupResizerDrag();
-        */
+
+        this.theme('value-info');
+        this.populate();
     }
 
     /**
@@ -309,43 +314,18 @@ class ValueInfo extends N2WindowResizable {
     }
 
     /**
-     * Keep increasing z-index of original info panel to keep it on top.
-     * Max z-index is 2147483647. It will be unusual here for it to climb
-     * above 100, and even extreme cases (e.g. a diagram that's been in use
-     * for weeks with lots of info panels pinned) shouldn't get above a few
-     * thousand.
+     * Fill the table with the data from our val array and display in a window.
      */
-    /*
-    bringToFront() {
-        // Assign ourselves the current highest info panel z-index and
-        // increment that of the original info panel.
-        const mainPanel = d3.select('#node-info-container');
-        const zIndex = parseInt(mainPanel.style('z-index'));
-        mainPanel.style('z-index', zIndex + 1)
-        this.container.style('z-index', zIndex);
-    }
-
-    clear() {
-        this.container.remove();
-    }
-*/
-    update() {
-        // const titleSpan = this.header.select('.node-value-title');
-
-        // Capture the width of the header before the table is created
-        // We use this to limit how small the window can be as the user resizes
-        this.headerWidth = parseInt(this.header.style('width'));
-
-        // Check to see if the data is a 2d array since the rest of the code assumes that it is an Array
-        // If only 1d, make it a 2d with one row
+    populate() {
+        // Check to see if the data is a 2d array since the rest of the code assumes
+        // that it is an Array. If only 1d, make it a 2d with one row.
         let val = this.val;
         if (!Array.isArray(val[0])) {
             val = [val];
         }
 
         // Make the top row of the table the indices of the sub-arrays
-        const topRow = this.table.select("tbody")
-            .append('tr');
+        const topRow = this.tbody.append('tr');
         topRow.append('th'); // Top left corner spot is empty
         const valIdxArr = Array.from(val[0].keys());
 
@@ -358,7 +338,7 @@ class ValueInfo extends N2WindowResizable {
 
         // Construct the table displaying the variable value
         const evenOdd = ['even', 'odd'];
-        const rows = this.table.select("tbody")
+        const rows = this.tbody
             .selectAll('tr.array-row')
             .data(val)
             .enter()
@@ -374,99 +354,25 @@ class ValueInfo extends N2WindowResizable {
             .data(function (row) { return row; })
             .enter()
             .append('td')
-            .text(function (d) { return InfoPropArray.floatFormatter(d); })
+            .text(function (d) { return InfoPropArray.floatFormatter(d); });
 
+        this.sizeToContent().title(this.name).show();
+        
         // Save the width and height of the table when it is fully
         // constructed. This will be used later to limit the resizing
         // of the window. No need to let the user resize to a size
         // larger than full size
-        this.initial_width = parseInt(this.table.style('width'));
-        this.initial_height = parseInt(this.table.style('height'));
-
-        titleSpan.style('max-width', `${this.initial_width - 50}px`);
-        titleSpan.text(this.name);
+        const pos = this._getPos();      
+        this.maxWidth = pos.width;
+        this.maxHeight = pos.height;
+        if (this.minHeight < pos.height) this.minHeight = pos.height;
     }
 
-    /** Listen for the event to begin dragging the value window */
-    /*
-    _setupDrag() {
-        const self = this;
-
-        this.title.on('mousedown', function () {
-            self.title.style('cursor', 'grabbing');
-            const dragDiv = self.container;
-
-            self.bringToFront();
-
-            dragDiv.style('cursor', 'grabbing')
-                // top style needs to be set explicitly before releasing bottom:
-                .style('top', dragDiv.style('top'))
-                .style('bottom', 'initial');
-
-            self._startPos = [d3.event.clientX, d3.event.clientY]
-            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
-            d3.event.clientY - parseInt(dragDiv.style('top'))];
-
-            const w = d3.select(window)
-                .on("mousemove", e => {
-                    dragDiv
-                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
-                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
-                })
-                .on("mouseup", e => {
-                    dragDiv.style('cursor', 'grab');
-                    w.on("mousemove", null).on("mouseup", null);
-
-                });
-
-            d3.event.preventDefault();
-        })
+    /** Remove our name from the list of existing windows before closing. */
+    close() {
+        ValueInfo.del(this.name);
+        super.close();
     }
-    */
-
-    /** Set up event handlers for grabbing the bottom corner and dragging */
-    /*
-    _setupResizerDrag() {
-        const handle = this.container.select('.node-value-resizer-handle');
-        const body = d3.select('body');
-        const tableDiv = this.container.select('.node-value-table-div');
-
-        handle.on('mousedown', e => {
-            const startPos = {
-                'x': d3.event.clientX,
-                'y': d3.event.clientY
-            };
-            const startDims = {
-                'width': parseInt(tableDiv.style('width')),
-                'height': parseInt(tableDiv.style('height'))
-            };
-            body.style('cursor', 'nwse-resize')
-                .on('mouseup', e => {
-                    // Get rid of the drag event handlers
-                    body.style('cursor', 'default')
-                        .on('mousemove', null)
-                        .on('mouseup', null);
-                })
-                .on('mousemove', e => {
-                    let newWidth = d3.event.clientX - startPos.x + startDims.width;
-                    let newHeight = d3.event.clientY - startPos.y + startDims.height;
-
-                    // Do not let get it too big so that you get empty space
-                    newWidth = Math.min(newWidth, this.initial_width);
-                    newHeight = Math.min(newHeight, this.initial_height);
-
-                    // Don't let it get too small or things get weird
-                    newWidth = Math.max(newWidth, this.headerWidth);
-
-                    tableDiv.style('width', newWidth + 'px');
-                    tableDiv.style('height', newHeight + 'px');
-                });
-
-            d3.event.preventDefault();
-        });
-
-    }
-    */
 }
 
 // "Class" variable and function for ValueInfo
@@ -484,7 +390,7 @@ class NodeInfo extends N2Window {
      * references to the HTML elements.
      */
     constructor(ui) {
-        super();
+        super('nodeInfo-' + uuidv4());
         this.values = {};
 
         // Potential properties
@@ -530,7 +436,7 @@ class NodeInfo extends N2Window {
         this.showFooter();
 
         // Becomes active when node info mode is selected on toolbar
-        this.active = false; 
+        this.active = false;
     }
 
     /** Make the info box visible if it's hidden */
@@ -553,8 +459,9 @@ class NodeInfo extends N2Window {
 
     /** Toggle the active mode */
     toggle() {
-        if (this.active) this.deactivate();
-        else this.activate();
+        if (this.active) return this.deactivate();
+        
+        return this.activate();
     }
 
     pin() {
@@ -562,8 +469,14 @@ class NodeInfo extends N2Window {
 
         new PersistentNodeInfo(this);
         this.hidden = true;
-        this.clear();        
+        this.clear();
         return this;
+    }
+
+    moveNearMouse(event, offset = 15) {
+        if (!this.active) return this;
+
+        return super.moveNearMouse(event, offset);
     }
 
     /** Wipe the contents of the table body */
@@ -571,8 +484,10 @@ class NodeInfo extends N2Window {
         if (!this.active) return;
         // this.hidden = true;
 
-        this.setList({width: null, height: null, left: null, right: null,
-            top: null, bottom: null})
+        this.setList({
+            width: null, height: null, left: null, right: null,
+            top: null, bottom: null
+        })
         this.dataDiv.html('');
         this.tbody.html('');
 
@@ -613,7 +528,7 @@ class NodeInfo extends N2Window {
 
         this.sizeToContent()
             .title(node.name)
-            .move(event)
+            .moveNearMouse(event)
             .show();
     }
 }
@@ -624,7 +539,7 @@ class NodeInfo extends N2Window {
  */
 class PersistentNodeInfo extends N2WindowDraggable {
     constructor(nodeInfo) {
-        super(null, '#' + nodeInfo.window.attr('id'));
+        super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
 
         // Avoid just copying the reference because nodeInfo.values will be wiped:
         this.values = JSON.parse(JSON.stringify(nodeInfo.values));
@@ -642,9 +557,11 @@ class PersistentNodeInfo extends N2WindowDraggable {
 
         for (const valName in this.values) {
             if (this.values[valName].isTruncated) {
-                this.window.select(`button#${valName}.show_value_button`).on('click', c => {
-                    self.ui.valueInfoManager.add(name, this.values[valName].val);
-                })
+                this.window
+                    .select(`button#${valName}.show_value_button`)
+                    .on('click', c => {
+                        ValueInfo.add(name, self.values[valName].val);
+                    })
             }
         }
 
@@ -653,15 +570,15 @@ class PersistentNodeInfo extends N2WindowDraggable {
 
     /** Set up event handlers for any "Copy" buttons in the panel */
     _setupCopyButtons() {
-        const self = this;
-
         for (const valName in this.values) {
-            this.window.select(`button#${valName}.copy_value_button`).on('click', c => {
-                const copyText = d3.select("#input-for-pastebuffer");
-                copyText.text(this.values[valName].copyStr);
-                copyText.node().select();
-                document.execCommand('copy');
-            })
+            this.window
+                .select(`button#${valName}.copy_value_button`)
+                .on('click', c => {
+                    const copyText = d3.select("#input-for-pastebuffer");
+                    copyText.text(this.values[valName].copyStr);
+                    copyText.node().select();
+                    document.execCommand('copy');
+                })
         }
 
         return this;

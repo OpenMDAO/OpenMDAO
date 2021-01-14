@@ -24,7 +24,7 @@ class N2Window {
         // The primary reference for the new window
         this._window = d3.select(cloneId? cloneId : '#window-template')
             .clone(true)
-            .attr('id', newId ? newId : 'win' + uuidv4());
+            .attr('id', newId ? newId : 'n2win' + uuidv4());
 
         if (!N2Window.container) {
             N2Window.container = d3.select('#n2-windows');
@@ -136,7 +136,7 @@ class N2Window {
             return this;
         }
 
-        return this._title.html();
+        return this._title.text();
     }
 
     /**
@@ -146,13 +146,13 @@ class N2Window {
      *  otherwise a reference to this
      */
     theme(newTheme = null) {
-        const contents = this.window.select('div.window-contents'),
-            classes = contents.attr('class'),
-            curTheme = classes.replace(/^.*(window-theme-\S+).*$/, "$1")
+        const contents = this.main.select('.window-contents');
+        const classes = contents.attr('class');
+        const curTheme = classes.replace(/^.*(window-theme-\S+).*$/, "$1");
 
         if (newTheme) {
             contents
-                .classed(`window-theme-${curTheme}`, false)
+                .classed(`${curTheme}`, false)
                 .classed(`window-theme-${newTheme}`, true)
         }
         else {
@@ -237,9 +237,7 @@ class N2Window {
      * @param {Object} event The triggering event containing the position.
      * @param {Number} [offset = 15] Distance from mouse to place window.
      */
-    move(event, offset = 15) {
-        if (!this.active) return;
-
+    moveNearMouse(event, offset = 15) {
         let pos = this._getPos();
 
         // Mouse is in left half of browser, put window to right of mouse
@@ -277,16 +275,35 @@ class N2Window {
      * @returns {N2Window} Reference to this.
      */
     sizeToContent() {
+        const isHidden = this.hidden, leftPos = this.window.style('left');
+
+        // To size correctly, the window has to be displayed, so if it's
+        // hidden, move it offscreen and work there.
+        if (isHidden) {
+            this.set('left', '-15000px');
+            this.show();
+        }
+
         const contentWidth = this.body.node().scrollWidth,
             contentHeight = this.body.node().scrollHeight,
             headerHeight = this.header.node().scrollHeight,
             footerHeight = this.footer.classed('window-inactive') ?
-                parseInt(this.window.select('.window-contents').style('border-radius')) :
-                this.footer.node().scrollHeight;
+                parseInt(this.window.select('.window-contents')
+                    .style('border-radius')) : this.footer.node().scrollHeight;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
-        this.setList({ width: contentWidth + 'px', height: totalHeight + 'px' });
+        const newSize = {
+                width: contentWidth + 'px',
+                height: totalHeight + 'px'
+        };
+        this.setList(newSize);
+
+        // Put the window back where it belongs if we moved it
+        if (isHidden) {
+            this.hide();
+            this.set('left', leftPos);
+        }
 
         return this;
     }
