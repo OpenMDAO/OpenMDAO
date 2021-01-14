@@ -1,7 +1,7 @@
 **********************************
 # Release Notes for OpenMDAO 3.6.0
 
-January 14, 2020
+January 14, 2021
 
 OpenMDAO 3.6.0 provides new features, several bug fixes, as well as
 documentation and visualization updates.
