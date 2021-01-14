@@ -314,7 +314,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         cr = om.CaseReader(self.filename)
-        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
 
@@ -375,7 +375,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_model()
 
         cr = om.CaseReader(self.filename)
-        self.assertTrue(cr._system_options['root_1']['component_options']['assembled_jac_type'], 'dense')
+        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
 

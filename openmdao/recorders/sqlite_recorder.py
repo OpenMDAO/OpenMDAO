@@ -409,7 +409,7 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        driver : object
+        driver : Driver
             Driver in need of recording.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
@@ -672,7 +672,7 @@ class SqliteRecorder(CaseRecorder):
             if run_number is None:
                 name = path
             else:
-                name = META_KEY_SEP.join([path, run_number])
+                name = META_KEY_SEP.join([path, str(run_number)])
 
             with self.connection as c:
                 c.execute("INSERT INTO system_metadata"
@@ -702,7 +702,7 @@ class SqliteRecorder(CaseRecorder):
             if run_number is None:
                 name = path
             else:
-                name = META_KEY_SEP.join([path, run_number])
+                name = META_KEY_SEP.join([path, str(run_number)])
 
             id = "{}.{}".format(name, solver_class)
 
