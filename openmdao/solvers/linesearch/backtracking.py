@@ -12,6 +12,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.utils.general_utils import simple_warning
 
 
 def _print_violations(outputs, lower, upper):
@@ -31,14 +32,12 @@ def _print_violations(outputs, lower, upper):
     for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
-            print("'%s' exceeds upper bounds" % name)
-            print("  Val:", val)
-            print("  Upper:", upper[start:end], '\n')
+            msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
+            simple_warning(msg)
 
         if lower is not None and any(val < lower[start:end]):
-            print("'%s' exceeds lower bounds" % name)
-            print("  Val:", val)
-            print("  Lower:", lower[start:end], '\n')
+            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Upper: {lower[start:end]}\n")
+            simple_warning(msg)
 
         start = end
 

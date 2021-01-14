@@ -22,7 +22,7 @@ update periodically.
 **OpenMDAO 3.x.y** represents the current version and is no longer
 considered **[BETA][15]**.  It requires Python 3.6 or later and is
 maintained [here][4]. 
-To install the latest release, run `pip install --update openmdao`.
+To install the latest release, run `pip install --upgrade openmdao`.
 
 **OpenMDAO 2.10.x** is the last version to support Python2.x and will
 only receive critical bug fixes going forward.

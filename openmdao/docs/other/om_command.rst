@@ -160,6 +160,59 @@ column, all such inputs will be grouped together.  This can make it much easier 
 missing or unwanted implicit connections.
 
 
+.. _om-command-view_scaling_report:
+
+openmdao scaling
+################
+
+The :code:`openmdao scaling` command generates tables of information for design variables, objectives,
+and constraints, as well as a viewer that shows magnitudes of subjacobians of the total jacobian.
+
+Design variable/objective/constraint tables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Any of the columns in the design variable, objective, and constraint tables can be sorted by clicking on
+the header of the desired column.  Each row in a table corresponds to an individual design variable,
+objective, or constraint, and if that variable happens to be an array then the row can be expanded
+vertically using the "+" button on the far left to show a row for each entry in that array.  In
+the constraints table, if a constraint is linear it will have a green check mark in the "linear"
+column.
+
+
+Jacobian viewer
+%%%%%%%%%%%%%%%
+
+The jacobian viewer displays magnitude information for each subjacobian of the total jacobian. It
+contains one column for each design variable and one row for each objective and constraint.  If there
+are linear constraints, the part of the total jacobian that depends on them will be displayed in
+a separate tab.  A detailed view of a given sub-jacobian can be see by left clicking on the corresponding
+cell in the total jacobian view.  It will open a new tab containing the detailed sub-jacobian view.
+The detailed sub-jacobian view can be closed by right clicking on the tab.
+
+Cells in both the top level and detailed sub-jacobian views will be colored based on the maximum
+absolute value found in that location.  If the location is known to be zero because a total coloring
+has been computed, it will be dark gray in color.  If the location happens to have a value of zero
+for some other reason, it will be colored light gray.  All other values will be displayed using a color
+map that goes from red at large values down to blue for small values.
+
+
+Below is an example of what the driver scaling tables and the jacobian view look like:
+
+.. figure:: scaling_report_tables.png
+   :align: center
+   :alt: An example of driver scaling report tables
+
+   An example of driver scaling report tables.
+
+
+.. figure:: scaling_report_jac.png
+   :align: center
+   :alt: An example of driver scaling report jacobian view
+
+   An example of driver scaling report jacobian view.
+
+
+
 .. _om-command-tree:
 
 openmdao tree

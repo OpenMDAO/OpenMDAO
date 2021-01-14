@@ -1,9 +1,12 @@
 """Surrogate model based on Kriging."""
 import numpy as np
 import scipy.linalg as linalg
+import os.path
+from hashlib import md5
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
+from openmdao.utils.general_utils import simple_warning
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -91,6 +94,11 @@ class KrigingSurrogate(SurrogateModel):
                                   "or 'gesvd' which is slower but more reliable."
                                   "'gesvd' is the default.")
 
+        self.options.declare('training_cache', types=str, default=None,
+                             desc="Cache the trained model to avoid repeating training and write "
+                                  "it to the given file. If the specified file exists, it will be "
+                                  "used to load the weights")
+
     def train(self, x, y):
         """
         Train the surrogate model with the given set of inputs and outputs.
@@ -103,9 +111,46 @@ class KrigingSurrogate(SurrogateModel):
             Model responses at given inputs.
         """
         super().train(x, y)
-
         x, y = np.atleast_2d(x, y)
 
+        cache = self.options['training_cache']
+
+        if cache:
+            data_hash = md5()
+            data_hash.update(x.flatten())
+            data_hash.update(y.flatten())
+            training_data_hash = data_hash.hexdigest()
+            cache_hash = ''
+
+        if cache and os.path.exists(cache):
+
+            with np.load(cache, allow_pickle=False) as data:
+                try:
+                    self.n_samples = data['n_samples']
+                    self.n_dims = data['n_dims']
+                    self.X = np.array(data['X'])
+                    self.Y = np.array(data['Y'])
+                    self.X_mean = np.array(data['X_mean'])
+                    self.Y_mean = np.array(data['Y_mean'])
+                    self.X_std = np.array(data['X_std'])
+                    self.Y_std = np.array(data['Y_std'])
+                    self.thetas = np.array(data['thetas'])
+                    self.alpha = np.array(data['alpha'])
+                    self.U = np.array(data['U'])
+                    self.S_inv = np.array(data['S_inv'])
+                    self.Vh = np.array(data['Vh'])
+                    self.sigma2 = np.array(data['sigma2'])
+                    cache_hash = str(data['hash'])
+                except KeyError as e:
+                    msg = ("An error occurred while loading KrigingSurrogate Cache: %s. "
+                           "Ignoring and training from scratch.")
+                    simple_warning(msg % str(e))
+
+            # if the loaded data passes the hash check with the current training data, we exit
+            if cache_hash == training_data_hash:
+                return
+
+        # Training fallthrough
         self.n_samples, self.n_dims = x.shape
 
         if self.n_samples <= 1:
@@ -135,8 +180,15 @@ class KrigingSurrogate(SurrogateModel):
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
 
+        options = {'eps': 1e-3}
+
+        if cache:
+            # Enable logging since we expect the model to take long to train
+            options['disp'] = True
+            options['iprint'] = 2
+
         optResult = minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
-                             options={'eps': 1e-3},
+                             options=options,
                              bounds=bounds)
 
         if not optResult.success:
@@ -149,6 +201,30 @@ class KrigingSurrogate(SurrogateModel):
         self.S_inv = params['S_inv']
         self.Vh = params['Vh']
         self.sigma2 = params['sigma2']
+
+        # Save data to cache if specified
+        if cache:
+            data = {
+                'n_samples': self.n_samples,
+                'n_dims': self.n_dims,
+                'X': self.X,
+                'Y': self.Y,
+                'X_mean': self.X_mean,
+                'Y_mean': self.Y_mean,
+                'X_std': self.X_std,
+                'Y_std': self.Y_std,
+                'thetas': self.thetas,
+                'alpha': self.alpha,
+                'U': self.U,
+                'S_inv': self.S_inv,
+                'Vh': self.Vh,
+                'sigma2': self.sigma2,
+                'hash': training_data_hash
+            }
+
+            if not os.path.exists(cache) or cache_hash != training_data_hash:
+                with open(cache, 'wb') as f:
+                    np.savez_compressed(f, **data)
 
     def _calculate_reduced_likelihood_params(self, thetas=None):
         """

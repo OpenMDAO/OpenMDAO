@@ -322,7 +322,7 @@ class Component(System):
                 sizes[vec_name] = {}
                 for io in ('input', 'output'):
                     sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
-                                                        INT_DTYPE)
+                                                        dtype=INT_DTYPE)
                     # Variables for this vec_name are a subset of those for nonlinear, so just
                     # take columns of the nonlinear sizes array
                     for idx, abs_name in enumerate(relnames[io]):

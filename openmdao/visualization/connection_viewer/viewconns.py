@@ -168,8 +168,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     viewer = 'connect_table.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
-    libs_dir = os.path.join(code_dir, 'libs')
-    style_dir = os.path.join(code_dir, 'style')
+    libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
+    style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
