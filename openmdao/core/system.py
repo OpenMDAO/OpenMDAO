@@ -3702,10 +3702,14 @@ class System(object):
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
                 if self.notebook and ipython and tab_pkg:
-                    impl_outputs_nb_format = [[key, val['value']] for key, val in
-                                              impl_outputs.items() if n not in states]
-                    display(HTML(tabulate(impl_outputs_nb_format,
-                                          headers=["Implicit Output", "Value", "Units"], tablefmt='html')))
+                    nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
+                                 "global_shape": []}
+                    for output, attrs in expl_outputs.items():
+                        nb_format["Implicit Output"].append(output)
+                        for key, val in attrs.items():
+                            nb_format[key].append(val)
+
+                    return tabulate(nb_format, headers="keys", tablefmt='html')
                 else:
                     self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                       all_procs, out_stream)

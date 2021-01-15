@@ -545,7 +545,7 @@ class SqliteCaseReader(BaseCaseReader):
             if case_table is not None:
                 if self.notebook and tab_pkg and ipython:
                     cases = [[case] for case in case_table._cases.keys()]
-                    display(HTML(tabulate(cases, headers=[source], tablefmt='html')))
+                    return tabulate(cases, headers=[source], tablefmt='html')
                 elif not recurse:
                     # return list of cases from the source alone
                     return case_table.list_cases(source)

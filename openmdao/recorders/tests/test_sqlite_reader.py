@@ -3119,7 +3119,7 @@ class TestNotebookFormat(unittest.TestCase):
         self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
 
-    def test_list_inputs_notebook_format(self):
+    def test_list_inputs_and_outputs_notebook_format(self):
 
         prob = om.Problem()
         model = prob.model = DoubleSellar()
@@ -3164,7 +3164,7 @@ class TestNotebookFormat(unittest.TestCase):
         self.assertTrue("shape" in inputs)
         self.assertTrue("global_shape" in inputs)
 
-        outputs = prob.model.list_outputs()
+        outputs = prob.model.list_outputs(units=True)
 
         self.assertTrue("g1.d1.y1" in outputs)
         self.assertTrue("0.640004" in outputs)
@@ -3176,15 +3176,9 @@ class TestNotebookFormat(unittest.TestCase):
         self.assertTrue("shape" in outputs)
         self.assertTrue("global_shape" in outputs)
 
-        cr = om.CaseReader('cases.sql')
-
-        self.assertTrue('root' in cr.list_sources())
-        self.assertTrue('rank0:root._solve_nonlinear|0' in cr.list_cases())
-
     def test_list_cases_format(self):
 
-        filename = "sqlite_test"
-        recorder = om.SqliteRecorder(filename, record_viewer_data=False)
+        recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
 
         prob = SellarProblem()
         prob.setup()
@@ -3198,7 +3192,7 @@ class TestNotebookFormat(unittest.TestCase):
         prob.record('final')
         prob.cleanup()
 
-        cr = om.CaseReader(filename)
+        cr = om.CaseReader(self.filename)
 
         expected_cases = [
             'system',
@@ -3228,6 +3222,43 @@ class TestNotebookFormat(unittest.TestCase):
             'final']
 
         for i in expected_case_outputs:
+            self.assertTrue(i in cases)
+
+    def test_driver_source_list_cases(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        # create a list of DOE cases
+        case_gen = om.FullFactorialGenerator(levels=3)
+        cases = list(case_gen(model.get_design_vars(recurse=True)))
+
+        # create DOEDriver using provided list of cases
+        prob.driver = om.DOEDriver(cases)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        expected_output = [
+            'driver',
+            'rank0:DOEDriver_List|0',
+            'rank0:DOEDriver_List|1'
+        ]
+
+        for i in expected_output:
             self.assertTrue(i in cases)
 
 @use_tempdirs
