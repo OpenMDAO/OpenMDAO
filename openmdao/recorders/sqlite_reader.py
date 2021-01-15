@@ -409,22 +409,36 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
-    def system_iter(self, tree=None, path=''):
-        print('-------------------')
-        # if tree is None:
-        #     tree = self.problem_metadata['tree']
+    def systems(self, tree=None, path=None, paths=[]):
+        """
+        List pathnames of systems in the system hierarchy.
+
+        Parameters
+        ----------
+        tree : 
+            Nested dictionary of system information
+        path : str or None
+            Pathname of root system (None for the root model)
+        paths : list
+            List to which pathnames are appended
+
+        Returns
+        -------
+        list
+            List of pathnames of systems
+        """
+        if tree is None:
+            tree = self.problem_metadata['tree']
 
         path = '.'.join([path, tree['name']]) if path else tree['name']
-
-        print('path:', path, 'children', [child['type'] for child in tree['children']])
-
-        yield path
+        paths.append(path)
 
         if 'children' in tree:
             for child in tree['children']:
                 if child['type'] == 'subsystem':
-                    print('iter on', child['type'], child['name'])
-                    self.system_iter(child, path)
+                    self.systems(child, path, paths)
+
+        return paths
 
     def list_model_options(self, run_counter=None, system=None, out_stream=_DEFAULT_OUT_STREAM):
         """
@@ -450,13 +464,9 @@ class SqliteCaseReader(BaseCaseReader):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        systems = set(self.system_iter(self.problem_metadata['tree']))
-        print(systems)
-
         for key in self._system_options:
             if key.find(META_KEY_SEP) > 0:
-                name, num = key.rsplit('_', 1)
-                print('key:', key, 'name:', name, 'num:', num)
+                name, num = key.rsplit(META_KEY_SEP, 1)
             else:
                 name = key
                 num = 0
