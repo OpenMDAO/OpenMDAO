@@ -11,6 +11,16 @@ from collections import OrderedDict
 import numpy as np
 from io import StringIO
 
+try:
+    from IPython.display import HTML, display
+except ImportError:
+    ipython = None
+
+try:
+    from tabulate import tabulate
+except ImportError:
+    tab_pkg = None
+
 
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
@@ -24,6 +34,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
@@ -3098,6 +3109,126 @@ class TestSqliteCaseReader(unittest.TestCase):
         text = sorted(stream.getvalue().split('\n'), reverse=True)
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
+
+# @unittest.skipUnless(tab_pkg and ipython, "Tabulate and IPython are required")
+class TestNotebookFormat(unittest.TestCase):
+
+    def setUp(self):
+        om.notebook = True
+
+        self.filename = "sqlite_test"
+        self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
+
+    def test_list_inputs_notebook_format(self):
+
+        prob = om.Problem()
+        model = prob.model = DoubleSellar()
+
+        driver = prob.driver
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        driver.recording_options['record_desvars'] = False
+        driver.recording_options['record_objectives'] = False
+        driver.recording_options['record_constraints'] = False
+        driver.recording_options['record_derivatives'] = False
+        driver.add_recorder(recorder)
+
+        # each SubSellar group converges itself
+        g1 = model.g1
+        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        g1.linear_solver = om.DirectSolver()  # used for derivatives
+
+        g2 = model.g2
+        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        g2.linear_solver = om.DirectSolver()
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        model.nonlinear_solver = om.NonlinearBlockGS(rtol=1.0e-5)
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
+
+        prob.setup()
+        prob.run_model()
+
+        inputs = prob.model.list_inputs()
+
+        self.assertTrue("g1.d1.z" in inputs)
+        self.assertTrue("[0. 0.]" in inputs)
+        self.assertTrue("g1.d1.y2" in inputs)
+        self.assertTrue("[0.80000249]" in inputs)
+        self.assertTrue("Inputs" in inputs)
+        self.assertTrue("value" in inputs)
+        self.assertTrue("units" in inputs)
+        self.assertTrue("shape" in inputs)
+        self.assertTrue("global_shape" in inputs)
+
+        outputs = prob.model.list_outputs()
+
+        self.assertTrue("g1.d1.y1" in outputs)
+        self.assertTrue("0.640004" in outputs)
+        self.assertTrue("g1.d2.y2" in outputs)
+        self.assertTrue("0.800002" in outputs)
+        self.assertTrue("Explicit Output" in outputs)
+        self.assertTrue("value" in outputs)
+        self.assertTrue("units" in outputs)
+        self.assertTrue("shape" in outputs)
+        self.assertTrue("global_shape" in outputs)
+
+        cr = om.CaseReader('cases.sql')
+
+        self.assertTrue('root' in cr.list_sources())
+        self.assertTrue('rank0:root._solve_nonlinear|0' in cr.list_cases())
+
+    def test_list_cases_format(self):
+
+        filename = "sqlite_test"
+        recorder = om.SqliteRecorder(filename, record_viewer_data=False)
+
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.add_recorder(recorder)
+        prob.driver.add_recorder(recorder)
+        prob.model.d1.add_recorder(recorder)
+
+        prob.run_driver()
+
+        prob.record('final')
+        prob.cleanup()
+
+        cr = om.CaseReader(filename)
+
+        expected_cases = [
+            'system',
+            '    rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|2',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|3',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|4',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|5',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|6',
+            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|7|d1._solve_nonlinear|7',
+            'driver',
+            '    rank0:Driver|0',
+            'problem',
+            '    final',
+        ]
+
+        cases = cr.list_cases()
+
+        expected_case_outputs = [
+            'system',
+            'driver',
+            'problem',
+            'rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
+            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
+            'rank0:Driver|0',
+            'final']
+
+        for i in expected_case_outputs:
+            self.assertTrue(i in cases)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):

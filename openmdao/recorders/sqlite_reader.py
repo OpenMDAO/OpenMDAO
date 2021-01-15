@@ -518,7 +518,11 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat(out_stream=out_stream)
+            if self.notebook:
+                cases = self._list_cases_recurse_flat(out_stream=out_stream)
+                return tabulate(cases, headers="keys", tablefmt='html')
+            else:
+                return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -539,7 +543,10 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if not recurse:
+                if self.notebook and tab_pkg and ipython:
+                    cases = [[case] for case in case_table._cases.keys()]
+                    display(HTML(tabulate(cases, headers=[source], tablefmt='html')))
+                elif not recurse:
                     # return list of cases from the source alone
                     return case_table.list_cases(source)
                 elif flat:
@@ -633,7 +640,11 @@ class SqliteCaseReader(BaseCaseReader):
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            write_source_table(self.source_cases_table, out_stream)
+            if self.notebook:
+                nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
+                return nb_format
+            else:
+                write_source_table(self.source_cases_table, out_stream)
 
         return cases
 

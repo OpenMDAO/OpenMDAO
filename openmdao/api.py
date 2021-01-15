@@ -109,10 +109,21 @@ notebook = False
 def notebook_mode():
     try:
         from IPython import get_ipython
+        ipy = get_ipython() is not None
     except ImportError:
         print("IPython is not installed run `pip install openmdao[notebooks]` to install required "
               "required dependencies")
-    return get_ipython() is not None
+
+    try:
+        import tabulate
+    except ImportError:
+        print("Tabulate is not installed run `pip install openmdao[notebooks]` to install required "
+              "required dependencies")
+
+    return ipy
 
 if notebook_mode():
     notebook = True
+
+# notebook_mode()
+# notebook=True
