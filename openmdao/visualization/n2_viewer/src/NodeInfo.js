@@ -288,8 +288,9 @@ class ValueInfo extends N2WindowResizable {
         this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
 
-        this.theme('value-info');
-        this.populate();
+        this.theme('value-info')
+            .showFooter()
+            .populate();
     }
 
     /**

@@ -476,7 +476,7 @@
     left: 0;
     right: 0;
     bottom: var(--footer-height);
-    overflow: auto;
+    overflow: hidden;
 }
 
 .window-theme-value-info .window-footer {

@@ -284,12 +284,10 @@ class N2Window {
             this.show();
         }
 
-        const contentWidth = this.body.node().scrollWidth,
-            contentHeight = this.body.node().scrollHeight,
-            headerHeight = this.header.node().scrollHeight,
-            footerHeight = this.footer.classed('window-inactive') ?
-                parseInt(this.window.select('.window-contents')
-                    .style('border-radius')) : this.footer.node().scrollHeight;
+        let contentWidth = Math.max(this.body.node().scrollWidth, this.body.node().offsetWidth),
+            contentHeight = Math.max(this.body.node().scrollHeight, this.body.node().offsetHeight),
+            headerHeight = this.header.node().offsetHeight,
+            footerHeight = this.footer.classed('window-inactive') ? 0 : this.footer.node().offsetHeight;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
