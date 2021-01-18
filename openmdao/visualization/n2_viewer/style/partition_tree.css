@@ -350,3 +350,11 @@ rect.outputHighlight {
 .opt-vars {
     fill: #c5b0d5 !important;
 }
+
+#show-error-button-container {
+    visibility: hidden;
+    position: absolute;
+    bottom: 34px;
+    right: 115px;
+    z-index:5;
+}

@@ -507,7 +507,7 @@ class TemplateWriter(object):
         Contents of template file.
     """
 
-    def __init__(self, filename, embeddable=False, title=None, styles=None):
+    def __init__(self, filename, embeddable=False, title=None, styles=None,head_srcs=None):
         """
         Initialize.
 
@@ -526,6 +526,10 @@ class TemplateWriter(object):
         with open(filename, "r") as f:
             self.template = template = f.read()
 
+        head_scripts = ''
+        for name, code in head_srcs.items():
+            head_scripts += write_script(code, indent=_IND) # qqq IND?
+
         if styles is not None:
             style_elems = '\n\n'.join([write_style(content=s) for s in styles.values()])
 
@@ -535,9 +539,11 @@ class TemplateWriter(object):
                 meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
                 if title:
                     title_tag = "<title>%s</title>" % title
-                    head = '\n\n'.join([title_tag, meta, style_elems])  # Write styles to head
+                    head = '\n\n'.join([title_tag, meta, head_scripts, style_elems])  # Write styles to head
+                    # head = '\n\n'.join([title_tag, meta, style_elems])  # Write styles to head
                 else:
-                    head = '\n\n'.join([meta, style_elems])  # Write styles to head
+                    # head = '\n\n'.join([meta, style_elems])  # Write styles to head
+                    head = '\n\n'.join([meta, head_scripts, style_elems])  # Write styles to head
                 self.template = head_and_body(head=head, body=template)
 
         if title is not None:
@@ -588,7 +594,7 @@ class DiagramWriter(TemplateWriter):
         String of HTML for the help dialog.
     """
 
-    def __init__(self, filename, embeddable=False, title=None, styles=None):
+    def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
 
@@ -603,7 +609,7 @@ class DiagramWriter(TemplateWriter):
         styles : dict
             Dictionary of CSS styles.
         """
-        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles)
+        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles, head_srcs=head_srcs)
         self.toolbar = Toolbar()
         self.help = None
 
