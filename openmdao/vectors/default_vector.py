@@ -1,15 +1,11 @@
 """Define the default Vector class."""
-from __future__ import division
-
 from copy import deepcopy
 import numbers
 
-from six import iteritems, itervalues
-from six.moves import zip
-
 import numpy as np
 
-from openmdao.vectors.vector import Vector, INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
+from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
@@ -20,6 +16,23 @@ class DefaultVector(Vector):
     """
 
     TRANSFER = DefaultTransfer
+
+    def _get_data(self):
+        """
+        Return either the data array or its real part.
+
+        Note that this is intended to return only the _data array and not, for example,
+        to return a combined array in the case of an input vector that shares entries with
+        a connected output vector (for no-copy transfers).
+
+        Returns
+        -------
+        ndarray
+            The data array or its real part.
+        """
+        if self._under_complex_step:
+            return self._data
+        return self._data.real
 
     def _create_data(self):
         """
@@ -33,33 +46,11 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size to hold all of this vector's variables.
         """
-        ncol = self._ncol
-        size = np.sum(self._system()._var_sizes[self._name][self._typ][self._iproc, :])
-        return np.zeros(size) if ncol == 1 else np.zeros((size, ncol))
-
-    def _update_root_data(self):
-        """
-        Resize the root data if necesary (i.e., due to reconfiguration).
-        """
         system = self._system()
-        type_ = self._typ
-        vec_name = self._name
-        root_vec = self._root_vector
-
-        sys_offset, size_after_sys = system._ext_sizes[vec_name][type_]
-        sys_size = np.sum(system._var_sizes[vec_name][type_][self._iproc, :])
-        old_sizes_total = root_vec._data.size
-
-        root_vec._data = np.concatenate([
-            root_vec._data[:sys_offset],
-            np.zeros(sys_size),
-            root_vec._data[old_sizes_total - size_after_sys:],
-        ])
-
-        if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
-            root_vec._cplx_data = np.zeros(root_vec._data.size, dtype=complex)
-
-        root_vec._initialize_views()
+        ncol = self._ncol
+        size = np.sum(system._var_sizes[self._name][self._typ][system.comm.rank, :])
+        dtype = complex if self._alloc_complex else float
+        return np.zeros(size, dtype=dtype) if ncol == 1 else np.zeros((size, ncol), dtype=dtype)
 
     def _extract_root_data(self):
         """
@@ -72,35 +63,34 @@ class DefaultVector(Vector):
         """
         system = self._system()
         type_ = self._typ
-        iproc = self._iproc
+        ncol = self._ncol
         root_vec = self._root_vector
 
-        cplx_data = None
+        slices = root_vec.get_slice_dict()
+
+        mynames = system._var_relevant_names[self._name][type_]
+        if mynames:
+            myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
+        else:
+            myslice = slice(0, 0)
+
+        data = root_vec._data[myslice]
+
         scaling = {}
         if self._do_scaling:
             scaling['phys'] = {}
             scaling['norm'] = {}
 
-        sizes = system._var_sizes[self._name][type_]
-        ind1 = system._ext_sizes[self._name][type_][0]
-        ind2 = ind1 + np.sum(sizes[iproc, :])
-
-        data = root_vec._data[ind1:ind2]
-
-        # Extract view for complex storage too.
-        if self._alloc_complex:
-            cplx_data = root_vec._cplx_data[ind1:ind2]
-
-        if self._do_scaling:
             for typ in ('phys', 'norm'):
                 root_scale = root_vec._scaling[typ]
                 rs0 = root_scale[0]
                 if rs0 is None:
-                    scaling[typ] = (rs0, root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0, root_scale[1][myslice])
                 else:
-                    scaling[typ] = (rs0[ind1:ind2], root_scale[1][ind1:ind2])
+                    scaling[typ] = (rs0[myslice], root_scale[1][myslice])
 
-        return data, cplx_data, scaling
+        # return data, scaling
+        return data, scaling
 
     def _initialize_data(self, root_vector):
         """
@@ -128,13 +118,8 @@ class DefaultVector(Vector):
                 else:
                     self._scaling['phys'] = (None, np.ones(data.size))
                     self._scaling['norm'] = (None, np.ones(data.size))
-
-            # Allocate imaginary for complex step
-            if self._alloc_complex:
-                self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
-
         else:
-            self._data, self._cplx_data, self._scaling = self._extract_root_data()
+            self._data, self._scaling = self._extract_root_data()
 
     def _initialize_views(self):
         """
@@ -145,9 +130,8 @@ class DefaultVector(Vector):
         _views_flat
         """
         system = self._system()
-        type_ = self._typ
+        io = self._typ
         kind = self._kind
-        iproc = self._iproc
         ncol = self._ncol
 
         do_scaling = self._do_scaling
@@ -158,65 +142,46 @@ class DefaultVector(Vector):
         self._views = views = {}
         self._views_flat = views_flat = {}
 
-        alloc_complex = self._alloc_complex
-        self._cplx_views = cplx_views = {}
-        self._cplx_views_flat = cplx_views_flat = {}
-
-        allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
-        sizes_t = system._var_sizes[self._name][type_]
-        offs = system._get_var_offsets()[self._name][type_]
-        if offs.size > 0:
-            offs = offs[iproc].copy()
-            # turn global offset into local offset
-            start = offs[0]
-            offs -= start
-        else:
-            offs = offs[0].copy()
-        offsets_t = offs
-
-        abs2meta = system._var_abs2meta
-        for abs_name in system._var_relevant_names[self._name][type_]:
-            idx = allprocs_abs2idx_t[abs_name]
-
-            ind1 = offsets_t[idx]
-            ind2 = ind1 + sizes_t[iproc, idx]
-            shape = abs2meta[abs_name]['shape']
+        abs2meta = system._var_abs2meta[io]
+        start = end = 0
+        for abs_name in system._var_relevant_names[self._name][io]:
+            meta = abs2meta[abs_name]
+            end = start + meta['size']
+            shape = meta['shape']
             if ncol > 1:
                 if not isinstance(shape, tuple):
                     shape = (shape,)
                 shape = tuple(list(shape) + [ncol])
 
-            views_flat[abs_name] = v = self._data[ind1:ind2]
+            views_flat[abs_name] = v = self._data[start:end]
             if shape != v.shape:
                 v = v.view()
                 v.shape = shape
             views[abs_name] = v
-
-            if alloc_complex:
-                cplx_views_flat[abs_name] = v = self._cplx_data[ind1:ind2]
-                if shape != v.shape:
-                    v = v.view()
-                    v.shape = shape
-                cplx_views[abs_name] = v
 
             if do_scaling:
                 for scaleto in ('phys', 'norm'):
                     scale0, scale1 = factors[abs_name][kind, scaleto]
                     vec = scaling[scaleto]
                     if vec[0] is not None:
-                        vec[0][ind1:ind2] = scale0
-                    vec[1][ind1:ind2] = scale1
+                        vec[0][start:end] = scale0
+                    vec[1][start:end] = scale1
+
+            start = end
 
         self._names = frozenset(views)
+        self._len = end
 
-    def _clone_data(self):
+    def _in_matvec_context(self):
         """
-        For each item in _data, replace it with a copy of the data.
-        """
-        self._data = self._data.copy()
+        Return True if this vector is inside of a matvec_context.
 
-        if self._under_complex_step and self._cplx_data is not None:
-            self._cplx_data = self._cplx_data.copy()
+        Returns
+        -------
+        bool
+            Whether or not this vector is in a matvec_context.
+        """
+        return len(self._names) != len(self._views)
 
     def __iadd__(self, vec):
         """
@@ -232,7 +197,11 @@ class DefaultVector(Vector):
         <Vector>
             self + vec
         """
-        self._data += vec._data
+        if isinstance(vec, Vector):
+            self.iadd(vec.asarray())
+        else:
+            data = self.asarray()
+            data += vec
         return self
 
     def __isub__(self, vec):
@@ -249,24 +218,32 @@ class DefaultVector(Vector):
         <Vector>
             self - vec
         """
-        self._data -= vec._data
+        if isinstance(vec, Vector):
+            self.isub(vec.asarray())
+        else:
+            data = self.asarray()
+            data -= vec
         return self
 
-    def __imul__(self, val):
+    def __imul__(self, vec):
         """
-        Perform in-place scalar multiplication.
+        Perform in-place multiplication.
 
         Parameters
         ----------
-        val : int or float
-            scalar to multiply self.
+        vec : Vector, int, float or ndarray
+            Value to multiply self.
 
         Returns
         -------
         <Vector>
-            self * val
+            self * vec
         """
-        self._data *= val
+        if isinstance(vec, Vector):
+            self.imul(vec.asarray())
+        else:
+            data = self.asarray()
+            data *= vec
         return self
 
     def add_scal_vec(self, val, vec):
@@ -280,7 +257,8 @@ class DefaultVector(Vector):
         vec : <Vector>
             this vector times val is added to self.
         """
-        self._data += val * vec._data
+        data = self.asarray()
+        data += (val * vec.asarray())
 
     def set_vec(self, vec):
         """
@@ -291,18 +269,123 @@ class DefaultVector(Vector):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        self._data[:] = vec._data
+        data = self.asarray()
+        data[:] = vec.asarray()
 
-    def set_const(self, val):
+    def set_val(self, val, idxs=_full_slice):
         """
-        Set the value of this vector to a constant scalar value.
+        Set the data array of this vector to a value, with optional indexing.
 
         Parameters
         ----------
-        val : int or float
-            scalar to set self to.
+        val : float or ndarray
+            scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
         """
-        self._data[:] = val
+        data = self.asarray()
+        data[idxs] = val
+
+    def scale(self, scale_to):
+        """
+        Scale this vector to normalized or physical form.
+
+        Parameters
+        ----------
+        scale_to : str
+            Values are "phys" or "norm" to scale to physical or normalized.
+        """
+        adder, scaler = self._scaling[scale_to]
+        data = self.asarray()
+        if self._ncol == 1:
+            data *= scaler
+            if adder is not None:  # nonlinear only
+                data += adder
+        else:
+            data *= scaler[:, np.newaxis]
+            if adder is not None:  # nonlinear only
+                data += adder
+
+    def asarray(self, copy=False):
+        """
+        Return an array representation of this vector.
+
+        If copy is True, return a copy.  Otherwise, try to avoid it.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, return a copy of the array.
+
+        Returns
+        -------
+        ndarray
+            Array representation of this vector.
+        """
+        if self._under_complex_step:
+            arr = self._data
+        else:
+            arr = self._data.real
+
+        if copy:
+            return arr.copy()
+
+        return arr
+
+    def iscomplex(self):
+        """
+        Return True if this vector contains complex values.
+
+        This checks the type of the values, not whether they have a nonzero imaginary part.
+
+        Returns
+        -------
+        bool
+            True if this vector contains complex values.
+        """
+        return np.iscomplexobj(self._get_data())
+
+    def iadd(self, val, idxs=_full_slice):
+        """
+        Add the value to the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        data = self.asarray()
+        data[idxs] += val
+
+    def isub(self, val, idxs=_full_slice):
+        """
+        Subtract the value from the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        data = self.asarray()
+        data[idxs] -= val
+
+    def imul(self, val, idxs=_full_slice):
+        """
+        Multiply the value to the data array at the specified indices or slice(s).
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set into the data array.
+        idxs : int or slice or tuple of ints and/or slices.
+            The locations where the data array should be updated.
+        """
+        data = self.asarray()
+        data[idxs] *= val
 
     def dot(self, vec):
         """
@@ -318,7 +401,7 @@ class DefaultVector(Vector):
         float
             The computed dot product value.
         """
-        return np.dot(self._data, vec._data)
+        return np.dot(self.asarray(), vec.asarray())
 
     def get_norm(self):
         """
@@ -329,7 +412,7 @@ class DefaultVector(Vector):
         float
             norm of this vector.
         """
-        return np.linalg.norm(self._data)
+        return np.linalg.norm(self.asarray())
 
     def get_slice_dict(self):
         """
@@ -350,159 +433,6 @@ class DefaultVector(Vector):
             self._slices = slices
 
         return self._slices
-
-    def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds, backtracking the entire vector together.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        u = self
-
-        # The assumption is that alpha * du has been added to self (i.e., u)
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the u does not violate bounds in the first iteration. If it does,
-        # we modify the du vector directly.
-
-        # This is the required change in step size, relative to the du vector.
-        d_alpha = 0
-
-        # Find the largest amount a bound is violated
-        # where positive means a bound is violated - i.e. the required d_alpha.
-        mask = du._data != 0
-        if mask.any():
-            abs_du_mask = np.abs(du._data[mask])
-            u_mask = u._data[mask]
-
-            # Check lower bound
-            max_d_alpha = np.amax((lower_bounds._data[mask] - u_mask) / abs_du_mask)
-            if max_d_alpha > d_alpha:
-                d_alpha = max_d_alpha
-
-            # Check upper bound
-            max_d_alpha = np.amax((u_mask - upper_bounds._data[mask]) / abs_du_mask)
-            if max_d_alpha > d_alpha:
-                d_alpha = max_d_alpha
-
-        if d_alpha > 0:
-            # d_alpha will not be negative because it was initialized to be 0
-            # and we've only done max operations.
-            # d_alpha will not be greater than alpha because the assumption is that
-            # the original point was valid - i.e., no bounds were violated.
-            # Therefore 0 <= d_alpha <= alpha.
-
-            # We first update u to reflect the required change to du.
-            u.add_scal_vec(-d_alpha, du)
-
-            # At this point, we normalize d_alpha by alpha to figure out the relative
-            # amount that the du vector has to be reduced, then apply the reduction.
-            du *= 1 - d_alpha / alpha
-
-    def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        u = self
-
-        # The assumption is that alpha * step has been added to this vector
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the initial step does not violate bounds. If it does, we modify
-        # the step vector directly.
-
-        # enforce bounds on step in-place.
-        u_data = u._data
-
-        # If u > lower, we're just adding zero. Otherwise, we're adding
-        # the step required to get up to the lower bound.
-        # For du, we normalize by alpha since du eventually gets
-        # multiplied by alpha.
-        change_lower = np.maximum(u_data, lower_bounds._data) - u_data
-
-        # If u < upper, we're just adding zero. Otherwise, we're adding
-        # the step required to get down to the upper bound, but normalized
-        # by alpha since du eventually gets multiplied by alpha.
-        change_upper = np.minimum(u_data, upper_bounds._data) - u_data
-
-        change = change_lower + change_upper
-
-        u_data += change
-        du._data += change / alpha
-
-    def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
-        """
-        Enforce lower/upper bounds on each scalar separately, then backtrack along the wall.
-
-        This method modifies both self (u) and step (du) in-place.
-
-        Parameters
-        ----------
-        du : <Vector>
-            Newton step; the backtracking is applied to this vector in-place.
-        alpha : float
-            step size.
-        lower_bounds : <Vector>
-            Lower bounds vector.
-        upper_bounds : <Vector>
-            Upper bounds vector.
-        """
-        u = self
-
-        # The assumption is that alpha * step has been added to this vector
-        # just prior to this method being called. We are currently in the
-        # initialization of a line search, and we're trying to ensure that
-        # the initial step does not violate bounds. If it does, we modify
-        # the step vector directly.
-
-        # enforce bounds on step in-place.
-        u_data = u._data
-        du_data = du._data
-
-        # If u > lower, we're just adding zero. Otherwise, we're adding
-        # the step required to get up to the lower bound.
-        # For du, we normalize by alpha since du eventually gets
-        # multiplied by alpha.
-        change_lower = np.maximum(u_data, lower_bounds._data) - u_data
-
-        # If u < upper, we're just adding zero. Otherwise, we're adding
-        # the step required to get down to the upper bound, but normalized
-        # by alpha since du eventually gets multiplied by alpha.
-        change_upper = np.minimum(u_data, upper_bounds._data) - u_data
-
-        change = change_lower + change_upper
-
-        u_data += change
-        du_data += change / alpha
-
-        # Now we ensure that we will backtrack along the wall during the
-        # line search by setting the entries of du at the bounds to zero.
-        changed_either = change.astype(bool)
-        du_data[changed_either] = 0.
 
     def __getstate__(self):
         """

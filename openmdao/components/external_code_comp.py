@@ -1,6 +1,4 @@
 """Define the ExternalCodeComp and ExternalCodeImplicitComp classes."""
-from __future__ import print_function
-
 import os
 import sys
 import re
@@ -12,7 +10,6 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.shell_proc import STDOUT, DEV_NULL, ShellProc
-from openmdao.utils.general_utils import warn_deprecation
 
 
 class ExternalCodeDelegate(object):
@@ -266,7 +263,7 @@ class ExternalCodeComp(ExplicitComponent):
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
-        super(ExternalCodeComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.stdin = DEV_NULL
         self.stdout = None
@@ -281,7 +278,7 @@ class ExternalCodeComp(ExplicitComponent):
         Options are declared here because this class is intended to be subclassed by
         the end user. The `initialize` method is left available for user-defined options.
         """
-        super(ExternalCodeComp, self)._declare_options()
+        super()._declare_options()
         self._external_code_runner.declare_options()
 
     def check_config(self, logger):
@@ -310,27 +307,6 @@ class ExternalCodeComp(ExplicitComponent):
             Unscaled, dimensional output variables read via outputs[key].
         """
         self._external_code_runner.run_component()
-
-
-class ExternalCode(ExternalCodeComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'ExternalCode' has been deprecated. Use "
-                         "'ExternalCodeComp' instead.")
-        super(ExternalCode, self).__init__(*args, **kwargs)
 
 
 class ExternalCodeImplicitComp(ImplicitComponent):
@@ -364,7 +340,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
-        super(ExternalCodeImplicitComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.stdin = DEV_NULL
         self.stdout = None
@@ -379,7 +355,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Options are declared here because this class is intended to be subclassed by
         the end user. The `initialize` method is left available for user-defined options.
         """
-        super(ExternalCodeImplicitComp, self)._declare_options()
+        super()._declare_options()
         self._external_code_runner.declare_options()
 
         # ImplicitComponent has two separate commands to run.

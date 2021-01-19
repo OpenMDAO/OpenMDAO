@@ -19,7 +19,7 @@ Example
 -------
 
 In the following example, we create a model consisting of two instances of
-:code:`ImplicitComponent` and an :code:`IndepVarComp`.
+:code:`ImplicitComponent`.
 
 The implicit components are both instances of :code:`QuadraticComp`, defined
 as shown here.
@@ -29,8 +29,7 @@ as shown here.
 
 
 
-These two components are placed in a :code:`Group` with inputs provided by
-the :code:`IndepVarComp`.
+These two components are placed in a :code:`Group` with their common inputs promoted together.
 
 .. embed-code::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.setUp
@@ -93,6 +92,10 @@ to :code:`None` and then access the data instead via the return value.
 .. embed-code::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_return_value
     :layout: interleave
+
+
+The :code:`System.get_io_metadata` method, which is used internally by :code:`list_inputs` and
+:code:`list_outputs`, returns the specified variable information as a dict.
 
 
 *List Names Only*
@@ -206,8 +209,8 @@ The format is affected by the values set with :code:`numpy.set_printoptions`.
    It is normally required to run the model before :code:`list_inputs()` and :code:`list_outputs()` can be used.
    This is because the final setup that occurs just before execution determines the hierarchy and builds the
    data structures and connections.  In some cases however, it can be useful to call these functions on a
-   component prior to execution to assist in configuring your model. This capability does not apply to groups,
-   but basic metadata about a component's inputs and outputs is available.
+   system prior to execution to assist in configuring your model. At :code:`configure` time,
+   basic metadata about a system's inputs and outputs is available.
    See the documentation for the :ref:`configure() method<feature_configure_IO>` for one such use case.
 
 

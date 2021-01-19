@@ -7,7 +7,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 try:
@@ -27,9 +27,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -45,10 +42,13 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.58830273, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
     def test_feature_maxiter(self):
         import numpy as np
@@ -59,9 +59,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -74,15 +71,18 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['maxiter'] = 4
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['maxiter'] = 4
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5723813937, .00001)
-        assert_rel_error(self, prob['y2'], 12.0542542372, .00001)
+        assert_near_equal(prob['y1'], 25.5723813937, .00001)
+        assert_near_equal(prob['y2'], 12.0542542372, .00001)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -93,9 +93,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -108,15 +105,18 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['rtol'] = 1e-3
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['rtol'] = 1e-3
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5891491526, .00001)
-        assert_rel_error(self, prob['y2'], 12.0569142166, .00001)
+        assert_near_equal(prob.get_val('y1'), 25.5891491526, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.0569142166, .00001)
 
     def test_feature_atol(self):
         import numpy as np
@@ -127,9 +127,6 @@ class TestNLBlockJacobi(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
-
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
@@ -142,15 +139,18 @@ class TestNLBlockJacobi(unittest.TestCase):
 
         model.linear_solver = om.LinearBlockGS()
 
-        nlgbs = model.nonlinear_solver = om.NonlinearBlockJac()
-        nlgbs.options['atol'] = 1e-2
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockJac()
+        nlbgs.options['atol'] = 1e-2
 
         prob.setup()
 
+        prob.set_val('x', 1.)
+        prob.set_val('z', np.array([5.0, 2.0]))
+
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.5886171567, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_near_equal(prob['y1'], 25.5886171567, .00001)
+        assert_near_equal(prob['y2'], 12.05848819, .00001)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

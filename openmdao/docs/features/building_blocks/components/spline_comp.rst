@@ -11,6 +11,25 @@ using an interpolation algorithm. This is useful for reducing the size of an opt
 decreasing the number of design variables it solves. The spatial distribution of the points, in both
 the original and interpolated spaces is typically uniform but other distributions can be used.
 
+.. note::
+
+    OpenMDAO contains two components that perform interpolation: `SplineComp` and `MetaModelStructuredComp`.
+    While they provide access to mostly the same algorithms, their usage is subtly different.
+    The fundamental differences between them are as follows:
+
+    :ref:`MetaModelStructuredComp <feature_MetaModelStructuredComp>` is used when you have a set of known data values y on a structured grid x and
+    want to interpolate a new y value at a new x location that lies inside the grid. In this case, you
+    generally start with a known set of fixed "training" values and their locations.
+
+    :ref:`SplineComp <splinecomp_feature>` is used when you want to create a smooth curve with a large number of points, but you
+    want to control the shape of the curve with a small number of control points. The x locations of
+    the interpolated points (and where applicable, the control points) are fixed and known, but the
+    y values at the control points vary as the curve shape is modified by an upstream connection.
+
+    MetaModelStructuredComp can be used for multi-dimensional design spaces, whereas SplineComp is
+    restricted to one dimension.
+
+
 The following methods are available by setting the 'method' option:
 
 +---------------+--------+------------------------------------------------------------------+
@@ -28,6 +47,12 @@ The following methods are available by setting the 'method' option:
 +---------------+--------+------------------------------------------------------------------+
 | bsplines      | var.   | BSplines, default order is 4.                                    |
 +---------------+--------+------------------------------------------------------------------+
+| scipy_slinear | 1      | Scipy linear interpolation. Same as slinear, though slower       |
++---------------+--------+------------------------------------------------------------------+
+| scipy_cubic   | 3      | Scipy cubic interpolation. More accurate than cubic, but slower  |
++---------------+--------+------------------------------------------------------------------+
+| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slowest          |
++---------------+--------+------------------------------------------------------------------+
 
 
 SplineComp Options
@@ -37,6 +62,14 @@ SplineComp Options
     openmdao.components.spline_comp
     SplineComp
     options
+
+SplineComp Constructor
+----------------------
+
+The call signature for the `SplineComp` constructor is:
+
+.. automethod:: openmdao.components.spline_comp.SplineComp.__init__
+    :noindex:
 
 
 SplineComp Basic Example
@@ -64,7 +97,7 @@ calling the `add_spline` method and passing the `y_cp` values in as the keyword 
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_basic_example
-    :layout: code
+    :layout: code, output
 
 
 SplineComp Multiple Splines
@@ -76,7 +109,7 @@ input and output. The initial values for `y_cp` can also be specified here.
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_multi_splines
-    :layout: code
+    :layout: code, output
 
 
 Specifying Options for 'akima'
@@ -92,7 +125,7 @@ safeguard; its default value is 1e-30.
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_akima_options
-    :layout: code
+    :layout: code, output
 
 
 Specifying Options for 'bsplines'
@@ -107,23 +140,36 @@ specify the number of control points using the 'num_cp' argument.
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_bspline_options
-    :layout: code
+    :layout: code, output
 
 
 SplineComp Interpolation Distribution
 -------------------------------------
 
-We have included three different distribution functions for users to replicate functionality that used to
-be built-in to the individual akima and bsplines components. The `cell_centered` function takes the number
-of cells, and the start and end values, and returns a vector of points that lie at the center of those
-cells. The 'node_centered' function reproduces the functionality of numpy's linspace.  Finally, the
-`sine_distribution` function creates a sinusoidal distribution, in which points are clustered towards the
-ends. A 'phase' argument is also included, and a phase of pi/2.0 clusters the points in the center with
-fewer points on the ends.
+The `cell_centered` function takes the number of cells, and the start and end values, and returns a
+vector of points that lie at the center of those cells. The 'node_centered' function reproduces the
+functionality of numpy's linspace.  Finally, the `sine_distribution` function creates a sinusoidal
+distribution, in which points are clustered towards the ends. A 'phase' argument is also included,
+and a phase of pi/2.0 clusters the points in the center with fewer points on the ends.
+
+.. note::
+    We have included three different distribution functions for users to replicate functionality that used to
+    be built-in to the individual akima and bsplines components.
+
+.. autofunction:: openmdao.utils.spline_distributions.sine_distribution
+    :noindex:
+
+.. autofunction:: openmdao.utils.spline_distributions.cell_centered
+    :noindex:
+
+.. autofunction:: openmdao.utils.spline_distributions.node_centered
+    :noindex:
+
+Below is an example of `sine_distribution`
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_spline_distribution_example
-    :layout: code
+    :layout: code, output
 
 
 Standalone Interface for Spline Evaluation
@@ -136,17 +182,17 @@ create and evaluate a standalone Akima spline:
 
 .. embed-code::
     openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima
-    :layout: code
+    :layout: code, output
 
 Similiarly, the following example shows how to create a bspline:
 
 .. embed-code::
     openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_bsplines
-    :layout: code
+    :layout: code, output
 
 You can also compute the derivative of the interpolated output with respect to the control point values by setting
 the "compute_derivate" argument to True:
 
 .. embed-code::
     openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima_derivs
-    :layout: code
+    :layout: code, output

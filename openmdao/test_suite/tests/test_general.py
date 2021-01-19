@@ -30,10 +30,9 @@ CycleGroup ('group_type': 'cycle')
 """
 
 import unittest
-from six import iterkeys
 
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class ParameterizedTestCases(unittest.TestCase):
@@ -48,8 +47,8 @@ class ParameterizedTestCases(unittest.TestCase):
 
         expected_values = root.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
-            assert_rel_error(self, actual, expected_values, 1e-8)
+            actual = {key: problem[key] for key in expected_values}
+            assert_near_equal(actual, expected_values, 1e-8)
 
         error_bound = 1e-4 if root.options['partial_method'] != 'exact' else 1e-8
 
@@ -57,11 +56,11 @@ class ParameterizedTestCases(unittest.TestCase):
         if expected_totals:
             # Forward Derivatives Check
             totals = test.compute_totals('fwd')
-            assert_rel_error(self, totals, expected_totals, error_bound)
+            assert_near_equal(totals, expected_totals, error_bound)
 
             # Reverse Derivatives Check
             totals = test.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, error_bound)
+            assert_near_equal(totals, expected_totals, error_bound)
 
 
 class ParameterizedTestCasesSubset(unittest.TestCase):
@@ -78,22 +77,22 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
 
         expected_values = model.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
-            assert_rel_error(self, actual, expected_values, 1e-8)
+            actual = {key: problem[key] for key in expected_values}
+            assert_near_equal(actual, expected_values, 1e-8)
 
         expected_totals = model.expected_totals
         if expected_totals:
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_near_equal(totals, expected_totals, 1e-8)
 
             # Forward Derivatives Check
             totals = param_instance.compute_totals('fwd')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_near_equal(totals, expected_totals, 1e-8)
 
             # Reverse Derivatives Check
             totals = param_instance.compute_totals('rev')
-            assert_rel_error(self, totals, expected_totals, 1e-8)
+            assert_near_equal(totals, expected_totals, 1e-8)
 
 
 if __name__ == '__main__':

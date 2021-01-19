@@ -18,46 +18,46 @@ class N2Layout {
      * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement,
-        showLinearSolverNames, dims) {
+    constructor(model, newZoomedElement, showLinearSolverNames, showSolvers, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
-
-        this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
         this.visibleNodes = [];
 
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
+        this.curVisibleNodeCount = 0;
+        this.prevVisibleNodeCount = 0;
+
+        this.showSolvers = showSolvers ;
 
         // Initial size values derived from read-only defaults
         this.size = dims.size;
         this.svg = d3.select("#svgId");
+
+        startTimer('N2Layout._computeLeaves');
+        this._computeLeaves();
+        stopTimer('N2Layout._computeLeaves');
 
         this._setupTextRenderer();
         startTimer('N2Layout._updateTextWidths');
         this._updateTextWidths();
         stopTimer('N2Layout._updateTextWidths');
 
-        startTimer('N2Layout._updateSolverTextWidths');
-        this._updateSolverTextWidths();
-        stopTimer('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
-
-        startTimer('N2Layout._computeLeaves');
-        this._computeLeaves();
-        stopTimer('N2Layout._computeLeaves');
 
         startTimer('N2Layout._computeColumnWidths');
         this._computeColumnWidths();
         stopTimer('N2Layout._computeColumnWidths');
 
-        startTimer('N2Layout._computeSolverColumnWidths');
-        this._computeSolverColumnWidths();
-        stopTimer('N2Layout._computeSolverColumnWidths');
+        if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverColumnWidths');
+            this._computeSolverColumnWidths();
+            stopTimer('N2Layout._computeSolverColumnWidths');
+        }
 
         startTimer('N2Layout._setColumnLocations');
         this._setColumnLocations();
@@ -69,12 +69,13 @@ class N2Layout {
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        startTimer('N2Layout._computeSolverNormalizedPositions');
-        this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
-        stopTimer('N2Layout._computeSolverNormalizedPositions');
-        if (this.zoomedElement.parent)
-            this.zoomedSolverNodes.push(this.zoomedElement.parent);
-
+        if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverNormalizedPositions');
+            this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
+            stopTimer('N2Layout._computeSolverNormalizedPositions');
+            if (this.zoomedElement.parent)
+                this.zoomedSolverNodes.push(this.zoomedElement.parent);
+        }
         this.setTransitionPermission();
 
     }
@@ -87,8 +88,12 @@ class N2Layout {
      * the original transition methods are restored.
      */
     setTransitionPermission() {
+        this.prevVisibleNodeCount = this.visibleNodeCount;
+        this.visibleNodeCount = this.visibleNodes.length;
+        const highWaterMark = Math.max(this.prevVisibleNodeCount, this.visibleNodeCount);
+
         // Too many nodes, disable transitions.
-        if (this.visibleNodes.length >= N2TransitionDefaults.maxNodes) {
+        if (highWaterMark >= N2TransitionDefaults.maxNodes) {
             debugInfo("Denying transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
@@ -117,10 +122,8 @@ class N2Layout {
 
     /** Create an off-screen area to render text for _getTextWidth() */
     _setupTextRenderer() {
-        let textGroup = this.svg.append("g").attr("class", "partition_group");
-        let textSVG = textGroup.append("text")
-            .text("")
-            .attr("x", -100); // Put text off screen to the left.
+        const textGroup = this.svg.select('#text-width-renderer');
+        const textSVG = textGroup.select('text');
 
         this.textRenderer = {
             'group': textGroup,
@@ -154,7 +157,7 @@ class N2Layout {
     }
 
     /** Determine the text associated with the node. Normally its name,
-     * but can be changed if promoted or originally contained a colon.
+     * but can be changed if promoted.
      * @param {N2TreeNode} node The item to operate on.
      * @return {string} The selected text.
      */
@@ -163,21 +166,11 @@ class N2Layout {
 
         let retVal = node.name;
 
-        if (this.outputNamingType == "Promoted" &&
-            node.isParamOrUnknown() &&
-            this.zoomedElement.propExists('promotions') &&
-            this.zoomedElement.promotions.propExists(node.absPathName)) {
-            retVal = this.zoomedElement.promotions[node.absPathName];
+        if (node.name == '_auto_ivc') {
+            retVal = 'Auto-IVC';
         }
-
-        if (node.splitByColon) {
-            if (retVal.endsWith(colonVarNameAppend)) {
-                retVal = retVal.slice(0,-1);
-            }
-        }
-
-        if (node.splitByColon && node.hasChildren()) {
-            retVal += ":";
+        else if (node.absPathName.match(/^_auto_ivc.*/) && node.promotedName !== undefined) {
+            retVal = node.promotedName;
         }
 
         return retVal;
@@ -193,9 +186,10 @@ class N2Layout {
 
         let solver_name = this.showLinearSolverNames ? node.linear_solver : node.nonlinear_solver;
 
-        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems){
+        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems) {
             return solver_name + " (sub_solve)";
-        } else {
+        }
+        else {
             return solver_name;
         }
     }
@@ -210,7 +204,12 @@ class N2Layout {
         node.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (node.hasChildren()) {
+        if (!node.isInputOrOutput()) {
+            node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
+                this.size.rightTextMargin;
+        }
+
+        if (node.hasChildren() && !node.isMinimized) {
             for (let child of node.children) {
                 this._updateTextWidths(child);
             }
@@ -218,45 +217,35 @@ class N2Layout {
     }
 
     /**
-     * Determine text width for this and all decendents if node is a solver.
-     * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
-     */
-    _updateSolverTextWidths(node = this.zoomedElement) {
-        if (node.isParam() || node.varIsHidden) {
-            return;
-        }
-
-        node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
-            this.size.rightTextMargin;
-
-        if (node.hasChildren()) {
-            for (let child of node.children) {
-                this._updateSolverTextWidths(child);
-            }
-        }
-    }
-
-    /** Recurse through the tree and add up the number of leaves that each
-     * node has, based on their array of children.
+     * Recurse through the tree and add up the number of leaves that each
+     * node has, based on their array of visible children.
      * @param {N2TreeNode} [node = this.model.root] The starting node.
      */
     _computeLeaves(node = this.model.root) {
-        if (node.varIsHidden) {
-            node.numLeaves = 0;
-        }
-        else if (node.hasChildren() && !node.isMinimized) {
-            node.numLeaves = 0;
-            for (let child of node.children) {
-                this._computeLeaves(child);
-                node.numLeaves += child.numLeaves;
+        node.numLeaves = 0;
+
+        if (!node.varIsHidden) {
+            if (node.name == '_auto_ivc' && !node.manuallyExpanded) {
+                node.minimize();
             }
-        }
-        else {
-            node.numLeaves = 1;
+            else if (this.model.nodeIds.length > Precollapse.minimumNodes) {
+                node.minimizeIfLarge(this.model.depthCount[node.depth]);
+            }
+
+            if (node.hasChildren() && !node.isMinimized) {
+                for (let child of node.children) {
+                    this._computeLeaves(child);
+                    node.numLeaves += child.numLeaves;
+                }
+            }
+            else {
+                node.numLeaves = 1;
+            }
         }
     }
 
-    /** For visible nodes with children, choose a column width
+    /**
+     * For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
      * @param {N2TreeNode} node The item to operate on.
      * @param {string} childrenProp Either 'children' or 'subsystem_children'.
@@ -287,14 +276,20 @@ class N2Layout {
         }
     }
 
-    /** Compute column widths across the model, then adjust ends as needed.
+    /**
+     * Compute column widths across the model, then adjust ends as needed.
      * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.cols = Array.from({ length: this.model.maxDepth + 1 }, () =>
-            ({ 'width': 0.0, 'location': 0.0 }));
+        this.cols = Array.from({
+            length: this.model.maxDepth + 1
+        }, () =>
+            ({
+                'width': 0.0,
+                'location': 0.0
+            }));
 
         this._setColumnWidthsFromWidestText(node, 'children', this.cols,
             this.leafWidthsPx, 'nameWidthPx');
@@ -311,14 +306,20 @@ class N2Layout {
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /** Compute solver column widths across the model, then adjust ends as needed.
+    /**
+     * Compute solver column widths across the model, then adjust ends as needed.
      * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
     _computeSolverColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafSolverWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
-        this.solverCols = Array.from({ length: this.model.maxDepth + 1 }, () =>
-            ({ 'width': 0.0, 'location': 0.0 }));
+        this.solverCols = Array.from({
+            length: this.model.maxDepth + 1
+        }, () =>
+            ({
+                'width': 0.0,
+                'location': 0.0
+            }));
 
         this._setColumnWidthsFromWidestText(node, 'subsystem_children', this.solverCols,
             this.leafSolverWidthsPx, 'nameSolverWidthPx');
@@ -335,9 +336,7 @@ class N2Layout {
         this.solverCols[this.greatestDepth].width = lastColumnWidth;
     }
 
-    /** Set the location of the columns based on the width of the columns
-     * to the left.
-     */
+    /** Set the location of the columns based on the width of the columns to the left. */
     _setColumnLocations() {
         this.size.partitionTree.width = 0;
         this.size.solverTree.width = 0;
@@ -346,8 +345,10 @@ class N2Layout {
             this.cols[depth].location = this.size.partitionTree.width;
             this.size.partitionTree.width += this.cols[depth].width;
 
-            this.solverCols[depth].location = this.size.solverTree.width;
-            this.size.solverTree.width += this.solverCols[depth].width;
+             if (this.showSolvers) {
+                 this.solverCols[depth].location = this.size.solverTree.width;
+                 this.size.solverTree.width += this.solverCols[depth].width;
+             }
         }
 
     }
@@ -390,7 +391,7 @@ class N2Layout {
             (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.dims.x;
         node.dims.height = workNode.numLeaves / this.model.root.numLeaves;
 
-        if (node.varIsHidden) { // param or hidden leaf leaving
+        if (node.varIsHidden) { // input or hidden leaf leaving
             node.dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
             node.dims.y = node.parentComponent.dims.y;
             node.dims.width = node.dims.height = 1e-6;
@@ -427,7 +428,7 @@ class N2Layout {
                 this.zoomedSolverNodes.push(node);
             }
             if (!node.hasChildren() || node.isMinimized) { //at a "leaf" workNode
-                if (!node.isParam() && !node.varIsHidden) {
+                if (!node.isInput() && !node.varIsHidden) {
                     this.visibleSolverNodes.push(node);
                 }
                 earliestMinimizedParent = node;
@@ -445,7 +446,7 @@ class N2Layout {
 
         node.solverDims.height = workNode.numLeaves / this.model.root.numLeaves;
 
-        if (node.varIsHidden) { //param or hidden leaf leaving
+        if (node.varIsHidden) { //input or hidden leaf leaving
             node.solverDims.x = this.cols[node.parentComponent.depth + 1].location /
                 this.size.partitionTree.width;
             node.solverDims.y = node.parentComponent.dims.y;
@@ -477,7 +478,10 @@ class N2Layout {
         let height = (this.size.n2matrix.height +
             this.size.n2matrix.margin * 2);
 
-        return ({ 'width': width, 'height': height });
+        return ({
+            'width': width,
+            'height': height
+        });
     }
 
     /**
@@ -494,7 +498,11 @@ class N2Layout {
         let height = this.size.partitionTree.height;
         let margin = this.size.n2matrix.margin;
 
-        return ({ 'width': width, 'height': height, 'margin': margin });
+        return ({
+            'width': width,
+            'height': height,
+            'margin': margin
+        });
     }
 
     /**
@@ -503,32 +511,55 @@ class N2Layout {
      * @param {Object} dom References to HTML elements.
      * @param {number} transitionStartDelay ms to wait before performing transition
      */
-    updateTransitionInfo(dom, transitionStartDelay) {
+    updateTransitionInfo(dom, transitionStartDelay, manuallyResized) {
+
         sharedTransition = d3.transition()
             .duration(N2TransitionDefaults.duration)
-            .delay(transitionStartDelay);
+            .delay(transitionStartDelay)
+            // Hide the transition waiting animation when it ends:
+            .on('end', function () { dom.waiter.attr('class', 'no-show'); });
 
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
         let outerDims = this.newOuterDims();
         let innerDims = this.newInnerDims();
 
-        dom.svgDiv.transition(sharedTransition)
-            .style("width", outerDims.width + this.size.unit)
-            .style("height", outerDims.height + this.size.unit);
+        this.ratio = (window.innerWidth - 200) / outerDims.width;
+        if (this.ratio > 1 || manuallyResized) this.ratio = 1;
+        else if (this.ratio < 1)
+            debugInfo("Scaling diagram to " + Math.round(this.ratio * 100) + "%");
 
-        dom.svg.transition(sharedTransition)
-            .attr("width", outerDims.width)
-            .attr("height", outerDims.height)
-            .attr("transform", "translate(0 0)");
+        dom.svgDiv
+            .style("width", (outerDims.width * this.ratio) + this.size.unit)
+            .style("height", (outerDims.height * this.ratio) + this.size.unit)
 
-        dom.pTreeGroup.transition(sharedTransition)
+        dom.svg
+            .transition(sharedTransition)
+            .style("transform", "scale(" + this.ratio + ")")
+            .attr("width", outerDims.width + this.size.unit)
+            .attr("height", outerDims.height + this.size.unit);
+
+        this.gapDist = (this.size.partitionTreeGap * this.ratio) - 3;
+        this.gapSpace = this.gapDist + this.size.unit
+        d3.select('#n2-resizer-box')
+            .transition(sharedTransition)
+            .style('bottom', this.gapSpace);
+
+        dom.pTreeGroup
+            .transition(sharedTransition)
             .attr("height", innerDims.height)
             .attr("width", this.size.partitionTree.width)
             .attr("transform", "translate(0 " + innerDims.margin + ")");
-           
+
+        dom.highlightBar
+            .transition(sharedTransition)
+            .attr("height", innerDims.height)
+            .attr("width", "8")
+            .attr("transform", "translate(" + this.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
+
         // Move n2 outer group to right of partition tree, spaced by the margin.
-        dom.n2OuterGroup.transition(sharedTransition)
+        dom.n2OuterGroup
+            .transition(sharedTransition)
             .attr("height", outerDims.height)
             .attr("width", outerDims.height)
             .attr("transform", "translate(" +
@@ -551,5 +582,27 @@ class N2Layout {
                 innerDims.height +
                 innerDims.margin) + " " +
                 innerDims.margin + ")");
+    }
+
+    calcWidthBasedOnNewHeight(height) {
+        return this.size.partitionTree.width + height + this.size.solverTree.width +
+            this.size.n2matrix.margin * 2;
+    }
+
+    calcHeightBasedOnNewWidth(width) {
+        return width - this.size.partitionTree.width - this.size.solverTree.width -
+            this.size.n2matrix.margin * 2;
+    }
+
+    calcFitDims() {
+        let height = window.innerHeight * 0.95;
+        let width = this.calcWidthBasedOnNewHeight(height);
+
+        if (width > window.innerWidth - 200) {
+            width = window.innerWidth - 200;
+            height = this.calcHeightBasedOnNewWidth(width);
+        }
+
+        return { 'width': width, 'height': height };
     }
 }

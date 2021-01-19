@@ -5,12 +5,10 @@ from itertools import product
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
-from six import string_types
-from six.moves import range
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils import cs_safe
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -18,10 +16,10 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices', 'tags'}
+                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'vectorize', 'units', 'shape'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape'}
 
 
 def check_option(option, value):
@@ -39,7 +37,7 @@ def check_option(option, value):
     ------
     ValueError
     """
-    if option is 'units' and value is not None and not valid_units(value):
+    if option == 'units' and value is not None and not valid_units(value):
         raise ValueError("The units '%s' are invalid." % value)
 
 
@@ -76,7 +74,6 @@ class ExecComp(ExplicitComponent):
         Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
-
     """
 
     def initialize(self):
@@ -124,6 +121,7 @@ class ExecComp(ExplicitComponent):
         arcsin(x)                  Inverse sine of x
         arcsinh(x)                 Inverse hyperbolic sine of x
         arctan(x)                  Inverse tangent of x
+        arctan2(y, x)              4-quadrant arctangent function of y and x
         asin(x)                    Inverse sine of x
         asinh(x)                   Inverse hyperbolic sine of x
         atan(x)                    Inverse tangent of x
@@ -136,6 +134,7 @@ class ExecComp(ExplicitComponent):
         exp(x)                     Exponential function
         expm1(x)                   exp(x) - 1
         factorial(x)               Factorial of all numbers in x
+                                   (DEPRECATED, not available with SciPy >=1.5)
         fmax(x, y)                 Element-wise maximum of x and y
         fmin(x, y)                 Element-wise minimum of x and y
         inner(x, y)                Inner product of arrays x and y
@@ -206,28 +205,24 @@ class ExecComp(ExplicitComponent):
                               x={'value': numpy.ones(10,dtype=float),
                                  'units': 'ft'})
         """
-        # separate disallowed var names from kwargs, pass them as options to __init__
-        if 'vectorize' in kwargs:
-            warn_deprecation("The 'vectorize' option is deprecated.  "
-                             "Please use 'has_diag_partials' instead.")
-            kwargs['has_diag_partials'] = kwargs.pop('vectorize')
-
         options = {}
         for name in _disallowed_names:
             if name in kwargs:
                 options[name] = kwargs.pop(name)
 
-        super(ExecComp, self).__init__(**options)
+        super().__init__(**options)
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
-        if isinstance(exprs, string_types):
+        if isinstance(exprs, str):
             exprs = [exprs]
 
         self._exprs = exprs[:]
         self._codes = None
         self._kwargs = kwargs
+
+        self._no_check_partials = True
 
     def setup(self):
         """
@@ -297,6 +292,12 @@ class ExecComp(ExplicitComponent):
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
 
+                if 'shape_by_conn' in val or 'copy_shape' in val:
+                    if val.get('shape') is not None or val.get('value') is not None:
+                        raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'value' for "
+                                           f"variable '{arg}' along with 'copy_shape' or "
+                                           "'shape_by_conn'.")
+
                 if 'shape' in val:
                     if arg not in init_vals:
                         init_vals[arg] = np.ones(val['shape'])
@@ -310,40 +311,44 @@ class ExecComp(ExplicitComponent):
                 init_vals[arg] = val
 
         for var in sorted(allvars):
+            meta = kwargs2.get(var, {'units': units, 'shape': shape})
+
             # if user supplied an initial value, use it, otherwise set to 1.0
             if var in init_vals:
                 val = init_vals[var]
             else:
                 init_vals[var] = val = 1.0
 
-            meta = kwargs2.get(var, {'units': units, 'shape': shape})
-
             if var in outs:
                 self.add_output(var, val, **meta)
             else:
                 self.add_input(var, val, **meta)
 
-        if self.options['has_diag_partials']:
-            # check that sizes of any input/output vars match or one of them is size 1
-            osorted = sorted(self._var_rel_names['output'])
-            for inp in sorted(self._var_rel_names['input']):
-                ival = init_vals[inp]
-                iarray = isinstance(ival, ndarray) and ival.size > 1
-                for out in osorted:
-                    oval = init_vals[out]
-                    if iarray and isinstance(oval, ndarray) and oval.size > 1:
-                        if oval.size != ival.size:
-                            raise RuntimeError("%s: has_diag_partials is True but partial(%s, %s) "
-                                               "is not square (shape=(%d, %d))." %
-                                               (self.msginfo, out, inp, oval.size, ival.size))
-                        # partial will be declared as diagonal
-                        inds = np.arange(oval.size, dtype=int)
+        for expr in self._exprs:
+            lhs, _ = expr.split('=', 1)
+            outs = self._parse_for_out_vars(lhs)
+            all = self._parse_for_vars(expr)  # gets in and out
+            ins = sorted(set(all) - set(outs))
+            outs = sorted(outs)
+            for out in outs:
+                for inp in ins:
+                    if self.options['has_diag_partials']:
+                        ival = init_vals[inp]
+                        iarray = isinstance(ival, ndarray) and ival.size > 1
+                        oval = init_vals[out]
+                        if iarray and isinstance(oval, ndarray) and oval.size > 1:
+                            if oval.size != ival.size:
+                                raise RuntimeError(
+                                    "%s: has_diag_partials is True but partial(%s, %s) "
+                                    "is not square (shape=(%d, %d))." %
+                                    (self.msginfo, out, inp, oval.size, ival.size))
+                            # partial will be declared as diagonal
+                            inds = np.arange(oval.size, dtype=int)
+                        else:
+                            inds = None
+                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
                     else:
-                        inds = None
-                    self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
-        else:
-            # All derivatives are defined as dense
-            self.declare_partials(of='*', wrt='*')
+                        self.declare_partials(of=out, wrt=inp)
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -442,49 +447,51 @@ class ExecComp(ExplicitComponent):
             Contains sub-jacobians.
         """
         step = self.complex_stepsize * 1j
-        out_names = self._var_allprocs_prom2abs_list['output']
+        out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
-        for param in inputs:
+        for input in inputs:
 
             pwrap = _TmpDict(inputs)
-            pval = inputs[param]
+            pval = inputs[input]
             psize = pval.size
-            pwrap[param] = np.asarray(pval, npcomplex)
+            pwrap[input] = np.asarray(pval, npcomplex)
 
             if has_diag_partials or psize == 1:
-                # set a complex param value
-                pwrap[param] += step
+                # set a complex input value
+                pwrap[input] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                # solve with complex param value
-                self._residuals.set_const(0.0)
+                # solve with complex input value
+                self._residuals.set_val(0.0)
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
+                    if (u, input) in self._declared_partials:
+                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
 
-                # restore old param value
-                pwrap[param] -= step
+                # restore old input value
+                pwrap[input] -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[param].shape)):
-                    # set a complex param value
-                    pwrap[param][idx] += step
+                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                    # set a complex input value
+                    pwrap[input][idx] += step
 
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
-                    # solve with complex param value
-                    self._residuals.set_const(0.0)
+                    # solve with complex input value
+                    self._residuals.set_val(0.0)
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
-                        # set the column in the Jacobian entry
-                        partials[(u, param)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                        if (u, input) in self._declared_partials:
+                            # set the column in the Jacobian entry
+                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
-                    # restore old param value
-                    pwrap[param][idx] -= step
+                    # restore old input value
+                    pwrap[input][idx] -= step
 
 
 class _TmpDict(object):
@@ -576,18 +583,13 @@ class _IODict(object):
         self._inputs = inputs
 
     def __getitem__(self, name):
-        if name in self._outputs:
-            return self._outputs[name]
-        else:
+        try:
             return self._inputs[name]
+        except KeyError:
+            return self._outputs[name]
 
     def __setitem__(self, name, value):
-        if name in self._outputs:
-            self._outputs[name] = value
-        elif name in self._inputs:
-            self._inputs[name] = value
-        else:
-            self._outputs[name] = value  # will raise KeyError
+        self._outputs[name] = value
 
     def __contains__(self, name):
         return name in self._outputs or name in self._inputs
@@ -627,7 +629,7 @@ _import_functs(np, _expr_dict,
                       'e', 'pi',  # Constants
                       'isinf', 'isnan',  # Logic
                       'log', 'log10', 'log1p', 'power',  # Math operations
-                      'exp', 'expm1', 'fmax',
+                      'exp', 'expm1', 'fmax', 'min', 'max', 'diff',
                       'fmin', 'maximum', 'minimum',
                       'sum', 'dot', 'prod',  # Reductions
                       'tensordot', 'matmul',  # Linear algebra
@@ -644,22 +646,32 @@ try:
 except ImportError:
     pass
 else:
-    _import_functs(scipy.special, _expr_dict,
-                   names=['factorial', 'erf', 'erfc'])
+    _import_functs(scipy.special, _expr_dict, names=['erf', 'erfc'])
+
+    from distutils.version import LooseVersion
+    if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
+        def factorial(*args):
+            """
+            Raise a RuntimeError stating that the factorial function is not supported.
+            """
+            raise RuntimeError("The 'factorial' function is not supported for SciPy "
+                               f"versions >= 1.5, current version: {scipy.__version__}")
+    else:
+        def factorial(*args):
+            """
+            Raise a warning stating that the factorial function is deprecated.
+            """
+            warn_deprecation("The 'factorial' function is deprecated. "
+                             "It is no longer supported for SciPy versions >= 1.5.")
+            return scipy.special.factorial(*args)
+
+    _expr_dict['factorial'] = factorial
 
 
-# Put any functions here that need special versions to work under
-# complex step
+# put any functions that need custom complex-safe versions here
 
-def _cs_abs(x):
-    if isinstance(x, ndarray):
-        return x * np.sign(x)
-    elif x.real < 0.0:
-        return -x
-    return x
-
-
-_expr_dict['abs'] = _cs_abs
+_expr_dict['abs'] = cs_safe.abs
+_expr_dict['arctan2'] = cs_safe.arctan2
 
 
 class _NumpyMsg(object):

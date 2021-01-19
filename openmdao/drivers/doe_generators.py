@@ -4,9 +4,6 @@ Case generators for Design-of-Experiments Driver.
 
 import numpy as np
 
-from six import iteritems
-from six.moves import range
-
 import os.path
 import csv
 import re
@@ -66,7 +63,7 @@ class ListGenerator(DOEGenerator):
         data : list
             list of collections of name, value pairs for the design variables
         """
-        super(ListGenerator, self).__init__()
+        super().__init__()
 
         if not isinstance(data, list):
             msg = "Invalid DOE case data, expected a list but got a {}."
@@ -148,7 +145,7 @@ class CSVGenerator(DOEGenerator):
         filename : str
                the name of the file from which to read cases
         """
-        super(CSVGenerator, self).__init__()
+        super().__init__()
 
         if not isinstance(filename, str):
             raise RuntimeError("'{}' is not a valid file name.".format(filename))
@@ -232,7 +229,7 @@ class UniformGenerator(DOEGenerator):
         seed : int or None, optional
             Seed for random number generator.
         """
-        super(UniformGenerator, self).__init__()
+        super().__init__()
 
         self._num_samples = num_samples
         self._seed = seed
@@ -260,7 +257,7 @@ class UniformGenerator(DOEGenerator):
         for _ in range(self._num_samples):
             sample = []
 
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
 
                 lower = meta['lower']
@@ -289,7 +286,7 @@ class _pyDOE_Generator(DOEGenerator):
 
     def __init__(self, levels=_LEVELS):
         """
-        Initialize the FullFactorialGenerator.
+        Initialize the _pyDOE_Generator.
 
         Parameters
         ----------
@@ -297,9 +294,8 @@ class _pyDOE_Generator(DOEGenerator):
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
         """
-        super(_pyDOE_Generator, self).__init__()
+        super().__init__()
         self._levels = levels
-        self._level_lst = None
 
     def __call__(self, design_vars, model=None):
         """
@@ -318,7 +314,7 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+        size = sum([meta['global_size'] for name, meta in design_vars.items()])
 
         doe = self._generate_design(size)
 
@@ -329,8 +325,8 @@ class _pyDOE_Generator(DOEGenerator):
         values = np.empty((size, self._levels))
 
         row = 0
-        for name, meta in iteritems(design_vars):
-            size = meta['size']
+        for name, meta in design_vars.items():
+            size = meta['global_size']
 
             for k in range(size):
                 lower = meta['lower']
@@ -348,8 +344,8 @@ class _pyDOE_Generator(DOEGenerator):
         for idxs in doe.astype('int'):
             retval = []
             row = 0
-            for name, meta in iteritems(design_vars):
-                size = meta['size']
+            for name, meta in design_vars.items():
+                size = meta['global_size']
                 val = np.empty(size)
                 for k in range(size):
                     idx = idxs[row + k]
@@ -436,7 +432,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         """
         Initialize the PlackettBurmanGenerator.
         """
-        super(PlackettBurmanGenerator, self).__init__(levels=2)
+        super().__init__(levels=2)
 
     def _generate_design(self, size):
         """
@@ -478,7 +474,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
         center : int, optional
             The number of center points to include (default = None).
         """
-        super(BoxBehnkenGenerator, self).__init__(levels=3)
+        super().__init__(levels=3)
         self._center = center
 
     def _generate_design(self, size):
@@ -551,7 +547,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         seed : int, optional
             Random seed to use if design is randomized. Defaults to None.
         """
-        super(LatinHypercubeGenerator, self).__init__()
+        super().__init__()
 
         if criterion not in self._supported_criterion:
             raise ValueError("Invalid criterion '%s' specified for %s. "
@@ -599,7 +595,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         for row in doe:
             retval = []
             col = 0
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
                 sample = row[col:col + size]
 

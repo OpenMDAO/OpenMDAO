@@ -1,11 +1,9 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestAddSubtractCompScalars(unittest.TestCase):
@@ -40,7 +38,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -81,7 +79,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -122,7 +120,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         b = self.p['b']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -167,7 +165,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         c = self.p['c']
         out = self.p['add_subtract_comp.adder_output']
         expected = a + b + c
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -212,7 +210,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         c = self.p['c']
         out = self.p['add_subtract_comp.adder_output']
         expected = 2*a + b - c
-        assert_rel_error(self, out, expected,1e-16)
+        assert_near_equal(out, expected,1e-16)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
@@ -258,16 +256,67 @@ class TestAddSubtractUnits(unittest.TestCase):
         out = self.p['add_subtract_comp.adder_output']
         m_to_ft = 3.280839895
         expected = a + b*m_to_ft + c*m_to_ft
-        assert_rel_error(self, out, expected,1e-8)
+        assert_near_equal(out, expected,1e-8)
 
     def test_partials(self):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
 
-class TestWrongScalingFactorCount(unittest.TestCase):
+class TestAddSubtractInit(unittest.TestCase):
 
     def setUp(self):
+        self.nn = 5
+
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
+        ivc.add_output(name='b', shape=(self.nn, 3), units='m')
+        ivc.add_output(name='c', shape=(self.nn, 3), units='m')
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b','c'])
+
+        # verify proper handling of constructor args
+        adder = om.AddSubtractComp(output_name='adder_output',
+                                   input_names=['input_a', 'input_b', 'input_c'],
+                                   vec_size=self.nn, length=3,
+                                   scaling_factors=[2., 1., -1],
+                                   units='ft')
+
+        self.p.model.add_subsystem(name='add_subtract_comp', subsys=adder)
+
+        self.p.model.connect('a', 'add_subtract_comp.input_a')
+        self.p.model.connect('b', 'add_subtract_comp.input_b')
+        self.p.model.connect('c', 'add_subtract_comp.input_c')
+
+        self.p.setup()
+
+        self.p['a'] = np.random.rand(self.nn, 3)
+        self.p['b'] = np.random.rand(self.nn, 3)
+        self.p['c'] = np.random.rand(self.nn, 3)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a = self.p['a']
+        b = self.p['b']
+        c = self.p['c']
+        out = self.p['add_subtract_comp.adder_output']
+        m_to_ft = 3.280839895
+        expected = 2*a + b*m_to_ft - c*m_to_ft
+        assert_near_equal(out, expected, 1e-8)
+
+    def test_partials(self):
+        partials = self.p.check_partials(method='fd', out_stream=None)
+        assert_check_partials(partials)
+
+
+class TestForExceptions(unittest.TestCase):
+
+    def test_for_bad_scale_factors(self):
         self.nn = 5
         self.p = om.Problem()
 
@@ -282,15 +331,91 @@ class TestWrongScalingFactorCount(unittest.TestCase):
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
                                    subsys=om.AddSubtractComp())
-        adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,scaling_factors=[1,-1])
+
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', ['input_a', 'input_b', 'input_c'], vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: Scaling factors list needs to be " \
+                       "same length as input names"
+
+        self.assertEqual(str(err.exception), expected_msg)
+
+
+    def test_for_bad_input_set(self):
+        self.nn = 5
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 3))
+        ivc.add_output(name='b', shape=(self.nn, 3))
+        ivc.add_output(name='c', shape=(self.nn, 3))
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b','c'])
+
+        adder=self.p.model.add_subsystem(name='add_subtract_comp',
+                                   subsys=om.AddSubtractComp())
+
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', ['input_a',], vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: must specify more than one input " \
+                       "name for an equation, but only one given"
+
+        self.assertEqual(str(err.exception), expected_msg)
+
+        with self.assertRaises(ValueError) as err:
+            adder.add_equation('adder_output', 'input_a', vec_size=self.nn,
+                               length=3, scaling_factors=[1, -1])
+
+        expected_msg = "'add_subtract_comp' <class AddSubtractComp>: must specify more than one input " \
+                       "name for an equation, but only one given"
+
+        self.assertEqual(str(err.exception), expected_msg)
+
+
+class TestAddSubtractCompTags(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 1
+        self.p = om.Problem()
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn,))
+        ivc.add_output(name='b', shape=(self.nn,))
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        adder=self.p.model.add_subsystem(name='add_subtract_comp', subsys=om.AddSubtractComp())
+        adder.add_equation('adder_output', ['input_a','input_b'], tags={'foo'})
+        adder.add_equation('adder_output2', ['input_a','input_a'], tags={'bar'})
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
         self.p.model.connect('b', 'add_subtract_comp.input_b')
-        self.p.model.connect('c', 'add_subtract_comp.input_c')
 
+        self.p.setup()
 
-    def test_for_exception(self):
-        self.assertRaises(ValueError,self.p.setup)
+        self.p['a'] = np.random.rand(self.nn,)
+        self.p['b'] = np.random.rand(self.nn,)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a = self.p['a']
+        b = self.p['b']
+
+        foo_outputs = self.p.model.list_outputs(tags={'foo'}, out_stream=None)
+        bar_outputs = self.p.model.list_outputs(tags={'bar'}, out_stream=None)
+
+        self.assertEqual(len(foo_outputs), 1)
+        self.assertEqual(len(bar_outputs), 1)
+
+        assert_near_equal(foo_outputs[0][1]['value'], a + b)
+        assert_near_equal(bar_outputs[0][1]['value'], a + a)
 
 
 class TestFeature(unittest.TestCase):
@@ -306,16 +431,7 @@ class TestFeature(unittest.TestCase):
         n = 3
 
         p = om.Problem()
-
-        ivc = om.IndepVarComp()
-        # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        ivc.add_output(name='thrust', shape=(n, 2), units='kN')
-        ivc.add_output(name='drag', shape=(n, 2), units='kN')
-        ivc.add_output(name='lift', shape=(n, 2), units='kN')
-        ivc.add_output(name='weight', shape=(n, 2), units='kN')
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+        model = p.model
 
         # Construct an adder/subtracter here. create a relationship through the add_equation method
         adder = om.AddSubtractComp()
@@ -323,12 +439,9 @@ class TestFeature(unittest.TestCase):
                            vec_size=n, length=2, scaling_factors=[1, -1, 1, -1], units='kN')
         # Note the scaling factors. we assume all forces are positive sign upstream
 
-        p.model.add_subsystem(name='totalforcecomp', subsys=adder)
-
-        p.model.connect('thrust', 'totalforcecomp.thrust')
-        p.model.connect('drag', 'totalforcecomp.drag')
-        p.model.connect('lift', 'totalforcecomp.lift')
-        p.model.connect('weight', 'totalforcecomp.weight')
+        # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
+        p.model.add_subsystem(name='totalforcecomp', subsys=adder,
+                              promotes_inputs=['thrust', 'drag', 'lift', 'weight'])
 
         p.setup()
 
@@ -344,7 +457,7 @@ class TestFeature(unittest.TestCase):
 
         # Verify the results
         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
-        assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
+        assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 
 if __name__ == '__main__':

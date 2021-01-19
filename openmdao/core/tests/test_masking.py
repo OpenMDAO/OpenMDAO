@@ -25,19 +25,19 @@ def _build_model(mode, implicit=False):
 
     p.setup(mode=mode)
 
-    p.model.nonlinear_solver = NewtonSolver()
+    p.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
     return p
 
 
 def _add_solvers(p):
     p.model.double_sellar.g1.linear_solver = DirectSolver(assemble_jac=True)
-    p.model.double_sellar.g1.nonlinear_solver = NewtonSolver()
+    p.model.double_sellar.g1.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
     p.model.double_sellar.g2.linear_solver = DirectSolver(assemble_jac=True)
-    p.model.double_sellar.g2.nonlinear_solver = NewtonSolver()
+    p.model.double_sellar.g2.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
-    newton = p.model.nonlinear_solver = NewtonSolver()
+    newton = p.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
     newton.linear_solver = ScipyKrylov()
     newton.linear_solver.precon = LinearBlockGS()
 

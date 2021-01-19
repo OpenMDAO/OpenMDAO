@@ -1,16 +1,30 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
-from __future__ import division, print_function
 import numpy as np
-
-try:
-    import petsc4py
-    from petsc4py import PETSc
-except ImportError:
-    PETSc = None
+import os
+import sys
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.utils.general_utils import warn_deprecation
+
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        import petsc4py
+        from petsc4py import PETSc
+    else:
+        PETSc = None
+# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
+# with a notification.
+else:
+    try:
+        import petsc4py
+        from petsc4py import PETSc
+    except ImportError:
+        PETSc = None
+        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
+        sys.stdout.flush()
+
 
 KSP_TYPES = [
     "richardson",
@@ -180,7 +194,7 @@ class PETScKrylov(LinearSolver):
         **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
-        super(PETScKrylov, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if PETSc is None:
             raise RuntimeError("{}: PETSc is not available.".format(self.msginfo))
@@ -195,7 +209,7 @@ class PETScKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(PETScKrylov, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
@@ -231,7 +245,7 @@ class PETScKrylov(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(PETScKrylov, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
@@ -249,7 +263,7 @@ class PETScKrylov(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(PETScKrylov, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
@@ -289,7 +303,7 @@ class PETScKrylov(LinearSolver):
             b_vec = system._vectors['output'][vec_name]
 
         # set value of x vector to KSP provided value
-        x_vec._data[:] = _get_petsc_vec_array(in_vec)
+        x_vec.set_val(_get_petsc_vec_array(in_vec))
 
         # apply linear
         scope_out, scope_in = system._get_scope()
@@ -297,7 +311,7 @@ class PETScKrylov(LinearSolver):
                              scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
-        result.array[:] = b_vec._data
+        result.array[:] = b_vec.asarray()
 
     def _linearize_children(self):
         """
@@ -361,8 +375,8 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # create numpy arrays to interface with PETSc
-            sol_array = x_vec._data.copy()
-            rhs_array = b_vec._data.copy()
+            sol_array = x_vec.asarray(copy=True)
+            rhs_array = b_vec.asarray(copy=True)
 
             # create PETSc vectors from numpy arrays
             sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
@@ -375,7 +389,7 @@ class PETScKrylov(LinearSolver):
             ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
             # stuff the result into the x vector
-            x_vec._data[:] = sol_array
+            x_vec.set_val(sol_array)
 
             sol_petsc_vec = rhs_petsc_vec = None
 
@@ -398,7 +412,7 @@ class PETScKrylov(LinearSolver):
             mode = self._mode
 
             # Need to clear out any junk from the inputs.
-            system._vectors['input'][vec_name].set_const(0.0)
+            system._vectors['input'][vec_name].set_val(0.0)
 
             # assign x and b vectors based on mode
             if mode == 'fwd':
@@ -409,7 +423,7 @@ class PETScKrylov(LinearSolver):
                 b_vec = system._vectors['output'][vec_name]
 
             # set value of b vector to KSP provided value
-            b_vec._data[:] = _get_petsc_vec_array(in_vec)
+            b_vec.set_val(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
             self._solver_info.append_precon()
@@ -417,7 +431,7 @@ class PETScKrylov(LinearSolver):
             self._solver_info.pop()
 
             # stuff resulting value of x vector into result for KSP
-            result.array[:] = x_vec._data
+            result.array[:] = x_vec.asarray()
         else:
             # no preconditioner, just pass back the incoming vector
             result.array[:] = _get_petsc_vec_array(in_vec)
@@ -470,49 +484,3 @@ class PETScKrylov(LinearSolver):
         pc_mat.setPythonContext(self)
 
         return ksp
-
-    @property
-    def preconditioner(self):
-        """
-        Provide 'preconditioner' property for backwards compatibility.
-
-        Returns
-        -------
-        <LinearSolver>
-            reference to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        return self.precon
-
-    @preconditioner.setter
-    def preconditioner(self, precon):
-        """
-        Provide for setting the 'preconditioner' property for backwards compatibility.
-
-        Parameters
-        ----------
-        precon : <LinearSolver>
-            reference to a <LinearSolver> to be assigned to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        self.precon = precon
-
-
-class PetscKSP(PETScKrylov):
-    """
-    Deprecated.  Use PETScKrylov.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Named args.
-        """
-        super(PetscKSP, self).__init__(**kwargs)
-        warn_deprecation('PetscKSP is deprecated.  Use PETScKrylov instead.')

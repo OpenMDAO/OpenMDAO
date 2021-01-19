@@ -1,12 +1,29 @@
 """Define the OptionsDictionary class."""
-from __future__ import division, print_function
-
-from six import iteritems, string_types
 
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.constants import _UNDEFINED
 
-# unique object to check if default is given
-_undefined = object()
+
+#
+# Template for `check_valid` function
+#
+def check_valid(name, value):
+    """
+    Check the validity of value for the option with name.
+
+    Parameters
+    ----------
+    name : str
+        name of the option
+    value : any
+        value for the option
+
+    Raises
+    ------
+    ValueError
+        if value is not valid for option
+    """
+    raise ValueError(f"Option '{name}' with value {value} is not valid.")
 
 
 class OptionsDictionary(object):
@@ -29,6 +46,8 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
+    _deprecation_warning_issued : list
+        Option names that are deprecated and a warning has been issued for their use.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -47,6 +66,8 @@ class OptionsDictionary(object):
         self._read_only = read_only
 
         self._all_recordable = True
+
+        self._deprecation_warning_issued = []
 
     def __getstate__(self):
         """
@@ -85,9 +106,9 @@ class OptionsDictionary(object):
             A rendition of the options as an rST table.
         """
         outputs = []
-        for option_name, option_data in sorted(iteritems(self._dict)):
+        for option_name, option_data in sorted(self._dict.items()):
             name = option_name
-            default = option_data['value'] if option_data['value'] is not _undefined \
+            default = option_data['value'] if option_data['value'] is not _UNDEFINED \
                 else '**Required**'
             values = option_data['values']
             types = option_data['types']
@@ -96,7 +117,7 @@ class OptionsDictionary(object):
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
-            if idx >= 0 and default_str[0] is '<':
+            if idx >= 0 and default_str[0] == '<':
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
@@ -136,7 +157,7 @@ class OptionsDictionary(object):
 
         header = ""
         titles = ""
-        for key, val in iteritems(max_sizes):
+        for key, val in max_sizes.items():
             header += '=' * val + ' '
 
         for j, head in enumerate(col_heads):
@@ -246,7 +267,7 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
                     self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
                                                                                      values),
@@ -256,7 +277,7 @@ class OptionsDictionary(object):
                 if not isinstance(value, types):
                     vtype = type(value).__name__
 
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
 
                     if isinstance(types, (set, tuple, list)):
@@ -285,8 +306,9 @@ class OptionsDictionary(object):
         if meta['check_valid'] is not None:
             meta['check_valid'](name, value)
 
-    def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True):
+    def declare(self, name, default=_UNDEFINED, values=None, types=None, desc='',
+                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
+                deprecation=None):
         r"""
         Declare an option.
 
@@ -305,8 +327,6 @@ class OptionsDictionary(object):
             Optional list of acceptable option values.
         types : type or tuple of types or None
             Optional type or list of acceptable option types.
-        type_ : type or tuple of types or None
-            Deprecated.  Use types instead.
         desc : str
             Optional description of the option.
         upper : float or None
@@ -314,18 +334,16 @@ class OptionsDictionary(object):
         lower : float or None
             Minimum allowable value.
         check_valid : function or None
-            General check function that raises an exception if value is not valid.
+            User-supplied function with arguments (name, value) that raises an exception
+            if the value is not valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
         recordable : bool
             If True, add to recorder
+        deprecation : str or None
+            If None, it is not deprecated. If a str, use as a DeprecationWarning
+            during __setitem__ and __getitem__
         """
-        if type_ is not None:
-            warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
-                             "Use 'types' instead." % name)
-        if types is None:
-            types = type_
-
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
                         " list, or tuple - not %s." % (name, values), exc_type=TypeError)
@@ -343,7 +361,11 @@ class OptionsDictionary(object):
         if not recordable:
             self._all_recordable = False
 
-        default_provided = default is not _undefined
+        default_provided = default is not _UNDEFINED
+
+        if default_provided and default is None:
+            # specifying default=None implies allow_none
+            allow_none = True
 
         self._dict[name] = {
             'value': default,
@@ -356,6 +378,7 @@ class OptionsDictionary(object):
             'has_been_set': default_provided,
             'allow_none': allow_none,
             'recordable': recordable,
+            'deprecation': deprecation,
         }
 
         # If a default is given, check for validity
@@ -432,6 +455,10 @@ class OptionsDictionary(object):
             msg = "Option '{}' cannot be set because it has not been declared."
             self._raise(msg.format(name), exc_type=KeyError)
 
+        if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
+            warn_deprecation(meta['deprecation'])
+            self._deprecation_warning_issued.append(name)
+
         if self._read_only:
             self._raise("Tried to set read-only option '{}'.".format(name), exc_type=KeyError)
 
@@ -457,9 +484,19 @@ class OptionsDictionary(object):
         # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
+            if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
+                warn_deprecation(meta['deprecation'])
+                self._deprecation_warning_issued.append(name)
             if meta['has_been_set']:
                 return meta['value']
             else:
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
             self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)
+
+    def items(self):
+        """
+        Yield name and value of options.
+        """
+        for key, val in self._dict.items():
+            yield key, val['value']

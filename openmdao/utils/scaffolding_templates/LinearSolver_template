@@ -21,7 +21,7 @@ class {class_name}(LinearSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super({class_name}, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # initialize needed atributes here...
 
@@ -36,7 +36,7 @@ class {class_name}(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super({class_name}, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         # perform any necessary setup here...
 
@@ -44,7 +44,7 @@ class {class_name}(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super({class_name}, self)._declare_options()
+        super()._declare_options()
 
         # for example...
         # self.options.declare('cs_reconverge', types=bool, default=True,

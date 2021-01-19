@@ -1,6 +1,4 @@
 """Define the test group classes."""
-from __future__ import division, print_function
-
 from openmdao.core.group import Group
 
 
@@ -34,7 +32,7 @@ class ParametericTestGroup(Group):
             'jacobian_type': ['matvec', 'dense', 'sparse-csc'],
         }
 
-        super(ParametericTestGroup, self).__init__()
+        super().__init__()
 
         self.options.declare('local_vector_class', default='default',
                              values=['default', 'petsc'],

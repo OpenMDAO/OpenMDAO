@@ -4,59 +4,27 @@ import unittest
 from tempfile import mkdtemp
 from shutil import rmtree
 
-from six.moves import range
+import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    LinearBlockGS, NonlinearBlockGS, SqliteRecorder
-
-from openmdao.utils.logger_utils import TestLogger
+import openmdao.api as om
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.error_checking.check_config import get_sccs_topo
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
+from openmdao.utils.logger_utils import TestLogger
 
 
-class MyComp(ExecComp):
+class MyComp(om.ExecComp):
     def __init__(self):
-        super(MyComp, self).__init__(["y = 2.0*a", "z = 3.0*b"])
+        super().__init__(["y = 2.0*a", "z = 3.0*b"])
 
 
 class TestCheckConfig(unittest.TestCase):
 
-    def test_hanging_inputs(self):
-        p = Problem()
-        root = p.model
-
-        G1 = root.add_subsystem("G1", Group(), promotes=['*'])
-        G2 = G1.add_subsystem("G2", Group(), promotes=['*'])
-        G2.add_subsystem("C2", IndepVarComp('x', 1.0), promotes=['*'])
-        G2.add_subsystem("C1", ExecComp('y=x*2.0+w'), promotes=['*'])
-
-        G3 = root.add_subsystem("G3", Group())
-        G4 = G3.add_subsystem("G4", Group())
-        G4.add_subsystem("C3", ExecComp('y=x*2.0+u'), promotes=['*'])
-        G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
-
-        testlogger = TestLogger()
-        p.setup(check='all', logger=testlogger)
-        p.final_setup()
-
-        expected = (
-            "The following inputs are not connected:\n"
-            "   G3.G4.C4.v     [ 1.]\n"
-            "   G3.G4.C4.x     [ 1.]\n"
-            "   G3.G4.u  (p):\n"
-            "      G3.G4.C3.u  [ 1.]\n"
-            "   G3.G4.x  (p):\n"
-            "      G3.G4.C3.x  [ 1.]\n"
-            "   w  (p):\n"
-            "      G1.G2.C1.w  [ 1.]\n"
-        )
-
-        testlogger.find_in('warning', expected)
-
     def test_dataflow_1_level(self):
-        p = Problem()
+        p = om.Problem()
         root = p.model
 
-        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
         root.add_subsystem("C1", MyComp())
         root.add_subsystem("C2", MyComp())
         root.add_subsystem("C3", MyComp())
@@ -74,8 +42,8 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         # set iterative solvers since we have cycles
-        root.linear_solver = LinearBlockGS()
-        root.nonlinear_solver = NonlinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
@@ -94,13 +62,140 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning)
 
+    def test_parallel_group_order(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.connect('c1.y', 'c2.x')
+
+        parallel = model.add_subsystem('parallel_copy', om.ParallelGroup())
+        parallel.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        parallel.connect('comp1.y', 'comp2.x')
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c4', om.ExecComp(['y=3.0*x_copy_1+7.0*x_copy_2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+        model.connect("parallel_copy.comp1.y", "c4.x_copy_1")
+        model.connect("parallel_copy.comp2.y", "c4.x_copy_2")
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect("p1.x", "parallel_copy.comp1.x")
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
+
+        expected_warning = ("The following systems are executed out-of-order:\n"
+                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n"
+                            "   System 'parallel_copy.comp2' executes out-of-order with respect to its source systems ['parallel_copy.comp1']\n")
+
+        testlogger.find_in('warning', expected_warning)
+
+    def test_serial_in_parallel(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+
+        parallel2 = model.add_subsystem('parallel_copy', om.ParallelGroup())
+        parallel2.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
+
+        model.add_subsystem('con', om.ExecComp('y = 3.0*x'))
+
+        model.connect("p1.x", "parallel.c1.x")
+        model.connect('parallel.c1.y', 'parallel_copy.comp1.x')
+        model.connect('parallel_copy.comp1.y', 'con.x')
+
+        prob.setup(check=True)
+
+        msg = ("The following systems are executed out-of-order:\n"
+               "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
+    def test_single_parallel_group_order(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
+        parallel.connect('c1.y', 'c2.x')
+
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
+
+        model.connect("parallel.c1.y", "c3.x1")
+        model.connect("parallel.c2.y", "c3.x2")
+
+        model.connect("p1.x", "parallel.c1.x")
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_warning(UserWarning, msg):
+            prob.run_model()
+
+        expected_warning = ("The following systems are executed out-of-order:\n"
+                            "   System 'parallel.c2' executes out-of-order with respect to its source systems ['parallel.c1']\n")
+
+        testlogger.find_in('warning', expected_warning)
+
+    def test_no_connect_parallel_group(self):
+        prob = om.Problem()
+        model = prob.model
+
+        traj = model.add_subsystem('traj', om.ParallelGroup())
+
+        burn1 = traj.add_subsystem('burn1', om.Group())
+        burn1.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        burn1.add_subsystem('burn_eq1', om.ExecComp(['y=-2.0*x']))
+        burn1.connect('p1.x', 'burn_eq1.x')
+
+        burn2 = traj.add_subsystem('burn2', om.Group())
+        burn2.add_subsystem('p2', om.IndepVarComp('x', 1.0))
+        burn2.add_subsystem('burn_eq2', om.ExecComp(['y=5.0*x']))
+        burn2.connect('p2.x', 'burn_eq2.x')
+
+        testlogger = TestLogger()
+        prob.setup(check=True, mode='fwd', logger=testlogger)
+
+        msg = "Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver to 'parallel' when " \
+              "connecting components inside parallel groups"
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
     def test_dataflow_multi_level(self):
-        p = Problem()
+        p = om.Problem()
         root = p.model
 
-        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
 
-        G1 = root.add_subsystem("G1", Group())
+        G1 = root.add_subsystem("G1", om.Group())
 
         G1.add_subsystem("C1", MyComp())
         G1.add_subsystem("C2", MyComp())
@@ -120,8 +215,8 @@ class TestCheckConfig(unittest.TestCase):
         root.connect("indep.x", "C4.b")
 
         # set iterative solvers since we have cycles
-        root.linear_solver = LinearBlockGS()
-        root.nonlinear_solver = NonlinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
@@ -147,10 +242,10 @@ class TestCheckConfig(unittest.TestCase):
         self.assertEqual([['C4', 'G1.C1', 'G1.C2']], sccs)
 
     def test_out_of_order_repeat_bug_and_dup_inputs(self):
-        p = Problem()
-        p.model.add_subsystem("indep", IndepVarComp('x', 1.0))
-        p.model.add_subsystem("C1", ExecComp(["y = 2.0*a", "z = 3.0*b"]))
-        p.model.add_subsystem("C2", ExecComp("y = 2.0*a"))
+        p = om.Problem()
+        p.model.add_subsystem("indep", om.IndepVarComp('x', 1.0))
+        p.model.add_subsystem("C1", om.ExecComp(["y = 2.0*a", "z = 3.0*b"]))
+        p.model.add_subsystem("C2", om.ExecComp("y = 2.0*a"))
 
         # create 2 out of order connections from C2 to C1
         p.model.connect("C2.y", "C1.a")
@@ -178,10 +273,10 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', expected_warning_2)
 
     def test_multi_cycles(self):
-        p = Problem()
+        p = om.Problem()
         root = p.model
 
-        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
 
         def make_cycle(root, start, end):
             # systems within a cycle will be declared out of order, but
@@ -193,7 +288,7 @@ class TestCheckConfig(unittest.TestCase):
                 root.connect("C%d.y" % i, "C%d.a" % (i+1))
             root.connect("C%d.y" % end, "C%d.a" % start)
 
-        G1 = root.add_subsystem('G1', Group())
+        G1 = root.add_subsystem('G1', om.Group())
 
         make_cycle(G1, 1, 3)
 
@@ -215,8 +310,8 @@ class TestCheckConfig(unittest.TestCase):
         G1.connect("C11.z", "C3.b")
 
         # set iterative solvers since we have cycles
-        root.linear_solver = LinearBlockGS()
-        root.nonlinear_solver = NonlinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
@@ -231,10 +326,10 @@ class TestCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', expected_warning_1)
 
     def test_multi_cycles_non_default(self):
-        p = Problem()
+        p = om.Problem()
         root = p.model
 
-        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
 
         def make_cycle(root, start, end):
             # systems within a cycle will be declared out of order, but
@@ -246,7 +341,7 @@ class TestCheckConfig(unittest.TestCase):
                 root.connect("C%d.y" % i, "C%d.a" % (i+1))
             root.connect("C%d.y" % end, "C%d.a" % start)
 
-        G1 = root.add_subsystem('G1', Group())
+        G1 = root.add_subsystem('G1', om.Group())
 
         make_cycle(G1, 1, 3)
 
@@ -268,8 +363,8 @@ class TestCheckConfig(unittest.TestCase):
         G1.connect("C11.z", "C3.b")
 
         # set iterative solvers since we have cycles
-        root.linear_solver = LinearBlockGS()
-        root.nonlinear_solver = NonlinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
+        root.nonlinear_solver = om.NonlinearBlockGS()
 
         testlogger = TestLogger()
         p.setup(check=['cycles', 'out_of_order', 'unconnected_inputs'], logger=testlogger)
@@ -287,30 +382,57 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
         )
 
-        expected_warning_2 = (
-            'The following inputs are not connected:\n'
-            '   G1.C1.b      [ 1.]\n'
-            '   G1.C11.b     [ 1.]\n'
-            '   G1.C13.b     [ 1.]\n'
-            '   G1.C22.b     [ 1.]\n'
-            '   G1.C23.b     [ 1.]\n'
-            '   G1.N1.a      [ 1.]\n'
-            '   G1.N1.b      [ 1.]\n'
-            '   G1.N2.a      [ 1.]\n'
-            '   G1.N3.a      [ 1.]\n'
-        )
-
         testlogger.find_in('info', expected_info)
         testlogger.find_in('warning', expected_warning_1)
-        testlogger.find_in('warning', expected_warning_2)
+
+    def test_unconnected_auto_ivc(self):
+        class SellarMDAConnect(om.Group):
+
+            def setup(self):
+                cycle = self.add_subsystem('cycle', om.Group(), promotes_inputs=['x', 'z'])
+                cycle.add_subsystem('d1', SellarDis1(), promotes_inputs=['x', 'z'])
+                cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z'])
+                cycle.connect('d1.y1', 'd2.y1')
+
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+                self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                          z=np.array([0.0, 0.0]), x=0.0),
+                                   promotes_inputs=['x', 'z'])
+
+                self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
+                self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
+
+                self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])
+                self.connect('cycle.d2.y2', ['obj_cmp.y2', 'con_cmp2.y2'])
+
+        prob = om.Problem(model=SellarMDAConnect())
+
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj_cmp.obj')
+        prob.model.add_constraint('con_cmp1.con1', upper=0)
+        prob.model.add_constraint('con_cmp2.con2', upper=0)
+
+        testlogger = TestLogger()
+        prob.setup(check=['unconnected_inputs'], logger=testlogger)
+        prob.final_setup()
+
+        expected_warning = (
+            "The following inputs are not connected:\n"
+            "  cycle.d1.y2 (cycle.d1.y2)\n"
+            "  x (cycle.d1.x)\n"
+            "  x (obj_cmp.x)\n"
+        )
+
+        testlogger.find_in('warning', expected_warning)
 
     def test_comp_has_no_outputs(self):
-        p = Problem()
+        p = om.Problem()
         root = p.model
 
-        root.add_subsystem("indep", IndepVarComp('x', 1.0))
+        root.add_subsystem("indep", om.IndepVarComp('x', 1.0))
 
-        comp1 = root.add_subsystem("comp1", ExplicitComponent())
+        comp1 = root.add_subsystem("comp1", om.ExplicitComponent())
         comp1.add_input('x', val=0.)
 
         root.connect('indep.x', 'comp1.x')
@@ -329,7 +451,7 @@ class TestCheckConfig(unittest.TestCase):
     def test_initial_condition_order(self):
         # Makes sure we set vars to their initial condition before running checks.
 
-        class TestComp(ExplicitComponent):
+        class TestComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', 37.0)
@@ -343,7 +465,7 @@ class TestCheckConfig(unittest.TestCase):
             def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
                 outputs['y'] = inputs['x']
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('comp', TestComp())
 
         prob.setup(check='all')
@@ -361,7 +483,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         os.chdir(self.temp_dir)
 
         self.filename = os.path.join(self.temp_dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
+        self.recorder = om.SqliteRecorder(self.filename)
 
     def tearDown(self):
         os.chdir(self.orig_dir)
@@ -373,7 +495,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
                 raise e
 
     def test_check_no_recorder_set(self):
-        p = Problem()
+        p = om.Problem()
 
         testlogger = TestLogger()
         p.setup(check=True, logger=testlogger)
@@ -383,7 +505,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         testlogger.find_in('warning', expected_warning)
 
     def test_check_driver_recorder_set(self):
-        p = Problem()
+        p = om.Problem()
         p.driver.add_recorder(self.recorder)
 
         testlogger = TestLogger()
@@ -394,7 +516,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 0)
 
     def test_check_system_recorder_set(self):
-        p = Problem()
+        p = om.Problem()
         p.model.add_recorder(self.recorder)
 
         testlogger = TestLogger()
@@ -405,7 +527,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         self.assertEqual(len(warnings), 0)
 
     def test_check_linear_solver_recorder_set(self):
-        p = Problem()
+        p = om.Problem()
         p.model.nonlinear_solver.add_recorder(self.recorder)
 
         testlogger = TestLogger()

@@ -1,13 +1,11 @@
 """Define the EQConstraintComp class."""
 
-from __future__ import print_function, division, absolute_import
-
 from numbers import Number
-from six import iteritems
 
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils import cs_safe
 
 
 class EQConstraintComp(ExplicitComponent):
@@ -99,60 +97,14 @@ class EQConstraintComp(ExplicitComponent):
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
         """
-        super(EQConstraintComp, self).__init__()
+        super().__init__()
         self._output_vars = {}
         if name is not None:
             self.add_eq_output(name, eq_units, lhs_name, rhs_name, rhs_val,
                                use_mult, mult_name, mult_val, normalize, add_constraint, ref, ref0,
                                adder, scaler, **kwargs)
 
-    def _post_configure(self):
-        """
-        Define the independent variables, output variables, and partials.
-        """
-        # set static mode to False because we are doing things that would normally be done in setup
-        self._static_mode = False
-
-        for name, options in iteritems(self._output_vars):
-
-            meta = self.add_output(name, **options['kwargs'])
-
-            shape = meta['shape']
-
-            for s in ('lhs', 'rhs', 'mult'):
-                if options['{0}_name'.format(s)] is None:
-                    options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
-
-            self.add_input(options['lhs_name'],
-                           val=np.ones(shape),
-                           units=options['eq_units'])
-
-            self.add_input(options['rhs_name'],
-                           val=options['rhs_val'] * np.ones(shape),
-                           units=options['eq_units'])
-
-            if options['use_mult']:
-                self.add_input(options['mult_name'],
-                               val=options['mult_val'] * np.ones(shape),
-                               units=None)
-
-            self._scale_factor = np.ones(shape)
-            self._dscale_drhs = np.ones(shape)
-
-            ar = np.arange(np.prod(shape))
-            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
-            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
-
-            if options['use_mult']:
-                self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
-
-            if options['add_constraint']:
-                self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
-                                    adder=options['adder'], scaler=options['scaler'])
-
-        self._static_mode = True
-
-        super(EQConstraintComp, self)._post_configure()
+        self._no_check_partials = True
 
     def compute(self, inputs, outputs):
         """
@@ -170,7 +122,7 @@ class EQConstraintComp(ExplicitComponent):
         else:
             self._scale_factor = self._scale_factor.real
 
-        for name, options in iteritems(self._output_vars):
+        for name, options in self._output_vars.items():
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
 
@@ -178,10 +130,10 @@ class EQConstraintComp(ExplicitComponent):
             # scale factor that normalizes by the rhs, except near 0
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
 
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
             else:
                 self._scale_factor[:] = 1.0
@@ -207,7 +159,7 @@ class EQConstraintComp(ExplicitComponent):
         else:
             self._dscale_drhs = self._dscale_drhs.real
 
-        for name, options in iteritems(self._output_vars):
+        for name, options in self._output_vars.items():
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
 
@@ -216,11 +168,11 @@ class EQConstraintComp(ExplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
 
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
                 self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
@@ -304,17 +256,52 @@ class EQConstraintComp(ExplicitComponent):
             Additional arguments to be passed for the creation of the output variable.
             (see `add_output` method).
         """
-        self._output_vars[name] = {'kwargs': kwargs,
-                                   'eq_units': eq_units,
-                                   'lhs_name': lhs_name,
-                                   'rhs_name': rhs_name,
-                                   'rhs_val': rhs_val,
-                                   'use_mult': use_mult,
-                                   'mult_name': mult_name,
-                                   'mult_val': mult_val,
-                                   'normalize': normalize,
-                                   'add_constraint': add_constraint,
-                                   'ref': ref,
-                                   'ref0': ref0,
-                                   'adder': adder,
-                                   'scaler': scaler}
+        self._output_vars[name] = options = {'kwargs': kwargs,
+                                             'eq_units': eq_units,
+                                             'lhs_name': lhs_name,
+                                             'rhs_name': rhs_name,
+                                             'rhs_val': rhs_val,
+                                             'use_mult': use_mult,
+                                             'mult_name': mult_name,
+                                             'mult_val': mult_val,
+                                             'normalize': normalize,
+                                             'add_constraint': add_constraint,
+                                             'ref': ref,
+                                             'ref0': ref0,
+                                             'adder': adder,
+                                             'scaler': scaler}
+
+        meta = self.add_output(name, **options['kwargs'])
+
+        shape = meta['shape']
+
+        for s in ('lhs', 'rhs', 'mult'):
+            if options['{0}_name'.format(s)] is None:
+                options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
+
+        self.add_input(options['lhs_name'],
+                       val=np.ones(shape),
+                       units=options['eq_units'])
+
+        self.add_input(options['rhs_name'],
+                       val=options['rhs_val'] * np.ones(shape),
+                       units=options['eq_units'])
+
+        if options['use_mult']:
+            self.add_input(options['mult_name'],
+                           val=options['mult_val'] * np.ones(shape),
+                           units=None)
+
+        self._scale_factor = np.ones(shape)
+        self._dscale_drhs = np.ones(shape)
+
+        ar = np.arange(np.prod(shape))
+        self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
+        self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
+
+        if options['use_mult']:
+            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+
+        if options['add_constraint']:
+            self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
+                                adder=options['adder'], scaler=options['scaler'])

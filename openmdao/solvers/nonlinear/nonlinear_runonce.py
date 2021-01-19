@@ -5,7 +5,6 @@ This is a simple nonlinear solver that just runs the system once.
 """
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import multi_proc_fail_check
 
 
@@ -33,8 +32,6 @@ class NonlinearRunOnce(NonlinearSolver):
                     for subsys in system._subsystems_myproc:
                         subsys._solve_nonlinear()
 
-                system._check_child_reconf()
-
             # If this is not a parallel group, transfer for each subsystem just prior to running it.
             else:
                 self._gs_iter()
@@ -53,25 +50,4 @@ class NonlinearRunOnce(NonlinearSolver):
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")    # Deprecated option.
         self.options.undeclare("err_on_non_converge")
-
-
-class NonLinearRunOnce(NonlinearRunOnce):
-    """
-    Deprecated.  See NonlinearRunOnce.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Deprecated.
-
-        Parameters
-        ----------
-        *args : list of object
-            Positional args.
-        **kwargs : dict
-            Named args.
-        """
-        super(NonLinearRunOnce, self).__init__(*args, **kwargs)
-        warn_deprecation('NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead.')

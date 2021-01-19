@@ -17,11 +17,7 @@ from sphinx.writers.html import HTMLTranslator
 from sphinx.writers.html5 import HTML5Translator
 from sphinx.errors import SphinxError
 
-
-if sys.version_info[0] == 2:
-    import cgi as cgiesc
-else:
-    import html as cgiesc
+import html as cgiesc
 
 
 class failed_node(nodes.Element):
@@ -124,7 +120,7 @@ class EmbedShellCmdDirective(Directive):
         os.chdir(workdir)
 
         try:
-            output = subprocess.check_output(cmd, stderr=stderr).decode('utf-8', 'ignore')
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT,env=os.environ).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
             # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on

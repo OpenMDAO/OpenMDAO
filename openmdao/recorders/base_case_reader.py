@@ -2,6 +2,8 @@
 Base class for all CaseReaders.
 """
 
+from openmdao.utils.assert_utils import warn_deprecation
+
 
 class BaseCaseReader(object):
     """
@@ -15,7 +17,7 @@ class BaseCaseReader(object):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_metadata : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     """
 
@@ -33,7 +35,35 @@ class BaseCaseReader(object):
         self._format_version = None
         self.problem_metadata = {}
         self.solver_metadata = {}
-        self.system_metadata = {}
+        self._system_options = {}
+
+    @property
+    def system_options(self):
+        """
+        Provide '_system_options' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the _system_options attribute.
+        """
+        warn_deprecation("The system_options attribute is deprecated. "
+                         "Use `list_model_options` instead.")
+        return self._system_options
+
+    @property
+    def system_metadata(self):
+        """
+        Provide 'system_metadata' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the '_system_options' attribute.
+        """
+        warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
+                         "Use `list_model_options` instead.")
+        return self._system_options
 
     def get_cases(self, source, recurse=True, flat=False):
         """

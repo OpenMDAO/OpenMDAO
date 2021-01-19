@@ -10,13 +10,16 @@ From your python environment (we recommend `Anaconda <https://www.anaconda.com/d
 
 .. code::
 
-    >> pip install openmdao[all]
+    >> pip install 'openmdao[all]'
 
 
 .. note::
 
     The [all] suffix to the install command ensures that you get all the optional dependencies
     (e.g. for testing and visualization).  You can omit this for a minimal installation.
+
+    The quotation marks are required to prevent some command shells (e.g. zsh) from trying to interpret
+    the square brackets.
 
 
 .. _paraboloid_min:
@@ -28,7 +31,7 @@ With OpenMDAO installed, let's try out a simple example, to get you started runn
 Copy the following code into a file named paraboloid_min.py:
 
 .. embed-code::
-    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    openmdao.test_suite.test_examples.test_tldr_paraboloid.TestParaboloidTLDR.test_tldr
     :layout: code
 
 
@@ -42,6 +45,6 @@ If all works as planned, results should appear as such:
 
 
 .. embed-code::
-    openmdao.test_suite.test_examples.tldr_paraboloid.TestParaboloidTLDR.test_tldr
+    openmdao.test_suite.test_examples.test_tldr_paraboloid.TestParaboloidTLDR.test_tldr
     :layout: output
 

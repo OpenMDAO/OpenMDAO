@@ -1,8 +1,6 @@
 """ Definition of the Paraboloid component, which evaluates the equation
 (x-3)^2 + xy + (y+4)^2 = 3
 """
-from __future__ import division, print_function
-
 import openmdao.api as om
 
 
@@ -17,6 +15,7 @@ class Paraboloid(om.ExplicitComponent):
 
         self.add_output('f_xy', val=0.0)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):

@@ -3,9 +3,6 @@ Interpolate using am Akima spline.
 
 Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 """
-from __future__ import division, print_function, absolute_import
-from six.moves import range
-
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
@@ -16,7 +13,7 @@ def abs_smooth_complex(x, delta_x):
     """
     Compute the absolute value of a complex-stepped vector.
 
-    Rather than taking a Euclidian norm, simply negate the values that are less than zero.
+    Rather than taking a Euclidean norm, simply negate the values that are less than zero.
 
     Parameters
     ----------
@@ -98,7 +95,7 @@ class InterpAkima(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpAkima, self).__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, **kwargs)
         self.k = 4
         self._name = 'akima'
 
@@ -307,6 +304,10 @@ class InterpAkima(InterpAlgorithm):
         if compute_local_train:
             dm3_dv = (deriv_dv[..., idx_val4, :] - deriv_dv[..., idx_val3, :]) / \
                 (grid[idx + 1] - grid[idx])
+            dm1_dv = 0
+            dm2_dv = 0
+            dm4_dv = 0
+            dm5_dv = 0
 
         if idx >= 2:
             m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])

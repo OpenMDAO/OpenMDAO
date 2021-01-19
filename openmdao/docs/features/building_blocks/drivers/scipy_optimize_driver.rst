@@ -20,6 +20,15 @@ ScipyOptimizeDriver Options
     ScipyOptimizeDriver
     options
 
+ScipyOptimizeDriver Constructor
+-------------------------------
+
+The call signature for the `ScipyOptimizeDriver` constructor is:
+
+.. automethod:: openmdao.drivers.scipy_optimizer.ScipyOptimizeDriver.__init__
+    :noindex:
+
+
 ScipyOptimizeDriver Option Examples
 -----------------------------------
 
@@ -61,7 +70,7 @@ ScipyOptimizeDriver Option Examples
 ScipyOptimizeDriver Driver Specific Options
 -------------------------------------------
 Optimizers in `scipy.optimize.minimize` have optimizer specific options. To let the user specify values for these
-options, OpeMDAO provides an option in the form of a dictionary named `opt_settings`. See the `scipy.optimize.minimize`
+options, OpenMDAO provides an option in the form of a dictionary named `opt_settings`. See the `scipy.optimize.minimize`
 documentation for more information about the driver specific options that are available.
 
 As an example, here is code using some `opt_settings` for the `shgo` optimizer:

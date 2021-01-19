@@ -5,8 +5,6 @@ Contains some general test components that are used in multiple places for testi
 featured as examples, and are not meant to be showcased as the proper way to write components
 in OpenMDAO.
 """
-from __future__ import division, print_function
-
 import numpy as np
 
 import openmdao.api as om
@@ -28,6 +26,7 @@ class Comp4LinearCacheTest(om.ImplicitComponent):
         self.add_input('x', val=1.0)
         self.add_output('y', val=np.sqrt(3))
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):

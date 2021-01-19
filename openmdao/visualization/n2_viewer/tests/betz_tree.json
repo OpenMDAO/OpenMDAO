@@ -1,0 +1,253 @@
+{
+    "name": "root",
+    "type": "root",
+    "class": "Group",
+    "expressions": null,
+    "component_type": null,
+    "subsystem_type": "group",
+    "is_parallel": false,
+    "linear_solver": "LN: RUNONCE",
+    "linear_solver_options": {
+        "iprint": 1,
+        "assemble_jac": false,
+        "use_aitken": false,
+        "aitken_min_factor": 0.1,
+        "aitken_max_factor": 1.5,
+        "aitken_initial_factor": 1.0
+    },
+    "nonlinear_solver": "NL: RUNONCE",
+    "nonlinear_solver_options": {
+        "iprint": 1
+    },
+    "children": [
+        {
+            "name": "indeps",
+            "type": "subsystem",
+            "class": "IndepVarComp",
+            "expressions": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "indep",
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "children": [
+                {
+                    "name": "a",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.5
+                    ]
+                },
+                {
+                    "name": "Area",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "m**2",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        10.0
+                    ]
+                },
+                {
+                    "name": "rho",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "kg/m**3",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.225
+                    ]
+                },
+                {
+                    "name": "Vu",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "m/s",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        10.0
+                    ]
+                }
+            ],
+            "options": {
+                "distributed": false,
+                "name": "UNDEFINED",
+                "val": 1.0,
+                "shape": null,
+                "units": null,
+                "res_units": null,
+                "desc": null,
+                "lower": null,
+                "upper": null,
+                "ref": 1.0,
+                "ref0": 0.0,
+                "res_ref": null,
+                "tags": null
+            }
+        },
+        {
+            "name": "a_disk",
+            "type": "subsystem",
+            "class": "ActuatorDisc",
+            "expressions": null,
+            "subsystem_type": "component",
+            "is_parallel": false,
+            "component_type": "explicit",
+            "linear_solver": "",
+            "linear_solver_options": null,
+            "nonlinear_solver": "",
+            "nonlinear_solver_options": null,
+            "children": [
+                {
+                    "name": "a",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.5
+                    ]
+                },
+                {
+                    "name": "Area",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "m**2",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        10.0
+                    ]
+                },
+                {
+                    "name": "rho",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "kg/m**3",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        1.225
+                    ]
+                },
+                {
+                    "name": "Vu",
+                    "type": "input",
+                    "dtype": "ndarray",
+                    "units": "m/s",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        10.0
+                    ]
+                },
+                {
+                    "name": "Vr",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "m/s",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "Vd",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "m/s",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "Ct",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "thrust",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "N",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "Cp",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "None",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                },
+                {
+                    "name": "power",
+                    "type": "output",
+                    "implicit": false,
+                    "dtype": "ndarray",
+                    "units": "W",
+                    "shape": "(1,)",
+                    "distributed": false,
+                    "is_discrete": false,
+                    "value": [
+                        0.0
+                    ]
+                }
+            ],
+            "options": {
+                "distributed": false
+            }
+        }
+    ],
+    "options": {
+        "assembled_jac_type": "csc"
+    }
+}

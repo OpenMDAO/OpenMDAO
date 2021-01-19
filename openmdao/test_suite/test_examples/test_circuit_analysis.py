@@ -1,10 +1,9 @@
-from __future__ import print_function, division, absolute_import
 import numpy as np
 
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestCircuit(unittest.TestCase):
@@ -32,7 +31,7 @@ class TestCircuit(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
                 ##################################################################
@@ -44,29 +43,27 @@ class TestCircuit(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
 
+        p.set_val('circuit.I_in', 0.1)
+        p.set_val('circuit.Vg', 0.)
+
         # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1.)
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_near_equal(p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_near_equal(p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_plain_newton(self):
 
@@ -91,7 +88,7 @@ class TestCircuit(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = om.NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
                 self.linear_solver = om.DirectSolver()
@@ -114,14 +111,14 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_near_equal(p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_near_equal(p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_plain_newton_many_iter(self):
 
@@ -150,11 +147,11 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.98744708, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 8.73215484, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.98744708, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 8.73215484, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
 
     def test_circuit_advanced_newton(self):
         import openmdao.api as om
@@ -187,14 +184,14 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.71278185, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.09908047, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 0.00091953, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 9.90804735, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.71278185, 1e-5)
+        assert_near_equal(p['circuit.R1.I'], 0.09908047, 1e-5)
+        assert_near_equal(p['circuit.R2.I'], 0.00091953, 1e-5)
+        assert_near_equal(p['circuit.D1.I'], 0.00091953, 1e-5)
 
         # sanity check: should sum to .1 Amps
-        assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+        assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_voltage_source(self):
         import openmdao.api as om
@@ -251,11 +248,11 @@ class TestCircuit(unittest.TestCase):
 
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 1.5, 1e-5)
-        assert_rel_error(self, p['circuit.n2.V'], 0.65113362, 1e-5)
-        assert_rel_error(self, p['circuit.R1.I'], 0.015, 1e-5)
-        assert_rel_error(self, p['circuit.R2.I'], 8.48866375e-05, 1e-5)
-        assert_rel_error(self, p['circuit.D1.I'], 8.48866375e-05, 1e-5)
+        assert_near_equal(p['circuit.n1.V'], 1.5, 1e-5)
+        assert_near_equal(p['circuit.n2.V'], 0.65113362, 1e-5)
+        assert_near_equal(p['circuit.R1.I'], 0.015, 1e-5)
+        assert_near_equal(p['circuit.R2.I'], 8.48866375e-05, 1e-5)
+        assert_near_equal(p['circuit.D1.I'], 8.48866375e-05, 1e-5)
 
 
 if __name__ == "__main__":

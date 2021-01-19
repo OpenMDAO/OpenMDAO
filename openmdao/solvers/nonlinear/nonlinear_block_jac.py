@@ -30,7 +30,6 @@ class NonlinearBlockJac(NonlinearSolver):
                 for subsys in system._subsystems_myproc:
                     subsys._solve_nonlinear()
 
-            system._check_child_reconf()
             rec.abs = 0.0
             rec.rel = 0.0
 
@@ -61,6 +60,6 @@ class NonlinearBlockJac(NonlinearSolver):
         # If this is a parallel group, check for analysis errors and reraise.
         if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
             with multi_proc_fail_check(system.comm):
-                super(NonlinearBlockJac, self)._run_apply()
+                super()._run_apply()
         else:
-            super(NonlinearBlockJac, self)._run_apply()
+            super()._run_apply()

@@ -3,41 +3,31 @@ class ModelData {
 
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
-        debugInfo(modelJSON);
+
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
+        this.useDeclarePartialsList = (this.declarePartialsList.length > 0);
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
-        this.idCounter = 0;
-        this.unconnectedParams = 0;
+        this.unconnectedInputs = 0;
+        this.autoivcSources = 0;
         this.nodePaths = {};
-
-        if (modelJSON.options.use_declare_partial_info &&
-            this.declarePartialsList.length == 0) {
-            console.warn("Declare partial list is empty, but --use_declare_partial_info specified.")
-        }
+        this.nodeIds = [];
+        this.depthCount = [];
 
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
         stopTimer('ModelData._convertToN2TreeNodes');
 
-        startTimer('ModelData._expandColonVars');
-        this._expandColonVars(this.root);
-        stopTimer('ModelData._expandColonVars');
-
-        startTimer('ModelData._flattenColonGroups');
-        this._flattenColonGroups(this.root);
-        stopTimer('ModelData._flattenColonGroups');
-
         startTimer('ModelData._setParentsAndDepth');
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
 
-        if (this.unconnectedParams > 0)
-            console.info("Unconnected nodes: ", this.unconnectedParams);
+        if (this.unconnectedInputs > 0)
+            console.info("Unconnected nodes: ", this.unconnectedInputs);
 
         startTimer('ModelData._initSubSystemChildren');
         this._initSubSystemChildren(this.root);
@@ -47,8 +37,19 @@ class ModelData {
         this._computeConnections();
         stopTimer('ModelData._computeConnections');
 
+        this._updateAutoIvcNames();
+
         debugInfo("New model: ", this);
         // this.errorCheck();
+    }
+
+    static uncompressModel(b64str) {
+        const compressedData = atob(b64str);
+        const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+        /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
+            console.log(pos, jsonStr.substring(pos, pos+99));
+        } */
+        return JSON.parse(jsonStr);
     }
 
     /**
@@ -72,7 +73,7 @@ class ModelData {
     }
 
     /**
-     * Recurse over the tree and replace the JSON objects 
+     * Recurse over the tree and replace the JSON objects
      * provided by n2_viewer.py with N2TreeNodes.
      * @param {Object} element The current element being updated.
      */
@@ -80,7 +81,7 @@ class ModelData {
         let newNode = new N2TreeNode(element);
 
         if (newNode.hasChildren()) {
-            for (let i = 0; i < newNode.children.length; ++i) {
+            for (let i in newNode.children) {
                 newNode.children[i] = this._convertToN2TreeNodes(newNode.children[i]);
                 newNode.children[i].parent = newNode;
                 if (exists(newNode.children[i].parentComponent))
@@ -89,109 +90,6 @@ class ModelData {
         }
 
         return newNode;
-    }
-
-    /** Called by _expandColonVars when splitting an element into children.
-     * TODO: Document params and recursive functionality.
-     */
-    _addColonVarChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
-        if (arrayOfNames.length == arrayOfNamesIndex) return;
-
-        let name = arrayOfNames[arrayOfNamesIndex];
-
-        if (!parent.hasChildren()) parent.children = [];
-
-        let newChildName = name + colonVarNameAppend;
-        let parentIdx = indexForMember(parent.children, 'name', newChildName);
-        if (parentIdx == -1) { // new name not found in parent, create new
-            let newChild = new N2TreeNode({
-                "name": newChildName,
-                "type": type,
-                "splitByColon": true,
-                "originalParent": originalParent
-            });
-
-            if (type.match(paramRegex)) {
-                parent.children.splice(0, 0, newChild);
-            }
-            else {
-                parent.children.push(newChild);
-            }
-
-            this._addColonVarChildren(originalParent, newChild, arrayOfNames,
-                arrayOfNamesIndex + 1, type);
-        }
-        else { // new name already found in parent, keep traversing
-            this._addColonVarChildren(originalParent, parent.children[parentIdx],
-                arrayOfNames, arrayOfNamesIndex + 1, type);
-        }
-    }
-
-    /**
-     * If an object has a child with colons in its name, split that child
-     * into multiple objects named from the tokens in the original name. Replace the
-     * original child object with the new children. Recurse over the array of children.
-     * @param {N2TreeNode} node The object that may have children to check.
-     */
-    _expandColonVars(node) {
-        if (!node.hasChildren()) return;
-
-        // Don't use an iterator here because we may modify the array
-        for (let i = 0; i < node.children.length; ++i) {
-
-            let splitArray = node.children[i].name.split(":");
-            if (splitArray.length > 1) {
-                if (!node.hasOwnProperty("subsystem_type") ||
-                    node.subsystem_type != "component") {
-                    throw ("There is a colon-named object whose parent is not a component.");
-                }
-
-                let type = node.children[i].type;
-                node.children.splice(i--, 1);
-                this._addColonVarChildren(node, node, splitArray, 0, type);
-            }
-        }
-
-        for (let child of node.children) {
-            this._expandColonVars(child);
-        }
-    }
-
-    /**
-     * If an node formerly had a name with colons, but was split by _expandColonVars()
-     * and only ended up with one child, recombine the node and its child. Operate
-     * recursively on all children.
-     * @param {N2TreeNode} node The object to check.
-     */
-    _flattenColonGroups(node) {
-        if (!Array.isPopulatedArray(node.children)) return;
-
-        if (node.name.endsWith(colonVarNameAppend)) {
-            node.name = node.name.slice(0, -1);
-        }
-
-        while (node.splitByColon && exists(node.children) &&
-            node.children.length == 1 &&
-            node.children[0].splitByColon) {
-            let child = node.children[0];
-
-            if (child.name.endsWith(colonVarNameAppend)) {
-                node.name += ":" + child.name.slice(0, -1);
-            } else {
-                node.name += ":" + child.name;
-            }
-            node.children = (Array.isArray(child.children) &&
-                child.children.length >= 1) ?
-                child.children : null; //absorb childs children
-            if (node.children == null) delete node.children;
-            node.splitByColon = false;
-        }
-
-        if (!Array.isArray(node.children)) return;
-
-        for (let child of node.children) {
-            this._flattenColonGroups(child);
-        }
     }
 
     /**
@@ -203,57 +101,42 @@ class ModelData {
      * @return True is node is implicit, false otherwise.
      */
     _setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
-        node.numLeaves = 0; // for nested params
         node.depth = depth;
         node.parent = parent;
-        node.id = ++this.idCounter; // id starts at 1 for if comparision
-        node.absPathName = "";
+        node.id = this.nodeIds.length;
+        this.nodeIds.push(node);
+
+        // Track # of nodes at each depth
+        if (depth > this.depthCount.length) { this.depthCount.push(1); }
+        else { this.depthCount[depth - 1]++; }
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
-
-                if (node.parent.splitByColon) {
-                    if (node.parent.absPathName.endsWith(colonVarNameAppend)) {
-                        node.absPathName += node.parent.absPathName.slice(0, -1);
-                    }
-                    else {
-                        node.absPathName += node.parent.absPathName;
-                    }
-
-                }
-                else {
-                    node.absPathName += node.parent.absPathName;
-                }
-                node.absPathName += (node.parent.splitByColon) ? ":" : ".";
+                node.absPathName += node.parent.absPathName + ".";
             }
 
-            if (node.name.endsWith(colonVarNameAppend)) {
-                node.absPathName += node.name.slice(0, -1);
-            }
-            else {
-                node.absPathName += node.name;
-            }
+            node.absPathName += node.name;
 
             this.nodePaths[node.absPathName] = node;
+
+            if (this.abs2prom.input[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.input[node.absPathName];
+            }
+            else if (this.abs2prom.output[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.output[node.absPathName];
+            }
         }
 
-        this.identifyUnconnectedParam(node);
+        this.identifyUnconnectedInput(node);
 
-        if (node.isParamOrUnknown()) {
+        if (node.isInputOrOutput()) {
             let parentComponent = (node.originalParent) ? node.originalParent : node.parent;
             if (parentComponent.type == "subsystem" &&
                 parentComponent.subsystem_type == "component") {
                 node.parentComponent = parentComponent;
             }
             else {
-                throw ("Param or unknown without a parent component!");
-            }
-        }
-
-        if (node.splitByColon) {
-            node.colonName = node.name;
-            for (let obj = node.parent; obj.splitByColon; obj = obj.parent) {
-                node.colonName = obj.name + ":" + node.colonName;
+                throw ("Input or output without a parent component!");
             }
         }
 
@@ -263,10 +146,24 @@ class ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
+        node.childNames.add(node.absPathName); // Add the node itself
+
         if (node.hasChildren()) {
+            node.numDescendants = node.children.length;
             for (let child of node.children) {
+
                 let implicit = this._setParentsAndDepth(child, node, depth + 1);
                 if (implicit) node.implicit = true;
+
+                node.numDescendants += child.numDescendants;
+
+                // Add absolute pathnames of children to a set for quick searching
+                if (!node.isRoot()) { // All nodes are children of the model root
+                    node.childNames.add(child.absPathName);
+                    for (let childName of child.childNames) {
+                        node.childNames.add(childName);
+                    }
+                }
             }
         }
 
@@ -281,7 +178,9 @@ class ModelData {
      */
     hasInputConnection(elementPath) {
         for (let conn of this.conns) {
-            if (conn.tgt.match(elementPath)) { return true; }
+            if (conn.tgt.match(elementPath)) {
+                return true;
+            }
         }
 
         return false;
@@ -295,7 +194,9 @@ class ModelData {
      */
     hasOutputConnection(elementPath) {
         for (let conn of this.conns) {
-            if (conn.src.match(elementPath)) { return true; }
+            if (conn.src.match(elementPath)) {
+                return true;
+            }
         }
 
         return false;
@@ -315,19 +216,51 @@ class ModelData {
         }
 
         debugInfo(elementPath + " has no connections.");
-        this.unconnectedParams++;
+        this.unconnectedInputs++;
+
+        return false;
+    }
+
+    hasAutoIvcSrc(elementPath) {
+        for (let conn of this.conns) {
+            if (conn.tgt == elementPath && conn.src.match(/^_auto_ivc.*$/)) {
+                debugInfo(elementPath + " source is an auto-ivc output.");
+                this.autoivcSources++;
+                return true;
+            }
+        }
 
         return false;
     }
 
     /**
-    * Create an array in each node containing references to its
-    * children that are subsystems. Runs recursively over the node's
-    * children array.
-    * @param {N2TreeNode} node Node with children to check.
-    */
+     * Find the target of an Auto-IVC variable.
+     * @param {String} elementPath The full path of the element to check. Must start with _auto_ivc.
+     * @return {String} The absolute path of the target element, or undefined if not found.
+     */
+    getAutoIvcTgt(elementPath) {
+        if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
+
+        for (let conn of this.conns) {
+            if (conn.src == elementPath) {
+                return conn.tgt;
+            }
+        }
+
+        console.warn(`No target connection found for ${elementPath}.`)
+        return undefined;
+    }
+
+    /**
+     * Create an array in each node containing references to its
+     * children that are subsystems. Runs recursively over the node's
+     * children array.
+     * @param {N2TreeNode} node Node with children to check.
+     */
     _initSubSystemChildren(node) {
-        if (!node.hasChildren()) { return; }
+        if (!node.hasChildren()) {
+            return;
+        }
 
         for (let child of node.children) {
             if (child.isSubsystem()) {
@@ -348,53 +281,21 @@ class ModelData {
      * @return {Boolean} True if the string was found.
      */
     isDeclaredPartial(srcObj, tgtObj) {
-        let partialsString = tgtObj.absPathName + " > " + srcObj.absPathName;
+        let partialsStr = tgtObj.absPathName + " > " + srcObj.absPathName;
 
-        return this.declarePartialsList.includes(partialsString);
+        return this.declarePartialsList.includes(partialsStr);
     }
 
     /**
-     * Traverse the tree trying to match a complete path to the node.
-     * @param {N2TreeNode} node Starting point.
-     * @param {string[]} nameArray Path to node broken into components as array nodes.
-     * @param {number} nameIndex Index of nameArray currently being searched for.
-     * @return {N2TreeNode} Reference to node in the path.
-     */
-    _getObjectInTree(node, nameArray, nameIndex) {
-        // Reached the last name:
-        if (nameArray.length == nameIndex) return node;
-
-        // No children:
-
-        for (let child of node.children) {
-            if (child.name == nameArray[nameIndex]) {
-                return this._getObjectInTree(child, nameArray, nameIndex + 1);
-            }
-            else {
-                let numNames = child.name.split(":").length;
-                if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
-                    let mergedName = nameArray[nameIndex];
-                    for (let j = 1; j < numNames; ++j) {
-                        mergedName += ":" + nameArray[nameIndex + j];
-                    }
-                    if (child.name == mergedName) {
-                        return this._getObjectInTree(child, nameArray, nameIndex + numNames);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /** 
      * Add all leaf descendents of specified node to the array.
      * @param {N2TreeNode} node Current node to work on.
      * @param {N2TreeNode[]} objArray Array to add to.
      */
 
     _addLeaves(node, objArray) {
-        if (!node.isParam()) { objArray.push(node); }
+        if (!node.isInput()) {
+            objArray.push(node);
+        }
 
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -424,8 +325,8 @@ class ModelData {
             }
 
             let srcObjParents = [srcObj];
-            if (!srcObj.isUnknown()) { // source obj must be unknown
-                console.warn(throwLbl + "Found a source that is not an unknown.");
+            if (!srcObj.isOutput()) { // source obj must be output
+                console.warn(throwLbl + "Found a source that is not an output.");
                 continue;
             }
 
@@ -438,7 +339,6 @@ class ModelData {
                 srcObjParents.push(obj);
             }
 
-
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
 
@@ -447,9 +347,9 @@ class ModelData {
                 continue;
             }
 
-            // Target obj must be a param
-            if (!tgtObj.isParam()) {
-                console.warn(throwLbl + "Found a target that is NOT a param.");
+            // Target obj must be an input
+            if (!tgtObj.isInput()) {
+                console.warn(throwLbl + "Found a target that is NOT a input.");
                 continue;
             }
             if (tgtObj.hasChildren()) {
@@ -458,8 +358,7 @@ class ModelData {
             }
 
             if (!tgtObj.parentComponent) {
-                console.warn(throwLbl + "Target object " + conn.tgt +
-                    " is missing a parentComponent.");
+                console.warn(`${throwLbl} Target object ${conn.tgt} is missing a parent component.`);
                 continue;
             }
 
@@ -482,7 +381,7 @@ class ModelData {
              * The cycle_arrows object in each connection is an array of length-2 arrays,
              * each of which is an index into the sysPathnames array. Using that array we
              * can resolve the indexes to pathnames to the associated objects.
-            */
+             */
             if (Array.isPopulatedArray(conn.cycle_arrows)) {
                 let cycleArrowsArray = [];
                 let cycleArrows = conn.cycle_arrows;
@@ -508,13 +407,34 @@ class ModelData {
                         continue;
                     }
 
-                    cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
+                    cycleArrowsArray.push({
+                        "begin": arrowBeginObj,
+                        "end": arrowEndObj
+                    });
                 }
 
                 if (!tgtObj.parent.hasOwnProperty("cycleArrows")) {
                     tgtObj.parent.cycleArrows = [];
                 }
-                tgtObj.parent.cycleArrows.push({ "src": srcObj, "arrows": cycleArrowsArray });
+                tgtObj.parent.cycleArrows.push({
+                    "src": srcObj,
+                    "arrows": cycleArrowsArray
+                });
+            }
+        }
+    }
+
+    /**
+     *
+     */
+    _updateAutoIvcNames() {
+        const aivc = this.nodePaths['_auto_ivc'];
+        if (aivc !== undefined && aivc.hasChildren()) {
+            for (const ivc of aivc.children) {
+                const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+                if (tgtPath !== undefined) {
+                    ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                }
             }
         }
     }
@@ -524,11 +444,17 @@ class ModelData {
      * relabel it as unconnected.
      * @param {N2TreeNode} node The tree node to work on.
      */
-    identifyUnconnectedParam(node) { // Formerly updateRootTypes
+    identifyUnconnectedInput(node) { // Formerly updateRootTypes
         if (!node.hasOwnProperty('absPathName')) {
-            console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
+            console.warn("identifyUnconnectedInput error: absPathName not set for ", node);
         }
-        else if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
-            node.type = "unconnected_param";
+        else {
+            if (node.isInput()) {
+                if (!node.hasChildren() && !this.hasAnyConnection(node.absPathName))
+                    node.type = "unconnected_input";
+                else if (this.hasAutoIvcSrc(node.absPathName))
+                    node.type = "autoivc_input";
+            }
+        }
     }
 }

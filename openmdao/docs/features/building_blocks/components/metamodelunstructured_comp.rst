@@ -27,6 +27,15 @@ MetaModelUnStructuredComp Options
     MetaModelUnStructuredComp
     options
 
+MetaModelUnStructuredComp Constructor
+-------------------------------------
+
+The call signature for the `MetaModelUnStructuredComp` constructor is:
+
+.. automethod:: openmdao.components.meta_model_unstructured_comp.MetaModelUnStructuredComp.__init__
+    :noindex:
+
+
 Simple Example
 --------------
 
@@ -117,8 +126,9 @@ In some cases, you might define surrogates but not define a `linearize` method. 
 surrogate. By default, the default options for the finite differencing method will be used.
 
 If you would like to specify finite differencing options, you can do so by calling the `declare_partials`
-method in the component's `setup` or in a parent group's configure method. This example, which uses a surrogate with no
-`linearize` method and no training for simplicity, shows `declare_partials` called in `setup`.
+method in the component's `setup_partials` or in a parent group's configure method.
+This example, which uses a surrogate with no
+`linearize` method and no training for simplicity, shows `declare_partials` called in `setup_partials`.
 
 .. embed-code::
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelTestCase.test_feature_metamodel_use_fd_if_no_surrogate_linearize

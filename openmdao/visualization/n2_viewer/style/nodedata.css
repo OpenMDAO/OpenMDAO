@@ -1,0 +1,282 @@
+/******************* Node Data styling *******************/
+div.info-panel {
+    position: absolute;
+    z-index: 20;
+    height: auto;
+}
+
+.node-info-table {
+	overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    border-collapse: separate;
+    opacity: .95;
+    border-spacing: 0;
+}
+
+.info-hidden {
+    visibility: hidden;
+}
+
+.info-visible {
+    visibility: visible;
+}
+
+.node-info-table thead th {
+    background-color: #42926b;
+    color: black;
+    padding: 5px;
+    font-size: 11pt;
+    cursor: grab;
+}
+
+.node-info-title {
+    /* Stuff to prevent title bar from being too long */
+    display: block;
+    position: relative;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+.node-info-table tbody th {
+    text-align: right;
+    font-size: 9pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.node-info-table tbody .options-header {
+    background-color: #eeeeee;
+    text-align: center;
+}
+
+.node-info-table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.node-info-table tfoot th {
+    background-color: #42926b;
+    padding: 2px;
+    font-size: 11pt;
+}
+
+.caps {
+    text-transform: capitalize;
+}
+
+.node-info-data {
+    display: none;
+}
+
+.info-header {
+	background-color: #42926b;
+}
+
+.info-header p {
+	color: white;
+	text-align: center;
+}
+
+.node-data-cursor {
+    cursor: context-menu;
+}
+
+#node-info-pin {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    border: 0;
+    font-size: 12px;
+    background: #ccc;
+    width: 18px;
+    height: 18px;
+    padding: 0 2px 0 2px;
+    /* box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2); */
+    border-radius: 3px;
+}
+
+#node-info-pin:hover {
+    top: 4px;
+    right: 9px;
+    box-shadow: 1px 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/******************* Node Value Window styling *******************/
+
+/* these next two are actually styling used in the node info window but are there for the node value window */
+.show_value_button {
+   background-color: #c1c1c1;
+}
+
+.copy_value_button {
+   background-color: #c1c1c1;
+}
+
+#node-value-containers {
+    visibility: hidden;
+}
+
+.node-value-container {
+    visibility: visible;
+    overflow: hidden;
+	background-color: white;
+	border-radius: 10px;
+	border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-collapse: separate;
+    opacity: .95;
+    z-index: 20;
+    position: absolute;
+    top: 400px;
+    left: 700px;
+}
+
+/*.node-value-grabber {*/
+/*    overflow:hidden;*/
+/*    width:100%;*/
+/*    height:100%;*/
+/*}*/
+
+/* Value window header */
+.node-value-header {
+    background-color: #42926b;
+    color: black;
+    margin: 0;
+    padding: 5px;
+    font-size: 11pt;
+    text-align: right;
+    cursor: grab;
+    white-space: nowrap;
+}
+
+.node-value-title {
+    color: black;
+    display: block;
+    position: relative;
+    font-weight: bold;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 15px;
+}
+
+.node-value-title::after {
+    content: ' Value';
+}
+
+.close-value-window-button {
+	color: black;
+	float: right;
+    font-size: 11pt;
+	font-weight: bold;
+}
+
+.close-value-window-button:hover,
+.close-value-window-button:focus {
+	color: #f00;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+/* Value window table */
+.node-value-table-div {
+    overflow: auto;
+}
+
+.node-value-table {
+    border: 1px solid #a0a0a0;
+    border-collapse: collapse;
+}
+
+.node-value-table tbody th {
+    border: 1px solid #a0a0a0;
+    background-color: #c0c0c0;
+    text-align: center;
+    color: #202020;
+    font-size: 8pt;
+    min-width: 30px;
+    font-weight: 300;
+}
+
+.node-value-table tbody td {
+    border: 1px solid #a0a0a0;
+    text-align: left;
+    font-size: 9pt;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.node-value-table tbody tr.even td {
+    background-color:white;
+}
+
+.node-value-table tbody tr.odd td {
+    background-color: #e8ffe8;
+}
+
+/* Value window footer */
+.node-value-footer {
+    background-color: #42926b;
+    color: black;
+    margin: 0;
+    padding: 5px;
+}
+
+.node-value-resizer-box {
+    position: absolute;
+    right: -3px;
+}
+
+.node-value-hidden {
+    display: none;
+}
+
+.node-value-resizer-handle {
+    position: absolute;
+    right: -2px;
+    bottom: 0;
+    margin: 0;
+    height: 18px;
+    cursor: nwse-resize;
+    pointer-events: initial;
+    overflow: hidden;
+}
+
+/* this is an off screen element that is used in the strange way you
+   need to put content on the clipboard.
+   It has to have visibility of visible to work
+ */
+#input-for-pastebuffer {
+    visibility: visible;
+    position: absolute;
+    left: -999em;
+}

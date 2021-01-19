@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -10,7 +9,7 @@ import unittest
 import numpy as np
 import math
 
-from six import StringIO
+from io import StringIO
 
 from distutils.version import LooseVersion
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
@@ -21,9 +20,9 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
+from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
@@ -53,18 +52,18 @@ class CounterGroup(om.Group):
         self._solve_count = 0
         self._solve_nl_count = 0
         self._apply_nl_count = 0
-        super(CounterGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _solve_linear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_linear(*args, **kwargs)
+        super()._solve_linear(*args, **kwargs)
         self._solve_count += 1
 
     def _solve_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        super()._solve_nonlinear(*args, **kwargs)
         self._solve_nl_count += 1
 
     def _apply_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._apply_nonlinear(*args, **kwargs)
+        super()._apply_nonlinear(*args, **kwargs)
         self._apply_nl_count += 1
 
 
@@ -74,7 +73,7 @@ SIZE = 10
 
 class DynPartialsComp(om.ExplicitComponent):
     def __init__(self, size):
-        super(DynPartialsComp, self).__init__()
+        super().__init__()
         self.size = size
         self.num_computes = 0
 
@@ -95,7 +94,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            **options):
+            use_vois=True, auto_ivc=False, **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -103,15 +102,25 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.model.linear_solver = om.DirectSolver(assemble_jac=True)
         p.model.options['assembled_jac_type'] = assemble_type
 
-    indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
     # the following were randomly generated using np.random.random(10)*2-1 to randomly
     # disperse them within a unit circle centered at the origin.
-    indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                      0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-    indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                     -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-    indeps.add_output('r', .7)
+    x_init = np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                        0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886])
+    y_init = np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                        -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582])
+    r_init = .7
+
+    if auto_ivc:
+        p.model.set_input_defaults('x', x_init)
+        p.model.set_input_defaults('y', y_init)
+        p.model.set_input_defaults('r', r_init)
+
+    else:
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
+        indeps.add_output('x', x_init)
+        indeps.add_output('y', y_init)
+        indeps.add_output('r', r_init)
 
     if partial_coloring:
         arctan_yox = DynPartialsComp(SIZE)
@@ -140,9 +149,16 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     ODD_IND = IND[1::2]  # all odd indices
     EVEN_IND = IND[0::2]  # all even indices
 
-    p.model.connect('r', ('circle.r', 'r_con.r'))
-    p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-    p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+    if auto_ivc:
+        p.model.promotes('circle', inputs=['r'])
+        p.model.promotes('r_con', inputs=['r', 'x', 'y'])
+        p.model.promotes('l_conx', inputs=['x'])
+        p.model.promotes('arctan_yox', inputs=['x', 'y'])
+    else:
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
+        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+
     p.model.connect('arctan_yox.g', 'theta_con.x')
     p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
     p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
@@ -159,25 +175,26 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
     p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
-    p.model.add_design_var('x')
-    p.model.add_design_var('y')
-    p.model.add_design_var('r', lower=.5, upper=10)
+    if use_vois:
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
 
-    # nonlinear constraints
-    p.model.add_constraint('r_con.g', equals=0)
+        # nonlinear constraints
+        p.model.add_constraint('r_con.g', equals=0)
 
-    p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-    p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
-    # this constrains x[0] to be 1 (see definition of l_conx)
-    p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        # this constrains x[0] to be 1 (see definition of l_conx)
+        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
-    # linear constraint (if has_lin_constraint is set)
-    p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
+        # linear constraint (if has_lin_constraint is set)
+        p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
-    p.model.add_objective('circle.area', ref=-1)
+        p.model.add_objective('circle.area', ref=-1)
 
-    # # setup coloring
+    # setup coloring
     if color_info is not None:
         p.driver.use_fixed_coloring(color_info)
 
@@ -185,7 +202,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.add_recorder(recorder)
 
     p.setup(mode=mode, derivatives=derivs)
-    p.run_driver()
+    if use_vois:
+        p.run_driver()
+    else:
+        p.run_model()
 
     return p
 
@@ -199,6 +219,25 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_snopt_auto_autoivc(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                    auto_ivc=True)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, auto_ivc=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -257,7 +296,10 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
         # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 21) / 21,
+
+        # This has been changed to greater or equal to 28 iterations. This change arose when updating
+        # to pyOptSparse v2.1.0 and SNOPT 7.7
+        self.assertGreaterEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -316,6 +358,88 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_nl_count - 2) / 22,
                          (p_color.model._solve_nl_count - 2 - 66) / 6)
 
+    def test_size_zero_array_in_component(self):
+        class DynamicPartialsComp(om.ExplicitComponent):
+            def __init__(self, size):
+                super().__init__()
+                self.size = size
+                self.num_computes = 0
+
+            def setup(self):
+                self.add_input('y', np.ones(self.size))
+                self.add_input('x', np.ones(self.size))
+                self.add_output('g', np.ones(self.size))
+
+                self.declare_partials('*', '*', method='cs')
+
+                # turn on dynamic partial coloring
+                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
+                                    orders=20, show_summary=True, show_sparsity=True)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+                self.num_computes += 1
+
+        SIZE = 0
+        p = om.Problem()
+
+        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['disp'] = False
+
+        p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+
+        p.setup(mode='fwd')
+
+        with self.assertRaises(Exception) as context:
+            p.run_driver()
+        self.assertEqual(str(context.exception),
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0")
+
+    def test_size_zero_array_declare_partials(self):
+        class DynamicPartialsComp(om.ExplicitComponent):
+            def __init__(self, size):
+                super().__init__()
+                self.size = size
+                self.num_computes = 0
+
+            def setup(self):
+                self.add_input('y', np.ones(self.size))
+                self.add_input('x', np.ones(self.size))
+                self.add_output('g', np.ones(self.size))
+                self.add_output('r', np.ones(1))
+
+                self.declare_partials('r', 'y', method='cs')
+
+                # turn on dynamic partial coloring
+                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
+                                    orders=20, show_summary=True, show_sparsity=True)
+
+            def compute(self, inputs, outputs):
+                outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+                self.num_computes += 1
+
+        SIZE = 0
+        p = om.Problem()
+
+        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['disp'] = False
+
+        p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+
+        p.setup(mode='fwd')
+
+        with self.assertRaises(Exception) as context:
+            p.run_driver()
+        self.assertEqual(str(context.exception),
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0")
+
+
     def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):
         try:
             from pyoptsparse import OPT
@@ -345,7 +469,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info['coloring'])
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_fwd(self):
@@ -358,7 +482,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -373,7 +497,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('r_con.g', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -391,7 +515,7 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
 
         cr = om.CaseReader('cases.sql')
 
-        self.assertEqual(cr.list_cases(), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
+        self.assertEqual(cr.list_cases(out_stream=None), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
 
 @use_tempdirs
@@ -483,6 +607,25 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
 
+    def test_problem_total_coloring_auto(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, use_vois=False)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+
+    def test_problem_total_coloring_auto_mixed_vois(self):
+
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False,)
+        coloring = compute_total_coloring(p,
+                                          of=['r_con.g', 'theta_con.g', 'delta_theta_con.g',
+                                              'l_conx.g', 'y', 'circle.area'],
+                                          wrt=['x', 'y', 'r'])
+        self.assertEqual(coloring.total_solves(), 5)
+        coloring.display_txt()  # leave this in because at one point it caused an exception
+
     def test_simul_coloring_example(self):
 
         import numpy as np
@@ -492,23 +635,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
-
-        # the following were randomly generated using np.random.random(10)*2-1 to randomly
-        # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-        indeps.add_output('r', .7)
-
         p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
-                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                              promotes_inputs=['x', 'y'])
 
-        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'), promotes_inputs=['r'])
 
         p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                              promotes_inputs=['r', 'x', 'y'])
 
         thetas = np.linspace(0, np.pi/4, SIZE)
         p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
@@ -518,15 +653,13 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)),
+                              promotes_inputs=['x'])
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
-        p.model.connect('r', ('circle.r', 'r_con.r'))
-        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
         p.model.connect('arctan_yox.g', 'theta_con.x')
         p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
         p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
@@ -557,6 +690,15 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.add_objective('circle.area', ref=-1)
 
         p.setup(mode='fwd')
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                  0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                 -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        p.set_val('r', .7)
+
         p.run_driver()
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -568,7 +710,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
-                super(DynamicPartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
                 self.num_computes = 0
 
@@ -591,47 +733,40 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         SIZE = 10
 
         p = om.Problem()
-
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
-
-        # the following were randomly generated using np.random.random(10)*2-1 to randomly
-        # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-        indeps.add_output('r', .7)
+        model = p.model
 
         ########################################################################
         # DynamicPartialsComp is set up to do dynamic partial coloring
-        arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
+        arctan_yox = model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE),
+                                         promotes_inputs=['x', 'y'])
         ########################################################################
 
-        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
+        model.add_subsystem('circle', om.ExecComp('area=pi*r**2'),
+                            promotes_inputs=['r'])
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+        model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
+                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                            promotes_inputs=['x', 'y', 'r'])
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
+        model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                        g=np.ones(SIZE), x=np.ones(SIZE),
                                                        theta=thetas))
-        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
+        model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True,
+                                                  g=np.ones(SIZE), x=np.ones(SIZE)),
+                            promotes_inputs=['x'])
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
         EVEN_IND = IND[0::2]  # all even indices
 
-        p.model.connect('r', ('circle.r', 'r_con.r'))
-        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
-        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
-        p.model.connect('arctan_yox.g', 'theta_con.x')
-        p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
-        p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
+        model.connect('arctan_yox.g', 'theta_con.x')
+        model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
+        model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
         p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
@@ -642,25 +777,33 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver.declare_coloring(show_summary=True, show_sparsity=True)
         #####################################
 
-        p.model.add_design_var('x')
-        p.model.add_design_var('y')
-        p.model.add_design_var('r', lower=.5, upper=10)
+        model.add_design_var('x')
+        model.add_design_var('y')
+        model.add_design_var('r', lower=.5, upper=10)
 
         # nonlinear constraints
-        p.model.add_constraint('r_con.g', equals=0)
+        model.add_constraint('r_con.g', equals=0)
 
-        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
 
         # this constrains x[0] to be 1 (see definition of l_conx)
-        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
         # linear constraint
-        p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
+        model.add_constraint('y', equals=0, indices=[0,], linear=True)
 
-        p.model.add_objective('circle.area', ref=-1)
+        model.add_objective('circle.area', ref=-1)
 
         p.setup(mode='fwd')
+
+        # the following were randomly generated using np.random.random(10)*2-1 to randomly
+        # disperse them within a unit circle centered at the origin.
+        p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                  0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                  -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        p.set_val('r', .7)
 
         # coloring info will be displayed during run_driver.  The number of colors in the
         # partial coloring of arctan_yox should be 2 and the number of colors in the
@@ -717,12 +860,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21), pct nonzero: 13.42, tol: 1e-15')
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50), pct nonzero: 100.00, tol: None')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -851,11 +994,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SLSQP':
+        if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            p.driver.opt_settings['iSumm'] = 6
+            # p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
@@ -885,25 +1028,34 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        try:
-            p.setup()
+        p.setup()
 
-            p.run_driver()
+        p.run_driver()
 
-            J = p.compute_totals()
+        J = p.compute_totals()
 
-            for i in range(num_pts):
-                vname = 'par2.comp%d.A' % i
-                if vname in model._var_abs_names['input']:
-                    norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                          getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
-                    self.assertLess(norm, 1.e-7)
-                elif vname not in model._var_allprocs_abs_names['input']:
-                    self.fail("Can't find variable par2.comp%d.A" % i)
+        for i in range(num_pts):
+            cname = 'par2.comp%d' % i
+            vname = cname + '.A'
+            A1 = p.get_val('par1.comp%d.A'%i, get_remote=True)
+            A2 = p.get_val('par2.comp%d.A'%i, get_remote=True)
+            norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] - A2.dot(A1))
+            self.assertLess(norm, 1.e-7)
 
-            print("final obj:", p['obj.y'])
-        except Exception as err:
-            print(str(err))
+        print("final obj:", p['obj.y'])
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI2TestCase(MatMultMultipointTestCase):
+    N_PROCS = 2
+
+
+# use_tempdirs is inherited
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class MatMultMultipointMPI4TestCase(MatMultMultipointTestCase):
+    N_PROCS = 4
+
 
 class SimulColoringVarOutputTestClass(unittest.TestCase):
     def test_multi_variable_coloring_debug_print_totals(self):
@@ -917,10 +1069,10 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        # if OPTIMIZER == 'SLSQP':
-        #     p.driver.opt_settings['Major iterations limit'] = 100
-        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
         #     p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
@@ -957,7 +1109,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indep0.x', [7])" in output)
         self.assertTrue("('indep1.x', [7])" in output)
         self.assertTrue("('indep2.x', [7])" in output)
@@ -966,7 +1118,7 @@ class SimulColoringVarOutputTestClass(unittest.TestCase):
 
 class DumbComp(om.ExplicitComponent):
     def __init__(self, inputs, outputs, isizes, osizes, **kwargs):
-        super(DumbComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._inames = inputs[:]
         self._onames = outputs[:]
         self._isizes = isizes[:]
@@ -1009,6 +1161,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         if color == 'total':
             p.driver.declare_coloring()
             if fixed:
+                # NOTE: This call line is embedded in the 2.x->3.x api conversion guide. Do not
+                # modify without carefully checking the guide.
                 p.driver.use_fixed_coloring()
 
         indeps = model.add_subsystem('indeps', om.IndepVarComp())
@@ -1071,14 +1225,13 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               sizes=[3, 4, 5], color='partial', fixed=False)
         p.run_driver()
 
-        print('++++++++++++')
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                 sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1103,7 +1256,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception),
-                         "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+                         "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following row vars were removed: ['x'].\n   The following column vars were removed: ['x_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_reordered_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1126,7 +1279,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The row vars have changed order.\n   The column vars have changed order.\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
     def test_size_change_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
@@ -1149,9 +1302,8 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.run_driver()
 
-        self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
+        self.assertEqual(str(ctx.exception), "'comp' <class DumbComp>: Current coloring configuration does not match the configuration of the current model.\n   The following variables have changed sizes: ['y', 'y_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
 
 
 if __name__ == '__main__':
     unittest.main()
-

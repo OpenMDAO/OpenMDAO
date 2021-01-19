@@ -64,8 +64,8 @@ Array.isPopulatedArray = function (arr) {
     return (Array.isArray(arr) && arr.length > 0);
 };
 
-const paramRegex = /^(param|unconnected_param)$/;
-const paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;
+const inputRegex = /^(input|unconnected_input|autoivc_input)$/;
+const inputOrOutputRegex = /^(output|input|unconnected_input|autoivc_input)$/;
 
 d3.selection.prototype.originalFuncs = {
     'transition': d3.selection.prototype.transition,
@@ -107,4 +107,18 @@ function testThis(testThis, className, funcName) {
     }
 
     // console.log(className + '.' + funcName + ": 'this' IS an instance of the " + className + " class.");
+}
+
+/** UUID generator based on crypto API */
+function uuidv4() {
+    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+    );
+}
+
+/** Delete all properties in the object without destroying the actual object */
+function wipeObj(obj) {
+    for (const prop in obj) {
+        if (obj.hasOwnProperty(prop)) delete obj[prop];
+    }
 }

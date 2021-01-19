@@ -9,7 +9,6 @@ import ast
 import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
-from six import iteritems, next
 
 import networkx as nx
 
@@ -43,7 +42,7 @@ class _SelfCallCollector(ast.NodeVisitor):
     """
 
     def __init__(self, class_):
-        super(_SelfCallCollector, self).__init__()
+        super().__init__()
         self.self_calls = defaultdict(list)
         self.class_ = class_
         self.mro = inspect.getmro(class_)
@@ -79,15 +78,22 @@ class _SelfCallCollector(ast.NodeVisitor):
                     self.generic_visit(node)
             else:
                 self.generic_visit(node)
-        # check for super(Class, self) call
+        # check for super() call
         elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call):
             callnode = node.func.value
             n = _get_long_name(callnode.func)
             # if this is a 'super' call, get the base of the specified class
             if n == 'super':  # this only works for a single call level
-                sup_1 = _get_long_name(callnode.args[1])
-                sup_0 = _get_long_name(callnode.args[0])
-                if sup_1 == 'self' and sup_0 is not None and len(sup_0.split('.')) == 1:
+                if len(callnode.args) == 0:
+                    sup_0 = self.mro[0].__name__
+                    visit_super = True
+                else:
+                    sup_1 = _get_long_name(callnode.args[1])
+                    sup_0 = _get_long_name(callnode.args[0])
+                    visit_super = (sup_1 == 'self' and
+                                   sup_0 is not None and len(sup_0.split('.')) == 1)
+
+                if visit_super:
                     for i, c in enumerate(self.mro[:-1]):
                         if sup_0 == c.__name__:
                             # we need super of the specified class
@@ -138,7 +144,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
     seen.add('.'.join((class_.__name__, func_name)))
 
     # now find the actual owning class for each call
-    for klass, funcset in iteritems(visitor.self_calls):
+    for klass, funcset in visitor.self_calls.items():
         mro = inspect.getmro(klass)
         for f in funcset:
             full, c = _find_owning_class(mro, f)

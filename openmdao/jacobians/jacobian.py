@@ -1,5 +1,4 @@
 """Define the base Jacobian class."""
-from __future__ import division
 import weakref
 
 import numpy as np
@@ -7,10 +6,10 @@ from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
-from six import itervalues, iteritems
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
+from openmdao.vectors.vector import _full_slice
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -18,8 +17,6 @@ SUBJAC_META_DEFAULTS = {
     'value': None,
     'dependent': False,
 }
-
-_full_slice = slice(None)
 
 
 class Jacobian(object):
@@ -92,14 +89,11 @@ class Jacobian(object):
         system = self._system()
         abs2meta = system._var_allprocs_abs2meta
         of, wrt = abs_key
-        if system.comm.size > 1:
-            if wrt in system._outputs._views:
-                sz = abs2meta[wrt]['global_size']
-            else:
-                sz = abs2meta[wrt]['size']
-            return (abs2meta[of]['global_size'], sz)
-
-        return (abs2meta[of]['size'], abs2meta[wrt]['size'])
+        if wrt in abs2meta['input']:
+            sz = abs2meta['input'][wrt]['size']
+        else:
+            sz = abs2meta['output'][wrt]['size']
+        return (abs2meta['output'][of]['size'], sz)
 
     def __contains__(self, key):
         """
@@ -184,9 +178,9 @@ class Jacobian(object):
                 else:
                     # Sparse subjac
                     if subjac.shape != (1,) and subjac.shape != rows.shape:
-                        raise ValueError("{}: Sub-jacobian for key %s has "
-                                         "the wrong shape (%s), expected (%s)." %
-                                         (self.msginfo, abs_key, subjac.shape, rows.shape))
+                        msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
+                        raise ValueError(msg.format(self.msginfo, abs_key,
+                                                    subjac.shape, rows.shape))
 
                 subjacs_info['value'][:] = subjac
 
@@ -362,7 +356,7 @@ class Jacobian(object):
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
 
-        J *= (1.0 / num_full_jacs)
+        J *= (1.0 / np.max(J))
 
         tol_info = _tol_sweep(J, tol, orders)
 
@@ -383,7 +377,7 @@ class Jacobian(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for meta in itervalues(self._subjacs_info):
+        for meta in self._subjacs_info.values():
             if active:
                 meta['value'] = meta['value'].astype(np.complex)
             else:

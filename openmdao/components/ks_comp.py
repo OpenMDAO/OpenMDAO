@@ -1,12 +1,10 @@
 """
 KS Function Component.
 """
-from six.moves import range
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import valid_units
 
 
 CITATIONS = """
@@ -20,6 +18,25 @@ CITATIONS = """
         author = {Joaquim R. R. A. Martins and Nicholas M. K. Poon}
 }
 """
+
+
+def check_option(option, value):
+    """
+    Check option for validity.
+
+    Parameters
+    ----------
+    option : str
+        The name of the option
+    value : any
+        The value of the option
+
+    Raises
+    ------
+    ValueError
+    """
+    if option == 'units' and value is not None and not valid_units(value):
+        raise ValueError("The units '%s' are invalid." % value)
 
 
 class KSfunction(object):
@@ -129,9 +146,11 @@ class KSComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(KSComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.cite = CITATIONS
+
+        self._no_check_partials = True
 
     def initialize(self):
         """
@@ -144,6 +163,26 @@ class KSComp(ExplicitComponent):
                              desc="Set to True to reverse sign of input constraints.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
         self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")
+        self.options.declare('add_constraint', types=bool, default=False,
+                             desc='If True, add a constraint on the resulting output of the KSComp.'
+                                  ' If False, the user will be expected to add a constraint '
+                                  'explicitly.')
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means variables are unitless.',
+                             check_valid=check_option)
+        self.options.declare('scaler', types=(int, float), allow_none=True, default=None,
+                             desc="Scaler for constraint, if added, default is one.")
+        self.options.declare('adder', types=(int, float), allow_none=True, default=None,
+                             desc="Adder for constraint, if added, default is zero.")
+        self.options.declare('ref0', types=(int, float), allow_none=True, default=None,
+                             desc="Zero-reference for constraint, if added, default is zero.")
+        self.options.declare('ref', types=(int, float), allow_none=True, default=None,
+                             desc="Unit reference for constraint, if added, default is one.")
+        self.options.declare('parallel_deriv_color', types=str, allow_none=True, default=None,
+                             desc='If specified, this design var will be grouped for parallel '
+                                  'derivative calculations with other variables sharing the same '
+                                  'parallel_deriv_color.')
 
     def setup(self):
         """
@@ -152,13 +191,20 @@ class KSComp(ExplicitComponent):
         opts = self.options
         width = opts['width']
         vec_size = opts['vec_size']
+        units = opts['units']
 
         # Inputs
-        self.add_input('g', shape=(vec_size, width),
+        self.add_input('g', shape=(vec_size, width), units=units,
                        desc="Array of function values to be aggregated")
 
         # Outputs
-        self.add_output('KS', shape=(vec_size, 1), desc="Value of the aggregate KS function")
+        self.add_output('KS', shape=(vec_size, 1), units=units,
+                        desc="Value of the aggregate KS function")
+
+        if opts['add_constraint']:
+            self.add_constraint(name='KS', upper=0.0, scaler=opts['scaler'], adder=opts['adder'],
+                                ref0=opts['ref0'], ref=opts['ref'],
+                                parallel_deriv_color=opts['parallel_deriv_color'])
 
         rows = np.zeros(width, dtype=np.int)
         cols = range(width)
@@ -210,24 +256,3 @@ class KSComp(ExplicitComponent):
             derivs = -derivs
 
         partials['KS', 'g'] = derivs.flatten()
-
-
-class KSComponent(KSComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'KSComponent' has been deprecated. Use "
-                         "'KSComp' instead.")
-        super(KSComponent, self).__init__(*args, **kwargs)

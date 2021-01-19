@@ -9,21 +9,19 @@ in Scientific Python, by Konrad Hinsen. Modifications by
 Justin Gray.
 """
 
-from __future__ import division, print_function
-
-
 import sys
 
 import re
 import os.path
 from collections import OrderedDict
 
-from six import iteritems
-from six.moves import zip
-from six.moves.configparser import RawConfigParser as ConfigParser
+from configparser import RawConfigParser as ConfigParser
+from openmdao.utils.general_utils import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
+
+import numpy as np
 
 
 ####################################
@@ -94,9 +92,9 @@ class NumberDict(OrderedDict):
             new NumberDict with self+other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] + v
         return sum_dict
 
@@ -115,9 +113,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self-other values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = v
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -136,9 +134,9 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other-self values
         """
         sum_dict = NumberDict()
-        for k, v in iteritems(other):
+        for k, v in other.items():
             sum_dict[k] = v
-        for k, v in iteritems(self):
+        for k, v in self.items():
             sum_dict[k] = sum_dict[k] - v
         return sum_dict
 
@@ -157,7 +155,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with other*self values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = other * value
         return new
 
@@ -178,7 +176,7 @@ class NumberDict(OrderedDict):
             new NumberDict instance, with self/other values
         """
         new = NumberDict()
-        for key, value in iteritems(self):
+        for key, value in self.items():
             new[key] = value / other
         return new
 
@@ -289,7 +287,7 @@ class PhysicalUnit(object):
             self._factor < other._factor
         """
         if self._powers != other._powers or self._offset != other._offset:
-            raise TypeError('Incompatible units')
+            raise TypeError(f"Units '{self.name()}' and '{other.name()}' are incompatible.")
 
         return self._factor < other._factor
 
@@ -308,7 +306,7 @@ class PhysicalUnit(object):
             self._factor > other._factor
         """
         if self._powers != other._powers:
-            raise TypeError('Incompatible units')
+            raise TypeError(f"Units '{self.name()}' and '{other.name()}' are incompatible.")
         return self._factor > other._factor
 
     def __eq__(self, other):
@@ -345,7 +343,8 @@ class PhysicalUnit(object):
         """
         if self._offset != 0 or (isinstance(other, PhysicalUnit) and
                                  other._offset != 0):
-            raise TypeError("cannot multiply units with non-zero offset")
+            raise TypeError(f"Can't multiply units: either '{self.name()}' or '{other.name()}' "
+                            "has a non-zero offset.")
         if isinstance(other, PhysicalUnit):
             return PhysicalUnit(self._names + other._names,
                                 self._factor * other._factor,
@@ -374,7 +373,8 @@ class PhysicalUnit(object):
         """
         if self._offset != 0 or (isinstance(other, PhysicalUnit) and
                                  other._offset != 0):
-            raise TypeError("cannot divide units with non-zero offset")
+            raise TypeError(f"Can't divide units: either '{self.name()}' or '{other.name()}' "
+                            "has a non-zero offset.")
         if isinstance(other, PhysicalUnit):
             return PhysicalUnit(self._names - other._names,
                                 self._factor / other._factor,
@@ -406,32 +406,33 @@ class PhysicalUnit(object):
 
     __rtruediv__ = __rdiv__
 
-    def __pow__(self, other):
+    def __pow__(self, power):
         """
         Raise myself to a power.
 
         Parameters
         ----------
-        other : float or int
+        power : float or int
             power to raise self by
 
         Returns
         -------
         PhysicalUnit
-            new PhysicalUnit of self^other
+            new PhysicalUnit of self^power
         """
         if self._offset != 0:
-            raise TypeError("cannot exponentiate units with non-zero offset")
-        if isinstance(other, int):
-            return PhysicalUnit(other * self._names, pow(self._factor, other),
-                                [x * other for x in self._powers])
-        if isinstance(other, float):
-            inv_exp = 1. / other
+            raise TypeError(f"Can't exponentiate unit '{self.name()}' because it "
+                            "has a non-zero offset.")
+        if isinstance(power, int):
+            return PhysicalUnit(power * self._names, pow(self._factor, power),
+                                [x * power for x in self._powers])
+        if isinstance(power, float):
+            inv_exp = 1. / power
             rounded = int(floor(inv_exp + 0.5))
             if abs(inv_exp - rounded) < 1.e-10:
 
                 if all([x % rounded == 0 for x in self._powers]):
-                    f = self._factor**other
+                    f = self._factor**power
                     p = [x / rounded for x in self._powers]
                     if all([x % rounded == 0 for x in self._names.values()]):
                         names = self._names / rounded
@@ -443,7 +444,8 @@ class PhysicalUnit(object):
                             names[name] = x
                     return PhysicalUnit(names, f, p)
 
-        raise TypeError('Only integer and inverse integer exponents allowed')
+        raise TypeError(f"Can't exponentiate unit '{self.name()}': "
+                        "only integer and inverse integer exponents are allowed.")
 
     def in_base_units(self):
         """
@@ -488,7 +490,7 @@ class PhysicalUnit(object):
             The conversion factor and offset from this unit to another unit.
         """
         if self._powers != other._powers:
-            raise TypeError('Incompatible units')
+            raise TypeError(f"Units '{self.name()}' and '{other.name()}' are incompatible.")
 
         # let (s1,d1) be the conversion tuple from 'self' to base units
         #   (ie. (x+d1)*s1 converts a value x from 'self' to base units,
@@ -572,7 +574,7 @@ class PhysicalUnit(object):
         """
         num = ''
         denom = ''
-        for unit, power in iteritems(self._names):
+        for unit, power in self._names.items():
             if power < 0:
                 denom = denom + '/' + unit
                 if power < -1:
@@ -636,8 +638,7 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
     if name in _UNIT_LIB.unit_table:
         if (_UNIT_LIB.unit_table[name]._factor != unit._factor or
                 _UNIT_LIB.unit_table[name]._powers != unit._powers):
-            raise KeyError("Unit %s already defined with " % name +
-                           "different factor or powers")
+            raise KeyError(f"Unit '{name}' already defined with different factor or powers.")
     _UNIT_LIB.unit_table[name] = unit
     _UNIT_LIB.set('units', name, unit)
     if comment:
@@ -666,8 +667,7 @@ def add_unit(name, unit, comment=''):
     if name in _UNIT_LIB.unit_table:
         if (_UNIT_LIB.unit_table[name]._factor != unit._factor or
                 _UNIT_LIB.unit_table[name]._powers != unit._powers):
-            raise KeyError("Unit %s already defined with " % name +
-                           "different factor or powers")
+            raise KeyError(f"Unit '{name}' already defined with different factor or powers.")
 
     _UNIT_LIB.unit_table[name] = unit
     _UNIT_LIB.set('units', name, unit)
@@ -752,12 +752,9 @@ def import_library(libfilepointer):
     missing = [utype for utype in required_base_types
                if utype not in _UNIT_LIB.base_types]
     if missing:
-        raise ValueError('Not all required base type were present in the'
-                         ' config file. missing: %s, at least %s required'
-                         % (missing, required_base_types))
+        raise ValueError("Not all required base types were present in the config file. missing: "
+                         f"{missing}, at least {required_base_types} required.")
 
-    # Explicit unitless 'unit'.
-    _new_unit('unitless', 1, list(base_list))
     _update_library(_UNIT_LIB)
     return _UNIT_LIB
 
@@ -817,8 +814,7 @@ def _update_library(cfg):
                 retry1.add((name, baseunit, float(factor), float(offset),
                             comment))
         else:
-            raise ValueError('Unit %r definition %r has invalid format',
-                             name, unit)
+            raise ValueError(f"Unit '{name}' definition {unit} has invalid format.")
     retry_count = 0
     last_retry_count = -1
     while last_retry_count != retry_count and retry1:
@@ -843,13 +839,20 @@ def _update_library(cfg):
     if retry1:
         raise ValueError('The following units were not defined because they'
                          ' could not be resolved as a function of any other'
-                         ' defined units:%s' % [x[0] for x in retry1])
+                         ' defined units: %s.' % [x[0] for x in retry1])
 
 
 _UNIT_CACHE = {}
 
 
-def _find_unit(unit):
+def _is_unitless(units):
+    if units is None:
+        return True
+    unit_meta = _find_unit(units)
+    return unit_meta is not None and unit_meta.is_dimensionless()
+
+
+def _find_unit(unit, error=False):
     """
     Find unit helper function.
 
@@ -857,6 +860,8 @@ def _find_unit(unit):
     ----------
     unit : str
         str representing the desired unit
+    error : bool
+        If True, raise exception if unit isn't found.
 
     Returns
     -------
@@ -901,15 +906,19 @@ def _find_unit(unit):
 
                         # no prefixes found, unknown unit
                         else:
+                            if error:
+                                raise ValueError(f"The units '{name}' are invalid.")
                             return None
-                            # raise ValueError("no unit named '%s' is defined"
-                            #                  % item)
 
                 unit = eval(name, {'__builtins__': None}, _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit
+    else:
+        name = unit
 
     if not isinstance(unit, PhysicalUnit):
+        if error:
+            raise ValueError(f"The units '{name}' are invalid.")
         return None
 
     return unit
@@ -950,7 +959,7 @@ def conversion_to_base_units(units):
     """
     if not units:  # dimensionless
         return 0., 1.
-    unit = _find_unit(units)
+    unit = _find_unit(units, error=True)
 
     return unit._offset, unit._factor
 
@@ -976,13 +985,13 @@ def is_compatible(old_units, new_units):
     if not old_units and not new_units:  # dimensionless
         return True
 
-    old_unit = _find_unit(old_units)
-    new_unit = _find_unit(new_units)
+    old_unit = _find_unit(old_units, error=True)
+    new_unit = _find_unit(new_units, error=True)
 
     return old_unit.is_compatible(new_unit)
 
 
-def get_conversion(old_units, new_units):
+def unit_conversion(old_units, new_units):
     """
     Return conversion factor and offset between old and new units.
 
@@ -998,11 +1007,29 @@ def get_conversion(old_units, new_units):
     (float, float)
         Conversion factor and offset
     """
-    new_physical_units = _find_unit(new_units)
-    if new_physical_units is None:
-        raise RuntimeError("Cannot convert to new units: %s" % str(new_units))
+    return _find_unit(old_units, error=True).conversion_tuple_to(_find_unit(new_units, error=True))
 
-    return _find_unit(old_units).conversion_tuple_to(new_physical_units)
+
+def get_conversion(old_units, new_units):
+    """
+    Return conversion factor and offset between old and new units (deprecated).
+
+    Parameters
+    ----------
+    old_units : str
+        original units as a string.
+    new_units : str
+        new units to return the value in.
+
+    Returns
+    -------
+    (float, float)
+        Conversion factor and offset
+    """
+    warn_deprecation("'get_conversion' has been deprecated. Use "
+                     "'unit_conversion' instead.")
+
+    return unit_conversion(old_units, new_units)
 
 
 def convert_units(val, old_units, new_units=None):
@@ -1026,9 +1053,9 @@ def convert_units(val, old_units, new_units=None):
     if not old_units or not new_units:  # one side has no units
         return val
 
-    old_unit = _find_unit(old_units)
+    old_unit = _find_unit(old_units, error=True)
     if new_units:
-        new_unit = _find_unit(new_units)
+        new_unit = _find_unit(new_units, error=True)
     else:
         new_unit = old_unit.in_base_units()
 
@@ -1036,9 +1063,65 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
+def _has_val_mismatch(units1, val1, units2, val2):
+    """
+    Return True if values differ after unit conversion or if values differ when units are None.
+
+    Parameters
+    ----------
+    units1 : str or None
+        Units for first value.
+    val1 : float or ndarray
+        First value.
+    units2 : str or None
+        Units for second value.
+    val2 : float or ndarray
+        Second value.
+    """
+    if units1 != units2:
+        if units1 is None or units2 is None:
+            return True
+
+        # convert units
+        val1 = convert_units(val1, units1, new_units=units2)
+
+    rtol = 1e-10
+    val1 = np.asarray(val1)
+    val2 = np.asarray(val2)
+
+    norm1 = np.linalg.norm(val1)
+    if norm1 == 0.:
+        return np.linalg.norm(val2) > rtol
+    else:
+        return np.linalg.norm(val2 - val1) / norm1 > rtol
+
+
+def simplify_unit(old_unit_str):
+    """
+    Simplify unit string using built-in naming method.
+
+    Unit string 'ft*s/s' becomes 'ft'.
+
+    Parameters
+    ----------
+    old_unit_str : str
+        Unit string to simplify.
+
+    Returns
+    -------
+    str
+        Simplified unit string.
+    """
+    new_str = _find_unit(old_unit_str).name()
+    if new_str == '1':
+        # Special Case. Unity always becomes None.
+        new_str = None
+
+    return new_str
+
+
 # Load in the default unit library
-file_path = open(os.path.join(os.path.dirname(__file__),
-                 'unit_library.ini'))
+file_path = open(os.path.join(os.path.dirname(__file__), 'unit_library.ini'))
 with file_path as default_lib:
     import_library(default_lib)
 

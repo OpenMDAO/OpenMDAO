@@ -1,7 +1,5 @@
 """Various debugging functions."""
 
-from __future__ import print_function, division
-
 import sys
 import os
 import functools
@@ -12,11 +10,11 @@ try:
 
     def max_mem_usage():
         """
-        Return the maximum memory used by this process and its children so far.
+        Return the maximum resident memory used by this process and its children so far.
 
         Returns
         -------
-        The max memory used by this process and its children, in MB.
+        The max resident memory used by this process and its children, in MB.
         """
         denom = 1024.
         if sys.platform == 'darwin':
@@ -33,9 +31,9 @@ except ImportError:
 try:
     import psutil
 
-    def mem_usage(msg='', out=sys.stdout):
+    def mem_usage(msg='', out=sys.stdout, resident=True):
         """
-        Display current memory usage.
+        Display current resident or virtual memory usage.
 
         Parameters
         ----------
@@ -50,14 +48,17 @@ try:
         """
         denom = 1024. * 1024.
         p = psutil.Process(os.getpid())
-        mem = p.memory_info().rss / denom
+        if resident:
+            mem = p.memory_info().rss / denom
+        else:
+            mem = p.memory_info().vms / denom
         if msg:
             print(msg,"%6.3f MB" % mem, file=out)
         return mem
 
     def diff_mem(fn):
         """
-        Decorator that prints the difference in memory usage resulting from the function call.
+        Decorator that prints the difference in resident memory usage resulting from the call.
 
         Does not show output unless there is a memory increase. Requires psutil to be installed.
 
@@ -209,7 +210,8 @@ try:
         iters = []
         gc.collect()
         start_objs = objgraph.typestats()
-        start_objs['frame'] += 1
+        if 'frame' in start_objs:
+            start_objs['frame'] += 1
         start_objs['function'] += 1
         start_objs['builtin_function_or_method'] += 1
         start_objs['cell'] += 1

@@ -6,12 +6,9 @@ from subprocess import check_call
 import distutils.spawn
 
 __version__ = re.findall(
-    r"""__version__ = ["']+([0-9\.]*)["']+""",
+    r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
-
-# Pyppeteer GUI testing only works with Python 3.6+
-gui_test_deps = ['websockets>6', 'pyppeteer_fork']
 
 optional_dependencies = {
     'docs': [
@@ -30,8 +27,10 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.5',
-    ] + (gui_test_deps if sys.version_info > (3, 5) else [])
+        'testflo>=1.3.6'
+        'websockets>8',
+        'pyppeteer'
+    ]
 }
 
 # Add an optional dependency that concatenates all others
@@ -44,14 +43,14 @@ optional_dependencies['all'] = sorted([
 setup(
     name='openmdao',
     version=__version__,
-    description="OpenMDAO v2 framework infrastructure",
+    description="OpenMDAO framework infrastructure",
     long_description="""OpenMDAO is an open-source high-performance computing platform
     for systems analysis and multidisciplinary optimization, written in Python. It
     enables you to decompose your models, making them easier to build and maintain,
     while still solving them in a tightly coupled manner with efficient parallel numerical methods.
     """,
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Natural Language :: English',
@@ -60,15 +59,15 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Topic :: Scientific/Engineering',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
     keywords='optimization multidisciplinary multi-disciplinary analysis',
     author='OpenMDAO Team',
     author_email='openmdao@openmdao.org',
     url='http://openmdao.org',
-    download_url='http://github.com/OpenMDAO/OpenMDAO/tarball/'+__version__,
     license='Apache License, Version 2.0',
     packages=[
         'openmdao',
@@ -100,22 +99,27 @@ setup(
         'openmdao.test_suite.test_examples',
         'openmdao.test_suite.test_examples.beam_optimization',
         'openmdao.test_suite.test_examples.beam_optimization.components',
+        'openmdao.test_suite.test_examples.cannonball',
         'openmdao.test_suite.test_examples.meta_model_examples',
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
-        'openmdao.visualization.xdsm_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
+        'openmdao.visualization' : [
+            'common/libs/*.js',
+            'common/style/*.css'
+        ],
         'openmdao.visualization.n2_viewer': [
+            'assets/*',
             'libs/*.js',
             'src/*.js',
-            'style/*.css',
-            'style/*.woff',
+            'style/*',
             'tests/*.js',
             'tests/*.json',
             'tests/gui_test_models/*.py',
@@ -123,16 +127,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
-            'libs/*.js',
-            'style/*.css'
         ],
-        'openmdao.visualization.xdsm_viewer': [
-            'XDSMjs/*',
-            'XDSMjs/src/*.js',
-            'XDSMjs/build/*.js',
-            'XDSMjs/test/*.js',
-            'XDSMjs/test/*.html',
-            'XDSMjs/examples/*.json',
+        'openmdao.visualization.scaling_viewer': [
+            '*.html',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
@@ -151,15 +148,13 @@ setup(
         ],
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
+    python_requires=">=3.6",
     install_requires=[
-        'urllib3<1.25',  # this is to prevent urllib version conflict between
-                         # requests, numpydoc, and pyppeteer
         'networkx>=2.0',
         'numpy',
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
         'requests'
     ],
     entry_points={
@@ -177,9 +172,7 @@ setup(
         ],
         'openmdao_component': [
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-            'akimasplinecomp=openmdao.components.akima_spline_comp:AkimaSplineComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
-            'bsplinescomp=openmdao.components.bsplines_comp:BsplinesComp',
             'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
             'demuxcomp=openmdao.components.demux_comp:DemuxComp',
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
@@ -202,6 +195,7 @@ setup(
             'doedriver=openmdao.drivers.doe_driver:DOEDriver',
             'driver=openmdao.core.driver:Driver',
             'simplegadriver=openmdao.drivers.genetic_algorithm_driver:SimpleGADriver',
+            'differentialevolutiondriver=openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver',
             'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
             'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
         ],

@@ -1,10 +1,5 @@
 """Define the DenseMatrix class."""
-from __future__ import division, print_function
 import numpy as np
-from numpy import ndarray
-from six import iteritems
-
-from scipy.sparse import coo_matrix
 
 from openmdao.matrices.coo_matrix import COOMatrix
 
@@ -32,7 +27,7 @@ class DenseMatrix(COOMatrix):
         system : <System>
             owning system.
         """
-        super(DenseMatrix, self)._build(num_rows, num_cols)
+        super()._build(num_rows, num_cols)
         self._coo = self._matrix
 
     def _prod(self, in_vec, mode, mask=None):
@@ -97,10 +92,10 @@ class DenseMatrix(COOMatrix):
         ndarray or None
             The mask array or None.
         """
-        if len(d_inputs._views) > len(d_inputs._names):
+        if d_inputs._in_matvec_context():
             sub = d_inputs._names
             mask = np.ones(len(d_inputs), dtype=np.bool)
-            for key, val in iteritems(self._metadata):
+            for key, val in self._metadata.items():
                 if key[1] in sub:
                     mask[val[1]] = False
 
@@ -118,10 +113,3 @@ class DenseMatrix(COOMatrix):
         """
         # this will add any repeated entries together
         self._matrix = self._coo.toarray()
-
-    def _get_assembled_matrix(self, system):
-        mat = super(DenseMatrix, self)._get_assembled_matrix(system)
-        if mat is None:
-            return mat
-
-        return mat.toarray()

@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -6,7 +5,6 @@ import time
 import webbrowser
 import threading
 import json
-from six import iteritems, itervalues
 
 try:
     import tornado
@@ -75,7 +73,7 @@ def _stratify(call_data, sortby='time'):
         y0 = delta_y * depth
         y1 = y0 + delta_y
 
-        for parent, children in iteritems(pardict):
+        for parent, children in pardict.items():
             if not parent:
                 end_x = 0
             else:
@@ -136,7 +134,7 @@ else:
             # entry contains that node's call data and a dict containing each
             # child keyed by call path.
             self.call_tree = tree = defaultdict(lambda : [None, {}])
-            for path, data in iteritems(self.call_data):
+            for path, data in self.call_data.items():
                 data['id'] = path
                 parts = path.rsplit('|', 1)
                 # add our node to our parent
@@ -154,7 +152,7 @@ else:
                  static_path=os.path.join(os.path.dirname(__file__), "static"),
             )
 
-            super(_Application, self).__init__(handlers, **settings)
+            super().__init__(handlers, **settings)
 
         def get_nodes(self, idx):
             """
@@ -177,7 +175,7 @@ else:
                 if not stop_adding:
                     callcount += len(children)
                     if callcount <= maxcalls:
-                        for child in itervalues(children):
+                        for child in children.values():
                             stack.appendleft(self.call_tree[child['id']])
                     else:
                         stop_adding = True

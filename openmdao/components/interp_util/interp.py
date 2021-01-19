@@ -4,9 +4,6 @@ Base class for interpolation methods that calculate values for each dimension in
 Based on Tables in NPSS, and was added to bridge the gap between some of the slower scipy
 implementations.
 """
-from __future__ import division, print_function, absolute_import
-from six.moves import range
-
 import numpy as np
 
 from openmdao.components.interp_util.interp_akima import InterpAkima
@@ -94,7 +91,7 @@ class InterpND(object):
             The data on the regular grid in n dimensions.
         method : str
             Name of interpolation method(s).
-        x_interp : ndarry or None
+        x_interp : ndarray or None
             If we are always interpolating at a fixed set of locations, then they can be
             specified here.
         extrapolate : bool
@@ -239,6 +236,9 @@ class InterpND(object):
             values = np.expand_dims(values, axis=0)
 
         result = self._evaluate_spline(values)
+        if result.shape[0] == 1:
+            # Not vectorized, so drop the extra dimension.
+            result = result.flatten()
 
         if compute_derivative:
             d_dvalues = self.spline_gradient()
@@ -376,7 +376,6 @@ class InterpND(object):
             n_nodes, _ = values.shape
             nx = np.prod(xi.shape)
             result = np.empty((n_nodes, nx), dtype=values.dtype)
-            derivs_x = np.empty((n_nodes, nx), dtype=values.dtype)
             derivs_val = None
 
             # TODO: it might be possible to vectorize over n_nodes.
@@ -490,7 +489,7 @@ class InterpND(object):
 
         d_dvalues = self._d_dvalues
         if d_dvalues is not None:
-            dy_ddata = np.zeros((vec_size, n_interp, n_cp))
+            dy_ddata = np.zeros((vec_size, n_interp, n_cp), dtype=d_dvalues.dtype)
 
             if d_dvalues.shape[0] == vec_size:
                 # Akima precomputes derivs at all points in vec_size.
@@ -499,6 +498,8 @@ class InterpND(object):
                 # Bsplines computed derivative is the same at all points in vec_size.
                 dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
         else:
+            # Note: These derivatives are independent of control point y values, so they will never
+            # be complex dtype.
             dy_ddata = np.zeros((n_interp, n_cp))
 
             # This way works for the rest of the interpolation methods.

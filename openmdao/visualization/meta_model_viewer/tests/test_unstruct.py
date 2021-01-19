@@ -12,7 +12,7 @@ except ImportError:
     bokeh = None
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
@@ -325,8 +325,8 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         bottom_plot = adjusted_points._bottom_plot()
         bottom_transparency = adjusted_points.bottom_alphas
 
-        assert_rel_error(self, right_transparency, known_points_right, 1.1e-02)
-        assert_rel_error(self, bottom_transparency, known_points_bottom, 1.6e-02)
+        assert_near_equal(right_transparency, known_points_right, 1.1e-02)
+        assert_near_equal(bottom_transparency, known_points_bottom, 1.6e-02)
 
 
 

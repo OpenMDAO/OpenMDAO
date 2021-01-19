@@ -1,6 +1,4 @@
 """Define the explicit test component (simple)."""
-from __future__ import division, print_function
-
 import scipy.sparse
 
 from openmdao.core.explicitcomponent import ExplicitComponent
@@ -13,6 +11,7 @@ class TestExplCompSimple(ExplicitComponent):
         self.add_input('width', val=1., desc='width of rectangle')
         self.add_output('area', val=1., desc='area of rectangle')
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):

@@ -113,6 +113,7 @@ class ThreeBarTruss(om.ExplicitComponent):
                          3 : 285.0e6,
                          4 : 59.0e6 }
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='area*', method='fd')
 
     def compute(self, inputs, outputs):
@@ -200,6 +201,7 @@ class ThreeBarTrussVector(om.ExplicitComponent):
                          3 : 285.0e6,
                          4 : 59.0e6 }
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='area', method='fd')
 
     def compute(self, inputs, outputs):

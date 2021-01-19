@@ -27,6 +27,14 @@ All options can be passed in as arguments or set later by accessing the `options
 
 Additional interpolant-specific options can be passed in as call arguments.
 
+NearestNeighbor Constructor
+---------------------------
+
+The call signature for the `NearestNeighbor` constructor is:
+
+.. automethod:: openmdao.surrogate_models.nearest_neighbor.NearestNeighbor.__init__
+    :noindex:
+
 
 NearestNeighbor Option Examples
 -------------------------------

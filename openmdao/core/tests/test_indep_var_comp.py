@@ -1,10 +1,9 @@
 """IndepVarComp tests used in the IndepVarComp feature doc."""
-from __future__ import division
-
 import unittest
+import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -16,10 +15,10 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var')
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 1.0)
+        assert_near_equal(prob.get_val('indep_var'), 1.0)
 
-        prob['indep_var'] = 2.0
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        prob.set_val('indep_var', 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
@@ -28,7 +27,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
@@ -37,7 +36,7 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], 2.0)
+        assert_near_equal(prob.get_val('indep_var'), 2.0)
 
     def test_simple_array(self):
         """Define one independent array variable."""
@@ -53,55 +52,39 @@ class TestIndepVarComp(unittest.TestCase):
         comp = om.IndepVarComp('indep_var', val=array)
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var'], array)
-
-    def test_multiple_default(self):
-        """Define two independent variables at once."""
-        import openmdao.api as om
-
-        comp = om.IndepVarComp((
-            ('indep_var_1', 1.0),
-            ('indep_var_2', 2.0),
-        ))
-
-        prob = om.Problem(comp).setup()
-
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
-
-    def test_multiple_kwargs(self):
-        """Define two independent variables at once and additional options."""
-        import openmdao.api as om
-
-        comp = om.IndepVarComp((
-            ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
-            ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
-        ))
-
-        prob = om.Problem(comp).setup()
-
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
+        assert_near_equal(prob.get_val('indep_var'), array)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
         import openmdao.api as om
 
         comp = om.IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
+        comp.add_output('indep_var_1', val=1.0)
+        comp.add_output('indep_var_2', val=2.0)
 
         prob = om.Problem(comp).setup()
 
-        assert_rel_error(self, prob['indep_var_1'], 1.0)
-        assert_rel_error(self, prob['indep_var_2'], 2.0)
+        assert_near_equal(prob.get_val('indep_var_1'), 1.0)
+        assert_near_equal(prob.get_val('indep_var_2'), 2.0)
+
+    def test_promote_glob_no_inputs(self):
+        p = om.Problem()
+        p.model.add_subsystem('indep',
+                              om.IndepVarComp('x', 2.0),
+                              promotes_inputs=['*'],
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=x'), promotes_inputs=['x'], promotes_outputs=['y'])
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('x'), p.get_val('y'))
 
     def test_invalid_tags(self):
         with self.assertRaises(TypeError) as cm:
             comp = om.IndepVarComp('indep_var', tags=99)
 
         self.assertEqual(str(cm.exception),
-            "The tags argument should be str, set, or list: 99")
+            "IndepVarComp: Value (99) of option 'tags' has type 'int', "
+            "but one of types ('str', 'list') was expected.")
 
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
@@ -139,8 +122,8 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp()
-        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10, tags="tag1")
-        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20, tags="tag2")
+        comp.add_output('indep_var_1', val=1.0, tags="tag1")
+        comp.add_output('indep_var_2', val=2.0, tags="tag2")
 
         prob = Problem(comp).setup(check=False)
         prob.run_model()
@@ -181,22 +164,8 @@ class TestIndepVarComp(unittest.TestCase):
             prob = om.Problem(om.IndepVarComp()).setup()
         except Exception as err:
             self.assertEqual(str(err),
-                "IndepVarComp (<model>): No outputs (independent variables) have been declared. They must either be declared during "
+                "<model> <class IndepVarComp>: No outputs (independent variables) have been declared. They must either be declared during "
                 "instantiation or by calling add_output or add_discrete_output afterwards.")
-        else:
-            self.fail('Exception expected.')
-
-    def test_error_badtup(self):
-        try:
-            comp = om.IndepVarComp((
-                ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
-                'indep_var_2',
-            ))
-            prob = om.Problem(comp).setup()
-        except Exception as err:
-            self.assertEqual(str(err),
-                "IndepVarComp init: arg indep_var_2 must be a tuple of the "
-                "form (name, value) or (name, value, keyword_dict).")
         else:
             self.fail('Exception expected.')
 
@@ -217,7 +186,7 @@ class TestIndepVarComp(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x1', val=[1, 2, 3], lower=0, upper=10)
+        ivc.add_output('x1', val=[1, 2, 3])
 
         model.add_subsystem('p', ivc)
 
@@ -226,7 +195,57 @@ class TestIndepVarComp(unittest.TestCase):
         prob['p.x1'][0] = 0.5
         prob.run_model()
 
-        assert_rel_error(self, prob['p.x1'][0], 0.5)
+        assert_near_equal(prob.get_val('p.x1')[0], 0.5)
+
+    def test_options(self):
+        class Parameters(om.IndepVarComp):
+            def initialize(self):
+                self.options.declare('num_x', default=0)
+                self.options.declare('val_y', default=0.)
+
+            def setup(self):
+                self.add_discrete_output('num_x', val = np.zeros(self.options['num_x']))
+                self.add_output('val_y',val = self.options['val_y'])
+
+        prob = om.Problem(model=Parameters(num_x=4, val_y=2.5))
+        prob.setup()
+        prob.run_model()
+
+        self.assertEqual(len(prob.get_val('num_x')), 4)
+        self.assertEqual(prob.get_val('val_y'), 2.5)
+
+    def test_ivc_deprecations(self):
+        msg = "'p1' <class IndepVarComp>: The '{}' argument was used when adding output '{}'. " + \
+              "This argument has been deprecated and will be removed in a future version."
+
+        prob = om.Problem()
+
+        indep = prob.model.add_subsystem('p1', om.IndepVarComp())
+
+        # ref, ref0
+        with assert_warnings([(DeprecationWarning, msg.format('ref', 'a')),
+                              (DeprecationWarning, msg.format('ref0', 'a'))]):
+            indep.add_output('a', 12., ref=0.0, ref0=1.)
+
+        # res_units
+        with assert_warning(DeprecationWarning, msg.format('res_units', 'b')):
+            indep.add_output('b', 12., res_units='m')
+
+        # upper
+        with assert_warning(DeprecationWarning, msg.format('upper', 'c')):
+            indep.add_output('c', 12., upper=1.)
+
+        # lower
+        with assert_warning(DeprecationWarning, msg.format('lower', 'd')):
+            indep.add_output('d', 12., lower=1.)
+
+        # res_ref
+        with assert_warning(DeprecationWarning, msg.format('res_ref', 'e')):
+            indep.add_output('e', 12., res_ref=1.)
+
+        # res_ref
+        with assert_warning(DeprecationWarning, msg.format('ref', 'f')):
+            indep.add_output('f', 12., ref=2.)
 
 
 if __name__ == '__main__':

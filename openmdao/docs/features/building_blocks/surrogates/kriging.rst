@@ -16,9 +16,6 @@ Here is a simple example where a Kriging model is used to approximate the output
     openmdao.components.tests.test_meta_model_unstructured_comp.MetaModelUnstructuredSurrogatesFeatureTestCase.test_kriging
     :layout: code, output
 
-Note: `FloatKriginSurrogate` implements the same surrogate model as `KrigingSurrogate` with `eval_rmse` set to False,
-so that it only predicts the mean of the approximated output. This is deprecated and provided for backwards compatibility.
-
 
 KrigingSurrogate Options
 ------------------------
@@ -29,6 +26,14 @@ All options can be passed in as arguments or set later by accessing the `options
     openmdao.surrogate_models.kriging
     KrigingSurrogate
     options
+
+KrigingSurrogate Constructor
+----------------------------
+
+The call signature for the `KrigingSurrogate` constructor is:
+
+.. automethod:: openmdao.surrogate_models.kriging.KrigingSurrogate.__init__
+    :noindex:
 
 
 KrigingSurrogate Option Examples

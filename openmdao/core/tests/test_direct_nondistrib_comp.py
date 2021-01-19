@@ -1,5 +1,3 @@
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np
@@ -30,6 +28,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.add_input('c', val=1.0)
         self.add_output('x', val=1.0)
 
+    def setup_partials(self):
         self.declare_partials(of='x', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -61,7 +60,7 @@ class NondistribDirectCompTestCase(unittest.TestCase):
         p = om.Problem()
 
         comp = p.model.add_subsystem('comp', QuadraticComp())
-        comp.nonlinear_solver = om.NewtonSolver()
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         comp.linear_solver = om.DirectSolver()
 
         p.setup(force_alloc_complex=True)

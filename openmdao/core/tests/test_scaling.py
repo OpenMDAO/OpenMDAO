@@ -1,18 +1,18 @@
 """Define the units/scaling tests."""
-from __future__ import division, print_function
-
 import unittest
 from copy import deepcopy
-from six import assertRaisesRegex
+from itertools import chain
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
+from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import all_ancestors
 
 
 class PassThroughLength(om.ExplicitComponent):
@@ -201,7 +201,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -214,7 +214,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -227,7 +227,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -247,11 +247,11 @@ class TestScaling(unittest.TestCase):
         prob['sys1.old_length'] = 3.e5
         prob.final_setup()
 
-        assert_rel_error(self, prob['sys1.old_length'], 3.e5)
-        assert_rel_error(self, prob.model._outputs['sys1.old_length'], 3.e5)
+        assert_near_equal(prob['sys1.old_length'], 3.e5)
+        assert_near_equal(prob.model._outputs['sys1.old_length'], 3.e5)
         prob.run_model()
-        assert_rel_error(self, prob['sys2.new_length'], 3.e-1)
-        assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
+        assert_near_equal(prob['sys2.new_length'], 3.e-1)
+        assert_near_equal(prob.model._outputs['sys2.new_length'], 3.e-1)
 
     def test_speed(self):
         comp = om.IndepVarComp()
@@ -269,11 +269,11 @@ class TestScaling(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.run_model()
-        assert_rel_error(self, prob['c1.distance'], 1.0)  # units: km
-        assert_rel_error(self, prob['c2.distance'], 1000.0)  # units: m
-        assert_rel_error(self, prob['c1.time'], 1.0)  # units: h
-        assert_rel_error(self, prob['c2.time'], 3600.0)  # units: s
-        assert_rel_error(self, prob['c2.speed'], 1.0)  # units: km/h (i.e., kph)
+        assert_near_equal(prob['c1.distance'], 1.0)  # units: km
+        assert_near_equal(prob['c2.distance'], 1000.0)  # units: m
+        assert_near_equal(prob['c1.time'], 1.0)  # units: h
+        assert_near_equal(prob['c2.time'], 3600.0)  # units: s
+        assert_near_equal(prob['c2.speed'], 1.0)  # units: km/h (i.e., kph)
 
     def test_scaling(self):
         """Test convergence in essentially one Newton iteration to atol=1e-5."""
@@ -285,7 +285,7 @@ class TestScaling(unittest.TestCase):
                                                              use_scal=use_scal))
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
-            prob.model.nonlinear_solver = om.NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
+            prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=2, atol=1e-5, rtol=0)
             prob.model.nonlinear_solver.linear_solver = om.ScipyKrylov(maxiter=1)
 
             prob.set_solver_print(level=0)
@@ -293,7 +293,7 @@ class TestScaling(unittest.TestCase):
             prob.setup()
             prob.run_model()
 
-            return np.linalg.norm(prob.model._residuals._data) < 1e-5
+            return np.linalg.norm(prob.model._residuals.asarray()) < 1e-5
 
         # ---------------------------
         # coeffs: r1, r2, c1, c2
@@ -380,22 +380,22 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
         with model._scaled_context_all():
-            res1 = -model.p1._residuals._data[0]
-            out1 = model.p1._outputs._data[0]
-            out2 = model.p2._outputs._data[0]
+            res1 = -model.p1._residuals.asarray()[0]
+            out1 = model.p1._outputs.asarray()[0]
+            out2 = model.p2._outputs.asarray()[0]
 
             self.assertEqual(res1, out1 - 2.0*(out2 + 1.0))
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
+        assert_near_equal(deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Scale the outputs only.
         # Residual scaling uses output scaling by default.
@@ -419,20 +419,20 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, (out1 - 2.0*(out2 + 1.0)))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, (res1)/(ref))
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
+        assert_near_equal(deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Scale the residual
 
@@ -454,20 +454,20 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, res1/res_ref)
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
+        assert_near_equal(deriv['p1.y', 'p1.x'], [[2.0]])
 
         # Simultaneously scale the residual and output with different values
 
@@ -491,20 +491,20 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        res1 = -model.p1._residuals._data[0]
-        out1 = model.p1._outputs._data[0]
-        out2 = model.p2._outputs._data[0]
+        res1 = -model.p1._residuals.asarray()[0]
+        out1 = model.p1._outputs.asarray()[0]
+        out2 = model.p2._outputs.asarray()[0]
 
         self.assertEqual(res1, out1 - 2.0*(out2+1.0))
         with model._scaled_context_all():
-            res1a = -model.p1._residuals._data[0]
+            res1a = -model.p1._residuals.asarray()[0]
 
             self.assertEqual(res1a, (res1)/(res_ref))
 
         # Jacobian is unscaled
         prob.model.run_linearize()
         deriv = model.p1._jacobian
-        assert_rel_error(self, deriv['p1.y', 'p1.x'], [[2.0]])
+        assert_near_equal(deriv['p1.y', 'p1.x'], [[2.0]])
 
     def test_scale_array_with_float(self):
 
@@ -518,7 +518,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -533,20 +533,20 @@ class TestScaling(unittest.TestCase):
 
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.total_volume'], 4.)
+        assert_near_equal(prob['comp.total_volume'], 4.)
 
         with model._scaled_context_all():
             val = model.comp._outputs['areas']
-            assert_rel_error(self, val[0, 0], 0.5)
-            assert_rel_error(self, val[0, 1], 0.5)
-            assert_rel_error(self, val[1, 0], 0.5)
-            assert_rel_error(self, val[1, 1], 0.5)
+            assert_near_equal(val[0, 0], 0.5)
+            assert_near_equal(val[0, 1], 0.5)
+            assert_near_equal(val[1, 0], 0.5)
+            assert_near_equal(val[1, 1], 0.5)
 
             val = model.comp._outputs['stuff']
-            assert_rel_error(self, val[0, 0], 2.0/3)
-            assert_rel_error(self, val[0, 1], 2.0/3)
-            assert_rel_error(self, val[1, 0], 2.0/3)
-            assert_rel_error(self, val[1, 1], 2.0/3)
+            assert_near_equal(val[0, 0], 2.0/3)
+            assert_near_equal(val[0, 1], 2.0/3)
+            assert_near_equal(val[1, 0], 2.0/3)
+            assert_near_equal(val[1, 1], 2.0/3)
 
     def test_scale_array_with_array(self):
 
@@ -560,7 +560,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -574,20 +574,20 @@ class TestScaling(unittest.TestCase):
         prob['comp.widths'] = np.ones((2, 2))
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.total_volume'], 4.)
+        assert_near_equal(prob['comp.total_volume'], 4.)
 
         with model._scaled_context_all():
             val = model.comp._outputs['areas']
-            assert_rel_error(self, val[0, 0], 1.0/2)
-            assert_rel_error(self, val[0, 1], 1.0/3)
-            assert_rel_error(self, val[1, 0], 1.0/5)
-            assert_rel_error(self, val[1, 1], 1.0/7)
+            assert_near_equal(val[0, 0], 1.0/2)
+            assert_near_equal(val[0, 1], 1.0/3)
+            assert_near_equal(val[1, 0], 1.0/5)
+            assert_near_equal(val[1, 1], 1.0/7)
 
             val = model.comp._outputs['stuff']
-            assert_rel_error(self, val[0, 0], 2.0/11)
-            assert_rel_error(self, val[0, 1], 2.0/13)
-            assert_rel_error(self, val[1, 0], 2.0/17)
-            assert_rel_error(self, val[1, 1], 2.0/19)
+            assert_near_equal(val[0, 0], 2.0/11)
+            assert_near_equal(val[0, 1], 2.0/13)
+            assert_near_equal(val[1, 0], 2.0/17)
+            assert_near_equal(val[1, 1], 2.0/19)
 
     def test_scale_and_add_array_with_array(self):
 
@@ -603,13 +603,18 @@ class TestScaling(unittest.TestCase):
                                 lower=np.array([[-5000.0, -4000.0], [-3000.0, -2000.0]]),
                                 upper=np.array([[5000.0, 4000.0], [3000.0, 2000.0]]))
                 self.add_output('total_volume', val=1.)
+                self.declare_partials(['*'], ['*'], method='cs')
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
         model = prob.model
+
+        # bounds arrays don't exist any more unless there's a linesearch that uses them,
+        # so use Newton here even though we don't need to.
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
@@ -619,44 +624,49 @@ class TestScaling(unittest.TestCase):
         prob['comp.widths'] = np.ones((2, 2))
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.total_volume'], 4.)
+        assert_near_equal(prob['comp.total_volume'], 4.)
+
+        slices = model._outputs.get_slice_dict()
 
         with model._scaled_context_all():
             val = model.comp._outputs['areas']
-            assert_rel_error(self, val[0, 0], (1.0 - 0.1)/(2 - 0.1))
-            assert_rel_error(self, val[0, 1], (1.0 - 0.2)/(3 - 0.2))
-            assert_rel_error(self, val[1, 0], (1.0 - 0.3)/(5 - 0.3))
-            assert_rel_error(self, val[1, 1], (1.0 - 0.4)/(7 - 0.4))
+            assert_near_equal(val[0, 0], (1.0 - 0.1)/(2 - 0.1), tolerance=1e-11)
+            assert_near_equal(val[0, 1], (1.0 - 0.2)/(3 - 0.2), tolerance=1e-11)
+            assert_near_equal(val[1, 0], (1.0 - 0.3)/(5 - 0.3), tolerance=1e-11)
+            assert_near_equal(val[1, 1], (1.0 - 0.4)/(7 - 0.4), tolerance=1e-11)
 
             val = model.comp._outputs['stuff']
-            assert_rel_error(self, val[0, 0], (2.0 - 0.6)/(11 - 0.6))
-            assert_rel_error(self, val[0, 1], (2.0 - 0.7)/(13 - 0.7))
-            assert_rel_error(self, val[1, 0], (2.0 - 0.8)/(17 - 0.8))
-            assert_rel_error(self, val[1, 1], (2.0 - 0.9)/(19 - 0.9))
+            assert_near_equal(val[0, 0], (2.0 - 0.6)/(11 - 0.6), tolerance=1e-11)
+            assert_near_equal(val[0, 1], (2.0 - 0.7)/(13 - 0.7), tolerance=1e-11)
+            assert_near_equal(val[1, 0], (2.0 - 0.8)/(17 - 0.8), tolerance=1e-11)
+            assert_near_equal(val[1, 1], (2.0 - 0.9)/(19 - 0.9), tolerance=1e-11)
 
-            lb = model.comp._lower_bounds['areas']
-            assert_rel_error(self, lb[0, 0], (-1000.0 - 0.1)/(2 - 0.1))
-            assert_rel_error(self, lb[0, 1], (-1000.0 - 0.2)/(3 - 0.2))
-            assert_rel_error(self, lb[1, 0], (-1000.0 - 0.3)/(5 - 0.3))
-            assert_rel_error(self, lb[1, 1], (-1000.0 - 0.4)/(7 - 0.4))
+            slc = slices['comp.areas']
+            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
 
-            ub = model.comp._upper_bounds['areas']
-            assert_rel_error(self, ub[0, 0], (1000.0 - 0.1)/(2 - 0.1))
-            assert_rel_error(self, ub[0, 1], (1000.0 - 0.2)/(3 - 0.2))
-            assert_rel_error(self, ub[1, 0], (1000.0 - 0.3)/(5 - 0.3))
-            assert_rel_error(self, ub[1, 1], (1000.0 - 0.4)/(7 - 0.4))
+            assert_near_equal(lb[0], (-1000.0 - 0.1)/(2 - 0.1))
+            assert_near_equal(lb[1], (-1000.0 - 0.2)/(3 - 0.2))
+            assert_near_equal(lb[2], (-1000.0 - 0.3)/(5 - 0.3))
+            assert_near_equal(lb[3], (-1000.0 - 0.4)/(7 - 0.4))
 
-            lb = model.comp._lower_bounds['stuff']
-            assert_rel_error(self, lb[0, 0], (-5000.0 - 0.6)/(11 - 0.6))
-            assert_rel_error(self, lb[0, 1], (-4000.0 - 0.7)/(13 - 0.7))
-            assert_rel_error(self, lb[1, 0], (-3000.0 - 0.8)/(17 - 0.8))
-            assert_rel_error(self, lb[1, 1], (-2000.0 - 0.9)/(19 - 0.9))
+            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            assert_near_equal(ub[0], (1000.0 - 0.1)/(2 - 0.1))
+            assert_near_equal(ub[1], (1000.0 - 0.2)/(3 - 0.2))
+            assert_near_equal(ub[2], (1000.0 - 0.3)/(5 - 0.3))
+            assert_near_equal(ub[3], (1000.0 - 0.4)/(7 - 0.4))
 
-            ub = model.comp._upper_bounds['stuff']
-            assert_rel_error(self, ub[0, 0], (5000.0 - 0.6)/(11 - 0.6))
-            assert_rel_error(self, ub[0, 1], (4000.0 - 0.7)/(13 - 0.7))
-            assert_rel_error(self, ub[1, 0], (3000.0 - 0.8)/(17 - 0.8))
-            assert_rel_error(self, ub[1, 1], (2000.0 - 0.9)/(19 - 0.9))
+            slc = slices['comp.stuff']
+            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
+            assert_near_equal(lb[0], (-5000.0 - 0.6)/(11 - 0.6))
+            assert_near_equal(lb[1], (-4000.0 - 0.7)/(13 - 0.7))
+            assert_near_equal(lb[2], (-3000.0 - 0.8)/(17 - 0.8))
+            assert_near_equal(lb[3], (-2000.0 - 0.9)/(19 - 0.9))
+
+            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            assert_near_equal(ub[0], (5000.0 - 0.6)/(11 - 0.6))
+            assert_near_equal(ub[1], (4000.0 - 0.7)/(13 - 0.7))
+            assert_near_equal(ub[2], (3000.0 - 0.8)/(17 - 0.8))
+            assert_near_equal(ub[3], (2000.0 - 0.9)/(19 - 0.9))
 
     def test_implicit_scale(self):
 
@@ -672,7 +682,7 @@ class TestScaling(unittest.TestCase):
                 self.declare_partials('*', '*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -700,23 +710,23 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._outputs['x']
-            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
-            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
+            assert_near_equal(val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_near_equal(val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
             val = model.comp._outputs['extra']
-            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
-            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
+            assert_near_equal(val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_near_equal(val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.comp._residuals['x'].copy()
-            assert_rel_error(self, val[0], (base_res_x[0])/(7.0))
-            assert_rel_error(self, val[1], (base_res_x[1])/(11.0))
+            assert_near_equal(val[0], (base_res_x[0])/(7.0))
+            assert_near_equal(val[1], (base_res_x[1])/(11.0))
 
         model.run_linearize()
 
         with model._scaled_context_all():
             subjacs = comp._jacobian
 
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'], np.ones((2, 2)))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'], np.ones((2, 2)))
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'], -np.eye(2))
+            assert_near_equal(subjacs['comp.x', 'comp.x'], np.ones((2, 2)))
+            assert_near_equal(subjacs['comp.x', 'comp.extra'], np.ones((2, 2)))
+            assert_near_equal(subjacs['comp.x', 'comp.rhs'], -np.eye(2))
 
     def test_implicit_scale_with_scalar_jac(self):
         raise unittest.SkipTest('Cannot specify an n by m subjac with a scalar yet.')
@@ -731,7 +741,7 @@ class TestScaling(unittest.TestCase):
                                 ref0=np.array([14.0, 17.0]))
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -758,34 +768,34 @@ class TestScaling(unittest.TestCase):
         base_res_x = model.comp._residuals['x'].copy()
         with model._scaled_context_all():
             val = model.comp._outputs['x']
-            assert_rel_error(self, val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
-            assert_rel_error(self, val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
+            assert_near_equal(val[0], (base_x[0] - 4.0)/(2.0 - 4.0))
+            assert_near_equal(val[1], (base_x[1] - 9.0)/(3.0 - 9.0))
             val = model.comp._outputs['extra']
-            assert_rel_error(self, val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
-            assert_rel_error(self, val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
+            assert_near_equal(val[0], (base_ex[0] - 14.0)/(12.0 - 14.0))
+            assert_near_equal(val[1], (base_ex[1] - 17.0)/(13.0 - 17.0))
             val = model.comp._residuals['x'].copy()
-            assert_rel_error(self, val[0], (base_res_x[0])/(7.0))
-            assert_rel_error(self, val[1], (base_res_x[1])/(11.0))
+            assert_near_equal(val[0], (base_res_x[0])/(7.0))
+            assert_near_equal(val[1], (base_res_x[1])/(11.0))
 
         model.run_linearize()
 
         with model._scaled_context_all():
             subjacs = comp._jacobian
 
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
+            assert_near_equal(subjacs['comp.x', 'comp.x'][0][0], (2.0 - 4.0)/(7.0 - 13.0))
+            assert_near_equal(subjacs['comp.x', 'comp.x'][1][0], (2.0 - 4.0)/(11.0 - 18.0))
+            assert_near_equal(subjacs['comp.x', 'comp.x'][0][1], (3.0 - 9.0)/(7.0 - 13.0))
+            assert_near_equal(subjacs['comp.x', 'comp.x'][1][1], (3.0 - 9.0)/(11.0 - 18.0))
 
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
+            assert_near_equal(subjacs['comp.x', 'comp.extra'][0][0], (12.0 - 14.0)/(7.0 - 13.0))
+            assert_near_equal(subjacs['comp.x', 'comp.extra'][1][0], (12.0 - 14.0)/(11.0 - 18.0))
+            assert_near_equal(subjacs['comp.x', 'comp.extra'][0][1], (13.0 - 17.0)/(7.0 - 13.0))
+            assert_near_equal(subjacs['comp.x', 'comp.extra'][1][1], (13.0 - 17.0)/(11.0 - 18.0))
 
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
-            assert_rel_error(self, subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
+            assert_near_equal(subjacs['comp.x', 'comp.rhs'][0][0], -1.0/(7.0 - 13.0))
+            assert_near_equal(subjacs['comp.x', 'comp.rhs'][1][0], 0.0)
+            assert_near_equal(subjacs['comp.x', 'comp.rhs'][0][1], 0.0)
+            assert_near_equal(subjacs['comp.x', 'comp.rhs'][1][1], -1.0/(11.0 - 18.0))
 
     def test_scale_array_bug1(self):
         # Tests a bug when you have two connections with different sizes (code was using a
@@ -804,7 +814,7 @@ class TestScaling(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 """ Don't need to do much."""
-                #super(ExpCompArrayScale, self).compute(inputs, outputs)
+                #super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] * 2
                 outputs['areas'] = inputs['lengths'] * 2
 
@@ -825,8 +835,8 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp1.total_volume'], 14.)
-        assert_rel_error(self, prob['comp2.total_volume'], 28.)
+        assert_near_equal(prob['comp1.total_volume'], 14.)
+        assert_near_equal(prob['comp2.total_volume'], 28.)
 
     def test_newton_resid_scaling(self):
 
@@ -854,13 +864,13 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.DirectSolver()
 
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], 2.0)
+        assert_near_equal(prob['comp.y'], 2.0)
 
         # Now, let's try with an AssembledJacobian.
 
@@ -872,13 +882,13 @@ class TestScaling(unittest.TestCase):
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp.y'], 2.0)
+        assert_near_equal(prob['comp.y'], 2.0)
 
     def test_feature1(self):
         import openmdao.api as om
@@ -900,9 +910,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._outputs['y1']
-            assert_rel_error(self, val, 2.0)
+            assert_near_equal(val, 2.0)
             val = model.comp._outputs['y2']
-            assert_rel_error(self, val, 6.0)
+            assert_near_equal(val, 6.0)
 
     def test_feature2(self):
         import openmdao.api as om
@@ -924,9 +934,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._outputs['y1']
-            assert_rel_error(self, val, 0.5)
+            assert_near_equal(val, 0.5)
             val = model.comp._outputs['y2']
-            assert_rel_error(self, val, 0.5)
+            assert_near_equal(val, 0.5)
 
     def test_feature3(self):
         import openmdao.api as om
@@ -948,9 +958,9 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._residuals['y1']
-            assert_rel_error(self, val, -.995)
+            assert_near_equal(val, -.995)
             val = model.comp._residuals['y2']
-            assert_rel_error(self, val, (1-6000.)/6000.)
+            assert_near_equal(val, (1-6000.)/6000.)
 
     def test_feature_vector(self):
         import openmdao.api as om
@@ -970,11 +980,11 @@ class TestScaling(unittest.TestCase):
 
         with model._scaled_context_all():
             val = model.comp._residuals['y']
-            assert_rel_error(self, val[0], (1-200.)/200.)
-            assert_rel_error(self, val[1], (1-6000.)/6000.)
+            assert_near_equal(val[0], (1-200.)/200.)
+            assert_near_equal(val[1], (1-6000.)/6000.)
             val = model.comp._outputs['y']
-            assert_rel_error(self, val[0], 2.0)
-            assert_rel_error(self, val[1], 6.0)
+            assert_near_equal(val[0], 2.0)
+            assert_near_equal(val[1], 6.0)
 
 
 class MyComp(om.ExplicitComponent):
@@ -1085,14 +1095,14 @@ class TestScalingOverhaul(unittest.TestCase):
         model = prob.model
 
         inputs_comp = om.IndepVarComp()
-        inputs_comp.add_output('x1_u_u', val=1.0)
-        inputs_comp.add_output('x1_u_s', val=1.0)
-        inputs_comp.add_output('x1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('x1_s_s', val=1.0, ref=3.0)
+        inputs_comp.add_output('x1_u_u',  val=1.0)
+        inputs_comp.add_output('x1_u_s',  val=1.0)
+        inputs_comp.add_output('x1_s_u',  val=1.0)
+        inputs_comp.add_output('x1_s_s',  val=1.0)
         inputs_comp.add_output('ox1_u_u', val=1.0)
         inputs_comp.add_output('ox1_u_s', val=1.0)
-        inputs_comp.add_output('ox1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('ox1_s_s', val=1.0, ref=3.0)
+        inputs_comp.add_output('ox1_s_u', val=1.0)
+        inputs_comp.add_output('ox1_s_s', val=1.0)
 
         model.add_subsystem('p', inputs_comp)
         mycomp = model.add_subsystem('comp', MyComp())
@@ -1131,57 +1141,57 @@ class TestScalingOverhaul(unittest.TestCase):
         prob.run_driver()
 
         # Parameter values
-        assert_rel_error(self, driver.param_vals['p.x1_u_u'], 1.0)
-        assert_rel_error(self, driver.param_vals['p.x1_u_s'], 1.0/7.0)
-        assert_rel_error(self, driver.param_vals['p.x1_s_u'], 1.0)
-        assert_rel_error(self, driver.param_vals['p.x1_s_s'], 1.0/7.0)
+        assert_near_equal(driver.param_vals['p.x1_u_u'], 1.0)
+        assert_near_equal(driver.param_vals['p.x1_u_s'], 1.0/7.0)
+        assert_near_equal(driver.param_vals['p.x1_s_u'], 1.0)
+        assert_near_equal(driver.param_vals['p.x1_s_s'], 1.0/7.0)
 
-        assert_rel_error(self, driver.param_meta['p.x1_u_u']['upper'], 11.0)
-        assert_rel_error(self, driver.param_meta['p.x1_u_s']['upper'], 11.0/7.0)
-        assert_rel_error(self, driver.param_meta['p.x1_s_u']['upper'], 11.0)
-        assert_rel_error(self, driver.param_meta['p.x1_s_s']['upper'], 11.0/7.0)
+        assert_near_equal(driver.param_meta['p.x1_u_u']['upper'], 11.0)
+        assert_near_equal(driver.param_meta['p.x1_u_s']['upper'], 11.0/7.0)
+        assert_near_equal(driver.param_meta['p.x1_s_u']['upper'], 11.0)
+        assert_near_equal(driver.param_meta['p.x1_s_s']['upper'], 11.0/7.0)
 
-        assert_rel_error(self, driver.con_meta['p.x1_u_u']['upper'], 3.3)
-        assert_rel_error(self, driver.con_meta['p.x1_u_s']['upper'], 3.3/13.0)
-        assert_rel_error(self, driver.con_meta['p.x1_s_u']['upper'], 3.3)
-        assert_rel_error(self, driver.con_meta['p.x1_s_s']['upper'], 3.3/13.0)
+        assert_near_equal(driver.con_meta['p.x1_u_u']['upper'], 3.3)
+        assert_near_equal(driver.con_meta['p.x1_u_s']['upper'], 3.3/13.0)
+        assert_near_equal(driver.con_meta['p.x1_s_u']['upper'], 3.3)
+        assert_near_equal(driver.con_meta['p.x1_s_s']['upper'], 3.3/13.0)
 
-        assert_rel_error(self, driver.con_vals['p.x1_u_u'], 1.0)
-        assert_rel_error(self, driver.con_vals['p.x1_u_s'], 1.0/13.0)
-        assert_rel_error(self, driver.con_vals['p.x1_s_u'], 1.0)
-        assert_rel_error(self, driver.con_vals['p.x1_s_s'], 1.0/13.0)
+        assert_near_equal(driver.con_vals['p.x1_u_u'], 1.0)
+        assert_near_equal(driver.con_vals['p.x1_u_s'], 1.0/13.0)
+        assert_near_equal(driver.con_vals['p.x1_s_u'], 1.0)
+        assert_near_equal(driver.con_vals['p.x1_s_s'], 1.0/13.0)
 
-        assert_rel_error(self, driver.obj_vals['p.ox1_u_u'], 1.0)
-        assert_rel_error(self, driver.obj_vals['p.ox1_u_s'], 1.0/15.0)
-        assert_rel_error(self, driver.obj_vals['p.ox1_s_u'], 1.0)
-        assert_rel_error(self, driver.obj_vals['p.ox1_s_s'], 1.0/15.0)
+        assert_near_equal(driver.obj_vals['p.ox1_u_u'], 1.0)
+        assert_near_equal(driver.obj_vals['p.ox1_u_s'], 1.0/15.0)
+        assert_near_equal(driver.obj_vals['p.ox1_s_u'], 1.0)
+        assert_near_equal(driver.obj_vals['p.ox1_s_s'], 1.0/15.0)
 
         J = model.comp.J
 
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_u_u'][0][0], J[0, 0])
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_u_u'][0][0], J[1, 0] / 17.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_u_u'][0][0], J[2, 0])
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_u_u'][0][0], J[3, 0] / 17.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_u']['p.x1_u_u'][0][0], J[0, 0])
+        assert_near_equal(driver.sens_dict['comp.x3_u_s']['p.x1_u_u'][0][0], J[1, 0] / 17.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_u']['p.x1_u_u'][0][0], J[2, 0])
+        assert_near_equal(driver.sens_dict['comp.x3_s_s']['p.x1_u_u'][0][0], J[3, 0] / 17.0)
 
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_u_s'][0][0], J[0, 1] * 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_u_s'][0][0], J[1, 1] / 17.0 * 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_u_s'][0][0], J[2, 1] * 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_u_s'][0][0], J[3, 1] / 17.0 * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_u']['p.x1_u_s'][0][0], J[0, 1] * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_s']['p.x1_u_s'][0][0], J[1, 1] / 17.0 * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_u']['p.x1_u_s'][0][0], J[2, 1] * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_s']['p.x1_u_s'][0][0], J[3, 1] / 17.0 * 7.0)
 
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_s_u'][0][0], J[0, 2])
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_s_u'][0][0], J[1, 2] / 17.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_s_u'][0][0], J[2, 2])
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_s_u'][0][0], J[3, 2] / 17.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_u']['p.x1_s_u'][0][0], J[0, 2])
+        assert_near_equal(driver.sens_dict['comp.x3_u_s']['p.x1_s_u'][0][0], J[1, 2] / 17.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_u']['p.x1_s_u'][0][0], J[2, 2])
+        assert_near_equal(driver.sens_dict['comp.x3_s_s']['p.x1_s_u'][0][0], J[3, 2] / 17.0)
 
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_s_s'][0][0], J[0, 3] * 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_s_s'][0][0], J[1, 3] / 17.0* 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_s_s'][0][0], J[2, 3] * 7.0)
-        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_s_s'][0][0], J[3, 3] / 17.0 * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_u']['p.x1_s_s'][0][0], J[0, 3] * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_u_s']['p.x1_s_s'][0][0], J[1, 3] / 17.0* 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_u']['p.x1_s_s'][0][0], J[2, 3] * 7.0)
+        assert_near_equal(driver.sens_dict['comp.x3_s_s']['p.x1_s_s'][0][0], J[3, 3] / 17.0 * 7.0)
 
         totals = prob.check_totals(compact_print=True, out_stream=None)
 
         for (of, wrt) in totals:
-            assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+            assert_near_equal(totals[of, wrt]['abs error'][0], 0.0, 1e-7)
 
     def test_iimplicit(self):
         # Testing that our scale/unscale contexts leave the output vector in the correct state when
@@ -1198,7 +1208,7 @@ class TestScalingOverhaul(unittest.TestCase):
         model.connect('p.x1_u', 'comp.x2_u')
 
         model.linear_solver = om.DirectSolver()
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.nonlinear_solver.options['atol'] = 1e-12
         model.nonlinear_solver.options['rtol'] = 1e-12
 
@@ -1213,8 +1223,143 @@ class TestScalingOverhaul(unittest.TestCase):
         totals = prob.check_totals(compact_print=True, out_stream=None)
 
         for (of, wrt) in totals:
-            assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+            assert_near_equal(totals[of, wrt]['abs error'][0], 0.0, 1e-7)
 
+
+class ExecCompVOI(om.ExecComp):
+    # adds all of its inputs as DVs and all of its outputs as constraints
+    def setup(self):
+        super().setup()
+
+        # add design vars
+        rel2meta = self._var_rel2meta
+        for name in sorted(self._var_rel_names['input']):
+            meta = rel2meta[name]
+            self.add_design_var(name, units=meta['units'])
+
+        # add constraints
+        for name in sorted(self._var_rel_names['output']):
+            meta = rel2meta[name]
+            self.add_constraint(name, units=meta['units'])
+
+
+class _Obj(object):
+    def __init__(self):
+        self.dvs = []
+        self.cons = []
+        self.objs = []
+
+
+@use_tempdirs
+class TestDriverScalingReport(unittest.TestCase):
+
+    def setup_model(self, mult_exp_range=(-10, 4), nins=1, nouts=1, ncomps=10, shape=1):
+        assert nins >= 1
+        assert nouts >= 1
+        assert ncomps >= 1
+        assert mult_exp_range[1] > mult_exp_range[0]
+
+        inidxs = np.arange(nins)
+        outidxs = np.arange(nouts)
+
+        expected = _Obj()
+        expected.objs.append("objective_comp.out")
+
+        p = om.Problem()
+        model = p.model
+        for icomp in range(ncomps):
+            exprs = []
+            for iout in range(nouts):
+
+                inperm = np.random.permutation(inidxs)
+                imults = "+".join([f"in{i} * 10**{(mult_exp_range[1] - mult_exp_range[0]) * np.random.random() + mult_exp_range[0]}" for
+                          i in inperm])
+                exprs.append(f"out{iout} = {imults}")
+
+            comp = model.add_subsystem(f"comp{icomp}", ExecCompVOI(exprs, shape=shape))
+
+            if icomp == 0:
+                # add a comp for the objective
+                model.add_subsystem("objective_comp", om.ExecComp("out=inp * 2", shape=shape))
+                model.add_objective("objective_comp.out")
+                model.connect("comp0.out0", "objective_comp.inp")
+
+            s_ins = sorted(f"in{i}" for i in inidxs)
+            expected.dvs.extend(f"comp{icomp}.{n}" for n in s_ins)
+            s_outs = sorted(f"out{i}" for i in outidxs)
+            expected.cons.extend(f"comp{icomp}.{n}" for n in s_outs)
+
+        p.setup()
+        return p, expected
+
+    def _check_data(self, data, expected):
+        objs = data['oflabels'][0]
+        cons = data['oflabels'][1:]
+        self.assertEqual(expected.objs, [objs])
+        self.assertEqual(expected.cons, cons)
+        self.assertEqual(expected.dvs, data['wrtlabels'])
+        self.assertEqual(0, len(data['linear']['oflabels']))
+        self.assertEqual(len(expected.objs), len(data['obj_table']))
+        self.assertEqual(len(expected.cons), len(data['con_table']))
+        self.assertEqual(len(expected.dvs), len(data['dv_table']))
+        for dvrow in data['dv_table']:
+            if dvrow['size'] > 1:
+                self.assertEqual(dvrow['size'], len(dvrow['_children']))
+                for chrow in dvrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+        for conrow in data['con_table']:
+            if conrow['size'] > 1:
+                self.assertEqual(conrow['size'], len(conrow['_children']))
+                for chrow in conrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+        for objrow in data['obj_table']:
+            if objrow['size'] > 1:
+                self.assertEqual(objrow['size'], len(objrow['_children']))
+                for chrow in objrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+    def test_40x40_in1_out1(self):
+        p, expected = self.setup_model(ncomps=40)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_40x40_in4_out4(self):
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_40x40_in4_out4_shape10(self):
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=10, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_in100out4_shape10(self):
+        p, expected = self.setup_model(nins=100, nouts=4, ncomps=1, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_in4out100_shape10(self):
+        p, expected = self.setup_model(nins=4, nouts=100, ncomps=1, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_big_subjac(self):
+        # this gets slow with larger sizes, e.g. shape=1000 takes > 20 sec to
+        # show/hide table rows or show a subjac in the browser
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=1, shape=100)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
 
 if __name__ == '__main__':
     unittest.main()

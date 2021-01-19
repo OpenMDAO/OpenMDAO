@@ -1,14 +1,10 @@
 """Finite difference derivative approximations."""
-from __future__ import division, print_function
-
 from collections import namedtuple, defaultdict
-from six import iteritems
-from six.moves import range, zip
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results
+    _gather_jac_results, _full_slice
 from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
 
@@ -31,8 +27,6 @@ FD_COEFFS = {
                            coeffs=np.array([0.5, -0.5]),
                            current_coeff=0.),
 }
-
-_full_slice = slice(None)
 
 
 def _generate_fd_coeff(form, order, system):
@@ -96,10 +90,10 @@ class FiniteDifference(ApproximationScheme):
         """
         Initialize the ApproximationScheme.
         """
-        super(FiniteDifference, self).__init__()
+        super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, abs_key, system, kwargs, vector=None):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -111,6 +105,8 @@ class FiniteDifference(ApproximationScheme):
             Containing System.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
@@ -124,8 +120,10 @@ class FiniteDifference(ApproximationScheme):
                                  "one of {}".format(system.msginfo, form,
                                                     list(DEFAULT_ORDER.keys())))
 
-        key = (abs_key[1], options['form'], options['order'],
-               options['step'], options['step_calc'], options['directional'])
+        options['vector'] = vector
+
+        key = (abs_key[1], options['form'], options['order'], options['step'],
+               options['step_calc'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._reset()  # force later regen of approx_groups
 
@@ -158,10 +156,10 @@ class FiniteDifference(ApproximationScheme):
         fd_form = _generate_fd_coeff(form, order, system)
 
         if step_calc == 'rel':
-            if wrt in system._outputs._views_flat:
-                step *= np.linalg.norm(system._outputs._views_flat[wrt])
-            elif wrt in system._inputs._views_flat:
-                step *= np.linalg.norm(system._inputs._views_flat[wrt])
+            if system._outputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._outputs._abs_get_val(wrt))
+            elif system._inputs._contains_abs(wrt):
+                step *= np.linalg.norm(system._inputs._abs_get_val(wrt))
 
         deltas = fd_form.deltas * step
         coeffs = fd_form.coeffs / step
@@ -189,9 +187,9 @@ class FiniteDifference(ApproximationScheme):
         if jac is None:
             jac = system._jacobian
 
-        self._starting_outs = system._outputs._data.copy()
-        self._starting_resids = system._residuals._data.copy()
-        self._starting_ins = system._inputs._data.copy()
+        self._starting_outs = system._outputs.asarray(True)
+        self._starting_resids = system._residuals.asarray(True)
+        self._starting_ins = system._inputs.asarray(True)
         if total:
             self._results_tmp = self._starting_outs.copy()
         else:
@@ -234,7 +232,7 @@ class FiniteDifference(ApproximationScheme):
         array
             The givan array, unchanged.
         """
-        return array
+        return array.real
 
     def _run_point(self, system, idx_info, data, results_array, total):
         """
@@ -263,7 +261,7 @@ class FiniteDifference(ApproximationScheme):
         if current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
-            results_array[:] = current_vec._data
+            results_array[:] = current_vec.asarray()
             results_array *= current_coeff
         else:
             results_array[:] = 0.
@@ -298,25 +296,38 @@ class FiniteDifference(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] += delta
+                vec.iadd(delta, idxs)
 
         if total:
             system.run_solve_nonlinear()
-            self._results_tmp[:] = system._outputs._data
-            system._outputs._data[:] = self._starting_outs
+            self._results_tmp[:] = system._outputs.asarray()
         else:
             system.run_apply_nonlinear()
-            self._results_tmp[:] = system._residuals._data
-        system._residuals._data[:] = self._starting_resids
+            self._results_tmp[:] = system._residuals.asarray()
+
+        system._residuals.set_val(self._starting_resids)
 
         # save results and restore starting inputs/outputs
-        system._inputs._data[:] = self._starting_ins
-
-        # if results_vec are the residuals then we need to remove the delta's we added earlier
-        # to the outputs
-        if not total:
-            for vec, idxs in idx_info:
-                if vec is system._outputs:
-                    vec._data[idxs] -= delta
+        system._inputs.set_val(self._starting_ins)
+        system._outputs.set_val(self._starting_outs)
 
         return self._results_tmp
+
+    def apply_directional(self, data, direction):
+        """
+        Apply stepsize to direction and embed into approximation data.
+
+        Parameters
+        ----------
+        data : tuple
+            Tuple contains step size, and other info.
+        direction : ndarray
+            Vector containing derivative direction.
+
+        Returns
+        -------
+        ndarray
+            New tuple with new step direction.
+        """
+        deltas, coeffs, current_coeff = data
+        return (np.outer(np.atleast_1d(deltas), direction), coeffs, current_coeff)

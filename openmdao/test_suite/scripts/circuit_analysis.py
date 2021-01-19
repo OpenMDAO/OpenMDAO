@@ -1,10 +1,9 @@
-from __future__ import print_function, division, absolute_import
 import unittest
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class Resistor(om.ExplicitComponent):
@@ -18,6 +17,7 @@ class Resistor(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
@@ -38,6 +38,7 @@ class Diode(om.ExplicitComponent):
         self.add_input('V_out', units='V')
         self.add_output('I', units='A')
 
+    def setup_partials(self):
         self.declare_partials('I', 'V_in', method='fd')
         self.declare_partials('I', 'V_out', method='fd')
 
@@ -66,6 +67,7 @@ class Node(om.ImplicitComponent):
             i_name = 'I_out:{}'.format(i)
             self.add_input(i_name, units='A')
 
+    def setup_partials(self):
         #note: we don't declare any partials wrt `V` here,
         #      because the residual doesn't directly depend on it
         self.declare_partials('V', 'I*', method='fd')
@@ -97,7 +99,7 @@ class Circuit(om.Group):
         self.connect('R2.I', 'n2.I_in:0')
         self.connect('D1.I', 'n2.I_out:0')
 
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
         self.linear_solver = om.DirectSolver()
@@ -109,25 +111,23 @@ if __name__ == "__main__":
     p = om.Problem()
     model = p.model
 
-    model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-
     # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
-    # model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-    model.add_subsystem('batt', om.IndepVarComp('V', 1.5, units='V'))
-    bal = model.add_subsystem('batt_balance', om.BalanceComp())
+    model.set_input_defaults('ground.V', 0., units='V')
+    model.set_input_defaults('batt.V', 1.5, units='V')
+    bal = model.add_subsystem('batt_balance', om.BalanceComp(), promotes=[('rhs:I', 'batt.V')])
+
     bal.add_balance('I', units='A', eq_units='V')
 
-    model.add_subsystem('circuit', Circuit())
+    model.add_subsystem('circuit', Circuit(), promotes=[('Vg', 'ground.V')])
     model.add_subsystem('batt_deltaV', om.ExecComp('dV = V1 - V2', V1={'units':'V'},
-                                                   V2={'units':'V'}, dV={'units':'V'}))
+                                                   V2={'units':'V'}, dV={'units':'V'}),
+                        promotes=[('V2', 'ground.V')])
 
     # current into the circuit is now the output state from the batt_balance comp
     model.connect('batt_balance.I', 'circuit.I_in')
-    model.connect('ground.V', ['circuit.Vg','batt_deltaV.V2'])
     model.connect('circuit.n1.V', 'batt_deltaV.V1')
 
     # set the lhs and rhs for the battery residual
-    model.connect('batt.V', 'batt_balance.rhs:I')
     model.connect('batt_deltaV.dV', 'batt_balance.lhs:I')
 
     p.setup()

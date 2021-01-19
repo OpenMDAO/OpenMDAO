@@ -1,9 +1,6 @@
 """Define a base class for all Drivers in OpenMDAO."""
-from __future__ import print_function
 from collections import OrderedDict
 import warnings
-
-from six import iteritems, itervalues
 
 import numpy as np
 
@@ -90,8 +87,6 @@ class ExperimentalDriver(object):
         self.recording_options = OptionsDictionary()
 
         ###########################
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
-                                       default=True)
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the \
                                        driver level')
@@ -125,6 +120,7 @@ class ExperimentalDriver(object):
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
+        self.supports.declare('distributed_design_vars', types=bool, default=False)
 
         self.iter_count = 0
         self.options = None
@@ -166,154 +162,7 @@ class ExperimentalDriver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = problem
-        model = problem.model
-
-        self._objs = objs = OrderedDict()
-        self._cons = cons = OrderedDict()
-        self._responses = model.get_responses(recurse=True)
-        response_size = 0
-        for name, data in iteritems(self._responses):
-            if data['type'] == 'con':
-                cons[name] = data
-            else:
-                objs[name] = data
-            response_size += data['size']
-
-        # Gather up the information for design vars.
-        self._designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
-
-        if ((problem._mode == 'fwd' and desvar_size > response_size) or
-                (problem._mode == 'rev' and response_size > desvar_size)):
-            warnings.warn("Inefficient choice of derivative mode.  You chose '%s' for a "
-                          "problem with %d design variables and %d response variables "
-                          "(objectives and constraints)." %
-                          (problem._mode, desvar_size, response_size), RuntimeWarning)
-
-        self._has_scaling = (
-            np.any([r['scaler'] is not None for r in self._responses.values()]) or
-            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
-        )
-
-        con_set = set()
-        obj_set = set()
-        dv_set = set()
-
-        self._remote_dvs = dv_dict = {}
-        self._remote_cons = con_dict = {}
-        self._remote_objs = obj_dict = {}
-
-        # Now determine if later we'll need to allgather cons, objs, or desvars.
-        if model.comm.size > 1 and model._subsystems_allprocs:
-            local_out_vars = set(model._outputs._views)
-            remote_dvs = set(self._designvars) - local_out_vars
-            remote_cons = set(self._cons) - local_out_vars
-            remote_objs = set(self._objs) - local_out_vars
-            all_remote_vois = model.comm.allgather(
-                (remote_dvs, remote_cons, remote_objs))
-            for rem_dvs, rem_cons, rem_objs in all_remote_vois:
-                con_set.update(rem_cons)
-                obj_set.update(rem_objs)
-                dv_set.update(rem_dvs)
-
-            # If we have remote VOIs, pick an owning rank for each and use that
-            # to bcast to others later
-            owning_ranks = model._owning_rank['output']
-            sizes = model._var_sizes['nonlinear']['output']
-            for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                owner = owning_ranks[vname]
-                if vname in dv_set:
-                    dv_dict[vname] = (owner, sizes[owner, i])
-                if vname in con_set:
-                    con_dict[vname] = (owner, sizes[owner, i])
-                if vname in obj_set:
-                    obj_dict[vname] = (owner, sizes[owner, i])
-
-        self._remote_responses = self._remote_cons.copy()
-        self._remote_responses.update(self._remote_objs)
-
-        # Case recording setup
-        mydesvars = myobjectives = myconstraints = myresponses = set()
-        mysystem_outputs = set()
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
-        rec_desvars = self.recording_options['record_desvars']
-        rec_objectives = self.recording_options['record_objectives']
-        rec_constraints = self.recording_options['record_constraints']
-        rec_responses = self.recording_options['record_responses']
-
-        # includes and excludes for outputs are specified using promoted names
-        # NOTE: only local var names are in abs2prom, all will be gathered later
-        abs2prom = model._var_abs2prom['output']
-
-        all_desvars = {n for n in self._designvars
-                       if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-        all_objectives = {n for n in self._objs
-                          if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-        all_constraints = {n for n in self._cons
-                           if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-        if rec_desvars:
-            mydesvars = all_desvars
-
-        if rec_objectives:
-            myobjectives = all_objectives
-
-        if rec_constraints:
-            myconstraints = all_constraints
-
-        if rec_responses:
-            myresponses = {n for n in self._responses
-                           if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-
-        # get the includes that were requested for this Driver recording
-        if incl:
-            prob = self._problem
-            root = prob.model
-            # The my* variables are sets
-
-            # First gather all of the desired outputs
-            # The following might only be the local vars if MPI
-            mysystem_outputs = {n for n in root._outputs
-                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
-
-            # If MPI, and on rank 0, need to gather up all the variables
-            #    even those not local to rank 0
-            if MPI:
-                all_vars = root.comm.gather(mysystem_outputs, root=0)
-                if MPI.COMM_WORLD.rank == 0:
-                    mysystem_outputs = all_vars[-1]
-                    for d in all_vars[:-1]:
-                        mysystem_outputs.update(d)
-
-            # de-duplicate mysystem_outputs
-            mysystem_outputs = mysystem_outputs.difference(all_desvars, all_objectives,
-                                                           all_constraints)
-
-        if MPI:  # filter based on who owns the variables
-            # TODO Eventually, we think we can get rid of this next check. But to be safe,
-            #       we are leaving it in there.
-            if not model.is_active():
-                raise RuntimeError(
-                    "RecordingManager.startup should never be called when "
-                    "running in parallel on an inactive System")
-            rrank = self._problem.comm.rank  # root ( aka model ) rank.
-            rowned = model._owning_rank['output']
-            mydesvars = [n for n in mydesvars if rrank == rowned[n]]
-            myresponses = [n for n in myresponses if rrank == rowned[n]]
-            myobjectives = [n for n in myobjectives if rrank == rowned[n]]
-            myconstraints = [n for n in myconstraints if rrank == rowned[n]]
-            mysystem_outputs = [n for n in mysystem_outputs if rrank == rowned[n]]
-
-        self._filtered_vars_to_record = {
-            'des': mydesvars,
-            'obj': myobjectives,
-            'con': myconstraints,
-            'res': myresponses,
-            'sys': mysystem_outputs,
-        }
-
-        self._rec_mgr.startup(self)
+        pass
 
     def _get_voi_val(self, name, meta, remote_vois):
         """
@@ -539,9 +388,9 @@ class ExperimentalDriver(object):
         do_wrt = True
         islices = {}
         oslices = {}
-        for okey, oval in iteritems(derivs):
+        for okey, oval in derivs.items():
             if do_wrt:
-                for ikey, val in iteritems(oval):
+                for ikey, val in oval.items():
                     istart = isize
                     isize += val.shape[1]
                     islices[ikey] = slice(istart, isize)
@@ -554,14 +403,14 @@ class ExperimentalDriver(object):
 
         relevant = self._problem.model._relevant
 
-        for okey, odict in iteritems(derivs):
-            for ikey, val in iteritems(odict):
+        for okey, odict in derivs.items():
+            for ikey, val in odict.items():
                 if okey in relevant[ikey] or ikey in relevant[okey]:
                     new_derivs[oslices[okey], islices[ikey]] = val
 
         return new_derivs
 
-    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
+    def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', use_abs_names=True):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
 
@@ -579,7 +428,7 @@ class ExperimentalDriver(object):
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        global_names : bool
+        use_abs_names : bool
             Set to True when passing in global names to skip some translation steps.
 
         Returns
@@ -592,16 +441,16 @@ class ExperimentalDriver(object):
         # Compute the derivatives in dict format...
         if prob.model._owns_approx_jac:
             derivs = prob._compute_totals_approx(of=of, wrt=wrt, return_format='dict',
-                                                 global_names=global_names)
+                                                 use_abs_names=use_abs_names)
         else:
             derivs = prob._compute_totals(of=of, wrt=wrt, return_format='dict',
-                                          global_names=global_names)
+                                          use_abs_names=use_abs_names)
 
         # ... then convert to whatever the driver needs.
         if return_format in ('dict', 'array'):
             if self._has_scaling:
-                for okey, odict in iteritems(derivs):
-                    for ikey, val in iteritems(odict):
+                for okey, odict in derivs.items():
+                    for ikey, val in odict.items():
 
                         iscaler = self._designvars[ikey]['scaler']
                         oscaler = self._responses[okey]['scaler']
@@ -669,7 +518,7 @@ class ExperimentalDriver(object):
             outputs = root._outputs
             # outputsinputs, outputs, residuals = root.get_nonlinear_vectors()
             sysvars = {}
-            for name, value in iteritems(outputs._names):
+            for name, value in outputs._names.items():
                 if name in self._filtered_vars_to_record['sys']:
                     sysvars[name] = value
         else:

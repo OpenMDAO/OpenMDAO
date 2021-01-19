@@ -83,7 +83,7 @@ class EmbedCodeDirective(Directive):
         #
         path = self.arguments[0]
         try:
-            source, indent, module, class_ = get_source_code(path)
+            source, indent, module, class_, method = get_source_code(path)
         except Exception as err:
             # Generally means the source couldn't be inspected or imported.
             # Raise as a Directive warning (level 2 in docutils).
@@ -118,7 +118,11 @@ class EmbedCodeDirective(Directive):
 
         if is_test:
             try:
-                source = replace_asserts_with_prints(dedent(strip_header(strip_decorators(dedent(source)))))
+                source = dedent(source)
+                source = strip_decorators(source)
+                source = strip_header(source)
+                source = dedent(source)
+                source = replace_asserts_with_prints(source)
                 source = remove_initial_empty_lines(source)
 
                 class_name = class_.__name__
@@ -137,9 +141,10 @@ class EmbedCodeDirective(Directive):
 
                 # for interleaving, we need to mark input/output blocks
                 if 'interleave' in layout:
-                    source = insert_output_start_stop_indicators(source)
-
-                code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
+                    interleaved = insert_output_start_stop_indicators(source)
+                    code_to_run = '\n'.join([self_code, setup_code, interleaved, teardown_code]).strip()
+                else:
+                    code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
             except Exception:
                 err = traceback.format_exc()
                 raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
@@ -169,9 +174,14 @@ class EmbedCodeDirective(Directive):
                 if 'plot' in layout:
                     code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
 
-            skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
-                                                    imports_not_required=imports_not_required,
-                                                    shows_plot=shows_plot)
+            if is_test and getattr(method, '__unittest_skip__', False):
+                skipped = True
+                failed = False
+                run_outputs = method.__unittest_skip_why__
+            else:
+                skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
+                                                        imports_not_required=imports_not_required,
+                                                        shows_plot=shows_plot)
 
         #
         # Handle output
@@ -182,7 +192,13 @@ class EmbedCodeDirective(Directive):
             # an environment where mpi or pyoptsparse are missing.
             raise self.directive_error(2, run_outputs)
         elif skipped:
+            # issue a warning unless it's about missing SNOPT when building a Travis pull request
+            PR = os.environ.get("TRAVIS_PULL_REQUEST")
+            if not (PR and PR != "false" and "pyoptsparse is not providing SNOPT" in run_outputs):
+                self.state_machine.reporter.warning(run_outputs)
+
             io_nodes = [get_skip_output_node(run_outputs)]
+
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
@@ -230,6 +246,9 @@ class EmbedCodeDirective(Directive):
                 doc_nodes.append(body)
             elif skipped:
                 if not skip_fail_shown:
+                    body = nodes.literal_block(source, source)
+                    body['language'] = 'python'
+                    doc_nodes.append(body)
                     doc_nodes.extend(io_nodes)
                     skip_fail_shown = True
             else:

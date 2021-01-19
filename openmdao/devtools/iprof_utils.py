@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import os
 import sys
@@ -7,7 +6,6 @@ import ast
 from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
-from six import string_types
 
 
 class _Options(object):
@@ -145,7 +143,7 @@ def _setup_func_group():
             ('_set_initial_conditions', (Problem,)),
             ('_build', (Matrix,)),
             ('_add_submat', (Matrix,)),
-            ('_get_maps', (System,)),
+            ('_get_promotion_maps', (System,)),
             ('_set_approx_partials_meta', (System,)),
             ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
@@ -324,7 +322,7 @@ def _create_profile_callback(stack, matches=None, do_call=None, do_ret=None, con
 def _get_methods(options, default):
     if options.methods is None:
         methods = func_group[default]
-    elif isinstance(options.methods, string_types):
+    elif isinstance(options.methods, str):
         try:
             methods = func_group[options.methods]
         except KeyError:

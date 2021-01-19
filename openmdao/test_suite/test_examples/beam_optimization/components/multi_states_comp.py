@@ -1,6 +1,3 @@
-from __future__ import division
-from six.moves import range
-
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
@@ -96,7 +93,7 @@ class MultiStatesComp(om.ImplicitComponent):
         num_entry = num_elements * 12 + 4
         ndim = num_entry + 4
 
-        data = np.zeros((ndim, ), dtype=inputs._data.dtype)
+        data = np.zeros((ndim, ), dtype=inputs._get_data().dtype)
         cols = np.empty((ndim, ))
         rows = np.empty((ndim, ))
 

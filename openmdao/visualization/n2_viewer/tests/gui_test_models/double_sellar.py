@@ -6,11 +6,11 @@ model = prob.model = DoubleSellar()
 
 # each SubSellar group converges itself
 g1 = model.g1
-g1.nonlinear_solver = om.NewtonSolver()
+g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 g1.linear_solver = om.DirectSolver()  # used for derivatives
 
 g2 = model.g2
-g2.nonlinear_solver = om.NewtonSolver()
+g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
 g2.linear_solver = om.DirectSolver()
 
 # Converge the outer loop with Gauss Seidel, with a looser tolerance.

@@ -1,6 +1,4 @@
 """MetaModel provides basic meta modeling capability."""
-from six import iteritems
-from six.moves import range
 from copy import deepcopy
 from itertools import chain, product
 
@@ -9,7 +7,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import rel_key2abs_key
 
 
@@ -55,7 +53,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MetaModelUnStructuredComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # keep list of inputs and outputs that are not the training vars
         self._surrogate_input_names = []
@@ -72,7 +70,26 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._static_surrogate_output_names = []
         self._static_input_size = 0
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+        self._no_check_partials = True
+
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : str
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint).
+        prob_meta : dict
+            Problem level options.
+        """
         self._surrogate_input_names = []
         self._surrogate_output_names = []
 
@@ -80,7 +97,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_options)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def initialize(self):
         """
@@ -113,13 +130,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_input(name, val, **kwargs)
+        metadata = super().add_input(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of input '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of input '{name}' "
+                                   f"must be {vec_size}")
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -162,13 +179,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         dict
             metadata for added variable
         """
-        metadata = super(MetaModelUnStructuredComp, self).add_output(name, val, **kwargs)
+        metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
 
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
-                raise RuntimeError("%s: First dimension of output '%s' must be %d"
-                                   % (self.msginfo, name, vec_size))
+                raise RuntimeError(f"{self.msginfo}: First dimension of output '{name}' "
+                                   f"must be {vec_size}")
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
@@ -188,6 +205,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         if surrogate:
             metadata['surrogate'] = surrogate
             metadata['default_surrogate'] = False
+            metadata['surrogate_name'] = type(surrogate).__name__
         else:
             metadata['default_surrogate'] = True
 
@@ -198,16 +216,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         return metadata
 
-    def _setup_var_data(self, recurse=True):
+    def _setup_var_data(self):
         """
         Count total variables.
 
         Also instantiates surrogates for the output variables that use the default surrogate.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         default_surrogate = self.options['default_surrogate']
         for name, shape in self._surrogate_output_names:
@@ -219,26 +232,18 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 surrogate = deepcopy(default_surrogate)
                 metadata['surrogate'] = surrogate
 
-            if 'surrogate' in metadata:
-                metadata['surrogate']._setup_var_data(self.pathname)
-
         # training will occur on first execution after setup
         self.train = True
 
-        super(MetaModelUnStructuredComp, self)._setup_var_data(recurse=recurse)
+        super()._setup_var_data()
 
-    def _setup_partials(self, recurse=True):
+    def _setup_partials(self):
         """
         Process all partials and approximations that the user declared.
 
         Metamodel needs to declare its partials after inputs and outputs are known.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
         """
-        super(MetaModelUnStructuredComp, self)._setup_partials()
+        super()._setup_partials()
 
         vec_size = self.options['vec_size']
         if vec_size > 1:
@@ -273,7 +278,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         # Support for user declaring fd partials in a child class and assigning new defaults.
         # We want a warning for all partials that were not explicitly declared.
         declared_partials = set([
-            key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
+            key for key, dct in self._subjacs_info.items() if 'method' in dct
             and dct['method']])
 
         # Gather undeclared fd partials on surrogates that don't support analytic derivatives.
@@ -497,8 +502,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         """
         if method == 'cs':
             raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
-        super(MetaModelUnStructuredComp, self).declare_partials(of, wrt, dependent, rows, cols,
-                                                                val, method, step, form, step_calc)
+        super().declare_partials(of, wrt, dependent, rows, cols,
+                                 val, method, step, form, step_calc)
 
     def compute_partials(self, inputs, partials):
         """
@@ -558,17 +563,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if num_sample is None:
                 num_sample = len(val)
             elif len(val) != num_sample:
-                msg = "{}: Each variable must have the same number"\
-                      " of training points. Expected {} but found {} "\
-                      "points for '{}'."\
-                      .format(self.msginfo, num_sample, len(val), name)
-                raise RuntimeError(msg)
+                raise RuntimeError(f"{self.msginfo}: Each variable must have the same number "
+                                   f"of training points. Expected {num_sample} but found "
+                                   f"{len(val)} points for '{name}'.")
 
         if len(missing_training_data) > 0:
-            msg = "%s: The following training data sets must be " \
-                  "provided as options: " % self.msginfo + \
-                  str(missing_training_data)
-            raise RuntimeError(msg)
+            raise RuntimeError(f"{self.msginfo}: The following training data sets must be "
+                               f"provided as options: {missing_training_data}")
 
         inputs = np.zeros((num_sample, self._input_size))
         self._training_input = inputs
@@ -603,8 +604,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
             surrogate = self._metadata(name).get('surrogate')
             if surrogate is None:
-                raise RuntimeError("%s: No surrogate specified for output '%s'"
-                                   % (self.msginfo, name))
+                raise RuntimeError(f"{self.msginfo}: No surrogate specified for output '{name}'")
             else:
                 surrogate.train(self._training_input,
                                 self._training_output[name])
@@ -613,62 +613,3 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _metadata(self, name):
         return self._var_rel2meta[name]
-
-    @property
-    def default_surrogate(self):
-        """
-        Get the default surrogate for this MetaModel.
-        """
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        return self.options['default_surrogate']
-
-    @default_surrogate.setter
-    def default_surrogate(self, value):
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        self.options['default_surrogate'] = value
-
-
-class MetaModel(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModel' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModel, self).__init__(*args, **kwargs)
-
-
-class MetaModelUnStructured(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModelUnStructured' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModelUnStructured, self).__init__(*args, **kwargs)

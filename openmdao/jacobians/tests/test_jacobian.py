@@ -4,9 +4,6 @@ import itertools
 import sys
 import unittest
 
-from six import assertRaisesRegex, StringIO
-from six.moves import range
-
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
@@ -14,7 +11,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
 
@@ -26,7 +23,7 @@ except ImportError:
 
 class MyExplicitComp(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -74,7 +71,7 @@ class MyExplicitComp(ExplicitComponent):
 
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp2, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -120,7 +117,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._shape = shape
         self._value = value
         self._constructor = constructor
-        super(ExplicitSetItemComp, self).__init__()
+        super().__init__()
 
     def setup(self):
         if self._shape == 'scalar':
@@ -275,7 +272,7 @@ class TestJacobian(unittest.TestCase):
         top.connect('indep.a', 'C2.w', src_indices=[0,2,1])
         top.connect('C1.f', 'C2.z', src_indices=[1])
 
-        top.nonlinear_solver = NewtonSolver()
+        top.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         top.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=100)
         top.linear_solver = ScipyKrylov(
             maxiter=200, atol=1e-10, rtol=1e-10, assemble_jac=True)
@@ -290,18 +287,17 @@ class TestJacobian(unittest.TestCase):
     def _check_fwd(self, prob, check_vec):
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-        work = d_outputs._clone()
-        work.set_const(1.0)
+        work = np.ones(d_outputs._data.size)
 
         # fwd apply_linear test
-        d_outputs.set_const(1.0)
+        d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals._data[:] = d_residuals._data - check_vec
+        d_residuals.set_val(d_residuals.asarray() - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
-        d_outputs.set_const(0.0)
-        d_residuals._data[:] = check_vec
+        d_outputs.set_val(0.0)
+        d_residuals.set_val(check_vec)
 
         prob.model.run_solve_linear(['linear'], 'fwd')
 
@@ -311,18 +307,17 @@ class TestJacobian(unittest.TestCase):
     def _check_rev(self, prob, check_vec):
         d_inputs, d_outputs, d_residuals = prob.model.get_linear_vectors()
 
-        work = d_outputs._clone()
-        work.set_const(1.0)
+        work = np.ones(d_outputs._data.size)
 
         # rev apply_linear test
-        d_residuals.set_const(1.0)
+        d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs._data[:] = d_outputs._data - check_vec
+        d_outputs.set_val(d_outputs.asarray() - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
-        d_residuals.set_const(0.0)
-        d_outputs._data[:] = check_vec
+        d_residuals.set_val(0.0)
+        d_outputs.set_val(check_vec)
         prob.model.run_solve_linear(['linear'], 'rev')
         d_residuals -= work
         self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)
@@ -349,7 +344,7 @@ class TestJacobian(unittest.TestCase):
 
         prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
-        prob.model.add_subsystem('C1', comp)
+        comp = prob.model.add_subsystem('C1', comp)
         prob.setup()
 
         prob.set_solver_print(level=0)
@@ -358,13 +353,13 @@ class TestJacobian(unittest.TestCase):
         prob.model.run_linearize()
 
         expected = constructor(value)
-        J = prob.model._subsystems_allprocs[0]._jacobian
+        J = comp._jacobian
         jac_out = J['out', 'in']
 
         self.assertEqual(len(jac_out.shape), 2)
         expected_dtype = np.promote_types(dtype, float)
         self.assertEqual(jac_out.dtype, expected_dtype)
-        assert_rel_error(self, jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
+        assert_near_equal(jac_out, np.atleast_2d(expected).reshape(expected_shape), 1e-15)
 
     def test_group_assembled_jac_with_ext_mat(self):
 
@@ -477,7 +472,7 @@ class TestJacobian(unittest.TestCase):
         c2 = prob.model.add_subsystem('C2', ExecComp('d=a*2.0+b+c', a=0., b=0., c=0., d=0.))
         c3 = prob.model.add_subsystem('C3', ExecComp('ee=a*2.0', a=0., ee=0.))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         prob.model.connect('indep.x', 'C1.a')
@@ -487,7 +482,7 @@ class TestJacobian(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
+        assert_near_equal(prob['C3.ee'], 8.0, 0000.1)
 
     def test_assembled_jacobian_submat_indexing_dense(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -500,7 +495,7 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        prob.model.nonlinear_solver = NewtonSolver()
+        prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         G1.linear_solver = DirectSolver(assemble_jac=True)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
@@ -514,8 +509,8 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_assembled_jacobian_submat_indexing_csc(self):
         prob = Problem(model=Group(assembled_jac_type='dense'))
@@ -528,11 +523,11 @@ class TestJacobian(unittest.TestCase):
         G1.add_subsystem('C1', ExecComp('y=2.0*x*x'))
         G1.add_subsystem('C2', ExecComp('y=3.0*x*x'))
 
-        # prob.model.nonlinear_solver = NewtonSolver()
+        # prob.model.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
         G1.linear_solver = DirectSolver(assemble_jac=True)
-        G1.nonlinear_solver = NewtonSolver()
+        G1.nonlinear_solver = NewtonSolver(solve_subsystems=False)
 
         # before the fix, we got bad offsets into the _ext_mtx matrix.
         # to get entries in _ext_mtx, there must be at least one connection
@@ -545,8 +540,8 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['G1.C1.y'], 50.0)
-        assert_rel_error(self, prob['G1.C2.y'], 243.0)
+        assert_near_equal(prob['G1.C1.y'], 50.0)
+        assert_near_equal(prob['G1.C2.y'], 243.0)
 
     def test_declare_partial_reference(self):
         # Test for a bug where declare_partials is given an array reference
@@ -572,7 +567,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['y'], 2 * np.ones(2))
+        assert_near_equal(prob['y'], 2 * np.ones(2))
 
     def test_declare_partials_row_col_size_mismatch(self):
         # Make sure we have clear error messages.
@@ -601,20 +596,20 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp1())
 
-        msg = "Comp1 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = "'comp' <class Comp1>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
         prob = Problem()
         model = prob.model
         model.add_subsystem('comp', Comp2())
 
-        msg = "Comp2 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = "'comp' <class Comp2>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.setup()
 
     def test_assembled_jacobian_unsupported_cases(self):
@@ -651,7 +646,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Nested
@@ -672,7 +667,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Try a component that is derived from a matrix-free one
@@ -695,7 +690,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
         # Make sure regular comps don't give an error.
@@ -739,7 +734,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with assertRaisesRegex(self, Exception, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.run_model()
 
     def test_access_undeclared_subjac(self):
@@ -769,7 +764,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         msg = 'Variable name pair \("{}", "{}"\) must first be declared.'
-        with assertRaisesRegex(self, KeyError, msg.format('y', 'x')):
+        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
             J = prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
@@ -793,7 +788,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.array([[ 3.,  0.,  2.,  0.],
                                                                    [-0.,  3.,  0.,  2.]]), .0001)
 
     def test_one_src_2_tgts_csc_error(self):
@@ -817,7 +812,7 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
-        assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+        assert_near_equal(J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
 
     def test_dict_properties(self):
         # Make sure you can use the partials variable passed to compute_partials as a dict
@@ -852,7 +847,61 @@ class TestJacobian(unittest.TestCase):
                 [e[1] for e in sorted(comp.partials_values)],
                 [e[1] for e in sorted(expected)],
                 ):
-            assert_rel_error(self,act,exp, 1e-5)
+            assert_near_equal(act,exp, 1e-5)
+
+    def test_compute_totals_relevancy(self):
+        # When a model has desvars and responses defined, components that don't lie in the relevancy
+        # graph between them do not take part in the linear solve. This led to some derivatives
+        # being returned as zero in certain instances when it was called with wrt or of not in the
+        # set.
+        class DParaboloid(ExplicitComponent):
+
+            def setup(self):
+                ndvs = 3
+                self.add_input('w', val=1.)
+                self.add_input('x', shape=ndvs)
+
+                self.add_output('y', shape=1)
+                self.add_output('z', shape=ndvs)
+                self.declare_partials('y', 'x')
+                self.declare_partials('y', 'w')
+                self.declare_partials('z', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y_g = np.sum((x-5)**2)
+                outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+                outputs['z'] = x**2
+
+            def compute_partials(self, inputs, J):
+                x = inputs['x']
+                J['y', 'x'] = 2*(x-5)
+                J['y', 'w'] = 2*(inputs['w']-10)
+                J['z', 'x'] = np.diag(2*x)
+
+        p = Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                       IndepVarComp(),
+                                       promotes=['*'])
+        ndvs = 3
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    IndepVarComp(),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DParaboloid(), promotes=['*'])
+
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode='rev')
+        p.run_model()
+        J = p.compute_totals(of=['y', 'z'], wrt=['w', 'x'])
+
+        assert(J['y','w'][0,0] == -16)
+
 
 class MySparseComp(ExplicitComponent):
     def setup(self):

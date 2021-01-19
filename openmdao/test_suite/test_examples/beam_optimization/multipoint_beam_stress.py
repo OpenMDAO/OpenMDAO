@@ -4,9 +4,6 @@ This is a multipoint implementation of the beam optimization problem.
 This version minimizes volume while satisfying a max bending stress constraint in each element
 for each loadcase.
 """
-from __future__ import division
-from six.moves import range
-
 import numpy as np
 
 import openmdao.api as om
@@ -66,6 +63,7 @@ class MultipointBeamGroup(om.Group):
         self.options.declare('num_cp', 50)
         self.options.declare('num_load_cases', 1)
         self.options.declare('parallel_derivs', False, types=bool, allow_none=True)
+        self.options.declare('ks_add_constraint', default=False, types=bool)
 
     def setup(self):
         E = self.options['E']
@@ -78,10 +76,6 @@ class MultipointBeamGroup(om.Group):
         num_cp = self.options['num_cp']
         num_load_cases = self.options['num_load_cases']
         parallel_derivs = self.options['parallel_derivs']
-
-        inputs_comp = om.IndepVarComp()
-        inputs_comp.add_output('h_cp', shape=num_cp)
-        self.add_subsystem('inputs_comp', inputs_comp)
 
         x_interp = sine_distribution(num_elements)
         comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=x_interp)
@@ -126,38 +120,38 @@ class MultipointBeamGroup(om.Group):
             comp = MultiStressComp(num_elements=num_elements, E=E, num_rhs=num_rhs)
             sub.add_subsystem('stress_comp', comp)
 
-            self.connect(
-                'local_stiffness_matrix_comp.K_local',
-                'parallel.%s.states_comp.K_local' % name)
+            self.connect('local_stiffness_matrix_comp.K_local',
+                         'parallel.%s.states_comp.K_local' % name)
 
             for k in range(num_rhs):
                 sub.connect('states_comp.d_%d' % k,
                             'stress_comp.displacements_%d' % k,
                             src_indices=np.arange(2 *num_nodes))
 
-                comp = om.KSComp(width=num_elements)
-                comp.options['upper'] = max_bending
-                sub.add_subsystem('KS_%d' % k, comp)
-
-                sub.connect(
-                    'stress_comp.stress_%d' % k,
-                    'KS_%d.g' % k)
-
                 if parallel_derivs:
                     color = 'red_%d' % k
                 else:
                     color = None
 
-                sub.add_constraint('KS_%d.KS' % k, upper=0.0,
-                                   parallel_deriv_color=color)
+                comp = om.KSComp(width=num_elements, upper=max_bending,
+                                 add_constraint=self.options['ks_add_constraint'],
+                                 parallel_deriv_color=color)
+
+                sub.add_subsystem('KS_%d' % k, comp)
+
+                sub.connect('stress_comp.stress_%d' % k,
+                            'KS_%d.g' % k)
+
+                if not self.options['ks_add_constraint']:
+                    sub.add_constraint('KS_%d.KS' % k, upper=0.0,
+                                       parallel_deriv_color=color)
 
         comp = VolumeComp(num_elements=num_elements, b=b, L=L)
         self.add_subsystem('volume_comp', comp)
 
-        self.connect('inputs_comp.h_cp', 'interp.h_cp')
         self.connect('interp.h', 'I_comp.h')
-        self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
         self.connect('interp.h', 'volume_comp.h')
+        self.connect('I_comp.I', 'local_stiffness_matrix_comp.I')
 
-        self.add_design_var('inputs_comp.h_cp', lower=1e-2, upper=10.)
+        self.add_design_var('interp.h_cp', lower=1e-2, upper=10.)
         self.add_objective('volume_comp.volume')

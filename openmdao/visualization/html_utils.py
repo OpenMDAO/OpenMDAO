@@ -3,8 +3,6 @@ Functions to write HTML elements.
 """
 import os
 
-from six import iteritems, itervalues
-
 _IND = 4  # indentation (spaces)
 
 
@@ -78,7 +76,7 @@ def write_tags(tag, content='', attrs=None, cls_attr=None, uid=None, new_lines=F
         attrs['class'] = cls_attr
     if uid is not None:
         attrs['id'] = uid
-    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
+    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in attrs.items()])
     if isinstance(content, list):  # Convert iterable to string
         content = '\n'.join(content)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
@@ -298,7 +296,7 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     return write_div(content=content, cls_attr='dropdown', indent=indent, **kwargs)
 
 
-def add_help(txt, header='Instructions', footer=''):
+def add_help(txt, diagram_filepath, header='Instructions', footer=''):
     """
     Add a popup help.
 
@@ -306,6 +304,8 @@ def add_help(txt, header='Instructions', footer=''):
     ----------
     txt : str
         Help message/instructions.
+    diagram_filepath : str
+        File path to the diagram file in SVG format.
     header : str
         Message header.
     footer : str
@@ -320,7 +320,14 @@ def add_help(txt, header='Instructions', footer=''):
     head = write_div(content=header_txt, cls_attr="modal-header")
     foot = write_div(content=footer, cls_attr="modal-footer")
     body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
-    modal_content = write_div(content=[head, body, foot], cls_attr="modal-content")
+    toolbar_help_header = write_div(content='Toolbar Help', cls_attr="modal-section-header")
+
+    with open(diagram_filepath, "r") as f:
+        help_diagram = f.read()
+    help_diagram = write_div(content=help_diagram, cls_attr="toolbar-help")
+
+    modal_content = write_div(content=[head, body, toolbar_help_header, help_diagram, foot],
+                              cls_attr="modal-content")
     return write_div(content=modal_content, cls_attr="modal", uid="myModal")
 
 
@@ -491,13 +498,11 @@ class TemplateWriter(object):
     """
     Writes HTML files using templates.
 
-    Opens an HTML template files, text can be inserted into the template, and writes a new HTML
+    Opens an HTML template file, text can be inserted into the template, and writes a new HTML
     file with the replacements.
 
     Attributes
     ----------
-    filename : str
-        Filename of file to write to.
     template : str
         Contents of template file.
     """
@@ -509,7 +514,7 @@ class TemplateWriter(object):
         Parameters
         ----------
         filename : str
-            Filename of file to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
@@ -517,13 +522,12 @@ class TemplateWriter(object):
         styles : dict
             Dictionary of CSS styles.
         """
-        self.filename = filename
         # Load template
-        with open(self.filename, "r") as f:
+        with open(filename, "r") as f:
             self.template = template = f.read()
 
         if styles is not None:
-            style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
+            style_elems = '\n\n'.join([write_style(content=s) for s in styles.values()])
 
             if embeddable:
                 self.template = '\n\n'.join([style_elems, template])
@@ -591,7 +595,7 @@ class DiagramWriter(TemplateWriter):
         Parameters
         ----------
         filename : str
-            Filename to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
@@ -599,12 +603,11 @@ class DiagramWriter(TemplateWriter):
         styles : dict
             Dictionary of CSS styles.
         """
-        super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
-                                            styles=styles)
+        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles)
         self.toolbar = Toolbar()
         self.help = None
 
-    def add_help(self, txt, header='Instructions', footer=''):
+    def add_help(self, txt, diagram_filepath, header='Instructions', footer=''):
         """
         Add a modal with instructions.
 
@@ -612,6 +615,8 @@ class DiagramWriter(TemplateWriter):
         ----------
         txt : str
             Text.
+        diagram_filepath : str
+            File path to the diagram file in SVG format.
         header : str
             Title of the modal.
         footer : str
@@ -622,7 +627,8 @@ class DiagramWriter(TemplateWriter):
         str
             String of HTML for the help dialog.
         """
-        self.help = add_help(txt=txt, header=header, footer=footer)
+        self.help = add_help(txt=txt, diagram_filepath=diagram_filepath, header=header,
+                             footer=footer)
         return self.help
 
     def write(self, outfile):
@@ -637,4 +643,4 @@ class DiagramWriter(TemplateWriter):
         self.insert('{{toolbar}}', self.toolbar.write())
         if self.help is not None:
             self._replace('{{help}}', self.help)
-        super(DiagramWriter, self).write(outfile)
+        super().write(outfile)

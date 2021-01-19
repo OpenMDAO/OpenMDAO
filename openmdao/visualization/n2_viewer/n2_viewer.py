@@ -3,17 +3,12 @@ import base64
 import inspect
 import json
 import os
+import zlib
 from collections import OrderedDict
 from itertools import chain
-
 import networkx as nx
-from six import iteritems, itervalues
 
-try:
-    import h5py
-except ImportError:
-    # Necessary for the file to parse
-    h5py = None
+import numpy as np
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -29,38 +24,156 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
-from openmdao.utils.record_util import check_valid_sqlite3_db
+from openmdao.utils.general_utils import simple_warning, default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-
-# Toolbar settings
-_FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
-                  850, 900, 950, 1000, 2000, 3000, 4000]
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.constants import _UNDEFINED
 
 _IND = 4  # HTML indentation (spaces)
 
+_MAX_ARRAY_SIZE_FOR_REPR_VAL = 1000  # If var has more elements than this do not pass to N2
 
-def _get_var_dict(system, typ, name):
+
+def _convert_nans_in_nested_list(val_as_list):
+    """
+    Given a list, possibly nested, replace any numpy.nan values with the string "nan".
+
+    This is done since JSON does not handle nan. This code is used to pass variable values
+    to the N2 diagram.
+
+    The modifications to the list values are done in-place to avoid excessive copying of lists.
+
+    Parameters
+    ----------
+    val_as_list : list, possibly nested
+        the list whose nan elements need to be converted
+    """
+    for i, val in enumerate(val_as_list):
+        if isinstance(val, list):
+            _convert_nans_in_nested_list(val)
+        else:
+            if np.isnan(val):
+                val_as_list[i] = "nan"
+            elif np.isinf(val):
+                val_as_list[i] = "infinity"
+            else:
+                val_as_list[i] = val
+
+
+def _convert_ndarray_to_support_nans_in_json(val):
+    """
+    Given numpy array of arbitrary dimensions, return the equivalent nested list with nan replaced.
+
+    numpy.nan values are replaced with the string "nan".
+
+    Parameters
+    ----------
+    val : ndarray
+        the numpy array to be converted
+
+    Returns
+    -------
+    object : list, possibly nested
+        The equivalent list with any nan values replaced with the string "nan".
+    """
+    val_as_list = val.tolist()
+    _convert_nans_in_nested_list(val_as_list)
+    return(val_as_list)
+
+
+def _get_var_dict(system, typ, name, is_parallel):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
+        is_discrete = True
     else:
-        meta = system._var_abs2meta[name]
+        if name in system._var_abs2meta['output']:
+            meta = system._var_abs2meta['output'][name]
+        else:
+            meta = system._var_abs2meta['input'][name]
         name = system._var_abs2prom[typ][name]
+        is_discrete = False
 
     var_dict = OrderedDict()
+
     var_dict['name'] = name
-    if typ == 'input':
-        var_dict['type'] = 'param'
-    elif typ == 'output':
+    var_dict['type'] = typ
+    if typ == 'output':
         isimplicit = isinstance(system, ImplicitComponent)
-        var_dict['type'] = 'unknown'
+        var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
     var_dict['dtype'] = type(meta['value']).__name__
+    if 'units' in meta:
+        if meta['units'] is None:
+            var_dict['units'] = 'None'
+        else:
+            var_dict['units'] = meta['units']
+
+    if 'shape' in meta:
+        var_dict['shape'] = str(meta['shape'])
+
+    if 'distributed' in meta:
+        var_dict['distributed'] = is_distributed = meta['distributed']
+    else:
+        is_distributed = False
+
+    if 'surrogate_name' in meta:
+        var_dict['surrogate_name'] = meta['surrogate_name']
+
+    var_dict['is_discrete'] = is_discrete
+
+    if is_discrete:
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
+            var_dict['value'] = default_noraise(system.get_val(name))
+        else:
+            var_dict['value'] = type(meta['value']).__name__
+    else:
+        if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+            if not MPI:
+                # get the current value
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
+            elif is_parallel or is_distributed:
+                # we can't access non-local values, so just get the initial value
+                var_dict['value'] = meta['value']
+                var_dict['initial_value'] = True
+            else:
+                # get the current value but don't try to get it from the source,
+                # which could be remote under MPI
+                val = system.get_val(name, from_src=False)
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(val)
+        else:
+            var_dict['value'] = None
 
     return var_dict
+
+
+def _serialize_single_option(option):
+    """
+    Return a json-safe equivalent of the option.
+
+    The default_noraise function performs the datatype serialization, while this function takes
+    care of attributes specific to options dicts.
+
+    Parameters
+    ----------
+    option : object
+        Option to be serialized.
+
+    Returns
+    -------
+    object
+       JSON-safe serialized object.
+    """
+    val = option['value']
+    if not option['recordable']:
+        serialized_option = 'Not Recordable'
+    elif val is _UNDEFINED:
+        serialized_option = str(val)
+    else:
+        serialized_option = default_noraise(val)
+
+    return serialized_option
 
 
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
@@ -94,11 +207,11 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for typ in ['input', 'output']:
-            for abs_name in system._var_abs_names[typ]:
-                children.append(_get_var_dict(system, typ, abs_name))
+            for abs_name in system._var_abs2meta[typ]:
+                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name))
+                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
 
     else:
         if isinstance(system, ParallelGroup):
@@ -106,9 +219,12 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index,
-                                   is_parallel)
-                    for s in system._subsystems_myproc]
+
+        children = []
+        for s in system._subsystems_myproc:
+            children.append(_get_tree_dict(s, component_execution_orders,
+                            component_execution_index, is_parallel))
+
         if system.comm.size > 1:
             if system._subsystems_myproc:
                 sub_comm = system._subsystems_myproc[0].comm
@@ -123,32 +239,60 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     if isinstance(system, ImplicitComponent):
         if overrides_method('solve_linear', system, ImplicitComponent):
             tree_dict['linear_solver'] = "solve_linear"
+            tree_dict['linear_solver_options'] = None
         elif system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
+            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
+                       for k in system.linear_solver.options}
+            tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
+            tree_dict['linear_solver_options'] = None
 
         if overrides_method('solve_nonlinear', system, ImplicitComponent):
             tree_dict['nonlinear_solver'] = "solve_nonlinear"
+            tree_dict['nonlinear_solver_options'] = None
         elif system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
+                       for k in system.nonlinear_solver.options}
+            tree_dict['nonlinear_solver_options'] = options
         else:
             tree_dict['nonlinear_solver'] = ""
+            tree_dict['nonlinear_solver_options'] = None
     else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
+            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
+                       for k in system.linear_solver.options}
+            tree_dict['linear_solver_options'] = options
         else:
             tree_dict['linear_solver'] = ""
+            tree_dict['linear_solver_options'] = None
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
+                       for k in system.nonlinear_solver.options}
+            tree_dict['nonlinear_solver_options'] = options
 
             if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
                 tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
         else:
             tree_dict['nonlinear_solver'] = ""
+            tree_dict['nonlinear_solver_options'] = None
 
     tree_dict['children'] = children
+
+    options = {}
+    for k in system.options:
+        # need to handle solvers separate because they are classes or instances
+        if k in ['linear_solver', 'nonlinear_solver']:
+            options[k] = system.options[k].SOLVER
+        else:
+            options[k] = _serialize_single_option(system.options._dict[k])
+
+    tree_dict['options'] = options
 
     if not tree_dict['name']:
         tree_dict['name'] = 'root'
@@ -175,11 +319,11 @@ def _get_declare_partials(system):
     declare_partials_list = []
 
     def recurse_get_partials(system, dpl):
-
         if isinstance(system, Component):
             subjacs = system._subjacs_info
-            for abs_key, meta in iteritems(subjacs):
-                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
+            for abs_key, meta in subjacs.items():
+                if abs_key[0] != abs_key[1]:
+                    dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
@@ -207,18 +351,20 @@ def _get_viewer_data(data_source):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning(
-                "The model is not a Group, viewer data is unavailable.")
+            simple_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
-        driver_type = 'doe' if isinstance(
-            driver, DOEDriver) else 'optimization'
-        driver_options = {k: driver.options[k] for k in driver.options}
-        driver_opt_settings = None
-        if driver_type is 'optimization' and 'opt_settings' in dir(driver):
+        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+
+        driver_options = {key: _serialize_single_option(driver.options._dict[key])
+                          for key in driver.options}
+
+        if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
+        else:
+            driver_opt_settings = None
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
@@ -229,14 +375,21 @@ def _get_viewer_data(data_source):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
+            simple_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
             return {}
 
     elif isinstance(data_source, str):
-        return CaseReader(data_source, pre_load=False).problem_metadata
+        data_dict = CaseReader(data_source, pre_load=False).problem_metadata
+
+        # Delete the variables key since it's not used in N2
+        if 'variables' in data_dict:
+            del data_dict['variables']
+
+        return data_dict
 
     else:
-        raise TypeError(
-            '_get_viewer_data only accepts Problems, Groups or filenames')
+        raise TypeError(f"Viewer data is not available for '{data_source}'."
+                        "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
@@ -283,12 +436,12 @@ def _get_viewer_data(data_source):
                     exe_low <= orders[t] <= exe_high and
                     not (s == src and t == tgt) and t in sys_pathnames_dict
                 ]
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
                                                  'cycle_arrows': edges_list})
             else:  # edge is out of the SCC
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt})
 
@@ -296,44 +449,18 @@ def _get_viewer_data(data_source):
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
-    data_dict['driver'] = {'name': driver_name, 'type': driver_type,
-                           'options': driver_options, 'opt_settings': driver_opt_settings}
-    data_dict['design_vars'] = root_group.get_design_vars()
+    data_dict['driver'] = {
+        'name': driver_name,
+        'type': driver_type,
+        'options': driver_options,
+        'opt_settings': driver_opt_settings
+    }
+    data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses()
 
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
 
     return data_dict
-
-
-def view_tree(*args, **kwargs):
-    """
-    view_tree was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_tree is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
-
-
-def view_model(*args, **kwargs):
-    """
-    view_model was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_model is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
@@ -362,10 +489,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     title : str, optional
         The title for the diagram. Used in the HTML title.
 
-    use_declare_partial_info : bool, optional
-        If True, in the N2 matrix, component internal connectivity computed using derivative
-        declarations, otherwise, derivative declarations ignored, so dense component connectivity
-        is assumed.
+    use_declare_partial_info : ignored
+        This option is no longer used because it is now always true.
+        Still present for backwards compatibility.
 
     """
     # grab the model viewer data
@@ -375,11 +501,16 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    options = {'use_declare_partial_info': use_declare_partial_info}
+    options = {}
     model_data['options'] = options
 
-    model_data = 'var modelData = %s' % json.dumps(
-        model_data, default=make_serializable)
+    if use_declare_partial_info:
+        warn_deprecation("'use_declare_partial_info' is now the"
+                         " default and the option is ignored.")
+
+    raw_data = json.dumps(model_data, default=default_noraise).encode('utf8')
+    b64_data = str(base64.b64encode(zlib.compress(raw_data)).decode("ascii"))
+    model_data = 'var compressedModel = "%s";' % b64_data
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -387,13 +518,17 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     libs_dir = os.path.join(vis_dir, "libs")
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
+    assets_dir = os.path.join(vis_dir, "assets")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
-               'vk_beautify': 'vkBeautify'}
-    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
+    lib_dct = {
+        'd3': 'd3.v5.min',
+        'awesomplete': 'awesomplete',
+        'vk_beautify': 'vkBeautify',
+        'pako_inflate': 'pako_inflate.min'
+    }
+    libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
-        'modal', \
         'utils', \
         'SymbolType', \
         'N2TreeNode', \
@@ -405,15 +540,33 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Matrix', \
         'N2Arrow', \
         'N2Search', \
+        'N2Toolbar', \
         'N2Diagram', \
+        'NodeInfo', \
         'N2UserInterface', \
         'defaults', \
         'ptN2'
-    srcs = read_files(src_names, src_dir, 'js')
-    styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
 
-    with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
+    srcs = read_files(src_names, src_dir, 'js')
+
+    style_names = \
+        'partition_tree', \
+        'icon', \
+        'toolbar', \
+        'nodedata', \
+        'legend', \
+        'awesomplete'
+
+    styles = read_files((style_names), style_dir, 'css')
+
+    with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
+
+    with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
+        logo_png = str(f.read())
+
+    with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
+        waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
 
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
@@ -424,71 +577,30 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                       title=title,
                       styles=styles, embeddable=embeddable)
 
+    if (embeddable):
+        h.insert("non-embedded-n2", "embedded-n2")
+
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
+    h.insert('{{logo_png}}', logo_png)
+    h.insert('{{waiting_icon}}', waiting_icon)
 
-    for k, v in iteritems(lib_dct):
+    for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
 
-    for name, code in iteritems(srcs):
+    for name, code in srcs.items():
         h.insert('{{{}_lib}}'.format(name.lower()),
                  write_script(code, indent=_IND))
 
     h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
-    # Toolbar
-    toolbar = h.toolbar
-    group1 = toolbar.add_button_group()
-    group1.add_button("Return To Root", uid="returnToRootButtonId", disabled="disabled",
-                      content="icon-home")
-    group1.add_button("Back", uid="backButtonId",
-                      disabled="disabled", content="icon-left-big")
-    group1.add_button("Forward", uid="forwardButtonId", disabled="disabled",
-                      content="icon-right-big")
-    group1.add_button("Up One Level", uid="upOneLevelButtonId", disabled="disabled",
-                      content="icon-up-big")
-
-    group2 = toolbar.add_button_group()
-    group2.add_button("Uncollapse In View Only", uid="uncollapseInViewButtonId",
-                      content="icon-resize-full")
-    group2.add_button("Uncollapse All", uid="uncollapseAllButtonId",
-                      content="icon-resize-full bigger-font")
-    group2.add_button("Collapse Outputs In View Only", uid="collapseInViewButtonId",
-                      content="icon-resize-small")
-    group2.add_button("Collapse All Outputs", uid="collapseAllButtonId",
-                      content="icon-resize-small bigger-font")
-    group2.add_dropdown("Collapse Depth", button_content="icon-sort-number-up",
-                        uid="idCollapseDepthDiv")
-
-    group3 = toolbar.add_button_group()
-    group3.add_button("Clear Arrows and Connections", uid="clearArrowsAndConnectsButtonId",
-                      content="icon-eraser")
-    group3.add_button(
-        "Show Path", uid="showCurrentPathButtonId", content="icon-terminal")
-    group3.add_button("Show Legend", uid="showLegendButtonId",
-                      content="icon-map-signs")
-    group3.add_button("Toggle Solver Names",
-                      uid="toggleSolverNamesButtonId", content="icon-minus")
-    group3.add_dropdown("Font Size", id_naming="idFontSize", options=_FONT_SIZES,
-                        option_formatter=lambda x: '{}px'.format(x),
-                        button_content="icon-text-height")
-    group3.add_dropdown("Vertically Resize", id_naming="idVerticalResize",
-                        options=_MODEL_HEIGHTS, option_formatter=lambda x: '{}px'.format(
-                            x),
-                        button_content="icon-resize-vertical", header="Model Height")
-
-    group4 = toolbar.add_button_group()
-    group4.add_button("Save SVG", uid="saveSvgButtonId", content="icon-floppy")
-
-    group5 = toolbar.add_button_group()
-    group5.add_button("Help", uid="helpButtonId", content="icon-help")
-
     # Help
     help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
-                'Right clicking on a node in the model hierarchy will collapse/uncollapse it. '
-                'A click on any element in the N^2 diagram will allow those arrows to persist.')
-
-    h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
+                'Right clicking on a node in the model hierarchy will collapse/expand it. '
+                'A click on any element in the N2 diagram will allow those arrows to persist.')
+    help_diagram_svg_filepath = os.path.join(assets_dir, "toolbar_help.svg")
+    h.add_help(help_txt, help_diagram_svg_filepath,
+               footer="OpenMDAO Model Hierarchy and N2 diagram")
 
     # Write output file
     h.write(outfile)

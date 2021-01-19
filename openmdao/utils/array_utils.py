@@ -1,15 +1,37 @@
 """
 Utils for dealing with arrays.
 """
-from __future__ import print_function, division
-
 import sys
-import six
-from six.moves import range
 from itertools import product
 from copy import copy
 
 import numpy as np
+
+
+def shape_to_len(shape):
+    """
+    Compute length given a shape tuple.
+
+    For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
+
+    Parameters
+    ----------
+    shape : tuple
+        Numpy shape tuple.
+
+    Returns
+    -------
+    int
+        Length of multidimensional array.
+    """
+    if shape is None:
+        return None
+
+    length = 1
+    for dim in shape:
+        length *= dim
+
+    return length
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -33,8 +55,7 @@ def evenly_distrib_idxs(num_divisions, arr_size):
         a tuple of (sizes, offsets), where sizes and offsets contain values for all
         divisions.
     """
-    base = arr_size // num_divisions
-    leftover = arr_size % num_divisions
+    base, leftover = divmod(arr_size, num_divisions)
     sizes = np.full(num_divisions, base, dtype=int)
 
     # evenly distribute the remainder across size-leftover procs,
@@ -71,25 +92,27 @@ def take_nth(rank, size, seq):
         for proc in range(size):
             if rank == proc:
                 try:
-                    yield six.next(it)
+                    yield next(it)
                 except StopIteration:
                     return
             else:
                 try:
-                    six.next(it)
+                    next(it)
                 except StopIteration:
                     return
 
 
-def convert_neg(arr, dim):
+def convert_neg(arr, size):
     """
     Convert any negative indices into their positive equivalent.
+
+    This only works for a 1D array.
 
     Parameters
     ----------
     arr : ndarray
         Array having negative indices converted.
-    dim : int
+    size : int
         Dimension of the array.
 
     Returns
@@ -97,7 +120,7 @@ def convert_neg(arr, dim):
     ndarray
         The converted array.
     """
-    arr[arr < 0] += dim
+    arr[arr < 0] += size
     return arr
 
 
@@ -184,8 +207,8 @@ def array_connection_compatible(shape1, shape2):
     ashape1 = np.asarray(shape1, dtype=int)
     ashape2 = np.asarray(shape2, dtype=int)
 
-    size1 = np.prod(ashape1)
-    size2 = np.prod(ashape2)
+    size1 = shape_to_len(ashape1)
+    size2 = shape_to_len(ashape2)
 
     # Shapes are not connection-compatible if size is different
     if size1 != size2:
@@ -240,10 +263,10 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
         data = data * np.ones(nnz)
 
     if not np.isscalar(nrow):
-        nrow = np.prod(nrow)
+        nrow = shape_to_len(nrow)
 
     if not np.isscalar(ncol):
-        ncol = np.prod(ncol)
+        ncol = shape_to_len(ncol)
 
     repeat_arr = np.repeat(np.arange(num_nodes), nnz)
 
@@ -344,15 +367,15 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
     full_idxs = np.asarray(full_idxs)
     if use_full_cols:
-        out_size = outputs._data.size
+        out_size = len(outputs)
         out_idxs = full_idxs[full_idxs < out_size]
-        in_idxs = full_idxs[full_idxs >= out_size]
-        if out_idxs.size > 0 and in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
-        elif in_idxs.size > 0:
-            return [(inputs, in_idxs - out_size)]
-        else:
-            return [(outputs, out_idxs)]
+        in_idxs = full_idxs[full_idxs >= out_size] - out_size
+        if in_idxs.size > 0:
+            if out_idxs.size > 0:
+                return [(inputs, in_idxs), (outputs, out_idxs)]
+            else:
+                return [(inputs, in_idxs)]
+        return [(outputs, out_idxs)]
     elif is_total:
         return [(outputs, full_idxs)]
     else:
@@ -380,10 +403,10 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
         The flattened src_indices.
     """
     if len(shape_out) == 1 or shape_in == src_indices.shape:
-        return convert_neg(src_indices.flatten(), size_out)
+        return convert_neg(src_indices.ravel(), size_out)
 
     entries = [list(range(x)) for x in shape_in]
-    cols = np.vstack(src_indices[i] for i in product(*entries))
+    cols = np.vstack([src_indices[i] for i in product(*entries)])
     dimidxs = [convert_neg(cols[:, i], shape_out[i]) for i in range(cols.shape[1])]
     return np.ravel_multi_index(dimidxs, shape_out)
 

@@ -27,7 +27,8 @@ You can see the coupling between the two disciplines show up through the :math:`
 Building the Disciplinary Components
 ************************************
 
-In the following component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>` in the :code:`setup` method that looks like this:
+In the following component definitions, there is a call to :ref:`declare_partials <feature_declare_partials_approx>`
+in the :code:`setup_partials` method that looks like this:
 
 .. code::
 
@@ -117,7 +118,8 @@ Promoting variables with the same name connects them
 ----------------------------------------------------
 
 The data connections in this model are made via promotion.
-OpenMDAO will look at each level of the hierarchy and connect all output-input pairs that have the same names.
+OpenMDAO will look at each level of the hierarchy and connect all output-input pairs that have the same names. When an
+input is promoted on multiple components, you can use "set_input_defaults" to define the common initial value.
 
 
 ExecComp is a helper component for quickly defining components for simple equations

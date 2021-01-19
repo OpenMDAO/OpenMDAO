@@ -3,17 +3,15 @@ Define the BroydenSolver class.
 
 Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NPSS solver.
 """
-from __future__ import print_function
-from six.moves import range
-
 import numpy as np
 
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
-from openmdao.vectors.vector import INT_DTYPE
+
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -72,13 +70,13 @@ class BroydenSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(BroydenSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
+        self.linesearch = BoundsEnforceLS()
 
         self.cite = CITATION
 
@@ -100,7 +98,7 @@ class BroydenSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BroydenSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('alpha', default=0.4,
                              desc="Value to scale the starting Jacobian, which is Identity. This "
@@ -132,6 +130,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -147,11 +149,12 @@ class BroydenSolver(NonlinearSolver):
         depth : int
             Depth of the current system (already incremented).
         """
-        super(BroydenSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:
@@ -163,17 +166,8 @@ class BroydenSolver(NonlinearSolver):
             self.linesearch._setup_solvers(system, self._depth + 1)
             self.linesearch._do_subsolve = True
 
-        else:
-            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
-            # This deprecation warning is to prepare users for the change.
-            pathname = system.pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
-                  'to use the BoundsEnforceLS line search.'
-            warn_deprecation(pathname + msg)
-
-        self._disallow_distrib_solve()
+        # this check is incorrect (for broyden) and needs to be done differently.
+        # self._disallow_distrib_solve()
 
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
@@ -188,10 +182,10 @@ class BroydenSolver(NonlinearSolver):
         if len(states) > 0:
             # User has specified states, so we must size them.
             n = 0
-            sizes = system._var_allprocs_abs2meta
+            meta = system._var_allprocs_abs2meta['output']
 
             for i, name in enumerate(states):
-                size = sizes[prom2abs[name][0]]['global_size']
+                size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:
@@ -267,7 +261,7 @@ class BroydenSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(BroydenSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -306,7 +300,7 @@ class BroydenSolver(NonlinearSolver):
             self.Gm = self.Gm.astype(np.complex)
             self.xm = self.xm.astype(np.complex)
             self.fxm = self.fxm.astype(np.complex)
-        elif np.iscomplex(self.xm[0]):
+        elif np.iscomplexobj(self.xm):
             self.Gm = self.Gm.real
             self.xm = self.xm.real
             self.fxm = self.fxm.real
@@ -321,7 +315,7 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
@@ -353,7 +347,7 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system()._residuals._data
+            fxm = self._system()._residuals.asarray()
 
         return self.compute_norm(fxm)
 
@@ -496,7 +490,7 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of vector at desired states.
         """
         if self._full_inverse:
-            xm = vec._data.copy()
+            xm = vec.asarray(copy=True)
         else:
             states = self.options['state_vars']
             xm = self.xm.copy()
@@ -518,7 +512,7 @@ class BroydenSolver(NonlinearSolver):
         outputs = self._system()._outputs
 
         if self._full_inverse:
-            outputs._data[:] = new_val
+            outputs.set_val(new_val)
         else:
             states = self.options['state_vars']
             for name in states:
@@ -537,9 +531,9 @@ class BroydenSolver(NonlinearSolver):
         linear = self._system()._vectors['output']['linear']
 
         if self._full_inverse:
-            linear._data[:] = dx
+            linear.set_val(dx)
         else:
-            linear.set_const(0.0)
+            linear.set_val(0.0)
             for name in self.options['state_vars']:
                 i, j = self._idx[name]
                 linear[name] = dx[i:j]
@@ -562,7 +556,7 @@ class BroydenSolver(NonlinearSolver):
         d_out = system._vectors['output']['linear']
 
         inv_jac = self.Gm
-        d_res.set_const(0.0)
+        d_res.set_val(0.0)
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -656,7 +650,7 @@ class BroydenSolver(NonlinearSolver):
         """
         Clean up resources prior to exit.
         """
-        super(BroydenSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

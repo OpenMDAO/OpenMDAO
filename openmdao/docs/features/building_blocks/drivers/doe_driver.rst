@@ -34,6 +34,15 @@ DOEDriver Options
     DOEDriver
     options
 
+DOEDriver Constructor
+----------------------
+
+The call signature for the `DOEDriver` constructor is:
+
+.. automethod:: openmdao.drivers.doe_driver.DOEDriver.__init__
+    :noindex:
+
+
 Simple Example
 --------------
 `UniformGenerator` implements the simplest method and will generate a requested number of
@@ -56,7 +65,7 @@ Running a DOE in Parallel
 
 In a parallel processing environment, it is possible for `DOEDriver` to run
 cases concurrently. This is done by setting the `run_parallel` option to True as shown
-in the following example.
+in the following example and running your script using MPI.
 
 Here we are using the `FullFactorialGenerator` with 3 levels to generate inputs
 for our `Paraboloid` model. With two inputs, :math:`3^2=9` cases have been

@@ -1,6 +1,4 @@
 """Define the SplineComp class."""
-from six import iteritems
-
 import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND
@@ -33,18 +31,20 @@ class SplineComp(ExplicitComponent):
         **kwargs : dict
             Interpolator options to pass onward.
         """
-        super(SplineComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.interp_to_cp = {}
         self.interps = {}
         self._spline_cache = []
         self._n_cp = None
 
+        self._no_check_partials = True
+
     def _declare_options(self):
         """
         Declare options.
         """
-        super(SplineComp, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
@@ -57,7 +57,8 @@ class SplineComp(ExplicitComponent):
                              'increasing. Not applicable for bsplines.')
         self.options.declare('num_cp', default=None, types=(int, ), allow_none=True,
                              desc='Number of spline control points. Optional alternative to '
-                             'x_cp_val. Required for bsplines.')
+                             'x_cp_val. Required for bsplines. If None, num_cp will be a linspace '
+                             'from 0 to 1.')
         self.options.declare('interp_options', types=dict, default={},
                              desc='Dict contains the name and value of options specific to the '
                              'chosen interpolation method.')
@@ -127,7 +128,7 @@ class SplineComp(ExplicitComponent):
             elif len(y_cp_val.shape) < 2:
                 y_cp_val = y_cp_val.reshape((vec_size, n_cp))
 
-            self.add_input(name=y_cp_name, val=y_cp_val)
+            self.add_input(name=y_cp_name, val=y_cp_val, units=y_units)
 
             self.interp_to_cp[y_interp_name] = y_cp_name
 
@@ -162,7 +163,7 @@ class SplineComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             values = inputs[self.interp_to_cp[out_name]]
             interp._compute_d_dvalues = True
             interp._compute_d_dx = False
@@ -190,7 +191,7 @@ class SplineComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             cp_name = self.interp_to_cp[out_name]
 
             dy_ddata = interp.spline_gradient()

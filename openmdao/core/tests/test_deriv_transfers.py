@@ -1,6 +1,4 @@
 
-from __future__ import division, print_function
-
 import unittest
 import itertools
 
@@ -25,7 +23,7 @@ try:
 except ImportError:
     PETScVector = None
 
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import _default_checks
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
@@ -51,19 +49,25 @@ class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
-    def test_dup_dup(self, mode):
+    def test_dup_dup(self, mode, auto):
         # duplicated vars on both ends
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        if not auto:
+            model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+
         model.add_subsystem('C1', om.ExecComp('y = 2.5 * x'))
-        model.connect('indep.x', 'C1.x')
+
+        if auto:
+            wrt = ['C1.x']
+        else:
+            model.connect('indep.x', 'C1.x')
+            wrt=['indep.x']
 
         of=['C1.y']
-        wrt=['indep.x']
 
         prob.model.linear_solver = om.LinearRunOnce()
 
@@ -73,26 +77,26 @@ class TestParallelGroups(unittest.TestCase):
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        print(model.comm.rank, "val:", J['C1.y', 'indep.x'][0][0])
-        assert_rel_error(self, J['C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob['C1.y'], 2.5, 1e-6)
+        assert_near_equal(J['C1.y', wrt[0]][0][0], 2.5, 1e-6)
+        assert_near_equal(prob['C1.y'], 2.5, 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
-    def test_dup_par(self, mode):
+    def test_dup_par(self, mode, auto):
         # duplicated output, parallel input
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
-        par = model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'))
-        par.add_subsystem('C2', om.ExecComp('y = 7 * x'))
-        model.connect('indep.x', 'par.C1.x')
-        model.connect('indep.x', 'par.C2.x')
+        if not auto:
+            model.add_subsystem('indep', om.IndepVarComp('x', 1.0), promotes=['x'])
+
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'), promotes=['x'])
+        par.add_subsystem('C2', om.ExecComp('y = 7 * x'), promotes=['x'])
+
+        wrt = ['x']
 
         of=['par.C1.y', 'par.C2.y']
-        wrt=['indep.x']
 
         prob.model.linear_solver = om.LinearRunOnce()
 
@@ -100,34 +104,34 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['par.C1.y', 'x'][0][0], 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'x'][0][0], 7., 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
-    def test_dup_dup_and_par(self, mode):
+    def test_dup_dup_and_par(self, mode, auto):
         # duplicated and parallel outputs, dup input
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('dup', om.ExecComp('y = 1.5 * x'))
-        par = model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'))
-        par.add_subsystem('C2', om.ExecComp('y = 7 * x'))
-        model.connect('indep.x', 'par.C1.x')
-        model.connect('indep.x', 'par.C2.x')
-        model.connect('indep.x', 'dup.x')
+        if not auto:
+            model.add_subsystem('indep', om.IndepVarComp('x', 1.0), promotes=['x'])
+
+        model.add_subsystem('dup', om.ExecComp('y = 1.5 * x'), promotes=['x'])
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'), promotes=['x'])
+        par.add_subsystem('C2', om.ExecComp('y = 7 * x'), promotes=['x'])
 
         of=['par.C1.y', 'par.C2.y', 'dup.y']
-        wrt=['indep.x']
+        wrt=['x']
 
         prob.model.linear_solver = om.LinearRunOnce()
 
@@ -135,59 +139,55 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
-        assert_rel_error(self, prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
-        assert_rel_error(self, J['dup.y', 'indep.x'][0][0], 1.5, 1e-6)
-        assert_rel_error(self, prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
+        assert_near_equal(J['par.C1.y', 'x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'x'][0][0], 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['dup.y', 'x'][0][0], 1.5, 1e-6)
+        assert_near_equal(prob.get_val('dup.y', get_remote=True), 1.5, 1e-6)
 
     def test_dup_par_par_derivs(self):
         # duplicated output, parallel input
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
-        par = model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'))
-        par.add_subsystem('C2', om.ExecComp('y = 7 * x'))
-        model.connect('indep.x', 'par.C1.x')
-        model.connect('indep.x', 'par.C2.x')
+        model.add_subsystem('indep', om.IndepVarComp('x', 1.0), promotes=['x'])
 
-        model.add_design_var('indep.x')
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', om.ExecComp('y = 2.5 * x'), promotes=['x'])
+        par.add_subsystem('C2', om.ExecComp('y = 7 * x'), promotes=['x'])
+
+        model.add_design_var('x')
+
         model.add_constraint('par.C1.y', upper=0.0, parallel_deriv_color='parc')
         model.add_constraint('par.C2.y', upper=0.0, parallel_deriv_color='parc')
 
-        # of=['par.C1.y', 'par.C2.y']
-        # wrt=['indep.x']
-
         prob.model.linear_solver = om.LinearBlockGS()
-
-        #import wingdbstub
 
         prob.setup(check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
         J = prob.driver._compute_totals()
 
-        assert_rel_error(self, J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
-        assert_rel_error(self, J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
-        assert_rel_error(self, prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
+        assert_near_equal(J['par.C1.y', 'indep.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(prob.get_val('par.C1.y', get_remote=True), 2.5, 1e-6)
+        assert_near_equal(J['par.C2.y', 'indep.x'][0][0], 7., 1e-6)
+        assert_near_equal(prob.get_val('par.C2.y', get_remote=True), 7., 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
-    def test_dup_dist(self, mode):
+    def test_dup_dist(self, mode, auto):
+        # Note: Auto-ivc not supported for distributed inputs.
 
         # duplicated output, parallel input
         prob = om.Problem()
@@ -196,13 +196,14 @@ class TestParallelGroups(unittest.TestCase):
 
         sizes = [2, 1]
         rank = prob.comm.rank
-        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
-        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size))
 
-        model.connect('indep.x', 'C1.x')
+        if not auto:
+            model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
+
+        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
 
         of=['C1.y']
-        wrt=['indep.x']
+        wrt=['x']
 
         prob.model.linear_solver = om.LinearRunOnce()
 
@@ -210,15 +211,15 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('C1.y', get_remote=True),
+        assert_near_equal(prob.get_val('C1.y', get_remote=True),
                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[2.5, 0, 0], [0, 2.5, 0], [0,0,3.5]], dtype=float)
 
-        assert_rel_error(self, J['C1.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('C1.y', get_remote=True),
+        assert_near_equal(J['C1.y', 'x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('C1.y', get_remote=True),
                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
     @parameterized.expand(itertools.product(['fwd', 'rev']),
@@ -240,61 +241,58 @@ class TestParallelGroups(unittest.TestCase):
 
         prob.model.linear_solver = om.LinearRunOnce()
 
-        # import wingdbstub
-
         prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['C1.y'], 6., 1e-6)
+        assert_near_equal(prob['C1.y'], 6., 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
-        assert_rel_error(self, J['C1.y', 'par.indep1.x'][0][0], 2.5, 1e-6)
-        assert_rel_error(self, J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
-        assert_rel_error(self, prob['C1.y'], 6., 1e-6)
+        assert_near_equal(J['C1.y', 'par.indep1.x'][0][0], 2.5, 1e-6)
+        assert_near_equal(J['C1.y', 'par.indep2.x'][0][0], 3.5, 1e-6)
+        assert_near_equal(prob['C1.y'], 6., 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [False]),
                           name_func=_test_func_name)
-    def test_dist_dup(self, mode):
+    def test_dist_dup(self, mode, auto):
         # duplicated output, parallel input
+        # Note: Auto-ivc not supported for distributed inputs.
         prob = om.Problem()
         model = prob.model
         size = 3
 
         rank = prob.comm.rank
-        model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)))
-        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size))
+        if not auto:
+            model.add_subsystem('indep', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
+        model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
         model.add_subsystem('sink', om.ExecComp('y=-1.5 * x', x=np.zeros(size), y=np.zeros(size)))
 
-        model.connect('indep.x', 'C1.x')
         model.connect('C1.y', 'sink.x')
 
         of=['sink.y']
-        wrt=['indep.x']
+        wrt=['x']
 
         prob.model.linear_solver = om.LinearRunOnce()
-
-        #import wingdbstub
 
         prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('sink.y', get_remote=True),
+        assert_near_equal(prob.get_val('sink.y', get_remote=True),
                          np.array([-3.75,-3.75,-5.25], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[-3.75, 0, 0], [0, -3.75, 0], [0,0,-5.25]], dtype=float)
 
-        assert_rel_error(self, J['sink.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('sink.y', get_remote=True),
+        assert_near_equal(J['sink.y', 'x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('sink.y', get_remote=True),
                          np.array([-3.75,-3.75,-5.25], dtype=float), 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
-    def test_par_dist(self, mode):
+    def test_par_dist(self, mode, auto):
         # duplicated output, parallel input
         prob = om.Problem()
         model = prob.model
@@ -322,20 +320,20 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('C3.y', get_remote=True),
+        assert_near_equal(prob.get_val('C3.y', get_remote=True),
                          np.array([17,17,5], dtype=float), 1e-6)
 
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[17, 0, 0], [0, 17, 0], [0,0,5]], dtype=float)
 
-        assert_rel_error(self, J['C3.y', 'indep.x'], expected, 1e-6)
-        assert_rel_error(self, prob.get_val('C3.y', get_remote=True),
+        assert_near_equal(J['C3.y', 'indep.x'], expected, 1e-6)
+        assert_near_equal(prob.get_val('C3.y', get_remote=True),
                          np.array([17,17,5], dtype=float), 1e-6)
 
-    @parameterized.expand(itertools.product(['fwd', 'rev']),
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]),
                           name_func=_test_func_name)
-    def test_crossover(self, mode):
+    def test_crossover(self, mode, auto):
         # multiple crossovers in fwd and rev
         prob = om.Problem()
         model = prob.model
@@ -365,8 +363,6 @@ class TestParallelGroups(unittest.TestCase):
 
         of = ['C6.y']
         wrt = ['ivc.x']
-
-        #import wingdbstub
 
         prob.setup(check=False, mode=mode)
         prob.set_solver_print(level=0)

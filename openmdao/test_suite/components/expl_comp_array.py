@@ -1,6 +1,4 @@
 """Define the explicit test component (array)."""
-from __future__ import division, print_function
-
 import numpy as np
 import scipy.sparse
 
@@ -18,6 +16,7 @@ class TestExplCompArray(om.ExplicitComponent):
         self.add_output('areas', val=np.ones((2, 2)))
         self.add_output('total_volume', val=1.)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):

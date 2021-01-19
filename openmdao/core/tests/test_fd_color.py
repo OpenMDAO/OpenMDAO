@@ -1,10 +1,8 @@
 import os
 import tempfile
 import shutil
-from six.moves import range
 import unittest
 import itertools
-from six import iterkeys
 
 try:
     from parameterized import parameterized
@@ -16,7 +14,7 @@ from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring, Coloring
@@ -82,18 +80,18 @@ def setup_indeps(isplit, ninputs, indeps_name, comp_name):
 
 class CounterGroup(Group):
     def __init__(self, *args, **kwargs):
-        super(CounterGroup, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._nruns = 0
 
     def _solve_nonlinear(self, *args, **kwargs):
-        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        super()._solve_nonlinear(*args, **kwargs)
         self._nruns += 1
 
 
 class SparseCompImplicit(ImplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompImplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
@@ -105,7 +103,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined for easier testing of coloring of approx partials
     def apply_nonlinear(self, inputs, outputs, residuals):
-        prod = self.sparsity.dot(inputs._data) - outputs._data
+        prod = self.sparsity.dot(inputs.asarray()) - outputs.asarray()
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -116,7 +114,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
     def solve_nonlinear(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -129,7 +127,7 @@ class SparseCompImplicit(ImplicitComponent):
 class SparseCompExplicit(ExplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
-        super(SparseCompExplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
@@ -140,7 +138,7 @@ class SparseCompExplicit(ExplicitComponent):
         setup_vars(self, ofs='*', wrts='*')
 
     def compute(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -158,9 +156,9 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in system._var_allprocs_abs_names['input']:
+        for wrt in system._var_allprocs_abs2meta['input']:
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key]['value'])
@@ -172,9 +170,9 @@ def _check_partial_matrix(system, jac, expected, method):
 
 def _check_total_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 cblocks.append(jac[key])
@@ -186,9 +184,9 @@ def _check_total_matrix(system, jac, expected, method):
 
 def _check_semitotal_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs_names['output']:
+    for of in system._var_allprocs_abs2meta['output']:
         cblocks = []
-        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+        for wrt in itertools.chain(system._var_allprocs_abs2meta['output'], system._var_allprocs_abs2meta['input']):
             key = (of, wrt)
             if key in jac:
                 rows = jac[key]['rows']
@@ -661,7 +659,7 @@ class TestColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        with assert_warning(UserWarning, 'SparseCompExplicit (comp): Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%).'):
+        with assert_warning(UserWarning, "'comp' <class SparseCompExplicit>: Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%)."):
             prob.model._linearize(None)
 
         start_nruns = comp._nruns
@@ -671,7 +669,6 @@ class TestColoring(unittest.TestCase):
 
         self.assertEqual(comp._coloring_info['coloring'], None)
         self.assertEqual(comp._coloring_info['static'], None)
-        self.assertEqual(comp._coloring_info['dynamic'], None)
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, 'cs')
@@ -692,7 +689,7 @@ class TestColoring(unittest.TestCase):
         indeps, _ = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
         model.add_subsystem('indeps', indeps)
-        
+
         comps = []
         for i in range(3):
             cname = 'comp%d' % i
@@ -701,7 +698,7 @@ class TestColoring(unittest.TestCase):
             comp.declare_coloring('x*', method='cs', min_improve_pct=20, per_instance=False)
             comps.append(comp)
             _, conns = setup_indeps(isplit, mask.shape[1], 'indeps', cname)
-    
+
             for conn in conns:
                 model.connect(*conn)
 
@@ -711,7 +708,7 @@ class TestColoring(unittest.TestCase):
 
         for i, comp in enumerate(comps):
             if i == 0:
-                with assert_warning(UserWarning, 'SparseCompExplicit (comp0): Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%).'):
+                with assert_warning(UserWarning, "'comp0' <class SparseCompExplicit>: Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%)."):
                     comp._linearize()
 
             start_nruns = comp._nruns
@@ -719,7 +716,6 @@ class TestColoring(unittest.TestCase):
             self.assertEqual(6, comp._nruns - start_nruns)
             self.assertEqual(comp._coloring_info['coloring'], None)
             self.assertEqual(comp._coloring_info['static'], None)
-            self.assertEqual(comp._coloring_info['dynamic'], None)
 
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, 'cs')
@@ -805,11 +801,11 @@ class TestColoring(unittest.TestCase):
         model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
         model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
         model.approx_totals(method='cs')
-        model.declare_coloring(min_improve_pct=25.)
+        model.declare_coloring(min_improve_pct=25., method='cs')
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
 
-        with assert_warning(UserWarning, "CounterGroup (<model>): Coloring was deactivated.  Improvement of 20.0% was less than min allowed (25.0%)."):
+        with assert_warning(UserWarning, "<model> <class CounterGroup>: Coloring was deactivated.  Improvement of 20.0% was less than min allowed (25.0%)."):
             prob.run_driver()  # need this to trigger the dynamic coloring
 
         prob.driver._total_jac = None

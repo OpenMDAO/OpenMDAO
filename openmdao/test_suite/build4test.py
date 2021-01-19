@@ -1,11 +1,9 @@
 """
 Various functions to make it easier to build test models.
 """
-from __future__ import print_function
 
 import time
 import numpy
-from six.moves import range
 
 from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup
@@ -23,7 +21,7 @@ class DynComp(ExplicitComponent):
     def __init__(self, ninputs, noutputs,
                  nl_sleep=0.001, ln_sleep=0.001,
                  var_factory=float, vf_args=()):
-        super(DynComp, self).__init__()
+        super().__init__()
 
         self.ninputs = ninputs
         self.noutputs = noutputs
@@ -105,7 +103,7 @@ if __name__ == '__main__':
 
     if 'gmres' in sys.argv:
         from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
-        p.root.linear_solver = ScipyKrylov()
+        g.linear_solver = ScipyKrylov()
 
     g.add_subsystem("P", IndepVarComp('x', numpy.ones(vec_size)))
 

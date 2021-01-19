@@ -1,16 +1,14 @@
 """Define the default Transfer class."""
 
-from __future__ import division
-
 from itertools import product, chain
 from collections import defaultdict
-from six import iteritems, itervalues
 
 import numpy as np
 
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets
+from openmdao.utils.general_utils import _is_slicer_op
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -29,7 +27,7 @@ class DefaultTransfer(Transfer):
     """
 
     @staticmethod
-    def _setup_transfers(group, recurse=True):
+    def _setup_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -37,27 +35,24 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
-        if recurse:
-            for subsys in group._subgroups_myproc:
-                subsys._setup_transfers(recurse)
+        for subsys in group._subgroups_myproc:
+            subsys._setup_transfers()
 
         abs2meta = group._var_abs2meta
-        allprocs_abs2meta = group._var_allprocs_abs2meta
+        allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
 
         group._transfers = transfers = {}
         vectors = group._vectors
         offsets = _global2local_offsets(group._get_var_offsets())
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
+        allsubs = group._subsystems_allprocs
 
         mypathlen = len(group.pathname + '.' if group.pathname else '')
-        sub_inds = group._subsystems_inds
 
         for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
@@ -65,14 +60,14 @@ class DefaultTransfer(Transfer):
             relvars_out = relvars['output']
 
             # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(group._subsystems_allprocs)
+            nsub_allprocs = len(allsubs)
             xfer_in = []
             xfer_out = []
-            fwd_xfer_in = [[] for s in group._subsystems_allprocs]
-            fwd_xfer_out = [[] for s in group._subsystems_allprocs]
+            fwd_xfer_in = defaultdict(list)
+            fwd_xfer_out = defaultdict(list)
             if rev:
-                rev_xfer_in = [[] for s in group._subsystems_allprocs]
-                rev_xfer_out = [[] for s in group._subsystems_allprocs]
+                rev_xfer_in = defaultdict(list)
+                rev_xfer_out = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
@@ -81,30 +76,26 @@ class DefaultTransfer(Transfer):
             offsets_out = offsets[vec_name]['output']
 
             # Loop through all connections owned by this group
-            for abs_in, abs_out in iteritems(group._conn_abs_in2out):
+            for abs_in, abs_out in group._conn_abs_in2out.items():
                 if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta:
+                if abs_in in abs2meta['input']:
 
+                    indices = None
                     # Get meta
-                    meta_in = abs2meta[abs_in]
-                    meta_out = allprocs_abs2meta[abs_out]
+                    meta_in = abs2meta['input'][abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
 
                     # Read in and process src_indices
                     src_indices = meta_in['src_indices']
-                    if src_indices is None:
-                        pass
-                    elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, meta_out['global_size'])
-                    else:
-                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                           meta_out['global_shape'],
-                                                           meta_out['global_size'])
+                    if src_indices is not None:
+                        if src_indices.ndim == 1:
+                            src_indices = convert_neg(src_indices, meta_out['global_size'])
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
@@ -117,32 +108,37 @@ class DefaultTransfer(Transfer):
                     input_inds = np.arange(offsets_in[iproc, idx_in],
                                            offsets_in[iproc, idx_in] +
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
+                    if indices is not None:
+                        input_inds = input_inds.reshape(indices.shape)
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
-                    isub = sub_inds[sub_in]
-                    fwd_xfer_in[isub].append(input_inds)
-                    fwd_xfer_out[isub].append(output_inds)
-                    if rev and abs_out in abs2meta:
+                    fwd_xfer_in[sub_in].append(input_inds)
+                    fwd_xfer_out[sub_in].append(output_inds)
+                    if rev and abs_out in abs2meta['output']:
                         sub_out = abs_out[mypathlen:].split('.', 1)[0]
-                        isub = sub_inds[sub_out]
-                        rev_xfer_in[isub].append(input_inds)
-                        rev_xfer_out[isub].append(output_inds)
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
 
             tot_size = 0
-            for isub in range(nsub_allprocs):
-                fwd_xfer_in[isub] = _merge(fwd_xfer_in[isub])
-                fwd_xfer_out[isub] = _merge(fwd_xfer_out[isub])
-                tot_size += fwd_xfer_in[isub].size
-                if rev:
-                    rev_xfer_in[isub] = _merge(rev_xfer_in[isub])
-                    rev_xfer_out[isub] = _merge(rev_xfer_out[isub])
+            for sname, inds in fwd_xfer_in.items():
+                fwd_xfer_in[sname] = arr = _merge(inds)
+                fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
+                tot_size += arr.size
+
+            if rev:
+                for sname, inds in rev_xfer_in.items():
+                    rev_xfer_in[sname] = _merge(inds)
+                    rev_xfer_out[sname] = _merge(rev_xfer_out[sname])
 
             transfers[vec_name] = {}
 
             if tot_size > 0:
-                xfer_in = np.concatenate(fwd_xfer_in)
-                xfer_out = np.concatenate(fwd_xfer_out)
+                try:
+                    xfer_in = np.concatenate(list(fwd_xfer_in.values()))
+                    xfer_out = np.concatenate(list(fwd_xfer_out.values()))
+                except ValueError:
+                    xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
                 out_vec = vectors['output'][vec_name]
 
@@ -150,29 +146,35 @@ class DefaultTransfer(Transfer):
                                            xfer_in, xfer_out, group.comm)
             else:
                 xfer_all = None
-            transfers[vec_name]['fwd', None] = xfer_all
+
+            transfers[vec_name]['fwd'] = xfwd = {}
+            xfwd[None] = xfer_all
             if rev:
-                transfers[vec_name]['rev', None] = xfer_all
-            for isub in range(nsub_allprocs):
-                if fwd_xfer_in[isub].size > 0:
-                    transfers[vec_name]['fwd', isub] = DefaultTransfer(
-                        vectors['input'][vec_name], vectors['output'][vec_name],
-                        fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
+                transfers[vec_name]['rev'] = xrev = {}
+                xrev[None] = xfer_all
+
+            for sname, inds in fwd_xfer_in.items():
+                if inds.size > 0:
+                    xfwd[sname] = DefaultTransfer(vectors['input'][vec_name],
+                                                  vectors['output'][vec_name],
+                                                  inds, fwd_xfer_out[sname], group.comm)
                 else:
-                    transfers[vec_name]['fwd', isub] = None
-                if rev:
-                    if rev_xfer_out[isub].size > 0:
-                        transfers[vec_name]['rev', isub] = DefaultTransfer(
-                            vectors['input'][vec_name], vectors['output'][vec_name],
-                            rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                    xfwd[sname] = None
+
+            if rev:
+                for sname, inds in rev_xfer_out.items():
+                    if inds.size > 0:
+                        xrev[sname] = DefaultTransfer(vectors['input'][vec_name],
+                                                      vectors['output'][vec_name],
+                                                      rev_xfer_in[sname], inds, group.comm)
                     else:
-                        transfers[vec_name]['rev', isub] = None
+                        xrev[sname] = None
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
 
     @staticmethod
-    def _setup_discrete_transfers(group, recurse=True):
+    def _setup_discrete_transfers(group):
         """
         Compute all transfers that are owned by our parent group.
 
@@ -180,8 +182,6 @@ class DefaultTransfer(Transfer):
         ----------
         group : <Group>
             Parent group.
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         group._discrete_transfers = transfers = defaultdict(list)
         name_offset = len(group.pathname) + 1 if group.pathname else 0
@@ -189,7 +189,7 @@ class DefaultTransfer(Transfer):
         iproc = group.comm.rank
         owns = group._owning_rank
 
-        for tgt, src in iteritems(group._conn_discrete_in2out):
+        for tgt, src in group._conn_discrete_in2out.items():
             src_sys, src_var = src[name_offset:].split('.', 1)
             tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
             xfer = (src_sys, src_var, tgt_sys, tgt_var)
@@ -197,7 +197,7 @@ class DefaultTransfer(Transfer):
 
         if group.comm.size > 1:
             # collect all xfers for each tgt system
-            for tgt, src in iteritems(group._conn_discrete_in2out):
+            for tgt, src in group._conn_discrete_in2out.items():
                 src_sys, src_var = src[name_offset:].split('.', 1)
                 tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
                 xfer = (src_sys, src_var, tgt_sys, tgt_var)
@@ -207,7 +207,7 @@ class DefaultTransfer(Transfer):
             total_recv = []
             total_xfers = []
 
-            for tgt_sys, xfers in iteritems(transfers):
+            for tgt_sys, xfers in transfers.items():
                 send = set()
                 recv = []
                 for src_sys, src_var, tgt_sys, tgt_var in xfers:
@@ -237,7 +237,7 @@ class DefaultTransfer(Transfer):
             allproc_xfers = group.comm.allgather(transfers)
             allprocs_recv = defaultdict(lambda: defaultdict(list))
             for rank, rank_transfers in enumerate(allproc_xfers):
-                for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
+                for tgt_sys, (_, _, recvs) in rank_transfers.items():
                     for recv in recvs:
                         allprocs_recv[tgt_sys][recv].append(rank)
 
@@ -268,11 +268,11 @@ class DefaultTransfer(Transfer):
         """
         if mode == 'fwd':
             # this works whether the vecs have multi columns or not due to broadcasting
-            in_vec._data[self._in_inds] = out_vec._data[self._out_inds]
+            in_vec.set_val(out_vec.asarray()[self._out_inds], self._in_inds)
 
         else:  # rev
             if out_vec._ncol == 1:
-                out_vec._data[:] += np.bincount(self._out_inds, in_vec._data[self._in_inds],
-                                                minlength=out_vec._data.size)
+                out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
+                                         minlength=out_vec._data.size))
             else:  # matrix-matrix   (bincount only works with 1d arrays)
-                np.add.at(out_vec._data, self._out_inds, in_vec._data[self._in_inds])
+                np.add.at(out_vec.asarray(), self._out_inds, in_vec._get_data()[self._in_inds])

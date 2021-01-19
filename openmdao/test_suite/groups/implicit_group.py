@@ -1,7 +1,5 @@
 """Define a `Group` with two interconnected `ImplicitComponent`s for testing"""
 
-from __future__ import division, print_function
-
 import openmdao.api as om
 
 
@@ -81,7 +79,7 @@ class TestImplicitGroup(om.Group):
     def __init__(self, lnSolverClass=om.LinearBlockGS,
                        nlSolverClass=om.NonlinearBlockGS):
 
-        super(TestImplicitGroup, self).__init__()
+        super().__init__()
 
         self.add_subsystem("C1", Comp())
         self.add_subsystem("C2", Comp())

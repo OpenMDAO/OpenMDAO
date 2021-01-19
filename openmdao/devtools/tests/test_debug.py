@@ -1,6 +1,6 @@
 import unittest
 
-from six import StringIO
+from io import StringIO
 
 from openmdao.api import Problem
 from openmdao.test_suite.scripts.circle_opt import CircleOpt
@@ -22,7 +22,7 @@ class TestDebug(unittest.TestCase):
         expected = [
             "============== Problem Summary ============",
             "Groups:               1",
-            "Components:           7",
+            "Components:           8",
             "Max tree depth:       1",
             "",
             "Design variables:            3   Total size:       21",
@@ -38,9 +38,9 @@ class TestDebug(unittest.TestCase):
             "Objectives:                  1   Total size:        1",
             "",
             "Input variables:            11   Total size:       82",
-            "Output variables:            9   Total size:       67",
+            "Output variables:           10   Total size:       77",
             "",
-            "Total connections: 10   Total transfer data size: 72",
+            "Total connections: 11   Total transfer data size: 82",
             "",
             "Driver type: Driver",
             "Linear Solvers: [LinearRunOnce]",

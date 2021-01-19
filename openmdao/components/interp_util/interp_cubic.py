@@ -3,8 +3,6 @@ Interpolate using a cubic spline polynomial.
 
 Based on NPSS implementation.
 """
-from __future__ import division, print_function, absolute_import
-from six.moves import range
 
 import numpy as np
 
@@ -39,7 +37,7 @@ class InterpCubic(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpCubic, self).__init__(grid, values, interp)
+        super().__init__(grid, values, interp)
         self.second_derivs = None
         self.k = 4
         self._name = 'cubic'

@@ -36,7 +36,7 @@ class CalledProcessError(subprocess.CalledProcessError):
         errormsg : str
             Error message for this error.
         """
-        super(CalledProcessError, self).__init__(returncode, cmd)
+        super().__init__(returncode, cmd)
         self.errormsg = errormsg
 
     def __str__(self):

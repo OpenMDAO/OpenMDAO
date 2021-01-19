@@ -1,7 +1,5 @@
 """Define the base ProcAllocator class."""
-from __future__ import division
 import numpy as np
-from six.moves import range
 
 
 class ProcAllocationError(Exception):
@@ -27,7 +25,7 @@ class ProcAllocationError(Exception):
         sub_inds : list of int
             Indices of subsystems in _subsystems_allprocs in parent.
         """
-        super(ProcAllocationError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
         self.sub_inds = sub_inds
 

@@ -3,7 +3,6 @@
  * @typedef N2Style
  */
 class N2Style {
-
     constructor(svgStyle, fontSize) {
         this.svgStyle = svgStyle;
 
@@ -22,13 +21,17 @@ class N2Style {
                     this.solvers[sdata[i]] = {
                         'name': sdata[i],
                         'type': solverTypes[i],
-                        'class': 'solver_' + sdata[i].toLowerCase().replace(/[: ]/g, '_').replace(/_+/g, '_'),
+                        'class': 'solver_' +
+                            sdata[i]
+                                .toLowerCase()
+                                .replace(/[: ]/g, '_')
+                                .replace(/_+/g, '_'),
                         'style': {
                             'fill': sdata[2],
                             'cursor': 'pointer',
-                            'fill-opacity': '.8'
-                        }
-                    }
+                            'fill-opacity': '.8',
+                        },
+                    };
                 }
             }
         }
@@ -37,57 +40,65 @@ class N2Style {
     }
 
     /**
-     * Replace the entire content of the SVG style section with new styles.
-     * Doing a wholesale replace is easier than finding each style element,
-     * deleting, and inserting a new one.
-     * @param {number} fontSize In pixel units.
-     */
+       * Replace the entire content of the SVG style section with new styles.
+       * Doing a wholesale replace is easier than finding each style element,
+       * deleting, and inserting a new one.
+       * @param {number} fontSize In pixel units.
+       */
     updateSvgStyle(fontSize) {
         // Define as JSON first
         let newCssJson = {
             'rect': {
-                'stroke': N2Style.color.treeStroke
+                'stroke': N2Style.color.treeStroke,
             },
-            'g.unknown > rect': {
-                'fill': N2Style.color.unknownExplicit,
-                'fill-opacity': '.8'
+            '#tree > g.output > rect': {
+                'fill': N2Style.color.outputExplicit,
+                'fill-opacity': '.8',
             },
-            'g.unknown_implicit > rect': {
-                'fill': N2Style.color.unknownImplicit,
-                'fill-opacity': '.8'
+            '#tree > g.output_implicit > rect': {
+                'fill': N2Style.color.outputImplicit,
+                'fill-opacity': '.8',
             },
-            'g.param > rect': {
-                'fill': N2Style.color.param,
-                'fill-opacity': '.8'
+            '#tree > g.input > rect': {
+                'fill': N2Style.color.input,
+                'fill-opacity': '.8',
             },
-            'g.unconnected_param > rect': {
-                'fill': N2Style.color.unconnectedParam,
-                'fill-opacity': '.8'
+            '#tree > g.unconnected_input > rect': {
+                'fill': N2Style.color.unconnectedInput,
+                'fill-opacity': '.8',
             },
-            'g.subsystem > rect': {
+            '#tree > g.subsystem > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.group
+                'fill': N2Style.color.group,
             },
-            'g.component > rect': {
+            '#tree > g.component > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.component
+                'fill': N2Style.color.component,
             },
-            'g.param_group > rect': {
+            '#tree > g.input_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.paramGroup
+                'fill': N2Style.color.inputGroup,
             },
-            'g.unknown_group > rect': {
+            '#tree > g.output_group > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.unknownGroup
+                'fill': N2Style.color.outputGroup,
             },
-            'g.minimized > rect': {
+            '#tree > g.minimized > rect': {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
-                'fill': N2Style.color.collapsed
+                'fill': N2Style.color.collapsed,
+            },
+            '#tree > g.minimized > text': {
+                'fill': N2Style.color.collapsedText,
+            },
+            '#tree > g.autoivc_input > rect': {
+                'cursor': 'pointer',
+                'fill-opacity': '.8',
+                'fill': N2Style.color.autoivcInput,
             },
             'text': {
                 //'dominant-baseline: middle',
@@ -127,11 +138,12 @@ class N2Style {
             },
             '.horiz_line, .vert_line': {
                 'stroke': N2Style.color.gridline,
-            }
-        }
+            },
+        };
 
         for (let solverName in this.solvers) {
             let solver = this.solvers[solverName];
+
             newCssJson['g.' + solver.class + ' > rect'] = solver.style;
         }
 
@@ -141,49 +153,58 @@ class N2Style {
         for (let selector in newCssJson) {
             newCssText += selector + ' {\n';
             for (let attrib in newCssJson[selector]) {
-                newCssText += '    ' + attrib + ': ' + newCssJson[selector][attrib] + ';\n';
+                newCssText +=
+                    '    ' + attrib + ': ' + newCssJson[selector][attrib] + ';\n';
             }
             newCssText += '}\n\n';
+            if (selector === 'g.subsystem > rect') {
+            }
         }
 
-        this.svgStyle.innerHTML = newCssText;
+        this.svgStyle.html(newCssText);
     }
 
     /**
-     * Determine the name of the CSS class based on the name of the solver.
-     * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
-     * @param {Object} solverNames
-     * @param {string} solverNames.linear The linear solver name.
-     * @param {string} solverNames.nonLinear The non-linear solver name.
-     * @return {string} The CSS class of the solver, or for "other" if not found.
-     */
+       * Determine the name of the CSS class based on the name of the solver.
+       * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
+       * @param {Object} solverNames
+       * @param {string} solverNames.linear The linear solver name.
+       * @param {string} solverNames.nonLinear The non-linear solver name.
+       * @return {string} The CSS class of the solver, or for "other" if not found.
+       */
     getSolverClass(showLinearSolverNames, solverNames) {
-        let solverName = showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
-        return this.solvers[solverName]? this.solvers[solverName].class :
-            this.solvers.other.class;
+        let solverName = showLinearSolverNames
+            ? solverNames.linear
+            : solverNames.nonLinear;
+        return this.solvers[solverName]
+            ? this.solvers[solverName].class
+            : this.solvers.other.class;
     }
 
     /**
-     * Based on the element's type and conditionally other info, determine
-     * what CSS style is associated.
-     * @return {string} The name of an existing CSS class.
-     */
+       * Based on the element's type and conditionally other info, determine
+       * what CSS style is associated.
+       * @return {string} The name of an existing CSS class.
+       */
     getNodeClass(element) {
         if (element.isMinimized) return 'minimized';
 
         switch (element.type) {
-            case 'param':
-                if (Array.isPopulatedArray(element.children)) return 'param_group';
-                return 'param';
+            case 'input':
+                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                return 'input';
 
-            case 'unconnected_param':
-                if (Array.isPopulatedArray(element.children)) return 'param_group';
-                return 'unconnected_param';
+            case 'unconnected_input':
+                if (Array.isPopulatedArray(element.children)) return 'input_group';
+                return 'unconnected_input';
 
-            case 'unknown':
-                if (Array.isPopulatedArray(element.children)) return 'unknown_group';
-                if (element.implicit) return 'unknown_implicit';
-                return 'unknown';
+            case 'autoivc_input':
+                return 'autoivc_input';
+
+            case 'output':
+                if (Array.isPopulatedArray(element.children)) return 'output_group';
+                if (element.implicit) return 'output_implicit';
+                return 'output';
 
             case 'root':
                 return 'subsystem';
@@ -193,36 +214,38 @@ class N2Style {
                 return 'subsystem';
 
             default:
-                throw ('CSS class not found for element ' + element);
+                throw 'CSS class not found for element ' + element;
         }
-
     }
 }
 
 // From Isaias Reyes
 N2Style.color = {
-    'connection': 'black',
-    'unknownImplicit': '#c7d06d',
-    'unknownExplicit': '#9ec4c7',
+    'connection': 'gray',
+    'outputImplicit': '#C7D06D',
+    'outputExplicit': '#9FC4C6',
+    'desvar': '#c5b0d5',
     'componentBox': '#555',
     'background': '#eee',
     'gridline': 'white',
     'treeStroke': '#eee',
-    'unknownGroup': '#888',
-    'param': '#32afad',
-    'paramGroup': 'Orchid',
-    'group': '#3476a2',
-    'component': 'DeepSkyBlue',
-    'collapsed': '#555',
-    'unconnectedParam': '#f42e0c',
-    'highlightHovered': 'blue',
-    'redArrow': 'salmon',
-    'greenArrow': 'seagreen',
+    'outputGroup': '#888',
+    'input': '#30B0AD',
+    'inputGroup': 'Orchid',
+    'group': '#6092B5',
+    'component': '#02BFFF',
+    'collapsed': '#555555',
+    'collapsedText': 'white',
+    'unconnectedInput': '#F42F0D',
+    'inputArrow': 'salmon',
+    'outputArrow': 'seagreen',
+    'declaredPartial': 'black',
+    'autoivcInput': '#ff7000'
 };
 
 Object.freeze(N2Style.color); // Make it the equivalent of a constant
 
-/* 
+/*
 * This is how we want to map solvers to colors and CSS classes
 *    Linear             Nonlinear
 *    ---------          ---------
@@ -246,17 +269,80 @@ Object.freeze(N2Style.color); // Make it the equivalent of a constant
 N2Style.solverStyleData = [
     // [ linear, non-Linear, color ]
     ['None', 'None', '#8dd3c7'],
-    ["LN: LNBJ", "NL: NLBJ", '#ffffb3'],
-    ["LN: SCIPY", null, '#bebada'],
-    ["LN: RUNONCE", "NL: RUNONCE", '#fb8072'],
-    ["LN: Direct", null, '#80b1d3'],
-    ["LN: PETScKrylov", null, '#fdb462'],
-    ["LN: LNBGS", "NL: NLBGS", '#b3de69'],
-    ["LN: USER", null, '#fccde5'],
-    [null, "NL: Newton", '#d9d9d9'],
-    [null, "BROYDEN", '#bc80bd'],
-    ["solve_linear", "solve_nonlinear", '#ccebc5'],
-    ["other", "other", '#ffed6f']
+    ['LN: LNBJ', 'NL: NLBJ', '#ffffb3'],
+    ['LN: SCIPY', null, '#bebada'],
+    ['LN: RUNONCE', 'NL: RUNONCE', '#fb8072'],
+    ['LN: Direct', null, '#80b1d3'],
+    ['LN: PETScKrylov', null, '#fdb462'],
+    ['LN: LNBGS', 'NL: NLBGS', '#b3de69'],
+    ['LN: USER', null, '#fccde5'],
+    [null, 'NL: Newton', '#d9d9d9'],
+    [null, 'BROYDEN', '#bc80bd'],
+    ['solve_linear', 'solve_nonlinear', '#ccebc5'],
+    ['other', 'other', '#ffed6f'],
+];
+
+N2Style.solverStyleObject = [
+    {
+        'ln': 'None',
+        'nl': 'None',
+        'color': '#8dd3c7',
+    },
+    {
+        'ln': 'LN: LNBJ',
+        'nl': 'NL: NLBJ',
+        'color': '#ffffb3',
+    },
+    {
+        'ln': 'LN: SCIPY',
+        'nl': null,
+        'color': '#bebada',
+    },
+    {
+        'ln': 'LN: RUNONCE',
+        'nl': 'NL: RUNONCE',
+        'color': '#fb8072',
+    },
+    {
+        'ln': 'LN: Direct',
+        'nl': null,
+        'color': '#80b1d3',
+    },
+    {
+        'ln': 'LN: PETScKrylov',
+        'nl': null,
+        'color': '#fdb462',
+    },
+    {
+        'ln': 'LN: LNBGS',
+        'nl': 'NL: NLBGS',
+        'color': '#b3de69',
+    },
+    {
+        'ln': 'LN: USER',
+        'nl': null,
+        'color': '#fccde5',
+    },
+    {
+        'ln': null,
+        'nl': 'NL: Newton',
+        'color': '#d9d9d9',
+    },
+    {
+        'ln': null,
+        'nl': 'BROYDEN',
+        'color': '#bc80bd',
+    },
+    {
+        'ln': 'solve_linear',
+        'nl': 'solve_nonlinear',
+        'color': '#ccebc5',
+    },
+    {
+        'ln': 'other',
+        'nl': 'other',
+        'color': '#ffed6f',
+    },
 ];
 
 Object.freeze(N2Style.solverStyleData); // Make it the equivalent of a constant

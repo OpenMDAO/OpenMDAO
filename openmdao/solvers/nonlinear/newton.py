@@ -1,12 +1,11 @@
 """Define the NewtonSolver class."""
 
-from __future__ import print_function
 
 import numpy as np
 
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 
 
@@ -36,45 +35,31 @@ class NewtonSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(NewtonSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
-
-    @property
-    def line_search(self):
-        """
-        Return the current linesearch object.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        return self.linesearch
-
-    @line_search.setter
-    def line_search(self, solver):
-        """
-        Set the linesearch solver.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        self.linesearch = solver
+        self.linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(NewtonSolver, self)._declare_options()
+        super()._declare_options()
 
-        self.options.declare('solve_subsystems', types=bool, default=False,
+        self.options.declare('solve_subsystems', types=bool,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -90,30 +75,22 @@ class NewtonSolver(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(NewtonSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
 
+        if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
+            msg = '{}: solve_subsystems must be set by the user.'
+            raise ValueError(msg.format(self.msginfo))
+
         if self.linear_solver is not None:
-            self.linear_solver._setup_solvers(self._system(), self._depth + 1)
+            self.linear_solver._setup_solvers(system, self._depth + 1)
         else:
             self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
-            self.linesearch._setup_solvers(self._system(), self._depth + 1)
-
-        else:
-            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
-            # This deprecation warning is to prepare users for the change.
-            pathname = self._system().pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
-                  'to use the BoundsEnforceLS line search.'
-
-            if rank == 0:
-                warn_deprecation(pathname + msg)
+            self.linesearch._setup_solvers(system, self._depth + 1)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -136,7 +113,7 @@ class NewtonSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -207,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -250,6 +227,7 @@ class NewtonSolver(NonlinearSolver):
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
         if (my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac):
             my_asm_jac._update(system)
+
         self._linearize()
 
         self.linear_solver.solve(['linear'], 'fwd')
@@ -308,7 +286,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Clean up resources prior to exit.
         """
-        super(NewtonSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

@@ -1,7 +1,6 @@
 """
 Design-of-Experiments Driver.
 """
-from __future__ import print_function
 
 import traceback
 import inspect
@@ -25,15 +24,15 @@ class DOEDriver(Driver):
         The name used to identify this driver in recorded cases.
     _recorders : list
         List of case recorders that have been added to this driver.
-    _comm : MPI.Comm or None
-        MPI communicator object.
+    _problem_comm : MPI.Comm or None
+        The MPI communicator for the Problem.
     _color : int or None
         In MPI, the cached color is used to determine which cases to run on this proc.
     """
 
     def __init__(self, generator=None, **kwargs):
         """
-        Constructor.
+        Construct A DOEDriver.
 
         Parameters
         ----------
@@ -57,14 +56,21 @@ class DOEDriver(Driver):
                                 "but an instance of %s was found."
                                 % type(generator).__name__)
 
-        super(DOEDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
+
+        # What we support
+        self.supports['integer_design_vars'] = True
+
+        # What we don't support
+        self.supports['distributed_design_vars'] = False
+        self.supports._read_only = True
 
         if generator is not None:
             self.options['generator'] = generator
 
         self._name = ''
         self._recorders = []
-        self._comm = None
+        self._problem_comm = None
         self._color = None
 
     def _declare_options(self):
@@ -92,8 +98,9 @@ class DOEDriver(Driver):
         MPI.Comm or <FakeComm> or None
             The communicator for the Problem model.
         """
-        if MPI and self.options['run_parallel']:
-            self._comm = comm
+        self._problem_comm = comm
+
+        if MPI:
             procs_per_model = self.options['procs_per_model']
 
             full_size = comm.size
@@ -105,10 +112,8 @@ class DOEDriver(Driver):
                                    "specify a number of processors per model that divides "
                                    "into %d." % (procs_per_model, full_size))
             color = self._color = comm.rank % size
-
             model_comm = comm.Split(color)
         else:
-            self._comm = None
             model_comm = comm
 
         return model_comm
@@ -157,7 +162,7 @@ class DOEDriver(Driver):
         # set driver name with current generator
         self._set_name()
 
-        if self._comm:
+        if MPI and self.options['run_parallel']:
             case_gen = self._parallel_generator
         else:
             case_gen = self.options['generator']
@@ -222,7 +227,7 @@ class DOEDriver(Driver):
         list
             list of name, value tuples for the design variables.
         """
-        size = self._comm.size // self.options['procs_per_model']
+        size = self._problem_comm.size // self.options['procs_per_model']
         color = self._color
 
         generator = self.options['generator']
@@ -243,7 +248,7 @@ class DOEDriver(Driver):
         # if we end up running in parallel
         self._recorders.append(recorder)
 
-        super(DOEDriver, self).add_recorder(recorder)
+        super().add_recorder(recorder)
 
     def _setup_recording(self):
         """
@@ -261,13 +266,13 @@ class DOEDriver(Driver):
                     if procs_per_model == 1:
                         recorder._record_on_proc = True
                     else:
-                        size = self._comm.size // procs_per_model
-                        if self._comm.rank < size:
+                        size = self._problem_comm.size // procs_per_model
+                        if self._problem_comm.rank < size:
                             recorder._record_on_proc = True
                         else:
                             recorder._record_on_proc = False
 
-        super(DOEDriver, self)._setup_recording()
+        super()._setup_recording()
 
     def _get_recorder_metadata(self, case_name):
         """

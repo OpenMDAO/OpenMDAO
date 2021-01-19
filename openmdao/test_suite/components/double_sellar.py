@@ -9,18 +9,21 @@ from openmdao.test_suite.components.sellar import SellarImplicitDis1
 class SubSellar(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(SubSellar, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('d1', SellarDis1withDerivatives(units=units, scaling=scaling),
                            promotes=['x', 'z', 'y1', 'y2'])
         self.add_subsystem('d2', SellarDis2withDerivatives(units=units, scaling=scaling),
                            promotes=['z', 'y1', 'y2'])
+        if units:
+             # auto_ivc update requires this since two 'z' inputs have different units
+            self.set_input_defaults('z', units='ft')
 
 
 class DoubleSellar(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(DoubleSellar, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('g1', SubSellar(units=units, scaling=scaling))
         self.add_subsystem('g2', SubSellar(units=units, scaling=scaling))
@@ -29,14 +32,14 @@ class DoubleSellar(om.Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.linear_solver = om.DirectSolver()
 
 
 class SubSellarImplicit(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(SubSellarImplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('d1', SellarImplicitDis1(units=units, scaling=scaling),
                            promotes=['x', 'z', 'y1', 'y2'])
@@ -47,7 +50,7 @@ class SubSellarImplicit(om.Group):
 class DoubleSellarImplicit(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(DoubleSellarImplicit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('g1', SubSellar(units=units, scaling=scaling))
         self.add_subsystem('g2', SubSellar(units=units, scaling=scaling))
@@ -56,5 +59,5 @@ class DoubleSellarImplicit(om.Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.linear_solver = om.DirectSolver()

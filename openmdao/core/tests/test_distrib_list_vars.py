@@ -2,18 +2,19 @@ import os
 
 import unittest
 import numpy as np
-from six.moves import cStringIO
+from io import StringIO
 
 from distutils.version import LooseVersion
 
 import openmdao.api as om
 
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
+from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -61,26 +62,6 @@ class DistributedAdder(om.ExplicitComponent):
         outputs['y'] = inputs['x'] + 10.
 
 
-class Summer(om.ExplicitComponent):
-    """
-    Aggregation component that collects all the values from the distributed
-    vector addition and computes a total
-    """
-
-    def initialize(self):
-        self.options.declare('size', types=int, default=1,
-                             desc="Size of input and output vectors.")
-
-    def setup(self):
-        # NOTE: this component depends on the full y array, so OpenMDAO
-        #       will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(self.options['size']))
-        self.add_output('sum', 0.0, shape=1)
-
-    def compute(self, inputs, outputs):
-        outputs['sum'] = np.sum(inputs['y'])
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedListVarsTest(unittest.TestCase):
 
@@ -94,7 +75,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('summer', Summer(size=size), promotes=[('invec', 'y'), 'sum'])
 
         prob.setup()
 
@@ -102,60 +83,67 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.run_driver()
 
-        stream = cStringIO()
-        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-        self.assertEqual(inputs[0][0], 'plus.x')
-        self.assertEqual(inputs[1][0], 'summer.y')
-        self.assertEqual(inputs[0][1]['value'].size, 50)  # should only return half that is local
-        self.assertEqual(inputs[1][1]['value'].size, 100)
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            if prob.comm.rank:
+                self.assertEqual(inputs, [])
+            else:
+                self.assertEqual(inputs[0][0], 'plus.x')
+                self.assertEqual(inputs[1][0], 'summer.invec')
+                self.assertEqual(inputs[0][1]['value'].size, 100)
+                self.assertEqual(inputs[1][1]['value'].size, 100)
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('\nmodel'), 1)
-            self.assertEqual(text.count('\n  plus'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  summer'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
-            # make sure all the arrays written have 100 elements in them
-            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('\nplus'), 1)
+                self.assertEqual(text.count('\n  x'), 1)
+                self.assertEqual(text.count('\nsummer'), 1)
+                self.assertEqual(text.count('\n  invec'), 1)
+                # make sure all the arrays written have 100 elements in them
+                self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
 
-        stream = cStringIO()
-        outputs = sorted(prob.model.list_outputs(values=True,
-                                                 units=True,
-                                                 shape=True,
-                                                 bounds=True,
-                                                 residuals=True,
-                                                 scaling=True,
-                                                 hierarchical=True,
-                                                 print_arrays=True,
-                                                 out_stream=stream))
-        self.assertEqual(outputs[0][0], 'des_vars.x')
-        self.assertEqual(outputs[1][0], 'plus.y')
-        self.assertEqual(outputs[2][0], 'summer.sum')
-        self.assertEqual(outputs[0][1]['value'].size, 100)
-        self.assertEqual(outputs[1][1]['value'].size, 50)
-        self.assertEqual(outputs[2][1]['value'].size, 1)
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            outputs = sorted(prob.model.list_outputs(values=True,
+                                                     units=True,
+                                                     shape=True,
+                                                     bounds=True,
+                                                     residuals=True,
+                                                     scaling=True,
+                                                     hierarchical=True,
+                                                     print_arrays=True,
+                                                     out_stream=stream))
+            if prob.comm.rank:
+                self.assertEqual(outputs, [])
+            else:
+                self.assertEqual(outputs[0][0], 'des_vars.x')
+                self.assertEqual(outputs[1][0], 'plus.y')
+                self.assertEqual(outputs[2][0], 'summer.sum')
+                self.assertEqual(outputs[0][1]['value'].size, 100)
+                self.assertEqual(outputs[1][1]['value'].size, 100)
+                self.assertEqual(outputs[2][1]['value'].size, 1)
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('\n  des_vars'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  plus'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
-            self.assertEqual(text.count('\n  summer'), 1)
-            self.assertEqual(text.count('\n    sum'), 1)
-            # make sure all the arrays written have 100 elements in them
-            self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
-            self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('\ndes_vars'), 1)
+                self.assertEqual(text.count('\n  x'), 1)
+                self.assertEqual(text.count('\nplus'), 1)
+                self.assertEqual(text.count('\n  y'), 1)
+                self.assertEqual(text.count('\nsummer'), 1)
+                self.assertEqual(text.count('\n  sum'), 1)
+                # make sure all the arrays written have 100 elements in them
+                self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[3].split(']')[0].split()), 100)
+                self.assertEqual(len(text.split('[')[4].split(']')[0].split()), 100)
 
     def test_distributed_list_vars(self):
 
@@ -200,81 +188,73 @@ class DistributedListVarsTest(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        stream = cStringIO()
-        inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
-        self.assertEqual(inputs[0][0], 'Obj.y1')
-        self.assertEqual(inputs[1][0], 'Obj.y2')
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(inputs[2][0], 'par.G2.Cc.x')
-            self.assertEqual(inputs[3][0], 'par.G2.Cy.x')
-        else:
-            self.assertEqual(inputs[2][0], 'par.G1.Cc.x')
-            self.assertEqual(inputs[3][0], 'par.G1.Cy.x')
-        self.assertTrue('value' in inputs[0][1])
-        self.assertEqual(4, len(inputs))
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            inputs = sorted(prob.model.list_inputs(values=True, print_arrays=True, out_stream=stream))
+            if prob.comm.rank:
+                self.assertEqual(inputs, [])
+            else:
+                inames = [t[0] for t in inputs]
+                self.assertEqual(inames, ['Obj.y1', 'Obj.y2', 'par.G1.Cc.x', 'par.G1.Cy.x', 'par.G2.Cc.x', 'par.G2.Cy.x'])
+                self.assertTrue('value' in inputs[0][1])
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
-            self.assertEqual(1, text.count('value'))
-            self.assertEqual(1, text.count('  par'))
-            self.assertEqual(1, text.count('    G1'))
-            self.assertEqual(1, text.count('    G2'))
-            self.assertEqual(2, text.count('      Cy'))
-            self.assertEqual(2, text.count('      Cc'))
-            self.assertEqual(4, text.count('        x'))
-            self.assertEqual(1, text.count('  Obj'))
-            self.assertEqual(1, text.count('    y1'))
-            self.assertEqual(1, text.count('    y2'))
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
+                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('par'))
+                self.assertEqual(1, text.count('  G1'))
+                self.assertEqual(1, text.count('  G2'))
+                self.assertEqual(2, text.count('    Cy'))
+                self.assertEqual(2, text.count('    Cc'))
+                self.assertEqual(4, text.count('      x'))
+                self.assertEqual(1, text.count('Obj'))
+                self.assertEqual(1, text.count('  y1'))
+                self.assertEqual(1, text.count('  y2'))
 
-        stream = cStringIO()
-        outputs = sorted(prob.model.list_outputs(values=True,
-                                                 units=True,
-                                                 shape=True,
-                                                 bounds=True,
-                                                 residuals=True,
-                                                 scaling=True,
-                                                 hierarchical=True,
-                                                 print_arrays=True,
-                                                 out_stream=stream))
-        self.assertEqual(outputs[0][0], 'Obj.obj')
-        if prob.comm.rank:  # outputs only return what is on their proc
-            self.assertEqual(outputs[1][0], 'par.G2.Cc.c')
-            self.assertEqual(outputs[2][0], 'par.G2.Cy.y')
-            self.assertEqual(outputs[3][0], 'par.G2.indep_var_comp.x')
-        else:
-            self.assertEqual(outputs[1][0], 'par.G1.Cc.c')
-            self.assertEqual(outputs[2][0], 'par.G1.Cy.y')
-            self.assertEqual(outputs[3][0], 'par.G1.indep_var_comp.x')
-        self.assertEqual(4, len(outputs))
-        self.assertTrue('value' in outputs[0][1])
-        self.assertTrue('units' in outputs[0][1])
+        stream = StringIO()
+        with multi_proc_exception_check(prob.comm):
+            outputs = sorted(prob.model.list_outputs(values=True,
+                                                     units=True,
+                                                     shape=True,
+                                                     bounds=True,
+                                                     residuals=True,
+                                                     scaling=True,
+                                                     hierarchical=True,
+                                                     print_arrays=True,
+                                                     out_stream=stream))
+            onames = [t[0] for t in outputs]
+            if prob.comm.rank == 0:
+                self.assertEqual(onames, ['Obj.obj', 'par.G1.Cc.c', 'par.G1.Cy.y', 'par.G1.indep_var_comp.x', 'par.G2.Cc.c', 'par.G2.Cy.y', 'par.G2.indep_var_comp.x'])
+                self.assertTrue('value' in outputs[0][1])
+                self.assertTrue('units' in outputs[0][1])
+            else:
+                self.assertEqual(onames, [])
 
-        text = stream.getvalue()
-        if prob.comm.rank:  # Only rank 0 prints
-            self.assertEqual(len(text), 0)
-        else:
-            self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
-            self.assertEqual(1, text.count('value'))
-            self.assertEqual(1, text.count('units'))
-            self.assertEqual(1, text.count('  par'))
-            self.assertEqual(1, text.count('    G1'))
-            self.assertEqual(1, text.count('    G2'))
-            self.assertEqual(2, text.count('      Cy'))
-            self.assertEqual(2, text.count('      Cc'))
-            self.assertEqual(2, text.count('      indep_var_comp'))
-            self.assertEqual(2, text.count('        x'))
-            self.assertEqual(2, text.count('        y'))
-            self.assertEqual(2, text.count('        c'))
-            self.assertEqual(1, text.count('  Obj'))
-            self.assertEqual(1, text.count('    obj'))
+            text = stream.getvalue()
+            if prob.comm.rank:  # Only rank 0 prints
+                self.assertEqual(len(text), 0)
+            else:
+                self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
+                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('units'))
+                self.assertEqual(1, text.count('par'))
+                self.assertEqual(1, text.count('  G1'))
+                self.assertEqual(1, text.count('  G2'))
+                self.assertEqual(2, text.count('    Cy'))
+                self.assertEqual(2, text.count('    Cc'))
+                self.assertEqual(2, text.count('    indep_var_comp'))
+                self.assertEqual(2, text.count('      x'))
+                self.assertEqual(2, text.count('      y'))
+                self.assertEqual(2, text.count('      c'))
+                self.assertEqual(1, text.count('Obj'))
+                self.assertEqual(1, text.count('  obj'))
 
     def test_parallel_list_vars(self):
         print_opts = {'linewidth': 1024, 'precision': 1}
 
-        from distutils.version import LooseVersion
         if LooseVersion(np.__version__) >= LooseVersion("1.14"):
             print_opts['legacy'] = '1.13'
 
@@ -290,152 +270,151 @@ class DistributedListVarsTest(unittest.TestCase):
         #
         # list inputs, not hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
 
-        if prob.comm.rank == 0:  # Only rank 0 prints
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:  # Only rank 0 prints
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "6 Input(s) in 'model'",
-                '---------------------',
-                '',
-                'varname   value',
-                '--------  -----',
-                'c1.x',
-                'sub.c2.x',
-                'sub.c3.x',
-                'c2.x',
-                'c3.x',
-                'sub2.x'
-            ]
+                expected = [
+                    "6 Input(s) in 'model'",
+                    '---------------------',
+                    '',
+                    'varname   value',
+                    '--------  -----',
+                    'c1.x',
+                    'sub.c2.x',
+                    'sub.c3.x',
+                    'c2.x',
+                    'c3.x',
+                    'sub2.x'
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list inputs, hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "6 Input(s) in 'model'",
-                '---------------------',
-                '',
-                'varname  value',
-                '-------  -----',
-                'model',
-                '  c1',
-                '    x',
-                '  sub',
-                '    c2',
-                '      x',
-                '    c3',
-                '      x',
-                '  c2',
-                '    x',
-                '  c3',
-                '    x',
-                '  sub2',
-                '    x'
-            ]
+                expected = [
+                    "6 Input(s) in 'model'",
+                    '---------------------',
+                    '',
+                    'varname  value',
+                    '-------  -----',
+                    'c1',
+                    '  x',
+                    'sub',
+                    '  c2',
+                    '    x',
+                    '  c3',
+                    '    x',
+                    'c2',
+                    '  x',
+                    'c3',
+                    '  x',
+                    'sub2',
+                    '  x'
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list outputs, not hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "7 Explicit Output(s) in 'model'",
-                '-------------------------------',
-                '',
-                'varname   value   resids',
-                '--------  -----   ------',
-                'iv.x',
-                'c1.y',
-                'sub.c2.y',
-                'sub.c3.y',
-                'c2.y',
-                'c3.y',
-                'sub2.y',
-                '',
-                '',
-                "0 Implicit Output(s) in 'model'",
-                '-------------------------------',
-            ]
+                expected = [
+                    "7 Explicit Output(s) in 'model'",
+                    '-------------------------------',
+                    '',
+                    'varname   value   resids',
+                    '--------  -----   ------',
+                    'iv.x',
+                    'c1.y',
+                    'sub.c2.y',
+                    'sub.c3.y',
+                    'c2.y',
+                    'c3.y',
+                    'sub2.y',
+                    '',
+                    '',
+                    "0 Implicit Output(s) in 'model'",
+                    '-------------------------------',
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         #
         # list outputs, hierarchical
         #
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
 
-        if prob.comm.rank == 0:
-            text = stream.getvalue().split('\n')
+        with multi_proc_exception_check(prob.comm):
+            if prob.comm.rank == 0:
+                text = stream.getvalue().split('\n')
 
-            expected = [
-                "7 Explicit Output(s) in 'model'",
-                '-------------------------------',
-                '',
-                'varname  value   resids',
-                '-------  -----   ------',
-                'model',
-                '  iv',
-                '    x',
-                '  c1',
-                '    y',
-                '  sub',
-                '    c2',
-                '      y',
-                '    c3',
-                '      y',
-                '  c2',
-                '    y',
-                '  c3',
-                '    y',
-                '  sub2',
-                '    y',
-                '',
-                '',
-                "0 Implicit Output(s) in 'model'",
-                '-------------------------------',
-            ]
+                expected = [
+                    "7 Explicit Output(s) in 'model'",
+                    '-------------------------------',
+                    '',
+                    'varname  value   resids',
+                    '-------  -----   ------',
+                    'iv',
+                    '  x',
+                    'c1',
+                    '  y',
+                    'sub',
+                    '  c2',
+                    '    y',
+                    '  c3',
+                    '    y',
+                    'c2',
+                    '  y',
+                    'c3',
+                    '  y',
+                    'sub2',
+                    '  y',
+                    '',
+                    '',
+                    "0 Implicit Output(s) in 'model'",
+                    '-------------------------------',
+                ]
 
-            for i, line in enumerate(expected):
-                if line and not line.startswith('-'):
-                    self.assertTrue(text[i].startswith(line),
-                                    '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
+                for i, line in enumerate(expected):
+                    if line and not line.startswith('-'):
+                        self.assertTrue(text[i].startswith(line),
+                                        '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
     def test_distribcomp_list_vars(self):
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
-
         print_opts = {'linewidth': 1024}
 
-        from distutils.version import LooseVersion
         if LooseVersion(np.__version__) >= LooseVersion("1.14"):
             print_opts['legacy'] = '1.13'
 
@@ -454,7 +433,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         # prior to model execution, the global shape of a distributed variable is not available
         # and only the local portion of the value is available
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
                                  print_arrays=True, out_stream=stream)
@@ -468,9 +447,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
-                'invec    |2.82842712475|  (8,)   Unavailable ',
+                'invec    |3.87298334621|  (8,)   (15,)',
                 '         value:',
-                '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
+                '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
             for i, line in enumerate(expected):
@@ -478,7 +457,7 @@ class DistributedListVarsTest(unittest.TestCase):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
                                   print_arrays=True, out_stream=stream)
@@ -492,9 +471,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
-                'outvec   |2.82842712475|  (8,)   Unavailable ',
+                'outvec   |3.87298334621|  (8,)   (15,)',
                 '         value:',
-                '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
+                '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
             for i, line in enumerate(expected):
@@ -508,7 +487,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
         # after model execution, the global shape of a distributed variable is available
         # and the complete global value is available
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
                                  print_arrays=True, out_stream=stream)
@@ -520,18 +499,18 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Input(s) in 'C2'",
                 '------------------',
                 '',
-                'varname   value            shape  global_shape',
-                '--------  ---------------  -----  ------------',
-                'C2.invec  |3.87298334621|  (8,)   (15,)       ',
-                '          value:',
-                '          array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
+                'varname  value            shape  global_shape',
+                '-------  ---------------  -----  ------------',
+                'invec    |3.87298334621|  (8,)   (15,)',
+                '         value:',
+                '         array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
             for i, line in enumerate(expected):
                 if line and not line.startswith('-'):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
                                   print_arrays=True, out_stream=stream)
@@ -543,44 +522,39 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Explicit Output(s) in 'C2'",
                 '----------------------------',
                 '',
-                'varname    value           shape  global_shape',
-                '---------  --------------  -----  ------------',
-                'C2.outvec  |9.74679434481|  (8,)   (15,)       ',
-                '           value:',
-                '           array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
+                'varname  value           shape  global_shape',
+                '-------  --------------  -----  ------------',
+                'outvec   |9.74679434481|  (8,)   (15,)',
+                '         value:',
+                '         array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
             for i, line in enumerate(expected):
                 if line and not line.startswith('-'):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        # note that the shape of the input variable for the non-distributed Summer component
-        # is different on each processor, use the all_procs argument to display on all processors
-        stream = cStringIO()
+        stream = StringIO()
         with printoptions(**print_opts):
             model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
                                  print_arrays=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
-        if prob.comm.rank == 0:
-            norm = '|5.65685424949|'
-            shape = (8,)
-            value = '[2., 2., 2., 2., 2., 2., 2., 2.]'
-        else:
-            norm = '|7.93725393319|'
-            shape = (7,)
-            value = '[-3., -3., -3., -3., -3., -3., -3.]'
+        print('\n'.join(text))
+
+        norm = '|9.74679434481|'
+        shape = (15,)
+        value = '[2., 2., 2., 2., 2., 2., 2., 2., -3., -3., -3., -3., -3., -3., -3.]'
 
         expected = [
             "1 Input(s) in 'C3'",
             '------------------',
             '',
-            'varname   value                shape  global_shape',
-            '--------  -------------------  -----  ------------',
-            'C3.invec  {}  {}   {}        '.format(norm, shape, shape),
-            '          value:',
-            '          array({})'.format(value),
+            'varname  value                shape  global_shape',
+            '-------  -------------------  -----  ------------',
+            'invec  {}  {}   {}        '.format(norm, shape, shape),
+            '         value:',
+            '         array({})'.format(value),
         ]
 
         for i, line in enumerate(expected):
@@ -588,7 +562,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line),
                                  '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
-        assert_rel_error(self, prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
@@ -632,7 +606,7 @@ class MPIFeatureTests(unittest.TestCase):
         # is different on each processor, use the all_procs argument to display on all processors
         model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
 
-        assert_rel_error(self, prob['C3.out'], -5.)
+        assert_near_equal(prob['C3.sum'], -5.)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-from __future__ import print_function
 
 import sys
 import os
@@ -19,18 +18,14 @@ from docutils import nodes
 
 from collections import namedtuple
 
-from six import StringIO
-from six.moves import range, zip, cStringIO as cStringIO
+from io import StringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator
 from sphinx.writers.html5 import HTML5Translator
 from redbaron import RedBaron
 
-if sys.version_info[0] == 2:
-    import cgi as cgiesc
-else:
-    import html as cgiesc
+import html as cgiesc
 
 from openmdao.utils.general_utils import printoptions
 
@@ -225,6 +220,17 @@ def replace_asserts_with_prints(src):
             #
             assert_node.value[0].replace("print")
 
+    if 'assert_near_equal' in src:
+        assert_nodes = rb.findAll("NameNode", value='assert_near_equal')
+        for assert_node in assert_nodes:
+            assert_node = assert_node.parent
+            # If relative error tolerance is specified, there are 3 arguments
+            if len(assert_node.value[1]) == 3:
+                # remove the relative error tolerance
+                remove_redbaron_node(assert_node.value[1], -1)
+            remove_redbaron_node(assert_node.value[1], -1)  # remove the expected value
+            assert_node.value[0].replace("print")
+
     if 'assert_almost_equal' in src:
         assert_nodes = rb.findAll("NameNode", value='assert_almost_equal')
         for assert_node in assert_nodes:
@@ -269,10 +275,13 @@ def get_source_code(path):
         The imported module.
     class or None
         The class specified by path.
+    method or None
+        The class method specified by path.
     """
 
     indent = 0
-    cls = None
+    class_obj = None
+    method_obj = None
 
     if path.endswith('.py'):
         if not os.path.isfile(path):
@@ -295,8 +304,8 @@ def get_source_code(path):
                 module_path = '.'.join(parts[:-1])
                 module = importlib.import_module(module_path)
                 class_name = parts[-1]
-                cls = getattr(module, class_name)
-                source = inspect.getsource(cls)
+                class_obj = getattr(module, class_name)
+                source = inspect.getsource(class_obj)
                 indent = 1
 
             except ImportError:
@@ -306,12 +315,12 @@ def get_source_code(path):
                 module = importlib.import_module(module_path)
                 class_name = parts[-2]
                 method_name = parts[-1]
-                cls = getattr(module, class_name)
-                meth = getattr(cls, method_name)
-                source = inspect.getsource(meth)
+                class_obj = getattr(module, class_name)
+                method_obj = getattr(class_obj, method_name)
+                source = inspect.getsource(method_obj)
                 indent = 2
 
-    return remove_leading_trailing_whitespace_lines(source), indent, module, cls
+    return remove_leading_trailing_whitespace_lines(source), indent, module, class_obj, method_obj
 
 
 def remove_raise_skip_tests(src):
@@ -577,6 +586,7 @@ def extract_output_blocks(run_output):
 
     return output_blocks
 
+
 def strip_decorators(src):
     """
     Remove any decorators from the source code of the method or function.
@@ -620,8 +630,10 @@ def strip_decorators(src):
     else:
         raise RuntimeError("Cannot determine line number for decorated function without args")
     lines = src.splitlines()
-    lines_minus_decorator = lines[function_lineno - 1:]
-    return '\n'.join(lines_minus_decorator)
+
+    undecorated_src = '\n'.join(lines[function_lineno - 1:])
+
+    return undecorated_src
 
 
 def strip_header(src):
@@ -694,7 +706,7 @@ def sync_multi_output_blocks(run_output):
 
         for i, outp in enumerate(proc_output_blocks):
             for tag in outp:
-                if outp[tag].strip():
+                if str(outp[tag]).strip():
                     if tag in synced_blocks:
                         synced_blocks[tag] += "(rank %d) %s\n" % (i, outp[tag])
                     else:
@@ -791,7 +803,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             # capture all output
             stdout = sys.stdout
             stderr = sys.stderr
-            strout = cStringIO()
+            strout = StringIO()
             sys.stdout = strout
             sys.stderr = strout
 

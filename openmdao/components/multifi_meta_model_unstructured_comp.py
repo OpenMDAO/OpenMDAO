@@ -1,11 +1,9 @@
 """Define the MultiFiMetaModel class."""
-from six.moves import range
 from itertools import chain
 
 import numpy as np
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.utils.general_utils import warn_deprecation
 
 
 def _get_name_fi(name, fi_index):
@@ -93,7 +91,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MultiFiMetaModelUnStructuredComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         nfi = self._nfi = self.options['nfi']
 
@@ -103,20 +101,38 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         self._static_input_sizes = nfi * [0]
 
+        self._no_check_partials = True
+
     def initialize(self):
         """
         Declare options.
         """
-        super(MultiFiMetaModelUnStructuredComp, self).initialize()
+        super().initialize()
 
         self.options.declare('nfi', types=int, default=1, lower=1,
                              desc='Number of levels of fidelity.')
 
-    def _setup_procs(self, pathname, comm, mode, prob_options):
+    def _setup_procs(self, pathname, comm, mode, prob_meta):
+        """
+        Execute first phase of the setup process.
+
+        Distribute processors, assign pathnames, and call setup on the component.
+
+        Parameters
+        ----------
+        pathname : str
+            Global name of the system, including the path.
+        comm : MPI.Comm or <FakeComm>
+            MPI communicator object.
+        mode : str
+            Derivatives calculation mode, 'fwd' for forward, and 'rev' for
+            reverse (adjoint).
+        prob_meta : dict
+            Problem level options.
+        """
         self._input_sizes = list(self._static_input_sizes)
 
-        super(MultiFiMetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode,
-                                                                   prob_options)
+        super()._setup_procs(pathname, comm, mode, prob_meta)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -148,10 +164,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         desc : str
             description of the variable
         """
-        item = MultiFiMetaModelUnStructuredComp
-        metadata = super(item, self).add_input(name, val, shape=shape, src_indices=src_indices,
-                                               flat_src_indices=flat_src_indices, units=units,
-                                               desc=desc)
+        metadata = super().add_input(name, val, shape=shape, src_indices=src_indices,
+                                     flat_src_indices=flat_src_indices, units=units,
+                                     desc=desc)
         if self.options['vec_size'] > 1:
             input_size = metadata['value'][0].size
         else:
@@ -174,7 +189,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                     self._input_sizes[fi] += input_size
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
-                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
+                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -216,13 +232,23 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
+        tags : str or list of strs or set of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
         """
-        super(MultiFiMetaModelUnStructuredComp, self).add_output(name, val, shape=shape,
-                                                                 units=units, res_units=res_units,
-                                                                 desc=desc, lower=lower,
-                                                                 upper=upper, ref=ref,
-                                                                 ref0=ref0, res_ref=res_ref,
-                                                                 surrogate=surrogate)
+        super().add_output(name, val, shape=shape,
+                           units=units, res_units=res_units,
+                           desc=desc, lower=lower,
+                           upper=upper, ref=ref,
+                           ref0=ref0, res_ref=res_ref,
+                           surrogate=surrogate, tags=tags,
+                           shape_by_conn=shape_by_conn,
+                           copy_shape=copy_shape)
         self._training_output[name] = self._nfi * [np.empty(0)]
 
         # Add train:<outvar>_fi<n>
@@ -238,7 +264,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         """
         if self._nfi == 1:
             # shortcut: fallback to base class behaviour immediatly
-            super(MultiFiMetaModelUnStructuredComp, self)._train()
+            super()._train()
             return
 
         num_sample = self._nfi * [None]
@@ -249,10 +275,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 if num_sample[fi] is None:
                     num_sample[fi] = len(val)
                 elif len(val) != num_sample[fi]:
-                    msg = "{}: Each variable must have the same number"\
-                          " of training points. Expected {} but found {} "\
-                          "points for '{}'."\
-                          .format(self.msginfo, num_sample[fi], len(val), name)
+                    msg = f"{self.msginfo}: Each variable must have the same number " \
+                          f"of training points. Expected {num_sample[fi]} but found {len(val)} " \
+                          f"points for '{name}'."
                     raise RuntimeError(msg)
 
         inputs = [np.zeros((num_sample[fi], self._input_sizes[fi]))
@@ -294,52 +319,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
             surrogate = self._metadata(name_root).get('surrogate')
             if surrogate is None:
-                msg = "{}: No surrogate specified for output '{}'"
-                raise RuntimeError(msg.format(self.msginfo, name_root))
+                msg = f"{self.msginfo}: No surrogate specified for output '{name_root}'"
+                raise RuntimeError(msg)
             else:
                 surrogate.train_multifi(inputs, self._training_output[name])
 
         self._training_input = inputs
         self.train = False
-
-
-class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModel, self).__init__(*args, **kwargs)
-
-
-class MultiFiMetaModelUnStructured(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModelUnStructured' has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModelUnStructured, self).__init__(*args, **kwargs)

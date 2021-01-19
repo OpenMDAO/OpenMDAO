@@ -27,6 +27,28 @@ and the output :math:`a_mag`, as well as specifying their units.
     VectorMagnitudeComp
     options
 
+VectorMagnitudeComp Constructor
+-------------------------------
+
+The call signature for the `VectorMagnitudeComp` constructor is:
+
+.. automethod:: openmdao.components.vector_magnitude_comp.VectorMagnitudeComp.__init__
+    :noindex:
+
+
+VectorMagnitudeComp Usage
+-------------------------
+
+There are often situations when numerous magnitudes need to be computed, essentially in parallel.
+You can reduce the number of components required by having one `VectorMagnitudeComp` perform multiple operations.
+This is also convenient when the different operations have common inputs.
+
+The ``add_magnitude`` method is used to create additional magnitude calculations after instantiation.
+
+.. automethod:: openmdao.components.vector_magnitude_comp.VectorMagnitudeComp.add_magnitude
+   :noindex:
+
+
 VectorMagnitudeComp Example
 ---------------------------
 
@@ -38,5 +60,19 @@ the input.
 
 .. embed-code::
     openmdao.components.tests.test_vector_magnitude_comp.TestFeature.test
+    :layout: interleave
+
+
+VectorMagnitudeComp Example with Multiple Magnitudes
+----------------------------------------------------
+
+Note that, when defining multiple magnitudes, an input name in one call to `add_magnitude` may not be an
+output name in another call, and vice-versa.
+
+
+.. embed-code::
+    openmdao.components.tests.test_vector_magnitude_comp.TestFeature.test_multiple
+    :layout: interleave
+
 
 .. tags:: VectorMagnitudeComp, Component

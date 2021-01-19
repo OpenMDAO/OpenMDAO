@@ -1,12 +1,10 @@
-from __future__ import print_function, division, absolute_import
-
 from distutils.version import LooseVersion
 import unittest
 
 import scipy
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 # duplicate definition here so it can be included in docs by itself
@@ -31,6 +29,7 @@ class ActuatorDisc(om.ExplicitComponent):
         self.add_output('Cp', 0.0, desc="Power Coefficient")
         self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+    def setup_partials(self):
         self.declare_partials('Vr', ['a', 'Vu'])
         self.declare_partials('Vd', 'a')
         self.declare_partials('Ct', 'a')
@@ -120,6 +119,7 @@ class TestBetzLimit(unittest.TestCase):
                 self.add_output('Cp', 0.0, desc="Power Coefficient")
                 self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+            def setup_partials(self):
                 self.declare_partials('Vr', ['a', 'Vu'])
                 self.declare_partials('Vd', 'a')
                 self.declare_partials('Ct', 'a')
@@ -182,14 +182,8 @@ class TestBetzLimit(unittest.TestCase):
 
         # build the model
         prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        indeps.add_output('a', .5)
-        indeps.add_output('Area', 10.0, units='m**2')
-        indeps.add_output('rho', 1.225, units='kg/m**3')
-        indeps.add_output('Vu', 10.0, units='m/s')
-
         prob.model.add_subsystem('a_disk', ActuatorDisc(),
-                                promotes_inputs=['a', 'Area', 'rho', 'Vu'])
+                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
         prob.driver = om.ScipyOptimizeDriver()
@@ -202,18 +196,24 @@ class TestBetzLimit(unittest.TestCase):
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 
         prob.setup()
+
+        prob.set_val('a', .5)
+        prob.set_val('Area', 10.0, units='m**2')
+        prob.set_val('rho', 1.225, units='kg/m**3')
+        prob.set_val('Vu', 10.0, units='m/s')
+
         prob.run_driver()
 
         prob.model.list_inputs(values = False, hierarchical=False)
         prob.model.list_outputs(values = False, hierarchical=False)
 
         # minimum value
-        assert_rel_error(self, prob['a_disk.Cp'], 16./27., 1e-4)
-        assert_rel_error(self, prob['a'], 0.33333, 1e-4)
+        assert_near_equal(prob['a_disk.Cp'], 16./27., 1e-4)
+        assert_near_equal(prob['a'], 0.33333, 1e-4)
 
         # There is a bug in scipy version < 1.0 that causes this value to be wrong.
         if LooseVersion(scipy.__version__) >= LooseVersion("1.0"):
-            assert_rel_error(self, prob['Area'], 1.0, 1e-4)
+            assert_near_equal(prob['Area'], 1.0, 1e-4)
 
     def test_betz_with_var_tags(self):
         import openmdao.api as om
@@ -241,6 +241,7 @@ class TestBetzLimit(unittest.TestCase):
                 self.add_output('Cp', 0.0, desc="Power Coefficient")
                 self.add_output('power', 0.0, units="W", desc="Power produced by the rotor")
 
+            def setup_partials(self):
                 self.declare_partials('Vr', ['a', 'Vu'])
                 self.declare_partials('Vd', 'a')
                 self.declare_partials('Ct', 'a')

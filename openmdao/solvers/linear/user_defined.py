@@ -30,7 +30,7 @@ class LinearUserDefined(LinearSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(LinearUserDefined, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.solve_function = solve_function
 

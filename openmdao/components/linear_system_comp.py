@@ -1,7 +1,4 @@
 """Define the LinearSystemComp class."""
-from __future__ import division, print_function
-
-from six.moves import range
 
 import numpy as np
 from scipy import linalg
@@ -32,8 +29,10 @@ class LinearSystemComp(ImplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(LinearSystemComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._lup = None
+
+        self._no_check_partials = True
 
     def initialize(self):
         """
@@ -52,8 +51,6 @@ class LinearSystemComp(ImplicitComponent):
         vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
         size = self.options['size']
-        mat_size = size * size
-        full_size = size * vec_size
 
         self._lup = []
         shape = (vec_size, size) if vec_size > 1 else (size, )
@@ -67,7 +64,16 @@ class LinearSystemComp(ImplicitComponent):
         self.add_input("b", val=np.ones(shape))
         self.add_output("x", shape=shape, val=.1)
 
-        # Set up the derivatives.
+    def setup_partials(self):
+        """
+        Set up the derivatives.
+        """
+        vec_size = self.options['vec_size']
+        vec_size_A = self.vec_size_A = vec_size if self.options['vectorize_A'] else 1
+        size = self.options['size']
+        mat_size = size * size
+        full_size = size * vec_size
+
         row_col = np.arange(full_size, dtype="int")
 
         self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)

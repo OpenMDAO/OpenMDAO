@@ -14,9 +14,18 @@ class N2CellRenderer {
     static updateDims(baseWidth, baseHeight) {
         if (!N2CellRenderer.dims) {
             N2CellRenderer.prevDims = {
-                "size": { "width": 0, "height": 0 },
-                "bottomRight": { "x": 0, "y": 0 },
-                "topLeft": { "x": 0, "y": 0 }
+                "size": {
+                    "width": 0,
+                    "height": 0
+                },
+                "bottomRight": {
+                    "x": 0,
+                    "y": 0
+                },
+                "topLeft": {
+                    "x": 0,
+                    "y": 0
+                }
             }
         }
         else {
@@ -166,12 +175,59 @@ class N2VectorBase extends N2CellRenderer {
      * @param {Object} dims The cell spec to use while rendering.
      */
     render(svgGroup, dims) {
-        let d3Elem = d3.select(svgGroup)
-            .append("rect")
+        let d3Elem = d3.select(svgGroup).append('rect')
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color);
-        return this.update(svgGroup, dims, d3Elem)
+
+        return this.update(svgGroup, dims, d3Elem);
+    }
+}
+
+class N2Connector extends N2CellRenderer {
+    /**
+     * Invoke the superclass constructor with these values and "vMid" as a CSS class.
+     * @param {Object} dims Layout and dimensions for the current cell spec.
+     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
+     * @param {string} color The color to render all shapes in.
+     */
+    constructor(color, id) {
+        super(color, "vMid", id);
+    }
+
+    _transform(scale) { throw ("ERROR: N2Connector._transform() called.") }
+
+    /**
+     * Select the element with D3 if not already done, attach a transition
+     * and resize the shape.
+     * @param svgGroup Reference to SVG <g> element associated with data.
+     * @param {Object} dims The cell spec to use while resizing/repositioning.
+     * @param {selection} [d3Elem = null ] The selection created in render().
+     */
+    update(svgGroup, dims, d3Elem = null) {
+        if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
+            .transition(sharedTransition);
+
+        let ret = d3Elem.attr("transform", this._transform(dims.size.width/10.0));
+
+        return ret;
+    }
+
+    /** 
+     * Get the D3 selection for the appropriate group and append a filled arrow.
+     * @param {Object} svgGroup Reference to SVG <g> element associated with data.
+     * @param {Object} dims The cell spec to use while rendering.
+     */
+    render(svgGroup, dims) {
+        let d3Elem = d3.select(svgGroup).append('use')
+            .attr("class", this.className)
+            .attr("id", this.id)
+            .style("fill", this.color)
+            .attr("x", -5)
+            .attr("y", -5)
+            .attr("xlink:href", "#matrix-connector-square")
+
+        return this.update(svgGroup, dims, d3Elem);
     }
 }
 
@@ -320,6 +376,24 @@ class N2VectorVectorCell extends N2VectorBase {
     }
 }
 
+class N2ConnectorUpper extends N2Connector {
+    constructor(color, id) {
+        super(color, id);
+    }
+
+    /** Generate a string to use for the transform attribute */
+    _transform(scale) { return('scale(' + scale + ')'); }
+}
+
+class N2ConnectorLower extends N2Connector {
+    constructor(color, id) {
+        super(color, id);
+    }
+
+    /** Generate a string to use for the transform attribute */
+    _transform(scale) { return('scale(' + scale + ') rotate(180)'); }
+}
+
 class N2ScalarGroupCell extends N2GroupBase {
     constructor(color, id) {
         super(color, id);
@@ -361,7 +435,7 @@ class N2GroupGroupCell extends N2GroupBase {
  * @property {N2TreeNode} tgtObj The model tree node that this outputs to.
  * @property {string} id The srcObj id appended with the tgtObj id.
  * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
-*/
+ */
 class N2MatrixCell {
     /**
      * Initialize the cell.
@@ -371,34 +445,62 @@ class N2MatrixCell {
      * @param {N2TreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
      * @param {N2CellRenderer} renderer The object that draws the cell.
-    */
+     */
     constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
         this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
-        this.id = srcObj.id + "_" + tgtObj.id;
+        this.id = N2MatrixCell.makeId(srcObj.id, tgtObj.id);
 
         this.symbolType = new SymbolType(this, model);
         this.renderer = this._newRenderer();
 
         this.offScreen = {
-            "top": { "incoming": new Set(), "outgoing": new Set() },
-            "bottom": { "incoming": new Set(), "outgoing": new Set() },
+            "top": {
+                "incoming": new Set(),
+                "outgoing": new Set()
+            },
+            "bottom": {
+                "incoming": new Set(),
+                "outgoing": new Set()
+            },
             "total": 0
         }
+    }
+
+    static makeId(srcId, tgtId = null) {
+        if (! tgtId || srcId == tgtId) return "node_" + srcId;
+        
+        return "conn_" + srcId + "_to_" + tgtId;
     }
 
     /**
      * Determine if this node is on the main diagonal of the matrix.
      * @return {Boolean} True if row equals column.
-    */
+     */
     onDiagonal() {
         return (this.row == this.col);
     }
 
     /**
-     * Select the mouseover callback depending on whether we"re on the diagonal.
+     * Determine if this node is in the upper-right triangle of the matrix.
+     * @return {Boolean} True if column is greater than row.
+     */
+    inUpperTriangle() {
+        return (this.col > this.row);
+    }
+
+    /**
+     * Determine if this node is in the lower-left triangle of the matrix.
+     * @return {Boolean} True if row is greater than column.
+     */
+    inLowerTriangle() {
+        return (this.row > this.col);
+    }
+
+    /**
+     * Select the mouseover callback depending on whether we're on the diagonal.
      * TODO: Remove these globals
      */
     mouseover() {
@@ -407,16 +509,28 @@ class N2MatrixCell {
     }
 
     /**
+    * Select the mousemove callback depending on whether we're on the diagonal.
+    * TODO: Remove these globals
+    */
+    mousemove() {
+        return (this.onDiagonal() ? n2MouseFuncs.moveOnDiag : null);
+    }
+
+    /**
      * Choose a color based on our location and state of the associated N2TreeNode.
      */
     color() {
+        if (this.symbolType.potentialDeclaredPartial &&
+            this.symbolType.declaredPartial) return N2Style.color.declaredPartial;
+
         if (this.onDiagonal()) {
             if (this.obj.isMinimized) return N2Style.color.collapsed;
-            if (this.obj.isConnectedParam()) return N2Style.color.param;
-            if (this.obj.isUnconnectedParam()) return N2Style.color.unconnectedParam;
+            if (this.obj.isAutoIvcInput()) return N2Style.color.autoivcInput;
+            if (this.obj.isConnectedInput()) return N2Style.color.input;
+            if (this.obj.isUnconnectedInput()) return N2Style.color.unconnectedInput;
             return (this.obj.implicit) ?
-                N2Style.color.unknownImplicit :
-                N2Style.color.unknownExplicit;
+                N2Style.color.outputImplicit :
+                N2Style.color.outputExplicit;
         }
 
         return N2Style.color.connection;
@@ -424,7 +538,7 @@ class N2MatrixCell {
 
 
     /**
-     * An connection going "off-screen" was detected between two nodes.
+     * A connection going "off-screen" was detected between two nodes.
      * Determine whether the arrow should be in the top or bottom section of the
      * matrix based on rootIndex, and add to the appropriate array of
      * tracked offscreen connections.
@@ -465,24 +579,71 @@ class N2MatrixCell {
         // debugInfo("Total offscreen connections found: " + this.offScreen.total);
     }
 
-    /** Choose a renderer based on our SymbolType.
-     * @param {Object} dims Layout and dimensions for the current cell spec.
-     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
-     */
+    /** Choose a renderer based on our SymbolType. */
     _newRenderer() {
-        switch (this.symbolType.name) {
-            case "scalar": return new N2ScalarCell(this.color(), this.id);
-            case "vector": return new N2VectorCell(this.color(), this.id);
-            case "group": return new N2GroupCell(this.color(), this.id);
-            case "scalarScalar": return new N2ScalarScalarCell(this.color(), this.id);
-            case "scalarVector": return new N2ScalarVectorCell(this.color(), this.id);
-            case "vectorScalar": return new N2VectorScalarCell(this.color(), this.id);
-            case "vectorVector": return new N2VectorVectorCell(this.color(), this.id);
-            case "scalarGroup": return new N2ScalarGroupCell(this.color(), this.id);
-            case "groupScalar": return new N2GroupScalarCell(this.color(), this.id);
-            case "vectorGroup": return new N2VectorGroupCell(this.color(), this.id);
-            case "groupVector": return new N2GroupVectorCell(this.color(), this.id);
-            case "groupGroup": return new N2GroupGroupCell(this.color(), this.id);
+        if (this.color() == N2Style.color.connection) {
+            if (this.inUpperTriangle()) return new N2ConnectorUpper(this.color(), this.id);
+
+            return new N2ConnectorLower(this.color(), this.id)
         }
+
+        const color = this.color();
+
+        switch (this.symbolType.name) {
+            case "scalar":
+                return new N2ScalarCell(color, this.id);
+            case "vector":
+                return new N2VectorCell(color, this.id);
+            case "group":
+                return new N2GroupCell(color, this.id);
+            case "scalarScalar":
+                return new N2ScalarScalarCell(color, this.id);
+            case "scalarVector":
+                return new N2ScalarVectorCell(color, this.id);
+            case "vectorScalar":
+                return new N2VectorScalarCell(color, this.id);
+            case "vectorVector":
+                return new N2VectorVectorCell(color, this.id);
+            case "scalarGroup":
+                return new N2ScalarGroupCell(color, this.id);
+            case "groupScalar":
+                return new N2GroupScalarCell(color, this.id);
+            case "vectorGroup":
+                return new N2VectorGroupCell(color, this.id);
+            case "groupVector":
+                return new N2GroupVectorCell(color, this.id);
+            case "groupGroup":
+                return new N2GroupGroupCell(color, this.id);
+        }
+    }
+
+    /**
+     * Highlight the variable nodes *associated* with the cell, not the cell
+     * itself. The default is for cells on the diagonal to highlight the
+     * variable directly across from them.
+     * @param {String} [varType = 'self'] Either 'self', 'source', or 'target'
+     *   to indicate the variable name to highlight.
+     * @param {String} [direction = 'self'] Either 'self', 'input', or 'output'
+     *   to indicate the style of the highlighting.
+     */
+    highlight(varType = 'self', direction = 'self') {
+
+        const obj = (varType == 'target') ? this.tgtObj : this.srcObj;
+        const treeId = obj.absPathName.replace(/[\.:]/g, '_');
+        const treeNode = d3.select('rect#' + treeId);
+
+        let fill = treeNode.style('fill');
+        if (direction == 'input') fill = N2Style.color.inputArrow;
+        else if (direction == 'output') fill = N2Style.color.outputArrow;
+
+        d3.select('#highlight-bar').append('rect')
+            .attr('x', 0)
+            .attr('y', treeNode.node().parentNode.transform.baseVal[0].matrix.f)
+            .attr('rx', 4)
+            .attr('ry', 4)
+            .attr('width', 8)
+            .attr('height', treeNode.attr('height'))
+            .attr('stroke', N2Style.color.treeStroke)
+            .attr('fill', fill);
     }
 }

@@ -11,7 +11,6 @@
  * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv The outermost div we work with.
- * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} dom.svgDiv The div containing the SVG element.
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
@@ -26,47 +25,30 @@
  */
 class N2Diagram {
     constructor(modelJSON) {
+        this.modelData = modelJSON;
         this.model = new ModelData(modelJSON);
         this.zoomedElement = this.zoomedElementPrev = this.model.root;
         this.showPath = false;
+        this.manuallyResized = false; // If the diagram has been sized by the user
 
         // Assign this way because defaultDims is read-only.
         this.dims = JSON.parse(JSON.stringify(defaultDims));
 
-        // Find the divs for D3 content in the existing document, and add a style section.
-        let parentDiv = document.getElementById("ptN2ContentDivId");
-        this.dom = {
-            'parentDiv': parentDiv,
-            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
-            'svgDiv': d3.select("#svgDiv"),
-            'svg': d3.select("#svgId"),
-            'svgStyle': document.createElement("style"),
-            'toolTip': d3.select(".tool-tip"),
-            'arrowMarker': d3.select("#arrow")
-        };
-
-        // Append the new style section.
-        this.dom.svgStyle.setAttribute('title', 'svgStyle');
-        this.dom.parentDiv.querySelector("#svgId").appendChild(this.dom.svgStyle);
-
+        this._referenceD3Elements();
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
-
         this.chosenCollapseDepth = -1;
-
         this.showLinearSolverNames = true;
+        this.showSolvers = true ;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
-        this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames, this.dims);
+        this.layout = new N2Layout(this.model, this.zoomedElement,
+            this.showLinearSolverNames, this.showSolvers, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
-
         this.ui = new N2UserInterface(this);
-
-        this._setupSvgElements();
-
+        // Keep track of arrows to show and hide them
+        this.arrowMgr = new N2ArrowManager(this.dom.n2Groups);
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
-            true, this.ui.findRootOfChangeFunction);
-
-        // this.matrixMax = this.matrix;
+            this.arrowMgr, true, this.ui.findRootOfChangeFunction);
 
         // TODO: Move to N2Layout
         this.scales = {
@@ -96,20 +78,32 @@ class N2Diagram {
 
         this.transitCoords = {
             'unit': 'px',
-            'model': { 'x': 0, 'y': 0 },
-            'solver': { 'x': 0, 'y': 0 }
+            'model': {
+                'x': 0,
+                'y': 0
+            },
+            'solver': {
+                'x': 0,
+                'y': 0
+            }
         };
 
         this.prevTransitCoords = {
             'unit': 'px',
-            'model': { 'x': 0, 'y': 0 },
-            'solver': { 'x': 0, 'y': 0 }
+            'model': {
+                'x': 0,
+                'y': 0
+            },
+            'solver': {
+                'x': 0,
+                'y': 0
+            }
         };
     }
 
     /**
-    * Switch back and forth between showing the linear or non-linear solver names. 
-    */
+     * Switch back and forth between showing the linear or non-linear solver names.
+     */
     toggleSolverNameType() {
         this.showLinearSolverNames = !this.showLinearSolverNames;
     }
@@ -133,7 +127,9 @@ class N2Diagram {
         svgData = '<?xml version="1.0" standalone="no"?>\r\n' + svgData;
 
         svgData = vkbeautify.xml(svgData);
-        let svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+        let svgBlob = new Blob([svgData], {
+            type: "image/svg+xml;charset=utf-8"
+        });
         let svgUrl = URL.createObjectURL(svgBlob);
         let downloadLink = document.createElement("a");
         downloadLink.href = svgUrl;
@@ -154,56 +150,47 @@ class N2Diagram {
         this.layout.zoomedElement = this.zoomedElement;
     }
 
-    /** 
-     * Add several elements, mostly groups, to the primary SVG element to
-     * be populated later. Stored in the .doms property.
+    /**
+     * Setup internal references to D3 objects so we can avoid running
+     * d3.select() over and over later.
      */
-    _setupSvgElements() {
-        this.dom.clips = {
-            'partitionTree': this.dom.svg.select("#partitionTreeClip > rect"),
-            'n2Matrix': this.dom.svg.select("#n2MatrixClip > rect"),
-            'solverTree': this.dom.svg.select("#solverTreeClip > rect")
+    _referenceD3Elements() {
+        this.dom = {
+            'parentDiv': document.getElementById("ptN2ContentDivId"),
+            'svgDiv': d3.select("#svgDiv"),
+            'svg': d3.select("#svgId"),
+            'svgStyle': d3.select("#svgId style"),
+            'toolTip': d3.select(".tool-tip"),
+            'arrowMarker': d3.select("#arrow"),
+            'n2OuterGroup': d3.select('g#n2outer'),
+            'n2InnerGroup': d3.select('g#n2inner'),
+            'pTreeGroup': d3.select('g#tree'),
+            'highlightBar': d3.select('g#highlight-bar'),
+            'pSolverTreeGroup': d3.select('g#solver_tree'),
+            'n2BackgroundRect': d3.select('g#n2inner rect'),
+            'waiter': d3.select('#waiting-container'),
+            'clips': {
+                'partitionTree': d3.select("#partitionTreeClip > rect"),
+                'n2Matrix': d3.select("#n2MatrixClip > rect"),
+                'solverTree': d3.select("#solverTreeClip > rect")
+            }
         };
 
-        // ids given just so it is easier to see in Chrome dev tools when debugging
-        this.dom.n2OuterGroup = this.dom.svg.append('g')
-            .attr('id', 'n2outer');
+        let n2Groups = {};
+        this.dom.n2InnerGroup.selectAll('g').each(function () {
+            const d3elem = d3.select(this);
+            const name = new String(d3elem.attr('id')).replace(/n2/, '');
+            n2Groups[name] = d3elem;
+        })
+        this.dom.n2Groups = n2Groups;
 
-        this.dom.n2InnerGroup = this.dom.n2OuterGroup.append('g')
-            .attr('id', 'n2inner');
-
-        this.dom.pTreeGroup = this.dom.svg.append('g')
-            .attr('id', 'tree')
-            .attr('clip-path', 'url(#partitionTreeClip');
-
-        this.dom.pSolverTreeGroup = this.dom.svg.append('g')
-            .attr('id', 'solver_tree')
-            .attr('clip-path', 'url(#solverTreeClip');
-
-        this.dom.n2BackgroundRect = this.dom.n2InnerGroup.append('rect')
-            .attr('id', 'backgroundRect')
-            .attr('class', 'background');
-
-        this.dom.n2Groups = {};
-        for (let gName of ['elements', 'gridlines', 'componentBoxes',
-            'dots', 'highlights', 'arrows']) {
-            this.dom.n2Groups[gName] =
-                this.dom.n2InnerGroup.append('g')
-                    .attr('id', 'n2' + gName);
-        };
-
-        for (let clippedGrp of ['elements', 'gridlines', 'componentBoxes', 'dots']) {
-            this.dom.n2Groups[clippedGrp].attr('clip-path', 'url(#n2MatrixClip)');
-        }
-
-        let ogg = {};
-        for (let oName of ['top', 'left', 'right', 'bottom']) {
-            ogg[oName] = this.dom.n2OuterGroup.append('g')
-                .attr('id', 'n2' + oName)
-                .attr('class', 'offgridLabel');
-        }
-        this.dom.n2Groups.offgrid = ogg;
-
+        let offgrid = {};
+        this.dom.n2OuterGroup.selectAll('g.offgridLabel').each(function () {
+            const d3elem = d3.select(this);
+            const name = new String(d3elem.attr('id')).replace(/n2/, '');
+            offgrid[name] = d3elem;
+        })
+        this.dom.n2Groups.offgrid = offgrid;
     }
 
     /**
@@ -236,10 +223,12 @@ class N2Diagram {
         this.scales.model.x
             .domain([this.zoomedElement.dims.x, 1])
             .range([this.zoomedElement.dims.x ? this.layout.size.parentNodeWidth : 0,
-            this.layout.size.partitionTree.width]);
+            this.layout.size.partitionTree.width
+            ]);
         this.scales.model.y
             .domain([this.zoomedElement.dims.y, this.zoomedElement.dims.y +
-                this.zoomedElement.dims.height])
+                this.zoomedElement.dims.height
+            ])
             .range([0, this.layout.size.partitionTree.height]);
 
         this.transitCoords.solver.x = (this.zoomedElement.solverDims.x ?
@@ -251,10 +240,12 @@ class N2Diagram {
         this.scales.solver.x
             .domain([this.zoomedElement.solverDims.x, 1])
             .range([this.zoomedElement.solverDims.x ? this.layout.size.parentNodeWidth :
-                0, this.layout.size.solverTree.width]);
+                0, this.layout.size.solverTree.width
+            ]);
         this.scales.solver.y
             .domain([this.zoomedElement.solverDims.y,
-            this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height])
+            this.zoomedElement.solverDims.y + this.zoomedElement.solverDims.height
+            ])
             .range([0, this.layout.size.solverTree.height]);
 
         if (this.scales.firstRun) { // first run, duplicate what we just calculated
@@ -278,6 +269,11 @@ class N2Diagram {
                 .attr("height", innerDims.height)
                 .attr("width", this.dims.size.partitionTree.width)
                 .attr("transform", "translate(0 " + innerDims.margin + ")");
+
+            this.dom.highlightBar
+                .attr("height", innerDims.height)
+                .attr("width", "8")
+                .attr("transform", "translate(" + this.dims.size.partitionTree.width + 1 + " " + innerDims.margin + ")");
 
             this.dom.n2OuterGroup
                 .attr("height", outerDims.height)
@@ -309,17 +305,6 @@ class N2Diagram {
                 .attr("width", innerDims.height)
                 .attr("height", offgridHeight);
 
-                /*
-            this.dom.n2Groups.offgrid.top
-                .append("text")
-                .attr("x", 0).attr("y", 0)
-                // .attr("transform", "translate(0 0)")
-                //.attr("width", innerDims.height)
-                //.attr("height", offgridHeight)
-                //.style("fill", "black")
-                .text("HOWDY.HOWDY.HOWDY.HOWDY");
-                */
-
             this.dom.n2Groups.offgrid.bottom
                 .attr("transform", "translate(0 " + innerDims.height + offgridHeight + ")")
                 .attr("width", outerDims.height)
@@ -331,10 +316,12 @@ class N2Diagram {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
-            .data(this.layout.zoomedNodes, function (node) { return node.id; });
+            .data(this.layout.zoomedNodes, function (node) {
+                return node.id;
+            });
 
         // Create a new SVG group for each node in zoomedNodes
-        let nodeEnter = selection.enter().append("svg:g")
+        let nodeEnter = selection.enter().append("g")
             .attr("class", function (d) {
                 return "partition_group " + self.style.getNodeClass(d);
             })
@@ -343,50 +330,43 @@ class N2Diagram {
                     self.prevScales.model.x(d.prevDims.x) + " " +
                     self.prevScales.model.y(d.prevDims.y) + ")";
             })
-            .on("click", function (d) { self.ui.leftClick(d); })
-            .on("contextmenu", function (d) { self.ui.rightClick(d, this); })
+            .on("click", function (d) {
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
+            })
+            .on("contextmenu", function (d) {
+                self.ui.rightClick(d, this);
+            })
             .on("mouseover", function (d) {
-                if (self.model.abs2prom != undefined) {
-                    if (d.isParam()) {
-                        return self.dom.toolTip.text(
-                            self.model.abs2prom.input[d.absPathName])
-                            .style("visibility", "visible");
-                    }
-                    if (d.isUnknown()) {
-                        return self.dom.toolTip.text(
-                            self.model.abs2prom.output[d.absPathName])
-                            .style("visibility", "visible");
-                    }
-                }
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
             })
             .on("mouseleave", function (d) {
-                if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("visibility", "hidden");
-                }
+                self.ui.nodeInfoBox.clear();
             })
             .on("mousemove", function () {
-                if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
-                        .style("left", (d3.event.pageX + 5) + "px");
-                }
+                self.ui.nodeInfoBox.move(d3.event);
             });
 
-        nodeEnter.append("svg:rect")
+        nodeEnter.append("rect")
             .attr("width", function (d) {
                 return d.prevDims.width * self.prevTransitCoords.model.x;
             })
             .attr("height", function (d) {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
             })
-            .attr("id", function(d) { return d.absPathName.replace(/\./g,'_'); });
+            .attr("id", function (d) {
+                return d.absPathName.replace(/[\.:]/g, '_');
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
-        nodeEnter.append("svg:text")
+        nodeEnter.append("text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
                 let anchorX = d.prevDims.width * self.prevTransitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.prevDims.height *
-                    self.prevTransitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " +
+                    (d.prevDims.height * self.prevTransitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -394,7 +374,10 @@ class N2Diagram {
             })
             .text(self.layout.getText.bind(self.layout));
 
-        return { 'selection': selection, 'nodeEnter': nodeEnter };
+        return {
+            'selection': selection,
+            'nodeEnter': nodeEnter
+        };
     }
 
     _setupPartitionTransition(d3Refs) {
@@ -420,14 +403,16 @@ class N2Diagram {
             })
             .attr("height", function (d) {
                 return d.dims.height * self.transitCoords.model.y;
-            });
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + " " + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + " " + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < self.zoomedElement.depth) return 0;
@@ -459,8 +444,8 @@ class N2Diagram {
             .attr("transform", function (d) {
                 let anchorX = d.dims.width * self.transitCoords.model.x -
                     self.layout.size.rightTextMargin;
-                return "translate(" + anchorX + "," + d.dims.height *
-                    self.transitCoords.model.y / 2 + ")";
+                return "translate(" + anchorX + "," + (d.dims.height *
+                    self.transitCoords.model.y / 2) + ")";
             })
             .style("opacity", 0);
     }
@@ -475,8 +460,10 @@ class N2Diagram {
 
         let nodeEnter = selection.enter().append("svg:g")
             .attr("class", function (d) {
-                let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
-                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                let solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
+                    'linear': d.linear_solver,
+                    'nonLinear': d.nonlinear_solver
+                });
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
@@ -486,28 +473,39 @@ class N2Diagram {
                 return "translate(" + self.prevScales.solver.x(x) + "," +
                     self.prevScales.solver.y(d.prevSolverDims.y) + ")";
             })
-            .on("click", function (d) { self.ui.leftClick(d); })
-            .on("contextmenu", function (d) { self.ui.rightClick(d, this); })
+            .on("click", function (d) {
+                if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
+            })
+            .on("contextmenu", function (d) {
+                self.ui.rightClick(d, this);
+            })
             .on("mouseover", function (d) {
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
+
                 if (self.model.abs2prom != undefined) {
-                    if (d.isParam()) {
+                    if (d.isInput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.input[d.absPathName])
                             .style("visibility", "visible");
                     }
-                    if (d.isUnknown()) {
+                    if (d.isOutput()) {
                         return self.dom.toolTip.text(self.model.abs2prom.output[d.absPathName])
                             .style("visibility", "visible");
                     }
                 }
             })
             .on("mouseleave", function (d) {
+                self.ui.nodeInfoBox.clear();
+
                 if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("visibility", "hidden");
+                    self.dom.toolTip.style("visibility", "hidden");
                 }
             })
             .on("mousemove", function () {
+                self.ui.nodeInfoBox.move(d3.event);
+
                 if (self.model.abs2prom != undefined) {
-                    return self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
+                    self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
                         .style("left", (d3.event.pageX + 5) + "px");
                 }
             });
@@ -519,7 +517,9 @@ class N2Diagram {
             .attr("height", function (d) {
                 return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
             })
-            .attr("id", function(d) { return d.absPathName.replace(/\./g, '_'); });
+            .attr("id", function (d) {
+                return d.absPathName.replace(/\./g, '_');
+            });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
@@ -535,7 +535,10 @@ class N2Diagram {
             })
             .text(self.layout.getSolverText.bind(self.layout));
 
-        return ({ 'selection': selection, 'nodeEnter': nodeEnter });
+        return ({
+            'selection': selection,
+            'nodeEnter': nodeEnter
+        });
     }
 
     _setupSolverTransition(d3Refs) {
@@ -548,8 +551,10 @@ class N2Diagram {
         let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection)
             .transition(sharedTransition)
             .attr("class", function (d) {
-                let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
-                    { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
+                let solver_class = self.style.getSolverClass(self.showLinearSolverNames, {
+                    'linear': d.linear_solver,
+                    'nonLinear': d.nonlinear_solver
+                });
                 return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
@@ -566,7 +571,9 @@ class N2Diagram {
             })
             .attr("height", function (d) {
                 return d.solverDims.height * self.transitCoords.solver.y;
-            });
+            })
+            .attr('rx', 12)
+            .attr('ry', 12);
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
@@ -612,8 +619,57 @@ class N2Diagram {
             .style("opacity", 0);
     }
 
+    /** Remove all rects in the highlight bar */
+    clearHighlights() {
+        const selection = this.dom.highlightBar.selectAll('rect');
+        const size = selection.size();
+        debugInfo(`clearHighlights: Removing ${size} highlights`);
+        selection.remove();
+    }
+
+    /** Remove all pinned arrows */
     clearArrows() {
-        this.dom.n2OuterGroup.selectAll("[class^=n2_hover_elements]").remove();
+        this.arrowMgr.removeAllPinned();
+        this.clearHighlights();
+    }
+
+    /** Display connection arrows for all visible inputs/outputs */
+    showAllArrows() {
+        for (const row in this.matrix.grid) {
+            const cell = this.matrix.grid[row][row]; // Diagonal cells only
+            this.matrix.drawOnDiagonalArrows(cell);
+            this.arrowMgr.togglePin(cell.id, true);
+        }
+    }
+
+    showDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
+            );
+        d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
+    }
+
+    hideDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            );
+        d3.select("#_auto_ivc").classed('opt-vars', false)
+    }
+
+    delay(time) {
+        return new Promise(function(resolve) {
+            setTimeout(resolve, time)
+        });
+     }
+
+    /** Display an animation while the transition is in progress */
+    showWaiter() {
+        this.dom.waiter.attr('class', 'show');
+    }
+
+    /** Hide the animation after the transition completes */
+    hideWaiter() {
+        this.dom.waiter.attr('class', 'no-show');
     }
 
     /**
@@ -621,25 +677,27 @@ class N2Diagram {
      * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
      *  matrix objects.
      */
-    update(computeNewTreeLayout = true) {
+    async update(computeNewTreeLayout = true) {
+        this.showWaiter();
+        await this.delay(100);
+
         this.ui.update();
         this.search.update(this.zoomedElement, this.model.root);
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
-            this.clearArrows();
-
             this.layout = new N2Layout(this.model, this.zoomedElement,
-                this.showLinearSolverNames, this.dims);
+                this.showLinearSolverNames, this.showSolvers, this.dims);
+
             this.ui.updateClickedIndices();
 
             this.matrix = new N2Matrix(this.model, this.layout,
-                this.dom.n2Groups, this.ui.lastClickWasLeft,
+                this.dom.n2Groups, this.arrowMgr, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
         }
 
         this._updateScale();
-        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay);
+        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay, this.manuallyResized);
 
         let d3PartRefs = this._createPartitionCells();
         this._setupPartitionTransition(d3PartRefs);
@@ -649,7 +707,12 @@ class N2Diagram {
         this._setupSolverTransition(d3SolverRefs);
         this._runSolverTransition(d3SolverRefs.selection);
 
+        this.arrowMgr.transition(this.matrix);
         this.matrix.draw();
+
+        if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
+
+        if (!this.ui.desVars) this.showDesignVars()
     }
 
     /**
@@ -677,20 +740,16 @@ class N2Diagram {
      * @param {number} height The new height in pixels.
      */
     verticalResize(height) {
-        for (let i = 600; i <= 1000; i += 50) {
-            let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
-            this.dom.parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
-        }
-        for (let i = 2000; i <= 4000; i += 1000) {
-            let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
-            this.dom.parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
+        // Don't resize if the height didn't actually change:
+        if (this.dims.size.partitionTree.height == height) return;
+
+        if (!this.manuallyResized) {
+            height = this.layout.calcFitDims().height;
         }
 
-        this.clearArrows();
         this.updateSizes(height, this.dims.size.font);
 
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-        this.style.updateSvgStyle(this.dims.size.font);
         this.update();
     }
 
@@ -699,13 +758,6 @@ class N2Diagram {
      * @param {number} fontSize The new font size in pixels.
      */
     fontSizeSelectChange(fontSize) {
-        for (let i = 8; i <= 14; ++i) {
-            let newText = (i == fontSize) ? ("<b>" + i + "px</b>") : (i + "px");
-            this.dom.parentDiv.querySelector("#idFontSize" + i + "px").innerHTML = newText;
-        }
-
-        this.updateSizes(this.dims.size.n2matrix.height, fontSize);
-
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         this.style.updateSvgStyle(fontSize);
         this.update();
@@ -717,8 +769,20 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOnDiagonal(cell);
+            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        }
+    }
+
+    /**
+     * Move the node info panel around if it's visible
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseMoveOnDiagonal(cell) {
+        if (this.matrix.cellExists(cell)) {
+            this.ui.nodeInfoBox.move(d3.event);
+        }
     }
 
     /**
@@ -726,50 +790,187 @@ class N2Diagram {
      * rather than setting one up that points directly to a specific matrix.
      */
     mouseOverOffDiagonal(cell) {
-        if (this.matrix.cellExists(cell))
+        if (this.matrix.cellExists(cell)) {
             this.matrix.mouseOverOffDiagonal(cell);
+        }
     }
 
-    /** When the mouse leaves a cell, remove all temporary arrows. */
+    /** When the mouse leaves a cell, remove all temporary arrows and highlights. */
     mouseOut() {
-        this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
-        d3.selectAll("div.offgrid")
-            .style("visibility", "hidden")
-            .node().innerHTML = '';
+        this.arrowMgr.removeAllHovered();
+        this.clearHighlights();
+        d3.selectAll("div.offgrid").style("visibility", "hidden").html('');
+
+        this.ui.nodeInfoBox.clear();
     }
 
     /**
-     * When the mouse if left-clicked on a cell, change their CSS class
-     * so they're not removed when the mouse moves out.
+     * When the mouse is left-clicked on a cell, change their CSS class
+     * so they're not removed when the mouse moves out. Or, if in info panel
+     * mode, pin the info panel.
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseClick(cell) {
-        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
-        let selection = this.dom.n2OuterGroup.selectAll("." + newClassName);
-        if (selection.size() > 0) {
-            selection.remove();
+        if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
+            this.arrowMgr.togglePin(cell.id);
         }
-        else {
-            this.dom.n2OuterGroup
-                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                .attr("class", newClassName);
+        else { // Make a persistent info panel
+            this.ui.nodeInfoBox.pin();
         }
     }
 
     /**
      * Place member mouse callbacks in an object for easy reference.
      * @returns {Object} Object containing each of the functions.
-    */
+     */
     getMouseFuncs() {
         let self = this;
 
         let mf = {
             'overOffDiag': self.mouseOverOffDiagonal.bind(self),
             'overOnDiag': self.mouseOverOnDiagonal.bind(self),
+            'moveOnDiag': self.mouseMoveOnDiagonal.bind(self),
             'out': self.mouseOut.bind(self),
             'click': self.mouseClick.bind(self)
         }
 
         return mf;
+    }
+
+    /**
+     * Recurse through the model, and determine whether a group/component is
+     * minimized or manually expanded, or an input/output hidden. If it is,
+     * add it to the hiddenList array, and optionally reset its state.
+     * @param {Object[]} hiddenList The provided array to populate.
+     * @param {Boolean} reveal If true, make the node visible.
+     * @param {N2TreeNode} node The current node to operate on.
+     */
+    findAllHidden(hiddenList, reveal = false, node = this.model.root) {
+        if (!node.isVisible() || node.manuallyExpanded) {
+            hiddenList.push({
+                'node': node,
+                'isMinimized': node.isMinimized,
+                'varIsHidden': node.varIsHidden,
+                'manuallyExpanded': node.manuallyExpanded
+            })
+
+            if (reveal) {
+                node.isMinimized = false;
+                node.varIsHidden = false;
+                node.manuallyExpanded = false;
+            }
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.findAllHidden(hiddenList, reveal, child);
+            }
+        }
+    }
+
+    /**
+     * Restore the minimized/hidden value to all the specified nodes.
+     * @param {Object[]} hiddenList The list of preserved objects
+     * @param {N2TreeNode} node The current node to operate on.
+    */
+    resetAllHidden(hiddenList, node = this.model.root) {
+        if (!hiddenList) return;
+
+        const foundEntry = hiddenList.find(item => item.node === node);
+
+        if (!foundEntry) { // Not found, reset values to default
+            node.isMinimized = false;
+            node.varIsHidden = false;
+            node.manuallyExpanded = false;
+        }
+        else { // Found, restore values
+            node.isMinimized = foundEntry.isMinimized;
+            node.varIsHidden = foundEntry.varIsHidden;
+            node.manuallyExpanded = foundEntry.manuallyExpanded;
+        }
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.resetAllHidden(hiddenList, child);
+            }
+        }
+    }
+
+    /** Unset all manually-selected node states and zoom to the root element */
+    reset() {
+        this.resetAllHidden([]);
+        this.updateZoomedElement(this.model.root);
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.update();
+    }
+
+    /**
+     * Set the node as not minimized and manually expanded, as well as
+     * all children.
+     * @param {N2TreeNode} startNode The node to begin from.
+     */
+    manuallyExpandAll(startNode) {
+        startNode.isMinimized = false;
+        startNode.manuallyExpanded = true;
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.manuallyExpandAll(child);
+            }
+        }
+    }
+
+    /**
+     * Set all the children of the specified node as minimized and not manually expanded.
+     * @param {N2TreeNode} startNode The node to begin from.
+     * @param {Boolean} [initialNode = true] Indicate the starting node.
+     */
+    minimizeAll(startNode, initialNode = true) {
+        if (!initialNode) {
+            startNode.isMinimized = true;
+            startNode.manuallyExpanded = false;
+        }
+
+        if (startNode.hasChildren()) {
+            for (let child of startNode.children) {
+                this.minimizeAll(child, false);
+            }
+        }
+    }
+
+    /**
+     * Recursively minimize non-input nodes to the specified depth.
+     * @param {N2TreeNode} node The node to work on.
+     */
+    _minimizeToDepth(node) {
+        if (node.isInputOrOutput()) {
+            return;
+        }
+
+        if (node.depth < this.chosenCollapseDepth) {
+            node.isMinimized = false;
+            node.manuallyExpanded = true;
+        }
+        else {
+            node.isMinimized = true;
+            node.manuallyExpanded = false;
+        }
+
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._minimizeToDepth(child);
+            }
+        }
+    }
+
+    /**
+     * Set the new depth to collapse to and perform the operation.
+     * @param {Number} depth If the node's depth is the same or more, collapse it.
+     */
+    minimizeToDepth(depth) {
+        this.chosenCollapseDepth = depth;
+
+        if (this.chosenCollapseDepth > this.zoomedElement.depth)
+            this._minimizeToDepth(this.model.root);
     }
 }

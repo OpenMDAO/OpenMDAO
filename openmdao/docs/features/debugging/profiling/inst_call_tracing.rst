@@ -50,7 +50,7 @@ indented based on its location in the call stack. :
             LinearRunOnce#2.Solver.__init__
                 LinearRunOnce#2.Solver._declare_options
     Problem#1.Problem.set_solver_print
-        Group#1().System._set_solver_print
+        Group#1().System.set_solver_print
             LinearRunOnce#2.Solver._set_solver_print
             NonlinearRunOnce#2.Solver._set_solver_print
     Problem#1.Problem.setup

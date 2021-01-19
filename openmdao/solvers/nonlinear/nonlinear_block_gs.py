@@ -3,6 +3,7 @@
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.mpi import MPI
 
 
 class NonlinearBlockGS(NonlinearSolver):
@@ -30,7 +31,7 @@ class NonlinearBlockGS(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(NonlinearBlockGS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._theta_n_1 = 1.0
         self._delta_outputs_n_1 = None
@@ -46,7 +47,9 @@ class NonlinearBlockGS(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(NonlinearBlockGS, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
+
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
             raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '
@@ -56,7 +59,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(NonlinearBlockGS, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('use_aitken', types=bool, default=False,
                              desc='set to True to use Aitken relaxation')
@@ -64,12 +67,18 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='lower limit for Aitken relaxation factor')
         self.options.declare('aitken_max_factor', default=1.5,
                              desc='upper limit for Aitken relaxation factor')
+        self.options.declare('aitken_initial_factor', default=1.0,
+                             desc='initial value for Aitken relaxation factor')
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
                              desc="Set to True to always call apply_nonlinear on the solver's "
                              "system after solve_nonlinear has been called.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
     def _iter_initialize(self):
         """
@@ -85,16 +94,19 @@ class NonlinearBlockGS(NonlinearSolver):
         system = self._system()
 
         if self.options['use_aitken']:
-            self._delta_outputs_n_1 = system._outputs._data.copy()
+            self._delta_outputs_n_1 = system._outputs.asarray(copy=True)
             self._theta_n_1 = 1.
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
-        return super(NonlinearBlockGS, self)._iter_initialize()
+        # Execute guess_nonlinear if specified.
+        system._guess_nonlinear()
+
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """
@@ -113,17 +125,18 @@ class NonlinearBlockGS(NonlinearSolver):
             # some variables that are used for Aitken's relaxation
             delta_outputs_n_1 = self._delta_outputs_n_1
             theta_n_1 = self._theta_n_1
+            theta_n = self.options['aitken_initial_factor']
 
             # store a copy of the outputs, used to compute the change in outputs later
-            delta_outputs_n = outputs._data.copy()
+            delta_outputs_n = outputs.asarray(copy=True)
 
         if use_aitken or not self.options['use_apply_nonlinear']:
             # store a copy of the outputs
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs_n = outputs._data.copy()
+                    outputs_n = outputs.asarray(copy=True)
             else:
-                outputs_n = outputs._data.copy()
+                outputs_n = outputs.asarray(copy=True)
 
         self._solver_info.append_subsolver()
         self._gs_iter()
@@ -131,7 +144,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken:
             # compute the change in the outputs after the NLBGS iteration
-            delta_outputs_n -= outputs._data
+            delta_outputs_n -= outputs.asarray()
             delta_outputs_n *= -1
 
             if self._iter_count >= 2:
@@ -144,8 +157,8 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 # If MPI, piggyback on the residual vector to perform a distributed norm.
                 if system.comm.size > 1:
-                    backup_r = residuals._data.copy()
-                    residuals._data[:] = temp
+                    backup_r = residuals.asarray(copy=True)
+                    residuals.set_val(temp)
                     temp_norm = residuals.get_norm()
                 else:
                     temp_norm = np.linalg.norm(temp)
@@ -156,32 +169,33 @@ class NonlinearBlockGS(NonlinearSolver):
                 # If MPI, piggyback on the output and residual vectors to perform a distributed
                 # dot product.
                 if system.comm.size > 1:
-                    backup_o = outputs._data.copy()
-                    outputs._data[:] = delta_outputs_n
+                    backup_o = outputs.asarray(copy=True)
+                    outputs.set_val(delta_outputs_n)
                     tddo = residuals.dot(outputs)
-                    residuals._data[:] = backup_r
-                    outputs._data[:] = backup_o
+                    residuals.set_val(backup_r)
+                    outputs.set_val(backup_o)
                 else:
                     tddo = temp.dot(delta_outputs_n)
 
                 theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
 
-                # limit relaxation factor to the specified range
-                theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
-
-                # save relaxation factor for the next iteration
-                theta_n_1 = theta_n
             else:
-                theta_n = 1.
+                # keep the initial the relaxation factor
+                pass
+
+            # limit relaxation factor to the specified range
+            theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
+            # save relaxation factor for the next iteration
+            self._theta_n_1 = theta_n
 
             if not self.options['use_apply_nonlinear']:
                 with system._unscaled_context(outputs=[outputs]):
-                    outputs._data[:] = outputs_n
+                    outputs.set_val(outputs_n)
             else:
-                outputs._data[:] = outputs_n
+                outputs.set_val(outputs_n)
 
             # compute relaxed outputs
-            outputs._data += theta_n * delta_outputs_n
+            outputs += theta_n * delta_outputs_n
 
             # save update to use in next iteration
             delta_outputs_n_1[:] = delta_outputs_n
@@ -189,7 +203,7 @@ class NonlinearBlockGS(NonlinearSolver):
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
             with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals._data[:] = outputs._data - outputs_n
+                residuals.set_val(outputs.asarray() - outputs_n)
 
     def _run_apply(self):
         """
@@ -213,23 +227,22 @@ class NonlinearBlockGS(NonlinearSolver):
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also
             # further increments the iteration counter.
-            itercount += 1
+            self._iter_count += 1
             outputs = system._outputs
             residuals = system._residuals
 
             with system._unscaled_context(outputs=[outputs]):
-                outputs_n = outputs._data.copy()
+                outputs_n = outputs.asarray(copy=True)
 
             self._solver_info.append_subsolver()
-            for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
-                system._transfer('nonlinear', 'fwd', isub)
-                if local:
+            for subsys, _ in system._subsystems_allprocs.values():
+                system._transfer('nonlinear', 'fwd', subsys.name)
+                if subsys._is_local:
                     subsys._solve_nonlinear()
-                    system._check_child_reconf()
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
-                residuals._data[:] = outputs._data - outputs_n
+                residuals.set_val(outputs.asarray() - outputs_n)
 
     def _mpi_print_header(self):
         """

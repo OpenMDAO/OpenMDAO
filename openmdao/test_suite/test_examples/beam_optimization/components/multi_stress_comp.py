@@ -1,12 +1,9 @@
 """
 Stress calculation component.
 
-Simple calculation of beam bending stress assuming small angular displacments.
+Simple calculation of beam bending stress assuming small angular displacements.
 Vectorized for multiple load cases.
 """
-
-from __future__ import division
-from six.moves import range
 
 import numpy as np
 

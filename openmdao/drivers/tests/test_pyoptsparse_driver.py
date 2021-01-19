@@ -9,10 +9,11 @@ from distutils.version import LooseVersion
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
@@ -31,7 +32,7 @@ class ParaboloidAE(om.ExplicitComponent):
     The AE in ParaboloidAE stands for AnalysisError."""
 
     def __init__(self):
-        super(ParaboloidAE, self).__init__()
+        super().__init__()
         self.fail_hard = False
 
     def setup(self):
@@ -143,6 +144,22 @@ class DataSave(om.ExplicitComponent):
 
         partials['y', 'x'] = 2.0*x - 6.0
 
+
+@unittest.skipUnless(OPT is None, "only run if pyoptsparse is NOT installed.")
+class TestNotInstalled(unittest.TestCase):
+
+    def test_pyoptsparse_not_installed(self):
+        # the import should not fail
+        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+
+        # but we get a RuntimeError if we try to instantiate
+        with self.assertRaises(RuntimeError) as ctx:
+            pyOptSparseDriver()
+
+        self.assertEqual(str(ctx.exception),
+                         'pyOptSparseDriver is not available, pyOptsparse is not installed.')
+
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
@@ -153,8 +170,6 @@ class TestMPIScatter(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 
@@ -174,6 +189,86 @@ class TestMPIScatter(unittest.TestCase):
 
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+
+    def test_opt_distcomp(self):
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+        obj = prob.driver.get_objective_values()
+
+        assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.zeros(7),
+                          1e-5)
+
+    def test_paropt_distcomp(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='ParOpt')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+        obj = prob.driver.get_objective_values()
+
+        assert_near_equal(obj['sum.f_sum'], 0.0, 4e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.zeros(7),
+                          1e-5)
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -208,8 +303,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_upper_indices(self):
 
@@ -252,8 +347,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
-        assert_rel_error(self, prob['p2.y'], np.array([50., -7.833334, 50.]), 1e-6)
+        assert_near_equal(prob['p1.x'], np.array([50., 7.16667, 50.]), 1e-6)
+        assert_near_equal(prob['p2.y'], np.array([50., -7.833334, 50.]), 1e-6)
 
     def test_simple_paraboloid_lower(self):
 
@@ -287,8 +382,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_lower_linear(self):
 
@@ -321,8 +416,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
         self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
 
@@ -363,16 +458,17 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_equality_linear(self):
 
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
@@ -397,8 +493,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_simple_paraboloid_double_sided_low(self):
 
@@ -429,7 +525,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['y'] - prob['x'], -11.0, 1e-6)
+        assert_near_equal(prob['y'] - prob['x'], -11.0, 1e-6)
 
     def test_simple_paraboloid_double_sided_high(self):
 
@@ -460,7 +556,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_array_comp2D(self):
 
@@ -492,7 +588,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
 
     def test_simple_array_comp2D_array_lo_hi(self):
 
@@ -524,7 +620,25 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['o']
-        assert_rel_error(self, obj, 20.0, 1e-6)
+        assert_near_equal(obj, 20.0, 1e-6)
+
+    def test_driver_supports(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver(optimizer=OPTIMIZER, print_results=False)
+
+        with self.assertRaises(KeyError) as raises_msg:
+            prob.driver.supports['equality_constraints'] = False
+
+        exception = raises_msg.exception
+
+        msg = "pyOptSparseDriver: Tried to set read-only option 'equality_constraints'."
+
+        self.assertEqual(exception.args[0], msg)
 
     def test_fan_out(self):
         # This tests sparse-response specification.
@@ -532,9 +646,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
         model.add_subsystem('comp1', om.ExecComp('y = 3.0*x'))
         model.add_subsystem('comp2', om.ExecComp('y = 5.0*x'))
@@ -544,8 +655,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('con2', om.ExecComp('c = 15.0 - x'))
 
         # hook up explicitly
-        model.connect('p1.x', 'comp1.x')
-        model.connect('p2.x', 'comp2.x')
         model.connect('comp1.y', 'obj.i1')
         model.connect('comp2.y', 'obj.i2')
         model.connect('comp1.y', 'con1.x')
@@ -557,8 +666,8 @@ class TestPyoptSparse(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.options['print_results'] = False
 
-        model.add_design_var('p1.x', lower=-50.0, upper=50.0)
-        model.add_design_var('p2.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp1.x', lower=-50.0, upper=50.0)
+        model.add_design_var('comp2.x', lower=-50.0, upper=50.0)
         model.add_objective('obj.o')
         model.add_constraint('con1.c', equals=0.0)
         model.add_constraint('con2.c', equals=0.0)
@@ -571,13 +680,13 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         obj = prob['obj.o']
-        assert_rel_error(self, obj, 30.0, 1e-6)
+        assert_near_equal(obj, 30.0, 1e-6)
 
         # Verify that pyOpt has the correct wrt names
         con1 = prob.driver.pyopt_solution.constraints['con1.c']
-        self.assertEqual(con1.wrt, ['p1.x'])
+        self.assertEqual(con1.wrt, ['comp1.x'])
         con2 = prob.driver.pyopt_solution.constraints['con2.c']
-        self.assertEqual(con2.wrt, ['p2.x'])
+        self.assertEqual(con2.wrt, ['comp2.x'])
 
     def test_inf_as_desvar_bounds(self):
 
@@ -613,8 +722,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_pyopt_fd_solution(self):
 
@@ -648,13 +757,13 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-4)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+        assert_near_equal(prob['x'], 7.16667, 1e-4)
+        assert_near_equal(prob['y'], -7.833334, 1e-4)
 
     def test_pyopt_fd_is_called(self):
 
         class ParaboloidApplyLinear(Paraboloid):
-            def apply_linear(params, unknowns, resids):
+            def apply_linear(inputs, outputs, resids):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " pyopt_fd option has failed.")
 
@@ -688,8 +797,8 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-4)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-4)
+        assert_near_equal(prob['x'], 7.16667, 1e-4)
+        assert_near_equal(prob['y'], -7.833334, 1e-4)
 
     def test_snopt_fd_option_error(self):
 
@@ -793,14 +902,15 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
@@ -827,7 +937,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_cs(self):
         prob = om.Problem()
@@ -861,7 +971,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
@@ -894,7 +1004,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
@@ -927,7 +1037,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
         prob = om.Problem()
@@ -961,7 +1071,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_cs(self):
         prob = om.Problem()
@@ -995,7 +1105,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_rev(self):
 
@@ -1028,7 +1138,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
@@ -1061,7 +1171,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_objective_rev(self):
 
@@ -1094,7 +1204,7 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
+        assert_near_equal(prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_sellar_mdf(self):
 
@@ -1122,9 +1232,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 4e-3)
 
     def test_sellar_mdf_linear_con_directsolver(self):
         # This test makes sure that we call solve_nonlinear first if we have any linear constraints
@@ -1138,6 +1248,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y2', val=0.0)
                 self.add_output('y1', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -1161,6 +1272,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y1', val=0.0)
                 self.add_output('y2', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -1228,9 +1340,9 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 4e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 4e-3)
 
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
         prob.driver.run()
@@ -1264,15 +1376,14 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup()
-
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
         # Normally it takes 9 iterations, but takes 13 here because of the
         # analysis failures. (note SLSQP takes 5 instead of 4)
@@ -1364,8 +1475,8 @@ class TestPyoptSparse(unittest.TestCase):
             tol = 1e-6
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, tol)
-        assert_rel_error(self, prob['y'], -7.833334, tol)
+        assert_near_equal(prob['x'], 7.16667, tol)
+        assert_near_equal(prob['y'], -7.833334, tol)
 
         # Normally it takes 9 iterations, but takes 13 here because of the
         # gradfunc failures. (note SLSQP just doesn't do well)
@@ -1443,7 +1554,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1477,7 +1588,78 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+    def test_debug_print_option_totals_no_ivc(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='rev')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                             str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1535,6 +1717,11 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_show_exception_bad_opt(self):
 
+        # First, check if we have the optimizer for this test. If they do, then just skip it.
+        _, loc_opt = set_pyoptsparse_opt('NOMAD')
+        if loc_opt == 'NOMAD':
+            raise unittest.SkipTest("Skipping because user has this optimizer.")
+
         prob = om.Problem()
         model = prob.model
 
@@ -1552,15 +1739,15 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = pyOptSparseDriver()
 
-        # We generally don't hae a working IPOPT install.
-        prob.driver.options['optimizer'] = 'IPOPT'
+        # We generally don't hae a working NOMAD install.
+        prob.driver.options['optimizer'] = 'NOMAD'
         prob.setup()
 
         # Test that we get exception.
         with self.assertRaises(ImportError) as raises_cm:
             prob.run_driver()
 
-        self.assertTrue("IPOPT is not available" in str(raises_cm.exception))
+        self.assertTrue("NOMAD is not available" in str(raises_cm.exception))
 
     # Travis testing core dumps on many of the machines. Probabaly a build problem with the NSGA source.
     # Limiting this to the single travis 1.14 machine for now.
@@ -1781,7 +1968,7 @@ class TestPyoptSparse(unittest.TestCase):
                 elif self.iter_count > 3:
                     raise RuntimeError('SNOPT should have stopped.')
                 else:
-                    # Post optimization run with optimal params.
+                    # Post optimization run with optimal inputs.
                     pass
 
             def compute_partials(self, inputs, partials):
@@ -1811,6 +1998,56 @@ class TestPyoptSparse(unittest.TestCase):
         # SNOPT return code 71 is a user-requested termination.
         code = prob.driver.pyopt_solution.optInform['value']
         self.assertEqual(code, 71)
+
+    def test_IPOPT_basic(self):
+        _, local_opt = set_pyoptsparse_opt('IPOPT')
+        if local_opt != 'IPOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing IPOPT")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "IPOPT"
+        prob.driver.opt_settings['print_level'] = 0
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+
+    def test_ParOpt_basic(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "ParOpt"
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
@@ -1848,7 +2085,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_settings_print(self):
         import numpy as np
@@ -1874,7 +2111,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
         import numpy as np
@@ -1901,7 +2138,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
         import numpy as np
@@ -1928,7 +2165,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.98337708, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.98337708, 1e-3)
 
 
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
@@ -1964,7 +2201,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_snopt_maxit(self):
         import numpy as np
@@ -1993,15 +2230,15 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9780247, 2e-3)
+        assert_near_equal(prob.get_val('z', indices=0), 1.9780247, 2e-3)
 
     def test_snopt_fd_solution(self):
 
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
@@ -2027,21 +2264,21 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_snopt_fd_is_called(self):
 
         class ParaboloidApplyLinear(Paraboloid):
-            def apply_linear(params, unknowns, resids):
+            def apply_linear(inputs, outputs, resids):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " snopt_fd option has failed.")
 
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
 
@@ -2067,8 +2304,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         # Minimum should be at (7.166667, -7.833334)
-        assert_rel_error(self, prob['x'], 7.16667, 1e-6)
-        assert_rel_error(self, prob['y'], -7.833334, 1e-6)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
 
     def test_sellar_analysis_error(self):
         # One discipline of Sellar will something raise analysis error. This is to test that
@@ -2080,12 +2317,12 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('x', val=0.)
                 self.add_input('y2', val=1.0)
                 self.add_output('y1', val=1.0)
-
-                self.declare_partials('*', '*')
-
                 self.fail_deriv = [2, 4]
                 self.count_iter = 0
                 self.failed = 0
+
+            def setup_partials(self):
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
 
@@ -2113,6 +2350,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('y1', val=1.0)
                 self.add_output('y2', val=1.0)
 
+            def setup_partials(self):
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
@@ -2138,9 +2376,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         class SellarMDAAE(om.Group):
             def setup(self):
-                indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-                indeps.add_output('x', 1.0)
-                indeps.add_output('z', np.array([5.0, 2.0]))
+
+                model.set_input_defaults('x', 1.0)
+                model.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
 
@@ -2185,9 +2423,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        assert_rel_error(self, prob['z'][0], 1.9776, 1e-3)
-        assert_rel_error(self, prob['z'][1], 0.0, 1e-3)
-        assert_rel_error(self, prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
 
         self.assertEqual(model.cycle.d1.failed, 2)
 
@@ -2204,7 +2442,98 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
+        prob.driver.options['user_terminate_signal'] = signal.SIGUSR2
+
+    def test_options_deprecated(self):
+        # Not a feature test.
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SNOPT"
+
+        msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
+        with assert_warning(DeprecationWarning, msg):
+            prob.driver.options['user_teriminate_signal'] = None
+
+
+class MatMultCompExact(om.ExplicitComponent):
+    def __init__(self, mat, sparse=False, **kwargs):
+        super().__init__(**kwargs)
+        self.mat = mat
+        self.sparse = sparse
+
+    def setup(self):
+        self.add_input('x', val=np.ones(self.mat.shape[1]))
+        self.add_output('y', val=np.zeros(self.mat.shape[0]))
+
+        if self.sparse:
+            self.rows, self.cols = np.nonzero(self.mat)
+            self.declare_partials(of='y', wrt='x', rows=self.rows, cols=self.cols)
+        else:
+            self.declare_partials(of='y', wrt='x')
+        self.num_computes = 0
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+        self.num_computes += 1
+
+    def compute_partials(self, inputs, partials):
+        """
+        Compute the sparse partials.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        if self.sparse:
+            partials['y', 'x'] = self.mat[self.rows, self.cols]
+        else:
+            partials['y', 'x'] = self.mat
+
+
+class MyGroup(om.Group):
+    def __init__(self, size=5):
+        super().__init__()
+        self.size = size
+
+    def setup(self):
+        size = self.size
+        self.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)))
+        A = np.ones((size, size))  # force coloring to fail
+        self.add_subsystem('comp1', MatMultCompExact(A))
+        self.add_subsystem('comp2', om.ExecComp('y=x-1.0', x=np.zeros(size), y=np.zeros(size), has_diag_partials=True))
+        self.connect('indeps.x', 'comp1.x')
+        self.connect('comp1.y', 'comp2.x')
+        self.add_design_var('indeps.x')
+        self.add_objective('comp2.y', index=0)
+        self.add_constraint('comp1.y', indices=list(range(1, size)), lower=5., upper=10.)
+
+
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
+class TestResizingTestCase(unittest.TestCase):
+    def test_resize(self):
+        # this test just verifies that pyoptsparsedriver doesn't raise an exception due
+        # to mismatched sizes in the sparsity definition, so this test passes as long as
+        # an exception isn't raised.
+        p = om.Problem()
+        model = p.model
+        p.driver = om.pyOptSparseDriver()
+        p.driver.declare_coloring()
+
+        G = model.add_subsystem("G", MyGroup(5))
+        p.setup()
+        p.run_driver()
+        p.compute_totals()
+
+        G.size = 10
+        p.setup()
+        p.run_driver()
+        p.compute_totals()
 
 
 if __name__ == "__main__":

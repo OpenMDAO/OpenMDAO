@@ -2,13 +2,13 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
 
     def __init__(self):
-        super(MockSurrogate, self).__init__()
+        super().__init__()
         self.xtrain = None
         self.ytrain = None
 
@@ -43,7 +43,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): No surrogate specified for output 'y'")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: No surrogate specified for output 'y'")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of input samples
@@ -71,7 +71,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of output samples
@@ -99,7 +99,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_inputs_wrt_nfidelity(self):
@@ -315,12 +315,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[2./3., 1./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
+        assert_near_equal(prob['mm.y'], 26.26, tolerance=0.02)
 
         prob['mm.x'] = np.array([[1./3., 2./3.]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 36.1031735, tolerance=0.02)
+        assert_near_equal(prob['mm.y'], 36.1031735, tolerance=0.02)
 
         # Now, vectorized model with both points predicted together.
 
@@ -342,57 +342,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob['mm.x'] = np.array([[[2./3., 1./3.]], [[1./3., 2./3.]]])
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
-
-    def test_multifi_meta_model_unstructured_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured  # deprecated
-
-        msg = "'MultiFiMetaModelUnStructured' has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MultiFiMetaModelUnStructured(nfi=3)
-
-        mm.add_input('x', 0.)
-        mm.add_output('y', 0.)
-
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        self.assertEqual(mm.options['train:x'], None)
-        self.assertEqual(mm.options['train:x_fi2'], None)
-        self.assertEqual(mm.options['train:x_fi3'], None)
-        self.assertEqual(mm.options['train:y'], None)
-        self.assertEqual(mm.options['train:y_fi2'], None)
-        self.assertEqual(mm.options['train:y_fi3'], None)
-
-    def test_multifi_meta_model_deprecated(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModel  # deprecated
-
-        msg = "'MultiFiMetaModel' component has been deprecated. Use 'MultiFiMetaModelUnStructuredComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            mm = MultiFiMetaModel(nfi=3)
-
-        mm.add_input('x', 0.)
-        mm.add_output('y', 0.)
-
-        prob = om.Problem()
-        prob.model.add_subsystem('mm', mm)
-        prob.setup()
-
-        self.assertEqual(mm.options['train:x'], None)
-        self.assertEqual(mm.options['train:x_fi2'], None)
-        self.assertEqual(mm.options['train:x_fi3'], None)
-        self.assertEqual(mm.options['train:y'], None)
-        self.assertEqual(mm.options['train:y_fi2'], None)
-        self.assertEqual(mm.options['train:y_fi3'], None)
+        assert_near_equal(prob['mm.y'], [[26.26], [36.1031735]], tolerance=0.02)
 
     def test_surrogate_message_format(self):
         mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
@@ -422,9 +372,26 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        expected = ("mm: Multiple input features cannot have the same value.")
-        self.assertEqual(str(cm.exception), expected)
+        self.assertEqual(str(cm.exception), "'mm' <class MultiFiMetaModelUnStructuredComp>: "
+                         "Error calling compute(), Multiple input features cannot have the same value.")
 
+    def test_om_slice_in_add_input(self):
+
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm.add_input('x', np.ones(3), src_indices=om.slicer[:, 1])
+        mm.add_output('y', np.zeros((1, )))
+
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+
+        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('mm', mm)
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        prob.model.connect('indep.x', 'mm.x')
+        prob.setup()
+
+        assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
 
 class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
 
@@ -513,10 +480,10 @@ class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
         mm.options['train:x_fi2'] = x_lofi
         mm.options['train:y_fi2'] = y_lofi
 
-        prob['mm.x'] = np.array([[2./3., 1./3.]])
+        prob.set_val('mm.x', np.array([[2./3., 1./3.]]))
         prob.run_model()
 
-        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
+        assert_near_equal(prob.get_val('mm.y'), 26.26, tolerance=0.02)
 
 
 if __name__ == "__main__":

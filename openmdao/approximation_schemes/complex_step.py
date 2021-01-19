@@ -1,20 +1,14 @@
 """Complex Step derivative approximations."""
-from __future__ import division, print_function
 
-from six import iteritems, itervalues
-from six.moves import range
 from collections import defaultdict
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results, _get_wrt_subjacs
+    _gather_jac_results, _get_wrt_subjacs, _full_slice
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
-
-
-_full_slice = slice(None)
 
 
 class ComplexStep(ApproximationScheme):
@@ -43,12 +37,12 @@ class ComplexStep(ApproximationScheme):
         """
         Initialize the ApproximationScheme.
         """
-        super(ComplexStep, self).__init__()
+        super().__init__()
 
         # Only used when nested under complex step.
         self._fd = None
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, abs_key, system, kwargs, vector=None):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -58,11 +52,14 @@ class ComplexStep(ApproximationScheme):
             Absolute name pairing of (of, wrt) for the derivative.
         system : System
             Containing System.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
+        options['vector'] = vector
 
         key = (abs_key[1], options['step'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
@@ -115,12 +112,19 @@ class ComplexStep(ApproximationScheme):
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
-                for lst in itervalues(self._exec_dict):
+                for lst in self._exec_dict.values():
                     for apprx in lst:
                         fd.add_approximation(apprx[0], system, empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return
+
+        saved_inputs = system._inputs._get_data().copy()
+        system._inputs._data.imag[:] = 0.0
+        saved_outputs = system._outputs.asarray(copy=True)
+        system._outputs._data.imag[:] = 0.0
+        saved_resids = system._residuals.asarray(copy=True)
+        system._residuals._data.imag[:] = 0.0
 
         # Turn on complex step.
         system._set_complex_step_mode(True)
@@ -129,6 +133,10 @@ class ComplexStep(ApproximationScheme):
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
+
+        system._inputs.set_val(saved_inputs)
+        system._outputs.set_val(saved_outputs)
+        system._residuals.set_val(saved_resids)
 
     def _get_multiplier(self, delta):
         """
@@ -186,19 +194,35 @@ class ComplexStep(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] += delta
+                vec.iadd(delta, idxs)
 
         if total:
             system.run_solve_nonlinear()
-            results_vec = system._outputs
+            result_array[:] = system._outputs._data
         else:
             system.run_apply_nonlinear()
-            results_vec = system._residuals
-
-        result_array[:] = results_vec._data
+            result_array[:] = system._residuals._data
 
         for vec, idxs in idx_info:
             if vec is not None:
-                vec._data[idxs] -= delta
+                vec.isub(delta, idxs)
 
         return result_array
+
+    def apply_directional(self, data, direction):
+        """
+        Apply stepsize to direction and embed into approximation data.
+
+        Parameters
+        ----------
+        data : float
+            Step size for complex step.
+        direction : ndarray
+            Vector containing derivative direction.
+
+        Returns
+        -------
+        ndarray
+            New step direction.
+        """
+        return data * direction

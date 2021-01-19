@@ -1,12 +1,12 @@
 """Surrogate model based on Kriging."""
-from six.moves import zip, range
-
 import numpy as np
 import scipy.linalg as linalg
+import os.path
+from hashlib import md5
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import simple_warning
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -55,7 +55,7 @@ class KrigingSurrogate(SurrogateModel):
         **kwargs : dict
             options dictionary.
         """
-        super(KrigingSurrogate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.n_dims = 0                 # number of independent
         self.n_samples = 0              # number of training points
@@ -88,6 +88,17 @@ class KrigingSurrogate(SurrogateModel):
                                   "must be of the same length as the number of training points. "
                                   "Default: 10. * Machine Epsilon")
 
+        self.options.declare('lapack_driver', types=str, default='gesvd',
+                             desc="Which lapack driver should be used for scipy's linalg.svd."
+                                  "Options are 'gesdd' which is faster but not as robust,"
+                                  "or 'gesvd' which is slower but more reliable."
+                                  "'gesvd' is the default.")
+
+        self.options.declare('training_cache', types=str, default=None,
+                             desc="Cache the trained model to avoid repeating training and write "
+                                  "it to the given file. If the specified file exists, it will be "
+                                  "used to load the weights")
+
     def train(self, x, y):
         """
         Train the surrogate model with the given set of inputs and outputs.
@@ -99,15 +110,51 @@ class KrigingSurrogate(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(KrigingSurrogate, self).train(x, y)
-
+        super().train(x, y)
         x, y = np.atleast_2d(x, y)
 
+        cache = self.options['training_cache']
+
+        if cache:
+            data_hash = md5()
+            data_hash.update(x.flatten())
+            data_hash.update(y.flatten())
+            training_data_hash = data_hash.hexdigest()
+            cache_hash = ''
+
+        if cache and os.path.exists(cache):
+
+            with np.load(cache, allow_pickle=False) as data:
+                try:
+                    self.n_samples = data['n_samples']
+                    self.n_dims = data['n_dims']
+                    self.X = np.array(data['X'])
+                    self.Y = np.array(data['Y'])
+                    self.X_mean = np.array(data['X_mean'])
+                    self.Y_mean = np.array(data['Y_mean'])
+                    self.X_std = np.array(data['X_std'])
+                    self.Y_std = np.array(data['Y_std'])
+                    self.thetas = np.array(data['thetas'])
+                    self.alpha = np.array(data['alpha'])
+                    self.U = np.array(data['U'])
+                    self.S_inv = np.array(data['S_inv'])
+                    self.Vh = np.array(data['Vh'])
+                    self.sigma2 = np.array(data['sigma2'])
+                    cache_hash = str(data['hash'])
+                except KeyError as e:
+                    msg = ("An error occurred while loading KrigingSurrogate Cache: %s. "
+                           "Ignoring and training from scratch.")
+                    simple_warning(msg % str(e))
+
+            # if the loaded data passes the hash check with the current training data, we exit
+            if cache_hash == training_data_hash:
+                return
+
+        # Training fallthrough
         self.n_samples, self.n_dims = x.shape
 
         if self.n_samples <= 1:
-            self._raise('KrigingSurrogate requires at least 2 training points.',
-                        exc_type=ValueError)
+            raise ValueError('KrigingSurrogate requires at least 2 training points.')
 
         # Normalize the data
         X_mean = np.mean(x, axis=0)
@@ -133,13 +180,19 @@ class KrigingSurrogate(SurrogateModel):
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
 
+        options = {'eps': 1e-3}
+
+        if cache:
+            # Enable logging since we expect the model to take long to train
+            options['disp'] = True
+            options['iprint'] = 2
+
         optResult = minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
-                             options={'eps': 1e-3},
+                             options=options,
                              bounds=bounds)
 
         if not optResult.success:
-            msg = 'Kriging Hyper-parameter optimization failed: {0}'.format(optResult.message)
-            self._raise(msg, exc_type=ValueError)
+            raise ValueError(f'Kriging Hyper-parameter optimization failed: {optResult.message}')
 
         self.thetas = np.exp(optResult.x)
         _, params = self._calculate_reduced_likelihood_params()
@@ -148,6 +201,30 @@ class KrigingSurrogate(SurrogateModel):
         self.S_inv = params['S_inv']
         self.Vh = params['Vh']
         self.sigma2 = params['sigma2']
+
+        # Save data to cache if specified
+        if cache:
+            data = {
+                'n_samples': self.n_samples,
+                'n_dims': self.n_dims,
+                'X': self.X,
+                'Y': self.Y,
+                'X_mean': self.X_mean,
+                'Y_mean': self.Y_mean,
+                'X_std': self.X_std,
+                'Y_std': self.Y_std,
+                'thetas': self.thetas,
+                'alpha': self.alpha,
+                'U': self.U,
+                'S_inv': self.S_inv,
+                'Vh': self.Vh,
+                'sigma2': self.sigma2,
+                'hash': training_data_hash
+            }
+
+            if not os.path.exists(cache) or cache_hash != training_data_hash:
+                with open(cache, 'wb') as f:
+                    np.savez_compressed(f, **data)
 
     def _calculate_reduced_likelihood_params(self, thetas=None):
         """
@@ -158,6 +235,7 @@ class KrigingSurrogate(SurrogateModel):
         thetas : ndarray, optional
             Given input correlation coefficients. If none given, uses self.thetas
             from training.
+
 
         Returns
         -------
@@ -181,7 +259,7 @@ class KrigingSurrogate(SurrogateModel):
         R = np.exp(-thetas.dot(np.square(distances)))
         R[np.diag_indices_from(R)] = 1. + self.options['nugget']
 
-        [U, S, Vh] = linalg.svd(R)
+        [U, S, Vh] = linalg.svd(R, lapack_driver=self.options['lapack_driver'])
 
         # Penrose-Moore Pseudo-Inverse:
         # Given A = USV^* and Ax=b, the least-squares solution is
@@ -221,7 +299,7 @@ class KrigingSurrogate(SurrogateModel):
         ndarray, optional (if eval_rmse is True)
             Root mean square of the prediction error.
         """
-        super(KrigingSurrogate, self).predict(x)
+        super().predict(x)
 
         thetas = self.thetas
         if isinstance(x, list):
@@ -280,22 +358,3 @@ class KrigingSurrogate(SurrogateModel):
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
         return jac
-
-
-class FloatKrigingSurrogate(KrigingSurrogate):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'FloatKrigingSurrogate' has been deprecated. Use "
-                         "'KrigingSurrogate' instead.")
-        super(FloatKrigingSurrogate, self).__init__(**kwargs)

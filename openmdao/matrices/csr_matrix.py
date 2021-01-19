@@ -24,7 +24,7 @@ class CSRMatrix(COOMatrix):
         out_ranges : dict
             Maps output var name to row range.
         """
-        super(CSRMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
+        super()._build(num_rows, num_cols, in_ranges, out_ranges)
 
         self._coo = self._matrix
 

@@ -1,9 +1,5 @@
 """Tests the `debug_print` option for Nonlinear solvers."""
 
-from __future__ import division, print_function
-
-from six import StringIO
-
 import os
 import re
 import sys
@@ -12,13 +8,13 @@ import tempfile
 
 import unittest
 from distutils.version import LooseVersion
+from io import StringIO
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 
@@ -110,6 +106,9 @@ class TestNonlinearSolvers(unittest.TestCase):
         if name == 'NonlinearBlockGS':
             nl.options['use_apply_nonlinear'] = True
 
+        if name == 'NewtonSolver':
+            nl.options['solve_subsystems'] = True
+
         # suppress solver output for test
         nl.options['iprint'] = model.circuit.linear_solver.options['iprint'] = -1
 
@@ -159,24 +158,21 @@ class TestNonlinearSolvers(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
-
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
 
         p.setup()
 
-        nl = model.circuit.nonlinear_solver = om.NewtonSolver()
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True
         nl.options['err_on_non_converge'] = True
 
         # set some poor initial guesses so that we don't converge
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1e-3
+        p.set_val('circuit.I_in', 0.1, units='A')
+        p.set_val('circuit.Vg', 0.0, units='V')
+        p.set_val('circuit.n1.V', 10.)
+        p.set_val('circuit.n2.V', 1e-3)
 
         opts = {}
         # formatting has changed in numpy 1.14 and beyond.
@@ -260,7 +256,7 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
         self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
         self.assertEqual(expected_msg, str(cm.exception))
 
 

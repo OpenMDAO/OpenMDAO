@@ -6,7 +6,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.ae_tests import AEComp, AEDriver
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 
 try:
@@ -34,7 +34,7 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         prob.run_model()
 
         # Make sure value is fine.
-        assert_rel_error(self, prob['c7.y1'], -102.7, 1e-6)
+        assert_near_equal(prob['c7.y1'], -102.7, 1e-6)
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class cause an error
@@ -55,20 +55,18 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.nonlinear_solver = om.NonlinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 
-        prob['x'] = 4.0
-        prob['y'] = 6.0
+        prob.set_val('x', 4.0)
+        prob.set_val('y', 6.0)
 
         prob.run_model()
 
-        assert_rel_error(self, prob['f_xy'], 122.0)
+        assert_near_equal(prob.get_val('f_xy'), 122.0)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

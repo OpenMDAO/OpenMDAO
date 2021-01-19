@@ -38,13 +38,6 @@ compute its derivatives internally.  The model contained in the sub-problem look
    :alt: Model using 3 ExecComps
 
 
-Note that our sub-problem contains an :code:`IndepVarComp` as well as an :code:`ExecComp`.  This
-is necessary because we're computing total derivatives, and total derivatives in OpenMDAO are specified
-only in terms of outputs and residuals, not inputs.  At the beginning of :code:`compute` and
-:code:`compute_partials`, we copy our component's inputs, :code:`inp` and :code:`x`, into the
-:code:`IndepVarComp` in our sub-problem so that there they can be treated as outputs, allowing us to
-compute total derivatives with respect to them.
-
 The code for :code:`SubProbComp` is shown below:
 
 

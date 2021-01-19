@@ -1,5 +1,4 @@
 
-from __future__ import print_function
 
 import time
 import itertools
@@ -7,11 +6,9 @@ import numpy as np
 import unittest
 TestCase = unittest.TestCase
 
-from six import iterkeys
-
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
 
@@ -29,7 +26,7 @@ except ImportError:
 class ScalableComp(om.ExplicitComponent):
 
     def __init__(self, size, mult=2.0, add=1.0):
-        super(ScalableComp, self).__init__()
+        super().__init__()
 
         self._size = size
         self._mult = mult
@@ -116,7 +113,7 @@ class SerialSimpleFDTestCase(TestCase):
         prob = setup_1comp_model(1, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_serial_cs(self):
         size = 15
@@ -125,7 +122,7 @@ class SerialSimpleFDTestCase(TestCase):
         prob = setup_1comp_model(1, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -141,7 +138,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         prob = setup_1comp_model(2, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_parallel_cs2(self):
         size = 15
@@ -151,7 +148,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         prob = setup_1comp_model(2, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -166,7 +163,7 @@ class ParallelFDTestCase5(TestCase):
         prob = setup_1comp_model(5, size, mult, add, 'fd')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
     def test_parallel_cs5(self):
         size = 15
@@ -175,7 +172,7 @@ class ParallelFDTestCase5(TestCase):
         prob = setup_1comp_model(5, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
+        assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
 class SerialDiamondFDTestCase(TestCase):
@@ -183,18 +180,18 @@ class SerialDiamondFDTestCase(TestCase):
     def test_diamond_fd_totals(self):
         size = 15
         prob = setup_diamond_model(1, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals(self):
         size = 15
         prob = setup_diamond_model(1, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_bad_num_par_fds(self):
         try:
@@ -211,50 +208,50 @@ class ParallelDiamondFDTestCase(TestCase):
     def test_diamond_fd_totals(self):
         size = 15
         prob = setup_diamond_model(2, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_fd_nested_par_fd_totals(self):
         size = 15
         prob = setup_diamond_model(4, size, 'fd', 'par')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_fd_totals_num_fd_bigger_than_psize(self):
         size = 1
         prob = setup_diamond_model(2, size, 'fd', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals(self):
         size = 15
         prob = setup_diamond_model(2, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals_nested_par_cs(self):
         size = 15
         prob = setup_diamond_model(4, size, 'cs', 'par')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
     def test_diamond_cs_totals_num_fd_bigger_than_psize(self):
         size = 1
         prob = setup_diamond_model(2, size, 'cs', 'model')
-        assert_rel_error(self, prob['C3.y'], np.ones(size)*24.0, 1e-6)
+        assert_near_equal(prob['C3.y'], np.ones(size)*24.0, 1e-6)
 
         J = prob.compute_totals(['C3.y'], ['P1.x'], return_format='dict')
-        assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
+        assert_near_equal(J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
 
 def _test_func_name(func, num, param):
@@ -458,13 +455,13 @@ class ParFDWarningsTestCase(unittest.TestCase):
         self.mat = np.random.random(5 * size).reshape((5, size)) - 0.5
 
     def test_total_no_mpi(self):
-        msg = "Group (<model>): MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+        msg = "<model> <class Group>: MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
 
         with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=True)
 
     def test_partial_no_mpi(self):
-        msg = "MatMultComp (comp): MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
+        msg = "'comp' <class MatMultComp>: MPI is not active but num_par_fd = 3. No parallel finite difference will be performed."
 
         with assert_warning(UserWarning, msg):
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
@@ -482,13 +479,14 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             _setup_problem(self.mat, total_method='fd', total_num_par_fd = 3, approx_totals=False)
 
-        self.assertEqual(str(ctx.exception), "Group (<model>): num_par_fd = 3 but FD is not active.")
+        self.assertEqual(str(ctx.exception), "<model> <class Group>: num_par_fd = 3 but FD is not active.")
 
     def test_no_partial_approx(self):
+        p = _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
         with self.assertRaises(RuntimeError) as ctx:
-            _setup_problem(self.mat, partial_num_par_fd = 3, approx_totals=False)
+            p.final_setup()
 
-        self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
+        self.assertEqual(str(ctx.exception), "'comp' <class MatMultComp>: num_par_fd is > 1 but no FD is active.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -501,17 +499,15 @@ class ParFDFeatureTestCase(unittest.TestCase):
         p = om.Problem(model=om.Group(num_par_fd=3))
         model = p.model
         model.approx_totals(method='fd')
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat))
 
-        model.connect('indep.x', 'comp.x')
-
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
         p.setup(mode='fwd')
         p.run_model()
 
         pre_count = comp.num_computes
 
-        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         post_count =  comp.num_computes
 
@@ -529,18 +525,16 @@ class ParFDFeatureTestCase(unittest.TestCase):
 
         p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=3))
 
-        model.connect('indep.x', 'comp.x')
-
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
         p.setup(mode='fwd')
         p.run_model()
 
         pre_count = comp.num_computes
 
         # calling compute_totals will result in the computation of partials for comp
-        p.compute_totals(of=['comp.y'], wrt=['indep.x'])
+        p.compute_totals(of=['comp.y'], wrt=['comp.x'])
 
         # get the partial jacobian matrix
         J = comp._jacobian['y', 'x']

@@ -17,7 +17,7 @@ class {class_name}(BaseCaseReader):
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        super({class_name}, self).__init__(filename, pre_load)
+        super().__init__(filename, pre_load)
 
         # initialize attributes here...
 

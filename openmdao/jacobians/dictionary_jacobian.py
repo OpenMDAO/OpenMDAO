@@ -1,14 +1,8 @@
 """Define the DictionaryJacobian class."""
-from __future__ import division
-
 import numpy as np
-from six.moves import range
 from scipy.sparse import csc_matrix
 
-from openmdao.jacobians.jacobian import Jacobian
-
-
-_full_slice = slice(None)
+from openmdao.jacobians.jacobian import Jacobian, _full_slice
 
 
 class DictionaryJacobian(Jacobian):
@@ -33,7 +27,7 @@ class DictionaryJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(DictionaryJacobian, self).__init__(system, **kwargs)
+        super().__init__(system, **kwargs)
         self._iter_keys = {}
 
     def _iter_abs_keys(self, system, vec_name):
@@ -99,9 +93,9 @@ class DictionaryJacobian(Jacobian):
         if not d_out_names and not d_inp_names:
             return
 
-        rflat = d_residuals._views_flat
-        oflat = d_outputs._views_flat
-        iflat = d_inputs._views_flat
+        rflat = d_residuals._abs_get_val
+        oflat = d_outputs._abs_get_val
+        iflat = d_inputs._abs_get_val
         ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
         is_explicit = isinstance(system, ExplicitComponent)
@@ -120,24 +114,26 @@ class DictionaryJacobian(Jacobian):
                         # skip the matvec mult completely for identity subjacs
                         if is_explicit and res_name is other_name:
                             if fwd:
-                                rflat[res_name] -= oflat[other_name]
+                                val = rflat(res_name)
+                                val -= oflat(other_name)
                             else:
-                                oflat[other_name] -= rflat[res_name]
+                                val = oflat(other_name)
+                                val -= rflat(res_name)
                             continue
 
                         if fwd:
-                            left_vec = rflat[res_name]
-                            right_vec = oflat[other_name]
+                            left_vec = rflat(res_name)
+                            right_vec = oflat(other_name)
                         else:
-                            left_vec = oflat[other_name]
-                            right_vec = rflat[res_name]
+                            left_vec = oflat(other_name)
+                            right_vec = rflat(res_name)
                     elif other_name in d_inp_names:
                         if fwd:
-                            left_vec = rflat[res_name]
-                            right_vec = iflat[other_name]
+                            left_vec = rflat(res_name)
+                            right_vec = iflat(other_name)
                         else:
-                            left_vec = iflat[other_name]
-                            right_vec = rflat[res_name]
+                            left_vec = iflat(other_name)
+                            right_vec = rflat(res_name)
                     else:
                         continue
 

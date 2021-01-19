@@ -1,24 +1,26 @@
 """
 A console script wrapper for multiple openmdao functions.
 """
-from __future__ import print_function
 
 import sys
 import os
 import argparse
+from openmdao import __version__ as version
+
 try:
     import pkg_resources
 except ImportError:
     pkg_resources = None
 
 from itertools import chain
-from six import iteritems
 
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
-from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
-    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
+from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
+    _scaling_cmd
+from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
+    _view_dyn_shapes_cmd
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
@@ -41,12 +43,12 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
-from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
+from openmdao.utils.general_utils import ignore_errors, warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -69,7 +71,7 @@ def _n2_setup_parser(parser):
                         action='store', dest='title', help='diagram title.')
     parser.add_argument('--use_declare_partial_info', action='store_true',
                         dest='use_declare_partial_info',
-                        help="use declare partial info for internal connectivity.")
+                        help="ignored, now always true.")
 
 
 def _n2_cmd(options, user_args):
@@ -83,142 +85,31 @@ def _n2_cmd(options, user_args):
     user_args : list of str
         Command line options after '--' (if any).  Passed to user script.
     """
-    filename = options.file[0]
+    filename = _to_filename(options.file[0])
 
     if filename.endswith('.py'):
         # the file is a python script, run as a post_setup hook
+        def _noraise(prob):
+            prob.model._raise_connection_errors = False
+
+        if options.use_declare_partial_info:
+            warn_deprecation("'--use_declare_partial_info' is now the"
+                             " default and the option is ignored.")
+
         def _viewmod(prob):
             n2(prob, outfile=options.outfile, show_browser=not options.no_browser,
-               title=options.title, embeddable=options.embeddable,
-               use_declare_partial_info=options.use_declare_partial_info)
+                title=options.title, embeddable=options.embeddable)
             exit()  # could make this command line selectable later
 
+        hooks._register_hook('setup', 'Problem', pre=_noraise)
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
-        _load_and_exec(filename, user_args)
+        ignore_errors(True)
+        _load_and_exec(options.file[0], user_args)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
-           show_browser=not options.no_browser, embeddable=options.embeddable,
-           use_declare_partial_info=options.use_declare_partial_info)
-
-
-def _view_model_cmd(options, user_args):
-    warn_deprecation("The 'view_model' command has been deprecated. Use 'n2' instead.")
-    _n2_cmd(options, user_args)
-
-
-def _xdsm_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao xdsm' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
-    parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
-                        help='XDSM output file. (use pathname without extension)')
-    parser.add_argument('-f', '--format', default='html', action='store', dest='format',
-                        choices=['html', 'pdf', 'tex'], help='format of XSDM output.')
-    parser.add_argument('-m', '--model_path', action='store', dest='model_path',
-                        help='Path to system to transcribe to XDSM.')
-    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help="Don't treat the top level of each name as the source/target "
-                             "component.")
-    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
-                        help="Don't display in a browser.")
-    parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
-                        help="don't show stacked parallel blocks. Only active for 'pdf' and 'tex' "
-                             "formats.")
-    parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
-                        help="Don't show externally connected outputs.")
-    parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
-                        help="Include the problem model's solver in the XDSM.")
-    parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
-                        help="Don't add process connections (thin black lines).")
-    parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
-                        choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
-                        dest='box_stacking', help='Controls the appearance of boxes.')
-    parser.add_argument('--box_width', action='store', default=_DEFAULT_BOX_WIDTH,
-                        dest='box_width', type=int, help='Controls the width of boxes.')
-    parser.add_argument('--box_lines', action='store', default=_MAX_BOX_LINES,
-                        dest='box_lines', type=int,
-                        help='Limits number of vertical lines in box if box_stacking is vertical.')
-    parser.add_argument('--numbered_comps', action='store_true', dest='numbered_comps',
-                        help="Display components with numbers.  Only active for 'pdf' and 'tex' "
-                        "formats.")
-    parser.add_argument('--number_alignment', action='store', dest='number_alignment',
-                        choices=['horizontal', 'vertical'], default='horizontal',
-                        help='Positions the number either above or in front of the component label '
-                        'if numbered_comps is true.')
-    parser.add_argument('--output_side', action='store', dest='output_side',
-                        default=_DEFAULT_OUTPUT_SIDE,
-                        help='Position of the outputs on the diagram. Left or right, or a '
-                             'dictionary with component types as keys. Component type key can be '
-                             '"optimization", "doe" or "default".')
-    parser.add_argument('--legend', action='store_true', dest='legend',
-                        help='If True, show legend.')
-    parser.add_argument('--class_names', action='store_true', dest='class_names',
-                        help='If true, appends class name of the groups/components to the '
-                             'component blocks of the diagram.')
-    parser.add_argument('--equations', action='store_true', dest='equations',
-                        help='If true, for ExecComps their equations are shown in the diagram.')
-
-
-def _xdsm_cmd(options, user_args):
-    """
-    Process command line args and call xdsm on the specified file.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Command line options after '--' (if any).  Passed to user script.
-    """
-    filename = options.file[0]
-
-    kwargs = {}
-    for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
-        val = getattr(options, name)
-        if val is not None:
-            kwargs[name] = val
-
-    if filename.endswith('.py'):
-        # the file is a python script, run as a post_setup hook
-        def _xdsm(prob):
-            write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
-                       recurse=options.recurse,
-                       include_external_outputs=not options.no_extern_outputs,
-                       out_format=options.format,
-                       include_solver=options.include_solver, subs=_CHAR_SUBS,
-                       show_browser=not options.no_browser, show_parallel=not options.no_parallel,
-                       add_process_conns=not options.no_process_conns,
-                       output_side=options.output_side,
-                       legend=options.legend,
-                       class_names=options.class_names,
-                       equations=options.equations,
-                       **kwargs)
-            exit()
-
-        hooks._register_hook('setup', 'Problem', post=_xdsm)
-
-        _load_and_exec(filename, user_args)
-    else:
-        # assume the file is a recording, run standalone
-        write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
-                   recurse=options.recurse,
-                   include_external_outputs=not options.no_extern_outputs,
-                   out_format=options.format,
-                   include_solver=options.include_solver, subs=_CHAR_SUBS,
-                   show_browser=not options.no_browser, show_parallel=not options.no_parallel,
-                   add_process_conns=not options.no_process_conns, output_side=options.output_side,
-                   legend=options.legend,
-                   class_names=options.class_names,
-                   equations=options.equations,
-                   **kwargs)
+            show_browser=not options.no_browser, embeddable=options.embeddable)
 
 
 def _view_connections_setup_parser(parser):
@@ -269,6 +160,7 @@ def _view_connections_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -385,6 +277,7 @@ def _config_summary_cmd(options, user_args):
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -495,6 +388,7 @@ def _tree_cmd(options, user_args):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -524,11 +418,6 @@ def _cite_cmd(options, user_args):
         Command line options.
     user_args : list of str
         Args to be passed to the user script.
-
-    Returns
-    -------
-    function
-        The hook function.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -545,6 +434,7 @@ def _cite_cmd(options, user_args):
 
     hooks._register_hook('setup', 'Problem', post=_cite)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -584,11 +474,10 @@ _command_map = {
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
+    'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
+                        'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
-    'view_model': (_n2_setup_parser, _view_model_cmd,
-                   'Display an interactive N2 diagram of the problem. '
-                   '(Deprecated, please use n2 instead.)'),
-    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'Generate an XDSM diagram of a model.'),
+    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 
 
@@ -610,6 +499,8 @@ def openmdao_cmd():
                                      ' If using a tool on a script that takes its own command line'
                                      ' arguments, place those arguments after a "--". For example:'
                                      ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
+
+    parser.add_argument('--version', action='version', version=version)
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")

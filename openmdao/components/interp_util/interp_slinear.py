@@ -3,8 +3,6 @@ Interpolate using a linear polynomial.
 
 Based on NPSS implementation.
 """
-from __future__ import division, print_function, absolute_import
-
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
@@ -30,7 +28,7 @@ class InterpLinear(InterpAlgorithm):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super(InterpLinear, self).__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, **kwargs)
         self.k = 2
         self._name = 'slinear'
 

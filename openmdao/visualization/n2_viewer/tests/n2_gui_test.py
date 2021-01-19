@@ -1,6 +1,6 @@
 """Test N2 GUI with multiple models using Pyppeteer."""
 import asyncio
-from pyppeteer_fork import launch
+import pyppeteer
 import subprocess
 import unittest
 import os
@@ -21,69 +21,79 @@ current_test = 1
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
     {
-        "desc": "Collapse All Outputs button",
-        "id": "collapseAllButtonId",
-        "waitForTransition": True
-    },
-    {
         "desc": "Uncollapse All button",
-        "id": "uncollapseAllButtonId",
+        "id": "expand-all",
         "waitForTransition": True
     },
     {
         "desc": "Collapse Outputs in View Only button",
-        "id": "collapseInViewButtonId",
+        "id": "collapse-element-2",
         "waitForTransition": True
     },
     {
         "desc": "Uncollapse In View Only button",
-        "id": "uncollapseInViewButtonId",
+        "id": "expand-element",
+        "waitForTransition": True
+    },
+    {
+        "desc": "Show Legend (off) button",
+        "id": "legend-button",
         "waitForTransition": True
     },
     {
         "desc": "Show Legend (on) button",
-        "id": "showLegendButtonId",
-        "waitForTransition": False
-    },
-    {
-        "desc": "Show Legend (off) button",
-        "id": "showLegendButtonId",
+        "id": "legend-button",
         "waitForTransition": False
     },
     {
         "desc": "Show Path (on) button",
-        "id": "showCurrentPathButtonId",
+        "id": "info-button",
         "waitForTransition": False
     },
     {
         "desc": "Show Path (off) button",
-        "id": "showCurrentPathButtonId",
+        "id": "info-button",
         "waitForTransition": False
     },
     {
-        "desc": "Toggle Solver Names (on) button",
-        "id": "toggleSolverNamesButtonId",
+        "desc": "Non-linear solver names button",
+        "id": "non-linear-solver-button",
+        "waitForTransition": False
+    },
+    {
+        "desc": "Linear solver names button",
+        "id": "linear-solver-button-2",
         "waitForTransition": True
     },
     {
-        "desc": "Toggle Solver Names (off) button",
-        "id": "toggleSolverNamesButtonId",
+        "desc": "Toggle solver visibility button (off)",
+        "id": "no-solver-button",
+        "waitForTransition": True
+    },
+    {
+        "desc": "Toggle solver visibility button (on)",
+        "id": "no-solver-button",
         "waitForTransition": True
     },
     {
         "desc": "Clear Arrows and Connection button",
-        "id": "clearArrowsAndConnectsButtonId",
+        "id": "hide-connections",
         "waitForTransition": False
     },
     {
         "desc": "Help (on) button",
-        "id": "helpButtonId",
+        "id": "question-button",
         "waitForTransition": False
     },
     {
         "desc": "Help (off) button",
-        "id": "helpButtonId",
+        "id": "question-button",
         "waitForTransition": False
+    },
+    {
+        "desc": "Collapse All Outputs button",
+        "id": "collapse-all",
+        "waitForTransition": True
     }
 ]
 
@@ -93,7 +103,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "selector": "g#n2elements rect#cellShape_node_22.vMid",
             "arrowCount": 4
         },
         {
@@ -105,7 +115,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "selector": "g#n2elements rect#cellShape_node_22.vMid",
             "arrowCount": 4
         },
         {
@@ -120,7 +130,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "selector": "g#n2elements rect#cellShape_node_6.gMid",
             "arrowCount": 5
         },
         {
@@ -138,7 +148,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_12_12.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 5
         },
         {
@@ -153,7 +163,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "selector": "g#n2elements rect#cellShape_node_6.gMid",
             "arrowCount": 5
         },
         {
@@ -163,16 +173,41 @@ n2_gui_test_scripts = {
             "button": "right"
         },
         {
+            "test": "root"
+        },
+        {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
+        {
+            "desc": "Perform a search on V_out",
             "test": "search",
-            "searchString": "R1.I",
-            "n2ElementCount": 16
-        }
+            "searchString": "V_out",
+            "n2ElementCount": 11
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Check that home button works after search",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 40
+        },
     ],
     "bug_arrow": [
         {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 14
+        },
+        {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 2
         },
         {
@@ -184,7 +219,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_13.vMid",
             "arrowCount": 2
         },
         {
@@ -199,7 +234,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_node_12.gMid",
             "arrowCount": 1
         },
         {
@@ -211,14 +246,14 @@ n2_gui_test_scripts = {
         {
             "desc": "Left-click to zoom on solver element",
             "test": "click",
-            "selector": "g#solver_tree rect#design_fan_map_d1",
+            "selector": "g#solver_tree rect#design_fan_map_scalars",
             "button": "left"
         },
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_9_9.vMid",
-            "arrowCount": 1
+            "selector": "g#n2elements rect#cellShape_node_13.vMid",
+            "arrowCount": 2
         },
         {
             "test": "root"
@@ -232,7 +267,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "selector": "g#n2elements rect#cellShape_node_12.gMid",
             "arrowCount": 1
         },
         {
@@ -240,30 +275,25 @@ n2_gui_test_scripts = {
             "test": "click",
             "selector": "g#solver_tree rect#design_fan_map_scalars",
             "button": "right"
-        },
-        {
-            "test": "search",
-            "searchString": "s_Nc",
-            "n2ElementCount": 4
         }
     ],
     "double_sellar": [
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_9.vMid",
             "arrowCount": 4
         },
         {
             "desc": "Left-click on partition tree element to zoom",
             "test": "click",
-            "selector": "g#tree rect#g1_d2_y2",
+            "selector": "g#tree rect#g1_d2",
             "button": "left"
         },
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "selector": "g#n2elements rect#cellShape_node_13.vMid",
             "arrowCount": 4
         },
         {
@@ -278,8 +308,8 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 matrix element and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_13_13.gMid",
-            "arrowCount": 3
+            "selector": "g#n2elements rect#cellShape_node_15.gMid",
+            "arrowCount": 4
         },
         {
             "desc": "Right-click on partition tree element to uncollapse",
@@ -296,7 +326,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over zoomed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_21_21.vMid",
+            "selector": "g#n2elements rect#cellShape_node_23.vMid",
             "arrowCount": 4
         },
         {
@@ -311,8 +341,8 @@ n2_gui_test_scripts = {
         {
             "desc": "Hover over collapsed N2 cell and check arrow count",
             "test": "hoverArrow",
-            "selector": "g#n2elements rect#cellShape_3_3.gMid",
-            "arrowCount": 3
+            "selector": "g#n2elements rect#cellShape_node_5.gMid",
+            "arrowCount": 4
         },
         {
             "desc": "Right-click again on solver element to uncollapse",
@@ -321,18 +351,17 @@ n2_gui_test_scripts = {
             "button": "right"
         },
         {
-            "test": "search",
-            "searchString": "d2.y2",
-            "n2ElementCount": 8
-        }
-    ],
-    "udpi_circuit": [
+            "desc": "Right-click on partition tree element to collapse",
+            "test": "click",
+            "selector": "g#tree rect#g1",
+            "button": "right"
+        },
         {
-            "desc": "Check the number of cells in the N2 Matrix",
-            "test": "count",
-            "selector": "g#n2elements > g.n2cell",
-            "count": 29
-        }
+            "desc": "Hover over N2 cell and check arrow count with collapsed group",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_node_17.vMid",
+            "arrowCount": 2
+        },
     ],
     "parabaloid": [
         {
@@ -344,7 +373,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Hit back button to uncollapse the indeps view",
             "test": "click",
-            "selector": "#backButtonId",
+            "selector": "#undo-graph",
             "button": "left"
         },
         {
@@ -371,7 +400,8 @@ n2_gui_test_scripts = {
             "selector": "rect#indeps",
             "n2ElementCount": 2
         }
-    ]
+    ],
+    "nan_value": []
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
@@ -382,29 +412,40 @@ class n2_gui_test_case(unittest.TestCase):
     async def handle_console_err(self, msg):
         """ Invoked any time that an error or warning appears in the log. """
         if msg.type == 'warning':
-            print("Warning: " + self.current_test_desc + "\n")
-            for m in msg:
-                print(msg + "\n")
+            self.console_warning = True
+            print('    Console Warning: ' + msg.text)
         elif msg.type == 'error':
-            self.fail(msg)
+            self.console_error = True
+            print('    Console Error: ' + msg.text)
 
-    async def setup_error_handlers(self):
+    async def handle_page_err(self, msg):
+        self.page_error = True
+        print('    Error on page: ', msg)
+
+    def setup_error_handlers(self):
+        self.console_warning = False
+        self.console_error = False
+        self.page_error = False
+
         self.page.on('console', lambda msg: self.handle_console_err(msg))
-        self.page.on('pageerror', lambda msg: self.fail(msg))
+        self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
 
     async def setup_browser(self):
         """ Create a browser instance and print user agent info. """
-        self.browser = await launch({
+        self.browser = await pyppeteer.launch({
             'defaultViewport': {
                 'width': 1600,
-                'height': 1200
-            }
+                'height': 900
+            },
+            'args': ['--start-fullscreen'],
+            'headless': True
         })
         userAgentStr = await self.browser.userAgent()
         print("Browser: " + userAgentStr + "\n")
 
         self.page = await self.browser.newPage()
-        await self.setup_error_handlers()
+        await self.page.bringToFront()
+        self.setup_error_handlers()
 
     def log_test(self, msg):
         global current_test
@@ -428,15 +469,9 @@ class n2_gui_test_case(unittest.TestCase):
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
 
-        if (self.current_model[:5] == 'udpi_'):
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser',
-                    '--use_declare_partial_info', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        else:
-            subprocess.run(
-                ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        subprocess.run(
+            ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
+            stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
@@ -484,7 +519,7 @@ class n2_gui_test_case(unittest.TestCase):
         Count the number of path elements in the n2arrows < div > and make
         sure it matches the specified value.
         """
-        await self.assert_element_count('g#n2arrows > path', expected_arrows)
+        await self.assert_element_count('g#n2arrows > g', expected_arrows)
 
     async def get_handle(self, selector):
         """ Get handle for a specific element and assert that it exists. """
@@ -535,25 +570,33 @@ class n2_gui_test_case(unittest.TestCase):
         """
 
         self.log_test("Return to root")
-        hndl = await self.get_handle("button#returnToRootButtonId.myButton")
+        hndl = await self.get_handle("#reset-graph")
         await hndl.click()
-        await self.page.waitFor(self.transition_wait)
+        await self.page.waitFor(self.transition_wait * 2)
 
     async def search_and_check_result(self, options):
         """
         Enter a string in the search textbox and check that the expected
         number of elements are shown in the N2 matrix.
         """
+        searchString = options['searchString']
         self.log_test(options['desc'] if 'desc' in options else
                       "Searching for '" + options['searchString'] +
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        hndl = await self.get_handle("div#toolbarLoc input#awesompleteId")
-        await hndl.type(options['searchString'])
-        await hndl.press('Enter')
-        await self.page.waitFor(self.transition_wait + 500)
+        # await self.page.hover(".searchbar-container")
+        await self.page.click("#searchbar-container")
+        await self.page.waitFor(500)
 
+        searchbar = await self.page.querySelector('#awesompleteId')
+        await searchbar.type(searchString + "\n")
+
+        # await self.page.waitFor(500)
+
+        # await self.page.keyboard.press('Backspace')
+        # await self.page.keyboard.press("Enter")
+        await self.page.waitFor(self.transition_wait + 500)
         await self.assert_element_count("g#n2elements > g.n2cell",
                                         options['n2ElementCount'])
 
@@ -601,6 +644,16 @@ class n2_gui_test_case(unittest.TestCase):
             await self.run_model_script(self.scripts[bname])
 
         await self.browser.close()
+
+        if self.console_error:
+            msg = "Console log contains errors."
+            print(msg)
+            self.fail(msg)
+
+        if self.page_error:
+            msg = "There were errors on the page."
+            print(msg)
+            self.fail(msg)
 
     @parameterized.expand(n2_gui_test_models)
     def test_n2_gui(self, basename):

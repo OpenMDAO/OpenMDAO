@@ -6,8 +6,7 @@ import unittest, itertools
 from numpy import array, linspace, sin, cos, pi
 
 from openmdao.api import ResponseSurface
-from openmdao.utils.assert_utils import assert_rel_error
-from six.moves import zip
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 def branin(x):
@@ -31,7 +30,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_near_equal(mu, y0, 1e-9)
 
     def test_1d_predictor(self):
         x = array([[0.0], [2.0], [3.0], [4.0], [6.0]])
@@ -43,7 +42,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
         new_x = array([pi])
         mu = surrogate.predict(new_x)
 
-        assert_rel_error(self, mu, 1.73114, 1e-4)
+        assert_near_equal(mu, 1.73114, 1e-4)
 
     def test_1d_ill_conditioned(self):
         # Test for least squares solver utilization when ill-conditioned
@@ -54,7 +53,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
         new_x = array([0.5])
         mu = surrogate.predict(new_x)
 
-        assert_rel_error(self, mu, sin(0.5), 1e-3)
+        assert_near_equal(mu, sin(0.5), 1e-3)
 
     def test_2d(self):
 
@@ -66,11 +65,11 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_near_equal(mu, y0, 1e-9)
 
         mu = surrogate.predict(array([.5, .5]))
 
-        assert_rel_error(self, mu, branin([.5, .5]), 1e-1)
+        assert_near_equal(mu, branin([.5, .5]), 1e-1)
 
     def test_no_training_data(self):
         surrogate = ResponseSurface()
@@ -89,7 +88,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
         y = array([[1.]])
 
         surrogate.train(x, y)
-        assert_rel_error(self, surrogate.betas, array([[1.], [0.], [0.]]), 1e-9)
+        assert_near_equal(surrogate.betas, array([[1.], [0.], [0.]]), 1e-9)
 
     def test_vector_input(self):
         surrogate = ResponseSurface()
@@ -101,7 +100,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_near_equal(mu, y0, 1e-9)
 
     def test_vector_output(self):
         surrogate = ResponseSurface()
@@ -113,7 +112,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
 
         for x0, y0 in zip(x, y):
             mu = surrogate.predict(x0)
-            assert_rel_error(self, mu, y0, 1e-9)
+            assert_near_equal(mu, y0, 1e-9)
 
     def test_scalar_derivs(self):
         surrogate = ResponseSurface()
@@ -124,7 +123,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
         surrogate.train(x, y)
         jac = surrogate.linearize(array([[0.]]))
 
-        assert_rel_error(self, jac[0][0], 1., 1e-3)
+        assert_near_equal(jac[0][0], 1., 1e-3)
 
     def test_vector_derivs(self):
         surrogate = ResponseSurface()
@@ -135,7 +134,7 @@ class TestResponseSurfaceSurrogate(unittest.TestCase):
 
         surrogate.train(x, y)
         jac = surrogate.linearize(array([[0.5, 0.5]]))
-        assert_rel_error(self, jac, array([[1, 1], [1, -1]]), 1e-5)
+        assert_near_equal(jac, array([[1, 1], [1, -1]]), 1e-5)
 
 
 if __name__ == "__main__":

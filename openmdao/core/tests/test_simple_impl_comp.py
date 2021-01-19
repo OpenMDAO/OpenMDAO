@@ -1,11 +1,10 @@
-from __future__ import division
 import numpy as np
 import unittest
 import scipy.sparse.linalg
 
 from openmdao.api import Problem, ImplicitComponent, Group
 from openmdao.api import LinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class CompA(ImplicitComponent):
@@ -73,7 +72,7 @@ class CompB(ImplicitComponent):
 class GroupG(Group):
 
     def __init__(self, **kwargs):
-        super(GroupG, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.add_subsystem('CA', CompA(), promotes=['*'])
         self.add_subsystem('CB', CompB(), promotes=['*'])
 
@@ -98,15 +97,15 @@ class Test(unittest.TestCase):
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-        d_outputs.set_const(1.0)
+        d_outputs.set_val(1.0)
         root.run_apply_linear(['linear'], 'fwd')
         output = d_residuals._data
-        assert_rel_error(self, output, [7, 3])
+        assert_near_equal(output, [7, 3])
 
-        d_residuals.set_const(1.0)
+        d_residuals.set_val(1.0)
         root.run_apply_linear(['linear'], 'rev')
         output = d_outputs._data
-        assert_rel_error(self, output, [7, 3])
+        assert_near_equal(output, [7, 3])
 
     def test_solve_linear(self):
         root = self.p.model
@@ -114,17 +113,17 @@ class Test(unittest.TestCase):
 
         d_inputs, d_outputs, d_residuals = root.get_linear_vectors()
 
-        d_residuals.set_const(11.0)
-        d_outputs.set_const(0.0)
+        d_residuals.set_val(11.0)
+        d_outputs.set_val(0.0)
         root.run_solve_linear(['linear'], 'fwd')
         output = d_outputs._data
-        assert_rel_error(self, output, [1, 5], 1e-10)
+        assert_near_equal(output, [1, 5], 1e-10)
 
-        d_outputs.set_const(11.0)
-        d_residuals.set_const(0.0)
+        d_outputs.set_val(11.0)
+        d_residuals.set_val(0.0)
         root.run_solve_linear(['linear'], 'rev')
         output = d_residuals._data
-        assert_rel_error(self, output, [1, 5], 1e-10)
+        assert_near_equal(output, [1, 5], 1e-10)
 
 
 if __name__ == '__main__':

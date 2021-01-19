@@ -1,17 +1,11 @@
 """Define the COOmatrix class."""
-from __future__ import division, print_function
-
-from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
 from scipy.sparse import coo_matrix, csc_matrix
 
-from six import iteritems
-from six.moves import range
-
 from collections import OrderedDict
 
-from openmdao.matrices.matrix import Matrix, _compute_index_map, sparse_types
+from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
 class COOMatrix(Matrix):
@@ -22,8 +16,6 @@ class COOMatrix(Matrix):
     ----------
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
-    _first_gather : bool
-        If True, this is the first time the matrix has been gathered (MPI only).
     """
 
     def __init__(self, comm, is_internal):
@@ -37,9 +29,8 @@ class COOMatrix(Matrix):
         is_internal : bool
             If True, this is the int_mtx of an AssembledJacobian.
         """
-        super(COOMatrix, self).__init__(comm, is_internal)
+        super().__init__(comm, is_internal)
         self._coo = None
-        self._first_gather = True
 
     def _build_coo(self, system):
         """
@@ -57,55 +48,41 @@ class COOMatrix(Matrix):
         """
         submats = self._submats
         metadata = self._metadata
-        pre_metadata = self._key_ranges = OrderedDict()
-        if system is None:
-            owns = None
-            iproc = 0
-            abs2meta = None
-        else:
-            owns = system._owning_rank
-            iproc = system.comm.rank
-            abs2meta = system._var_allprocs_abs2meta
+        key_ranges = self._key_ranges = OrderedDict()
 
         start = end = 0
-        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
-            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
-            if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
-                continue  # only keep stuff that this rank owns
+        for key, (info, loc, src_indices, shape, factor) in submats.items():
 
             val = info['value']
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
+            shape = val.shape
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    if wrt_dist:
-                        delta = np.prod(info['shape'])
-                    else:
-                        delta = full_size
+                    end += full_size
                 else:
-                    if wrt_dist:
-                        delta = info['shape'][0] * len(src_indices)
-                    else:
-                        delta = shape[0] * len(src_indices)
-            elif rows is None:  # sparse matrix
-                delta = val.data.size
-            else:  # list sparse format
-                delta = len(rows)
+                    end += shape[0] * len(src_indices)
 
-            end += delta
-            pre_metadata[key] = (start, end, dense, rows)
+            elif rows is None:  # sparse matrix
+                end += val.data.size
+            else:  # list sparse format
+                end += len(rows)
+
+            key_ranges[key] = (start, end, dense, rows)
             start = end
 
         data = np.zeros(end)
         rows = np.empty(end, dtype=int)
         cols = np.empty(end, dtype=int)
 
-        for key, (start, end, dense, jrows) in iteritems(pre_metadata):
+        for key, (start, end, dense, jrows) in key_ranges.items():
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
+            # _shape = val.shape
+            # assert _shape == shape
             idxs = None
 
             col_offset = row_offset = 0
@@ -169,7 +146,7 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
-        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor) in metadata.items():
             if idxs is None:
                 metadata[key] = (slice(start, end), jac_type, factor)
             else:
@@ -266,10 +243,10 @@ class COOMatrix(Matrix):
         ndarray or None
             The mask array or None.
         """
-        if len(d_inputs._views) > len(d_inputs._names):
+        if d_inputs._in_matvec_context():
             input_names = d_inputs._names
             mask = None
-            for key, val in iteritems(self._key_ranges):
+            for key, val in self._key_ranges.items():
                 if key[1] in input_names:
                     if mask is None:
                         mask = np.ones(self._matrix.data.size, dtype=np.bool)
@@ -294,8 +271,9 @@ class COOMatrix(Matrix):
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:
-            self._coo.data = self._coo.data.astype(np.complex)
-            self._coo.dtype = np.complex
+            if 'complex' not in self._coo.dtype.__str__():
+                self._coo.data = self._coo.data.astype(np.complex)
+                self._coo.dtype = np.complex
         else:
             self._coo.data = self._coo.data.real
             self._coo.dtype = np.float
@@ -315,36 +293,3 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
-
-    def _get_assembled_matrix(self, system):
-        assert self._is_internal
-        if self._first_gather:
-            self._first_gather = False
-
-            # only need to gather the row/col indices the first time. After that we only need
-            # the data.
-            all_mtx = system.comm.gather(self._coo, root=0)
-
-            if system.comm.rank == 0:
-                data = []
-                rows = []
-                cols = []
-                for i, mtx in enumerate(all_mtx):
-                    data.append(mtx.data)
-                    rows.append(mtx.row)
-                    cols.append(mtx.col)
-
-                data = np.hstack(data)
-                self._gathered_rows = rows = np.hstack(rows)
-                self._gathered_cols = cols = np.hstack(cols)
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
-        else:
-            all_data = system.comm.gather(self._coo.data, root=0)
-
-            if system.comm.rank == 0:
-                data = np.hstack(all_data)
-                rows = self._gathered_rows
-                cols = self._gathered_cols
-
-                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)

@@ -1,8 +1,5 @@
 """Define the base Solver, NonlinearSolver, and LinearSolver classes."""
 
-from __future__ import division, print_function
-
-from six import iteritems, reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -15,10 +12,10 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.general_utils import simple_warning
 from openmdao.core.component import Component
 
 _emptyset = set()
@@ -140,8 +137,8 @@ class Solver(object):
         Dict of list of var names to record
     _norm0: float
         Normalization factor
-    _solver_info : SolverInfo
-        A stack-like object shared by all Solvers in the model.
+    _problem_meta : dict
+        Problem level metadata.
     """
 
     # Object to store some formatting for iprint that is shared across all solvers.
@@ -161,7 +158,7 @@ class Solver(object):
         self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
-        self._solver_info = None
+        self._problem_meta = None
 
         # Solver options
         self.options = OptionsDictionary(parent_name=self.msginfo)
@@ -173,8 +170,6 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=None, allow_none=True,
-                             desc="Deprecated. Use 'err_on_non_converge'.")
         self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
@@ -192,7 +187,11 @@ class Solver(object):
                                        desc='Set to True to record outputs at the solver level')
         self.recording_options.declare('record_solver_residuals', types=bool, default=False,
                                        desc='Set to True to record residuals at the solver level')
-        self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
+        self.recording_options.declare('record_metadata', types=bool, desc='Deprecated. Recording '
+                                       'of metadata will always be done',
+                                       deprecation="The recording option, record_metadata, on "
+                                       "Solver is "
+                                       "deprecated. Recording of metadata will always be done",
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc="Patterns for variables to include in recording. \
@@ -233,6 +232,20 @@ class Solver(object):
         if self._system is None:
             return type(self).__name__
         return '{} in {}'.format(type(self).__name__, self._system().msginfo)
+
+    @property
+    def _recording_iter(self):
+        if self._problem_meta is None:
+            raise RuntimeError(f"{self.msginfo}: Can't access recording_iter because "
+                               "_setup_solvers has not been called.")
+        return self._problem_meta['recording_iter']
+
+    @property
+    def _solver_info(self):
+        if self._problem_meta is None:
+            raise RuntimeError(f"{self.msginfo}: Can't access solver_info because _setup_solvers "
+                               "has not been called.")
+        return self._problem_meta['solver_info']
 
     def _assembled_jac_solver_iter(self):
         """
@@ -276,8 +289,7 @@ class Solver(object):
         """
         self._system = weakref.ref(system)
         self._depth = depth
-        self._solver_info = system._solver_info
-        self._recording_iter = system._recording_iter
+        self._problem_meta = system._problem_meta
 
         if system.pathname:
             parent_name = self.msginfo
@@ -303,26 +315,19 @@ class Solver(object):
             excl = ['.'.join((system.pathname, i)) for i in excl]
 
         if self.recording_options['record_solver_residuals']:
-            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
+            myresiduals = [n for n in system._residuals._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
+            myoutputs = [n for n in system._outputs._abs_iter() if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
+            myinputs = [n for n in system._inputs._abs_iter() if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
             'input': myinputs,
             'output': myoutputs,
             'residual': myresiduals
         }
-
-        # Raise a deprecation warning for changed option.
-        if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
-            self.options['err_on_non_converge'] = self.options['err_on_maxiter']
-            warn_deprecation("The 'err_on_maxiter' option provides backwards compatibility "
-                             "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
-                             "instead.")
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -369,77 +374,6 @@ class Solver(object):
         Print header text before solving.
         """
         pass
-
-    def _solve(self):
-        """
-        Run the iterative solver.
-        """
-        maxiter = self.options['maxiter']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
-        iprint = self.options['iprint']
-
-        self._mpi_print_header()
-
-        self._iter_count = 0
-        norm0, norm = self._iter_initialize()
-
-        self._norm0 = norm0
-
-        self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
-            with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
-                self._iter_count += 1
-                self._run_apply()
-                norm = self._iter_get_norm()
-                # With solvers, we want to record the norm AFTER the call, but the call needs to
-                # be wrapped in the with for stack purposes, so we locally assign  norm & norm0
-                # into the class.
-                rec.abs = norm
-                rec.rel = norm / norm0
-
-            if norm0 == 0:
-                norm0 = 1
-            self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        system = self._system()
-        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
-            prefix = self._solver_info.prefix + self.SOLVER
-
-            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
-            # conditionals.
-            if np.isinf(norm) or np.isnan(norm):
-                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                      "iterations."
-                if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, system.pathname,
-                                              self._iter_count))
-
-                # Raise AnalysisError if requested.
-                if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                   self._iter_count))
-
-            # Solver hit maxiter without meeting desired tolerances.
-            elif (norm > atol and norm / norm0 > rtol):
-                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
-
-                if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, system.pathname,
-                                              self._iter_count))
-
-                # Raise AnalysisError if requested.
-                if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                   self._iter_count))
-
-            # Solver converged
-            elif iprint == 1:
-                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
-            elif iprint == 2:
-                print(prefix + ' Converged')
 
     def _iter_initialize(self):
         """
@@ -556,15 +490,11 @@ class Solver(object):
             return
 
         from openmdao.core.group import Group
-        if (isinstance(s, Group) and s._has_distrib_vars) or (isinstance(s, Component) and
-                                                              s.options['distributed']):
-            raise RuntimeError("%s has a %s solver and contains a distributed system." %
-                               (s.msginfo, type(self).__name__))
-
-        if not (np.all(s._var_sizes['nonlinear']['output']) and
-                np.all(s._var_sizes['nonlinear']['input'])):
-            raise RuntimeError("%s has a %s solver and contains remote variables." %
-                               (s.msginfo, type(self).__name__))
+        if (isinstance(s, Group) and (s._has_distrib_vars or s._contains_parallel_group)) or \
+           (isinstance(s, Component) and s.options['distributed']):
+            msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
+                "distributed component."
+            raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
 
 
 class NonlinearSolver(Solver):
@@ -586,7 +516,7 @@ class NonlinearSolver(Solver):
         **kwargs : dict
             options dictionary.
         """
-        super(NonlinearSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._err_cache = OrderedDict()
 
     def _declare_options(self):
@@ -597,6 +527,14 @@ class NonlinearSolver(Solver):
                              desc='If true, the values of input and output variables at '
                                   'the start of iteration are printed and written to a file '
                                   'after a failure to converge.')
+        self.options.declare('stall_limit', default=0,
+                             desc='Number of iterations after which, if the residual norms are '
+                                  'identical within the stall_tol, then terminate as if max '
+                                  'iterations were reached. Default is 0, which disables this '
+                                  'feature.')
+        self.options.declare('stall_tol', default=1e-12,
+                             desc='When stall checking is enabled, the threshold below which the '
+                                  'residual norm is considered unchanged.')
 
     def solve(self):
         """
@@ -604,11 +542,10 @@ class NonlinearSolver(Solver):
         """
         try:
             self._solve()
-        except Exception:
-            exc = sys.exc_info()
+        except Exception as err:
             if self.options['debug_print']:
                 self._print_exc_debug_info()
-            reraise(*exc)
+            raise err
 
     def _iter_initialize(self):
         """
@@ -633,6 +570,121 @@ class NonlinearSolver(Solver):
             norm = 1.0
         norm0 = norm if norm != 0.0 else 1.0
         return norm0, norm
+
+    def _solve(self):
+        """
+        Run the iterative solver.
+        """
+        maxiter = self.options['maxiter']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
+        iprint = self.options['iprint']
+        stall_limit = self.options['stall_limit']
+        stall_tol = self.options['stall_tol']
+
+        self._mpi_print_header()
+
+        self._iter_count = 0
+        norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
+        self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        stalled = False
+        stall_count = 0
+        if stall_limit > 0:
+            stall_norm = norm0
+
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+
+                if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+
+                    self.linesearch.options['print_bound_enforce'] = True
+
+                    if self._system().pathname:
+                        pathname = f"{self._system().pathname}."
+                    else:
+                        pathname = ""
+
+                    msg = (f"Your model has stalled three times and may be violating the bounds. "
+                           f"In the future, turn on print_bound_enforce in your solver options "
+                           f"here: \n{pathname}nonlinear_solver.linesearch.options"
+                           f"['print_bound_enforce']=True. "
+                           f"\nThe bound(s) being violated now are:\n")
+                    simple_warning(msg)
+
+                    self._single_iteration()
+                    self.linesearch.options['print_bound_enforce'] = False
+                else:
+                    self._single_iteration()
+
+                self._iter_count += 1
+                self._run_apply()
+                norm = self._iter_get_norm()
+
+                # Save the norm values in the context manager so they can also be recorded.
+                rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
+                rec.rel = norm / norm0
+
+                # Check if convergence is stalled.
+                if stall_limit > 0:
+                    rel_norm = rec.rel
+                    norm_diff = np.abs(stall_norm - rel_norm)
+                    if norm_diff <= stall_tol:
+                        stall_count += 1
+                        if stall_count >= stall_limit:
+                            stalled = True
+                    else:
+                        stall_count = 0
+                        stall_norm = rel_norm
+
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver hit maxiter without meeting desired tolerances.
+            # Or solver stalled.
+            elif (norm > atol and norm / norm0 > rtol) or stalled:
+
+                if stalled:
+                    msg = "Solver '{}' on system '{}' stalled after {} iterations."
+                else:
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
+            elif iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
@@ -668,7 +720,7 @@ class NonlinearSolver(Solver):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
         out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
-        for vec_type, views in iteritems(self._err_cache):
+        for vec_type, views in self._err_cache.items():
             out_strs.append('\n# nonlinear %s\n' % vec_type)
             out_strs.append(pprint.pformat(views))
             out_strs.append('\n')
@@ -690,13 +742,16 @@ class NonlinearSolver(Solver):
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
         system = self._system()
-        for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
-            system._transfer('nonlinear', 'fwd', isub)
+        for subsys, _ in system._subsystems_allprocs.values():
+            system._transfer('nonlinear', 'fwd', subsys.name)
 
-            if local:
-                subsys._solve_nonlinear()
-
-            system._check_child_reconf(subsys)
+            if subsys._is_local:
+                try:
+                    subsys._solve_nonlinear()
+                except AnalysisError as err:
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
+                        raise err
 
 
 class LinearSolver(Solver):
@@ -722,7 +777,7 @@ class LinearSolver(Solver):
         """
         self._rel_systems = None
         self._assembled_jac = None
-        super(LinearSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -762,7 +817,7 @@ class LinearSolver(Solver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(LinearSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
@@ -781,6 +836,76 @@ class LinearSolver(Solver):
             Set of names of relevant systems based on the current linear solve.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
+
+    def _solve(self):
+        """
+        Run the iterative solver.
+        """
+        maxiter = self.options['maxiter']
+        atol = self.options['atol']
+        rtol = self.options['rtol']
+        iprint = self.options['iprint']
+
+        self._mpi_print_header()
+
+        self._iter_count = 0
+        norm0, norm = self._iter_initialize()
+
+        self._norm0 = norm0
+
+        self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol:
+            with Recording(type(self).__name__, self._iter_count, self) as rec:
+                self._single_iteration()
+                self._iter_count += 1
+                self._run_apply()
+                norm = self._iter_get_norm()
+
+                # Save the norm values in the context manager so they can also be recorded.
+                rec.abs = norm
+                if norm0 == 0:
+                    norm0 = 1
+                rec.rel = norm / norm0
+
+            self._mpi_print(self._iter_count, norm, norm / norm0)
+
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+            prefix = self._solver_info.prefix + self.SOLVER
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver hit maxiter without meeting desired tolerances.
+            elif (norm > atol and norm / norm0 > rtol):
+                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
+            elif iprint == 1:
+                print(prefix + ' Converged in {} iterations'.format(self._iter_count))
+            elif iprint == 2:
+                print(prefix + ' Converged')
 
     def _run_apply(self):
         """
@@ -807,7 +932,7 @@ class BlockLinearSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BlockLinearSolver, self)._declare_options()
+        super()._declare_options()
         self.supports['assembled_jac'] = False
 
     def _setup_solvers(self, system, depth):
@@ -821,7 +946,7 @@ class BlockLinearSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(BlockLinearSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if system._use_derivatives:
             self._create_rhs_vecs()
 
@@ -830,17 +955,17 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
             else:
-                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
 
     def _update_rhs_vecs(self):
         system = self._system()
         for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name].asarray()
             else:
-                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name].asarray()
 
     def _set_complex_step_mode(self, active):
         """
@@ -900,7 +1025,7 @@ class BlockLinearSolver(LinearSolver):
 
         norm = 0
         for vec_name in system._lin_rel_vec_name_list:
-            b_vecs[vec_name]._data -= self._rhs_vecs[vec_name]
+            b_vecs[vec_name] -= self._rhs_vecs[vec_name]
             norm += b_vecs[vec_name].get_norm()**2
 
         return norm ** 0.5

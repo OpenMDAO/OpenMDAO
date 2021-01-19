@@ -2,10 +2,13 @@
 
 import os
 import unittest
+import warnings
 
-# from openmdao.utils.assert_utils import assert_rel_error
+# from openmdao.utils.assert_utils import assert_near_equal
+import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, get_conversion
+    add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
+from openmdao.utils.assert_utils import assert_warning, assert_near_equal
 
 
 class TestNumberDict(unittest.TestCase):
@@ -108,7 +111,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             x < z
         except TypeError as err:
-            self.assertEqual(str(err), "Incompatible units")
+            self.assertEqual(str(err), "Units 'd' and 'ft' are incompatible.")
         else:
             self.fail("Expecting TypeError")
 
@@ -131,7 +134,7 @@ class TestPhysicalUnit(unittest.TestCase):
             x * z
         except TypeError as err:
             self.assertEqual(
-                str(err), "cannot multiply units with non-zero offset")
+                str(err), "Can't multiply units: either 'g' or 'degC' has a non-zero offset.")
         else:
             self.fail("Expecting TypeError")
 
@@ -161,7 +164,7 @@ class TestPhysicalUnit(unittest.TestCase):
             x / z
         except TypeError as err:
             self.assertEqual(
-                str(err), "cannot divide units with non-zero offset")
+                str(err), "Can't divide units: either 'g' or 'degC' has a non-zero offset.")
         else:
             self.fail("Expecting TypeError")
 
@@ -183,7 +186,7 @@ class TestPhysicalUnit(unittest.TestCase):
             y**17
         except TypeError as err:
             self.assertEqual(
-                str(err), 'cannot exponentiate units with non-zero offset')
+                str(err), "Can't exponentiate unit 'degF' because it has a non-zero offset.")
         else:
             self.fail('Expecting TypeError')
 
@@ -192,14 +195,14 @@ class TestPhysicalUnit(unittest.TestCase):
             x**1.2
         except TypeError as err:
             self.assertEqual(
-                str(err), 'Only integer and inverse integer exponents allowed')
+                str(err), "Can't exponentiate unit 'm': only integer and inverse integer exponents are allowed.")
         else:
             self.fail('Expecting TypeError')
         try:
             x**(5.0 / 2.0)
         except TypeError as err:
             self.assertEqual(
-                str(err), 'Only integer and inverse integer exponents allowed')
+                str(err), "Can't exponentiate unit 'm': only integer and inverse integer exponents are allowed.")
         else:
             self.fail('Expecting TypeError')
 
@@ -227,7 +230,7 @@ class TestPhysicalUnit(unittest.TestCase):
         try:
             x.conversion_tuple_to(z1)
         except TypeError as err:
-            self.assertEqual(str(err), "Incompatible units")
+            self.assertEqual(str(err), "Units 'm' and 'degC' are incompatible.")
         else:
             self.fail("Expecting TypeError")
 
@@ -245,15 +248,46 @@ class TestPhysicalUnit(unittest.TestCase):
         y = x2 / (x1**2)
         self.assertEqual(y.name(), 'kg/m**2')
 
+    def test_unit_conversion(self):
+        self.assertEqual(unit_conversion('km', 'm'), (1000., 0.))
+
+        try:
+            unit_conversion('km', 1.0)
+        except ValueError as err:
+            self.assertEqual(str(err), "The units '1.0' are invalid.")
+        else:
+            self.fail("Expecting RuntimeError")
+
     def test_get_conversion(self):
+        msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
+        with assert_warning(DeprecationWarning, msg):
+            get_conversion('km', 'm'), (1000., 0.)
+
         self.assertEqual(get_conversion('km', 'm'), (1000., 0.))
 
         try:
             get_conversion('km', 1.0)
-        except RuntimeError as err:
-            self.assertEqual(str(err), "Cannot convert to new units: 1.0")
+        except ValueError as err:
+            self.assertEqual(str(err), "The units '1.0' are invalid.")
         else:
-            self.fail("Expecting RuntimeError")
+            self.fail("Expecting ValueError")
+
+    def test_unit_simplification(self):
+        test_strings = ['ft/s*s',
+                        'm/s*s',
+                        'm * ft * cm / km / m',
+                        's/s',
+                        'm ** 7 / m ** 5']
+
+        correct_strings = ['ft',
+                           'm',
+                           'ft*cm/km',
+                           None,
+                           'm**2']
+
+        for test_str, correct_str in zip(test_strings, correct_strings):
+            simplified_str = simplify_unit(test_str)
+            self.assertEqual(simplified_str, correct_str)
 
 
 class TestModuleFunctions(unittest.TestCase):
@@ -262,7 +296,7 @@ class TestModuleFunctions(unittest.TestCase):
             add_unit('ft', '20*m')
         except KeyError as err:
             self.assertEqual(
-                str(err), "'Unit ft already defined with different factor or powers'")
+                err.args[0], "Unit 'ft' already defined with different factor or powers.")
         else:
             self.fail("Expecting Key Error")
 
@@ -270,9 +304,76 @@ class TestModuleFunctions(unittest.TestCase):
             add_offset_unit('degR', 'degK', 20, 10)
         except KeyError as err:
             self.assertEqual(
-                str(err), "'Unit degR already defined with different factor or powers'")
+                err.args[0], "Unit 'degR' already defined with different factor or powers.")
         else:
             self.fail("Expecting Key Error")
+
+    def test_connect_unitless_to_none(self):
+        import warnings
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp())
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': None}))
+        p.model.connect('indeps.x', 'exec_comp.x')
+        p.model.connect('indeps.y', 'exec_comp.y')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_promote_unitless_and_none(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': None}),
+                              promotes_inputs=['x', 'y'])
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_promote_unitless_ivc_to_exec_comp(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp())
+        ivc.add_output('x', val=5.0, units=None)
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': '1/s*s'}, y={'units': None}))
+        p.model.connect('indeps.x', 'exec_comp.x')
+        p.model.connect('indeps.y', 'exec_comp.y')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            p.setup()
+
+        p.run_model()
+        assert_near_equal(p.get_val('exec_comp.z'), 15.0)
+
+    def test_incompatible(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['x', 'y'])
+        ivc.add_output('x', val=5.0, units='1/s*s')
+        ivc.add_output('y', val=10.0, units='Hz*s')
+        p.model.add_subsystem('exec_comp', om.ExecComp('z = x + y', z={'units': None},
+                                                       x={'units': None}, y={'units': 'ft'}),
+                              promotes_inputs=['x', 'y'])
+
+        msg = ("<model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
+               "units of 'ft' for 'exec_comp.y'.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+        self.assertEqual(str(cm.exception), msg)
 
 
 if __name__ == "__main__":

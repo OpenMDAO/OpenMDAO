@@ -15,21 +15,21 @@ class N2Search {
             'value': "",
             'containsDot': false,
             'baseName': ""
-            
+
         }
         this.filterSet = {};
 
         this.updateRecomputesAutoComplete = true;
 
         this.wordIndex = 0;
-        this.searchVals0 = [];
+        this.searchVals = [];
         this.inDataFunction = true;
 
         this.searchCollapsedUndo = []; // Non-matching nodes to be minimized/hidden.
 
         this.numMatches = 0;
         this.searchInputDiv = d3.select("#awesompleteId").node();
-        this.searchCountDiv = d3.select("#searchCountId").node();
+        this.searchCountDiv = d3.select("#searchCountId");
 
         this._setupAwesomplete();
         this._addEventListeners();
@@ -43,7 +43,7 @@ class N2Search {
             "minChars": 1,
             "maxItems": 15,
             "list": [],
-            "filter": function (text, input) {
+            "filter": function(text, input) {
                 if (self.inDataFunction) {
                     self.inDataFunction = false;
                     self.filterSet = {};
@@ -62,20 +62,20 @@ class N2Search {
                 return Awesomplete.FILTER_CONTAINS(text,
                     self.filteredWord.value);
             },
-            "item": function (text, input) {
+            "item": function(text, input) {
                 return Awesomplete.ITEM(text, self.filteredWord.value);
             },
-            "replace": function (text) {
+            "replace": function(text) {
                 let newVal = "";
                 let cursorPos = 0;
-                for (let i = 0; i < self.searchVals0.length; ++i) {
-                    newVal += ((i == self.wordIndex) ? text : self.searchVals0[i]) + " ";
+                for (let i = 0; i < self.searchVals.length; ++i) {
+                    newVal += ((i == self.wordIndex) ? text : self.searchVals[i]) + " ";
                     if (i == self.wordIndex) cursorPos = newVal.length - 1;
                 }
                 this.input.value = newVal;
                 self.searchInputDiv.setSelectionRange(cursorPos, cursorPos);
             },
-            "data": function (item/*, input*/) {
+            "data": function(item /*, input*/ ) {
                 self.inDataFunction = true;
                 if (self.filteredWord.containsDot) {
                     let baseIndex = item.toLowerCase().indexOf("." +
@@ -94,15 +94,12 @@ class N2Search {
     _addEventListeners() {
         let self = this;
 
-        window.addEventListener("awesomplete-selectcomplete", function (e) {
-            // User made a selection from dropdown.
-            // This is fired after the selection is applied
-            self.searchInputEventListener(e);
-            this.searchAwesomplete.evaluate();
-        }.bind(self), false);
+       d3.select('body').on('awesomplete-selectcomplete', function() {
+           self.searchInputEventListener();
+           self.searchAwesomplete.evaluate();
+       });
 
-        // Use Capture not bubble so that this will be the first input event
-        window.addEventListener('input', self.searchInputEventListener.bind(self), true);
+       d3.select('body').on('input', this.searchInputEventListener.bind(this));
     }
 
     /**
@@ -125,10 +122,10 @@ class N2Search {
 
         if (node === this.zoomedElement) return didMatch;
 
-        if (!didMatch && !node.hasChildren() && node.isParamOrUnknown()) {
+        if (!didMatch && !node.hasChildren() && node.isInputOrOutput()) {
             didMatch = regexMatch.test(node.absPathName);
             if (didMatch) {
-                // only params and unknowns can count as matches
+                // only inputs and outputs can count as matches
                 ++this.numMatches;
             }
             else if (undoList) {
@@ -154,22 +151,22 @@ class N2Search {
     _countMatches() {
         this.numMatches = 0;
 
-        if (this.searchVals0.length != 0)
-            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals0), null);
+        if (this.searchVals.length != 0)
+            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals), null);
     }
 
     /** Undo results of the previous search, and perform a new one. */
     performSearch() {
         for (let node of this.searchCollapsedUndo) {
             //auto undo on successive searches
-            if (!node.hasChildren() && node.isParamOrUnknown()) node.varIsHidden = false;
+            if (!node.hasChildren() && node.isInputOrOutput()) node.varIsHidden = false;
             else node.isMinimized = false;
         }
 
         this.numMatches = 0;
         this.searchCollapsedUndo = [];
-        if (this.searchVals0.length != 0)
-            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals0),
+        if (this.searchVals.length != 0)
+            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals),
                 this.searchCollapsedUndo);
 
     }
@@ -185,16 +182,18 @@ class N2Search {
         return new RegExp(regexStr, "i"); // case insensitive
     }
 
-    _isValid(value) { return value.length > 0; }
+    _isValid(value) {
+        return value.length > 0;
+    }
 
     /**
      * React to each value entered into the search input box.
      * @param {Event} e The object describing the keypress event.
      */
-    searchInputEventListener(e) {
+    searchInputEventListener() {
         testThis(this, 'N2Search', 'searchInputEventListener');
 
-        let target = e.target;
+        let target = d3.event.target;
         if (target.id != "awesompleteId") return;
 
         //valid characters AlphaNumeric : _ ? * space .
@@ -204,10 +203,10 @@ class N2Search {
             target.value = newVal; // won't trigger new event
         }
 
-        this.searchVals0 = target.value.split(" ");
+        this.searchVals = target.value.split(" ");
 
-        let filtered = this.searchVals0.filter(this._isValid);
-        this.searchVals0 = filtered;
+        let filtered = this.searchVals.filter(this._isValid);
+        this.searchVals = filtered;
 
         let lastLetterTypedIndex = target.selectionStart - 1;
 
@@ -222,7 +221,7 @@ class N2Search {
         this.filteredWord.value = sub.replace(/([^a-zA-Z0-9:_\.])/g, "");
 
         let i = 0;
-        for (let val of this.searchVals0) {
+        for (let val of this.searchVals) {
             if (val.replace(/([^a-zA-Z0-9:_\.])/g, "") == this.filteredWord.value) {
                 this.wordIndex = i;
                 break;
@@ -237,7 +236,7 @@ class N2Search {
             this.filteredWord.value.split(".")[0].trim() : "";
 
         this._countMatches();
-        this.searchCountDiv.innerHTML = "" + this.numMatches + " matches";
+        this.searchCountDiv.html("" + this.numMatches + " matches");
     }
 
     /**
@@ -269,12 +268,8 @@ class N2Search {
         if (node === this.zoomedElement) return;
 
         let nodeName = node.name;
-        if (node.splitByColon && node.hasChildren()) nodeName += ":";
-        if (node.isParamOrUnknown()) nodeName += ".";
+        if (! node.isInputOrOutput()) nodeName += ".";
         let namesToAdd = [nodeName];
-
-        if (node.splitByColon) namesToAdd.push(node.colonName +
-            ((node.hasChildren()) ? ":" : ""));
 
         for (let name of namesToAdd) {
             if (!this.autoComplete.names.set.hasOwnProperty(name)) {

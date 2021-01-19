@@ -6,7 +6,6 @@
 import os
 import shutil
 import re
-from six import PY3
 
 
 def make_tagdir():
@@ -31,14 +30,9 @@ def make_tagfiles(docdirs, tagdir):
                 # The path to the file being read for tags
                 sourcefile = os.path.join(dirpath, filename)
                 # A file object for the file being read for tags
-                if PY3:
-                    with open(sourcefile, 'r', encoding="latin-1") as textfile:
-                        # The text of the entire sourcefile
-                        filetext = textfile.read()
-                else:
-                    with open(sourcefile, 'r') as textfile:
-                        # The text of the entire sourcefile
-                        filetext = textfile.read()
+                with open(sourcefile, 'r', encoding="latin-1") as textfile:
+                    # The text of the entire sourcefile
+                    filetext = textfile.read()
                 # Pull all tag directives out of the filetext
                 matches = re.findall(".. tags::.*$", filetext)
 

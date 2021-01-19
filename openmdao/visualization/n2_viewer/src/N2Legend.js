@@ -1,240 +1,271 @@
 /**
- * Draw a box under the diagram describing each of the element types.
+ * Draw a symbol describing each of the element types.
  * @typedef N2Legend
- * @property {String} title The label to put at the top of the legend.
  * @property {Boolean} shown Whether the legend is currently drawn or not.
  */
 class N2Legend {
     /**
-     * Initializes the legend object, but doesn't draw it yet.
-     * @param {String} [title = "LEGEND"] The label at the top of the legend box.
+     * Initializes the legend object.
+     * @param {ModelData} modelData Symbols are only displayed if they're in the model
      */
-    constructor(title = "LEGEND") {
-        this.title = title;
-        this.shown = false; // Not shown until show() is called
+    constructor(modelData) {
+        this._div = d3.select("#legend-div");
 
-        this._elementSize = 30; // The base width & height of each legend item
-        this._xOffset = 10; // Left-margin width
-        this._columnWidth = 250; // The width of each column in pixels
+        // TODO: The legend should't have to search through modelData itself,
+        // this info can be collected as modelData is built.
+        this.nodes = modelData.tree.children;
+        this.showSysVar = {
+            'group': false,
+            'component': false,
+            'input': false,
+            'desvars': false,
+            'unconnectedInput': false,
+            'autoivcInput': false,
+            'outputExplicit': false,
+            'outputImplicit': false,
+            'collapsed': true,
+            'connection': true,
+            'declaredPartial': true
+        };
 
-        // Overall legend sizes
-        let numColumns = 3;
-        this._width = this._columnWidth * numColumns;
-        this._height = 500;
+        this.showN2Symbols = {
+            'scalar': false,
+            'vector': false,
+            'collapsedVariables': false
+        };
 
-        // Individual element sizes
-        this._elemDims = {
-            'x': this._elementSize * .5,
-            'y': this._elementSize * .5,
-            'topLeft': { 'x': this._elementSize * -.5, 'y': this._elementSize * -.5 },
-            'bottomRight': { 'x': this._elementSize * .5, 'y': this._elementSize * .5 },
-            'size': { 'width': this._elementSize, 'height': this._elementSize }
-        }
-
-        // The HTML parent element to draw in.
-        this._div = d3.select("div#legend")
-            .style("width", this._width + "px")
-            .style("height", this._height + "px");
-
-        // Colors of each variable/system type
-        this._colors = [
-            { 'name': "Group", 'color': N2Style.color.group },
-            { 'name': "Component", 'color': N2Style.color.component },
-            { 'name': "Input", 'color': N2Style.color.param },
-            { 'name': "Unconnected Input", 'color': N2Style.color.unconnectedParam },
-            { 'name': "Output Explicit", 'color': N2Style.color.unknownExplicit },
-            { 'name': "Output Implicit", 'color': N2Style.color.unknownImplicit },
+        this.sysAndVar = [
+            { 'name': "Connection", 'color': N2Style.color.connection },
             { 'name': "Collapsed", 'color': N2Style.color.collapsed },
-            { 'name': "Connection", 'color': N2Style.color.connection }
+            { 'name': "Declared Partial", 'color': N2Style.color.declaredPartial}
         ];
 
-        // Name and renderer object for each symbol type
-        let symColor = N2Style.color.unknownExplicit;
-        this._symbols = [
-            { 'name': 'Scalar', 'cell': new N2ScalarCell(symColor) },
-            { 'name': 'Vector', 'cell': new N2VectorCell(symColor) },
-            { 'name': 'Collapsed variables', 'cell': new N2GroupCell(symColor) }
-        ];
-    }
-
-    /**
-     * Create a square, white border for a symbol.
-     * @param {Array} svgGrp D3 selection of a previously-created SVG <g> element.
-     */
-    _createElementBorder(svgGrp) {
-        svgGrp.append("rect")
-            .attr("x", -this._elemDims.x)
-            .attr("y", -this._elemDims.y)
-            .attr("width", this._elemDims.size.width)
-            .attr("height", this._elemDims.size.height)
-            .style("stroke-width", 2)
-            .style("stroke", "white")
-            .style("fill", "none");
-    }
-
-    /**
-     * Add SVG text label to the legend.
-     * @param {Array} svgGrp D3 selection of a previously-created SVG <g> element.
-     * @param {String} label The label to insert.
-     */
-    _createText(svgGrp, label) {
-        svgGrp.append("svg:text")
-            .attr("x", this._elemDims.x + 5)
-            .attr("y", 0)
-            .attr("dy", ".35em")
-            .attr("font-size", 20)
-            .text(label)
-            .style("fill", "black");
-    }
-
-    /**
-     * Add a colored rectangle to the legend.
-     * @param {Array} svgGrp D3 selection of a previously-created SVG <g> element.
-     * @param {String} color The value of the fill color.
-     */
-    _drawLegendColor(svgGrp, color) {
-        let shape = svgGrp.append("rect")
-            .attr("class", "colorMid")
-            .style("fill", color);
-
-        return shape.attr("x", -this._elemDims.x)
-            .attr("y", -this._elemDims.y)
-            .attr("width", this._elemDims.x * 2)
-            .attr("height", this._elemDims.y * 2)
-            .style("stroke-width", 0)
-            .style("fill-opacity", 1);
-    }
-
-    /** Create an SVG group and text element containing the main title. */
-    _addMainTitle() {
-        let titleGrp = this.svg.append("g")
-            .attr("transform", "translate(" + (this._width * .5) + ",15)");
-
-        titleGrp.append("svg:text")
-            .attr("text-anchor", "middle")
-            .attr("dy", ".35em")
-            .attr("font-size", 30)
-            .attr("text-decoration", "underline")
-            .text(this.title)
-            .style("fill", "black");
-    }
-
-    /**
-     * For each column, create an SVG group and text element with its title.
-     * @param {Boolean} showLinearSolverNames Whether linear or non-linear solvers are viewed.
-     */
-    _addColumnTitles(showLinearSolverNames) {
-        let titles = [
-            "Systems & Variables",
-            "N^2 Symbols",
-            showLinearSolverNames ? " Linear Solvers" : "Nonlinear Solvers"
+        this.n2Symbols = [];
+        const rootLinearSolver =
+            N2Style.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
+        const rootNonLinearSolver =
+            N2Style.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
+        this.linearSolvers = [
+            { 'name': modelData.tree.linear_solver, 'color': rootLinearSolver.color }
         ];
 
-        for (let i = 0; i < titles.length; ++i) {
-            let columnTitleGrp = this.svg.append("g")
-                .attr("transform", "translate(" +
-                    (this._columnWidth * i + this._xOffset) + ",60)");
+        this.nonLinearSolvers = [
+            { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
+        ];
 
-            columnTitleGrp.append("svg:text")
-                .attr("dy", ".35em")
-                .attr("font-size", 24)
-                .attr("text-decoration", "underline")
-                .text(titles[i])
-                .style("fill", "black");
-        }
+        this._setDisplayBooleans(this.nodes);
+        this._setupContents();
+
+        // Get the initial setting from the style sheet
+        this.hidden = (this._div.style('visibility') == 'hidden');
+
+        this._setupDrag();
+
+        let self = this;
+        this.closeDiv = d3.select('#close-legend');
+        this.closeButton = this.closeDiv.select('p');
+
+        this.closeDiv
+            .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
+            .on('mouseout', e => { self.closeButton.style('color', 'black'); })
+            .on('click', e => {
+                self.hide();
+                self.closeButton.style('color', 'black');
+                d3.select('#legend-button').attr('class', 'fas icon-key');
+            })
     }
 
-    /** Draw a colored rectangle for each system/variable type in the first column. */
-    _drawColors() {
-        let i = 0;
+    _setDisplayBooleans(nodes) {
+        for (let node of nodes) {
+            const {
+                group,
+                component,
+                desvar,
+                input,
+                unconnectedInput,
+                outputExplicit,
+                outputImplicit,
+                collapsed,
+                connection,
+                declaredPartial
+            } = this.showSysVar;
 
-        for (let color of this._colors) {
-            let el = this.svg.append("g")
-                .attr("transform", "translate(" +
-                    (this._xOffset + this._elemDims.x) + "," +
-                    (80 + i + this._elemDims.y) + ")");
-            this._drawLegendColor(el, color.color, false);
-            this._createText(el, color.name);
-            i += 40;
-        }
-    }
+            const linearSolver = node.linear_solver;
+            const nonLinearSolver = node.nonlinear_solver;
 
-    /** Render a shape for each symbol type in the second column. */
-    _drawSymbols() {
-        let yOffset = 0;
+            const linearSolverIndex =
+                this.linearSolvers.indexOf(this.linearSolvers.find(x => x.name === linearSolver))
+            const nonLinearSolverIndex =
+                this.nonLinearSolvers.indexOf(this.nonLinearSolvers.find(x => x.name === nonLinearSolver));
 
-        for (let sym of this._symbols) {
-            let svgGrp = this.svg.append("g")
-                .attr("transform", "translate(" + (this._columnWidth + this._xOffset
-                    + this._elemDims.x) + "," + (80 + yOffset + this._elemDims.y) + ")");
+            if (linearSolverIndex < 0 && linearSolver !== undefined) {
+                let solverStyle = N2Style.solverStyleObject.find(x => x.ln === linearSolver);
+                this.linearSolvers.push({
+                    'name': solverStyle.ln,
+                    'color': solverStyle.color
+                });
+            }
 
-            sym.cell.render(svgGrp.node(), this._elemDims, true);
+            if (nonLinearSolverIndex < 0 && nonLinearSolver !== undefined) {
+                let solverStyle = N2Style.solverStyleObject.find(x => x.nl === nonLinearSolver);
+                this.nonLinearSolvers.push({
+                    'name': solverStyle.nl,
+                    'color': solverStyle.color
+                });
+            }
 
-            this._createElementBorder(svgGrp);
-            this._createText(svgGrp, sym.name);
-            yOffset += 40;
-        }
-    }
-
-    /**
-     * Render a colored rectangle for each solver in the third column, depending
-     * on whether linear or non-linear ones are selected.
-     * @param {Boolean} showLinearSolverNames Determines solver name type displayed.
-     * @param {Object} solverStyles Solver names, types, and styles including color.
-     */
-    _drawSolverColors(showLinearSolverNames, solverStyles) {
-        let yOffset = 0;
-        for (let solverName in solverStyles) {
-            let solver = solverStyles[solverName];
-            if ((solver.type == 'linear' && showLinearSolverNames) ||
-                (solver.type == 'nonLinear' && !showLinearSolverNames)) {
-                let el = this.svg.append("g")
-                    .attr("transform", "translate(" + (this._columnWidth * 2 + this._xOffset +
-                        this._elemDims.x) + "," + (80 + yOffset + this._elemDims.y) + ")");
-                this._drawLegendColor(el, solver.style.fill, false);
-                this._createText(el, solverName);
-                yOffset += 40;
+            if (node.hasChildren()) {
+                if (!this.showSysVar.group && node.isGroup()) {
+                    this.showSysVar.group = true;
+                    this.sysAndVar.push({
+                        'name': 'Group',
+                        'color': N2Style.color.group
+                    })
+                }
+                else if (!this.showSysVar.component && node.isComponent()) {
+                    this.showSysVar.component = true;
+                    this.sysAndVar.push({
+                        'name': 'Component',
+                        'color': N2Style.color.component
+                    })
+                }
+                this._setDisplayBooleans(node.children);
+            }
+            else {
+                if (!this.showSysVar.input && node.isInput()) {
+                    this.showSysVar.input = true;
+                    this.sysAndVar.push({
+                        'name': 'Input',
+                        'color': N2Style.color.input
+                    })
+                }
+                else if (!this.showSysVar.outputExplicit && node.isExplicitOutput()) {
+                    this.showSysVar.outputExplicit = true;
+                    this.sysAndVar.push({
+                        'name': 'Explicit Output',
+                        'color': N2Style.color.outputExplicit
+                    })
+                }
+                else if (!this.showSysVar.outputImplicit && node.isImplicitOutput()) {
+                    this.showSysVar.outputImplicit = true;
+                    this.sysAndVar.push({
+                        'name': 'Implicit Output',
+                        'color': N2Style.color.outputImplicit
+                    })
+                }
+                else if (!this.showSysVar.autoivcInput && node.isAutoIvcInput()) {
+                    this.showSysVar.autoivcInput = true;
+                    this.sysAndVar.push({
+                        'name': 'Auto-IVC Input',
+                        'color': N2Style.color.autoivcInput
+                    })
+                }
+                else if (!this.showSysVar.unconnectedInput && node.isUnconnectedInput()) {
+                    this.showSysVar.unconnectedInput = true;
+                    this.sysAndVar.push({
+                        'name': 'Unconnected Input',
+                        'color': N2Style.color.unconnectedInput
+                    })
+                }
+                else if (!this.showSysVar.desvar) {
+                    this.showSysVar.desvar = true;
+                    this.sysAndVar.push({
+                        'name': 'Optimization Variables',
+                        'color': N2Style.color.desvar
+                    })
+                }
             }
         }
     }
 
-    /** Remove all legend SVG elements. */
-    _clear() {
-        this._div.node().innerHTML = "";
+    /**
+     * Create elements in the legend divs for the supplied item
+     * @param {Object} item Contains the name and color of the item
+     * @param {Object} container The div to append into
+     */
+    _addItem(item, container) {
+        const newDiv = container
+            .append('div')
+            .attr('class', 'legend-box-container');
+
+        newDiv.append('div')
+            .attr('class', 'legend-box')
+            .style('background-color', item.color);
+
+        newDiv.append('p')
+            .html(item.name);
     }
 
-    /** Remove all legend SVG elements and mark as not shown. */
+    /** Add symbols for all of the items that were discovered */
+    _setupContents() {
+        const sysVarContainer = d3.select('#sys-var-legend');
+        for (let item of this.sysAndVar) this._addItem(item, sysVarContainer);
+
+        sysVarContainer.style('width', sysVarContainer.node().scrollWidth + 'px')
+
+        const solversLegend = d3.select('#solvers-legend')
+        for (let item of this.linearSolvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
+
+    }
+
+    /** Listen for the event to begin dragging the legend */
+    _setupDrag() {
+        const self = this;
+
+        this._div.on('mousedown', function() {
+            let dragDiv = d3.select(this);
+            dragDiv.style('cursor', 'grabbing')
+                // top style needs to be set explicitly before releasing bottom:
+                .style('top', dragDiv.style('top'))
+                .style('bottom', 'initial');
+
+            self._startPos = [d3.event.clientX, d3.event.clientY]
+            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
+                d3.event.clientY - parseInt(dragDiv.style('top'))];
+
+            let w = d3.select(window)
+                .on("mousemove", e => {
+                    dragDiv
+                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
+                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
+                })
+                .on("mouseup", e => {
+                    dragDiv.style('cursor', 'grab');
+                    w.on("mousemove", null).on("mouseup", null);
+                });
+
+            d3.event.preventDefault();
+        })
+    }
+
     hide() {
-        this._clear();
-        this.shown = false;
+        this._div.style('visibility', 'hidden');
+        this.hidden = true;
+    }
+
+    show() {
+        this._div.style('visibility', 'visible');
+        this.hidden = false;
     }
 
     /**
-     * Remove any existing SVG elements, create a new SVG element with
-     * a background rect, and add all of the other pieces.
-     * @param {Boolean} showLinearSolverNames Determines solver name type displayed.
-     * @param {Object} solverStyles Solver names, types, and styles including color.
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
-    show(showLinearSolverNames, solverStyles) {
-        // Clear anything that might already be in there
-        this._clear();
-        this.shown = true;
+    toggleSolvers(linear) {
 
-        this.svg = this._div.append("svg:svg")
-            .attr("id", "legendSVG")
-            .attr("width", this._width)
-            .attr("height", this._height);
+        const solversLegendTitle = d3.select('#solvers-legend-title');
+        solversLegendTitle.text(linear ? "Linear Solvers" : "Non-Linear Solvers");
 
-        this.svg.append("rect")
-            .attr("class", "background")
-            .attr("width", this._width)
-            .attr("height", this._height);
+        const solversLegend = d3.select('#solvers-legend');
+        solversLegend.html('');
 
-        this._addMainTitle();
-        this._addColumnTitles(showLinearSolverNames);
-        this._drawColors();
-        this._drawSymbols();
-        this._drawSolverColors(showLinearSolverNames, solverStyles);
+        const solvers = linear ? this.linearSolvers : this.nonLinearSolvers;
+        for (let item of solvers) this._addItem(item, solversLegend);
+
+        solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }
 
     /**
@@ -243,7 +274,7 @@ class N2Legend {
      * @param {Object} solverStyles Solver names, types, and styles including color.
      */
     toggle(showLinearSolverNames, solverStyles) {
-        if (this.shown) this.hide();
-        else this.show(showLinearSolverNames, solverStyles);
+        if (this.hidden) this.show();
+        else this.hide();
     }
 }

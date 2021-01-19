@@ -20,7 +20,7 @@ class Circuit(om.Group):
         # self.connect('D1.I', 'n2.I_out:0') # commented out so there is an unconnected input
                                              # example for docs for the N2 diagram
 
-        self.nonlinear_solver = om.NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
         self.linear_solver = om.DirectSolver()
@@ -28,12 +28,10 @@ class Circuit(om.Group):
 p = om.Problem()
 model = p.model
 
-model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
-model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
-model.add_subsystem('circuit', Circuit())
-
-model.connect('source.I', 'circuit.I_in')
-model.connect('ground.V', 'circuit.Vg')
+model.set_input_defaults('ground.V', 0., units='V')
+model.set_input_defaults('source.I', 0.1, units='A')
+model.add_subsystem('circuit', Circuit(),
+                    promotes_inputs=[('Vg', 'ground.V'), ('I_in', 'source.I')])
 
 model.add_design_var('ground.V')
 model.add_design_var('source.I')

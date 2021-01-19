@@ -17,7 +17,7 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    return rel_name if system.pathname is '' else system.pathname + '.' + rel_name
+    return rel_name if system.pathname == '' else system.pathname + '.' + rel_name
 
 
 def abs_name2rel_name(system, abs_name):
@@ -36,7 +36,7 @@ def abs_name2rel_name(system, abs_name):
     str
         Relative variable name.
     """
-    return abs_name if system.pathname is '' else abs_name[len(system.pathname) + 1:]
+    return abs_name if system.pathname == '' else abs_name[len(system.pathname) + 1:]
 
 
 def rel_key2abs_key(system, rel_key):
@@ -142,26 +142,70 @@ def name2abs_name(system, name):
         The type ('input' or 'output') of the corresponding variable.
     """
     if name in system._var_allprocs_abs2prom['output']:
-        return (name, 'output')
+        return name
     if name in system._var_allprocs_abs2prom['input']:
-        return (name, 'input')
+        return name
 
     if name in system._var_allprocs_prom2abs_list['output']:
-        abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-        return (abs_name, 'output')
+        return system._var_allprocs_prom2abs_list['output'][name][0]
 
-    # This will raise an exception if name is not unique
+    # This may raise an exception if name is not unique
     abs_name = prom_name2abs_name(system, name, 'input')
     if abs_name is not None:
-        return (abs_name, 'input')
+        return abs_name
 
     abs_name = rel_name2abs_name(system, name)
     if abs_name in system._var_allprocs_abs2prom['output']:
-        return (abs_name, 'output')
+        return abs_name
     elif abs_name in system._var_allprocs_abs2prom['input']:
-        return (abs_name, 'input')
+        return abs_name
 
-    return None, None
+
+def name2abs_names(system, name):
+    """
+    Map the given promoted, relative, or absolute name to any matching absolute names.
+
+    This will also match any buried promotes.
+
+    Parameters
+    ----------
+    system : <System>
+        System to which name is relative.
+    name : str
+        Promoted or relative variable name in the owning system's namespace.
+
+    Returns
+    -------
+    tuple or list of str
+        Tuple or list of absolute variable names found.
+    """
+    # first check relative promoted names
+    if name in system._var_allprocs_prom2abs_list['output']:
+        return system._var_allprocs_prom2abs_list['output'][name]
+
+    if name in system._var_allprocs_prom2abs_list['input']:
+        return system._var_allprocs_prom2abs_list['input'][name]
+
+    # then check absolute names
+    if name in system._var_allprocs_abs2prom['output']:
+        return (name,)
+    if name in system._var_allprocs_abs2prom['input']:
+        return (name,)
+
+    # then check global promoted names, including buried promotes
+    if name in system._problem_meta['prom2abs']['output']:
+        absnames = system._problem_meta['prom2abs']['output'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['output']:
+            return absnames
+
+    if name in system._problem_meta['prom2abs']['input']:
+        absnames = system._problem_meta['prom2abs']['input'][name]
+        # reduce scope to this system
+        if absnames[0] in system._var_allprocs_abs2prom['input']:
+            return absnames
+
+    return ()
 
 
 def prom_key2abs_key(system, prom_key):
@@ -183,8 +227,9 @@ def prom_key2abs_key(system, prom_key):
     (str, str) or None
         Absolute name pair of sub-Jacobian or None is prom_key is invalid.
     """
-    abs_name1in = prom_name2abs_name(system, prom_key[1], 'input')
-    abs_name1out = prom_name2abs_name(system, prom_key[1], 'output')
+    of, wrt = prom_key
+    abs_name1in = prom_name2abs_name(system, wrt, 'input')
+    abs_name1out = prom_name2abs_name(system, wrt, 'output')
     if abs_name1in is None and abs_name1out is None:
         return None
     elif abs_name1in is None:
@@ -193,9 +238,9 @@ def prom_key2abs_key(system, prom_key):
         abs_name1 = abs_name1in
     else:
         msg = 'The promoted name "{}" is invalid because it is non-unique.'
-        raise KeyError(msg.format(prom_key[1]))
+        raise KeyError(msg.format(wrt))
 
-    abs_name0 = prom_name2abs_name(system, prom_key[0], 'output')
+    abs_name0 = prom_name2abs_name(system, of, 'output')
     if abs_name0 is not None:
         return (abs_name0, abs_name1)
 
@@ -227,7 +272,9 @@ def key2abs_key(system, key):
         return abs_key
 
     abs_key = rel_key2abs_key(system, key)
-    if abs_key[0] in system._var_abs2meta and abs_key[1] in system._var_abs2meta:
+    if abs_key[0] in system._var_abs2meta['output'] and \
+            (abs_key[1] in system._var_abs2meta['input'] or
+             abs_key[1] in system._var_abs2meta['output']):
         return abs_key
     else:
         return None

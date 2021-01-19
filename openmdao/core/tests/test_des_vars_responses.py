@@ -1,17 +1,10 @@
 """ Unit tests for the design_variable and response interface to system."""
-from __future__ import print_function
-
-from six.moves import range
-
 import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov,  \
-    IndepVarComp, ScipyOptimizeDriver
-from openmdao.utils.assert_utils import assert_rel_error
+import openmdao.api as om
 from openmdao.utils.mpi import MPI
-
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
 
@@ -23,37 +16,12 @@ except ImportError:
 
 class TestDesVarsResponses(unittest.TestCase):
 
-    def test_api_backwards_compatible(self):
-        raise unittest.SkipTest("api not implemented yet")
-
-        prob = Problem()
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
-
-        prob.driver = ScipyOpt()
-        prob.driver.options['method'] = 'slsqp'
-        prob.driver.add_design_var('x', lower=-100, upper=100)
-        prob.driver.add_design_var('z', lower=-100, upper=100)
-        prob.driver.add_objective('obj')
-        prob.driver.add_constraint('con1')
-        prob.driver.add_constraint('con2')
-
-        prob.setup()
-
-        des_vars = prob.model.get_des_vars()
-        obj = prob.model.get_objectives()
-        constraints = prob.model.get_constraints()
-
-        self.assertItemsEqual(des_vars.keys(), ('x', 'z'))
-        self.assertItemsEqual(obj.keys(), ('obj',))
-        self.assertItemsEqual(constraints.keys(), ('con1', 'con2'))
-
     def test_api_on_model(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -67,16 +35,16 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
     def test_api_response_on_model(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -91,17 +59,17 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj'})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
         self.assertEqual(set(responses.keys()), {'obj_cmp.obj', 'con_cmp1.con1', 'con_cmp2.con2'})
 
     def test_api_list_on_model(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=[-100, -20], upper=[100, 20])
@@ -115,16 +83,16 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
     def test_api_array_on_model(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z',
@@ -140,16 +108,16 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
     def test_api_iter_on_model(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=range(-101, -99),
@@ -166,34 +134,34 @@ class TestDesVarsResponses(unittest.TestCase):
         obj = prob.model.get_objectives()
         constraints = prob.model.get_constraints()
 
-        self.assertEqual(set(des_vars.keys()), {'px.x', 'pz.z'})
+        self.assertEqual(set(des_vars.keys()), {'x', 'z'})
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
     def test_api_on_subsystems(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0))
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
 
         model.add_subsystem('d1', SellarDis1withDerivatives())
         model.add_subsystem('d2', SellarDis2withDerivatives())
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0))
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0))
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
 
         model.connect('px.x', ['d1.x', 'obj_cmp.x'])
         model.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
         model.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
         model.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.linear_solver = om.ScipyKrylov()
 
         px = prob.model.px
         px.add_design_var('x', lower=-100, upper=100)
@@ -220,29 +188,89 @@ class TestDesVarsResponses(unittest.TestCase):
         self.assertEqual(set(obj.keys()), {'obj_cmp.obj',})
         self.assertEqual(set(constraints.keys()), {'con_cmp1.con1', 'con_cmp2.con2'})
 
+    def test_units_checking(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+        G1.add_subsystem('C2', om.ExecComp('yy = 4.*xx', xx={'units': 'm'}), promotes=['xx'])
+
+        # Constraints
+
+        with self.assertRaises(ValueError) as cm:
+            G1.add_constraint('y', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid for response 'y'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.add_constraint('y', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None for response 'y'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        G1.add_constraint('y', units='ft*ft/ft')
+        self.assertEqual(G1._static_responses['y']['units'], 'ft')
+
+        # Objectives
+
+        with self.assertRaises(ValueError) as cm:
+            G1.add_objective('yy', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid for response 'yy'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.add_objective('yy', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None for response 'yy'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # Simplification
+        G1.add_objective('yy', units='ft*ft/ft')
+        self.assertEqual(G1._static_responses['yy']['units'], 'ft')
+
+        # Design Variables
+
+        with self.assertRaises(ValueError) as cm:
+            G1.add_design_var('x', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid for design_var 'x'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.add_design_var('x', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None for design_var 'x'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # Simplification
+        G1.add_design_var('x', units='ft*ft/ft')
+        self.assertEqual(G1._static_design_vars['x']['units'], 'ft')
+
 
 class TestDesvarOnModel(unittest.TestCase):
 
     def test_design_var_not_exist(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('junk')
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for design variable 'junk'.")
+        self.assertEqual(str(context.exception), "<model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_design_var('x', lower=-100, upper=100, ref=1.0,
@@ -278,10 +306,10 @@ class TestDesvarOnModel(unittest.TestCase):
 
     def test_desvar_affine_mapping(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100, ref0=-100.0,
                                   ref=100)
@@ -294,10 +322,10 @@ class TestDesvarOnModel(unittest.TestCase):
 
         des_vars = prob.model.get_design_vars()
 
-        x_ref0 = des_vars['px.x']['ref0']
-        x_ref = des_vars['px.x']['ref']
-        x_scaler = des_vars['px.x']['scaler']
-        x_adder = des_vars['px.x']['adder']
+        x_ref0 = des_vars['x']['ref0']
+        x_ref = des_vars['x']['ref']
+        x_scaler = des_vars['x']['scaler']
+        x_adder = des_vars['x']['adder']
 
         self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
         self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
@@ -306,10 +334,10 @@ class TestDesvarOnModel(unittest.TestCase):
 
         # make sure no overflow when there is no specified upper/lower bound and significatn scaling
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', scaler=1e6)
         prob.model.add_objective('obj', scaler=1e6)
@@ -320,8 +348,8 @@ class TestDesvarOnModel(unittest.TestCase):
 
         des_vars = prob.model.get_design_vars()
 
-        self.assertFalse(np.isinf(des_vars['px.x']['upper']))
-        self.assertFalse(np.isinf(-des_vars['px.x']['lower']))
+        self.assertFalse(np.isinf(des_vars['x']['upper']))
+        self.assertFalse(np.isinf(-des_vars['x']['lower']))
 
         responses = prob.model.get_responses()
 
@@ -332,24 +360,24 @@ class TestDesvarOnModel(unittest.TestCase):
 
     def test_desvar_invalid_name(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_desvar_invalid_bounds(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var('x', lower='foo', upper=[0, 100],
@@ -368,24 +396,24 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_not_exist(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_constraint('junk')
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for response 'junk'.")
+        self.assertEqual(str(context.exception), "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=-100, upper=100, ref=1.0,
@@ -421,10 +449,10 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_affine_mapping(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -449,24 +477,24 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_invalid_name(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_bounds(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_design_var('x', lower='foo', upper=[0, 100],
@@ -483,23 +511,23 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_invalid_name(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_lower(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         with self.assertRaises(TypeError) as context:
@@ -522,9 +550,9 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_invalid_upper(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         with self.assertRaises(TypeError) as context:
@@ -546,9 +574,9 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context2.exception), msg2)
 
     def test_constraint_invalid_equals(self):
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         with self.assertRaises(TypeError) as context:
@@ -569,30 +597,30 @@ class TestConstraintOnModel(unittest.TestCase):
 
     def test_constraint_invalid_indices(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices='foo')
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=1)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=[1, 'k'])
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         # passing an iterator for indices should be valid
@@ -600,16 +628,16 @@ class TestConstraintOnModel(unittest.TestCase):
                                           indices=range(2))
 
     def test_error_eq_ineq_con(self):
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
                                       indices='foo')
 
-        msg = "SellarDerivatives: Constraint 'con1' cannot be both equality and inequality."
+        msg = "<class SellarDerivatives>: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -620,18 +648,18 @@ class TestAddConstraintMPI(unittest.TestCase):
 
     def test_add_bad_con(self):
         # From a bug, this message didn't work in mpi.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         sub = model.add_subsystem('sub', SellarDerivatives())
-        sub.nonlinear_solver = NonlinearBlockGS()
+        sub.nonlinear_solver = om.NonlinearBlockGS()
 
         sub.add_constraint('d1.junk', equals=0.0, cache_linear_solution=True)
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "SellarDerivatives (sub): Output not found for response 'd1.junk'."
+        msg = "'sub' <class SellarDerivatives>: Output not found for response 'd1.junk'."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -639,10 +667,10 @@ class TestObjectiveOnModel(unittest.TestCase):
 
     def test_obective_not_exist(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_objective('junk')
 
@@ -650,14 +678,14 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "SellarDerivatives (<model>): Output not found for response 'junk'.")
+                         "<model> <class SellarDerivatives>: Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('con1', lower=-100, upper=100, ref=1.0,
@@ -696,10 +724,10 @@ class TestObjectiveOnModel(unittest.TestCase):
 
     def test_objective_affine_mapping(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -722,70 +750,70 @@ class TestObjectiveOnModel(unittest.TestCase):
 
     def test_desvar_size_err(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         for name in ['lower', 'upper', 'adder', 'scaler', 'ref', 'ref0']:
             args = {name: -np.ones(2)*100}
             with self.assertRaises(Exception) as context:
                 prob.model.add_design_var('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_constraint_size_err(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         for name in ['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0']:
             args = {name: -np.ones(2)*100}
             with self.assertRaises(Exception) as context:
                 prob.model.add_constraint('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_size_err(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         for name in ['adder', 'scaler', 'ref', 'ref0']:
             args = {name: -np.ones(2)*100}
             with self.assertRaises(Exception) as context:
                 prob.model.add_objective('z', index=1, **args)
             self.assertEqual(str(context.exception),
-                             "SellarDerivatives: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+                             "<class SellarDerivatives>: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective(42, ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: The name argument should '
                                                  'be a string, got 42')
 
     def test_objective_invalid_index(self):
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('obj', index='foo')
 
-        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, objective index must be an int.')
+        self.assertEqual(str(context.exception), '<class SellarDerivatives>: If specified, objective index must be an int.')
 
         prob.model.add_objective('obj', index=1)
 

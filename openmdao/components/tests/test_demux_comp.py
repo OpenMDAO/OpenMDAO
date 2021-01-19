@@ -1,11 +1,9 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 
 class TestDemuxCompOptions(unittest.TestCase):
@@ -22,14 +20,10 @@ class TestDemuxCompOptions(unittest.TestCase):
 
         demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(nn,), axis=1)
-
-        p.model.connect('a', 'demux_comp.a')
-
         with self.assertRaises(RuntimeError) as ctx:
-            p.setup()
+            demux_comp.add_var('a', shape=(nn,), axis=1)
         self.assertEqual(str(ctx.exception),
-                         "DemuxComp (demux_comp): Invalid axis (1) for variable 'a' of shape (10,)")
+                         "'demux_comp' <class DemuxComp>: Invalid axis (1) for variable 'a' of shape (10,)")
 
     def test_axis_with_wrong_size(self):
         nn = 10
@@ -44,16 +38,10 @@ class TestDemuxCompOptions(unittest.TestCase):
 
         demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
-        demux_comp.add_var('a', shape=(nn, 7), axis=1)
-        demux_comp.add_var('b', shape=(3, nn), axis=1)
-
-        p.model.connect('a', 'demux_comp.a')
-        p.model.connect('b', 'demux_comp.b')
-
         with self.assertRaises(RuntimeError) as ctx:
-            p.setup()
+            demux_comp.add_var('a', shape=(nn, 7), axis=1)
         self.assertEqual(str(ctx.exception),
-                         "DemuxComp (demux_comp): Variable 'a' cannot be demuxed along axis 1. Axis size is "
+                         "'demux_comp' <class DemuxComp>: Variable 'a' cannot be demuxed along axis 1. Axis size is "
                          "7 but vec_size is 10.")
 
 
@@ -93,10 +81,10 @@ class TestDemuxComp1D(unittest.TestCase):
         for i in range(self.nn):
             in_i = self.p['a'][i]
             out_i = self.p['demux_comp.a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
             in_i = self.p['b'][i]
             out_i = self.p['demux_comp.b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -140,11 +128,11 @@ class TestDemuxComp2D(unittest.TestCase):
         for i in range(self.nn):
             in_i = np.take(self.p['a'], indices=i, axis=0)
             out_i = self.p['demux_comp.a_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
             in_i = np.take(self.p['b'], indices=i, axis=1)
             out_i = self.p['demux_comp.b_{0}'.format(i)]
-            assert_rel_error(self, in_i, out_i)
+            assert_near_equal(in_i, out_i)
 
     def test_partials(self):
         np.set_printoptions(linewidth=1024)
@@ -161,8 +149,6 @@ class TestFeature(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_rel_error
-
         # The number of elements to be demuxed
         n = 3
 
@@ -171,17 +157,10 @@ class TestFeature(unittest.TestCase):
 
         p = om.Problem()
 
-        ivc = om.IndepVarComp()
-        ivc.add_output(name='pos_ecef', shape=(m, 3), units='km')
+        demux_comp = p.model.add_subsystem(name='demux', subsys=om.DemuxComp(vec_size=n),
+                                         promotes_inputs=['pos_ecef'])
 
-        p.model.add_subsystem(name='ivc',
-                              subsys=ivc,
-                              promotes_outputs=['pos_ecef'])
-
-        mux_comp = p.model.add_subsystem(name='demux',
-                                         subsys=om.DemuxComp(vec_size=n))
-
-        mux_comp.add_var('pos', shape=(m, n), axis=1, units='km')
+        demux_comp.add_var('pos_ecef', shape=(m, n), axis=1, units='km')
 
         p.model.add_subsystem(name='longitude_comp',
                               subsys=om.ExecComp('long = atan(y/x)',
@@ -189,20 +168,19 @@ class TestFeature(unittest.TestCase):
                                                  y={'value': np.ones(m), 'units': 'km'},
                                                  long={'value': np.ones(m), 'units': 'rad'}))
 
-        p.model.connect('demux.pos_0', 'longitude_comp.x')
-        p.model.connect('demux.pos_1', 'longitude_comp.y')
-        p.model.connect('pos_ecef', 'demux.pos')
+        p.model.connect('demux.pos_ecef_0', 'longitude_comp.x')
+        p.model.connect('demux.pos_ecef_1', 'longitude_comp.y')
 
         p.setup()
 
-        p['pos_ecef'][:, 0] = 6378 * np.cos(np.linspace(0, 2*np.pi, m))
-        p['pos_ecef'][:, 1] = 6378 * np.sin(np.linspace(0, 2*np.pi, m))
-        p['pos_ecef'][:, 2] = 0.0
+        p.set_val('pos_ecef', 6378 * np.cos(np.linspace(0, 2*np.pi, m)), indices=om.slicer[:, 0])
+        p.set_val('pos_ecef', 6378 * np.sin(np.linspace(0, 2*np.pi, m)), indices=om.slicer[:, 1])
+        p.set_val('pos_ecef', 0.0, indices=om.slicer[:, 2])
 
         p.run_model()
 
-        expected = np.arctan(p['pos_ecef'][:, 1] / p['pos_ecef'][:, 0])
-        assert_rel_error(self, p.get_val('longitude_comp.long'), expected)
+        expected = np.arctan(p.get_val('pos_ecef', indices=om.slicer[:, 1]) / p.get_val('pos_ecef', indices=om.slicer[:, 0]))
+        assert_near_equal(p.get_val('longitude_comp.long'), expected)
 
 
 if __name__ == '__main__':
