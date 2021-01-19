@@ -1269,16 +1269,16 @@ class TestFunctionRegistration(unittest.TestCase):
 
     def test_register_simple_arr(self):
         with _temporary_expr_dict():
-            size = 10
+            size = 5
             om.ExecComp.register('area', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             p.model.add_subsystem('comp', om.ExecComp('area_square = area(x)', shape=size))
             p.setup()
-            p['comp.x'] = 3.
+            p['comp.x'] = x = np.arange(1, size+1, dtype=float)
             p.run_model()
-            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            assert_near_equal(p['comp.area_square'], x * x, 1e-6)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
-            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * x * 2., 1e-6)
 
     def test_register_check_partials_not_safe(self):
         with _temporary_expr_dict():
@@ -1314,20 +1314,22 @@ class TestFunctionRegistration(unittest.TestCase):
 
     def test_register_check_partials_not_safe_mult_expr(self):
         with _temporary_expr_dict():
-            size = 10
+            size = 5
             om.ExecComp.register('unsafe', lambda x: x**2, complex_safe=False)
             om.ExecComp.register('safe', lambda x: x**2, complex_safe=True)
             p = om.Problem()
             comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
                                                               'out2 = safe(y) + z'], shape=size))
-            comp.declare_partials('*', ['x', 'z'], method='fd')
+            comp.declare_partials('out1', ['x', 'z'], method='fd')
+            comp.declare_partials('out2', ['y'], method='cs')
             p.setup()
-            p['comp.x'] = 3.
-            p['comp.y'] = 4.
-            p['comp.z'] = 5.
+            xx = np.arange(1, size + 1, dtype=float)
+            p['comp.x'] = xx * 3.
+            p['comp.y'] = xx * 4.
+            p['comp.z'] = xx * 5.
             p.run_model()
-            assert_near_equal(p['comp.out1'], np.ones(size) * 45., 1e-6)
-            assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
+            assert_near_equal(p['comp.out1'], (xx*3) * (xx*3) * xx * 5., 1e-10)
+            assert_near_equal(p['comp.out2'], (xx*4) * (xx*4) + xx * 5., 1e-10)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
@@ -1380,7 +1382,7 @@ class TestFunctionRegistration(unittest.TestCase):
             p.run_model()
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
-            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-8)
 
     def test_register_simple_arr_manual_partials_fd(self):
         with _temporary_expr_dict():
@@ -1408,6 +1410,10 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
             assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+
+            # verify diagonal subjac
+            self.assertTrue(np.all(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['rows'] == np.arange(size)))
+            self.assertTrue(np.all(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['cols'] == np.arange(size)))
 
     def test_register_shape_by_conn(self):
         with _temporary_expr_dict():
@@ -1513,7 +1519,7 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
 
             def mydot(x):
                 return sparsity.dot(x)
-            
+
             om.ExecComp.register('mydot', mydot, complex_safe=True)
 
             comp = model.add_subsystem('comp', om.ExecComp('y=mydot(x)',
@@ -1528,7 +1534,7 @@ class TestFunctionRegistrationColoring(unittest.TestCase):
             J = prob.compute_totals('comp.y', 'comp.x')
 
             assert_near_equal(J['comp.y', 'comp.x'], sparsity)
-            
+
             self.assertTrue(np.all(comp._coloring_info['coloring'].get_dense_sparsity() == _MASK))
 
 

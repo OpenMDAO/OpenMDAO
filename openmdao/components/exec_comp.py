@@ -77,6 +77,9 @@ class ExecComp(ExplicitComponent):
         Step size used for complex step which is used for derivatives.
     _manual_decl_partials : bool
         If True, at least one partial has been declared by the user.
+    _requires_fd : dict
+        Contains a mapping of 'of' variables to a tuple of the form (wrts, functs) for those
+        'of' variables that require finite difference to be used to compute their derivatives.
     """
 
     def __init__(self, exprs=[], **kwargs):
@@ -235,7 +238,7 @@ class ExecComp(ExplicitComponent):
     @classmethod
     def register(cls, name, callable_obj, complex_safe):
         """
-        Register a callable to be used within an ExecComp expression.
+        Register a callable to be usable within ExecComp expressions.
 
         Parameters
         ----------
