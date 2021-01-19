@@ -106,7 +106,10 @@ elif os.environ.get('OPENMDAO_PROF_MEM'):
 
 # Checking for interactive notebook mode
 notebook = False
-def notebook_mode():
+
+
+def _notebook_mode():
+
     try:
         from IPython import get_ipython
         ipy = get_ipython() is not None
@@ -122,8 +125,7 @@ def notebook_mode():
 
     return ipy
 
-if notebook_mode():
-    notebook = True
 
-# notebook_mode()
-# notebook=True
+if _notebook_mode():
+
+    notebook = True

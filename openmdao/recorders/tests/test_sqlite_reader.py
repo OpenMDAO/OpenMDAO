@@ -11,16 +11,8 @@ from collections import OrderedDict
 import numpy as np
 from io import StringIO
 
-try:
-    from IPython.display import HTML, display
-except ImportError:
-    ipython = None
-
-try:
-    from tabulate import tabulate
-except ImportError:
-    tab_pkg = None
-
+from IPython.display import HTML, display
+from tabulate import tabulate
 
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
@@ -3110,7 +3102,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
-# @unittest.skipUnless(tab_pkg and ipython, "Tabulate and IPython are required")
+@unittest.skipUnless(tabulate and display, "Tabulate and IPython are required")
 class TestNotebookFormat(unittest.TestCase):
 
     def setUp(self):
@@ -3118,6 +3110,9 @@ class TestNotebookFormat(unittest.TestCase):
 
         self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
+
+    def tearDown(self):
+        om.notebook = False
 
     def test_list_inputs_and_outputs_notebook_format(self):
 

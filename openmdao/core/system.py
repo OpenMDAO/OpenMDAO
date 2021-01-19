@@ -334,6 +334,8 @@ class System(object):
         If True, this is the first call to _linearize.
     _is_local : bool
         If True, this system is local to this mpi process.
+    _notebook : bool
+        If True, display output in Jupyter Notebook format
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -492,7 +494,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
-        self.notebook = openmdao.api.notebook
+        self._notebook = openmdao.api.notebook
 
     @property
     def msginfo(self):
@@ -3512,14 +3514,13 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            if self.notebook and ipython and tab_pkg:
+            if self._notebook and ipython and tab_pkg:
                 nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
                              "global_shape": []}
                 for output, attrs in inputs.items():
                     nb_format["Inputs"].append(output)
                     for key, val in attrs.items():
                         nb_format[key].append(val)
-
 
                 return tabulate(nb_format, headers="keys", tablefmt='html')
             else:
@@ -3668,7 +3669,7 @@ class System(object):
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                if self.notebook and ipython and tab_pkg:
+                if self._notebook and ipython and tab_pkg:
                     nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
                                  "global_shape": []}
                     for output, attrs in expl_outputs.items():
@@ -3701,7 +3702,7 @@ class System(object):
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                if self.notebook and ipython and tab_pkg:
+                if self._notebook and ipython and tab_pkg:
                     nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
                                  "global_shape": []}
                     for output, attrs in expl_outputs.items():
