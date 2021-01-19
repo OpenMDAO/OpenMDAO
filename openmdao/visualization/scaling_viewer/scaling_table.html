@@ -437,10 +437,9 @@ function sizeOfLongest(strings, start, rotate) {
 
 function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
     var parent = d3.select(parent_id);
-    var longest_of = ofEntries.reduce((accum, val) => accum.length < val.length ? val : accum, "XXXX");
-    var minOfHeight = (textSize(longest_of, 0).height + 4) * ofEntries.length;
-    var leftmargin = is_top ? textSize(longest_of, 45).width : 10;
-    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "XXXX", 45).height : 10;
+    var minOfHeight = 5 * ofEntries.length;
+    var leftmargin = 10;
+    var bottommargin = 10;
     var legendwidth = 20;
     var legendloc = 20;
 
@@ -473,16 +472,16 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .domain(wrtEntries)
         .padding(0.01);
 
-    if (is_top) {
-        svg.append("g")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(x))
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("transform", "rotate(-45)")
-            .attr("dx", "-.5em")
-            .attr("dy", ".3em");
-    }
+    // if (is_top) {
+    //     svg.append("g")
+    //         .attr("transform", "translate(0," + height + ")")
+    //         .call(d3.axisBottom(x))
+    //         .selectAll("text")
+    //         .style("text-anchor", "end")
+    //         .attr("transform", "rotate(-45)")
+    //         .attr("dx", "-.5em")
+    //         .attr("dy", ".3em");
+    // }
 
     // Build Y scales and axis:
     var y = d3.scaleBand()
@@ -490,14 +489,14 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .domain(ofEntries)
         .padding(0.01);
 
-    if (is_top) {
-        svg.append("g")
-            .call(d3.axisLeft(y))
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("transform", "rotate(-45)")
-            .attr("dy", "-.5em");
-    }
+    // if (is_top) {
+    //     svg.append("g")
+    //         .call(d3.axisLeft(y))
+    //         .selectAll("text")
+    //         .style("text-anchor", "end")
+    //         .attr("transform", "rotate(-45)")
+    //         .attr("dy", "-.5em");
+    // }
 
     svg.selectAll()
         .data(jac_data, d => d[1] + ':' + d[0])
