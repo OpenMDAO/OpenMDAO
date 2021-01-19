@@ -950,10 +950,7 @@ class _TotalJacInfo(object):
 
         for color, ilist in enumerate(coloring.color_iter(mode)):
             if len(ilist) == 1:
-                if both:
-                    yield ilist, input_setter, jac_setter, None
-                else:
-                    yield ilist[0], self.single_input_setter, self.single_jac_setter, None
+                yield ilist, input_setter, jac_setter, None
             else:
                 # yield all indices for a color at once
                 yield ilist, input_setter, jac_setter, imeta['itermeta'][color]
@@ -1270,6 +1267,7 @@ class _TotalJacInfo(object):
                 i = loc_idx
             else:
                 return
+
         if mode == 'fwd':
             self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
         else:  # rev
@@ -1533,8 +1531,6 @@ class _TotalJacInfo(object):
         if debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
-
-        # np.save("total_jac%d.npy" % self.comm.rank, self.J)
 
         return self.J_final
 

@@ -122,10 +122,6 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
 
 
 def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
-    if coloring is not None:  # factor in the sparsity
-        mask = np.zeros(totals.shape, dtype=bool)
-        mask[coloring._nzrows, coloring._nzcols] = 1
-
     start = end = 0
     data['ofslices'] = slices = {}
     for n, v in response_vals.items():
@@ -145,6 +141,10 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     var_matrix = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
 
     matrix = np.abs(totals)
+
+    if coloring is not None:  # factor in the sparsity
+        mask = np.zeros(totals.shape, dtype=bool)
+        mask[coloring._nzrows, coloring._nzcols] = 1
 
     for i, of in enumerate(response_vals):
         ofstart, ofend = data['ofslices'][of]
@@ -214,6 +214,8 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     dict
         Data to used to generate html file.
     """
+    global _run_driver_called
+
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
@@ -384,18 +386,18 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         jac = False
 
     if jac:
+        # save old totals
+        save = driver._total_jac
+        driver._total_jac = None
+
         coloring = driver._get_static_coloring()
-        if coloring_mod._use_total_sparsity and jac:
+        if coloring_mod._use_total_sparsity:
             if coloring is None and driver._coloring_info['dynamic']:
                 coloring = coloring_mod.dynamic_total_coloring(driver)
 
         # assemble data for jacobian visualization
         data['oflabels'] = driver._get_ordered_nl_responses()
         data['wrtlabels'] = list(dv_vals)
-
-        # save old totals
-        save = driver._total_jac
-        driver._total_jac = None
 
         try:
             totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
