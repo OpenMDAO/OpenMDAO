@@ -10,14 +10,14 @@ class IndexerTestCase(unittest.TestCase):
     def test_int(self):
         ind = indexer(4)
         src = np.arange(10)
-        assert_equal(src[ind()], 4)
-        assert_equal(ind.shape(), (1,))
+        assert_equal(src[ind.as_array()], 4)
+        assert_equal(ind.shape(), 1)
 
     def test_neg_int(self):
         ind = indexer(-4)
         src = np.arange(10)
-        assert_equal(src[ind()], 6)
-        assert_equal(ind.shape(), (1,))
+        assert_equal(src[ind.as_array()], 6)
+        assert_equal(ind.shape(), 1)
 
     def test_full_slice(self):
         ind = indexer[:]
@@ -32,10 +32,10 @@ class IndexerTestCase(unittest.TestCase):
     def test_neg_start_slice(self):
         ind = indexer[-3:-6:-1]
         src = np.arange(10)
-        assert_equal(src[ind()], [7,6,5])
+        assert_equal(src[ind.as_slice()], [7,6,5])
         with self.assertRaises(RuntimeError) as cm:
-            ind(final=True)
-        self.assertEqual(cm.exception.args[0], "indexer(slice(-3, -6, -1)) does not have a known src_shape so can't compute its shape.")
+            ind.as_array()
+        self.assertEqual(cm.exception.args[0], "Can't convert slice(-3, -6, -1) to array because source shape is unknown.")
 
     def test_none_slice(self):
         pass
@@ -49,16 +49,21 @@ class IndexerTestCase(unittest.TestCase):
     def test_simple_arr(self):
         ind = indexer([5, 3, 7, 1])
         src = np.arange(10)
-        assert_equal(src[ind()], [5,3,7,1])
+        assert_equal(src[ind.as_array()], [5,3,7,1])
         assert_equal(ind.shape(), (4,))
+        try:
+            ind.as_slice()
+        except Exception as err:
+            self.assertEqual(str(err), "array index cannot be converted to a slice.")
+        else:
+            self.fail("Exception expected")
 
     def test_arr_to_slice(self):
         ind = indexer([1,3,5,7,9])
         src = np.arange(10)
-        assert_equal(src[ind()], [1,3,5,7,9])
+        assert_equal(src[ind.as_array()], [1,3,5,7,9])
         assert_equal(ind.shape(), (5,))
-        self.assertTrue(isinstance(ind(), slice))
-        self.assertEqual(ind(), slice(1, 10, 2))
+        self.assertEqual(ind.as_slice(), slice(1, 10, 2))
 
     def test_neg_arr(self):
         pass
