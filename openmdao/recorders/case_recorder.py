@@ -117,7 +117,7 @@ class CaseRecorder(object):
         else:
             return scaling_vecs, system.options
 
-    def record_metadata_system(self, system, run_number):
+    def record_metadata_system(self, system, run_number=None):
         """
         Record system metadata.
 
@@ -131,7 +131,7 @@ class CaseRecorder(object):
         """
         raise NotImplementedError()
 
-    def record_metadata_solver(self, solver, run_number):
+    def record_metadata_solver(self, solver, run_number=None):
         """
         Record solver metadata.
 

@@ -3859,23 +3859,25 @@ def _assert_model_matches_case(case, system):
         np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 
+@use_tempdirs
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
+    def test_options_v12(self):
 
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
+        # The case reader code should handle an old database that doesn not have
+        # the suystem and solver options recorded
+
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        with assert_warning(UserWarning, 'System options not recorded.'):
+            options = cr.list_model_options()
+
+        with assert_warning(UserWarning, 'Solver options not recorded.'):
+            options = cr.list_solver_options()
 
     def test_problem_v9(self):
 

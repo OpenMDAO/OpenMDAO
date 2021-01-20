@@ -461,6 +461,10 @@ class SqliteCaseReader(BaseCaseReader):
         """
         dct = {}
 
+        if not self._system_options:
+            simple_warning("System options not recorded.")
+            return dct
+
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
@@ -514,6 +518,10 @@ class SqliteCaseReader(BaseCaseReader):
             {solver: {key: val}}
         """
         dct = {}
+
+        if not self.solver_metadata:
+            simple_warning("Solver options not recorded.")
+            return dct
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
