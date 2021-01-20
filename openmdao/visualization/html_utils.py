@@ -507,7 +507,7 @@ class TemplateWriter(object):
         Contents of template file.
     """
 
-    def __init__(self, filename, embeddable=False, title=None, styles=None,head_srcs=None):
+    def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
 
@@ -521,6 +521,8 @@ class TemplateWriter(object):
             Title of diagram.
         styles : dict
             Dictionary of CSS styles.
+        head_srcs : dict
+            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         # Load template
         with open(filename, "r") as f:
@@ -539,9 +541,11 @@ class TemplateWriter(object):
                 meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
                 if title:
                     title_tag = "<title>%s</title>" % title
-                    head = '\n\n'.join([title_tag, meta, head_scripts, style_elems])  # Write styles to head
+                    # Write styles and scripts to head
+                    head = '\n\n'.join([title_tag, meta, head_scripts, style_elems])
                 else:
-                    head = '\n\n'.join([meta, head_scripts, style_elems])  # Write styles to head
+                    # Write styles and scripts to head
+                    head = '\n\n'.join([meta, head_scripts, style_elems])
                 self.template = head_and_body(head=head, body=template)
 
         if title is not None:
@@ -606,8 +610,11 @@ class DiagramWriter(TemplateWriter):
             Title of diagram.
         styles : dict
             Dictionary of CSS styles.
+        head_srcs : dict
+            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
-        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles, head_srcs=head_srcs)
+        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles,
+                         head_srcs=head_srcs)
         self.toolbar = Toolbar()
         self.help = None
 
