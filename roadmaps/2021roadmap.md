@@ -113,7 +113,7 @@ Specifically focus on the use of BalanceComps, their role in model building, and
 Also focus on techniques for debugging a model when it won't converge.
 
 ## 2) Develop a class for practical optimization based around OpenMDAO
-Having a flexible optimization framework is a bit of a double edges sword,
+Having a flexible optimization framework is a bit of a double-edged sword,
 because it allows you to create any problem formulation you want... even a bad one!
 This course will teach the rules for proper optimization formulation,
 techniques for improving convergence and performance, and debugging processes for when
