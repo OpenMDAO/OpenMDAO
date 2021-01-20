@@ -3524,6 +3524,8 @@ class System(object):
 
                 return tabulate(nb_format, headers="keys", tablefmt='html')
             else:
+                if self._notebook and not tab_pkg:
+                    print("Tabulate not installed, falling back to ascii table version")
                 self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
                                   out_stream)
 
@@ -3679,6 +3681,8 @@ class System(object):
 
                     return tabulate(nb_format, headers="keys", tablefmt='html')
                 else:
+                    if self._notebook and not tab_pkg:
+                        print("Tabulate not installed, falling back to ascii table version")
                     self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                       all_procs, out_stream)
 
@@ -3712,6 +3716,8 @@ class System(object):
 
                     return tabulate(nb_format, headers="keys", tablefmt='html')
                 else:
+                    if self._notebook and not tab_pkg:
+                        print("Tabulate not installed, falling back to ascii table version")
                     self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                       all_procs, out_stream)
             if self.name:  # convert to relative name
