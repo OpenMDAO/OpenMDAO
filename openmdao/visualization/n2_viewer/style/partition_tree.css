@@ -354,7 +354,17 @@ rect.outputHighlight {
 #show-error-button-container {
     visibility: hidden;
     position: absolute;
-    bottom: 34px;
+    bottom: 4px;
     right: 115px;
     z-index:5;
+}
+
+#show-error-button{
+    background-color: red;
+    border: none;
+    color: white;
+    padding: 12px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
 }
