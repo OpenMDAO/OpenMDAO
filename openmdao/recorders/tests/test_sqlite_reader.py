@@ -3866,9 +3866,8 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     def test_options_v12(self):
 
-        # The case reader code should handle an old database that doesn not have
-        # the suystem and solver options recorded
-
+        # The case reader should handle an old database that does not have
+        # the system and solver options recorded
         filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
 
         cr = om.CaseReader(filename)
@@ -3878,6 +3877,63 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         with assert_warning(UserWarning, 'Solver options not recorded.'):
             options = cr.list_solver_options()
+
+        # The case reader should handle a v11 database that had a
+        # different separator for runs in the model option keys
+        filename = os.path.join(self.legacy_dir, 'case_problem_v11.sql')
+
+        cr = om.CaseReader(filename)
+
+        stream = StringIO()
+
+        cr.list_model_options(run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
     def test_problem_v9(self):
 

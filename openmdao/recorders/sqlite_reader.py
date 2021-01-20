@@ -470,9 +470,15 @@ class SqliteCaseReader(BaseCaseReader):
 
         num_header = None
 
+        # need to handle edge case for v11 recording
+        if self._format_version < 12:
+            SEP = '_'
+        else:
+            SEP = META_KEY_SEP
+
         for key in self._system_options:
-            if key.find(META_KEY_SEP) > 0:
-                name, num = key.rsplit(META_KEY_SEP, 1)
+            if key.find(SEP) > 0:
+                name, num = key.rsplit(SEP, 1)
             else:
                 name = key
                 num = 0
