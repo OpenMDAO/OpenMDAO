@@ -259,16 +259,29 @@ def record_system_options(problem):
     problem : Problem
         The problem for which all its systems' options are to be recorded.
     """
+    warn_deprecation("The 'record_system_options' function is deprecated. "
+                     "Use 'record_model_options' instead.")
+    record_model_options(problem)
+
+
+def record_model_options(problem):
+    """
+    Record the options for all systems and solvers in the model.
+
+    Parameters
+    ----------
+    problem : Problem
+        The problem for which all its system and solver options are to be recorded.
+    """
+    run_number = problem._run_counter
+    if run_number < 1:
+        # for backward compatibility, the first run does not have a run number
+        run_number = None
+
     recorders = set(_get_all_recorders(problem))
 
     for system in problem.model.system_iter(recurse=True, include_self=True):
         for recorder in recorders:
-            run_number = problem._run_counter
-
-            # for backward compatibility, the first run does not have a run number
-            if run_number < 1:
-                run_number = None
-
             # record system metadata (options)
             recorder.record_metadata_system(system, run_number)
 

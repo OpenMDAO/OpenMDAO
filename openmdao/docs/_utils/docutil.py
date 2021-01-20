@@ -462,6 +462,7 @@ def insert_output_start_stop_indicators(src):
         '.list_outputs(',
         '.list_problem_vars(',
         '.list_model_options(',
+        '.list_solver_options(',
     ]
 
     newlines = []

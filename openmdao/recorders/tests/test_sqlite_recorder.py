@@ -322,16 +322,11 @@ class TestSqliteRecorder(unittest.TestCase):
 
         text = stream.getvalue().split('\n')
 
-        from pprint import pprint
-        pprint(text)
-
         expected = [
+            "",
             "Run Number: 0",
             "    Subsystem: root",
             "        assembled_jac_type : csc",
-            "Run Number: 1",
-            "    Subsystem: root",
-            "        assembled_jac_type : dense"
         ]
 
         for i, line in enumerate(expected):
@@ -345,6 +340,7 @@ class TestSqliteRecorder(unittest.TestCase):
         text = stream.getvalue().split('\n')
 
         expected = [
+            "",
             "Run Number: 1",
             "    Subsystem: root",
             "        assembled_jac_type : dense"
@@ -384,12 +380,10 @@ class TestSqliteRecorder(unittest.TestCase):
         text = stream.getvalue().split('\n')
 
         expected = [
+            "",
             "Run Number: 0",
             "    Subsystem: root",
             "        assembled_jac_type : csc",
-            "Run Number: 1",
-            "    Subsystem: root",
-            "        assembled_jac_type : dense"
         ]
 
         for i, line in enumerate(expected):
@@ -403,6 +397,7 @@ class TestSqliteRecorder(unittest.TestCase):
         text = stream.getvalue().split('\n')
 
         expected = [
+            "",
             "Run Number: 1",
             "    Subsystem: root",
             "        assembled_jac_type : dense"
@@ -2574,73 +2569,89 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                                "tol": 1e-03, "maxiter": 200, "disp": True})
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
-    def test_feature_solver_metadata(self):
+    def test_feature_solver_options(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+
+        # configure a Newton solver with linesearch for the Sellar MDA Group
+        newton = om.NewtonSolver(solve_subsystems=True, max_sub_solves=4)
+        newton.linesearch = om.BoundsEnforceLS()
+
+        model = SellarDerivativesGrouped(mda_nonlinear_solver=newton)
+
+        prob = om.Problem(model)
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.setup()
+
+        # initial run
+        newton.linesearch.options['bound_enforcement'] = 'vector'
+        prob.run_model()
+
+        # change linesearch and run again
+        newton.linesearch.options['bound_enforcement'] = 'wall'
+        prob.run_model()
+
+        # clean up after runs and open a case reader
+        prob.cleanup()
+        cr = om.CaseReader("cases.sql")
+
+        # get/display options for initial run
+        options = cr.list_solver_options()
+
+        self.assertEqual(sorted(options.keys()), [
+            'mda.BoundsEnforceLS', 'mda.NewtonSolver', 'mda.ScipyKrylov',
+            'root.NonlinearBlockGS', 'root.ScipyKrylov'
+        ])
+        self.assertEqual(options['root.NonlinearBlockGS']['maxiter'], 10)
+        self.assertEqual(options['root.ScipyKrylov']['maxiter'], 1000)
+        self.assertEqual(options['mda.NewtonSolver']['maxiter'], 10)
+
+        self.assertEqual(options['mda.NewtonSolver']['solve_subsystems'], True)
+        self.assertEqual(options['mda.NewtonSolver']['max_sub_solves'], 4)
+
+        self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'vector')
+
+        # get options for second run
+        options = cr.list_solver_options(run_counter=1, out_stream=None)
+        self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'wall')
+
+    def test_feature_system_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem(model=SellarDerivativesGrouped())
-        prob.setup()
-
-        # configure Newton solver with line search
-        nl = prob.model.mda.nonlinear_solver = om.NewtonSolver()
-        nl.options['solve_subsystems'] = True
-        nl.options['max_sub_solves'] = 4
-        nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-
-        # add recorder and run model
         prob.add_recorder(om.SqliteRecorder("cases.sql"))
-        prob.run_model()
-        prob.cleanup()
 
-        # access recorded solver metadata/options
-        cr = om.CaseReader("cases.sql")
-        metadata = cr.solver_metadata
-
-        self.assertEqual(sorted(metadata.keys()), [
-            'mda.ArmijoGoldsteinLS', 'mda.NewtonSolver', 'mda.ScipyKrylov',
-            'root.NonlinearBlockGS', 'root.ScipyKrylov'
-        ])
-        self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
-        self.assertEqual(metadata['root.ScipyKrylov']['solver_options']['maxiter'], 1000)
-
-        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['maxiter'], 10)
-        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['solve_subsystems'], True)
-        self.assertEqual(metadata['mda.NewtonSolver']['solver_options']['max_sub_solves'], 4)
-
-        self.assertEqual(metadata['mda.ArmijoGoldsteinLS']['solver_options']['bound_enforcement'], 'vector')
-
-    def test_feature_recording_system_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = om.Problem(model=SellarDerivativesGrouped(ln_maxiter=999))
-
+        # set option and run model
+        prob.model.options['nl_maxiter'] = 1
         prob.setup()
-
-        # create recorder and attach to driver and model
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.driver.add_recorder(recorder)
-        prob.model.add_recorder(recorder)
-
         prob.run_model()
-        prob.cleanup()
 
+        # change option and run again
+        prob.model.options['nl_maxiter'] = 9
+        prob.setup()
+        prob.run_model()
+
+        # clean up after runs and open a case reader
+        prob.cleanup()
         cr = om.CaseReader("cases.sql")
 
-        # options for all the systems in the model
-        options = cr.list_model_options(out_stream=None)
+        # get/display options for initial run
+        options = cr.list_model_options()
 
         self.assertEqual(sorted(options.keys()),
                          sorted(['root', '_auto_ivc', 'con_cmp1', 'con_cmp2',
                                  'mda', 'mda.d1', 'mda.d2', 'obj_cmp']))
 
-        self.assertEqual(sorted(options['root'].keys()),
-                         sorted(prob.model.options._dict.keys()))
+        self.assertEqual(sorted(options['mda.d1'].keys()),
+                         sorted(prob.model.mda.d1.options._dict.keys()))
 
-        self.assertEqual(options['root']['ln_maxiter'], 999)
+        self.assertEqual(options['root']['nl_maxiter'], 1)
 
-        self.assertEqual(sorted(options['con_cmp1'].keys()),
-                         sorted(prob.model.con_cmp1.options._dict.keys()))
+        # get options for the second run
+        options = cr.list_model_options(run_counter=1, out_stream=None)
+
+        self.assertEqual(options['root']['nl_maxiter'], 9)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
@@ -2730,7 +2741,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(design_vars['x'], 0., 1e-4)
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
 
-    def test_feature_driver_options(self):
+    def test_feature_driver_recording_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -2780,7 +2791,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(last_case.outputs['z'], prob['z'])
         assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
 
-    def test_feature_solver_options(self):
+    def test_feature_solver_recording_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 

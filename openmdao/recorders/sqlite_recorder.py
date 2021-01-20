@@ -29,7 +29,7 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
-12-- OpenMDAO 3.5.1
+12-- OpenMDAO 3.6.1
      Change key for system metadata to use non-ambiguous separator
 11-- OpenMDAO 3.2
      IndepVarComps are created automatically, so this changes some bookkeeping.
@@ -699,12 +699,10 @@ class SqliteRecorder(CaseRecorder):
             if not path:
                 path = 'root'
 
-            if run_number is None:
-                name = path
-            else:
-                name = META_KEY_SEP.join([path, str(run_number)])
+            id = "{}.{}".format(path, solver_class)
 
-            id = "{}.{}".format(name, solver_class)
+            if run_number is not None:
+                id = META_KEY_SEP.join([id, str(run_number)])
 
             solver_options = pickle.dumps(solver.options, self._pickle_version)
 

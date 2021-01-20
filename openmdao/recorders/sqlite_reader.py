@@ -415,7 +415,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        tree : 
+        tree :
             Nested dictionary of system information
         path : str or None
             Pathname of root system (None for the root model)
@@ -440,16 +440,16 @@ class SqliteCaseReader(BaseCaseReader):
 
         return paths
 
-    def list_model_options(self, run_counter=None, system=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_model_options(self, run_counter=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List model options for the specified run.
 
         Parameters
         ----------
-        run_counter : int or None
+        run_counter : int
             Run_driver or run_model iteration to inspect
         system : str or None
-            Pathname of system (None for the root model)
+            Pathname of system (None for all systems)
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -464,6 +464,8 @@ class SqliteCaseReader(BaseCaseReader):
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
+        num_header = None
+
         for key in self._system_options:
             if key.find(META_KEY_SEP) > 0:
                 name, num = key.rsplit(META_KEY_SEP, 1)
@@ -471,13 +473,72 @@ class SqliteCaseReader(BaseCaseReader):
                 name = key
                 num = 0
 
-            if (system is None or system == name) and (run_counter is None or run_counter == int(num)):
+            if (system is None or system == name) and (run_counter == int(num)):
+
                 if out_stream:
-                    out_stream.write(f"Run Number: {num}\n    Subsystem: {name}")
+                    if num_header != num:
+                        out_stream.write(f"\nRun Number: {num}\n")
+                        num_header = num
+
+                    out_stream.write(f"    Subsystem: {name}\n")
 
                 dct[name] = {}
 
                 comp_options = self._system_options[key]['component_options']
+
+                for opt, val in comp_options.items():
+                    dct[name][opt] = val
+
+                    if out_stream:
+                        out_stream.write(f"        {opt} : {val}\n")
+
+        return dct
+
+    def list_solver_options(self, run_counter=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List solver options for the specified run.
+
+        Parameters
+        ----------
+        run_counter : int
+            Run_driver or run_model iteration to inspect
+        solver : str or None
+            Pathname of solver (None for all solvers)
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {solver: {key: val}}
+        """
+        dct = {}
+
+        if out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        num_header = None
+
+        for key in self.solver_metadata:
+            if key.find(META_KEY_SEP) > 0:
+                name, num = key.rsplit(META_KEY_SEP, 1)
+            else:
+                name = key
+                num = 0
+
+            if (solver is None or solver == name) and (run_counter == int(num)):
+
+                if out_stream:
+                    if num_header != num:
+                        out_stream.write(f"\nRun Number: {num}\n")
+                        num_header = num
+
+                    out_stream.write(f"\n    Solver: {name}\n")
+
+                dct[name] = {}
+
+                comp_options = self.solver_metadata[key]['solver_options']
 
                 for opt, val in comp_options.items():
                     dct[name][opt] = val
