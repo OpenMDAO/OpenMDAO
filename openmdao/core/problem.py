@@ -618,10 +618,10 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
-        record_model_options(self)
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
 
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
@@ -658,10 +658,10 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
-        record_model_options(self)
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
 
         self.model._clear_iprint()
         return self.driver.run()

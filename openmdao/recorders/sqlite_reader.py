@@ -415,7 +415,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        tree :
+        tree : dict
             Nested dictionary of system information
         path : str or None
             Pathname of root system (None for the root model)

@@ -86,10 +86,8 @@ class CaseRecorder(object):
         recording_requester : object
             The object that would like to record its metadata.
         """
-        if isinstance(recording_requester, System):
-            self.record_metadata_system(recording_requester)
-        elif isinstance(recording_requester, Solver):
-            self.record_metadata_solver(recording_requester)
+        warn_deprecation("The 'record_metadata' function is deprecated. "
+                         "All system and solver options are recorded automatically.")
 
     def _get_metadata_system(self, system):
         # Cannot handle PETScVector yet
@@ -133,7 +131,7 @@ class CaseRecorder(object):
         """
         raise NotImplementedError()
 
-    def record_metadata_solver(self, solver):
+    def record_metadata_solver(self, solver, run_number):
         """
         Record solver metadata.
 

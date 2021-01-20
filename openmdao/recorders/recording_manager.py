@@ -149,11 +149,8 @@ class RecordingManager(object):
             The object that needs its metadata recorded.
 
         """
-        for recorder in self._recorders:
-            # If the recorder does not support parallel recording
-            # we need to make sure we only record on rank 0.
-            if recorder._parallel or self.rank == 0:
-                recorder.record_metadata(recording_requester)
+        warn_deprecation("The 'record_metadata' function is deprecated. "
+                         "All system and solver options are recorded automatically.")
 
     def record_derivatives(self, recording_requester, data, metadata):
         """
@@ -264,7 +261,7 @@ def record_system_options(problem):
     record_model_options(problem)
 
 
-def record_model_options(problem):
+def record_model_options(problem, run_number):
     """
     Record the options for all systems and solvers in the model.
 
@@ -272,10 +269,12 @@ def record_model_options(problem):
     ----------
     problem : Problem
         The problem for which all its system and solver options are to be recorded.
+    run_number : int or None
+        Number indicating which run the metadata is associated with.
+        Zero or None for the first run, 1 for the second, etc.
     """
-    run_number = problem._run_counter
-    if run_number < 1:
-        # for backward compatibility, the first run does not have a run number
+    # for backward compatibility, the first run does not have a run number
+    if run_number is not None and run_number < 1:
         run_number = None
 
     recorders = set(_get_all_recorders(problem))
