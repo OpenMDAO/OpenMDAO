@@ -1286,9 +1286,9 @@ class TestFunctionRegistration(unittest.TestCase):
             p.setup()
             p['comp.x'] = x = np.arange(1, size+1, dtype=float)
             p.run_model()
-            assert_near_equal(p['comp.area_square'], x * x, 1e-6)
+            assert_near_equal(p['comp.area_square'], x * x, 1e-11)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
-            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * x * 2., 1e-6)
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * x * 2., 1e-11)
 
     def test_register_check_partials_not_safe(self):
         with _temporary_expr_dict():
@@ -1345,9 +1345,9 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out1', 'comp.x'], np.eye(size) * 2. * x * z, 1e-6)
             assert_near_equal(J['comp.out1', 'comp.y'], np.zeros((size, size)), 1e-6)
             assert_near_equal(J['comp.out1', 'comp.z'], np.eye(size) * x**2, 1e-6)
-            assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-8)
-            assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-8)
-            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-8)
+            assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-11)
+            assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-11)
+            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-11)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
@@ -1383,7 +1383,7 @@ class TestFunctionRegistration(unittest.TestCase):
             p.setup()
             p['comp.x'] = 3.
             p.run_model()
-            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), [])
@@ -1398,9 +1398,9 @@ class TestFunctionRegistration(unittest.TestCase):
             p.setup()
             p['comp.x'] = 3.
             p.run_model()
-            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
-            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-8)
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-11)
 
     def test_register_simple_arr_manual_partials_fd(self):
         with _temporary_expr_dict():
@@ -1425,9 +1425,9 @@ class TestFunctionRegistration(unittest.TestCase):
             p.setup()
             p['comp.x'] = 3.
             p.run_model()
-            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
+            assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-11)
             J = p.compute_totals(of=['comp.area_square'], wrt=['comp.x'])
-            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-6)
+            assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-11)
 
             # verify diagonal subjac
             self.assertTrue(np.all(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['rows'] == np.arange(size)))
@@ -1446,11 +1446,11 @@ class TestFunctionRegistration(unittest.TestCase):
             p.setup()
             p['indeps.x'] = 3.
             p.run_model()
-            assert_near_equal(p['comp.x'], np.ones(size) * 3., 1e-6)
-            assert_near_equal(p['comp.y'], np.ones(size-2) * 9., 1e-6)
-            assert_near_equal(p['sink.y'], np.ones(size-2) * 9., 1e-6)
+            assert_near_equal(p['comp.x'], np.ones(size) * 3., 1e-11)
+            assert_near_equal(p['comp.y'], np.ones(size-2) * 9., 1e-11)
+            assert_near_equal(p['sink.y'], np.ones(size-2) * 9., 1e-11)
             J = p.compute_totals(of=['sink.y'], wrt=['indeps.x'])
-            assert_near_equal(J['sink.y', 'indeps.x'], np.eye(size)[2:, :] * 3., 1e-6)
+            assert_near_equal(J['sink.y', 'indeps.x'], np.eye(size)[2:, :] * 3., 1e-11)
 
     def test_register_shape_by_conn_err(self):
         with _temporary_expr_dict():
