@@ -3,7 +3,7 @@ RecordingManager class definition.
 """
 import time
 
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, warn_deprecation
 
 try:
     from openmdao.utils.mpi import MPI

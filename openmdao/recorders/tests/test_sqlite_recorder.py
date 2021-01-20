@@ -318,37 +318,70 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(system='root', out_stream=stream)
+        cr.list_model_options(out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
         expected = [
-            "",
             "Run Number: 0",
             "    Subsystem: root",
             "        assembled_jac_type : csc",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            ""
         ]
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
         stream = StringIO()
 
-        cr.list_model_options(run_counter=1, out_stream=stream)
+        cr.list_model_options(system='root', run_counter=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
         expected = [
-            "",
             "Run Number: 1",
             "    Subsystem: root",
-            "        assembled_jac_type : dense"
+            "        assembled_jac_type : dense",
+            ""
         ]
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
     def test_double_run_model_option_overwrite(self):
         prob = ParaboloidProblem()
@@ -375,37 +408,70 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(system='root', out_stream=stream)
+        cr.list_model_options(out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
         expected = [
-            "",
             "Run Number: 0",
             "    Subsystem: root",
             "        assembled_jac_type : csc",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            ""
         ]
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
         stream = StringIO()
 
-        cr.list_model_options(run_counter=1, out_stream=stream)
+        cr.list_model_options(system='root', run_counter=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
         expected = [
-            "",
             "Run Number: 1",
             "    Subsystem: root",
-            "        assembled_jac_type : dense"
+            "        assembled_jac_type : dense",
+            ""
         ]
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
@@ -2435,6 +2501,17 @@ class TestSqliteRecorder(unittest.TestCase):
                          "`Problem.final_setup()`.")
 
         prob.cleanup()
+
+    def test_deprecation(self):
+        # this is not technically part of the user-facing API, but
+        # could have been used in a custom recording implementation
+        from openmdao.recorders.recording_manager import RecordingManager
+
+        rec_mgr = RecordingManager()
+        msg = "The 'record_metadata' function is deprecated. " \
+              "All system and solver options are recorded automatically."
+        with assert_warning(DeprecationWarning, msg):
+            rec_mgr.record_metadata(None)
 
 
 @use_tempdirs

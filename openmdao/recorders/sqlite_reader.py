@@ -477,7 +477,7 @@ class SqliteCaseReader(BaseCaseReader):
 
                 if out_stream:
                     if num_header != num:
-                        out_stream.write(f"\nRun Number: {num}\n")
+                        out_stream.write(f"Run Number: {num}\n")
                         num_header = num
 
                     out_stream.write(f"    Subsystem: {name}\n")
@@ -531,7 +531,7 @@ class SqliteCaseReader(BaseCaseReader):
 
                 if out_stream:
                     if num_header != num:
-                        out_stream.write(f"\nRun Number: {num}\n")
+                        out_stream.write(f"Run Number: {num}\n")
                         num_header = num
 
                     out_stream.write(f"    Solver: {name}\n")
