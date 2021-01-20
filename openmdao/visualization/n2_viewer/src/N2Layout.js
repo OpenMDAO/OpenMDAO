@@ -18,7 +18,7 @@ class N2Layout {
      * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement, showLinearSolverNames, dims) {
+    constructor(model, newZoomedElement, showLinearSolverNames, showSolvers, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
@@ -31,6 +31,8 @@ class N2Layout {
         this.visibleSolverNodes = [];
         this.curVisibleNodeCount = 0;
         this.prevVisibleNodeCount = 0;
+
+        this.showSolvers = showSolvers ;
 
         // Initial size values derived from read-only defaults
         this.size = dims.size;
@@ -51,9 +53,11 @@ class N2Layout {
         this._computeColumnWidths();
         stopTimer('N2Layout._computeColumnWidths');
 
-        startTimer('N2Layout._computeSolverColumnWidths');
-        this._computeSolverColumnWidths();
-        stopTimer('N2Layout._computeSolverColumnWidths');
+        if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverColumnWidths');
+            this._computeSolverColumnWidths();
+            stopTimer('N2Layout._computeSolverColumnWidths');
+        }
 
         startTimer('N2Layout._setColumnLocations');
         this._setColumnLocations();
@@ -65,12 +69,13 @@ class N2Layout {
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        startTimer('N2Layout._computeSolverNormalizedPositions');
-        this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
-        stopTimer('N2Layout._computeSolverNormalizedPositions');
-        if (this.zoomedElement.parent)
-            this.zoomedSolverNodes.push(this.zoomedElement.parent);
-
+        if (this.showSolvers) {
+            startTimer('N2Layout._computeSolverNormalizedPositions');
+            this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
+            stopTimer('N2Layout._computeSolverNormalizedPositions');
+            if (this.zoomedElement.parent)
+                this.zoomedSolverNodes.push(this.zoomedElement.parent);
+        }
         this.setTransitionPermission();
 
     }
@@ -340,8 +345,10 @@ class N2Layout {
             this.cols[depth].location = this.size.partitionTree.width;
             this.size.partitionTree.width += this.cols[depth].width;
 
-            this.solverCols[depth].location = this.size.solverTree.width;
-            this.size.solverTree.width += this.solverCols[depth].width;
+             if (this.showSolvers) {
+                 this.solverCols[depth].location = this.size.solverTree.width;
+                 this.size.solverTree.width += this.solverCols[depth].width;
+             }
         }
 
     }

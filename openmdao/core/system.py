@@ -26,7 +26,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, unit_conversion
+from openmdao.utils.units import is_compatible, unit_conversion, valid_units, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op, shape_from_idx
+    simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import unit_conversion
@@ -2518,6 +2518,16 @@ class System(object):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
+                                f"design_var '{name}'.")
+
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
+                                 f"design_var '{name}'.")
+            units = simplify_unit(units)
+
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
@@ -2525,17 +2535,23 @@ class System(object):
         # determine adder and scaler based on args
         adder, scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
-        # Convert lower to ndarray/float as necessary
-        lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                         flatten=True)
+        if lower is None:
+            # if not set, set lower to -INF_BOUND and don't apply adder/scaler
+            lower = -openmdao.INF_BOUND
+        else:
+            # Convert lower to ndarray/float as necessary
+            lower = format_as_float_or_array('lower', lower, flatten=True)
+            # Apply scaler/adder
+            lower = (lower + adder) * scaler
 
-        # Convert upper to ndarray/float as necessary
-        upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                         flatten=True)
-
-        # Apply scaler/adder to lower and upper
-        lower = (lower + adder) * scaler
-        upper = (upper + adder) * scaler
+        if upper is None:
+            # if not set, set upper to INF_BOUND and don't apply adder/scaler
+            upper = openmdao.INF_BOUND
+        else:
+            # Convert upper to ndarray/float as necessary
+            upper = format_as_float_or_array('upper', upper, flatten=True)
+            # Apply scaler/adder
+            upper = (upper + adder) * scaler
 
         if self._static_mode:
             design_vars = self._static_design_vars
@@ -2662,6 +2678,17 @@ class System(object):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '
                              'Got \'{}\' instead'.format(self.msginfo, name))
 
+        if units is not None:
+            if not isinstance(units, str):
+                raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
+                                f"response '{name}'.")
+
+            if not valid_units(units):
+                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
+                                 f"response '{name}'.")
+
+            units = simplify_unit(units)
+
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
@@ -2698,8 +2725,12 @@ class System(object):
 
             # Convert lower to ndarray/float as necessary
             try:
-                lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                                 flatten=True)
+                if lower is None:
+                    # don't apply adder/scaler if lower not set
+                    lower = -openmdao.INF_BOUND
+                else:
+                    lower = format_as_float_or_array('lower', lower, flatten=True)
+                    lower = (lower + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
                                 "specify a variable as lower bound. You can only provide constant "
@@ -2707,8 +2738,12 @@ class System(object):
 
             # Convert upper to ndarray/float as necessary
             try:
-                upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                                 flatten=True)
+                if upper is None:
+                    # don't apply adder/scaler if upper not set
+                    upper = openmdao.INF_BOUND
+                else:
+                    upper = format_as_float_or_array('upper', upper, flatten=True)
+                    upper = (upper + adder) * scaler
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
                                 "specify a variable as upper bound. You can only provide constant "
@@ -2721,15 +2756,6 @@ class System(object):
                     raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
                                     "not specify a variable as equals bound. You can only provide "
                                     "constant float values".format(equals))
-
-            # Scale the bounds
-            if lower is not None:
-                lower = (lower + adder) * scaler
-
-            if upper is not None:
-                upper = (upper + adder) * scaler
-
-            if equals is not None:
                 equals = (equals + adder) * scaler
 
             resp['lower'] = lower
@@ -3007,6 +3033,7 @@ class System(object):
                             meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
                     else:
                         meta['size'] = 0  # discrete var, don't know size
+                meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
                 if src_name in abs2idx:
                     meta = abs2meta_out[src_name]
@@ -4684,7 +4711,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self.get_var_meta(name, 'units')
+        base_units = self._get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4715,7 +4742,7 @@ class System(object):
         float or ndarray of float
             The value converted to the specified units.
         """
-        base_units = self.get_var_meta(name, 'units')
+        base_units = self._get_var_meta(name, 'units')
 
         if base_units == units:
             return val
@@ -4759,7 +4786,7 @@ class System(object):
 
         return (val + offset) * scale
 
-    def get_var_meta(self, name, key):
+    def _get_var_meta(self, name, key):
         """
         Get metadata for a variable.
 

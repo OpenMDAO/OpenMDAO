@@ -42,8 +42,19 @@
                             <i class="fas icon-bezier-curve" id="show-all-connections"></i>
                         </div>
                     </div>
-                    <i class="fas icon-linear-solver solver-button" id="linear-solver-button"></i>
+
                     <i class="fas icon-key" id="legend-button"></i>
+
+                    <div class="expandable">
+                        <i class="fas icon-linear-solver solver-button" id="linear-solver-button"></i>
+                        <i class="fas icon-caret-right caret"></i>
+                        <div class="toolbar-group-expandable" id="solvers-expandable">
+                            <i class="fas icon-linear-solver solver-button" id="linear-solver-button-2"></i>
+                            <i class="fas icon-nonlinear-solver solver-button" id="non-linear-solver-button"></i>
+                            <i class="fas icon-no-solver solver-button" id="no-solver-button"></i>
+                        </div>
+                    </div>
+
                     <i class="fas icon-fx-2" id="desvars-button"></i>
                 </div>
                 <div class="toolbar-group group-4">
@@ -262,7 +273,7 @@
 
 <div id="show-error-button-container">
     <button id="show-error-button">
-        <i class="fas icon-warning"></i> N2 Error! Show More Info
+        <i class="fas icon-notification"></i> N2 Error! Show More Info
     </button>
 </div>
 
