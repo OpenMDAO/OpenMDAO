@@ -540,9 +540,7 @@ class TemplateWriter(object):
                 if title:
                     title_tag = "<title>%s</title>" % title
                     head = '\n\n'.join([title_tag, meta, head_scripts, style_elems])  # Write styles to head
-                    # head = '\n\n'.join([title_tag, meta, style_elems])  # Write styles to head
                 else:
-                    # head = '\n\n'.join([meta, style_elems])  # Write styles to head
                     head = '\n\n'.join([meta, head_scripts, style_elems])  # Write styles to head
                 self.template = head_and_body(head=head, body=template)
 
