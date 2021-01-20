@@ -1345,9 +1345,9 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out1', 'comp.x'], np.eye(size) * 2. * x * z, 1e-6)
             assert_near_equal(J['comp.out1', 'comp.y'], np.zeros((size, size)), 1e-6)
             assert_near_equal(J['comp.out1', 'comp.z'], np.eye(size) * x**2, 1e-6)
-            assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-6)
-            assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-6)
-            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
+            assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-8)
+            assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-8)
+            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-8)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
