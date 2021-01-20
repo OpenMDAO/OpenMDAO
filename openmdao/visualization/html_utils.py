@@ -528,7 +528,7 @@ class TemplateWriter(object):
 
         head_scripts = ''
         for name, code in head_srcs.items():
-            head_scripts += write_script(code, indent=_IND) # qqq IND?
+            head_scripts += write_script(code, indent=_IND)
 
         if styles is not None:
             style_elems = '\n\n'.join([write_style(content=s) for s in styles.values()])

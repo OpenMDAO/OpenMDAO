@@ -1,4 +1,4 @@
-window.addEventListener("error", handleError, true); /* qqq */
+window.addEventListener("error", handleError, true);
 function handleError(evt) {
 
     // Cannot define this color in N2Style since hasn't been loaded yet
@@ -12,7 +12,6 @@ function handleError(evt) {
                "issue to the OpenMDAO developers.\n\n" +
                "Error: " + evt.message + "\n\n" +
                "Stack trace: \n" + evt.error.stack + "\n" );
-               // "    Line number: " + evt.lineno + "    \n");
        } else {
          alert("An error has occured while displaying the N2 diagram. This error should be reported as an issue " +
                "to the OpenMDAO developers. \n\n" +
