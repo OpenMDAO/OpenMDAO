@@ -944,7 +944,6 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         coloring = imeta['coloring']
-        both = coloring._fwd and coloring._rev
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
