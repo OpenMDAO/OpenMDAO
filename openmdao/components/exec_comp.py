@@ -8,7 +8,7 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils import cs_safe
 
 # regex to check for variable names.
@@ -291,8 +291,8 @@ class ExecComp(ExplicitComponent):
         outs = set()
         allvars = set()
 
-        exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
-                       self._parse_for_names(expr)) for expr in exprs]
+        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
+                                          self._parse_for_names(expr)) for expr in exprs]
 
         self._requires_fd = {}
 
@@ -400,9 +400,8 @@ class ExecComp(ExplicitComponent):
 
         if not self._manual_decl_partials:
             decl_partials = super().declare_partials
-            for i, tup in enumerate(exprs_info):
-                outs = tup[0]
-                vs, funcs = tup[1]
+            for i, (outs, tup) in enumerate(exprs_info):
+                vs, funcs = tup
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
@@ -521,6 +520,29 @@ class ExecComp(ExplicitComponent):
 
         self._manual_decl_partials = True
         return super().declare_partials(*args, **kwargs)
+
+    def _setup_partials(self):
+        """
+        Check that all partials are declared.
+        """
+        super()._setup_partials()
+        if self._manual_decl_partials:
+            undeclared = []
+            for i, (outs, tup) in enumerate(self._exprs_info):
+                vs, funcs = tup
+                ins = sorted(set(vs).difference(outs))
+                for out in sorted(outs):
+                    out = '.'.join((self.pathname, out)) if self.pathname else out
+                    for inp in ins:
+                        inp = '.'.join((self.pathname, inp)) if self.pathname else inp
+                        if (out, inp) not in self._subjacs_info:
+                            undeclared.append((out, inp))
+            if undeclared:
+                idx = len(self.pathname) + 1 if self.pathname else 0
+                undeclared = ', '.join([' wrt '.join((f"'{of[idx:]}'", f"'{wrt[idx:]}'"))
+                                        for of, wrt in undeclared])
+                simple_warning(f"{self.msginfo}: The following partial derivatives have not been "
+                               f"declared so they are assumed to be zero: [{undeclared}].")
 
     def compute(self, inputs, outputs):
         """

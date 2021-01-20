@@ -301,6 +301,16 @@ else:
 
 class TestExecComp(unittest.TestCase):
 
+    def test_missing_partial_warn(self):
+        p = om.Problem()
+        model = p.model
+        comp = om.ExecComp('z=3.0*x + 2.5*y')
+        model.add_subsystem('comp', comp)
+        comp.declare_partials('z', 'x', method='fd')
+        p.setup()
+        with assert_warning(UserWarning, "'comp' <class ExecComp>: The following partial derivatives have not been declared so they are assumed to be zero: ['z' wrt 'y']."):
+            p.final_setup()
+
     def test_no_expr(self):
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp())
@@ -1321,15 +1331,23 @@ class TestFunctionRegistration(unittest.TestCase):
             comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
                                                               'out2 = safe(y) + z'], shape=size))
             comp.declare_partials('out1', ['x', 'z'], method='fd')
-            comp.declare_partials('out2', ['y'], method='cs')
+            comp.declare_partials('out2', ['y', 'z'], method='cs')
             p.setup()
             xx = np.arange(1, size + 1, dtype=float)
-            p['comp.x'] = xx * 3.
-            p['comp.y'] = xx * 4.
-            p['comp.z'] = xx * 5.
+            p['comp.x'] = x = xx * 3.
+            p['comp.y'] = y = xx * 4.
+            p['comp.z'] = z = xx * 5.
             p.run_model()
-            assert_near_equal(p['comp.out1'], (xx*3) * (xx*3) * xx * 5., 1e-10)
-            assert_near_equal(p['comp.out2'], (xx*4) * (xx*4) + xx * 5., 1e-10)
+            assert_near_equal(p['comp.out1'], x * x * z, 1e-10)
+            assert_near_equal(p['comp.out2'], y * y + z, 1e-10)
+
+            J = p.compute_totals(of=['comp.out1', 'comp.out2'], wrt=['comp.x', 'comp.y', 'comp.z'])
+            assert_near_equal(J['comp.out1', 'comp.x'], np.eye(size) * 2. * x * z, 1e-6)
+            assert_near_equal(J['comp.out1', 'comp.y'], np.zeros((size, size)), 1e-6)
+            assert_near_equal(J['comp.out1', 'comp.z'], np.eye(size) * x**2, 1e-6)
+            assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-6)
+            assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-6)
+            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
