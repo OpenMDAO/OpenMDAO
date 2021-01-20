@@ -15,6 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.utils.general_utils import simple_warning
 from openmdao.core.component import Component
 
 _emptyset = set()
@@ -591,13 +592,34 @@ class NonlinearSolver(Solver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         stalled = False
+        stall_count = 0
         if stall_limit > 0:
-            stall_count = 0
             stall_norm = norm0
 
         while self._iter_count < maxiter and norm > atol and norm / norm0 > rtol and not stalled:
             with Recording(type(self).__name__, self._iter_count, self) as rec:
-                self._single_iteration()
+
+                if stall_count == 3 and not self.linesearch.options['print_bound_enforce']:
+
+                    self.linesearch.options['print_bound_enforce'] = True
+
+                    if self._system().pathname:
+                        pathname = f"{self._system().pathname}."
+                    else:
+                        pathname = ""
+
+                    msg = (f"Your model has stalled three times and may be violating the bounds. "
+                           f"In the future, turn on print_bound_enforce in your solver options "
+                           f"here: \n{pathname}nonlinear_solver.linesearch.options"
+                           f"['print_bound_enforce']=True. "
+                           f"\nThe bound(s) being violated now are:\n")
+                    simple_warning(msg)
+
+                    self._single_iteration()
+                    self.linesearch.options['print_bound_enforce'] = False
+                else:
+                    self._single_iteration()
+
                 self._iter_count += 1
                 self._run_apply()
                 norm = self._iter_get_norm()

@@ -1633,32 +1633,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.run_driver()
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
-    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
-                         "scipy >= 1.2 is required.")
-    def test_dual_annealing(self):
-
-        import openmdao.api as om
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
-
-        prob.driver = driver = om.ScipyOptimizeDriver()
-        driver.options['optimizer'] = 'dual_annealing'
-        driver.options['disp'] = False
-        driver.options['tol'] = 1e-9
-        driver.options['maxiter'] = 2000
-        driver.opt_settings['seed'] = 1234
-        driver.opt_settings['initial_temp'] = 5230
-
-        model.add_design_var('x', lower=-2*np.ones(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
-        model.add_objective('f')
-        prob.setup()
-        prob.run_driver()
-        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
-        assert_near_equal(prob['f'], 0.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
