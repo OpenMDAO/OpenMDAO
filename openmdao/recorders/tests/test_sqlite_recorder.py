@@ -369,7 +369,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(system='root', run_counter=1, out_stream=stream)
+        cr.list_model_options(system='root', run_number=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -459,7 +459,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         stream = StringIO()
 
-        cr.list_model_options(system='root', run_counter=1, out_stream=stream)
+        cr.list_model_options(system='root', run_number=1, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -2689,7 +2689,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'vector')
 
         # get options for second run
-        options = cr.list_solver_options(run_counter=1, out_stream=None)
+        options = cr.list_solver_options(run_number=1, out_stream=None)
         self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'wall')
 
     def test_feature_system_options(self):
@@ -2726,7 +2726,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(options['root']['nl_maxiter'], 1)
 
         # get options for the second run
-        options = cr.list_model_options(run_counter=1, out_stream=None)
+        options = cr.list_model_options(run_number=1, out_stream=None)
 
         self.assertEqual(options['root']['nl_maxiter'], 9)
 

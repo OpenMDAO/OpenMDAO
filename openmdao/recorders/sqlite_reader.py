@@ -440,13 +440,13 @@ class SqliteCaseReader(BaseCaseReader):
 
         return paths
 
-    def list_model_options(self, run_counter=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_model_options(self, run_number=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List model options for the specified run.
 
         Parameters
         ----------
-        run_counter : int
+        run_number : int
             Run_driver or run_model iteration to inspect
         system : str or None
             Pathname of system (None for all systems)
@@ -473,7 +473,7 @@ class SqliteCaseReader(BaseCaseReader):
                 name = key
                 num = 0
 
-            if (system is None or system == name) and (run_counter == int(num)):
+            if (system is None or system == name) and (run_number == int(num)):
 
                 if out_stream:
                     if num_header != num:
@@ -494,13 +494,13 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
-    def list_solver_options(self, run_counter=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_solver_options(self, run_number=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List solver options for the specified run.
 
         Parameters
         ----------
-        run_counter : int
+        run_number : int
             Run_driver or run_model iteration to inspect
         solver : str or None
             Pathname of solver (None for all solvers)
@@ -527,7 +527,7 @@ class SqliteCaseReader(BaseCaseReader):
                 name = key
                 num = 0
 
-            if (solver is None or solver == name) and (run_counter == int(num)):
+            if (solver is None or solver == name) and (run_number == int(num)):
 
                 if out_stream:
                     if num_header != num:

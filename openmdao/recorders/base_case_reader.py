@@ -168,13 +168,13 @@ class BaseCaseReader(object):
         """
         pass
 
-    def list_model_options(self, run_counter=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_model_options(self, run_number=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List model options for the specified run.
 
         Parameters
         ----------
-        run_counter : int
+        run_number : int
             Run_driver or run_model iteration to inspect
         system : str or None
             Pathname of system (None for all systems)
@@ -189,13 +189,13 @@ class BaseCaseReader(object):
         """
         pass
 
-    def list_solver_options(self, run_counter=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
+    def list_solver_options(self, run_number=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
         """
         List solver options for the specified run.
 
         Parameters
         ----------
-        run_counter : int
+        run_number : int
             Run_driver or run_model iteration to inspect
         solver : str or None
             Pathname of solver (None for all solvers)
