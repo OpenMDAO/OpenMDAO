@@ -375,7 +375,7 @@ rect.outputHighlight {
 #show-error-button-container {
     visibility: hidden;
     position: absolute;
-    bottom: 4px;
+    bottom: 17px;
     right: 115px;
     z-index:5;
 }
@@ -388,4 +388,6 @@ rect.outputHighlight {
     font-size: 16px;
     cursor: pointer;
     border-radius: 5px;
+    text-decoration: underline;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
 }
