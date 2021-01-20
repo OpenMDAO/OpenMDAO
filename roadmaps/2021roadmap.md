@@ -97,7 +97,7 @@ Similar to the multi-case data N2 concept, this functionality will likely be bui
 We have also considered a reduced functionality version of this feature built into the OpenMDAO command line tool, based on matplotlib or bokeh.
 This lighter version may be done instead of a stand alone tool or in addition to it.
 
-# Building and OpenMDAO Training Course
+# Building an OpenMDAO Training Course
 We've seen that as users get more comfortable with OpenMDAO the size of the models they can build grows quickly, 
 both in terms of the number of components and the complexity of their couplings.
 One problem can then arise when the problem complexity grows to the point that converging the solver or the optimizers becomes a real bottle neck.
