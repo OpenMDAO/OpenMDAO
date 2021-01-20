@@ -114,8 +114,7 @@ def _notebook_mode():
         from IPython import get_ipython
         ipy = get_ipython() is not None
     except ImportError:
-        print("IPython is not installed run `pip install openmdao[notebooks]` to install required "
-              "required dependencies")
+        pass
 
     try:
         import tabulate
