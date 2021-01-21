@@ -1674,7 +1674,7 @@ class System(object):
         """
         pass
 
-    def _setup_vectors(self, root_vectors, alloc_complex=False):
+    def _setup_vectors(self, root_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1682,8 +1682,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        alloc_complex : bool
-            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._vectors = vectors = {'input': OrderedDict(),
                                    'output': OrderedDict(),
@@ -4273,7 +4271,10 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
+                    if val is _UNDEFINED:
+                        loc_val = np.zeros(sizes[myrank])
+                    else:
+                        loc_val = np.ascontiguousarray(val)
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
@@ -4291,7 +4292,10 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
+                    if val is _UNDEFINED:
+                        loc_val = np.zeros(sizes[idx])
+                    else:
+                        loc_val = np.ascontiguousarray(val)
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                     if not flat:
