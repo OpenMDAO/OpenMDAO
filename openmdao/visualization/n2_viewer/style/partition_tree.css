@@ -371,3 +371,23 @@ rect.outputHighlight {
 .opt-vars {
     fill: #c5b0d5 !important;
 }
+
+#show-error-button-container {
+    visibility: hidden;
+    position: absolute;
+    bottom: 17px;
+    right: 115px;
+    z-index:5;
+}
+
+#show-error-button{
+    background-color: red;
+    border: none;
+    color: white;
+    padding: 12px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    text-decoration: underline;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+}

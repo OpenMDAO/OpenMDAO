@@ -573,9 +573,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     else:
         title = "OpenMDAO Model Hierarchy and N2 diagram"
 
+    src_names = ('N2ErrorHandling',)
+    head_srcs = read_files(src_names, src_dir, 'js')
+
     h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
                       title=title,
-                      styles=styles, embeddable=embeddable)
+                      styles=styles, embeddable=embeddable, head_srcs=head_srcs)
 
     if (embeddable):
         h.insert("non-embedded-n2", "embedded-n2")
