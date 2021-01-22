@@ -267,20 +267,20 @@ class ApproximationScheme(object):
             directional = key[-1]
             data = self._get_approx_data(system, key)
             if inputs._contains_abs(wrt):
-                arr = inputs
+                vec = inputs
                 slices = in_slices
             elif outputs._contains_abs(wrt):
-                arr = outputs
+                vec = outputs
                 slices = out_slices
             else:  # wrt is remote
-                arr = None
+                vec = None
 
             if wrt in approx_wrt_idx:
                 in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
-                if arr is not None:
+                if vec is not None:
                     in_idx += slices[wrt].start
             else:
-                if arr is None:
+                if vec is None:
                     if wrt in abs2meta['input']:
                         in_idx = range(abs2meta['input'][wrt]['size'])
                     else:
@@ -296,7 +296,7 @@ class ApproximationScheme(object):
             tmpJ = _get_wrt_subjacs(system, approx)
             tmpJ['@out_slices'] = out_slices
 
-            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
+            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(vec, in_idx)], None))
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
