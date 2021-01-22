@@ -209,7 +209,7 @@ class ApproximationScheme(object):
                 if abs_of in approx_of_idx:
                     full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
                 else:
-                    full_idxs.append(range(slc.start, slc.stop))
+                    full_idxs.append(np.arange(slc.start, slc.stop))
         if full_idxs:
             tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 

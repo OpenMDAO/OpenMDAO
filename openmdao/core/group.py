@@ -2997,8 +2997,7 @@ class Group(System):
                 yield of, offset, end, sub_of_idx
                 offset = end
         else:
-            for tup in super()._jacobian_of_iter():
-                yield tup
+            yield from super()._jacobian_of_iter()
 
     def _jacobian_wrt_iter(self, wrt_matches=None):
         """
