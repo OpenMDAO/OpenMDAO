@@ -214,8 +214,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     dict
         Data to used to generate html file.
     """
-    global _run_driver_called
-
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
@@ -491,6 +489,8 @@ def _scaling_setup_parser(parser):
 
 
 _run_driver_called = False
+_run_model_start = False
+_run_model_done = False
 
 
 def _exitfunc():
@@ -510,18 +510,30 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _set_flag(problem):
+    def _set_run_driver_flag(problem):
         global _run_driver_called
         _run_driver_called = True
+
+    def _set_run_model_start(problem):
+        global _run_model_start
+        _run_model_start = True
+
+    def _set_run_model_done(problem):
+        global _run_model_done
+        _run_model_done = True
 
     def _scaling_check(problem):
         if _run_driver_called:
             # If run_driver has been called, we know no more user changes are coming.
-            _scaling(problem)
+            if not _run_model_start:
+                problem.run_model()
+            if _run_model_done:
+                _scaling(problem)
 
     def _scaling(problem):
         hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
         hooks._unregister_hook('run_driver', 'Problem')
+        hooks._unregister_hook('run_model', 'Problem')
         driver = problem.driver
         if options.title:
             title = options.title
@@ -535,8 +547,11 @@ def _scaling_cmd(options, user_args):
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_scaling_check)
 
+    hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
+                         pre=_set_run_model_start, post=_set_run_model_done)
+
     hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_flag)
+                         pre=_set_run_driver_flag)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit
