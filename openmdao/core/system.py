@@ -2519,7 +2519,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"design_var '{name}'.")
-            units = simplify_unit(units, msginfo=self.msginfo)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2675,7 +2678,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"response '{name}'.")
-            units = simplify_unit(units, msginfo=self.msginfo)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}

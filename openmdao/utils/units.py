@@ -1120,7 +1120,7 @@ def simplify_unit(old_unit_str, msginfo=''):
     found_unit = _find_unit(old_unit_str)
     if found_unit is None:
         _msginfo = f'{msginfo}: ' if msginfo else ''
-        raise ValueError(f'{_msginfo}The units {old_unit_str} are invalid.')
+        raise ValueError(f"{_msginfo}The units '{old_unit_str}' are invalid.")
 
     new_str = found_unit.name()
     if new_str == '1':
