@@ -14,7 +14,8 @@ import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System
-from openmdao.core.component import Component, _DictValues, _full_slice
+from openmdao.core.component import Component, _DictValues
+from openmdao.vectors.vector import _full_slice
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS

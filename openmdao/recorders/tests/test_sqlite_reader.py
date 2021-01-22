@@ -1624,7 +1624,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
         prob.run_model()
-        prob.cleanup()
 
         cr = om.CaseReader(self.filename)
 
@@ -1648,6 +1647,20 @@ class TestSqliteCaseReader(unittest.TestCase):
             with self.assertRaises(expected_exception=ValueError) as e:
                 datasrc.get_val('acomp.tin', units='not_a_unit')
             self.assertEqual('The units not_a_unit are invalid.', str(e.exception))
+
+        prob.set_val('comp.x', value=100.0, units='s*ft/s')
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        for datasrc in [case, prob, prob.model]:
+            assert_near_equal(datasrc.get_val('comp.x', units='m/s*s'),
+                              om.convert_units(100.0, 'ft', 'm'),
+                              1e-6)
+            assert_near_equal(datasrc.get_val('comp.y', units='m*s/s'),
+                              om.convert_units(100.0, 'ft', 'm')-25.0,
+                              1e-6)
 
     def test_get_ambiguous_input(self):
         model = om.Group()
