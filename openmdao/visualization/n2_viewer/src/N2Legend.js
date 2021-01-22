@@ -37,7 +37,7 @@ class N2Legend {
         this.sysAndVar = [
             { 'name': "Connection", 'color': N2Style.color.connection },
             { 'name': "Collapsed", 'color': N2Style.color.collapsed },
-            { 'name': "Declared Partial", 'color': N2Style.color.declaredPartial}
+            { 'name': "Declared Partial", 'color': N2Style.color.declaredPartial }
         ];
 
         this.n2Symbols = [];
@@ -214,7 +214,7 @@ class N2Legend {
     _setupDrag() {
         const self = this;
 
-        this._div.on('mousedown', function() {
+        this._div.on('mousedown', function () {
             let dragDiv = d3.select(this);
             dragDiv.style('cursor', 'grabbing')
                 // top style needs to be set explicitly before releasing bottom:
@@ -223,7 +223,7 @@ class N2Legend {
 
             self._startPos = [d3.event.clientX, d3.event.clientY]
             self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
-                d3.event.clientY - parseInt(dragDiv.style('top'))];
+            d3.event.clientY - parseInt(dragDiv.style('top'))];
 
             let w = d3.select(window)
                 .on("mousemove", e => {
@@ -276,5 +276,27 @@ class N2Legend {
     toggle(showLinearSolverNames, solverStyles) {
         if (this.hidden) this.show();
         else this.hide();
+    }
+}
+
+class N2Help extends N2Window {
+    constructor() {
+        super();
+        this.theme('help')
+            .setList({ left: '100px', top: '20px', right: '100px', height: '800px' })
+            .title('Instructions')
+            .showFooter('OpenMDAO Model Hierarchy and N2 diagram');
+
+        this.body.append('p')
+            .text(
+                'Left clicking on a node in the partition tree will navigate to that node. ' +
+                'Right clicking on a node in the model hierarchy will collapse/expand it. ' +
+                'A click on any element in the N2 diagram will allow those arrows to persist.');
+
+        this.body.append('h1').text('Toolbar Help');
+        
+        const helpSvg = this.body.append('svg').append('use').attr('href', '#help-graphic');
+        this.show();
+        this.modal(true);
     }
 }

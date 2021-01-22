@@ -559,6 +559,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
         waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
 
+    with open(os.path.join(assets_dir, "toolbar_help.svg"), "r") as f:
+        help_svg = str(f.read())
+
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
     else:
@@ -575,6 +578,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     h.insert('{{fontello}}', encoded_font)
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
+    h.insert('{{help}}', help_svg)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
@@ -586,12 +590,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
     # Help
-    help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
-                'Right clicking on a node in the model hierarchy will collapse/expand it. '
-                'A click on any element in the N2 diagram will allow those arrows to persist.')
-    help_diagram_svg_filepath = os.path.join(assets_dir, "toolbar_help.svg")
-    h.add_help(help_txt, help_diagram_svg_filepath,
-               footer="OpenMDAO Model Hierarchy and N2 diagram")
+    # help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
+    #             'Right clicking on a node in the model hierarchy will collapse/expand it. '
+    #            'A click on any element in the N2 diagram will allow those arrows to persist.')
+    # help_diagram_svg_filepath = os.path.join(assets_dir, "toolbar_help.svg")
+    # h.add_help(help_txt, help_diagram_svg_filepath,
+    #           footer="OpenMDAO Model Hierarchy and N2 diagram")
 
     # Write output file
     h.write(outfile)

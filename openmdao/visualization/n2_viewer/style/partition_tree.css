@@ -147,6 +147,12 @@ body {
     /* Black w/ opacity */
 }
 
+div#help-svg {
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 /* Modal Content */
 
 .modal-content {

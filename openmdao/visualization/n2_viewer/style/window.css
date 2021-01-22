@@ -8,6 +8,13 @@
     position: absolute;
 }
 
+.n2-windows-modal-bg {
+    width: 100vw;
+    height: 100vw;
+    opacity: 0.6;
+    background-color: black;
+}
+
 .main-window {
     top: 0;
     left: 0;
@@ -557,3 +564,124 @@
 }
 
 /* ^^^^^^^^^^ End Node Value N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Help N2 Window theme vvvvvvvvvv */
+.window-theme-help {
+    --header-height: 42px;
+    --footer-height: 32px;
+    --ribbon-color: steelblue;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+
+    border: 2px solid white;
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.window-theme-help .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-help .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-help .window-close-button {
+    color: none;
+    opacity: 0.5;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-help .window-close-button:hover,
+.window-theme-help .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-help .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: normal;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    text-align: left;
+    font-size: 20px;
+    padding-left: 10px;
+}
+
+.window-theme-help .window-body {
+    color: black;
+    border: 0;
+    margin: 0 0 0 15px;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+
+    font-family: helvetica, sans-serif;
+    font-size: 11pt;
+}
+
+.window-theme-help .window-body > svg {
+    width: 100%;
+    height: 100%;
+}
+
+.window-theme-help .window-body h1 {
+    padding: 0;
+    margin: 0;
+}
+
+.window-theme-help .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.window-theme-help .window-footer span {
+    color: white;
+    display: block;
+    line-height: var(--footer-height);
+    position: relative;
+    overflow: hidden;
+    width: auto;
+    text-align: left;
+    font-family: helvetica, sans-serif;
+    font-size: 12px;
+    padding-left: 10px;
+}
+
+/* ^^^^^^^^^^ End Help N2 Window theme ^^^^^^^^^^ */

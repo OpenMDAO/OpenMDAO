@@ -22,7 +22,7 @@ class N2Window {
      */
     constructor(newId = null, cloneId = null) {
         // The primary reference for the new window
-        this._window = d3.select(cloneId? cloneId : '#window-template')
+        this._window = d3.select(cloneId ? cloneId : '#window-template')
             .clone(true)
             .attr('id', newId ? newId : 'n2win' + uuidv4());
 
@@ -36,6 +36,8 @@ class N2Window {
         this._closeButton = this._window.select('.window-close-button');
         this._body = this._window.select('.window-body');
         this._footer = this._window.select('.window-footer');
+
+        this._enabledModal = false;
 
         const self = this;
         this._closeButton.on('click', e => { self.close(); })
@@ -53,11 +55,24 @@ class N2Window {
 
     /**
      * Compute the position of all four sides of the window relative to the container.
+     * CAUTION: This only works correctly for a displayed element.
+     * @param {Object} [container = N2Window.container.node()] HTML element containing window.
      * @returns {Object} Each key represents the position in pixels.
      */
     _getPos(container = N2Window.container.node()) {
         const parentPos = container.getBoundingClientRect(),
             childPos = this.window.node().getBoundingClientRect();
+
+        // If hidden, move offscreen and display to get correct width and height
+        if (this.hidden) {
+            this.set('left', '-15000px').show();
+
+            const tmpPos = this.window.node().getBoundingClientRect();
+            childPos.width = tmpPos.width;
+            childPos.height = tmpPos.height;
+
+            this.hide().set('left', childPos.left);
+        }
 
         let posInfo = {
             top: childPos.top - parentPos.top,
@@ -80,7 +95,7 @@ class N2Window {
      */
     _setPos(newPos) {
         // All of the values need to be set because some may have started as "auto"
-        for (const s of ['top', 'right', 'bottom', 'left', 'width', 'height']) {
+        for (const s of ['top', 'left', 'bottom', 'right', 'width', 'height']) {
             this.set(s, `${newPos[s]}px`);
         }
 
@@ -102,11 +117,12 @@ class N2Window {
     /**
      * Make the window the highest z-index we know of, and increment that afterwards.
      * @param {Boolean} force Do it even if the current z-index is already highest.
+     * @param {Number} [inc = 1] The amount to increase z-index by.
      * @return {N2Window} Reference to this.
      */
-    bringToFront(force = false) {
+    bringToFront(force = false, inc = 1) {
         if (force || this.window.style('z-index') < N2Window.zIndex) {
-            N2Window.zIndex++;
+            N2Window.zIndex += inc;
             this.window.style('z-index', N2Window.zIndex);
         }
 
@@ -200,6 +216,7 @@ class N2Window {
     /** Delete the window element from the document and remove the event handler. */
     close() {
         this.closeButton.on('click', null);
+        this.modal(false);
         this.window.remove();
     }
 
@@ -216,8 +233,9 @@ class N2Window {
     }
 
     /** Display the footer ribbon */
-    showFooter() {
+    showFooter(footerText = null) {
         this.footer.classed('window-inactive', false);
+        this.footer.select('span').text(footerText);
         return this;
     }
 
@@ -228,6 +246,19 @@ class N2Window {
     ribbonColor(color) {
         this.header.style('background-color', color);
         this.footer.style('background-color', color);
+
+        return this;
+    }
+
+    move(top, left) {
+        let pos = this._getPos();
+        pos.left = left;
+        pos.top = top;
+
+        pos.right = pos.parentWidth - pos.width - left;
+        pos.bottom = pos.parentHeight - pos.height - top;
+
+        this._setPos(pos);
 
         return this;
     }
@@ -284,16 +315,16 @@ class N2Window {
             this.show();
         }
 
-        let contentWidth = Math.max(this.body.node().scrollWidth, this.body.node().offsetWidth),
-            contentHeight = Math.max(this.body.node().scrollHeight, this.body.node().offsetHeight),
+        let contentWidth = this.body.node().scrollWidth,
+            contentHeight = this.body.node().scrollHeight,
             headerHeight = this.header.node().offsetHeight,
             footerHeight = this.footer.classed('window-inactive') ? 0 : this.footer.node().offsetHeight;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
         const newSize = {
-                width: contentWidth + 'px',
-                height: totalHeight + 'px'
+            width: contentWidth + 'px',
+            height: totalHeight + 'px'
         };
         this.setList(newSize);
 
@@ -303,6 +334,25 @@ class N2Window {
             this.set('left', leftPos);
         }
 
+        return this;
+    }
+
+    /**
+     * Make visible the div that separates this window from everything else
+     * @param {Boolean} [enable = null] Turn on modal mode if true, off if false.
+     * @returns Modal setting if enable is null, otherwise current modal state.
+     */
+    modal(enable = null) {
+        const modalDiv = d3.select('.n2-windows-modal-bg');
+        if (enable === null) { return this._enabledModal; }
+
+        if (enable) {
+            this.bringToFront(true, 2);
+            modalDiv.style('z-index', N2Window.zIndex - 1);
+        }
+
+        modalDiv.classed('window-inactive', !enable);
+        this._enabledModal = enable;
         return this;
     }
 }
@@ -375,14 +425,14 @@ class N2WindowResizable extends N2WindowDraggable {
     constructor(newId = null, cloneId = null, sizeOpts = {}) {
         super(newId, cloneId);
 
-        this.min = { 
-            width: exists(sizeOpts.minWidth)? sizeOpts.minWidth : 200, 
-            height: exists(sizeOpts.minHeight)? sizeOpts.minHeight: 200
+        this.min = {
+            width: exists(sizeOpts.minWidth) ? sizeOpts.minWidth : 200,
+            height: exists(sizeOpts.minHeight) ? sizeOpts.minHeight : 200
         };
 
         this.max = {
-            width: exists(sizeOpts.maxWidth)? sizeOpts.maxWidth : window.innerWidth, 
-            height: exists(sizeOpts.maxHeight)? sizeOpts.maxHeight : window.innerHeight
+            width: exists(sizeOpts.maxWidth) ? sizeOpts.maxWidth : window.innerWidth,
+            height: exists(sizeOpts.maxHeight) ? sizeOpts.maxHeight : window.innerHeight
         };
 
         this._setupResizers();
@@ -447,7 +497,7 @@ class N2WindowResizable extends N2WindowDraggable {
 
                 const dragStart = [d3.event.pageX, d3.event.pageY];
                 let newPos = [0, 0]; // Delta values of the current mouse position vs. start position
-                let newSize = { }; // Object to store newly computed positions in
+                let newSize = {}; // Object to store newly computed positions in
 
                 const w = d3.select(window)
                     .on("mousemove", e => {
@@ -458,22 +508,22 @@ class N2WindowResizable extends N2WindowDraggable {
                             const dv = dirVals[dirs[i]],
                                 startPos = startDims[dirs[i]],
                                 startSize = startDims[dv.dir];
-                            
+
                             // Calculate the amount the dimension can change to without
                             // violating the set width or height limits of the window.
                             const dimMin = Math.max(0, startPos + startSize - self.min[dv.dir]),
                                 dimMax = Math.max(0, startPos + startSize - self.max[dv.dir]);
-                            
+
                             // Calculate the new potential position of the edge from the
                             // original position and the current position of the mouse.
                             const newVal = startPos + (newPos[dv.idx] * dv.mult);
 
                             // Make sure the edge won't move beyond its limits.
                             if (newVal > startPos) { // Decreasing size (farther from window edge)
-                                newSize[dirs[i]] = newVal > dimMin? dimMin : newVal;
+                                newSize[dirs[i]] = newVal > dimMin ? dimMin : newVal;
                             }
                             else { // Increasing size (closer to window edge)
-                                newSize[dirs[i]] = newVal < dimMax? dimMax : newVal;
+                                newSize[dirs[i]] = newVal < dimMax ? dimMax : newVal;
                             }
                         }
                         newSize.width = startDims.parentWidth - (newSize.right + newSize.left);
@@ -485,8 +535,8 @@ class N2WindowResizable extends N2WindowDraggable {
                         w.on("mousemove", null).on("mouseup", null);
                     });
 
-                d3.event.preventDefault();
             });
+            d3.event.preventDefault();
         }
     }
 }

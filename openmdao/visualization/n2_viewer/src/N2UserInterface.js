@@ -39,9 +39,6 @@ class N2UserInterface {
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this);
-
-        this.valueInfoManager = new ValueInfoManager(this);
-
         this.toolbar = new N2Toolbar(this);
     }
 

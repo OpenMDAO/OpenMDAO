@@ -220,32 +220,6 @@ class InfoPropArray extends InfoPropDefault {
 InfoPropArray.floatFormatter = d3.format('g');
 
 /**
- * Manage the windows that display the values of variables
- * @typedef ValueInfoManager
- */
-class ValueInfoManager {
-    /**
-     * Manage the value info windows.
-     */
-    constructor(ui) {
-        this.ui = ui;
-        this.valueInfoWindows = {};
-    }
-
-    add(name, val) {
-        // Check to see if already exists before opening a new one
-        if (!this.valueInfoWindows[name]) {
-            this.valueInfoWindows[name] = new ValueInfo(name, val, this.ui);
-        }
-    }
-
-    remove(name) {
-        this.valueInfoWindows[name].clear() // remove the DOM elements
-        delete this.valueInfoWindows[name]; // remove the reference and let GC cleanup
-    }
-};
-
-/**
  * Manage a window for displaying the value of a variable.
  * @typedef ValueInfo
  */
@@ -258,12 +232,13 @@ class ValueInfo extends N2WindowResizable {
      * Add a new value window if it doesn't already exist.
      * @param {String} name Variable name.
      * @param {Number} val Variable value.
+     * @param {PersistentNodeInfo} pnInfo The PersistentNodeInfo window to get data from.
      * @returns {ValueInfo} The newly constructed window.
      */
-    static add(name, val) {
+    static add(name, val, pnInfo) {
         if (!this.existingValueWindows[name]) {
             this.existingValueWindows[name] = true;
-            return new ValueInfo(name, val);
+            return new ValueInfo(name, val, pnInfo);
         }
     }
 
@@ -279,8 +254,9 @@ class ValueInfo extends N2WindowResizable {
      * references to the HTML elements.
      * @param {String} name Variable name.
      * @param {Number} val Variable value.
+     * @param {PersistentNodeInfo} pnInfo The PersistentNodeInfo window to get data from.
      */
-    constructor(name, val) {
+    constructor(name, val, pnInfo) {
         super('valueInfo-' + uuidv4());
         this.name = name;
         this.val = val;
@@ -288,9 +264,7 @@ class ValueInfo extends N2WindowResizable {
         this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
 
-        this.theme('value-info')
-            .showFooter()
-            .populate();
+        this.theme('value-info').showFooter().populate(pnInfo);
     }
 
     /**
@@ -317,7 +291,7 @@ class ValueInfo extends N2WindowResizable {
     /**
      * Fill the table with the data from our val array and display in a window.
      */
-    populate() {
+    populate(pnInfo) {
         // Check to see if the data is a 2d array since the rest of the code assumes
         // that it is an Array. If only 1d, make it a 2d with one row.
         let val = this.val;
@@ -357,7 +331,12 @@ class ValueInfo extends N2WindowResizable {
             .append('td')
             .text(function (d) { return InfoPropArray.floatFormatter(d); });
 
-        this.sizeToContent().title(this.name).show();
+        const pnInfoPos = pnInfo._getPos();
+        this.sizeToContent()
+            .title(this.name)
+            .move(pnInfoPos.top + 20, pnInfoPos.left + 20)
+            .show()
+
         
         // Save the width and height of the table when it is fully
         // constructed. This will be used later to limit the resizing
@@ -366,7 +345,7 @@ class ValueInfo extends N2WindowResizable {
         const pos = this._getPos();      
         this.maxWidth = pos.width;
         this.maxHeight = pos.height;
-        if (this.minHeight < pos.height) this.minHeight = pos.height;
+        if (this.minHeight > pos.height) this.minHeight = pos.height;
     }
 
     /** Remove our name from the list of existing windows before closing. */
@@ -561,7 +540,7 @@ class PersistentNodeInfo extends N2WindowDraggable {
                 this.window
                     .select(`button#${valName}.show_value_button`)
                     .on('click', c => {
-                        ValueInfo.add(name, self.values[valName].val);
+                        ValueInfo.add(name, self.values[valName].val, self);
                     })
             }
         }
