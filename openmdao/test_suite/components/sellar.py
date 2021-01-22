@@ -368,18 +368,22 @@ class SellarDerivativesGrouped(om.Group):
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS, recordable=False,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=om.ScipyKrylov,
+        self.options.declare('linear_solver', default=om.ScipyKrylov, recordable=False,
                              desc='Linear solver (class or instance)')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
         self.options.declare('ln_maxiter', default=None,
                              desc='Iteration limit for linear solver.')
+        self.options.declare('mda_nonlinear_solver', default=om.NonlinearBlockGS, recordable=False,
+                             desc='Nonlinear solver (class or instance)')
+        self.options.declare('mda_linear_solver', default=om.ScipyKrylov, recordable=False,
+                             desc='Linear solver (class or instance) for Sellar MDA')
 
     def setup(self):
         self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
@@ -410,9 +414,11 @@ class SellarDerivativesGrouped(om.Group):
         if self.options['ln_maxiter']:
             self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
-    def configure(self):
-        self.mda.linear_solver = om.ScipyKrylov()
-        self.mda.nonlinear_solver = om.NonlinearBlockGS()
+        nl = self.options['mda_nonlinear_solver']
+        self.mda.nonlinear_solver = nl() if inspect.isclass(nl) else nl
+
+        ln = self.options['mda_linear_solver']
+        self.mda.linear_solver = ln() if inspect.isclass(ln) else ln
 
 
 class StateConnection(om.ImplicitComponent):
