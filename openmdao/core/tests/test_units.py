@@ -264,7 +264,6 @@ class TestUnitConversion(unittest.TestCase):
             prob = om.Problem(model=Comp1())
             prob.setup()
         expected_msg = "The units 'junk' are invalid"
-        print(str(cm.exception))
         self.assertTrue(expected_msg in str(cm.exception))
 
         with self.assertRaises(Exception) as cm:
