@@ -453,8 +453,6 @@ class TestFeature(unittest.TestCase):
 
         p.run_model()
 
-        # print(p.get_val('totalforcecomp.total_force', units='kN'))
-
         # Verify the results
         expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
