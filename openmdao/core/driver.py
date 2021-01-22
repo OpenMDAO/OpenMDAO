@@ -570,8 +570,7 @@ class Driver(object):
                 local_val = local_val[local_indices]
 
             if get_remote:
-                if not local_val.flags['C_CONTIGUOUS']:
-                    local_val = np.ascontiguousarray(local_val)
+                local_val = np.ascontiguousarray(local_val)
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                 offsets[1:] = np.cumsum(sizes[:-1])
                 val = np.zeros(np.sum(sizes))
