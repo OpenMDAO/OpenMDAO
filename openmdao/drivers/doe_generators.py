@@ -1,6 +1,7 @@
 """
 Case generators for Design-of-Experiments Driver.
 """
+from collections import OrderedDict
 
 import numpy as np
 
@@ -290,12 +291,13 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        levels : int, optional
+        levels : int or dict, optional
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
         """
         super().__init__()
         self._levels = levels
+        self._n_levels = self._levels if isinstance(self._levels, int) else sum(self._levels.values())
 
     def __call__(self, design_vars, model=None):
         """
@@ -314,15 +316,16 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['global_size'] for name, meta in design_vars.items()])
-
+        size = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
         doe = self._generate_design(size)
 
         # generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
-        values = np.empty((size, self._levels))
+        n_levels = self._n_levels
+        values = np.empty((sum(size.values()), n_levels))
+        values[:] = np.nan
 
         row = 0
         for name, meta in design_vars.items():
@@ -337,7 +340,7 @@ class _pyDOE_Generator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[row][:] = np.linspace(lower, upper, num=self._levels)
+                values[row][:] = np.linspace(lower, upper, num=self._n_levels)
                 row += 1
 
         # yield values for doe generated indices
@@ -376,13 +379,26 @@ class FullFactorialGenerator(_pyDOE_Generator):
     DOE case generator implementing the Full Factorial method.
     """
 
+    def __init__(self, levels=_LEVELS):
+        """
+        Initialize the _pyDOE_Generator.
+
+        Parameters
+        ----------
+        levels : int or dict, optional
+            The number of evenly spaced levels between each design variable
+            lower and upper bound. Defaults to 2.
+        """
+        super().__init__()
+        self._levels = levels
+
     def _generate_design(self, size):
         """
         Generate a full factorial DOE design.
 
         Parameters
         ----------
-        size : int
+        size : OrderedDict
             The number of factors for the design.
 
         Returns
@@ -390,7 +406,12 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.fullfact([self._levels] * size)
+        print(":::", size, "  ", self._levels)
+        #  return pyDOE2.fullfact([self._levels] * size)
+        if isinstance(self._levels, int):
+            return pyDOE2.fullfact([self._levels] * np.array(list(size.values())))
+        elif isinstance(self._levels, dict):
+            return pyDOE2.fullfact([v * self._levels[k] for k, v in size.items()])
 
 
 class GeneralizedSubsetGenerator(_pyDOE_Generator):
