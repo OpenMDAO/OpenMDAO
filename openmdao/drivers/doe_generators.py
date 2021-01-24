@@ -295,7 +295,7 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super().__init__()
         self._levels = levels
-        self.sizes = None
+        self._sizes = None
 
     def _get_level(self, name):
         """
@@ -336,8 +336,8 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        self.sizes = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
-        size = sum(list(self.sizes.values()))
+        self._sizes = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
+        size = sum(list(self._sizes.values()))
         doe = self._generate_design(size).astype('int')
 
         # generate values for each level for each design variable
@@ -412,7 +412,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        sizes = self.sizes
+        sizes = self._sizes
         if isinstance(self._levels, int):  # All have the same number of levels
             all_levels = [self._levels] * size
         elif isinstance(self._levels, dict):  # Different DVs have different number of levels
@@ -425,13 +425,24 @@ class FullFactorialGenerator(_pyDOE_Generator):
 class GeneralizedSubsetGenerator(_pyDOE_Generator):
     """
     DOE case generator implementing the General Subset Design Factorial method.
+
+    Attributes
+    ----------
+    _reduction : int
+        Reduction factor (bigger than 1). Larger `reduction` means fewer
+        experiments in the design and more possible complementary designs.
+    _n : int, optional
+        Number of complementary GSD-designs. The complementary
+        designs are balanced analogous to fold-over in two-level fractional
+        factorial designs.
+        Defaults to 1.
     """
 
     def __init__(self, levels, reduction, n=1):
         """
-        Initialize the PlackettBurmanGenerator.
+        Initialize the GeneralizedSubsetGenerator.
         """
-        super(GeneralizedSubsetGenerator, self).__init__(levels=levels)
+        super().__init__(levels=levels)
         self._reduction = reduction
         self._n = n
 
@@ -449,7 +460,14 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.gsd(levels=[self._levels] * size, reduction=self._reduction, n=self._n)
+        sizes = self._sizes
+        if isinstance(self._levels, int):  # All have the same number of levels
+            all_levels = [self._levels] * size
+        elif isinstance(self._levels, dict):  # Different DVs have different number of levels
+            all_levels = [v * self._get_level(k) for k, v in sizes.items()]
+        else:
+            raise ValueError(f"Levels should be an int or dictionary, not '{type(self._levels)}'")
+        return pyDOE2.gsd(levels=all_levels, reduction=self._reduction, n=self._n)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
