@@ -297,7 +297,14 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super().__init__()
         self._levels = levels
-        self._n_levels = self._levels if isinstance(self._levels, int) else sum(self._levels.values())
+        self.sizes = None
+
+    def _get_level(self, k):
+        levels = self._levels
+        if isinstance(levels, int):
+            return levels
+        else:
+            return levels[k]
 
     def __call__(self, design_vars, model=None):
         """
@@ -316,22 +323,21 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
-        doe = self._generate_design(size)
+        self.sizes = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
+        size = sum(list(self.sizes.values()))
+        doe = self._generate_design(size).astype('int')
 
         # generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
-        n_levels = self._n_levels
-        values = np.empty((sum(size.values()), n_levels))
+        n_levels = self._levels if isinstance(self._levels, int) else max(list(self._levels.values()))
+        values = np.empty((size, n_levels))
         values[:] = np.nan
 
         row = 0
         for name, meta in design_vars.items():
-            size = meta['global_size']
-
-            for k in range(size):
+            for k in range(meta['global_size']):  # Size of this design variable
                 lower = meta['lower']
                 if isinstance(lower, np.ndarray):
                     lower = lower[k]
@@ -340,21 +346,21 @@ class _pyDOE_Generator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[row][:] = np.linspace(lower, upper, num=self._n_levels)
+                levels = self._get_level(name)
+                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
                 row += 1
 
         # yield values for doe generated indices
-        for idxs in doe.astype('int'):
+        for idxs in doe:
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size = meta['global_size']
-                val = np.empty(size)
-                for k in range(size):
-                    idx = idxs[row + k]
-                    val[k] = values[row + k][idx]
+                size_i = meta['global_size']
+                val = np.empty(size_i)
+                for k in range(size_i):
+                    val[k] = values[row + k, idxs[row + k]]
                 retval.append((name, val))
-                row += size
+                row += size_i
             yield retval
 
     def _generate_design(self, size):
@@ -379,26 +385,13 @@ class FullFactorialGenerator(_pyDOE_Generator):
     DOE case generator implementing the Full Factorial method.
     """
 
-    def __init__(self, levels=_LEVELS):
-        """
-        Initialize the _pyDOE_Generator.
-
-        Parameters
-        ----------
-        levels : int or dict, optional
-            The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 2.
-        """
-        super().__init__()
-        self._levels = levels
-
     def _generate_design(self, size):
         """
         Generate a full factorial DOE design.
 
         Parameters
         ----------
-        size : OrderedDict
+        size : int
             The number of factors for the design.
 
         Returns
@@ -406,12 +399,14 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        print(":::", size, "  ", self._levels)
-        #  return pyDOE2.fullfact([self._levels] * size)
-        if isinstance(self._levels, int):
-            return pyDOE2.fullfact([self._levels] * np.array(list(size.values())))
-        elif isinstance(self._levels, dict):
-            return pyDOE2.fullfact([v * self._levels[k] for k, v in size.items()])
+        sizes = self.sizes
+        if isinstance(self._levels, int):  # All have the same number of levels
+            all_levels = [self._levels] * size
+        elif isinstance(self._levels, dict):  # Different DVs have different number of levels
+            all_levels = [v * self._levels[k] for k, v in sizes.items()]
+        else:
+            raise ValueError(f"Levels should be an int or dictionary, not '{type(self._levels)}'")
+        return pyDOE2.fullfact(all_levels)
 
 
 class GeneralizedSubsetGenerator(_pyDOE_Generator):
