@@ -1,14 +1,12 @@
 """
 Case generators for Design-of-Experiments Driver.
 """
+import csv
+import os.path
+import re
 from collections import OrderedDict
 
 import numpy as np
-
-import os.path
-import csv
-import re
-
 import pyDOE2
 
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -299,12 +297,27 @@ class _pyDOE_Generator(DOEGenerator):
         self._levels = levels
         self.sizes = None
 
-    def _get_level(self, k):
+    def _get_level(self, name):
+        """
+        Gets the number of levels of a design variable.
+
+        If the name is not given, it looks for a "default" key in the dictionary. If this is also missing, it uses the
+        default number of levels (2).
+
+        Parameters
+        ----------
+        name : str
+            Design variable name
+
+        Returns
+        -------
+            int
+        """
         levels = self._levels
         if isinstance(levels, int):
             return levels
         else:
-            return levels[k]
+            return levels.get(name, levels.get("default", _LEVELS))
 
     def __call__(self, design_vars, model=None):
         """
@@ -403,7 +416,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         if isinstance(self._levels, int):  # All have the same number of levels
             all_levels = [self._levels] * size
         elif isinstance(self._levels, dict):  # Different DVs have different number of levels
-            all_levels = [v * self._levels[k] for k, v in sizes.items()]
+            all_levels = [v * self._get_level(k) for k, v in sizes.items()]
         else:
             raise ValueError(f"Levels should be an int or dictionary, not '{type(self._levels)}'")
         return pyDOE2.fullfact(all_levels)
