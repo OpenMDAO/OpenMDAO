@@ -25,9 +25,9 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind()], src)
         with self.assertRaises(RuntimeError) as cm:
             ind.shape()
-        self.assertEqual(cm.exception.args[0], "indexer(slice(None, None, None)) does not have a known src_shape so can't compute its shape.")
-        ind.src_shape = 10
-        assert_equal(ind.shape(), (10,))
+        self.assertEqual(cm.exception.args[0], "Can't get shape of slice(None, None, None) because source shape is unknown.")
+        ind.set_src_shape(10)
+        assert_equal(ind.shape(), 10)
 
     def test_neg_start_slice(self):
         ind = indexer[-3:-6:-1]
@@ -37,8 +37,21 @@ class IndexerTestCase(unittest.TestCase):
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't convert slice(-3, -6, -1) to array because source shape is unknown.")
 
-    def test_none_slice(self):
-        pass
+    def test_none_start_slice(self):
+        ind = indexer[:5]
+        src = np.arange(10)
+        assert_equal(src[ind()], src[:5])
+        assert_equal(ind.shape(), 5)
+
+    def test_none_stop_slice(self):
+        ind = indexer[3:]
+        src = np.arange(10)
+        assert_equal(src[ind()], src[3:])
+        with self.assertRaises(RuntimeError) as cm:
+            ind.shape()
+        self.assertEqual(cm.exception.args[0], "Can't get shape of slice(3, None, None) because source shape is unknown.")
+        ind.set_src_shape(10)
+        assert_equal(ind.shape(), 7)
 
     def test_slice_ellipsis(self):
         pass

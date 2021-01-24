@@ -18,9 +18,14 @@ def array2slice(arr):
     """
     if arr.ndim == 1 and arr.size > 1:  # see if 1D array will convert to slice
         span = arr[1] - arr[0]
-        if span > 0 and np.all((arr[1:] - arr[:-1]) == span):
-            # array is increasing with constant span
-            return slice(arr[0], arr[-1] + 1, span)
+        if np.all((arr[1:] - arr[:-1]) == span):
+            if span > 0:
+                # array is increasing with constant span
+                return slice(arr[0], arr[-1] + 1, span)
+            elif span < 0:
+                 # array is decreasing with constant span
+                return slice(arr[0], arr[-1] - 1, span)
+               
 
 
 class Indexer(object):
@@ -74,11 +79,17 @@ class IntIndexer(Indexer):
 class SliceIndexer(Indexer):
     def __init__(self, slc):
         super().__init__()
+        start, stop, step = slc.start, slc.stop, slc.step
         self._slice = deepcopy(slc)
-        if (slc.start is not None and slc.start < 0) or slc.stop is None or slc.stop < 0:  # need shape
+        start, stop, step = self._slice.start, self._slice.stop, self._slice.step
+        if start is None:
+            start = 0
+        if step is None:
+            step = 1
+        if start < 0 or stop is None or stop < 0:  # need shape
             self._shaped_slice = None
         else:
-            self._shaped_slice = self._slice
+            self._shaped_slice = slice(start, stop, step)
 
     def __call__(self):
         return self._slice
@@ -90,7 +101,7 @@ class SliceIndexer(Indexer):
 
     def set_src_shape(self, shape):
         super().set_src_shape(shape)
-        if np.is_scalar(shape):
+        if np.isscalar(shape):
             length = shape
         elif len(shape) == 1:
             length = shape[0]
@@ -99,7 +110,7 @@ class SliceIndexer(Indexer):
 
         slc = self._slice
 
-        if slc.start < 0 or slc.stop is None or slc.stop < 0:  # need shape
+        if slc.start is None or slc.start < 0 or slc.stop is None or slc.stop < 0:  # need shape
             start = 0 if slc.start is None else slc.start
             if start < 0:
                 start = length - start
