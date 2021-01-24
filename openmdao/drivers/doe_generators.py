@@ -464,7 +464,7 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         if isinstance(self._levels, int):  # All have the same number of levels
             all_levels = [self._levels] * size
         elif isinstance(self._levels, dict):  # Different DVs have different number of levels
-            all_levels = [v * self._get_level(k) for k, v in sizes.items()]
+            all_levels = sum([v * [self._get_level(k)] for k, v in sizes.items()], [])
         else:
             raise ValueError(f"Levels should be an int or dictionary, not '{type(self._levels)}'")
         return pyDOE2.gsd(levels=all_levels, reduction=self._reduction, n=self._n)

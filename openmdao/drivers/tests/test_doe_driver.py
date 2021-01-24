@@ -541,8 +541,8 @@ class TestDOEDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', np.array([0.0, 0.0])), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', np.array([0.0, 0.0])), promotes=['*'])
+        model.set_input_defaults('x', np.array([0.0, 0.0]))
+        model.set_input_defaults('y', np.array([0.0, 0.0]))
         model.add_subsystem('comp', Digits2Num(), promotes=['*'])
 
         model.add_design_var('x', lower=0.0, upper=np.array([1.0, 2.0]))
@@ -681,6 +681,52 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'f_xy'):
                 self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
+
+    def test_generalized_subset_array(self):
+
+        class Digits2Num(om.ExplicitComponent):
+            """
+            Makes from two vectors with 2 elements a 4 digit number.
+            For singe digit integers always gives a unique output number.
+            """
+
+            def setup(self):
+                self.add_input('x', val=np.array([0., 0.]))
+                self.add_input('y', val=np.array([0., 0.]))
+                self.add_output('f', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f'] = x[0] * 1000 + x[1] * 100 + y[0] * 10 + y[1]
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', np.array([0.0, 0.0]))
+        model.set_input_defaults('y', np.array([0.0, 0.0]))
+        model.add_subsystem('comp', Digits2Num(), promotes=['*'])
+
+        model.add_design_var('x', lower=0.0, upper=np.array([1.0, 2.0]))
+        model.add_design_var('y', lower=0.0, upper=np.array([3.0, 4.0]))
+        model.add_objective('f')
+
+        prob.driver = om.DOEDriver(generator=om.GeneralizedSubsetGenerator(levels={'x': 5, 'y': 8}, reduction=14))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+
+        self.assertEqual(len(objs), 104)
+        # Testing uniqueness. If all elements are unique, it should be the same length as the
+        # number of cases
+        self.assertEqual(len(set(objs)), 104)
 
     def test_plackett_burman(self):
         prob = om.Problem()
