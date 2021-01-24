@@ -337,14 +337,14 @@ class _pyDOE_Generator(DOEGenerator):
             list of name, value tuples for the design variables.
         """
         self._sizes = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
-        size = sum(list(self._sizes.values()))
+        size = sum(self._sizes.values())
         doe = self._generate_design(size).astype('int')
 
         # generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
-        n_levels = self._levels if isinstance(self._levels, int) else max(list(self._levels.values()))
+        n_levels = self._levels if isinstance(self._levels, int) else max(self._levels.values())
         values = np.empty((size, n_levels))
         values[:] = np.nan
 
