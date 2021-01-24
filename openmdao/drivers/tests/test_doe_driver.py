@@ -570,7 +570,7 @@ class TestDOEDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('xy', np.array([0., 0.])), promotes=['*'])
+        model.set_input_defaults('xy', np.array([0., 0.]))
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
         model.add_design_var('xy', lower=np.array([-10., -50.]), upper=np.array([10., 50.]))
@@ -611,8 +611,8 @@ class TestDOEDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -640,6 +640,47 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
+
+    def test_generalized_subset_dict_levels(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.GeneralizedSubsetGenerator(levels={'x': 3, 'y': 6}, reduction=2))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = [
+            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.])},
+            {'x': np.array([0.]), 'y': np.array([0.4]), 'f_xy': np.array([25.36])},
+            {'x': np.array([0.]), 'y': np.array([0.8]), 'f_xy': np.array([29.04])},
+            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.])},
+            {'x': np.array([1.]), 'y': np.array([0.4]), 'f_xy': np.array([20.76])},
+            {'x': np.array([1.]), 'y': np.array([0.8]), 'f_xy': np.array([24.84])},
+            {'x': np.array([0.5]), 'y': np.array([0.2]), 'f_xy': np.array([20.99])},
+            {'x': np.array([0.5]), 'y': np.array([0.6]), 'f_xy': np.array([24.71])},
+            {'x': np.array([0.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+        ]
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        self.assertEqual(len(cases), 9)
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
 
     def test_plackett_burman(self):
         prob = om.Problem()
