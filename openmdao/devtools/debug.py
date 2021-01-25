@@ -371,10 +371,11 @@ def profiling(outname='prof.out'):
     prof = cProfile.Profile()
     prof.enable()
 
-    yield prof
-
-    prof.disable()
-    prof.dump_stats(outname)
+    try:
+        yield prof
+    finally:
+        prof.disable()
+        prof.dump_stats(outname)
 
 
 def compare_jacs(Jref, J, rel_trigger=1.0):

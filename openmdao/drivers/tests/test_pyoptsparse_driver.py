@@ -86,7 +86,7 @@ class ParaboloidAE(om.ExplicitComponent):
         self.grad_iter_count += 1
 
 
-class DummyComp(om.ExecComp):
+class DummyComp(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -96,7 +96,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """

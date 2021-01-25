@@ -1,13 +1,14 @@
 """Define the ExecComp class, a component that evaluates an expression."""
 import re
 from itertools import product
+from contextlib import contextmanager
 
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils import cs_safe
 
 # regex to check for variable names.
@@ -19,7 +20,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn'}
 
 
 def check_option(option, value):
@@ -74,27 +75,12 @@ class ExecComp(ExplicitComponent):
         Default is None, which means units are provided for variables individually.
     complex_stepsize : double
         Step size used for complex step which is used for derivatives.
+    _manual_decl_partials : bool
+        If True, at least one partial has been declared by the user.
+    _requires_fd : dict
+        Contains a mapping of 'of' variables to a tuple of the form (wrts, functs) for those
+        'of' variables that require finite difference to be used to compute their derivatives.
     """
-
-    def initialize(self):
-        """
-        Declare options.
-        """
-        self.options.declare('has_diag_partials', types=bool, default=False,
-                             desc='If True, treat all array/array partials as diagonal if both '
-                                  'arrays have size > 1. All arrays with size > 1 must have the '
-                                  'same flattened size or an exception will be raised.')
-
-        self.options.declare('units', types=str, allow_none=True, default=None,
-                             desc='Units to be assigned to all variables in this component. '
-                                  'Default is None, which means units are provided for variables '
-                                  'individually.',
-                             check_valid=check_option)
-
-        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
-                             desc='Shape to be assigned to all variables in this component. '
-                                  'Default is None, which means shape is provided for variables '
-                                  'individually.')
 
     def __init__(self, exprs=[], **kwargs):
         r"""
@@ -190,7 +176,7 @@ class ExecComp(ExplicitComponent):
 
             import numpy
             import openmdao.api as om
-            excomp = om.ExecComp('y=sum(x)', x=numpy.ones(10,dtype=float))
+            excomp = om.ExecComp('y=sum(x)', x=numpy.ones(10, dtype=float))
 
         In this example, 'y' would be assumed to be the default type of float
         and would be given the default initial value of 1.0, while 'x' would be
@@ -202,7 +188,7 @@ class ExecComp(ExplicitComponent):
         .. code-block:: python
 
             excomp = ExecComp('y=sum(x)',
-                              x={'value': numpy.ones(10,dtype=float),
+                              x={'value': numpy.ones(10, dtype=float),
                                  'units': 'ft'})
         """
         options = {}
@@ -222,28 +208,110 @@ class ExecComp(ExplicitComponent):
         self._codes = None
         self._kwargs = kwargs
 
+        self._manual_decl_partials = False
         self._no_check_partials = True
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('has_diag_partials', types=bool, default=False,
+                             desc='If True, treat all array/array partials as diagonal if both '
+                                  'arrays have size > 1. All arrays with size > 1 must have the '
+                                  'same flattened size or an exception will be raised.')
+
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means units may be provided for variables'
+                                  ' individually.',
+                             check_valid=check_option)
+
+        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
+                             desc='Shape to be assigned to all variables in this component. '
+                                  'Default is None, which means shape may be provided for variables'
+                                  ' individually.')
+
+        self.options.declare('shape_by_conn', types=bool, default=False,
+                             desc='If True, shape all inputs and outputs based on their '
+                                  'connection. Default is False.')
+
+    @classmethod
+    def register(cls, name, callable_obj, complex_safe):
+        """
+        Register a callable to be usable within ExecComp expressions.
+
+        Parameters
+        ----------
+        name : str
+            Name of the callable.
+        callable_obj : callable
+            The callable.
+        complex_safe : bool
+            If True, the given callable works correctly with complex numbers.
+        """
+        global _expr_dict, _not_complex_safe
+
+        if not callable(callable_obj):
+            raise TypeError(f"{cls.__name__}: '{name}' passed to register() of type "
+                            f"'{type(callable_obj).__name__}' is not callable.")
+        if name in _expr_dict:
+            raise NameError(f"{cls.__name__}: '{name}' has already been registered.")
+
+        if name in _disallowed_names:
+            raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
+                            "it's a reserved keyword.")
+
+        if '.' in name:
+            raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
+                            "it contains '.'.")
+        _expr_dict[name] = callable_obj
+
+        if not complex_safe:
+            _not_complex_safe.add(name)
 
     def setup(self):
         """
         Set up variable name and metadata lists.
         """
+        global _not_complex_safe
+
         if not self._exprs:
             raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
                                % (self.msginfo, self._exprs))
-        outs = set()
-        allvars = set()
         exprs = self._exprs
         kwargs = self._kwargs
 
         units = self.options['units']
         shape = self.options['shape']
+        shape_by_conn = self.options['shape_by_conn']
+
+        if shape is not None and shape_by_conn:
+            raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
+
+        outs = set()
+        allvars = set()
+
+        self._exprs_info = exprs_info = [(self._parse_for_out_vars(expr.split('=', 1)[0]),
+                                          self._parse_for_names(expr)) for expr in exprs]
+
+        self._requires_fd = {}
 
         # find all of the variables and which ones are outputs
-        for expr in exprs:
-            lhs, _ = expr.split('=', 1)
-            outs.update(self._parse_for_out_vars(lhs))
-            allvars.update(self._parse_for_vars(expr))
+        for i, (onames, names) in enumerate(exprs_info):
+            outs.update(onames)
+            allvars.update(names[0])
+            if _not_complex_safe.intersection(names[1]):
+                for o in onames:
+                    self._requires_fd[o] = names
+
+        if self._requires_fd:
+            inps = []
+            for out, (rhsvars, funcs) in self._requires_fd.items():
+                iset = rhsvars.difference(outs)
+                self._requires_fd[out] = (iset, funcs)
+                inps.extend(iset)
+            self._no_check_partials = False
+            self.set_check_partial_options(wrt=inps, method='fd')
 
         kwargs2 = {}
         init_vals = {}
@@ -292,7 +360,7 @@ class ExecComp(ExplicitComponent):
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
 
-                if 'shape_by_conn' in val or 'copy_shape' in val:
+                if shape_by_conn or 'shape_by_conn' in val or 'copy_shape' in val:
                     if val.get('shape') is not None or val.get('value') is not None:
                         raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'value' for "
                                            f"variable '{arg}' along with 'copy_shape' or "
@@ -311,44 +379,49 @@ class ExecComp(ExplicitComponent):
                 init_vals[arg] = val
 
         for var in sorted(allvars):
-            meta = kwargs2.get(var, {'units': units, 'shape': shape})
+            meta = kwargs2.get(var, {
+                'units': units,
+                'shape': shape,
+                'shape_by_conn': shape_by_conn})
 
             # if user supplied an initial value, use it, otherwise set to 1.0
             if var in init_vals:
                 val = init_vals[var]
             else:
-                init_vals[var] = val = 1.0
+                val = 1.0
 
             if var in outs:
-                self.add_output(var, val, **meta)
+                dct = self.add_output(var, val, **meta)
             else:
-                self.add_input(var, val, **meta)
+                dct = self.add_input(var, val, **meta)
 
-        for expr in self._exprs:
-            lhs, _ = expr.split('=', 1)
-            outs = self._parse_for_out_vars(lhs)
-            all = self._parse_for_vars(expr)  # gets in and out
-            ins = sorted(set(all) - set(outs))
-            outs = sorted(outs)
-            for out in outs:
-                for inp in ins:
-                    if self.options['has_diag_partials']:
-                        ival = init_vals[inp]
-                        iarray = isinstance(ival, ndarray) and ival.size > 1
-                        oval = init_vals[out]
-                        if iarray and isinstance(oval, ndarray) and oval.size > 1:
-                            if oval.size != ival.size:
-                                raise RuntimeError(
-                                    "%s: has_diag_partials is True but partial(%s, %s) "
-                                    "is not square (shape=(%d, %d))." %
-                                    (self.msginfo, out, inp, oval.size, ival.size))
-                            # partial will be declared as diagonal
-                            inds = np.arange(oval.size, dtype=int)
+            if var not in init_vals:
+                init_vals[var] = dct['value']
+
+        if not self._manual_decl_partials:
+            decl_partials = super().declare_partials
+            for i, (outs, tup) in enumerate(exprs_info):
+                vs, funcs = tup
+                ins = sorted(set(vs).difference(outs))
+                for out in sorted(outs):
+                    for inp in ins:
+                        if self.options['has_diag_partials']:
+                            ival = init_vals[inp]
+                            iarray = isinstance(ival, ndarray) and ival.size > 1
+                            oval = init_vals[out]
+                            if iarray and isinstance(oval, ndarray) and oval.size > 1:
+                                if oval.size != ival.size:
+                                    raise RuntimeError(
+                                        "%s: has_diag_partials is True but partial(%s, %s) "
+                                        "is not square (shape=(%d, %d))." %
+                                        (self.msginfo, out, inp, oval.size, ival.size))
+                                # partial will be declared as diagonal
+                                inds = np.arange(oval.size, dtype=int)
+                            else:
+                                inds = None
+                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
                         else:
-                            inds = None
-                        self.declare_partials(of=out, wrt=inp, rows=inds, cols=inds)
-                    else:
-                        self.declare_partials(of=out, wrt=inp)
+                            decl_partials(of=out, wrt=inp)
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -372,9 +445,10 @@ class ExecComp(ExplicitComponent):
                                 "function or constant." % (self.msginfo, v))
         return vnames
 
-    def _parse_for_vars(self, s):
-        vnames = set([x.strip() for x in re.findall(VAR_RGX, s)
-                      if not x.endswith('(') and not x.startswith('.')])
+    def _parse_for_names(self, s):
+        names = [x.strip() for x in re.findall(VAR_RGX, s) if not x.startswith('.')]
+        vnames = set([n for n in names if not n.endswith('(')])
+        fnames = [n[:-1] for n in names if n[-1] == '(']
         to_remove = []
         for v in vnames:
             if v in _disallowed_names:
@@ -385,10 +459,16 @@ class ExecComp(ExplicitComponent):
                 if callable(expvar):
                     raise NameError("%s: cannot use '%s' as a variable because "
                                     "it's already defined as an internal "
-                                    "function." % (self.msginfo, v))
+                                    "function or constant." % (self.msginfo, v))
                 else:
                     to_remove.append(v)
-        return vnames.difference(to_remove)
+
+        for f in fnames:
+            if f not in _expr_dict:
+                raise NameError(f"{self.msginfo}: can't use '{f}' as a function because "
+                                "it hasn't been registered.")
+
+        return vnames.difference(to_remove), fnames
 
     def __getstate__(self):
         """
@@ -415,6 +495,55 @@ class ExecComp(ExplicitComponent):
         self.__dict__.update(state)
         self._codes = self._compile_exprs(self._exprs)
 
+    def declare_partials(self, *args, **kwargs):
+        """
+        Declare information about this component's subjacobians.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args to be passed to base class version of declare_partials.
+        **kwargs : dict
+            Keyword args  to be passed to base class version of declare_partials.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the specified partial(s).
+        """
+        if 'method' not in kwargs or kwargs['method'] == 'exact':
+            raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method='cs' "
+                               "or method='fd'.")
+        if self.options['has_diag_partials']:
+            raise RuntimeError(f"{self.msginfo}: declare_partials cannot be called manually if "
+                               "has_diag_partials has been set.")
+
+        self._manual_decl_partials = True
+        return super().declare_partials(*args, **kwargs)
+
+    def _setup_partials(self):
+        """
+        Check that all partials are declared.
+        """
+        super()._setup_partials()
+        if self._manual_decl_partials:
+            undeclared = []
+            for i, (outs, tup) in enumerate(self._exprs_info):
+                vs, funcs = tup
+                ins = sorted(set(vs).difference(outs))
+                for out in sorted(outs):
+                    out = '.'.join((self.pathname, out)) if self.pathname else out
+                    for inp in ins:
+                        inp = '.'.join((self.pathname, inp)) if self.pathname else inp
+                        if (out, inp) not in self._subjacs_info:
+                            undeclared.append((out, inp))
+            if undeclared:
+                idx = len(self.pathname) + 1 if self.pathname else 0
+                undeclared = ', '.join([' wrt '.join((f"'{of[idx:]}'", f"'{wrt[idx:]}'"))
+                                        for of, wrt in undeclared])
+                simple_warning(f"{self.msginfo}: The following partial derivatives have not been "
+                               f"declared so they are assumed to be zero: [{undeclared}].")
+
     def compute(self, inputs, outputs):
         """
         Execute this component's assignment statements.
@@ -431,8 +560,36 @@ class ExecComp(ExplicitComponent):
             try:
                 exec(expr, _expr_dict, _IODict(outputs, inputs))
             except Exception as err:
-                raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
-                                   % (self.msginfo, self._exprs[i], str(err)))
+                raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
+                                   f"\n{err}")
+
+    def _linearize(self, jac=None, sub_do_ln=False):
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        jac : Jacobian or None
+            Ignored.
+        sub_do_ln : boolean
+            Flag indicating if the children should call linearize on their linear solvers.
+        """
+        if self._requires_fd:
+            if 'fd' in self._approx_schemes:
+                fdins = {tup[0].rsplit('.', 1)[1] for tup in self._approx_schemes['fd']._exec_dict}
+            else:
+                fdins = set()
+
+            for _, (inps, funcs) in self._requires_fd.items():
+                diff = inps.difference(fdins)
+                if diff:
+                    raise RuntimeError(f"{self.msginfo}: expression contains functions "
+                                       f"{sorted(funcs)} that are not complex safe. To fix this, "
+                                       f"call declare_partials('*', {sorted(diff)}, method='fd') "
+                                       f"on this component prior to setup.")
+            self._requires_fd = False  # only need to do this check the first time around
+
+        super()._linearize(jac, sub_do_ln)
 
     def compute_partials(self, inputs, partials):
         """
@@ -446,21 +603,24 @@ class ExecComp(ExplicitComponent):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
+        if self._manual_decl_partials:
+            return
+
         step = self.complex_stepsize * 1j
         out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
 
-        for input in inputs:
+        for inp in inputs:
 
             pwrap = _TmpDict(inputs)
-            pval = inputs[input]
+            pval = inputs[inp]
             psize = pval.size
-            pwrap[input] = np.asarray(pval, npcomplex)
+            pwrap[inp] = np.asarray(pval, npcomplex)
 
             if has_diag_partials or psize == 1:
-                # set a complex input value
-                pwrap[input] += step
+                # set a complex inpup value
+                pwrap[inp] += step
 
                 uwrap = _TmpDict(self._outputs, return_complex=True)
 
@@ -469,15 +629,15 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    if (u, input) in self._declared_partials:
-                        partials[(u, input)] = imag(uwrap[u] * inv_stepsize).flat
+                    if (u, inp) in self._declared_partials:
+                        partials[(u, inp)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old input value
-                pwrap[input] -= step
+                pwrap[inp] -= step
             else:
-                for i, idx in enumerate(array_idx_iter(pwrap[input].shape)):
+                for i, idx in enumerate(array_idx_iter(pwrap[inp].shape)):
                     # set a complex input value
-                    pwrap[input][idx] += step
+                    pwrap[inp][idx] += step
 
                     uwrap = _TmpDict(self._outputs, return_complex=True)
 
@@ -486,12 +646,12 @@ class ExecComp(ExplicitComponent):
                     self.compute(pwrap, uwrap)
 
                     for u in out_names:
-                        if (u, input) in self._declared_partials:
+                        if (u, inp) in self._declared_partials:
                             # set the column in the Jacobian entry
-                            partials[(u, input)][:, i] = imag(uwrap[u] * inv_stepsize).flat
+                            partials[(u, inp)][:, i] = imag(uwrap[u] * inv_stepsize).flat
 
                     # restore old input value
-                    pwrap[input][idx] -= step
+                    pwrap[inp][idx] -= step
 
 
 class _TmpDict(object):
@@ -620,8 +780,8 @@ def _import_functs(mod, dct, names=None):
             dct[alias] = dct[name]
 
 
-# this dict will act as the local scope when we eval our expressions
-_expr_dict = {}
+_expr_dict = {}  # this dict will act as the local scope when we eval our expressions
+_not_complex_safe = set()  # this is the set of registered functions that are not complex safe
 
 
 _import_functs(np, _expr_dict,
@@ -712,3 +872,18 @@ class _NumpyMsg(object):
 
 _expr_dict['np'] = _NumpyMsg('np')
 _expr_dict['numpy'] = _NumpyMsg('numpy')
+
+
+@contextmanager
+def _temporary_expr_dict():
+    """
+    During a test, it's useful to be able to save and restore the _expr_dict.
+    """
+    global _expr_dict, _not_complex_safe
+
+    save = (_expr_dict.copy(), _not_complex_safe.copy())
+
+    try:
+        yield
+    finally:
+        _expr_dict, _not_complex_safe = save
