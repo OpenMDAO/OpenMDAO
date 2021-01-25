@@ -1373,15 +1373,14 @@ def _compute_total_coloring_context(top):
         if jac is not None:
             jac._randomize = True
 
-    try:
-        yield
-    finally:
-        for system in top.system_iter(recurse=True, include_self=True):
-            jac = system._assembled_jac
-            if jac is None:
-                jac = system._jacobian
-            if jac is not None:
-                jac._randomize = False
+    yield
+
+    for system in top.system_iter(recurse=True, include_self=True):
+        jac = system._assembled_jac
+        if jac is None:
+            jac = system._jacobian
+        if jac is not None:
+            jac._randomize = False
 
 
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],

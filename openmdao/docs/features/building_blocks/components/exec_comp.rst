@@ -9,7 +9,7 @@ ExecComp
 `ExecComp` is a component that provides a shortcut for building an ExplicitComponent that
 represents a set of simple mathematical relationships between inputs and outputs. The ExecComp
 automatically takes care of all of the component API methods, so you just need to instantiate
-it with an equation or a list of equations.
+it with an equation.
 
 ExecComp Options
 ----------------
@@ -46,8 +46,6 @@ Name              Description                                            Valid T
 ================  ====================================================== ============================================================= ==============  ========
 value             Initial value in user-defined units                    float, list, tuple, ndarray                                   input & output  1
 shape             Variable shape, only needed if not an array            int, tuple, list, None                                        input & output  None
-shape_by_conn     Determine variable shape based on its connection       bool                                                          input & output  False
-copy_shape        Determine variable shape based on named variable       str                                                           input & output  None
 units             Units of variable                                      str, None                                                     input & output  None
 desc              Description of variable                                str                                                           input & output  ""
 res_units         Units of residuals                                     str, None                                                     output          None
@@ -67,19 +65,6 @@ For more information about these metadata, see the documentation for the argumen
 - :meth:`add_input <openmdao.core.component.Component.add_input>`
 
 - :meth:`add_output <openmdao.core.component.Component.add_output>`
-
-Registering User Functions
---------------------------
-
-To get your own functions added to the internal namespace of ExecComp so you can call them
-from within an ExecComp expression, you can use the :code:`ExecComp.register` function.
-
-.. automethod:: openmdao.components.exec_comp.ExecComp.register
-    :noindex:
-
-Note that you're required, when registering a new function, to indicate whether that function
-is complex safe or not.
-
 
 ExecComp Example: Simple
 ------------------------
@@ -103,8 +88,7 @@ ExecComp Example: Arrays
 ------------------------
 
 You can declare an ExecComp with arrays for inputs and outputs, but when you do, you must also
-pass in a correctly-sized array as an argument to the ExecComp call, or set the 'shape' metadata
-for that variable as described earlier. If specifying the value directly, it can be the initial value
+pass in a correctly-sized array as an argument to the ExecComp call. This can be the initial value
 in the case of unconnected inputs, or just an empty array with the correct size.
 
 .. embed-code::
@@ -155,29 +139,5 @@ common units that are specified by setting the option.
 .. embed-code::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_options
     :layout: interleave
-
-
-ExecComp Example: User function registration
---------------------------------------------
-
-If the function is complex safe, then you don't need to do anything differently than you
-would for any other ExecComp.
-
-.. embed-code::
-    openmdao.components.tests.test_exec_comp.TestFunctionRegistration.featuretest_register_simple
-    :layout: interleave
-
-
-ExecComp Example: Complex unsafe user function registration
------------------------------------------------------------
-
-If the function isn't complex safe, then derivatives involving that function
-will have to be computed using finite difference instead of complex step.  The way to specify
-that `fd` should be used for a given derivative is to call :code:`declare_partials`.
-
-.. embed-code::
-    openmdao.components.tests.test_exec_comp.TestFunctionRegistration.featuretest_register_simple_unsafe
-    :layout: interleave
-
 
 .. tags:: ExecComp, Component, Examples

@@ -201,18 +201,16 @@ def memtrace(**kwargs):
 
     _setup(options)
     start()
-    try:
-        yield
-    finally:
-        stop()
+    yield
+    stop()
 
-        _file_line2qualname(options.outfile)
-        if options.tree:
-            postprocess_memtrace_tree(fname=options.outfile, min_mem=options.min_mem,
-                                    show_colors=options.show_colors, stream=options.stream)
-        else:
-            postprocess_memtrace_flat(fname=options.outfile, min_mem=options.min_mem,
-                                    show_colors=options.show_colors, stream=options.stream)
+    _file_line2qualname(options.outfile)
+    if options.tree:
+        postprocess_memtrace_tree(fname=options.outfile, min_mem=options.min_mem,
+                                  show_colors=options.show_colors, stream=options.stream)
+    else:
+        postprocess_memtrace_flat(fname=options.outfile, min_mem=options.min_mem,
+                                  show_colors=options.show_colors, stream=options.stream)
 
 
 def _mempost_setup_parser(parser):

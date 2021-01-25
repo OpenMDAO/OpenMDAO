@@ -41,7 +41,7 @@ def rastrigin(x):
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
 
-class DummyComp(om.ExplicitComponent):
+class DummyComp(om.ExecComp):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -52,7 +52,7 @@ class DummyComp(om.ExplicitComponent):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*', method='cs')
+        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         """
