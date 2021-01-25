@@ -83,8 +83,7 @@ class DynPartialsComp(om.ExplicitComponent):
         self.add_output('g', np.ones(self.size))
 
         # turn on dynamic partial coloring
-        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
-                              orders=20)
+        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20)
 
     def compute(self, inputs, outputs):
         outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
@@ -123,10 +122,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         indeps.add_output('r', r_init)
 
     if partial_coloring:
-        arctan_yox = DynPartialsComp(SIZE)
+        arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE)
+        arctan_yox.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20)
     else:
-        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=has_diag_partials,
-                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
+        arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE, has_diag_partials=has_diag_partials)
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
@@ -270,8 +269,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
         expected = [
+            "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
-            "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])"
         ]
         decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
         for i, d in enumerate(decl_partials_calls.split('\n')):
