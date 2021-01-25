@@ -19,10 +19,9 @@ def database_cursor(filename):
     con = sqlite3.connect(filename)
     cur = con.cursor()
 
-    try:
-        yield cur
-    finally:
-        con.close()
+    yield cur
+
+    con.close()
 
 
 def get_format_version_abs2meta(db_cur):
