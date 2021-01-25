@@ -350,11 +350,13 @@ class _pyDOE_Generator(DOEGenerator):
         size = sum(self._sizes.values())
         doe = self._generate_design(size).astype('int')
 
+        # Maximum number of levels, or the default if the maximum is smaller than the default.
+        # This is to ensure that the array will be big enough even if some keys are missing from levels (defaulted).
+        levels_max = self._levels if isinstance(self._levels, int) else max(max(self._levels.values()), _LEVELS)
+
         # generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
-
         # rows = vars (# rows/var = var size), cols = levels
-        levels_max = self._levels if isinstance(self._levels, int) else max(self._levels.values())
         values = np.empty((size, levels_max))  # Initialize array for the largest number of levels
         values[:] = np.nan
 
@@ -370,7 +372,11 @@ class _pyDOE_Generator(DOEGenerator):
                     upper = upper[k]
 
                 levels = self._get_dv_levels(name)
-                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+                print(name, levels)
+                if levels > 1:
+                    values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+                else:
+                    values[row, 0:levels] = np.array([levels])
                 row += 1
 
         # yield values for doe generated indices
@@ -453,7 +459,7 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         reduction : int
             Reduction factor (bigger than 1). Larger `reduction` means fewer
             experiments in the design and more possible complementary designs.
-        n Int, optional
+        n : int, optional
             Number of complementary GSD-designs. The complementary
             designs are balanced analogous to fold-over in two-level fractional
             factorial designs.
