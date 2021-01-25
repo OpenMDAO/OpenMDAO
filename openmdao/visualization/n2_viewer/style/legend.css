@@ -1,17 +1,17 @@
 /******************* Legend styling *******************/
 
 #legend-div {
-    position: absolute;
-    left: 50px;
-    bottom: 10px;
-    z-index: 2;
-    visibility: hidden;
     display: flex;
     flex-direction: row;
+    background-color: none;
     border-radius: 15px;
-    cursor: grab;
-    opacity: 0.95;
     box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+/* Flexbox fails with absolute positioning */
+#legend-div div {
+    position: static;
 }
 
 .legend-box-container {
@@ -210,34 +210,3 @@
     margin-right: 5px;
 }
 
-#close-legend {
-    position: absolute;
-    top: -20px;
-    right: -18px;
-    height: 20px;
-    width: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 4;
-    cursor: default;
-}
-
-#close-legend p::before {
-    content: '\2715'
-}
-
-#close-legend p {
-    color: black;
-    font-weight: bold;
-    font-size: 20px;
-    text-align: center;
-    margin: auto;
-    vertical-align: middle;
-    width: 20px;
-    height: 20px;
-}
-
-p.legend-dots::before {
-    content: '::::::';
-}

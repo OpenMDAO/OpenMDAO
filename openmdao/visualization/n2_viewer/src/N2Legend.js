@@ -3,13 +3,13 @@
  * @typedef N2Legend
  * @property {Boolean} shown Whether the legend is currently drawn or not.
  */
-class N2Legend {
+class N2Legend extends N2WindowDraggable {
     /**
      * Initializes the legend object.
      * @param {ModelData} modelData Symbols are only displayed if they're in the model
      */
     constructor(modelData) {
-        this._div = d3.select("#legend-div");
+        super('n2win-legend');
 
         // TODO: The legend should't have to search through modelData itself,
         // this info can be collected as modelData is built.
@@ -53,26 +53,23 @@ class N2Legend {
             { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
         ];
 
+
+        this.body.node().appendChild(d3.select('#legend-div').node());      
         this._setDisplayBooleans(this.nodes);
+
+        this.building(true);
+        this.title('<span class="icon-key"></span>');
         this._setupContents();
+        this.building(false);
 
-        // Get the initial setting from the style sheet
-        this.hidden = (this._div.style('visibility') == 'hidden');
+        this.theme('legend');
+        this.sizeToContent();
+        this.move(50, -10);
+    }
 
-        this._setupDrag();
-
-        let self = this;
-        this.closeDiv = d3.select('#close-legend');
-        this.closeButton = this.closeDiv.select('p');
-
-        this.closeDiv
-            .on('mouseenter', e => { self.closeButton.style('color', 'red'); })
-            .on('mouseout', e => { self.closeButton.style('color', 'black'); })
-            .on('click', e => {
-                self.hide();
-                self.closeButton.style('color', 'black');
-                d3.select('#legend-button').attr('class', 'fas icon-key');
-            })
+    close() {
+        d3.select('#legend-button').attr('class', 'fas icon-key');
+        this.hide();
     }
 
     _setDisplayBooleans(nodes) {
@@ -210,46 +207,6 @@ class N2Legend {
 
     }
 
-    /** Listen for the event to begin dragging the legend */
-    _setupDrag() {
-        const self = this;
-
-        this._div.on('mousedown', function () {
-            let dragDiv = d3.select(this);
-            dragDiv.style('cursor', 'grabbing')
-                // top style needs to be set explicitly before releasing bottom:
-                .style('top', dragDiv.style('top'))
-                .style('bottom', 'initial');
-
-            self._startPos = [d3.event.clientX, d3.event.clientY]
-            self._offset = [d3.event.clientX - parseInt(dragDiv.style('left')),
-            d3.event.clientY - parseInt(dragDiv.style('top'))];
-
-            let w = d3.select(window)
-                .on("mousemove", e => {
-                    dragDiv
-                        .style('top', (d3.event.clientY - self._offset[1]) + 'px')
-                        .style('left', (d3.event.clientX - self._offset[0]) + 'px');
-                })
-                .on("mouseup", e => {
-                    dragDiv.style('cursor', 'grab');
-                    w.on("mousemove", null).on("mouseup", null);
-                });
-
-            d3.event.preventDefault();
-        })
-    }
-
-    hide() {
-        this._div.style('visibility', 'hidden');
-        this.hidden = true;
-    }
-
-    show() {
-        this._div.style('visibility', 'visible');
-        this.hidden = false;
-    }
-
     /**
      * Wipe the current solvers legend area and populate with the other type.
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
@@ -267,18 +224,12 @@ class N2Legend {
 
         solversLegend.style('width', solversLegend.node().scrollWidth + 'px');
     }
-
-    /**
-     * If legend is shown, hide it; if it's hidden, show it.
-     * @param {Boolean} showLinearSolverNames Determines solver name type displayed.
-     * @param {Object} solverStyles Solver names, types, and styles including color.
-     */
-    toggle(showLinearSolverNames, solverStyles) {
-        if (this.hidden) this.show();
-        else this.hide();
-    }
 }
 
+/**
+ * Display a modal window with helpful information.
+ * @typedef N2Help
+ */
 class N2Help extends N2Window {
     constructor() {
         super();
@@ -294,9 +245,8 @@ class N2Help extends N2Window {
                 'A click on any element in the N2 diagram will allow those arrows to persist.');
 
         this.body.append('h1').text('Toolbar Help');
-        
-        const helpSvg = this.body.append('svg').append('use').attr('href', '#help-graphic');
-        this.show();
-        this.modal(true);
+        this.body.append('svg').append('use').attr('href', '#help-graphic');
+
+        this.show().modal(true);
     }
 }

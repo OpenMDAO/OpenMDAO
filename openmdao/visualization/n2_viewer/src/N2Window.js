@@ -10,7 +10,7 @@ class N2Window {
      * above 100, and even extreme cases (e.g. a diagram that's been in use
      * for weeks with lots of windows) shouldn't get above a few thousand.
      */
-    static zIndex = 10;
+    static zIndex = 1000;
     static container = null;
 
     /**
@@ -118,7 +118,7 @@ class N2Window {
      * Make the window the highest z-index we know of, and increment that afterwards.
      * @param {Boolean} force Do it even if the current z-index is already highest.
      * @param {Number} [inc = 1] The amount to increase z-index by.
-     * @return {N2Window} Reference to this.
+     * @returns {N2Window} Reference to this.
      */
     bringToFront(force = false, inc = 1) {
         if (force || this.window.style('z-index') < N2Window.zIndex) {
@@ -129,15 +129,54 @@ class N2Window {
         return this;
     }
 
-    /** Make the window visible and return a self-reference */
+    /**
+     * Make the window visible.
+     * @returns {N2Window} Reference to this.
+     */
     show() {
         this.hidden = false;
         return this;
     }
 
-    /** Make the window invisible and return a self-reference */
+    /**
+     * Make the window invisible.
+     * @returns {N2Window} Reference to this.
+     */
     hide() {
         this.hidden = true;
+        return this;
+    }
+
+    /**
+     * If window is visible, hide it; if it's hidden, show it.
+     * @returns {N2Window} Reference to this.
+     */
+    toggle() {
+        if (this.hidden) this.show();
+        else this.hide();
+        return this;
+    }
+
+    /**
+     * Many operations only work correctly if the window is displayed. Frequently,
+     * however, the window should be hidden while it's construction. To remedy this,
+     * the visibility property can be set to 'hidden' while the 'display: none'
+     * style is removed. This puts the window in the flow of the page but still
+     * makes it invisible to the user while construction is performed.
+     * @param {Boolean} isBuilding True to put the window in construction mode,
+     *      false to turn off.
+     * @returns {N2Window} Reference to this.
+     */
+    building(isBuilding) {
+        if (isBuilding) {
+            this.window.classed('window-building-state', true);
+            this.show();
+        }
+        else {
+            this.window.classed('window-building-state', false);
+            this.hide();
+        }
+
         return this;
     }
 
@@ -147,7 +186,7 @@ class N2Window {
      * @returns Reference to this if new title set; otherwise String with the current title.
      */
     title(newTitle = null) {
-        if (newTitle) {
+        if (newTitle !== null) {
             this._title.html(newTitle);
             return this;
         }
@@ -158,7 +197,7 @@ class N2Window {
     /**
      * Change the styling of the window to a preset theme and/or return it.
      * @param {String} [newTheme = null] The name of the theme to change to. No change if null.
-     * @returns if newTheme is null, a string with the current theme name;
+     * @returns If newTheme is null, a string with the current theme name;
      *  otherwise a reference to this
      */
     theme(newTheme = null) {
@@ -183,7 +222,7 @@ class N2Window {
      * properties: title, theme.
      * @param {String} opt The name of the style/property to set
      * @param {String} val The value to set it to.
-     * @returns {Object} Reference to this.
+     * @returns {N2Window} Reference to this.
      */
     set(opt, val) {
         switch (opt) {
@@ -203,7 +242,7 @@ class N2Window {
     /**
      * Iterate over a list of styles/properties w/values and set them.
      * @param {Object} options Dictionary of style/value pairs.
-     * @returns {Object} Reference to this.
+     * @returns {N2Window} Reference to this.
      */
     setList(options) {
         for (const optName in options) {
@@ -220,19 +259,29 @@ class N2Window {
         this.window.remove();
     }
 
-    /** Make the close button invisibile and return a reference to this */
+    /**
+     * Make the close button invisibile.
+     * @returns {N2Window} Reference to this.
+     */
     hideCloseButton() {
         this.closeButton.classed('window-inactive', true);
         return this;
     }
 
-    /** Make the close button visibile and return a reference to this */
+    /**
+     * Make the close button visibile.
+     * @returns {N2Window} Reference to this.
+     */
     showCloseButton() {
         this.closeButton.classed('window-inactive', false);
         return this;
     }
 
-    /** Display the footer ribbon */
+    /** Display the footer ribbon
+     * @param {String} [footerText = null] If not empty, set the text in the footer.
+     * @returns {N2Window} Reference to this.
+     */
+
     showFooter(footerText = null) {
         this.footer.classed('window-inactive', false);
         this.footer.select('span').text(footerText);
@@ -242,6 +291,7 @@ class N2Window {
     /**
      * Change the color of both the header and footer
      * @param {String} color An HTML-compatible color value
+     * @returns {N2Window} Reference to this.
      */
     ribbonColor(color) {
         this.header.style('background-color', color);
@@ -250,13 +300,33 @@ class N2Window {
         return this;
     }
 
-    move(top, left) {
-        let pos = this._getPos();
-        pos.left = left;
-        pos.top = top;
+    /**
+     * Move the window to the specified coordinates.
+     * @param {Number} x If positive, set the left property to this and adjust
+     *   the right. If negative, set the right property to this and adjust left.
+     * @param {Number} y If positive, set the top property to this and adjust
+     *   the bottom. If negative, set the bottom property to this and adjust top.
+     * @returns {N2Window} Reference to this.
+     */
+    move(x, y) {
+        let pos = this._getPos(d3.select('body').node());
+        if (x >= 0 ) {
+            pos.left = x;
+            pos.right = pos.parentWidth - pos.width - pos.left;
+        }
+        else {
+            pos.right = -x;
+            pos.left = pos.parentWidth - pos.width - pos.right;
+        }
 
-        pos.right = pos.parentWidth - pos.width - left;
-        pos.bottom = pos.parentHeight - pos.height - top;
+        if (y >= 0) {
+            pos.top = y;
+            pos.bottom = pos.parentHeight - pos.height - pos.top;
+        }
+        else {
+            pos.bottom = -y;
+            pos.top = pos.parentHeight - pos.height - pos.bottom;
+        }
 
         this._setPos(pos);
 
@@ -267,6 +337,7 @@ class N2Window {
      * Relocate the window to a position near the mouse
      * @param {Object} event The triggering event containing the position.
      * @param {Number} [offset = 15] Distance from mouse to place window.
+     * @returns {N2Window} Reference to this.
      */
     moveNearMouse(event, offset = 15) {
         let pos = this._getPos();
@@ -306,19 +377,17 @@ class N2Window {
      * @returns {N2Window} Reference to this.
      */
     sizeToContent() {
-        const isHidden = this.hidden, leftPos = this.window.style('left');
+        const isHidden = this.hidden;
 
         // To size correctly, the window has to be displayed, so if it's
         // hidden, move it offscreen and work there.
-        if (isHidden) {
-            this.set('left', '-15000px');
-            this.show();
-        }
+        if (isHidden) { this.building(true); }
 
         let contentWidth = this.body.node().scrollWidth,
             contentHeight = this.body.node().scrollHeight,
             headerHeight = this.header.node().offsetHeight,
-            footerHeight = this.footer.classed('window-inactive') ? 0 : this.footer.node().offsetHeight;
+            footerHeight = this.footer.classed('window-inactive') ? 0 :
+                this.footer.node().offsetHeight;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
@@ -329,10 +398,7 @@ class N2Window {
         this.setList(newSize);
 
         // Put the window back where it belongs if we moved it
-        if (isHidden) {
-            this.hide();
-            this.set('left', leftPos);
-        }
+        if (isHidden) { this.building(false); }
 
         return this;
     }

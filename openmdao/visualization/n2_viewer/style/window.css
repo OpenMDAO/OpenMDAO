@@ -33,6 +33,10 @@
     display: none;
 }
 
+.window-building-state {
+    visibility: hidden;
+}
+
 .window-draggable-header {
     cursor: grab;
 }
@@ -186,60 +190,6 @@
 }
 
 /* ^^^^^^^^^^ End Default N2 Window theme ^^^^^^^^^^ */
-
-/* vvvvvvvvvv Begin N2 Window resizing styles vvvvvvvvvv */
-:root {
-    --resize-overflow: -2px;
-    --resize-edge-size: 5px;
-    --resize-corner-size: 10px;
-}
-
-.resize {
-    top: var(--resize-overflow);
-    left: var(--resize-overflow);
-    right: var(--resize-overflow);
-    bottom: var(--resize-overflow);
-    display: block;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.resize>div {
-    pointer-events: auto;
-}
-
-.rsz-horizontal {
-    height: var(--resize-edge-size);
-    left: var(--resize-corner-size);
-    right: var(--resize-corner-size);
-}
-.rsz-horizontal:hover { cursor: ns-resize; }
-
-.rsz-top { top: 0; }
-.rsz-bottom { bottom: 0; }
-
-.rsz-vertical {
-    width: var(--resize-edge-size);
-    top: var(--resize-corner-size);
-    bottom: var(--resize-corner-size);
-}
-.rsz-vertical:hover { cursor: ew-resize; }
-
-.rsz-right { right: 0; }
-.rsz-left { left: 0; }
-
-.rsz-corner {
-    height: var(--resize-corner-size);
-    width: var(--resize-corner-size);
-}
-
-.rsz-top-right { top: 0; right: 0; cursor: nesw-resize; }
-.rsz-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
-.rsz-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
-.rsz-top-left { top: 0; left: 0; cursor: nwse-resize; }
-
-/* ^^^^^^^^^^ End N2 Window resizing styles ^^^^^^^^^^ */
-
 
 /* vvvvvvvvvv Begin Node Info N2 Window theme vvvvvvvvvv */
 .window-theme-node-info {
@@ -684,4 +634,113 @@
     padding-left: 10px;
 }
 
+div#help-svg {
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
 /* ^^^^^^^^^^ End Help N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Legend N2 Window theme vvvvvvvvvv */
+.window-theme-legend {
+    --header-height: 20px;
+    --footer-height: 20px;
+    --ribbon-color: #42926b;
+
+    background-color: none;
+    border: 0;
+    transition: opacity 0.25s;
+    overflow: visible;
+}
+
+.window-theme-legend .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    bottom: auto;
+    width: 100px;
+    left: 50%;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translate(-50%, 0px);
+}
+
+.window-theme-legend .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-legend .window-close-button {
+    color: none;
+    opacity: 0.5;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-legend .window-close-button:hover,
+.window-theme-legend .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-legend .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.window-theme-legend .window-header .window-title::before {
+    content: ':::::: ';
+}
+
+.window-theme-legend .window-header .window-title::after {
+    content: ' ::::::';
+}
+
+.window-theme-legend .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background-color: none;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+    overflow: visible;
+}
+
+.window-theme-legend .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* ^^^^^^^^^^ End Legend N2 Window theme ^^^^^^^^^^ */

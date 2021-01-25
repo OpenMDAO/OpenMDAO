@@ -315,19 +315,7 @@ class N2Toolbar {
                 n2ui.nodeInfoBox.toggle();
             }
         );
-/*        
-                new N2ToolbarButtonToggle('#question-button', tooltipBox,
-                    ["Hide N2 diagram help", "Show N2 diagram help"],
-                    pred => { return d3.select("#myModal").style('display') == "block"; },
-                    e => {
-                        d3.select("#myModal").style('display', 'block');
-                        d3.select("#idSpanModalClose").on('click', c => {
-                            d3.select("#myModal").style('display', 'none');
-                            d3.select("#idSpanModalClose").on('click', null);
-                        });
-                    }
-                );
-        */
+
         new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
             pred => { return !!(d3.select(".window-theme-help").size()); },

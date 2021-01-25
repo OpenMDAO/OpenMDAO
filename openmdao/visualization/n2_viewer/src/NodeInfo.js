@@ -334,7 +334,7 @@ class ValueInfo extends N2WindowResizable {
         const pnInfoPos = pnInfo._getPos();
         this.sizeToContent()
             .title(this.name)
-            .move(pnInfoPos.top + 20, pnInfoPos.left + 20)
+            .move(pnInfoPos.left + 20, pnInfoPos.top + 20)
             .show()
 
         
