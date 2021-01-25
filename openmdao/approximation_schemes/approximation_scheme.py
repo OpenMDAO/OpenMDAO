@@ -439,8 +439,8 @@ class ApproximationScheme(object):
             if mult != 1.0:
                 self._j_colored.data *= mult
 
-            # convert COO matrix to dense for easier slicing
-            Jcolored = self._j_colored.toarray()
+            # convert COO matrix to CSC for easier slicing
+            Jcolored = self._j_colored.tocsc()
 
         elif is_parallel and not is_distributed:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
@@ -452,10 +452,10 @@ class ApproximationScheme(object):
                     slc = tmpJ['@jac_slices'][key]
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
 
         Jcolored = None  # clean up memory
 
