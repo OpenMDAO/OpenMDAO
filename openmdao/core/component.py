@@ -1278,15 +1278,12 @@ class Component(System):
             cases with large numbers of explicit components or indepvarcomps.
         """
         if quick_declare:
-            abs_key = rel_key2abs_key(self, (of, wrt))
-
-            meta = {}
-            meta['rows'] = np.array(dct['rows'], dtype=INT_DTYPE, copy=False)
-            meta['cols'] = np.array(dct['cols'], dtype=INT_DTYPE, copy=False)
-            meta['shape'] = (len(dct['rows']), len(dct['cols']))
-            meta['value'] = dct['value']
-
-            self._subjacs_info[abs_key] = meta
+            self._subjacs_info[rel_key2abs_key(self, (of, wrt))] = {
+                'rows': np.array(dct['rows'], dtype=INT_DTYPE, copy=False),
+                'cols': np.array(dct['cols'], dtype=INT_DTYPE, copy=False),
+                'shape': (len(dct['rows']), len(dct['cols'])),
+                'value': dct['value'],
+            }
             return
 
         val = dct['value'] if 'value' in dct else None

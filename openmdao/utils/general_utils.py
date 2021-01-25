@@ -102,8 +102,10 @@ def ignore_errors_context(flag=True):
     """
     save = ignore_errors()
     ignore_errors(flag)
-    yield
-    ignore_errors(save)
+    try:
+        yield
+    finally:
+        ignore_errors(save)
 
 
 def warn_deprecation(msg):

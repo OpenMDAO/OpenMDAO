@@ -4,7 +4,6 @@ import inspect
 import json
 import os
 import zlib
-from collections import OrderedDict
 from itertools import chain
 import networkx as nx
 
@@ -94,7 +93,7 @@ def _get_var_dict(system, typ, name, is_parallel):
         name = system._var_abs2prom[typ][name]
         is_discrete = False
 
-    var_dict = OrderedDict()
+    var_dict = {}
 
     var_dict['name'] = name
     var_dict['type'] = typ
@@ -179,7 +178,7 @@ def _serialize_single_option(option):
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
                    is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
-    tree_dict = OrderedDict()
+    tree_dict = {}
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
