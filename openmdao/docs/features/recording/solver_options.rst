@@ -25,6 +25,6 @@ Solver Recording Options
 Solver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_recording_options
     :layout: interleave
 

@@ -474,9 +474,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            ['d1.NonlinearBlockGS', 'root.NonlinearBlockGS']
+            ['d1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS']
         )
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['root.LinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
 
     def test_reading_driver_recording_with_system_vars(self):
@@ -3858,23 +3859,81 @@ def _assert_model_matches_case(case, system):
         np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 
+@use_tempdirs
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
+    def test_options_v12(self):
 
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
+        # The case reader should handle an old database that does not have
+        # the system and solver options recorded
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        with assert_warning(UserWarning, 'System options not recorded.'):
+            options = cr.list_model_options()
+
+        with assert_warning(UserWarning, 'Solver options not recorded.'):
+            options = cr.list_solver_options()
+
+        # The case reader should handle a v11 database that had a
+        # different separator for runs in the model option keys
+        filename = os.path.join(self.legacy_dir, 'case_problem_v11.sql')
+
+        cr = om.CaseReader(filename)
+
+        stream = StringIO()
+
+        cr.list_model_options(run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
     def test_problem_v9(self):
 

@@ -108,7 +108,11 @@ class N2UserInterface {
                     box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
-                    handle.attr('class', 'inactive-resizer-handle');
+                    if (n2Diag.showSolvers) {
+                        handle.attr('class', 'inactive-resizer-handle');
+                    } else {
+                        handle.attr('class', 'inactive-resizer-handle-without-solvers');
+                    }
                     box.attr('class', 'inactive-resizer-box');
 
                     // Get rid of the drag event handlers
@@ -558,19 +562,15 @@ class N2UserInterface {
     }
 
     /**
-     * React to the toggle-solver-name button press and show non-linear if linear
-     * is currently shown, and vice-versa.
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
-    toggleSolverNamesCheckboxChange() {
-        testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+    setSolvers(linear) {
 
-        this.n2Diag.toggleSolverNameType();
-        this.n2Diag.dom.parentDiv.querySelector(
-            '#linear-solver-button'
-        ).className = !this.n2Diag.showLinearSolverNames ?
-                'fas icon-nonlinear-solver solver-button' :
-                'fas icon-linear-solver solver-button';
+        // Update the diagram
+        this.n2Diag.showLinearSolverNames = linear;
 
+        // update the legend
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
         if (this.legend.shown)
@@ -580,6 +580,26 @@ class N2UserInterface {
             );
         this.n2Diag.update();
     }
+
+    /**
+     * React to the toggle-solver-name button press and show non-linear if linear
+     * is currently shown, and vice-versa.
+     */
+    showSolvers() {
+        // d3.select('#solver_tree').style('display','block');
+        n2Diag.showSolvers = true;
+        this.n2Diag.update();
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
+        }
+    hideSolvers() {
+        // d3.select('#solver_tree').style('display','none');
+        // d3.select('#solver_tree').attr('width',0);
+        n2Diag.showSolvers = false;
+        this.n2Diag.update();
+        // const handle = d3.select('#n2-resizer-handle');
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
+        // n2-resizer-handle
+        }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {

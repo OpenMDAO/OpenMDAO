@@ -29,7 +29,7 @@ from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
-    record_system_options
+    record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
     _is_slicer_op, _slice_indices
@@ -618,9 +618,11 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
+
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
 
@@ -656,9 +658,11 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
+
         self.model._clear_iprint()
         return self.driver.run()
 
@@ -972,7 +976,6 @@ class Problem(object):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
-            record_system_options(self)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP

@@ -7,7 +7,7 @@ import warnings
 # from openmdao.utils.assert_utils import assert_near_equal
 import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
-    add_unit, add_offset_unit, unit_conversion, get_conversion
+    add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
 from openmdao.utils.assert_utils import assert_warning, assert_near_equal
 
 
@@ -271,6 +271,23 @@ class TestPhysicalUnit(unittest.TestCase):
             self.assertEqual(str(err), "The units '1.0' are invalid.")
         else:
             self.fail("Expecting ValueError")
+
+    def test_unit_simplification(self):
+        test_strings = ['ft/s*s',
+                        'm/s*s',
+                        'm * ft * cm / km / m',
+                        's/s',
+                        'm ** 7 / m ** 5']
+
+        correct_strings = ['ft',
+                           'm',
+                           'ft*cm/km',
+                           None,
+                           'm**2']
+
+        for test_str, correct_str in zip(test_strings, correct_strings):
+            simplified_str = simplify_unit(test_str)
+            self.assertEqual(simplified_str, correct_str)
 
 
 class TestModuleFunctions(unittest.TestCase):

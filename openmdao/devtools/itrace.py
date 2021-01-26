@@ -311,8 +311,10 @@ def tracing(methods=None, verbose=False, memory=False, leaks=False, show_ptrs=Fa
     """
     setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, show_ptrs=show_ptrs)
     start()
-    yield
-    stop()
+    try:
+        yield
+    finally:
+        stop()
 
 
 class tracedfunc(object):
