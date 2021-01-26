@@ -18,7 +18,7 @@
         position: absolute;
         text-align: left;
         padding: 4px;
-        font: 12px sans-serif;
+        font: 10px sans-serif;
         background: lightsteelblue;
         border: 3px;
         border-radius: 8px;
@@ -436,19 +436,25 @@ function sizeOfLongest(strings, start, rotate) {
 
 
 function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
-    var viewport_width = document.documentElement.clientWidth * .95;
-    var viewport_height = document.documentElement.clientHeight * .95;
-
     var parent = d3.select(parent_id);
-    var leftmargin = is_top ? sizeOfLongest(ofEntries, "XXXX", 45).width : 10;
-    var bottommargin = is_top ? sizeOfLongest(wrtEntries, "XXXX", 45).height : 10;
+    var minOfHeight = 5 * ofEntries.length;
+    var leftmargin = 10;
+    var bottommargin = 10;
     var legendwidth = 20;
     var legendloc = 20;
 
-    // set the dimensions and margins of the graph
+    var viewport_width = document.documentElement.clientWidth * .95;
+    var viewport_height = document.documentElement.clientHeight * .95;
+
     var margin = {top: 30, right: 70 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
+
     var width = viewport_width - margin.left - margin.right;
     var height = viewport_height - margin.top - margin.bottom;
+
+    if (is_top && height < minOfHeight) {
+        viewport_height = viewport_height + (minOfHeight - height);
+        height = minOfHeight;
+    }
 
     var hmap = parent.select(".heatmap");
     hmap.selectAll("g").remove();
@@ -466,31 +472,11 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         .domain(wrtEntries)
         .padding(0.01);
 
-    if (is_top) {
-        svg.append("g")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(x))
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("transform", "rotate(-45)")
-            .attr("dx", "-.5em")
-            .attr("dy", ".3em");
-    }
-
     // Build Y scales and axis:
     var y = d3.scaleBand()
         .range([0, height])
         .domain(ofEntries)
         .padding(0.01);
-
-    if (is_top) {
-        svg.append("g")
-            .call(d3.axisLeft(y))
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("transform", "rotate(-45)")
-            .attr("dy", "-.5em");
-    }
 
     svg.selectAll()
         .data(jac_data, d => d[1] + ':' + d[0])
@@ -523,19 +509,31 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
             var val = (d[2] === null) ? 0 : d3_format(d[2]);
 
             if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
-                var txt = "row: " + d[0] + ", col: " + d[1] + "<br>value: " + val;
+                var txt = "<b>row:</b> " + d[0] + "<br><b>col:</b> " + d[1] + "<br><b>value:</b> " + val;
             }
             else {  // for var wrt var jac, show shape along with value
                 var dat = (parent_id == "#norm-jac") ? data : data.linear;
                 var oslc = dat.ofslices[d[0]];
                 var wrtslc = dat.wrtslices[d[1]];
                 var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "max abs" : "value";
-                var txt = "shape: (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br>" + vname + ": " + val;
+                var txt = "<b>of:</b> " + d[0] + "<br>" + "<b>wrt:</b> " + d[1] + "<br><b>shape:</b> (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br><b>" + vname + ":</b> " + val;
             }
+            var newx;
+            var clientWidthO2 = tooltip.node().clientWidth/2;
+            if (event.layerX < clientWidthO2) {
+                newx = 0;
+            }
+            else if (event.layerX > window.innerWidth-clientWidthO2) {
+                newx = window.innerWidth - tooltip.node().clientWidth;
+            }
+            else {
+                newx = event.layerX - clientWidthO2;
+            }
+
             tooltip
                 .html(txt)
-                .style("left", event.pageX + 10 + "px")
-                .style("top", event.pageY - 15 + "px");
+                .style("left", (newx) + "px")
+                .style("top", (event.pageY + 10) + "px");
         })
         .on("mouseleave", function(event) {
             event.stopPropagation();
