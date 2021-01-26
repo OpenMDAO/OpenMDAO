@@ -1,8 +1,6 @@
 <div id="all_pt_n2_content_div" class="non-embedded-n2">
     <div id="ptN2ContentDivId">
-        <!-- Modal help view -->
-        {{help}}
-
+        <div id='help-svg'><svg id='help-graphic'>{{help}}</svg></div>
         <!-- Toolbar -->
         <div id="toolbarLoc">
             <div class="searchbar-container" id="searchbar-container">
@@ -163,7 +161,7 @@
             </div>
 
             <!-- Legend to show all symbols -->
-            <div class="legend" id="legend-div">
+            <div class="legend" id="legend-div" style="visibility: hidden">
                 <div class="sys-var-container">
                     <div class="legend-title-container">
                         <p class="legend-title">Systems &amp;&nbsp;Variables</p>
@@ -201,75 +199,44 @@
                     </div>
                     <div id="solvers-legend"></div>
                 </div>
-                <div class="draggable">
-                    <div class='draggable-legend-dots'>
-                        <p class="legend-dots"></p>
-                    </div>
-                    <div class="icon-key"></div>
-                    <div class='draggable-legend-dots'>
-                        <p class="legend-dots"></p>
-                    </div>
-                </div>
-                <div id="close-legend">
-                    <p></p>
-                </div>
             </div>
         </div>
+    
         <div id="connectionId"></div>
-        <div id="node-info-container" class='info-panel info-hidden'>
-            <div class='node-info-data'></div>
-            <table class="node-info-table" cellpadding='0' cellspacing='0'>
-                <thead>
-                    <tr>
-                        <th scope='col' colspan='2'>
-                            <span class='node-info-title'>Name</span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-                <tfoot>
-                    <tr>
-                        <th scope='col' colspan='2'>&nbsp;</th>
-                    </tr>
-                </tfoot>
-            </table>
-            <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
-        </div>
-        
-        <!-- all the node value containers and tables will be put inside this div -->
-        <div class="node-value" id="node-value-containers">
-            <div id='template' class='node-value-container node-value-hidden'>
-                <div class='node-value-header'>
-                    <span class='close-value-window-button'>x</span>
-                    <span class='node-value-title'></span>
-                </div>
-                <div class='node-value-table-div'>
-                    <table class='node-value-table'>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div class='node-value-footer'></div>
-                <div class='node-value-resizer-box inactive-resizer-box'>
-                    <p class='node-value-resizer-handle inactive-resizer-handle'></p>
+
+        <div id='n2-windows'>
+            <div class='n2-windows-modal-bg window-inactive'></div>
+            <!-- Window template for all N2 windows -->
+            <div id='window-template' class='window-inactive' style='z-index: 100'>
+                <div class='main-window'>
+                    <div class='window-contents window-theme-default'>
+                        <div class='window-header'>
+                            <span class='window-title'>N2 Information</span>
+                        </div>
+                        <!-- Close button outside of header so it doesn't affect title alignment -->
+                        <span class='window-close-button'></span>
+                        <div class='window-body'></div>
+                        <div class='window-footer'>
+                            <span></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
     </div>
-</div>
 
-<!-- Need this off window element to put values that can then be put on the pastebuffer -->
-<textarea id="input-for-pastebuffer"></textarea>
+    <!-- Need this off window element to put values that can then be put on the pastebuffer -->
+    <textarea id="input-for-pastebuffer"></textarea>
 
-<div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
-<div id="top" class="offgrid" style="visibility: hidden;"></div>
-<div id="left" class="offgrid" style="visibility: hidden;"></div>
-<div id="right" class="offgrid" style="visibility: hidden;"></div>
-<div id="bottom" class="offgrid" style="visibility: hidden;"></div>
+    <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
+    <div id="top" class="offgrid" style="visibility: hidden;"></div>
+    <div id="left" class="offgrid" style="visibility: hidden;"></div>
+    <div id="right" class="offgrid" style="visibility: hidden;"></div>
+    <div id="bottom" class="offgrid" style="visibility: hidden;"></div>
 
-<div id="logo-container">
-    <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
-</div>
+    <div id="logo-container">
+        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
+    </div>
 
 <div id="show-error-button-container">
     <button id="show-error-button">
@@ -277,9 +244,9 @@
     </button>
 </div>
 
-{d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
-{{model_data}}
-{utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
-{n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
-{n2search_lib} {n2toolbar_lib} {n2diagram_lib}
-{nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}
+    {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
+    {{model_data}}
+    {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
+    {n2window_lib} {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib}
+    {n2arrow_lib} {n2search_lib} {n2toolbar_lib} {n2diagram_lib}
+    {nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}

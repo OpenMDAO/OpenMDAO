@@ -122,3 +122,7 @@ function wipeObj(obj) {
         if (obj.hasOwnProperty(prop)) delete obj[prop];
     }
 }
+
+function visible(elem) {
+    return !!( elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length );
+}
