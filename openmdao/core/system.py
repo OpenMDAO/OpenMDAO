@@ -30,6 +30,7 @@ except ImportError:
     tab_pkg = False
 
 import openmdao
+from openmdao.core.notebook_mode import notebook
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -494,7 +495,7 @@ class System(object):
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
-        self._notebook = openmdao.api.notebook
+        self._notebook = notebook
 
     @property
     def msginfo(self):

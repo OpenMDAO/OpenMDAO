@@ -21,10 +21,9 @@ try:
 except ImportError:
     tab_pkg = False
 
-import openmdao
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
-
+from openmdao.core.notebook_mode import notebook
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
@@ -157,7 +156,7 @@ class SqliteCaseReader(BaseCaseReader):
         if pre_load:
             self._load_cases()
 
-        self._notebook = openmdao.api.notebook
+        self._notebook = notebook
 
     def _collect_metadata(self, cur):
         """

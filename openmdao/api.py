@@ -8,6 +8,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.notebook_mode import _notebook_mode
 
 # Components
 from openmdao.components.add_subtract_comp import AddSubtractComp
@@ -103,28 +104,3 @@ elif os.environ.get('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start
     setup(os.environ['OPENMDAO_PROF_MEM'])
     start()
-
-# Checking for interactive notebook mode
-notebook = False
-
-
-def _notebook_mode():
-
-    try:
-        from IPython import get_ipython
-        ipy = get_ipython() is not None
-    except ImportError:
-        pass
-
-    try:
-        import tabulate
-    except ImportError:
-        print("Tabulate is not installed run `pip install openmdao[notebooks]` to install required "
-              "required dependencies")
-
-    return ipy
-
-
-if _notebook_mode():
-
-    notebook = True

@@ -12,6 +12,7 @@ from IPython.display import IFrame, display
 
 import openmdao
 from openmdao.core.problem import Problem
+from openmdao.core.notebook_mode import notebook
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -56,7 +57,6 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     title : str, optional
         Sets the title of the web page.
     """
-    notebook = openmdao.api.notebook
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 

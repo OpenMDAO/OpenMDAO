@@ -15,10 +15,12 @@ from IPython.display import HTML, display
 from tabulate import tabulate
 
 import openmdao.api as om
+import openmdao
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
+from openmdao.core import notebook_mode
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -3106,13 +3108,15 @@ class TestSqliteCaseReader(unittest.TestCase):
 class TestNotebookFormat(unittest.TestCase):
 
     def setUp(self):
-        om.notebook = True
+        openmdao.core.system.notebook = True
+        openmdao.recorders.sqlite_reader.notebook = True
 
         self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
 
     def tearDown(self):
-        om.notebook = False
+        openmdao.core.system.notebook = False
+        openmdao.recorders.sqlite_reader.notebook = False
 
     def test_list_inputs_and_outputs_notebook_format(self):
 
