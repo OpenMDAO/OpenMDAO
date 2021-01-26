@@ -1608,6 +1608,60 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(case.get_val('ayy', indices=0), 52., 1e-6)
         assert_near_equal(case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
 
+    def test_get_val_reducable_units(self):
+        import openmdao.api as om
+
+        model = om.Group()
+        model.add_subsystem('comp', om.ExecComp('y=x-25.',
+                                                x={'value': 77.0, 'units': 'm'},
+                                                y={'value': 0.0, 'units': 'm'}))
+        model.add_subsystem('acomp', om.ExecComp('tout=tin-25.',
+                                                 tin={'value': np.array([77.0, 95.0]), 'units': 'degC'},
+                                                 tout={'value': np.array([0., 0.]), 'units': 'degF'}))
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        case = cr.get_case(0)
+
+        for datasrc in [case, prob, prob.model]:
+            assert_near_equal(datasrc.get_val('comp.x', units='m/s*s'), 77.0, 1e-6)
+            assert_near_equal(datasrc.get_val('comp.x', units='ft/s*s'),
+                              om.convert_units(77, 'm', 'ft'), 1e-6)
+
+            assert_near_equal(datasrc.get_val('comp.y', units='m'), 52., 1e-6)
+            assert_near_equal(datasrc.get_val('comp.y', units='s*ft/s'),
+                              om.convert_units(52, 'm', 'ft'), 1e-6)
+
+            assert_near_equal(datasrc.get_val('acomp.tin', units='degC'), [77., 95.], 1e-6)
+            assert_near_equal(datasrc.get_val('acomp.tin', units='degF'),
+                              om.convert_units(np.array([77., 95.]), 'degC', 'degF'), 1e-6)
+            assert_near_equal(datasrc.get_val('acomp.tin', units='s*degK/s'),
+                              om.convert_units(np.array([77., 95.]), 'degC', 'degK'), 1e-6)
+
+            with self.assertRaises(expected_exception=ValueError) as e:
+                datasrc.get_val('acomp.tin', units='not_a_unit')
+            self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
+
+        prob.set_val('comp.x', value=100.0, units='s*ft/s')
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        for datasrc in [case, prob, prob.model]:
+            assert_near_equal(datasrc.get_val('comp.x', units='m/s*s'),
+                              om.convert_units(100.0, 'ft', 'm'),
+                              1e-6)
+            assert_near_equal(datasrc.get_val('comp.y', units='m*s/s'),
+                              om.convert_units(100.0, 'ft', 'm')-25.0,
+                              1e-6)
+
     def test_get_ambiguous_input(self):
         model = om.Group()
         model.add_recorder(self.recorder)

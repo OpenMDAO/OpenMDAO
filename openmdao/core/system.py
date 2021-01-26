@@ -26,7 +26,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, unit_conversion, valid_units, simplify_unit
+from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -39,7 +39,6 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import unit_conversion
 
 
 _empty_frozen_set = frozenset()
@@ -2531,11 +2530,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"design_var '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"design_var '{name}'.")
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2691,12 +2689,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"response '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"response '{name}'.")
-
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
@@ -4368,6 +4364,7 @@ class System(object):
         abs_names = name2abs_names(self, name)
         if not abs_names:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        simp_units = simplify_unit(units)
 
         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         if from_src and abs_names[0] in conns:  # pull input from source
@@ -4377,8 +4374,8 @@ class System(object):
             else:
                 # src is outside of this system so get the value from the model
                 caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
-                                              get_remote=get_remote, rank=rank,
+            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+                                              indices=indices, get_remote=get_remote, rank=rank,
                                               vec_name='nonlinear', flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
@@ -4387,7 +4384,7 @@ class System(object):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_names[0], val, units)
+                val = self.convert2units(abs_names[0], val, simp_units)
 
         return val
 

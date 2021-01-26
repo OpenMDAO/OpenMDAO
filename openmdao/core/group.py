@@ -14,7 +14,8 @@ import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System
-from openmdao.core.component import Component, _DictValues, _full_slice
+from openmdao.core.component import Component, _DictValues
+from openmdao.vectors.vector import _full_slice
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
@@ -27,7 +28,7 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning, common_sub
     conditional_error, _is_slicer_op, _slice_indices, convert_src_inds, \
     shape_from_idx, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, valid_units, simplify_unit
+    _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -296,9 +297,7 @@ class Group(System):
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
-            meta['units'] = simplify_unit(units)
+            meta['units'] = simplify_unit(units, msginfo=self.msginfo)
 
         if src_shape is not None:
             meta['src_shape'] = src_shape
