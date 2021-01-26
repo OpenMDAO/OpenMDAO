@@ -264,7 +264,7 @@ class ValueInfo extends N2WindowResizable {
         this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
 
-        this.theme('value-info').showFooter().populate(pnInfo);
+        this.theme('value-info').populate(pnInfo);
     }
 
     /**
@@ -413,7 +413,6 @@ class NodeInfo extends N2Window {
         this.dataDiv = this.main.append('div').attr('class', 'node-info-data');
         this.theme('node-info');
         this.hideCloseButton();
-        this.showFooter();
 
         // Becomes active when node info mode is selected on toolbar
         this.active = false;

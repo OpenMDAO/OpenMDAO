@@ -29,12 +29,17 @@
     bottom: 0;
 }
 
+/* Use "visibility:hidden" instead of "display: none" here
+   because "display: none" will caused certain operations
+   and calculations on the window to fail. */
 .window-inactive {
-    display: none;
+    visibility: hidden;
 }
 
-.window-building-state {
-    visibility: hidden;
+/* For when the window or window component will not be used
+   or manipulated at all. */
+.window-unused {
+    display: none;
 }
 
 .window-draggable-header {
@@ -98,7 +103,6 @@
 /* vvvvvvvvvv Begin Default N2 Window theme vvvvvvvvvv */
 .window-theme-default {
     --header-height: 30px;
-    --footer-height: 30px;
     --ribbon-color: #42926b;
 
     background-color: white;
@@ -179,14 +183,7 @@
 }
 
 .window-theme-default .window-footer {
-    background-color: var(--ribbon-color);
-    color: white;
-
-    height: var(--footer-height);
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    display: none;
 }
 
 /* ^^^^^^^^^^ End Default N2 Window theme ^^^^^^^^^^ */
@@ -645,7 +642,6 @@ div#help-svg {
 /* vvvvvvvvvv Begin Legend N2 Window theme vvvvvvvvvv */
 .window-theme-legend {
     --header-height: 20px;
-    --footer-height: 20px;
     --ribbon-color: #42926b;
 
     background-color: none;
@@ -733,14 +729,7 @@ div#help-svg {
 }
 
 .window-theme-legend .window-footer {
-    background-color: var(--ribbon-color);
-    color: white;
-
-    height: var(--footer-height);
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    display: none;
 }
 
 /* ^^^^^^^^^^ End Legend N2 Window theme ^^^^^^^^^^ */

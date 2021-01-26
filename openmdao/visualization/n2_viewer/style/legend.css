@@ -9,7 +9,7 @@
     overflow: hidden;
 }
 
-/* Flexbox fails with absolute positioning */
+/* Flexbox arrangement fails with 'position: absolute' */
 #legend-div div {
     position: static;
 }

@@ -150,7 +150,7 @@
             </div>
 
             <!-- Legend to show all symbols -->
-            <div class="legend" id="legend-div">
+            <div class="legend" id="legend-div" style="visibility: hidden">
                 <div class="sys-var-container">
                     <div class="legend-title-container">
                         <p class="legend-title">Systems &amp;&nbsp;Variables</p>
@@ -190,12 +190,13 @@
                 </div>
             </div>
         </div>
+    
         <div id="connectionId"></div>
 
         <div id='n2-windows'>
             <div class='n2-windows-modal-bg window-inactive'></div>
             <!-- Window template for all N2 windows -->
-            <div id='window-template' class='window-inactive' style='z-index: 10'>
+            <div id='window-template' class='window-inactive' style='z-index: 100'>
                 <div class='main-window'>
                     <div class='window-contents window-theme-default'>
                         <div class='window-header'>
@@ -204,7 +205,7 @@
                         <!-- Close button outside of header so it doesn't affect title alignment -->
                         <span class='window-close-button'></span>
                         <div class='window-body'></div>
-                        <div class='window-footer window-inactive'>
+                        <div class='window-footer'>
                             <span></span>
                         </div>
                     </div>

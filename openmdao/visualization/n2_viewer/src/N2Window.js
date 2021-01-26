@@ -158,29 +158,6 @@ class N2Window {
     }
 
     /**
-     * Many operations only work correctly if the window is displayed. Frequently,
-     * however, the window should be hidden while it's construction. To remedy this,
-     * the visibility property can be set to 'hidden' while the 'display: none'
-     * style is removed. This puts the window in the flow of the page but still
-     * makes it invisible to the user while construction is performed.
-     * @param {Boolean} isBuilding True to put the window in construction mode,
-     *      false to turn off.
-     * @returns {N2Window} Reference to this.
-     */
-    building(isBuilding) {
-        if (isBuilding) {
-            this.window.classed('window-building-state', true);
-            this.show();
-        }
-        else {
-            this.window.classed('window-building-state', false);
-            this.hide();
-        }
-
-        return this;
-    }
-
-    /**
      * Set the title if specified or return the current one.
      * @param {String} [newTitle = null] The optional new title.
      * @returns Reference to this if new title set; otherwise String with the current title.
@@ -277,15 +254,18 @@ class N2Window {
         return this;
     }
 
-    /** Display the footer ribbon
+    /** Set the text in the footer ribbon.
      * @param {String} [footerText = null] If not empty, set the text in the footer.
      * @returns {N2Window} Reference to this.
      */
-
-    showFooter(footerText = null) {
-        this.footer.classed('window-inactive', false);
-        this.footer.select('span').text(footerText);
+    footerText(newText = null) {
+        this.footer.select('span').text(newText);
         return this;
+    }
+
+    /** Determine whether the footer is visible in this theme. */
+    hasFooter() {
+        return visible(this.footer.node());
     }
 
     /**
@@ -377,17 +357,10 @@ class N2Window {
      * @returns {N2Window} Reference to this.
      */
     sizeToContent() {
-        const isHidden = this.hidden;
-
-        // To size correctly, the window has to be displayed, so if it's
-        // hidden, move it offscreen and work there.
-        if (isHidden) { this.building(true); }
-
         let contentWidth = this.body.node().scrollWidth,
             contentHeight = this.body.node().scrollHeight,
             headerHeight = this.header.node().offsetHeight,
-            footerHeight = this.footer.classed('window-inactive') ? 0 :
-                this.footer.node().offsetHeight;
+            footerHeight = this.hasFooter() ? this.footer.node().offsetHeight : 0;
 
         const totalHeight = contentHeight + headerHeight + footerHeight + 2;
 
@@ -396,9 +369,6 @@ class N2Window {
             height: totalHeight + 'px'
         };
         this.setList(newSize);
-
-        // Put the window back where it belongs if we moved it
-        if (isHidden) { this.building(false); }
 
         return this;
     }
@@ -567,6 +537,8 @@ class N2WindowResizable extends N2WindowDraggable {
 
                 const w = d3.select(window)
                     .on("mousemove", e => {
+                        d3.event.preventDefault();
+
                         newPos = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
                         Object.assign(newSize, startDims)
 
@@ -602,7 +574,6 @@ class N2WindowResizable extends N2WindowDraggable {
                     });
 
             });
-            d3.event.preventDefault();
         }
     }
 }
@@ -622,8 +593,8 @@ function wintest() {
     myWin2.sizeToContent();
 
     myWin3 = new N2WindowResizable(null, null, { maxWidth: 500, maxHeight: 1000 });
+    myWin3.theme('value-info');
     myWin3.setList({ width: '300px', height: '300px', title: 'Resizable Window', top: '100px', left: '700px' });
-    myWin3.showFooter();
     myWin3.show();
     myWin3.body.html(content);
     myWin3.sizeToContent();

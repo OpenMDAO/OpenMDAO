@@ -10,7 +10,7 @@ class N2Legend extends N2WindowDraggable {
      */
     constructor(modelData) {
         super('n2win-legend');
-
+    
         // TODO: The legend should't have to search through modelData itself,
         // this info can be collected as modelData is built.
         this.nodes = modelData.tree.children;
@@ -53,14 +53,13 @@ class N2Legend extends N2WindowDraggable {
             { 'name': modelData.tree.nonlinear_solver, 'color': rootNonLinearSolver.color }
         ];
 
-
-        this.body.node().appendChild(d3.select('#legend-div').node());      
+        const legendDiv = d3.select('#legend-div');
+        legendDiv.style('visibility', null);
+        this.body.node().appendChild(legendDiv.node());      
         this._setDisplayBooleans(this.nodes);
 
-        this.building(true);
         this.title('<span class="icon-key"></span>');
         this._setupContents();
-        this.building(false);
 
         this.theme('legend');
         this.sizeToContent();
@@ -212,7 +211,6 @@ class N2Legend extends N2WindowDraggable {
      * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
     toggleSolvers(linear) {
-
         const solversLegendTitle = d3.select('#solvers-legend-title');
         solversLegendTitle.text(linear ? "Linear Solvers" : "Non-Linear Solvers");
 
@@ -236,7 +234,7 @@ class N2Help extends N2Window {
         this.theme('help')
             .setList({ left: '100px', top: '20px', right: '100px', height: '800px' })
             .title('Instructions')
-            .showFooter('OpenMDAO Model Hierarchy and N2 diagram');
+            .footerText('OpenMDAO Model Hierarchy and N2 diagram');
 
         this.body.append('p')
             .text(
