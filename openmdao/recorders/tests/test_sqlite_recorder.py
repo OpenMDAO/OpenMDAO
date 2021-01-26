@@ -361,6 +361,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        has_diag_partials : False",
             "        units : None",
             "        shape : None",
+            "        shape_by_conn : False",
             ""
         ]
 
@@ -451,6 +452,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        has_diag_partials : False",
             "        units : None",
             "        shape : None",
+            "        shape_by_conn : False",
             ""
         ]
 
