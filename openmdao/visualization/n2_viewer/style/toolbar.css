@@ -124,12 +124,12 @@
 .toolbar-hide-container {
     background-color: white;
     width: 15px;
-    height: 35px;
+    height: 33px;
     border-top-right-radius: 25%;
     border-bottom-right-radius: 25%;
 
     position: absolute;
-    top: 270px;
+    top: 275px;
     margin-left: 20px;
     left: -20px;
     /* Start hidden */
@@ -338,10 +338,6 @@
     font-size: 20px;
     cursor: pointer;
     transition: color 0.2s;
-}
-
-.solver-button {
-    font-size: 25px !important;
 }
 
 .active-tab-icon {

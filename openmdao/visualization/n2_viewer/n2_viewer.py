@@ -4,7 +4,6 @@ import inspect
 import json
 import os
 import zlib
-from collections import OrderedDict
 from itertools import chain
 import networkx as nx
 
@@ -82,7 +81,7 @@ def _convert_ndarray_to_support_nans_in_json(val):
     return(val_as_list)
 
 
-def _get_var_dict(system, typ, name):
+def _get_var_dict(system, typ, name, is_parallel):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
         is_discrete = True
@@ -94,7 +93,7 @@ def _get_var_dict(system, typ, name):
         name = system._var_abs2prom[typ][name]
         is_discrete = False
 
-    var_dict = OrderedDict()
+    var_dict = {}
 
     var_dict['name'] = name
     var_dict['type'] = typ
@@ -114,7 +113,9 @@ def _get_var_dict(system, typ, name):
         var_dict['shape'] = str(meta['shape'])
 
     if 'distributed' in meta:
-        var_dict['distributed'] = meta['distributed']
+        var_dict['distributed'] = is_distributed = meta['distributed']
+    else:
+        is_distributed = False
 
     if 'surrogate_name' in meta:
         var_dict['surrogate_name'] = meta['surrogate_name']
@@ -128,10 +129,18 @@ def _get_var_dict(system, typ, name):
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            if MPI:
-                var_dict['value'] = meta['value']
-            else:
+            if not MPI:
+                # get the current value
                 var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
+            elif is_parallel or is_distributed:
+                # we can't access non-local values, so just get the initial value
+                var_dict['value'] = meta['value']
+                var_dict['initial_value'] = True
+            else:
+                # get the current value but don't try to get it from the source,
+                # which could be remote under MPI
+                val = system.get_val(name, from_src=False)
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(val)
         else:
             var_dict['value'] = None
 
@@ -169,7 +178,7 @@ def _serialize_single_option(option):
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
                    is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
-    tree_dict = OrderedDict()
+    tree_dict = {}
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
@@ -198,10 +207,10 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name))
+                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name))
+                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
 
     else:
         if isinstance(system, ParallelGroup):
@@ -563,9 +572,12 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     else:
         title = "OpenMDAO Model Hierarchy and N2 diagram"
 
+    src_names = ('N2ErrorHandling',)
+    head_srcs = read_files(src_names, src_dir, 'js')
+
     h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
                       title=title,
-                      styles=styles, embeddable=embeddable)
+                      styles=styles, embeddable=embeddable, head_srcs=head_srcs)
 
     if (embeddable):
         h.insert("non-embedded-n2", "embedded-n2")

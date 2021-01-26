@@ -86,58 +86,62 @@ class CaseRecorder(object):
         recording_requester : object
             The object that would like to record its metadata.
         """
-        if isinstance(recording_requester, System):
-            self.record_metadata_system(recording_requester)
-        elif isinstance(recording_requester, Solver):
-            self.record_metadata_solver(recording_requester)
+        warn_deprecation("The 'record_metadata' function is deprecated. "
+                         "All system and solver options are recorded automatically.")
 
-    def _get_metadata_system(self, recording_requester):
+    def _get_metadata_system(self, system):
         # Cannot handle PETScVector yet
         from openmdao.api import PETScVector
-        if PETScVector and isinstance(recording_requester._outputs, PETScVector):
+        if PETScVector and isinstance(system._outputs, PETScVector):
             return None, None  # Cannot handle PETScVector yet
 
         # collect scaling arrays
         scaling_vecs = {}
-        for kind, odict in recording_requester._vectors.items():
+        for kind, odict in system._vectors.items():
             scaling_vecs[kind] = scaling = {}
             for vecname, vec in odict.items():
                 scaling[vecname] = vec._scaling
 
         # create a copy of the system's metadata excluding what is in 'options_excludes'
-        excludes = recording_requester.recording_options['options_excludes']
+        excludes = system.recording_options['options_excludes']
 
         if excludes:
             user_options = OptionsDictionary()
-            user_options._all_recordable = recording_requester.options._all_recordable
-            for key in recording_requester.options._dict:
+            user_options._all_recordable = system.options._all_recordable
+            for key in system.options._dict:
                 if check_path(key, [], excludes, True):
-                    user_options._dict[key] = recording_requester.options._dict[key]
-            user_options._read_only = recording_requester.options._read_only
+                    user_options._dict[key] = system.options._dict[key]
+            user_options._read_only = system.options._read_only
 
             return scaling_vecs, user_options
         else:
-            return scaling_vecs, recording_requester.options
+            return scaling_vecs, system.options
 
-    def record_metadata_system(self, recording_requester):
+    def record_metadata_system(self, system, run_number=None):
         """
         Record system metadata.
 
         Parameters
         ----------
-        recording_requester : System
-            The System that would like to record its metadata.
+        system : System
+            The System for which to record metadata.
+        run_number : int or None
+            Number indicating which run the metadata is associated with.
+            None for the first run, 1 for the second, etc.
         """
         raise NotImplementedError()
 
-    def record_metadata_solver(self, recording_requester):
+    def record_metadata_solver(self, solver, run_number=None):
         """
         Record solver metadata.
 
         Parameters
         ----------
-        recording_requester : Solver
-            The Solver that would like to record its metadata.
+        solver : Solver
+            The Solver for which to record metadata.
+        run_number : int or None
+            Number indicating which run the metadata is associated with.
+            None for the first run, 1 for the second, etc.
         """
         raise NotImplementedError()
 

@@ -733,7 +733,7 @@ class Case(object):
                     return_name = auto_ivc_map[name]
                 else:
                     return_name = name
-                ret_vars[return_name] = val = self.outputs[name]
+                ret_vars[return_name] = val = self.outputs[name].copy()
                 if update_vals and name in self._var_info:
                     meta = self._var_info[name]
                     if use_indices and meta['indices'] is not None:

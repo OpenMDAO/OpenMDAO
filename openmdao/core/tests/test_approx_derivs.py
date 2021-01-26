@@ -792,6 +792,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         p.driver = pyOptSparseDriver()
         p.driver.options['print_results'] = False
+
         p.model.approx_totals(method='fd')
 
         p.model.add_design_var('x')
@@ -1255,8 +1256,6 @@ class TestGroupComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
-                            promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])

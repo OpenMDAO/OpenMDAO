@@ -12,7 +12,8 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation, prom2ivc_src_dict
+from openmdao.utils.general_utils import simple_warning, warn_deprecation, _prom2ivc_src_dict, \
+    _prom2ivc_src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -192,6 +193,14 @@ class Driver(object):
         self._declare_options()
         self.options.update(kwargs)
 
+    def _get_inst_id(self):
+        if self._problem is None:
+            return None
+        probid = self._problem()._get_inst_id()
+        if probid is None:
+            return "driver"
+        return f"{probid}.driver"
+
     @property
     def msginfo(self):
         """
@@ -284,11 +293,6 @@ class Driver(object):
         self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
 
-        src_design_vars = prom2ivc_src_dict(self._designvars)
-        src_cons = prom2ivc_src_dict(self._cons)
-        src_objs = prom2ivc_src_dict(self._objs)
-        responses = prom2ivc_src_dict(self._responses)
-
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
             dist_vars = []
@@ -317,10 +321,13 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
+            src_design_vars = _prom2ivc_src_dict(self._designvars)
+            responses = _prom2ivc_src_dict(self._responses)
+
             local_out_vars = set(model._outputs._abs_iter())
             remote_dvs = set(src_design_vars) - local_out_vars
-            remote_cons = set(src_cons) - local_out_vars
-            remote_objs = set(src_objs) - local_out_vars
+            remote_cons = set(_prom2ivc_src_name_iter(self._cons)) - local_out_vars
+            remote_objs = set(_prom2ivc_src_name_iter(self._objs)) - local_out_vars
 
             all_remote_vois = model.comm.allgather(
                 (remote_dvs, remote_cons, remote_objs))
@@ -563,8 +570,7 @@ class Driver(object):
                 local_val = local_val[local_indices]
 
             if get_remote:
-                if not local_val.flags['C_CONTIGUOUS']:
-                    local_val = np.ascontiguousarray(local_val)
+                local_val = np.ascontiguousarray(local_val)
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                 offsets[1:] = np.cumsum(sizes[:-1])
                 val = np.zeros(np.sum(sizes))
@@ -1089,6 +1095,33 @@ class Driver(object):
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
+
+    def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
+                       jac=True):
+        """
+        Generate a self-contained html file containing a detailed connection viewer.
+
+        Optionally pops up a web browser to view the file.
+
+        Parameters
+        ----------
+        outfile : str, optional
+            The name of the output html file.  Defaults to 'driver_scaling_report.html'.
+        title : str, optional
+            Sets the title of the web page.
+        show_browser : bool, optional
+            If True, pop up a browser to view the generated html file. Defaults to True.
+        jac : bool
+            If True, show jacobian information.
+
+        Returns
+        -------
+        dict
+            Data used to create html file.
+        """
+        from openmdao.visualization.scaling_viewer.scaling_report import view_driver_scaling
+        return view_driver_scaling(self, outfile=outfile, show_browser=show_browser, jac=jac,
+                                   title=title)
 
     def _pre_run_model_debug_print(self):
         """

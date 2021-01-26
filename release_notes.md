@@ -1,4 +1,51 @@
 **********************************
+# Release Notes for OpenMDAO 3.6.0
+
+January 14, 2021
+
+OpenMDAO 3.6.0 provides new features, several bug fixes, as well as
+documentation and visualization updates.
+
+Thank you to users @Dakror and @cfe316 for contributing to this release.
+
+## Backwards Incompatible API Changes:
+
+- None
+
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- (POEM_032) Implemented a new scaling report feature that is intended to provide the user with some information as to how well their problem is scaled. [#1820](https://github.com/OpenMDAO/OpenMDAO/pull/1820)
+- (POEM_036) Implemented caching of the Kriging training weights by serializing them and saving them to a file so they can be used in later runs to save computation time. [#1830](https://github.com/OpenMDAO/OpenMDAO/pull/1830)
+- Added button to n2 to show or hide desvars, constraints, and objectives [#1793](https://github.com/OpenMDAO/OpenMDAO/pull/1793)
+- Units are now simplified upon creation. [#1796](https://github.com/OpenMDAO/OpenMDAO/pull/1796)
+- Added info about surrogate in n2 [#1800](https://github.com/OpenMDAO/OpenMDAO/pull/1800)
+- Added note to N2 NodeInfo when displaying initial value [#1805](https://github.com/OpenMDAO/OpenMDAO/pull/1805)
+- Added the ability to hide the solver hierarchy in the N2 [#1807](https://github.com/OpenMDAO/OpenMDAO/pull/1807)
+- Added warning when nonlinear solver stalls three times [#1818](https://github.com/OpenMDAO/OpenMDAO/pull/1818)
+
+## Bug Fixes:
+
+- Fixed a bug related to show_progress in check_totals [#1794](https://github.com/OpenMDAO/OpenMDAO/pull/1794)
+- A few fixes for the standalone InterpND [#1797](https://github.com/OpenMDAO/OpenMDAO/pull/1797)
+- Fix for an undefined variable in error msg related to shape_by_conn [#1799](https://github.com/OpenMDAO/OpenMDAO/pull/1799)
+- Fixed issue where resid_tol failed with vectorized resids [#1804](https://github.com/OpenMDAO/OpenMDAO/pull/1804)
+- Only raise distributed variable errors when MPI comm size > 1 [#1814](https://github.com/OpenMDAO/OpenMDAO/pull/1814)
+- Fixed shape bug in DVs when indices were used [#1815](https://github.com/OpenMDAO/OpenMDAO/pull/1815)
+- Make get_var_meta private, and fix a test failure introduced from the latest scipy. [#1819](https://github.com/OpenMDAO/OpenMDAO/pull/1819)
+
+## Miscellaneous:
+
+- Added new logos to docs [#1806](https://github.com/OpenMDAO/OpenMDAO/pull/1806)
+- Fixed dead link in NonlinearBlockGS docs [#1810](https://github.com/OpenMDAO/OpenMDAO/pull/1810)
+- Correct the very short "input + output" example to have both an input and an output. [#1812](https://github.com/OpenMDAO/OpenMDAO/pull/1812)
+- Fixed flag for pip --upgrade in the README. [#1826](https://github.com/OpenMDAO/OpenMDAO/pull/1826)
+- fix for change in sphinx-doc v3.4.0 (PR 8445) [#1827](https://github.com/OpenMDAO/OpenMDAO/pull/1827)
+
+**********************************
 # Release Notes for OpenMDAO 3.5.0
 
 December 04, 2020
