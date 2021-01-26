@@ -157,7 +157,7 @@ class ApproximationScheme(object):
 
         out_slices = outputs.get_slice_dict()
 
-        is_total = isinstance(system, Group)
+        is_group = isinstance(system, Group)
 
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
@@ -173,7 +173,7 @@ class ApproximationScheme(object):
                 if 'coloring' in options:
                     keys.update(a[0] for a in apprx)
 
-        if is_total and system.pathname == '':  # top level approx totals
+        if is_group and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
             full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
                                    system._var_allprocs_abs2meta['input']))
@@ -199,12 +199,12 @@ class ApproximationScheme(object):
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
         jac_slices = tmpJ['@jac_slices']
-        for abs_of, roffset, rend, _ in system._jacobian_of_iter():
+        for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend, _ in system._jacobian_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend, _ in system._partial_jac_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
-            if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
+            if is_group and (approx_of_idx or len_full_ofs > len(of_names)):
                 slc = out_slices[abs_of]
                 if abs_of in approx_of_idx:
                     full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
@@ -214,7 +214,7 @@ class ApproximationScheme(object):
             tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
-            if is_total and system.pathname == '':  # top level approx totals
+            if is_group and system.pathname == '':  # top level approx totals
                 a2mi = system._var_allprocs_abs2meta['input']
                 a2mo = system._var_allprocs_abs2meta['output']
                 full_wrt_sizes = [a2mi[wrt]['size'] if wrt in a2mi else a2mo[wrt]['size']
@@ -229,11 +229,11 @@ class ApproximationScheme(object):
 
         # get groups of columns from the coloring and compute proper indices into
         # the inputs and outputs vectors.
-        is_semi = is_total and system.pathname
+        is_semi = is_group and system.pathname
         use_full_cols = isinstance(system, ImplicitComponent) or is_semi
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             ccols = cols if col_map is None else col_map[cols]
-            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_total)
+            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_group)
             self._colored_approx_groups.append((data, cols, tmpJ, idx_info, nzrows))
 
     def _init_approximations(self, system):

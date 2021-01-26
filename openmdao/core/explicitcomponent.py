@@ -82,7 +82,7 @@ class ExplicitComponent(Component):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
 
-    def _jacobian_wrt_iter(self, wrt_matches=None):
+    def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -123,7 +123,7 @@ class ExplicitComponent(Component):
             size = meta['size']
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if size > 0:
+            if size > 0 and not self.matrix_free:
                 out_name = abs2prom_out[out_abs]
                 arange = np.arange(size)
 
@@ -218,11 +218,11 @@ class ExplicitComponent(Component):
                                   copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
+        is_output = self._outputs._contains_abs
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta:
+            if 'method' in meta and not is_output(abs_key[1]):
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes and
-                        not self._outputs._contains_abs(abs_key[1])):
+                if (method is not None and method in self._approx_schemes):
                     yield abs_key
 
     def _apply_nonlinear(self):

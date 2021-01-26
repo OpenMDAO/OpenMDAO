@@ -353,6 +353,13 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
+        if self.matrix_free:
+            sjacs = [k for k in self._subjacs_info if k[0] != k[1]]
+            if sjacs:
+                simple_warning(f"{self.msginfo}: matrix free component has declared the following "
+                               f"partials: {sorted(sjacs)}, which will allocate "
+                               "(possibly unnecessary) memory for each of those sub-jacobians.")
+
     def setup_partials(self):
         """
         Declare partials.

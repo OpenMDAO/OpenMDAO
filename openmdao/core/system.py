@@ -967,7 +967,7 @@ class System(object):
                     break
             else:  # no approx derivs found
                 simple_warning("%s: No approx partials found but coloring was requested.  "
-                               "Declaring ALL partials as approx (method='%s')" %
+                               "Declaring ALL partials as dense and approx (method='%s')" %
                                (self.msginfo, self._coloring_info['method']))
                 try:
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
@@ -1045,8 +1045,8 @@ class System(object):
 
         self._update_wrt_matches(info)
 
-        ordered_of_info = list(self._jacobian_of_iter())
-        ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
+        ordered_of_info = list(self._partial_jac_of_iter())
+        ordered_wrt_info = list(self._partial_jac_wrt_iter(info['wrt_matches']))
         sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
                                                              num_full_jacs=info['num_full_jacs'],
                                                              tol=info['tol'],
@@ -1116,7 +1116,7 @@ class System(object):
     def _setup_approx_coloring(self):
         pass
 
-    def _jacobian_of_iter(self):
+    def _partial_jac_of_iter(self):
         """
         Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
         """
@@ -1127,7 +1127,7 @@ class System(object):
             yield of, offset, end, _full_slice
             offset = end
 
-    def _jacobian_wrt_iter(self, wrt_matches=None):
+    def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -1142,7 +1142,7 @@ class System(object):
             wrt_matches = ContainsAll()
         abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
+        for of, _offset, _end, sub_of_idx in self._partial_jac_of_iter():
             if of in wrt_matches:
                 end += (_end - _offset)
                 yield of, offset, end, sub_of_idx

@@ -2973,12 +2973,16 @@ class Group(System):
 
             yield key
 
-    def _jacobian_of_iter(self):
+    def _partial_jac_of_iter(self):
         """
         Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
 
         idxs will usually be a full slice, except in cases where _owns_approx__idx has
         a value for that variable.
+
+        Yields
+        ------
+        of_name, start, end, intra_variable_slice_or_idxs
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
@@ -2988,18 +2992,17 @@ class Group(System):
             offset = end = 0
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
-                    sub_of_idx = approx_of_idx[of]
-                    size = len(sub_of_idx)
+                    end += len(approx_of_idx[of])
+                    yield of, offset, end, approx_of_idx[of]
                 else:
-                    size = abs2meta[of]['size']
-                    sub_of_idx = _full_slice
-                end += size
-                yield of, offset, end, sub_of_idx
+                    end += abs2meta[of]['size']
+                    yield of, offset, end, _full_slice
+
                 offset = end
         else:
-            yield from super()._jacobian_of_iter()
+            yield from super()._partial_jac_of_iter()
 
-    def _jacobian_wrt_iter(self, wrt_matches=None):
+    def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -3012,38 +3015,37 @@ class Group(System):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+
+        Yields
+        ------
+        wrt_name, start, end, intra_variable_slice_or_idxs
         """
         if self._owns_approx_wrt:
-            if wrt_matches is None:
-                wrt_matches = ContainsAll()
             abs2meta = self._var_allprocs_abs2meta
-            approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
-                    if of in wrt_matches:
+                for of, _offset, _end, sub_of_idx in self._partial_jac_of_iter():
+                    if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         yield of, offset, end, sub_of_idx
                         offset = end
 
             for wrt in self._owns_approx_wrt:
-                if wrt in wrt_matches:
+                if wrt_matches is None or wrt in wrt_matches:
                     if wrt in approx_wrt_idx:
-                        sub_wrt_idx = approx_wrt_idx[wrt]
-                        size = len(sub_wrt_idx)
+                        end += len(approx_wrt_idx[wrt])
+                        yield wrt, offset, end, approx_wrt_idx[wrt]
                     else:
                         if wrt in abs2meta['input']:
-                            size = abs2meta['input'][wrt]['size']
+                            end += abs2meta['input'][wrt]['size']
                         else:
-                            size = abs2meta['output'][wrt]['size']
-                        sub_wrt_idx = _full_slice
-                    end += size
-                    yield wrt, offset, end, sub_wrt_idx
+                            end += abs2meta['output'][wrt]['size']
+                        yield wrt, offset, end, _full_slice
                     offset = end
         else:
-            yield from super()._jacobian_wrt_iter(wrt_matches)
+            yield from super()._partial_jac_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """
