@@ -376,15 +376,21 @@ class N2Window {
     /**
      * Make visible the div that separates this window from everything else
      * @param {Boolean} [enable = null] Turn on modal mode if true, off if false.
+     * @param {String} [style = null] Change the default appearance of translucent black.
      * @returns Modal setting if enable is null, otherwise current modal state.
      */
-    modal(enable = null) {
+    modal(enable = null, style = null) {
         const modalDiv = d3.select('.n2-windows-modal-bg');
         if (enable === null) { return this._enabledModal; }
 
         if (enable) {
             this.bringToFront(true, 2);
-            modalDiv.style('z-index', N2Window.zIndex - 1);
+            modalDiv.attr('style', style)
+                .style('z-index', N2Window.zIndex - 1)
+                
+        }
+        else {
+            modalDiv.attr('style', null);
         }
 
         modalDiv.classed('window-inactive', !enable);
@@ -487,6 +493,21 @@ class N2WindowResizable extends N2WindowDraggable {
     set maxHeight(val) { this.max.height = val; }
 
     /**
+     * Set the cursor for all elements to the specified value, for the purpose
+     * of resizing the window and not having the cursor change every time another
+     * element is hovered.
+     * @param {String} cursor The new value of the cursor.
+     */
+    _lockCursor(cursor) {
+        this.header.style('cursor', cursor);
+        this.window.style('cursor', cursor);
+        this.window.select('.window-close-button').style('cursor', cursor);
+        this.resizerDiv.selectAll('div').style('cursor', cursor);        
+
+        return this;
+    }
+
+    /**
      * Add event handlers for each of the 8 resizer elements surrounding the window.
      */
     _setupResizers() {
@@ -504,7 +525,7 @@ class N2WindowResizable extends N2WindowDraggable {
         }
 
         // Add div to contain the 8 resizer elements
-        const resizerDiv = this.window.select('.main-window')
+        this.resizerDiv = this.window.select('.main-window')
             .append('div')
             .attr('class', 'resize');
 
@@ -521,15 +542,18 @@ class N2WindowResizable extends N2WindowDraggable {
         // Set up a mousedown event listener for each of the 8 elements.
         for (const name in resizerClassNames) {
             // Add the div that the resizer mouse event handler will be on
-            const resizer = resizerDiv.append('div')
+            const resizer = this.resizerDiv.append('div')
                 // Class style settings determine where each div is positioned
                 .attr('class', `rsz-${name} rsz-${resizerClassNames[name]}`);
 
             const dirs = name.split('-'); // From class name, figure out which directions to handle
             resizer.on('mousedown', function () {
                 const startDims = self._getPos();
-
                 self.bringToFront();
+
+                const cursor = resizer.style('cursor');
+                self.modal(true, `background-color: none; opacity: 0; cursor: ${cursor};`)
+                    ._lockCursor(cursor);
 
                 const dragStart = [d3.event.pageX, d3.event.pageY];
                 let newPos = [0, 0]; // Delta values of the current mouse position vs. start position
@@ -537,6 +561,7 @@ class N2WindowResizable extends N2WindowDraggable {
 
                 const w = d3.select(window)
                     .on("mousemove", e => {
+                        d3.event.stopPropagation();
                         d3.event.preventDefault();
 
                         newPos = [d3.event.pageX - dragStart[0], d3.event.pageY - dragStart[1]];
@@ -571,6 +596,8 @@ class N2WindowResizable extends N2WindowDraggable {
                     })
                     .on("mouseup", e => {
                         w.on("mousemove", null).on("mouseup", null);
+                        self.modal(false);
+                        self._lockCursor(null);
                     });
 
             });
