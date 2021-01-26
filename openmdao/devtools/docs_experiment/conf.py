@@ -149,7 +149,7 @@ todo_include_todos = False
 html_theme = '_theme'
 html_theme_path = ['../../docs']
 html_logo = '../../docs/_static/OpenMDAO_Logo.png'
-html_favicon = '../../docs/_static/OpenMDAO_Favicon.ico'
+html_favicon = '../../docs/_static/favicon.svg'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.

@@ -1326,6 +1326,8 @@ class TestDriverScalingReport(unittest.TestCase):
     def test_40x40_in1_out1(self):
         p, expected = self.setup_model(ncomps=40)
         p.final_setup()
+        # compute dict totals to make sure we handle that properly
+        p.driver._compute_totals()
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
 
