@@ -363,9 +363,6 @@ class SqliteCaseReader(BaseCaseReader):
         elif out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
-
-            if self._notebook and not tab_pkg:
-                print("Tabulate not installed, falling back to ascii table version")
             for source in sources:
                 out_stream.write('{}\n'.format(source))
 
@@ -524,8 +521,6 @@ class SqliteCaseReader(BaseCaseReader):
                 cases = self._list_cases_recurse_flat(out_stream=out_stream)
                 return tabulate(cases, headers="keys", tablefmt='html')
             else:
-                if self._notebook and not tab_pkg:
-                    print("Tabulate not installed, falling back to ascii table version")
                 return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':

@@ -1,23 +1,21 @@
 """Checking for interactive notebook mode."""
+from openmdao.utils.general_utils import simple_warning
 
 
-def _notebook_mode():
-
+def notebook_mode():
+    ipy = False
     try:
         from IPython import get_ipython
         ipy = get_ipython() is not None
     except ImportError:
         pass
-    else:
+
+    if ipy is not None:
         try:
             import tabulate
         except ImportError:
-            print("Tabulate is not installed run `pip install openmdao[notebooks]` to install "
-                  "required dependencies")
+            simple_warning("Tabulate is not installed run `pip install openmdao[notebooks]` to "
+                           "install required dependencies. Using ASCII for outputs.")
     return ipy
 
-
-if _notebook_mode():
-    notebook = True
-else:
-    notebook = False
+notebook = notebook_mode()
