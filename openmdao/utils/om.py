@@ -539,7 +539,8 @@ def openmdao_cmd():
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(sys.argv[1]):
+    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version')]
+    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
         _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True
