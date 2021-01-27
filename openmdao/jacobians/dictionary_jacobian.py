@@ -101,25 +101,11 @@ class DictionaryJacobian(Jacobian):
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
-                subjac_info = subjacs_info[abs_key]
-                if self._randomize:
-                    subjac = self._randomize_subjac(subjac_info['value'], abs_key)
-                else:
-                    subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
-
+                    if is_explicit and res_name is other_name:
+                        continue
                     if other_name in d_out_names:
-                        # skip the matvec mult completely for identity subjacs
-                        if is_explicit and res_name is other_name:
-                            if fwd:
-                                val = rflat(res_name)
-                                val -= oflat(other_name)
-                            else:
-                                val = oflat(other_name)
-                                val -= rflat(res_name)
-                            continue
-
                         if fwd:
                             left_vec = rflat(res_name)
                             right_vec = oflat(other_name)
@@ -136,6 +122,11 @@ class DictionaryJacobian(Jacobian):
                     else:
                         continue
 
+                    subjac_info = subjacs_info[abs_key]
+                    if self._randomize:
+                        subjac = self._randomize_subjac(subjac_info['value'], abs_key)
+                    else:
+                        subjac = subjac_info['value']
                     rows = subjac_info['rows']
                     if rows is not None:  # our homegrown COO format
                         linds, rinds = rows, subjac_info['cols']

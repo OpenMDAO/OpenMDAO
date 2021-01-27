@@ -353,11 +353,9 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-        if self.matrix_free:
-            sjacs = [k for k in self._subjacs_info if k[0] != k[1]]
-            if sjacs:
-                simple_warning(f"{self.msginfo}: matrix free component has declared the following "
-                               f"partials: {sorted(sjacs)}, which will allocate "
+        if self.matrix_free and self._subjacs_info:
+            raise RuntimeError(f"{self.msginfo}: matrix free component has declared the following "
+                               f"partials: {sorted(self._subjacs_info)}, which will allocate "
                                "(possibly unnecessary) memory for each of those sub-jacobians.")
 
     def setup_partials(self):
@@ -1285,15 +1283,12 @@ class Component(System):
             cases with large numbers of explicit components or indepvarcomps.
         """
         if quick_declare:
-            abs_key = rel_key2abs_key(self, (of, wrt))
-
-            meta = {}
-            meta['rows'] = np.array(dct['rows'], dtype=INT_DTYPE, copy=False)
-            meta['cols'] = np.array(dct['cols'], dtype=INT_DTYPE, copy=False)
-            meta['shape'] = (len(dct['rows']), len(dct['cols']))
-            meta['value'] = dct['value']
-
-            self._subjacs_info[abs_key] = meta
+            self._subjacs_info[rel_key2abs_key(self, (of, wrt))] = {
+                'rows': np.array(dct['rows'], dtype=INT_DTYPE, copy=False),
+                'cols': np.array(dct['cols'], dtype=INT_DTYPE, copy=False),
+                'shape': (len(dct['rows']), len(dct['cols'])),
+                'value': dct['value'],
+            }
             return
 
         val = dct['value'] if 'value' in dct else None

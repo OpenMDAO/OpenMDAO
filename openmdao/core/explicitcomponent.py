@@ -4,6 +4,7 @@ import sys
 import numpy as np
 
 from openmdao.core.component import Component, _full_slice
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -298,9 +299,9 @@ class ExplicitComponent(Component):
                 # Jacobian and vectors are all scaled, unitless
                 J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because compute_jacvec_product does nothing.
                 if not self.matrix_free:
+                    # if we're not matrix free, we can skip the bottom of
+                    # this loop because compute_jacvec_product does nothing.
                     continue
 
                 # Jacobian and vectors are all unscaled, dimensional
@@ -310,10 +311,27 @@ class ExplicitComponent(Component):
                     # set appropriate vectors to read_only to help prevent user error
                     if mode == 'fwd':
                         d_inputs.read_only = True
-                    elif mode == 'rev':
+                    else:  # rev
                         d_residuals.read_only = True
 
                     try:
+                        # handle identity subjacs (output_or_resid wrt itself)
+                        if isinstance(J, DictionaryJacobian):
+                            rflat = self._vectors['residual'][vec_name]._abs_get_val
+                            oflat = self._vectors['output'][vec_name]._abs_get_val
+                            d_out_names = self._vectors['output'][vec_name]._names
+                            vnames = self._var_relevant_names[vec_name]['output']
+                            if mode == 'fwd':
+                                for v in vnames:
+                                    if v in d_out_names:
+                                        val = rflat(v)
+                                        val -= oflat(v)
+                            else:  # rev
+                                for v in vnames:
+                                    if v in d_out_names:
+                                        val = oflat(v)
+                                        val -= rflat(v)
+
                         args = [self._inputs, d_inputs, d_residuals, mode]
                         if self._discrete_inputs:
                             args.append(self._discrete_inputs)
