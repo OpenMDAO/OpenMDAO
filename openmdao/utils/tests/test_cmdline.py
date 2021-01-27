@@ -122,7 +122,6 @@ class CmdlineTestErrTestCase(unittest.TestCase):
     @parameterized.expand(test_cmd_err, name_func=_test_func_name)
     def test_cmd(self, cmd):
         proc = subprocess.run(cmd.split(), capture_output=True, text=True)
-        print(proc.stderr)
         if 'argument : invalid choice:' not in proc.stderr:
             self.fail(f"Command '{cmd}' didn't fail in the expected way.\n"
                       f"Return code: {proc.returncode}.\nstderr: {proc.stderr}\nstdout: {proc.stdout}")
