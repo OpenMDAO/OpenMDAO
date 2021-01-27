@@ -495,7 +495,8 @@ def openmdao_cmd():
         user_args = []
 
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
-                                     usage='openmdao [-h] [--version] command [command_options] filename',
+                                     usage='openmdao [-h] [--version] command [command_options] '
+                                     'filename',
                                      epilog='Use -h after any sub-command for sub-command help.'
                                      ' If using a tool on a script that takes its own command line'
                                      ' arguments, place those arguments after a "--". For example:'
