@@ -10,7 +10,7 @@ def notebook_mode():
     except ImportError:
         pass
 
-    if ipy is not None:
+    if ipy:
         try:
             import tabulate
         except ImportError:
