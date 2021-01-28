@@ -280,6 +280,8 @@ class ValueInfo extends N2WindowResizable {
         this.table = this.body.append('table');
         this.tbody = this.table.append('tbody');
 
+        this.minWidth = 180;
+        this.minHeight = 100;
         this.theme('value-info').populate(pnInfo);
     }
 
@@ -348,17 +350,16 @@ class ValueInfo extends N2WindowResizable {
             .text(function (d) { return InfoPropArray.floatFormatter(d); });
 
         const pnInfoPos = pnInfo._getPos();
-        this.sizeToContent()
+        this.sizeToContent(2, 2)
             .title(this.name)
             .move(pnInfoPos.left + 20, pnInfoPos.top + 20)
-            .show()
+            .show();
 
-        
         // Save the width and height of the table when it is fully
         // constructed. This will be used later to limit the resizing
         // of the window. No need to let the user resize to a size
         // larger than full size
-        const pos = this._getPos();      
+        const pos = this._getPos();
         this.maxWidth = pos.width;
         this.maxHeight = pos.height;
         if (this.minHeight > pos.height) this.minHeight = pos.height;

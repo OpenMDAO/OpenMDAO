@@ -61,6 +61,7 @@
     display: block;
     opacity: 0;
     pointer-events: none;
+    background-color:none;
 }
 
 .resize>div {
@@ -133,7 +134,7 @@
 
 .window-theme-default .window-close-button {
     color: none;
-    opacity: 0.5;
+    opacity: 0.4;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
     position: absolute;
     top: 0px;
@@ -221,7 +222,7 @@
 
 .window-theme-node-info .window-close-button {
     color: none;
-    opacity: 0.7;
+    opacity: 0.4;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
     position: absolute;
     top: 0px;
@@ -356,9 +357,6 @@
     border-radius: 10px;
     
     overflow: hidden;
-    min-width: 200px;
-    min-height: calc(var(--header-height) + var(--footer-height) + 22pt)
-    
 }
 
 .window-theme-value-info .window-header {
@@ -380,14 +378,14 @@
 
 .window-theme-value-info .window-close-button {
     color: none;
-    opacity: 0.7;
+    opacity: 0.4;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
     position: absolute;
     top: 0px;
     right: 8px;
     cursor: pointer;
     margin: 0;
-    font-size: 12pt;
+    font-size: 11pt;
     font-weight: bold;
     line-height: var(--header-height);
     padding: 0;
@@ -430,7 +428,7 @@
     left: 0;
     right: 0;
     bottom: var(--footer-height);
-    overflow: hidden;
+    overflow: auto;
 }
 
 .window-theme-value-info .window-footer {
@@ -455,7 +453,7 @@
     height: fit-content;
 }
 
-.window-theme-value-info .window-body table tbody th {
+.window-theme-value-info .window-body table tbody tr th {
     text-align: center;
     font-size: 8pt;
     margin-top: 0;
@@ -471,7 +469,17 @@
     font-weight: 300;
 }
 
-.window-theme-value-info .window-body table tbody td {
+.window-theme-value-info .window-body table tbody tr th:last-child,
+.window-theme-value-info .window-body table tbody tr td:last-child {
+    border-right: 0;
+}
+
+.window-theme-value-info .window-body table tbody tr:last-child th,
+.window-theme-value-info .window-body table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.window-theme-value-info .window-body table tbody tr td {
     text-align: left;
     font-size: 9pt;
     margin-top: 0;
@@ -675,7 +683,7 @@ div#help-svg {
 
 .window-theme-legend .window-close-button {
     color: none;
-    opacity: 0.5;
+    opacity: 0.4;
     text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
     position: absolute;
     top: 0px;

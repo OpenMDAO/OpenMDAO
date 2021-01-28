@@ -356,13 +356,13 @@ class N2Window {
      * MutationObserver.
      * @returns {N2Window} Reference to this.
      */
-    sizeToContent() {
-        let contentWidth = this.body.node().scrollWidth,
+    sizeToContent(extraWidth = 0, extraHeight = 2) {
+        let contentWidth = this.body.node().scrollWidth + extraWidth,
             contentHeight = this.body.node().scrollHeight,
             headerHeight = this.header.node().offsetHeight,
             footerHeight = this.hasFooter() ? this.footer.node().offsetHeight : 0;
 
-        const totalHeight = contentHeight + headerHeight + footerHeight + 2;
+        const totalHeight = contentHeight + headerHeight + footerHeight + extraHeight;
 
         const newSize = {
             width: contentWidth + 'px',

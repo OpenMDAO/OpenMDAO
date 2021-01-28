@@ -190,7 +190,7 @@ body {
 }
 
 .tool-tip {
-    z-index: 10;
+    z-index: 10000;
     font-size: 11px;
     padding: 5;
     background-color: #fff;
