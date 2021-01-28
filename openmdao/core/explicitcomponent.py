@@ -323,12 +323,12 @@ class ExplicitComponent(Component):
                             vnames = self._var_relevant_names[vec_name]['output']
                             if mode == 'fwd':
                                 for v in vnames:
-                                    if v in d_out_names:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
                                         val = rflat(v)
                                         val -= oflat(v)
                             else:  # rev
                                 for v in vnames:
-                                    if v in d_out_names:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
                                         val = oflat(v)
                                         val -= rflat(v)
 

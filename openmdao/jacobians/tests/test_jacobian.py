@@ -711,6 +711,9 @@ class TestJacobian(unittest.TestCase):
 
         class ParaboloidJacVec(Paraboloid):
 
+            def setup_partials(self):
+                pass
+
             def linearize(self, inputs, outputs, jacobian):
                 return
 

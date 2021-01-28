@@ -826,8 +826,6 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
                 self.add_input('x', shape=size)
                 self.add_output('y', shape=size)
                 self.add_output('y2', shape=size)
-                self.declare_partials('y', 'x')
-                self.declare_partials('y2', 'x')
 
             def compute(self, inputs, outputs):
                 waittime = self.options['time']

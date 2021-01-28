@@ -103,9 +103,16 @@ class DictionaryJacobian(Jacobian):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
-                    if is_explicit and res_name is other_name:
-                        continue
                     if other_name in d_out_names:
+                        # skip the matvec mult completely for identity subjacs
+                        if is_explicit and res_name is other_name:
+                            if fwd:
+                                val = rflat(res_name)
+                                val -= oflat(other_name)
+                            else:
+                                val = oflat(other_name)
+                                val -= rflat(res_name)
+                            continue
                         if fwd:
                             left_vec = rflat(res_name)
                             right_vec = oflat(other_name)

@@ -22,9 +22,6 @@ class QuadraticCompVectorized(om.ImplicitComponent):
         self.add_input('c', val=np.array([-1.0, -2.0, -3.0]))
         self.add_output('x', val=np.array([.5, .5, .5]))
 
-    def setup_partials(self):
-        self.declare_partials(of='*', wrt='*')
-
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
         b = inputs['b']
@@ -114,9 +111,6 @@ class RectangleCompVectorized(om.ExplicitComponent):
         self.add_input('length', val=np.array([3.0, 4.0, 5.0]))
         self.add_input('width', val=np.array([1.0, 2.0, 3.0]))
         self.add_output('area', shape=(3, ))
-
-    def setup_partials(self):
-        self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']

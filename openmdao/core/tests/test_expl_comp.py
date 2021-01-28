@@ -61,6 +61,9 @@ class RectanglePartial(RectangleComp):
 
 class RectangleJacVec(RectangleComp):
 
+    def setup_partials(self):
+        pass
+
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         if mode == 'fwd':
             if 'area' in d_outputs:
