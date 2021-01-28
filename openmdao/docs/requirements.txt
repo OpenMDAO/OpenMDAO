@@ -1,4 +1,3 @@
-mock==2.0.0
 redbaron==0.6.3
 networkx==1.11
 numpy==1.12.1

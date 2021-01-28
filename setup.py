@@ -13,7 +13,6 @@ __version__ = re.findall(
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'mock',
         'numpydoc>=0.9.1',
         'redbaron',
         'sphinx>=1.8.5',

@@ -409,10 +409,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     if force:
         optname = force
 
-    try:
-        from mock import Mock
-    except ImportError:
-        Mock = None
+    from unittest.mock import Mock
 
     try:
         from pyoptsparse import OPT
@@ -428,7 +425,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
                 except Exception:
                     pass
         else:
-            if fallback and Mock and isinstance(opt, Mock):
+            if fallback and isinstance(opt, Mock):
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
@@ -437,7 +434,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     except Exception:
         pass
 
-    if Mock and isinstance(opt, Mock):
+    if isinstance(opt, Mock):
         OPT = OPTIMIZER = None
 
     if not fallback and OPTIMIZER != optname:
