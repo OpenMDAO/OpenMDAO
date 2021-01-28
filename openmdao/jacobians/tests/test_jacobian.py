@@ -902,6 +902,42 @@ class TestJacobian(unittest.TestCase):
 
         assert(J['y','w'][0,0] == -16)
 
+    def test_wildcard_partials_bug(self):
+        # Test for a bug where using wildcards when declaring partials resulted in extra
+        # derivatives of an output wrt other outputs.
+
+        class ODE(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', 1.0)
+                self.add_output('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials(of='*', wrt='*', method='cs')
+
+            def compute(self, inputs, outputs):
+                a = inputs['a']
+                outputs['x'] = 3.0 * a
+                outputs['y'] = 7.0 * a
+
+        p = Problem()
+
+        p.model.add_subsystem('ode', ODE())
+
+        p.model.linear_solver = DirectSolver()
+        p.model.add_design_var('ode.a')
+        p.model.add_constraint('ode.x', lower=0.0)
+        p.model.add_constraint('ode.y', lower=0.0)
+
+        p.setup()
+        p.run_model()
+
+        p.compute_totals()
+        keys = p.model.ode._jacobian._subjacs_info
+        self.assertTrue(('ode.x', 'ode.y') not in keys)
+        self.assertTrue(('ode.y', 'ode.x') not in keys)
+
 
 class MySparseComp(ExplicitComponent):
     def setup(self):

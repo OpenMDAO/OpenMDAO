@@ -1129,14 +1129,13 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    imp = not explicit
-                    of_list, wrt_list = comp._get_potential_partials_lists(include_wrt_outputs=imp)
+                    of_list, wrt_list = comp._get_partials_varlists()
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
                     if matrix_free:
                         print_reverse = True
-                        local_opts = comp._get_check_partial_options(include_wrt_outputs=imp)
+                        local_opts = comp._get_check_partial_options()
 
                         dstate = comp._vectors['output']['linear']
                         if mode == 'fwd':
@@ -1309,12 +1308,11 @@ class Problem(object):
 
             c_name = comp.pathname
             all_fd_options[c_name] = {}
-            explicit = isinstance(comp, ExplicitComponent)
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of, wrt = comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
+            of, wrt = comp._get_partials_varlists()
 
             # Load up approximation objects with the requested settings.
             local_opts = comp._get_check_partial_options()
