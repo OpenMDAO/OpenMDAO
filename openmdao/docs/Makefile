@@ -28,16 +28,16 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) .
 
 # to remake only recently-changed files, not the entire document base.
 #  note - first item in makefile is default action of "make"
-html-update: mock redbaron matplotlib build
+html-update: redbaron matplotlib build
 
 # to force the rebuild a file when its dependecy (e.g. code-embed) changes, not its rst file
 single: touch buildone
 
 # build it all over again (note: make all == make html)
-all html: make_srcdocs n2html mock redbaron matplotlib tagg buildall post_remove
+all html: make_srcdocs n2html redbaron matplotlib tagg buildall post_remove
 
 # build it all on CI machines; all warnings are raised as errors.
-travis: make_srcdocs n2html mock redbaron matplotlib tagg buildalltravis post_remove
+travis: make_srcdocs n2html redbaron matplotlib tagg buildalltravis post_remove
 
 clean:
 	rm -rf $(BUILDDIR)/*
@@ -95,10 +95,6 @@ post_remove:
 	rm -rf make_sourcedocs
 
 # installation testers
-mock:
-	@(python -c "import mock" >/dev/null 2>&1) || (echo "The 'mock' package \
-	is required to build the docs. Install with:\n pip install mock"; exit 1)
-
 redbaron:
 	@(python -c "import redbaron" >/dev/null 2>&1) || (echo "The 'redbaron' package \
 	is required to build the docs. Install with:\n pip install redbaron"; exit 1)
