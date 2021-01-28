@@ -3,6 +3,7 @@ import asyncio
 import pyppeteer
 import subprocess
 import unittest
+from aiounittest import async_test
 import os
 
 try:
@@ -17,6 +18,8 @@ URL_PREFIX = 'file://'
 DEBUG = False
 LINE_STR = '-' * 78
 current_test = 1
+
+my_loop = asyncio.get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
 toolbar_script = [
@@ -409,7 +412,7 @@ n2_gui_test_models = n2_gui_test_scripts.keys()
 
 class n2_gui_test_case(unittest.TestCase):
 
-    async def handle_console_err(self, msg):
+    def handle_console_err(self, msg):
         """ Invoked any time that an error or warning appears in the log. """
         if msg.type == 'warning':
             self.console_warning = True
@@ -418,9 +421,14 @@ class n2_gui_test_case(unittest.TestCase):
             self.console_error = True
             print('    Console Error: ' + msg.text)
 
-    async def handle_page_err(self, msg):
+    def handle_page_err(self, msg):
         self.page_error = True
         print('    Error on page: ', msg)
+        print (type(msg))
+
+    def handle_request_err(self, msg):
+        self.page_error = True
+        print('    Request error: ', msg)
 
     def setup_error_handlers(self):
         self.console_warning = False
@@ -429,6 +437,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         self.page.on('console', lambda msg: self.handle_console_err(msg))
         self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
+        self.page.on('requestfailed', lambda msg: self.handle_request_err(msg))
 
     async def setup_browser(self):
         """ Create a browser instance and print user agent info. """
@@ -636,7 +645,10 @@ class n2_gui_test_case(unittest.TestCase):
 
         self.n2_filename = self.n2files[self.current_model]
         await self.load_test_page()
-        await self.generic_toolbar_tests()
+        await self.page.waitFor(2000)
+        if self.toolbar_tests_complete is False:
+            await self.generic_toolbar_tests()
+            self.toolbar_tests_complete = True
 
         bname = os.path.basename(self.n2_filename)[:-len(GUI_N2_SUFFIX)]
 
@@ -656,21 +668,21 @@ class n2_gui_test_case(unittest.TestCase):
             self.fail(msg)
 
     @parameterized.expand(n2_gui_test_models)
-    def test_n2_gui(self, basename):
+    @async_test(loop=my_loop)
+    async def test_n2_gui(self, basename):
         if (basename[:2] == "__"):
             return
 
         print("\n" + LINE_STR + "\n" + basename + "\n" + LINE_STR)
 
         self.current_test_desc = ''
+        self.toolbar_tests_complete = False
         self.current_model = basename
         self.generate_n2_file()
-        self.event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.event_loop)
+#        self.event_loop = asyncio.new_event_loop()
+#        asyncio.set_event_loop(self.event_loop)
 
-        coro = asyncio.coroutine(self.run_gui_tests)
-        self.event_loop.run_until_complete(coro())
-        self.event_loop.close()
+        await self.run_gui_tests()
 
         if not DEBUG:
             try:
@@ -680,3 +692,4 @@ class n2_gui_test_case(unittest.TestCase):
                 # Don't want the test to fail if the test file is
                 # already removed
                 pass
+
