@@ -6,6 +6,7 @@ try:
 except ImportError:
     tabulate = None
 
+
 def notebook_mode():
     """
     Check if the environment is interactive and if tabulate is installed.

@@ -9,7 +9,7 @@ import numpy as np
 
 try:
     from IPython.display import HTML, display
-except:
+except ImportError:
     pass
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
