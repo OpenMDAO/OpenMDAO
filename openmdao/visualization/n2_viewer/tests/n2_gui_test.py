@@ -19,6 +19,17 @@ DEBUG = False
 LINE_STR = '-' * 78
 current_test = 1
 
+resize_dirs = {
+    'top': [0, -1],
+    'top-right': [1, -1],
+    'right': [1, 0],
+    'bottom-right': [1, 1],
+    'bottom': [0, 1],
+    'bottom-left': [-1, 1],
+    'left': [-1, 0],
+    'top-left': [-1, -1]
+}
+
 my_loop = asyncio.get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
@@ -103,6 +114,7 @@ toolbar_script = [
 """ A dictionary of tests script with an array for each model."""
 n2_gui_test_scripts = {
     "circuit": [
+        {"test": "toolbar"},
         {
             "desc": "Hover on N2 matrix element and check arrow count",
             "test": "hoverArrow",
@@ -121,9 +133,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_22.vMid",
             "arrowCount": 4
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on partition tree element to collapse",
             "test": "click",
@@ -154,9 +164,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_10.vMid",
             "arrowCount": 5
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on solver element to collapse",
             "test": "click",
@@ -175,9 +183,7 @@ n2_gui_test_scripts = {
             "selector": "g#solver_tree rect#circuit_n1",
             "button": "right"
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Check the number of cells in the N2 Matrix",
             "test": "count",
@@ -190,9 +196,7 @@ n2_gui_test_scripts = {
             "searchString": "V_out",
             "n2ElementCount": 11
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Check that home button works after search",
             "test": "count",
@@ -225,9 +229,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_13.vMid",
             "arrowCount": 2
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on partition tree element to collapse",
             "test": "click",
@@ -258,9 +260,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_13.vMid",
             "arrowCount": 2
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on solver element to collapse",
             "test": "click",
@@ -299,9 +299,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_13.vMid",
             "arrowCount": 4
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on partition tree element to collapse",
             "test": "click",
@@ -332,9 +330,7 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements rect#cellShape_node_23.vMid",
             "arrowCount": 4
         },
-        {
-            "test": "root"
-        },
+        {"test": "root"},
         {
             "desc": "Right-click on solver element to collapse",
             "test": "click",
@@ -404,7 +400,92 @@ n2_gui_test_scripts = {
             "n2ElementCount": 2
         }
     ],
-    "nan_value": []
+    "nan_value": [
+        {"test": "toolbar"}
+    ],
+    "valuewin2": [
+        {
+            "desc": "Turn on Node Info mode",
+            "test": "click",
+            "selector": "#info-button",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window",
+            "test": "hover",
+            "selector": "#lingrp_lin_A",
+        },
+        {
+            "desc": "Click variable to make Node Info window persistent",
+            "test": "click",
+            "selector": "#lingrp_lin_A",
+            "button": "left"
+        },
+        {
+            "desc": "Display Value Info window",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] button#value',
+            "button": "left"
+        },
+        {
+            "desc": "Drag Value Info window to new location",
+            "test": "drag",
+            "selector": '[id^="persistentNodeInfo"]  .window-draggable-header',
+            "x": 700, "y": 700
+        },
+        {
+            "desc": "Don't enlarge the Value Info window beyond its max width",
+            "test": "resize",
+            "selector": '[id^="valueInfo"]',
+            "side": "right",
+            "distance": 100,
+            "expectChange": False
+        },
+        {
+            "desc": "Resize the Value Info window smaller",
+            "test": "resize",
+            "selector": '[id^="valueInfo"]',
+            "side": "right",
+            "distance": -100,
+            "expectChange": True
+        },
+        {
+            "desc": "Close Value Info window",
+            "test": "click",
+            "selector": '[id^="valueInfo"] span.window-close-button',
+            "button": "left"
+        },
+        {
+            "desc": "Close Node Info window",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] span.window-close-button',
+            "button": "left"
+        },
+        {
+            "desc": "Turn off Node Info mode",
+            "test": "click",
+            "selector": "#info-button",
+            "button": "left"
+        },
+        {
+            "desc": "Display Legend",
+            "test": "click",
+            "selector": "#legend-button",
+            "button": "left"
+        },
+        {
+            "desc": "Drag Legend to new location",
+            "test": "drag",
+            "selector": "#n2win-legend .window-draggable-header",
+            "x": 700, "y": 500
+        },
+        {
+            "desc": "Hide Legend",
+            "test": "click",
+            "selector": "#n2win-legend span.window-close-button",
+            "button": "left"
+        }
+    ]
 }
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
@@ -424,7 +505,7 @@ class n2_gui_test_case(unittest.TestCase):
     def handle_page_err(self, msg):
         self.page_error = True
         print('    Error on page: ', msg)
-        print (type(msg))
+        print(type(msg))
 
     def handle_request_err(self, msg):
         self.page_error = True
@@ -503,12 +584,15 @@ class n2_gui_test_case(unittest.TestCase):
         """ Click most of the toolbar buttons to see if an error occurs """
         for test in toolbar_script:
             with self.subTest(test['desc']):
-                self.log_test(test['desc'])
+                self.log_test("[Toolbar] " + test['desc'])
                 btnHandle = await self.page.querySelector('#' + test['id'])
                 await btnHandle.click(button='left', delay=5)
                 waitTime = self.transition_wait if test['waitForTransition'] \
                     else self.normal_wait
                 await self.page.waitFor(waitTime)
+
+        await self.page.reload(waitUntil='networkidle0')
+        await self.page.waitFor(self.transition_wait)
 
     async def assert_element_count(self, selector, expected_found):
         """
@@ -540,20 +624,27 @@ class n2_gui_test_case(unittest.TestCase):
 
         return handle
 
+    async def hover(self, options, log_test = True):
+        """
+        Hover over the specified element.
+        """
+        if log_test:
+            self.log_test(options['desc'] if 'desc' in options else
+                          "Hover over '" + options['selector'] + "'")
+
+        hndl = await self.get_handle(options['selector'])
+
+        await hndl.hover()
+
+        # Give the browser a chance to do whatever
+        await self.page.waitFor(self.normal_wait)
+
     async def hover_and_check_arrow_count(self, options):
         """
         Hover over a matrix cell, make sure the number of expected arrows
         are there, then move off and make sure the arrows go away.
         """
-        self.log_test(options['desc'] if 'desc' in options else
-                      "Hover over '" + options['selector'] +
-                      "' and checking arrow count")
-
-        hndl = await self.get_handle(options['selector'])
-
-        await hndl.hover()
-        # Give it a chance to draw the arrows
-        await self.page.waitFor(self.normal_wait)
+        await self.hover(options)
 
         # Make sure there are enough arrows
         await self.assert_arrow_count(options['arrowCount'])
@@ -572,6 +663,71 @@ class n2_gui_test_case(unittest.TestCase):
         hndl = await self.get_handle(options['selector'])
         await hndl.click(button=options['button'])
         await self.page.waitFor(self.transition_wait)
+
+    async def drag(self, options):
+        """
+        Hover over the element, perform a mousedown event, move the mouse to the
+        specified location, and perform a mouseup. Check to make sure the element
+        moved in at least one direction.
+        """
+        self.log_test(options['desc'] if 'desc' in options else
+                      "Dragging '" + options['selector'] + "' to " + options['x'] + "," + options['y'])
+
+        hndl = await self.get_handle(options['selector'])
+        
+        pre_drag_bbox = await hndl.boundingBox()
+
+        await hndl.hover()
+        await self.page.mouse.down()
+        await self.page.mouse.move(options['x'], options['y'])
+        await self.page.mouse.up()
+
+        await self.page.waitFor(self.normal_wait)
+        post_drag_bbox = await hndl.boundingBox()
+
+        moved = ((pre_drag_bbox['x'] != post_drag_bbox['x']) or
+            (pre_drag_bbox['y'] != post_drag_bbox['y']))
+        
+        self.assertIsNot(moved, False,
+                         "The '" + options['selector'] + "' element did not move.")
+
+    async def resize_window(self, options):
+        """
+        Drag an edge/corner of an N2WindowResizable and check that the size changed
+        or didn't change as expected.
+        """
+        self.log_test(options['desc'] if 'desc' in options else
+                      "Resizing '" + options['selector'] + "' window.")
+
+        # await self.page.screenshot({'path': 'preresize.png'})
+
+        win_hndl = await self.get_handle(options['selector'])
+        pre_resize_bbox = await win_hndl.boundingBox()
+        
+        edge_hndl = await self.get_handle(options['selector'] + ' div.rsz-' + options['side'])
+        edge_bbox = await edge_hndl.boundingBox()
+
+        new_x = edge_bbox['x'] + resize_dirs[options['side']][0] * options['distance']
+        new_y = edge_bbox['y'] + resize_dirs[options['side']][1] * options['distance']
+
+        await edge_hndl.hover()
+        await self.page.mouse.down()
+        await self.page.mouse.move(new_x, new_y)
+        await self.page.mouse.up()
+
+        post_resize_bbox = await win_hndl.boundingBox()
+        dw = post_resize_bbox['width'] - pre_resize_bbox['width']
+        dh = post_resize_bbox['height'] - pre_resize_bbox['height']
+
+        resized = ((dw != 0) or (dh != 0))
+        if options['expectChange']:
+            self.assertIsNot(resized, False,
+                         "The '" + options['selector'] + "' element was NOT resized and should have been.")
+        else:
+            self.assertIsNot(resized, True,
+                         "The '" + options['selector'] + "' element was resized and should NOT have been.")
+
+        # await self.page.screenshot({'path': 'postresize.png'})
 
     async def return_to_root(self):
         """
@@ -615,9 +771,7 @@ class n2_gui_test_case(unittest.TestCase):
         action/test.
         """
 
-        print("Performing diagram-specific tests...")
-        await self.page.reload(waitUntil='networkidle0')
-        await self.page.waitFor(self.transition_wait)
+        print("Running tests from model script...")
 
         for script_item in script:
             if 'test' not in script_item:
@@ -626,12 +780,20 @@ class n2_gui_test_case(unittest.TestCase):
             test_type = script_item['test']
             if test_type == 'hoverArrow':
                 await self.hover_and_check_arrow_count(script_item)
+            elif test_type == 'hover':
+                await self.hover(script_item)
             elif test_type == 'click':
                 await self.click(script_item)
+            elif test_type == 'drag':
+                await self.drag(script_item)
+            elif test_type == 'resize':
+                await self.resize_window(script_item)
             elif test_type == 'root':
                 await self.return_to_root()
             elif test_type == 'search':
                 await self.search_and_check_result(script_item)
+            elif test_type == 'toolbar':
+                await self.generic_toolbar_tests()
             elif test_type == 'count':
                 self.log_test(script_item['desc'] if 'desc' in script_item
                               else "Checking for " + str(script_item['count']) +
@@ -646,10 +808,6 @@ class n2_gui_test_case(unittest.TestCase):
         self.n2_filename = self.n2files[self.current_model]
         await self.load_test_page()
         await self.page.waitFor(2000)
-        if self.toolbar_tests_complete is False:
-            await self.generic_toolbar_tests()
-            self.toolbar_tests_complete = True
-
         bname = os.path.basename(self.n2_filename)[:-len(GUI_N2_SUFFIX)]
 
         if bname in self.known_model_names:
@@ -676,20 +834,15 @@ class n2_gui_test_case(unittest.TestCase):
         print("\n" + LINE_STR + "\n" + basename + "\n" + LINE_STR)
 
         self.current_test_desc = ''
-        self.toolbar_tests_complete = False
         self.current_model = basename
         self.generate_n2_file()
-#        self.event_loop = asyncio.new_event_loop()
-#        asyncio.set_event_loop(self.event_loop)
-
         await self.run_gui_tests()
 
         if not DEBUG:
             try:
                 for n2html in self.n2files:
-                    os.remove(n2html)
+                    os.remove(self.n2files[n2html])
             except:
                 # Don't want the test to fail if the test file is
                 # already removed
                 pass
-

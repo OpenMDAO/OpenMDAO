@@ -66,11 +66,18 @@ class N2Legend extends N2WindowDraggable {
         this.move(50, -10);
     }
 
+    /** Override N2Window::close() to just hide the legend. */
     close() {
         d3.select('#legend-button').attr('class', 'fas icon-key');
         this.hide();
+        return this;
     }
 
+    /**
+     * Determine which types of nodes are present in the model and only mark
+     * those types of keys to be displayed in the legend.
+     * @param {Object} nodes The model node tree.
+     */
     _setDisplayBooleans(nodes) {
         for (let node of nodes) {
             const {
