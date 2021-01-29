@@ -148,8 +148,6 @@ class SqliteCaseReader(BaseCaseReader):
         if pre_load:
             self._load_cases()
 
-        self._notebook = notebook
-
     def _collect_metadata(self, cur):
         """
         Load data from the metadata table.
@@ -350,7 +348,7 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if self._notebook and tabulate is not None:
+        if notebook and tabulate is not None:
             return tabulate([sources], headers=["Source"], tablefmt='html')
         elif out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
@@ -509,7 +507,7 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            if self._notebook and tabulate is not None:
+            if notebook and tabulate is not None:
                 cases = self._list_cases_recurse_flat(out_stream=out_stream)
                 return tabulate(cases, headers="keys", tablefmt='html')
             else:
@@ -534,7 +532,7 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if self._notebook and tabulate is not None:
+                if notebook and tabulate is not None:
                     cases = [[case] for case in case_table._cases.keys()]
                     return tabulate(cases, headers=[source], tablefmt='html')
                 elif not recurse:
@@ -631,7 +629,7 @@ class SqliteCaseReader(BaseCaseReader):
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            if self._notebook:
+            if notebook:
                 nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
                 return nb_format
             else:
