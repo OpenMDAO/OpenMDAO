@@ -13,7 +13,7 @@ def notebook_mode():
     """
     ipy = False
     try:
-        from IPython import get_ipython
+        from IPython import get_ipython, HTML, display
         ipy = get_ipython() is not None
     except ImportError:
         pass

@@ -18,16 +18,9 @@ import numpy as np
 import networkx as nx
 
 try:
-    from IPython.display import HTML, display
-    ipython = True
-except ImportError:
-    ipython = False
-
-try:
     from tabulate import tabulate
-    tab_pkg = True
 except ImportError:
-    tab_pkg = False
+    tabulate = None
 
 import openmdao
 from openmdao.core.notebook_mode import notebook
@@ -3515,7 +3508,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            if self._notebook and ipython and tab_pkg:
+            if self._notebook and tabulate is not None:
                 nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
                              "global_shape": []}
                 for output, attrs in inputs.items():
@@ -3669,7 +3662,7 @@ class System(object):
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                if self._notebook and ipython and tab_pkg:
+                if self._notebook and tabulate is not None:
                     nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
                                  "global_shape": []}
                     for output, attrs in expl_outputs.items():
@@ -3702,7 +3695,7 @@ class System(object):
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                if self._notebook and ipython and tab_pkg:
+                if self._notebook and tabulate is not None:
                     nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
                                  "global_shape": []}
                     for output, attrs in expl_outputs.items():

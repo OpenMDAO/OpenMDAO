@@ -4,22 +4,14 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
-from io import StringIO
-
 import sys
 import numpy as np
 
 try:
     from IPython.display import HTML, display
-    ipython = True
-except ImportError:
-    ipython = False
-
-try:
     from tabulate import tabulate
-    tab_pkg = True
 except ImportError:
-    tab_pkg = False
+    tabulate = None
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
@@ -358,8 +350,8 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if self._notebook and ipython and tab_pkg:
-            display(HTML(tabulate([sources], headers=["Source"], tablefmt='html')))
+        if self._notebook and tabulate is not None:
+            return tabulate([sources], headers=["Source"], tablefmt='html')
         elif out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
@@ -517,7 +509,7 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            if self._notebook and ipython and tab_pkg:
+            if self._notebook and tabulate is not None:
                 cases = self._list_cases_recurse_flat(out_stream=out_stream)
                 return tabulate(cases, headers="keys", tablefmt='html')
             else:
@@ -542,7 +534,7 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if self._notebook and tab_pkg and ipython:
+                if self._notebook and tabulate is not None:
                     cases = [[case] for case in case_table._cases.keys()]
                     return tabulate(cases, headers=[source], tablefmt='html')
                 elif not recurse:
