@@ -17,13 +17,8 @@ from numbers import Integral
 import numpy as np
 import networkx as nx
 
-try:
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
-
 import openmdao
-from openmdao.core.notebook_mode import notebook
+from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -3504,7 +3499,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            if self._notebook and tabulate is not None:
+            if notebook and tabulate is not None:
                 nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
                              "global_shape": []}
                 for output, attrs in inputs.items():

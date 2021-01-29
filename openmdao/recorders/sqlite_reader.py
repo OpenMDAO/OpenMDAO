@@ -9,13 +9,12 @@ import numpy as np
 
 try:
     from IPython.display import HTML, display
-    from tabulate import tabulate
-except ImportError:
-    tabulate = None
+except:
+    pass
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
-from openmdao.core.notebook_mode import notebook
+from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
@@ -68,8 +67,6 @@ class SqliteCaseReader(BaseCaseReader):
         Helper object for accessing cases from the problem_cases table.
     _global_iterations : list
         List of iteration cases and the table and row in which they are found.
-    _notebook : bool
-        If True, display output in Jupyter Notebook format
     """
 
     def __init__(self, filename, pre_load=False):

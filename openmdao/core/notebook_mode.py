@@ -1,6 +1,10 @@
 """Checking for interactive notebook mode."""
 from openmdao.utils.general_utils import simple_warning
 
+try:
+    from tabulate import tabulate
+except ImportError:
+    tabulate = None
 
 def notebook_mode():
     """
