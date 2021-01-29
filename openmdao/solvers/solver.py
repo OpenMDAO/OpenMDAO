@@ -301,7 +301,6 @@ class Solver(object):
             return
 
         self._rec_mgr.startup(self)
-        self._rec_mgr.record_metadata(self)
 
         myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']

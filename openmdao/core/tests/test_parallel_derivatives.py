@@ -730,7 +730,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         elapsed_rev = time.time() - elapsed_rev
 
         # run in fwd mode and compare times for deriv calculation
-        p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()
 

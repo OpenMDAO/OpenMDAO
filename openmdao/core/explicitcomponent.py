@@ -3,8 +3,9 @@
 import sys
 import numpy as np
 
-from openmdao.core.component import Component, _full_slice
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.core.component import Component
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording

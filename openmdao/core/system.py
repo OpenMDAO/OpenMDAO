@@ -26,7 +26,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, unit_conversion, valid_units, simplify_unit
+from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -39,7 +39,6 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import unit_conversion
 
 
 _empty_frozen_set = frozenset()
@@ -973,8 +972,10 @@ class System(object):
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
                     from openmdao.core.component import Component
+                    from openmdao.components.exec_comp import ExecComp
                     for s in self.system_iter(recurse=True, typ=Component):
-                        s.declare_partials('*', '*', method=self._coloring_info['method'])
+                        if not isinstance(s, ExecComp):
+                            s.declare_partials('*', '*', method=self._coloring_info['method'])
                 self._setup_partials()
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
@@ -1674,7 +1675,7 @@ class System(object):
         """
         pass
 
-    def _setup_vectors(self, root_vectors, alloc_complex=False):
+    def _setup_vectors(self, root_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -1682,8 +1683,6 @@ class System(object):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        alloc_complex : bool
-            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._vectors = vectors = {'input': OrderedDict(),
                                    'output': OrderedDict(),
@@ -2069,15 +2068,19 @@ class System(object):
             for vec in residuals:
                 vec.scale('phys')
 
-        yield
+        try:
 
-        if self._has_output_scaling:
-            for vec in outputs:
-                vec.scale('norm')
+            yield
 
-        if self._has_resid_scaling:
-            for vec in residuals:
-                vec.scale('norm')
+        finally:
+
+            if self._has_output_scaling:
+                for vec in outputs:
+                    vec.scale('norm')
+
+            if self._has_resid_scaling:
+                for vec in residuals:
+                    vec.scale('norm')
 
     @contextmanager
     def _scaled_context_all(self):
@@ -2091,14 +2094,18 @@ class System(object):
             for vec in self._vectors['residual'].values():
                 vec.scale('norm')
 
-        yield
+        try:
 
-        if self._has_output_scaling:
-            for vec in self._vectors['output'].values():
-                vec.scale('phys')
-        if self._has_resid_scaling:
-            for vec in self._vectors['residual'].values():
-                vec.scale('phys')
+            yield
+
+        finally:
+
+            if self._has_output_scaling:
+                for vec in self._vectors['output'].values():
+                    vec.scale('phys')
+            if self._has_resid_scaling:
+                for vec in self._vectors['residual'].values():
+                    vec.scale('phys')
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -2155,11 +2162,12 @@ class System(object):
             if scope_in is not None:
                 d_inputs._names = scope_in.intersection(d_inputs._abs_iter())
 
-            yield d_inputs, d_outputs, d_residuals
-
-            # reset _names so users will see full vector contents
-            d_inputs._names = old_ins
-            d_outputs._names = old_outs
+            try:
+                yield d_inputs, d_outputs, d_residuals
+            finally:
+                # reset _names so users will see full vector contents
+                d_inputs._names = old_ins
+                d_outputs._names = old_outs
 
     @contextmanager
     def _call_user_function(self, fname, protect_inputs=True,
@@ -2522,11 +2530,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"design_var '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"design_var '{name}'.")
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2682,12 +2689,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"response '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"response '{name}'.")
-
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
@@ -4273,7 +4278,10 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[myrank])
+                    if val is _UNDEFINED:
+                        loc_val = np.zeros(sizes[myrank])
+                    else:
+                        loc_val = np.ascontiguousarray(val)
                     val = np.zeros(np.sum(sizes))
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
@@ -4291,7 +4299,10 @@ class System(object):
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
-                    loc_val = val if val is not _UNDEFINED else np.zeros(sizes[idx])
+                    if val is _UNDEFINED:
+                        loc_val = np.zeros(sizes[idx])
+                    else:
+                        loc_val = np.ascontiguousarray(val)
                     val = np.zeros(np.sum(sizes))
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                     if not flat:
@@ -4353,6 +4364,7 @@ class System(object):
         abs_names = name2abs_names(self, name)
         if not abs_names:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        simp_units = simplify_unit(units)
 
         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         if from_src and abs_names[0] in conns:  # pull input from source
@@ -4362,8 +4374,8 @@ class System(object):
             else:
                 # src is outside of this system so get the value from the model
                 caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
-                                              get_remote=get_remote, rank=rank,
+            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+                                              indices=indices, get_remote=get_remote, rank=rank,
                                               vec_name='nonlinear', flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
@@ -4372,7 +4384,7 @@ class System(object):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_names[0], val, units)
+                val = self.convert2units(abs_names[0], val, simp_units)
 
         return val
 

@@ -20,25 +20,23 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
-from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
-    record_system_options
+    record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
     _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
+from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
-from openmdao.utils import coloring as coloring_mod
+from openmdao.utils.units import simplify_unit
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import _full_slice
@@ -381,7 +379,7 @@ class Problem(object):
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
-                    val = self.model.convert2units(name, val, units)
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -618,9 +616,11 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
+
         self.model._clear_iprint()
         self.model.run_solve_nonlinear()
 
@@ -656,9 +656,11 @@ class Problem(object):
             self.driver.iter_count = 0
             self.model._reset_iter_counts()
 
-        self._run_counter += 1
-
         self.final_setup()
+
+        self._run_counter += 1
+        record_model_options(self, self._run_counter)
+
         self.model._clear_iprint()
         return self.driver.run()
 
@@ -972,7 +974,6 @@ class Problem(object):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
-            record_system_options(self)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP

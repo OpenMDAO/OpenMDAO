@@ -122,10 +122,6 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
 
 
 def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
-    if coloring is not None:  # factor in the sparsity
-        mask = np.zeros(totals.shape, dtype=bool)
-        mask[coloring._nzrows, coloring._nzcols] = 1
-
     start = end = 0
     data['ofslices'] = slices = {}
     for n, v in response_vals.items():
@@ -145,6 +141,10 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
     var_matrix = np.zeros((len(data['ofslices']), len(data['wrtslices'])))
 
     matrix = np.abs(totals)
+
+    if coloring is not None:  # factor in the sparsity
+        mask = np.zeros(totals.shape, dtype=bool)
+        mask[coloring._nzrows, coloring._nzcols] = 1
 
     for i, of in enumerate(response_vals):
         ofstart, ofend = data['ofslices'][of]
@@ -289,8 +289,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         upper = meta['upper']
         equals = meta['equals']
 
-        print(name, "EQUALS:", _get_val_and_size(meta['equals'], default))
-
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
@@ -384,8 +382,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         jac = False
 
     if jac:
+        # save old totals
+        save = driver._total_jac
+        driver._total_jac = None
+
         coloring = driver._get_static_coloring()
-        if coloring_mod._use_total_sparsity and jac:
+        if coloring_mod._use_total_sparsity:
             if coloring is None and driver._coloring_info['dynamic']:
                 coloring = coloring_mod.dynamic_total_coloring(driver)
 
@@ -393,8 +395,11 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         data['oflabels'] = driver._get_ordered_nl_responses()
         data['wrtlabels'] = list(dv_vals)
 
-        totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
-                                        return_format='array')
+        try:
+            totals = driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
+                                            return_format='array')
+        finally:
+            driver._total_jac = save
 
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
@@ -418,10 +423,12 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
             save = driver._total_jac
             driver._total_jac = None
 
-            lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
-                                               return_format='array')
-            lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
-            driver._total_jac = save
+            try:
+                lintotals = driver._compute_totals(of=lindata['oflabels'], wrt=data['wrtlabels'],
+                                                   return_format='array')
+                lin_response_vals = {n: full_response_vals[n] for n in lindata['oflabels']}
+            finally:
+                driver._total_jac = save
 
             _compute_jac_view_info(lintotals, lindata, dv_vals, lin_response_vals, None)
 
@@ -482,6 +489,8 @@ def _scaling_setup_parser(parser):
 
 
 _run_driver_called = False
+_run_model_start = False
+_run_model_done = False
 
 
 def _exitfunc():
@@ -501,18 +510,30 @@ def _scaling_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _set_flag(problem):
+    def _set_run_driver_flag(problem):
         global _run_driver_called
         _run_driver_called = True
+
+    def _set_run_model_start(problem):
+        global _run_model_start
+        _run_model_start = True
+
+    def _set_run_model_done(problem):
+        global _run_model_done
+        _run_model_done = True
 
     def _scaling_check(problem):
         if _run_driver_called:
             # If run_driver has been called, we know no more user changes are coming.
-            _scaling(problem)
+            if not _run_model_start:
+                problem.run_model()
+            if _run_model_done:
+                _scaling(problem)
 
     def _scaling(problem):
         hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
         hooks._unregister_hook('run_driver', 'Problem')
+        hooks._unregister_hook('run_model', 'Problem')
         driver = problem.driver
         if options.title:
             title = options.title
@@ -526,8 +547,11 @@ def _scaling_cmd(options, user_args):
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_scaling_check)
 
+    hooks._register_hook('run_model', class_name='Problem', inst_id=options.problem,
+                         pre=_set_run_model_start, post=_set_run_model_done)
+
     hooks._register_hook('run_driver', class_name='Problem', inst_id=options.problem,
-                         pre=_set_flag)
+                         pre=_set_run_driver_flag)
 
     # register an atexit function to check if scaling report was triggered during the script
     import atexit

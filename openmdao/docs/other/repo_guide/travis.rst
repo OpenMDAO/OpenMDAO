@@ -56,7 +56,7 @@ That file looks something like this:
       fi
 
     install:
-    - conda install --yes python=$PY numpy scipy nose sphinx mock swig pip;
+    - conda install --yes python=$PY numpy scipy nose sphinx swig pip;
     - pip install --upgrade pip
     - sudo apt-get install gfortran
     - pip install numpy==1.14.1

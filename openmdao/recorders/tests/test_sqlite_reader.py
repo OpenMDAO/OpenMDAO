@@ -474,9 +474,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(
             sorted(metadata.keys()),
-            ['d1.NonlinearBlockGS', 'root.NonlinearBlockGS']
+            ['d1.NonlinearBlockGS', 'root.LinearBlockGS', 'root.NonlinearBlockGS']
         )
         self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
+        self.assertEqual(metadata['root.LinearBlockGS']['solver_options']['maxiter'], 10)
         self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
 
     def test_reading_driver_recording_with_system_vars(self):
@@ -1606,6 +1607,60 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(case.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
         assert_near_equal(case.get_val('ayy', indices=0), 52., 1e-6)
         assert_near_equal(case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
+
+    def test_get_val_reducable_units(self):
+        import openmdao.api as om
+
+        model = om.Group()
+        model.add_subsystem('comp', om.ExecComp('y=x-25.',
+                                                x={'value': 77.0, 'units': 'm'},
+                                                y={'value': 0.0, 'units': 'm'}))
+        model.add_subsystem('acomp', om.ExecComp('tout=tin-25.',
+                                                 tin={'value': np.array([77.0, 95.0]), 'units': 'degC'},
+                                                 tout={'value': np.array([0., 0.]), 'units': 'degF'}))
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        case = cr.get_case(0)
+
+        for datasrc in [case, prob, prob.model]:
+            assert_near_equal(datasrc.get_val('comp.x', units='m/s*s'), 77.0, 1e-6)
+            assert_near_equal(datasrc.get_val('comp.x', units='ft/s*s'),
+                              om.convert_units(77, 'm', 'ft'), 1e-6)
+
+            assert_near_equal(datasrc.get_val('comp.y', units='m'), 52., 1e-6)
+            assert_near_equal(datasrc.get_val('comp.y', units='s*ft/s'),
+                              om.convert_units(52, 'm', 'ft'), 1e-6)
+
+            assert_near_equal(datasrc.get_val('acomp.tin', units='degC'), [77., 95.], 1e-6)
+            assert_near_equal(datasrc.get_val('acomp.tin', units='degF'),
+                              om.convert_units(np.array([77., 95.]), 'degC', 'degF'), 1e-6)
+            assert_near_equal(datasrc.get_val('acomp.tin', units='s*degK/s'),
+                              om.convert_units(np.array([77., 95.]), 'degC', 'degK'), 1e-6)
+
+            with self.assertRaises(expected_exception=ValueError) as e:
+                datasrc.get_val('acomp.tin', units='not_a_unit')
+            self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
+
+        prob.set_val('comp.x', value=100.0, units='s*ft/s')
+        prob.run_model()
+        prob.cleanup()
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        for datasrc in [case, prob, prob.model]:
+            assert_near_equal(datasrc.get_val('comp.x', units='m/s*s'),
+                              om.convert_units(100.0, 'ft', 'm'),
+                              1e-6)
+            assert_near_equal(datasrc.get_val('comp.y', units='m*s/s'),
+                              om.convert_units(100.0, 'ft', 'm')-25.0,
+                              1e-6)
 
     def test_get_ambiguous_input(self):
         model = om.Group()
@@ -3858,23 +3913,81 @@ def _assert_model_matches_case(case, system):
         np.testing.assert_almost_equal(case_outputs[name], model_output)
 
 
+@use_tempdirs
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
 
-    def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
+    def test_options_v12(self):
 
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
+        # The case reader should handle an old database that does not have
+        # the system and solver options recorded
+        filename = os.path.join(self.legacy_dir, 'case_problem_driver_v8.sql')
+
+        cr = om.CaseReader(filename)
+
+        with assert_warning(UserWarning, 'System options not recorded.'):
+            options = cr.list_model_options()
+
+        with assert_warning(UserWarning, 'Solver options not recorded.'):
+            options = cr.list_solver_options()
+
+        # The case reader should handle a v11 database that had a
+        # different separator for runs in the model option keys
+        filename = os.path.join(self.legacy_dir, 'case_problem_v11.sql')
+
+        cr = om.CaseReader(filename)
+
+        stream = StringIO()
+
+        cr.list_model_options(run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
 
     def test_problem_v9(self):
 

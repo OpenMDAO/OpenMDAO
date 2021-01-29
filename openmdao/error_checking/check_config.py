@@ -651,7 +651,7 @@ def _check_config_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def check_allocate_complex_ln(model, under_cs):
+def check_allocate_complex_ln(group, under_cs):
     """
     Return True if linear vector should be complex.
 
@@ -659,8 +659,8 @@ def check_allocate_complex_ln(model, under_cs):
 
     Parameters
     ----------
-    model : <Group>
-        Model to be checked, usually the root model.
+    group : <Group>
+        Group to be checked.
     under_cs : bool
         Flag indicates if complex vectors were allocated in a containing Group or were force
         allocated in setup.
@@ -670,16 +670,14 @@ def check_allocate_complex_ln(model, under_cs):
     bool
         True if linear vector should be complex.
     """
-    under_cs |= 'cs' in model._approx_schemes
+    under_cs |= 'cs' in group._approx_schemes
 
-    if under_cs and model.nonlinear_solver is not None and \
-       model.nonlinear_solver.supports['gradients']:
+    if under_cs and group.nonlinear_solver is not None and \
+       group.nonlinear_solver.supports['gradients']:
         return True
 
-    for sub, _ in model._subsystems_allprocs.values():
-        chk = check_allocate_complex_ln(sub, under_cs)
-
-        if chk:
+    for sub, _ in group._subsystems_allprocs.values():
+        if isinstance(sub, Group) and check_allocate_complex_ln(sub, under_cs):
             return True
 
     return False

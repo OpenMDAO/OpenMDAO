@@ -77,7 +77,7 @@ class DistributedListVarsTest(unittest.TestCase):
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size=size), promotes=[('invec', 'y'), 'sum'])
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)  # force complex array storage to detect mpi bug
 
         prob['x'] = np.arange(size)
 

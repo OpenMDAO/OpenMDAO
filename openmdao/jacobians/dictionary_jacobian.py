@@ -1,8 +1,7 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
-from scipy.sparse import csc_matrix
 
-from openmdao.jacobians.jacobian import Jacobian, _full_slice
+from openmdao.jacobians.jacobian import Jacobian
 
 
 class DictionaryJacobian(Jacobian):

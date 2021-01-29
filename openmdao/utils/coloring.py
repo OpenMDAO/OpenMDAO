@@ -169,8 +169,8 @@ class Coloring(object):
         self._rev = None
         self._meta = {}
 
-        self._names_array = None
-        self._local_array = None
+        self._names_array = {'fwd': None, 'rev': None}
+        self._local_array = {'fwd': None, 'rev': None}
 
     def color_iter(self, direction):
         """
@@ -915,8 +915,8 @@ class Coloring(object):
         return fwd_solves, rev_solves
 
     def _local_indices(self, inds, mode):
-
-        if self._names_array is None and self._local_array is None:
+        # this is currently only used when dumping debug info for coloring
+        if self._names_array[mode] is None and self._local_array[mode] is None:
             col_names = self._col_vars
             col_sizes = self._col_var_sizes
             row_names = self._row_vars
@@ -933,14 +933,16 @@ class Coloring(object):
                 names.append(np.repeat(i, j))
                 indices.append(np.arange(j))
 
-            self._names_array = np.concatenate(names)
-            self._local_array = np.concatenate(indices)
+            self._names_array[mode] = np.concatenate(names)
+            self._local_array[mode] = np.concatenate(indices)
 
         if isinstance(inds, list):
             var_name_and_sub_indices = [(key, [x[1] for x in group]) for key, group in groupby(
-                zip(self._names_array[inds], self._local_array[inds]), key=lambda x: x[0])]
+                zip(self._names_array[mode][inds],
+                    self._local_array[mode][inds]), key=lambda x: x[0])]
         else:
-            var_name_and_sub_indices = [(self._names_array[inds], self._local_array[inds])]
+            var_name_and_sub_indices = [(self._names_array[mode][inds],
+                                         self._local_array[mode][inds])]
 
         return var_name_and_sub_indices
 
@@ -1373,14 +1375,15 @@ def _compute_total_coloring_context(top):
         if jac is not None:
             jac._randomize = True
 
-    yield
-
-    for system in top.system_iter(recurse=True, include_self=True):
-        jac = system._assembled_jac
-        if jac is None:
-            jac = system._jacobian
-        if jac is not None:
-            jac._randomize = False
+    try:
+        yield
+    finally:
+        for system in top.system_iter(recurse=True, include_self=True):
+            jac = system._assembled_jac
+            if jac is None:
+                jac = system._jacobian
+            if jac is not None:
+                jac._randomize = False
 
 
 def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
@@ -1818,13 +1821,13 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
             # save metadata we used to create the coloring
             coloring._meta.update(sparsity_info)
 
-            driver._total_jac = None
-
             system = problem.model
             if fname is not None:
                 if ((system._full_comm is not None and system._full_comm.rank == 0) or
                         (system._full_comm is None and system.comm.rank == 0)):
                     coloring.save(fname)
+
+    driver._total_jac = None
 
     return coloring
 

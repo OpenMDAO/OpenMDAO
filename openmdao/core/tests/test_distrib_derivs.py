@@ -67,7 +67,8 @@ class DistribExecComp(om.ExecComp):
         for expr in exprs:
             lhs, _ = expr.split('=', 1)
             outs.update(self._parse_for_out_vars(lhs))
-            allvars.update(self._parse_for_vars(expr))
+            v, _ = self._parse_for_names(expr)
+            allvars.update(v)
 
         sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
         start = offsets[rank]

@@ -22,5 +22,5 @@ Driver Recording Options
 Driver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_driver_recording_options
     :layout: interleave
