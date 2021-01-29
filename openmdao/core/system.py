@@ -972,9 +972,10 @@ class System(object):
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
                     from openmdao.core.component import Component
+                    from openmdao.core.indepvarcomp import IndepVarComp
                     from openmdao.components.exec_comp import ExecComp
                     for s in self.system_iter(recurse=True, typ=Component):
-                        if not isinstance(s, ExecComp):
+                        if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
                             s.declare_partials('*', '*', method=self._coloring_info['method'])
                 self._setup_partials()
 
