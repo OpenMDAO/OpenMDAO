@@ -5,8 +5,6 @@ try:
     from tabulate import tabulate
 except ImportError:
     tabulate = None
-    simple_warning("Tabulate is not installed run `pip install openmdao[notebooks]` to "
-                   "install required dependencies. Using ASCII for outputs.")
 
 
 def notebook_mode():
@@ -20,11 +18,14 @@ def notebook_mode():
     """
     ipy = False
     try:
-        from IPython import get_ipython, HTML, display
+        from IPython import get_ipython
         ipy = get_ipython() is not None
     except ImportError:
         pass
 
+    if ipy and tabulate is None:
+        simple_warning("Tabulate is not installed run `pip install openmdao[notebooks]` to "
+                       "install required dependencies. Using ASCII for outputs.")
     return ipy
 
 
