@@ -11,16 +11,13 @@ from collections import OrderedDict
 import numpy as np
 from io import StringIO
 
-from IPython.display import HTML, display
-from tabulate import tabulate
-
 import openmdao.api as om
 import openmdao
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
-from openmdao.core import notebook_mode
+from openmdao.core.notebook_mode import notebook_mode, tabulate
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -3104,7 +3101,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
-@unittest.skipUnless(tabulate and display, "Tabulate and IPython are required")
+@unittest.skipUnless(tabulate, "Tabulate is required")
 class TestNotebookFormat(unittest.TestCase):
 
     def setUp(self):

@@ -7,11 +7,6 @@ from collections import OrderedDict
 import sys
 import numpy as np
 
-try:
-    from IPython.display import HTML, display
-except ImportError:
-    pass
-
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
 from openmdao.core.notebook_mode import notebook, tabulate
