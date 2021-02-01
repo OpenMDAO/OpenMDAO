@@ -6,7 +6,7 @@ try:
 except ImportError:
     tabulate = None
     simple_warning("Tabulate is not installed run `pip install openmdao[notebooks]` to "
-                           "install required dependencies. Using ASCII for outputs.")
+                   "install required dependencies. Using ASCII for outputs.")
 
 
 def notebook_mode():
