@@ -137,9 +137,7 @@ install:
 # install OpenMDAO and its development and documentation dependencies
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
-  pip install .[all];
-  PYPPETEER_CHROMIUM_REVISION=849599 pyppeteer-install;
-
+  pip install .[all]
 # display summary of installed packages and their versions
 - conda list
 
