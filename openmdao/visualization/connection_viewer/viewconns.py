@@ -8,7 +8,10 @@ from collections import defaultdict
 
 import numpy as np
 
-from IPython.display import IFrame, display
+try:
+    from IPython.display import IFrame, display
+except ImportError:
+    IFrame = display = None
 
 import openmdao
 from openmdao.core.problem import Problem

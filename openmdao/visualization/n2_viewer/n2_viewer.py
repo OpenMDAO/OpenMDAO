@@ -4,12 +4,14 @@ import inspect
 import json
 import os
 import zlib
-from itertools import chain
 import networkx as nx
 
 import numpy as np
 
-from IPython.display import IFrame, display
+try:
+    from IPython.display import IFrame, display
+except ImportError:
+    IFrame = display = None
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
