@@ -138,7 +138,7 @@ install:
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
   pip install .[all];
-  PYPPETEER_CHROMIUM_REVISION=848205 pyppeteer-install;
+  PYPPETEER_CHROMIUM_REVISION=849599 pyppeteer-install;
 
 # display summary of installed packages and their versions
 - conda list
