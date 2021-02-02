@@ -18,6 +18,7 @@ import numpy as np
 import networkx as nx
 
 import openmdao
+from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -3478,7 +3479,18 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+            if notebook and tabulate is not None:
+                nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
+                             "global_shape": []}
+                for output, attrs in inputs.items():
+                    nb_format["Inputs"].append(output)
+                    for key, val in attrs.items():
+                        nb_format[key].append(val)
+
+                return tabulate(nb_format, headers="keys", tablefmt='html')
+            else:
+                self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
+                                  out_stream)
 
         if self.pathname:
             # convert to relative names
@@ -3618,12 +3630,22 @@ class System(object):
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
-
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+                if notebook and tabulate is not None:
+                    nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
+                                 "global_shape": []}
+                    for output, attrs in expl_outputs.items():
+                        nb_format["Explicit Output"].append(output)
+                        for key, val in attrs.items():
+                            nb_format[key].append(val)
+
+                    return tabulate(nb_format, headers="keys", tablefmt='html')
+                else:
+                    self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                      all_procs, out_stream)
+
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
             else:
@@ -3644,8 +3666,18 @@ class System(object):
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+                if notebook and tabulate is not None:
+                    nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
+                                 "global_shape": []}
+                    for output, attrs in expl_outputs.items():
+                        nb_format["Implicit Output"].append(output)
+                        for key, val in attrs.items():
+                            nb_format[key].append(val)
+
+                    return tabulate(nb_format, headers="keys", tablefmt='html')
+                else:
+                    self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                      all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
