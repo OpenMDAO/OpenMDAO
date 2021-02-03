@@ -149,7 +149,7 @@ script:
 # IPOpt requires this
 - export LD_LIBRARY_PATH=/home/travis/ipopt/lib
 # Don't want old versions of Pyppeteer's Chromium in the cache:
-- export PYPPETEER_CHROMIUM_REINSTALL=1
+- rm -fr /home/travis/.local/share/pyppeteer
 
 # make docs first
 - cd openmdao/docs;
