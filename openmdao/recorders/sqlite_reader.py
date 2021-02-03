@@ -4,14 +4,12 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
-from io import StringIO
-
 import sys
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
-
+from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
@@ -342,10 +340,11 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if out_stream:
+        if notebook and tabulate is not None:
+            return tabulate([sources], headers=["Source"], tablefmt='html')
+        elif out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
-
             for source in sources:
                 out_stream.write('{}\n'.format(source))
 
@@ -607,7 +606,11 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat(out_stream=out_stream)
+            if notebook and tabulate is not None:
+                cases = self._list_cases_recurse_flat(out_stream=out_stream)
+                return tabulate(cases, headers="keys", tablefmt='html')
+            else:
+                return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -628,7 +631,10 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if not recurse:
+                if notebook and tabulate is not None:
+                    cases = [[case] for case in case_table._cases.keys()]
+                    return tabulate(cases, headers=[source], tablefmt='html')
+                elif not recurse:
                     # return list of cases from the source alone
                     return case_table.list_cases(source)
                 elif flat:
@@ -722,7 +728,11 @@ class SqliteCaseReader(BaseCaseReader):
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            write_source_table(self.source_cases_table, out_stream)
+            if notebook:
+                nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
+                return nb_format
+            else:
+                write_source_table(self.source_cases_table, out_stream)
 
         return cases
 

@@ -3469,8 +3469,11 @@ class Group(System):
         return auto_ivc
 
     def _resolve_ambiguous_input_meta(self):
-        # This should only be called on the top level Group.
+        """
+        Resolve ambiguous input units and values for auto_ivcs with multiple targets.
 
+        This should only be called on the top level Group.
+        """
         srcconns = {}
         for tgt, src in self._conn_global_abs_in2out.items():
             if src.startswith('_auto_ivc.'):
@@ -3515,9 +3518,16 @@ class Group(System):
                     tmeta = all_abs2meta_in[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        if _find_unit(sunits) != _find_unit(tunits):
+
+                        # Detect if either Source or Targe units are None.
+                        if sunits is None or tunits is None:
                             errs.add('units')
                             metadata.add('units')
+
+                        elif _find_unit(sunits) != _find_unit(tunits):
+                            errs.add('units')
+                            metadata.add('units')
+
                     if 'value' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):

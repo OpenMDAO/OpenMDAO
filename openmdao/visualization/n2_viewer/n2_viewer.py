@@ -4,14 +4,19 @@ import inspect
 import json
 import os
 import zlib
-from itertools import chain
 import networkx as nx
 
 import numpy as np
 
+try:
+    from IPython.display import IFrame, display
+except ImportError:
+    IFrame = display = None
+
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.core.notebook_mode import notebook
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -607,7 +612,11 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # Write output file
     h.write(outfile)
 
+    # Open in Jupyter Notebook
+    if notebook:
+        display(IFrame(src=outfile, width=1000, height=1000))
+
     # open it up in the browser
-    if show_browser:
+    if show_browser and not notebook:
         from openmdao.utils.webview import webview
         webview(outfile)

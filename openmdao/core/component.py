@@ -1186,16 +1186,11 @@ class Component(System):
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
 
-    def _get_check_partial_options(self, include_wrt_outputs=True):
+    def _get_check_partial_options(self):
         """
         Return dictionary of partial options with pattern matches processed.
 
         This is called by check_partials.
-
-        Parameters
-        ----------
-        include_wrt_outputs : bool
-            If True, include outputs in the wrt list.
 
         Returns
         -------
@@ -1203,7 +1198,7 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        of, wrt = self._get_potential_partials_lists(include_wrt_outputs=include_wrt_outputs)
+        of, wrt = self._get_partials_varlists()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1439,7 +1434,7 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, str) else of
         wrt_list = [wrt] if isinstance(wrt, str) else wrt
-        of, wrt = self._get_potential_partials_lists()
+        of, wrt = self._get_partials_varlists()
 
         of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]
