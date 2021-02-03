@@ -37,8 +37,21 @@ def select_chromium_revision(platform):
 # Make sure Python version is at least 3.6, otherwise do nothing.
 if sys.version_info > (3, 5):
     from pyppeteer.chromium_downloader import check_chromium, download_chromium
+    from appdirs import AppDirs
+    import shutil
 
-    if (check_chromium()):
+    if 'PYPPETEER_CHROMIUM_REINSTALL' in os.environ:
+        pyppeteer_chromium_dir = AppDirs('pyppeteer').user_data_dir + '/local-chromium'
+        if os.path.isdir(pyppeteer_chromium_dir):
+            print("Deleting previous pyppeteer Chromium installation.")
+            try:
+                shutil.rmtree(pyppeteer_chromium_dir)
+            except:
+                print(f'Deleting old {pyppeteer_chromium_dir} failed.')
+        else:
+            print(f'{pyppeteer_chromium_dir} does not exist.')
+
+    if check_chromium():
         print("Chromium already installed, pyppeteer will not download.")
     else:
         select_chromium_revision(current_platform())
