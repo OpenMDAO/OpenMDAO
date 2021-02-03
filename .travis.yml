@@ -140,7 +140,7 @@ install:
   pip install .[all];
 # Don't want old versions of Pyppeteer's Chromium in the cache:
 - rm -fr /home/travis/.local/share/pyppeteer
-- pyppeteer-install
+- PYPPETEER_CHROMIUM_REVISION=850087 pyppeteer-install
 # display summary of installed packages and their versions
 - conda list
 
