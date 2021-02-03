@@ -140,7 +140,9 @@ install:
   pip install .[all];
 # Don't want old versions of Pyppeteer's Chromium in the cache:
 - rm -fr /home/travis/.local/share/pyppeteer
-- PYPPETEER_CHROMIUM_REVISION=850087 pyppeteer-install
+- export LASTCHANGE_URL="https://www.googleapis.com/download/storage/v1/b/chromium-browser-snapshots/o/Linux_x64%2FLAST_CHANGE?alt=media"
+- export PYPPETEER_CHROMIUM_REVISION=$(curl -s -S $LASTCHANGE_URL)
+- pyppeteer-install
 # display summary of installed packages and their versions
 - conda list
 
