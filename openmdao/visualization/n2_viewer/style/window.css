@@ -428,7 +428,10 @@
     left: 0;
     right: 0;
     bottom: var(--footer-height);
-    overflow: auto;
+    overflow: scroll;
+    visibility: visible;
+    border: 1px solid gray;
+
 }
 
 .window-theme-value-info .window-footer {
@@ -449,14 +452,15 @@
     min-width: 200px;
     border-collapse: separate;
     border-spacing: 0;
-    width: fit-content;
-    height: fit-content;
+    margin: 0;
+    padding: 0;
+    border: 0;
 }
 
 .window-theme-value-info .window-body table tbody tr th {
     text-align: center;
     font-size: 8pt;
-    margin-top: 0;
+    margin: 0;
     border-top: 0;
     border-bottom: 1px solid #a0a0a0;
     border-right: 1px solid #a0a0a0;
@@ -482,8 +486,7 @@
 .window-theme-value-info .window-body table tbody tr td {
     text-align: left;
     font-size: 9pt;
-    margin-top: 0;
-    margin-left: 0;    
+    margin: 0;    
     border-top: 0;
     border-left: 0;
     border-bottom: 1px solid #a0a0a0;

@@ -347,7 +347,7 @@ class ValueInfo extends N2WindowResizable {
             .text(function (d) { return InfoPropArray.floatFormatter(d); });
 
         const pnInfoPos = pnInfo._getPos();
-        this.sizeToContent(2, 2)
+        this.sizeToContent(17, 17) // TODO: Properly find size of scrollbar + 2
             .title(this.name)
             .move(pnInfoPos.left + 20, pnInfoPos.top + 20)
             .show();
