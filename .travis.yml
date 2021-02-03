@@ -137,7 +137,10 @@ install:
 # install OpenMDAO and its development and documentation dependencies
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
-  pip install .[all]
+  pip install .[all];
+# Don't want old versions of Pyppeteer's Chromium in the cache:
+- rm -fr /home/travis/.local/share/pyppeteer
+- pyppeteer-install
 # display summary of installed packages and their versions
 - conda list
 
@@ -148,8 +151,6 @@ script:
 - export OMPI_MCA_rmaps_base_oversubscribe=1
 # IPOpt requires this
 - export LD_LIBRARY_PATH=/home/travis/ipopt/lib
-# Don't want old versions of Pyppeteer's Chromium in the cache:
-- rm -fr /home/travis/.local/share/pyppeteer
 
 # make docs first
 - cd openmdao/docs;
