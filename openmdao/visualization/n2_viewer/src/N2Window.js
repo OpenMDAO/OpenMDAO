@@ -4,14 +4,7 @@
  * @typedef N2Window
  */
 class N2Window {
-    /**
-     * Keep increasing z-index of the focused window to keep it on top.
-     * Max z-index is 2147483647. It will be unusual here for it to climb
-     * above 100, and even extreme cases (e.g. a diagram that's been in use
-     * for weeks with lots of windows) shouldn't get above a few thousand.
-     */
-    static zIndex = 1000;
-    static container = null;
+
 
     /**
      * Clone the template window defined in index.html, setup some
@@ -398,6 +391,16 @@ class N2Window {
         return this;
     }
 }
+
+
+/**
+ * Keep increasing z-index of the focused window to keep it on top.
+ * Max z-index is 2147483647. It will be unusual here for it to climb
+ * above 100, and even extreme cases (e.g. a diagram that's been in use
+ * for weeks with lots of windows) shouldn't get above a few thousand.
+ */
+N2Window.zIndex = 1000;
+N2Window.container = null;
 
 /**
  * Extends N2Window by allowing the window to be dragged with a mousedown on the header/title.

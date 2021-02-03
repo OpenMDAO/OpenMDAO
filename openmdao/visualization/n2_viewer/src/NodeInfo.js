@@ -241,9 +241,6 @@ InfoPropArray.floatFormatter = d3.format('g');
  */
 class ValueInfo extends N2WindowResizable {
 
-    /** Maintain a list of existing ValueInfo windows so only one of each is shown */
-    static existingValueWindows = {};
-
     /**
      * Add a new value window if it doesn't already exist.
      * @param {String} name Variable name.
@@ -252,16 +249,16 @@ class ValueInfo extends N2WindowResizable {
      * @returns {ValueInfo} The newly constructed window.
      */
     static add(name, val, pnInfo) {
-        if (!this.existingValueWindows[name]) {
-            this.existingValueWindows[name] = true;
+        if (!ValueInfo.existingValueWindows[name]) {
+            ValueInfo.existingValueWindows[name] = true;
             return new ValueInfo(name, val, pnInfo);
         }
     }
 
     /** Remove the name of the window from the list of existing ones. */
     static del(name) {
-        if (this.existingValueWindows[name]) {
-            delete this.existingValueWindows[name];
+        if (ValueInfo.existingValueWindows[name]) {
+            delete ValueInfo.existingValueWindows[name];
         }
     }
 
@@ -374,6 +371,7 @@ class ValueInfo extends N2WindowResizable {
 
 // "Class" variable and function for ValueInfo
 ValueInfo.TRUNCATE_LIMIT = 80;
+ValueInfo.existingValueWindows = {};
 
 /**
  * Manage a table containing all available metadata properties for
