@@ -14,7 +14,8 @@ import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.system import System
-from openmdao.core.component import Component, _DictValues, _full_slice
+from openmdao.core.component import Component, _DictValues
+from openmdao.vectors.vector import _full_slice
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
@@ -27,7 +28,7 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning, common_sub
     conditional_error, _is_slicer_op, _slice_indices, convert_src_inds, \
     shape_from_idx, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, valid_units, simplify_unit
+    _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
@@ -296,9 +297,7 @@ class Group(System):
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid.")
-            meta['units'] = simplify_unit(units)
+            meta['units'] = simplify_unit(units, msginfo=self.msginfo)
 
         if src_shape is not None:
             meta['src_shape'] = src_shape
@@ -3469,8 +3468,11 @@ class Group(System):
         return auto_ivc
 
     def _resolve_ambiguous_input_meta(self):
-        # This should only be called on the top level Group.
+        """
+        Resolve ambiguous input units and values for auto_ivcs with multiple targets.
 
+        This should only be called on the top level Group.
+        """
         srcconns = {}
         for tgt, src in self._conn_global_abs_in2out.items():
             if src.startswith('_auto_ivc.'):
@@ -3515,9 +3517,16 @@ class Group(System):
                     tmeta = all_abs2meta_in[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
                     if 'units' not in gmeta and sunits != tunits:
-                        if _find_unit(sunits) != _find_unit(tunits):
+
+                        # Detect if either Source or Targe units are None.
+                        if sunits is None or tunits is None:
                             errs.add('units')
                             metadata.add('units')
+
+                        elif _find_unit(sunits) != _find_unit(tunits):
+                            errs.add('units')
+                            metadata.add('units')
+
                     if 'value' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):

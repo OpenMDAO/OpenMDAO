@@ -1096,7 +1096,7 @@ def _has_val_mismatch(units1, val1, units2, val2):
         return np.linalg.norm(val2 - val1) / norm1 > rtol
 
 
-def simplify_unit(old_unit_str):
+def simplify_unit(old_unit_str, msginfo=''):
     """
     Simplify unit string using built-in naming method.
 
@@ -1106,13 +1106,23 @@ def simplify_unit(old_unit_str):
     ----------
     old_unit_str : str
         Unit string to simplify.
+    msginfo : str
+        A string prepended to the ValueError which is raised if the units are invalid.
 
     Returns
     -------
     str
         Simplified unit string.
     """
-    new_str = _find_unit(old_unit_str).name()
+    if old_unit_str is None:
+        return None
+
+    found_unit = _find_unit(old_unit_str)
+    if found_unit is None:
+        _msginfo = f'{msginfo}: ' if msginfo else ''
+        raise ValueError(f"{_msginfo}The units '{old_unit_str}' are invalid.")
+
+    new_str = found_unit.name()
     if new_str == '1':
         # Special Case. Unity always becomes None.
         new_str = None

@@ -5,7 +5,7 @@ import sys
 import os
 import importlib
 
-from mock import Mock
+from unittest.mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
 from openmdao.docs._utils.patch import do_monkeypatch

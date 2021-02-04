@@ -3,7 +3,8 @@
 import sys
 import numpy as np
 
-from openmdao.core.component import Component, _full_slice
+from openmdao.core.component import Component
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -66,6 +67,13 @@ class ExplicitComponent(Component):
         """
         of = list(self._var_rel_names['output'])
         wrt = list(self._var_rel_names['input'])
+
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            of = [n for n in of if n not in self._discrete_outputs]
+        if self._discrete_inputs:
+            wrt = [n for n in wrt if n not in self._discrete_inputs]
+
         return of, wrt
 
     def _get_partials_var_sizes(self):

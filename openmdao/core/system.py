@@ -18,6 +18,7 @@ import numpy as np
 import networkx as nx
 
 import openmdao
+from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -26,7 +27,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.units import is_compatible, unit_conversion, valid_units, simplify_unit
+from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
@@ -39,7 +40,6 @@ from openmdao.utils.general_utils import determine_adder_scaler, \
     simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.utils.units import unit_conversion
 
 
 _empty_frozen_set = frozenset()
@@ -973,9 +973,10 @@ class System(object):
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
                     from openmdao.core.component import Component
+                    from openmdao.core.indepvarcomp import IndepVarComp
                     from openmdao.components.exec_comp import ExecComp
                     for s in self.system_iter(recurse=True, typ=Component):
-                        if not isinstance(s, ExecComp):
+                        if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
                             s.declare_partials('*', '*', method=self._coloring_info['method'])
                 self._setup_partials()
 
@@ -2015,38 +2016,6 @@ class System(object):
             self._scope_cache[None] = (frozenset(self._var_abs2meta['output']), _empty_frozen_set)
             return self._scope_cache[None]
 
-    def _get_potential_partials_lists(self, include_wrt_outputs=True):
-        """
-        Return full lists of possible 'of' and 'wrt' variables.
-
-        Filters out any discrete variables.
-
-        Parameters
-        ----------
-        include_wrt_outputs : bool
-            If True, include outputs in the wrt list.
-
-        Returns
-        -------
-        list
-            List of 'of' variable names.
-        list
-            List of 'wrt' variable names.
-        """
-        of_list = list(self._var_allprocs_prom2abs_list['output'])
-        wrt_list = list(self._var_allprocs_prom2abs_list['input'])
-
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            of_list = [n for n in of_list if n not in self._discrete_outputs]
-        if self._discrete_inputs:
-            wrt_list = [n for n in wrt_list if n not in self._discrete_inputs]
-
-        if include_wrt_outputs:
-            wrt_list = of_list + wrt_list
-
-        return of_list, wrt_list
-
     @contextmanager
     def _unscaled_context(self, outputs=(), residuals=()):
         """
@@ -2531,11 +2500,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"design_var '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"design_var '{name}'.")
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for design_var '{name}'."))
 
         # Convert ref/ref0 to ndarray/float as necessary
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
@@ -2691,12 +2659,10 @@ class System(object):
             if not isinstance(units, str):
                 raise TypeError(f"{self.msginfo}: The units argument should be a str or None for "
                                 f"response '{name}'.")
-
-            if not valid_units(units):
-                raise ValueError(f"{self.msginfo}: The units '{units}' are invalid for "
-                                 f"response '{name}'.")
-
-            units = simplify_unit(units)
+            try:
+                units = simplify_unit(units, msginfo=self.msginfo)
+            except ValueError as e:
+                raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
@@ -3513,7 +3479,18 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
+            if notebook and tabulate is not None:
+                nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
+                             "global_shape": []}
+                for output, attrs in inputs.items():
+                    nb_format["Inputs"].append(output)
+                    for key, val in attrs.items():
+                        nb_format[key].append(val)
+
+                return tabulate(nb_format, headers="keys", tablefmt='html')
+            else:
+                self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
+                                  out_stream)
 
         if self.pathname:
             # convert to relative names
@@ -3653,12 +3630,22 @@ class System(object):
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
-
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+                if notebook and tabulate is not None:
+                    nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
+                                 "global_shape": []}
+                    for output, attrs in expl_outputs.items():
+                        nb_format["Explicit Output"].append(output)
+                        for key, val in attrs.items():
+                            nb_format[key].append(val)
+
+                    return tabulate(nb_format, headers="keys", tablefmt='html')
+                else:
+                    self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                      all_procs, out_stream)
+
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
             else:
@@ -3679,8 +3666,18 @@ class System(object):
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                  all_procs, out_stream)
+                if notebook and tabulate is not None:
+                    nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
+                                 "global_shape": []}
+                    for output, attrs in expl_outputs.items():
+                        nb_format["Implicit Output"].append(output)
+                        for key, val in attrs.items():
+                            nb_format[key].append(val)
+
+                    return tabulate(nb_format, headers="keys", tablefmt='html')
+                else:
+                    self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                      all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
@@ -4115,6 +4112,12 @@ class System(object):
         of = list(self._var_allprocs_prom2abs_list['output'])
         wrt = list(self._var_allprocs_prom2abs_list['input'])
 
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            of = [n for n in of if n not in self._discrete_outputs]
+        if self._discrete_inputs:
+            wrt = [n for n in wrt if n not in self._discrete_inputs]
+
         # wrt should include implicit states
         return of, of + wrt
 
@@ -4368,6 +4371,7 @@ class System(object):
         abs_names = name2abs_names(self, name)
         if not abs_names:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        simp_units = simplify_unit(units)
 
         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         if from_src and abs_names[0] in conns:  # pull input from source
@@ -4377,8 +4381,8 @@ class System(object):
             else:
                 # src is outside of this system so get the value from the model
                 caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=units, indices=indices,
-                                              get_remote=get_remote, rank=rank,
+            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+                                              indices=indices, get_remote=get_remote, rank=rank,
                                               vec_name='nonlinear', flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
@@ -4387,7 +4391,7 @@ class System(object):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_names[0], val, units)
+                val = self.convert2units(abs_names[0], val, simp_units)
 
         return val
 

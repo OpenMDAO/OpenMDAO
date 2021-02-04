@@ -123,7 +123,7 @@ class TestKSFunction(unittest.TestCase):
         stress0 = prob['parallel.sub_0.stress_comp.stress_0']
         stress1 = prob['parallel.sub_0.stress_comp.stress_1']
 
-        # Test that the the maximum constraint prior to aggregation is close to "active".
+        # Test that the maximum constraint prior to aggregation is close to "active".
         assert_near_equal(max(stress0), 100.0, tolerance=5e-2)
         assert_near_equal(max(stress1), 100.0, tolerance=5e-2)
 

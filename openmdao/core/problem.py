@@ -20,9 +20,8 @@ from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
-from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
@@ -35,10 +34,9 @@ from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, 
     _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name, name2abs_names
+from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import convert_units
-from openmdao.utils import coloring as coloring_mod
+from openmdao.utils.units import simplify_unit
 from openmdao.core.constants import _SetupStatus
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.vector import _full_slice
@@ -381,7 +379,7 @@ class Problem(object):
                 if indices is not None:
                     val = val[indices]
                 if units is not None:
-                    val = self.model.convert2units(name, val, units)
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -1131,14 +1129,13 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    imp = not explicit
-                    of_list, wrt_list = comp._get_potential_partials_lists(include_wrt_outputs=imp)
+                    of_list, wrt_list = comp._get_partials_varlists()
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
                     if matrix_free:
                         print_reverse = True
-                        local_opts = comp._get_check_partial_options(include_wrt_outputs=imp)
+                        local_opts = comp._get_check_partial_options()
 
                         dstate = comp._vectors['output']['linear']
                         if mode == 'fwd':
@@ -1311,12 +1308,11 @@ class Problem(object):
 
             c_name = comp.pathname
             all_fd_options[c_name] = {}
-            explicit = isinstance(comp, ExplicitComponent)
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of, wrt = comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
+            of, wrt = comp._get_partials_varlists()
 
             # Load up approximation objects with the requested settings.
             local_opts = comp._get_check_partial_options()
