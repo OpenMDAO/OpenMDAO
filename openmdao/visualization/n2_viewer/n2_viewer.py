@@ -331,8 +331,7 @@ def _get_declare_partials(system):
     recurse_get_partials(system, declare_partials_list)
     return declare_partials_list
 
-
-def _get_viewer_data(data_source):
+def _get_viewer_data(data_source, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
 
@@ -378,7 +377,20 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        data_dict = CaseReader(data_source, pre_load=False).problem_metadata
+        # if case_id is not None:
+        cr = CaseReader(data_source, pre_load=True)
+        single_case = cr.get_case(case_id)
+
+        data_dict = cr.problem_metadata
+
+        sys_cases = cr._system_cases._cases[case_id]
+
+        for i in data_dict['tree']['children']:
+            for j in i['children']:
+                if j['type'] == 'input':
+                    j['value'] = sys_cases.inputs[j['name']]
+                else:
+                    j['value'] = sys_cases.outputs[j['name']]
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
@@ -462,7 +474,7 @@ def _get_viewer_data(data_source):
     return data_dict
 
 
-def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddable=False,
        title=None, use_declare_partial_info=False):
     """
     Generate an HTML file containing a tree viewer.
@@ -494,7 +506,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     """
     # grab the model viewer data
-    model_data = _get_viewer_data(data_source)
+    model_data = _get_viewer_data(data_source, case_id=case_id)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
