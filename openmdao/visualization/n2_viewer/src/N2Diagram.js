@@ -140,6 +140,57 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
+
+    /**
+     * Save the model state to a file.
+     */
+    saveState() {
+        let stateFileName = 'n2.state';
+        let data = this.showLinearSolverNames;
+
+        var link = document.createElement('a');
+        link.setAttribute('download', stateFileName);
+        let data_blob = new Blob([data], {type: 'text/plain'});
+
+        // If we are replacing a previously generated file we need to
+        // manually revoke the object URL to avoid memory leaks.
+        if (stateFileName !== null) {
+          window.URL.revokeObjectURL(stateFileName);
+        }
+
+        link.href = window.URL.createObjectURL(data_blob);
+        document.body.appendChild(link);
+
+        // wait for the link to be added to the document
+        window.requestAnimationFrame(function () {
+            var event = new MouseEvent('click');
+            link.dispatchEvent(event);
+            document.body.removeChild(link);
+        })
+    }
+
+    /**
+     * Load the model state to a file.
+     */
+    loadState() {
+        console.log('Loading State');
+        let self = this;
+        document.getElementById('state-file-input').addEventListener('change', function() {
+
+            var fr=new FileReader();
+            fr.onload=function(){
+                console.log(fr.result);
+                self.showLinearSolverNames = fr.result
+                self.ui.setSolvers(fr.result)
+            }
+            fr.readAsText(this.files[0]);
+        })
+
+        document.getElementById('state-file-input').click();
+        //var fr=new FileReader();
+        //fr.readAsText(document.getElementById('state-file-input').files[0]);
+    }
+
     /**
      * Replace the current zoomedElement, but preserve its value.
      * @param {Object} newZoomedElement Replacement zoomed element.
