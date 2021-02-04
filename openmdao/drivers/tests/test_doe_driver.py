@@ -1160,6 +1160,20 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name], expected_case[name])
                 self.assertTrue(isinstance(outputs[name], int))
 
+    def test_desvar_indices(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x**2',
+                                                x=np.array([1., 2., 3.]),
+                                                y=np.zeros(3)), promotes=['*'])
+        prob.model.add_design_var('x', lower=7.0, upper=11.0, indices=[0])
+        prob.model.add_objective('y', index=0)
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.setup()
+        prob.run_driver()
+
+        # Last value in fullfactorial DOE is 11, which gives 121.
+        assert_near_equal(prob.get_val('y'), np.array([121., 4., 9.]))
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
