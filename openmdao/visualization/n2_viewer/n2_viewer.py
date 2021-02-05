@@ -331,6 +331,7 @@ def _get_declare_partials(system):
     recurse_get_partials(system, declare_partials_list)
     return declare_partials_list
 
+
 def _get_viewer_data(data_source, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
@@ -386,7 +387,8 @@ def _get_viewer_data(data_source, case_id=None):
             data_dict = cr.problem_metadata
             if isinstance(case_id, str):
                 if 'root' in case_id:
-                    raise ValueError(f"case_id is not a driver case. Find valid case_id with om.CaseReader('{data_source}').list_cases()")
+                    raise ValueError(f"case_id is not a driver case. Find valid case_id with "
+                                     "om.CaseReader('{data_source}').list_cases()")
                 sys_cases = cr._driver_cases._cases[case_id]
             else:
                 cases = [key for key in cr._driver_cases._cases.keys()]
