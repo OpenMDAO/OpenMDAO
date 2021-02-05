@@ -14,6 +14,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, 
     TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
      SellarDis2withDerivatives
+from openmdao.utils.assert_utils import assert_warning
 
 # Note: The following class definitions are used in feature docs
 
@@ -116,7 +117,9 @@ class ExplCompTestCase(unittest.TestCase):
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
-        prob.run_model()
+        with assert_warning(UserWarning, "'comp2' <class RectangleJacVec>: matrix free component has declared the following partials: [('comp2.area', 'comp2.length'), ('comp2.area', 'comp2.width')], which will allocate (possibly unnecessary) memory for each of those sub-jacobians."):
+            prob.run_model()
+
         assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
 

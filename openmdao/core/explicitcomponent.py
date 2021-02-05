@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
@@ -90,7 +91,7 @@ class ExplicitComponent(Component):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
 
-    def _jacobian_wrt_iter(self, wrt_matches=None):
+    def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -131,7 +132,7 @@ class ExplicitComponent(Component):
             size = meta['size']
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if size > 0:
+            if size > 0 and not self.matrix_free:
                 out_name = abs2prom_out[out_abs]
                 arange = np.arange(size)
 
@@ -226,11 +227,11 @@ class ExplicitComponent(Component):
                                   copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
+        is_output = self._outputs._contains_abs
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta:
+            if 'method' in meta and not is_output(abs_key[1]):
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes and
-                        not self._outputs._contains_abs(abs_key[1])):
+                if (method is not None and method in self._approx_schemes):
                     yield abs_key
 
     def _apply_nonlinear(self):
@@ -306,9 +307,9 @@ class ExplicitComponent(Component):
                 # Jacobian and vectors are all scaled, unitless
                 J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because compute_jacvec_product does nothing.
                 if not self.matrix_free:
+                    # if we're not matrix free, we can skip the bottom of
+                    # this loop because compute_jacvec_product does nothing.
                     continue
 
                 # Jacobian and vectors are all unscaled, dimensional
@@ -318,10 +319,27 @@ class ExplicitComponent(Component):
                     # set appropriate vectors to read_only to help prevent user error
                     if mode == 'fwd':
                         d_inputs.read_only = True
-                    elif mode == 'rev':
+                    else:  # rev
                         d_residuals.read_only = True
 
                     try:
+                        # handle identity subjacs (output_or_resid wrt itself)
+                        if isinstance(J, DictionaryJacobian):
+                            rflat = self._vectors['residual'][vec_name]._abs_get_val
+                            oflat = self._vectors['output'][vec_name]._abs_get_val
+                            d_out_names = self._vectors['output'][vec_name]._names
+                            vnames = self._var_relevant_names[vec_name]['output']
+                            if mode == 'fwd':
+                                for v in vnames:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = rflat(v)
+                                        val -= oflat(v)
+                            else:  # rev
+                                for v in vnames:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = oflat(v)
+                                        val -= rflat(v)
+
                         args = [self._inputs, d_inputs, d_residuals, mode]
                         if self._discrete_inputs:
                             args.append(self._discrete_inputs)
