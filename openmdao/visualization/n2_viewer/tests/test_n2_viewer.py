@@ -9,7 +9,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 
 class TestN2Viewer(unittest.TestCase):
 
-    def test_root_case(self):
+    def test_driver_case(self):
         prob = om.Problem()
         model = prob.model
 
@@ -30,8 +30,7 @@ class TestN2Viewer(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        data_dict = _get_viewer_data("cases.sql",
-                                     case_id='rank0:DOEDriver_PlackettBurman|3')
+        data_dict = _get_viewer_data("cases.sql", case_id='rank0:DOEDriver_PlackettBurman|3')
 
         vals = data_dict['tree']['children'][2]['children']
         x_val = vals[0]['value']
