@@ -340,6 +340,9 @@ def _get_viewer_data(data_source, case_id=None):
     data_source : <Problem> or <Group> or str
         A Problem or Group or case recorder file name containing the model or model data.
 
+    case_id : int or str or None
+        Case name or index of case in SQL file.
+
     Returns
     -------
     dict
@@ -377,20 +380,26 @@ def _get_viewer_data(data_source, case_id=None):
             return {}
 
     elif isinstance(data_source, str):
-        # if case_id is not None:
-        cr = CaseReader(data_source, pre_load=True)
-        single_case = cr.get_case(case_id)
+        if case_id is not None:
+            cr = CaseReader(data_source, pre_load=True)
 
-        data_dict = cr.problem_metadata
+            data_dict = cr.problem_metadata
+            if isinstance(case_id, str):
+                if 'root' in case_id:
+                    raise ValueError(f"case_id is not a driver case. Find valid case_id with om.CaseReader('{data_source}').list_cases()")
+                sys_cases = cr._driver_cases._cases[case_id]
+            else:
+                cases = [key for key in cr._driver_cases._cases.keys()]
+                sys_cases = cr._driver_cases._cases[cases[case_id]]
 
-        sys_cases = cr._system_cases._cases[case_id]
-
-        for i in data_dict['tree']['children']:
-            for j in i['children']:
-                if j['type'] == 'input':
-                    j['value'] = sys_cases.inputs[j['name']]
-                else:
-                    j['value'] = sys_cases.outputs[j['name']]
+            for i in data_dict['tree']['children']:
+                for j in i['children']:
+                    if j['type'] == 'input' and sys_cases.inputs is not None:
+                        j['value'] = sys_cases.inputs[j['name']]
+                    elif j['type'] == 'output' and sys_cases.outputs is not None:
+                        j['value'] = sys_cases.outputs[j['name']]
+                    else:
+                        j['value'] = 0.
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
@@ -485,6 +494,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     ----------
     data_source : <Problem> or str
         The Problem or case recorder database containing the model or model data.
+
+    case_id : int, str, or None
+        Case name or index of case in SQL file.
 
     outfile : str, optional
         The name of the final output file
