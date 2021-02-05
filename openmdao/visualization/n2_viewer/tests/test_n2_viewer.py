@@ -1,13 +1,21 @@
 """Unit Tests for n2_viewer"""
 import unittest
+import os
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
+from openmdao.utils.testing_utils import use_tempdirs
 
+@use_tempdirs
 class TestN2Viewer(unittest.TestCase):
+
+    def setUp(self):
+
+        self.filename = "cases.sql"
+        self.recorder = om.SqliteRecorder(self.filename)
 
     def test_driver_case(self):
         prob = om.Problem()
@@ -21,16 +29,14 @@ class TestN2Viewer(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        recorder = om.SqliteRecorder("cases.sql")
         prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
-        prob.driver.add_recorder(recorder)
-        # prob.model.add_recorder(recorder)
+        prob.driver.add_recorder(self.recorder)
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        data_dict = _get_viewer_data("cases.sql", case_id='rank0:DOEDriver_PlackettBurman|3')
+        data_dict = _get_viewer_data(self.filename, case_id='rank0:DOEDriver_PlackettBurman|3')
 
         vals = data_dict['tree']['children'][2]['children']
         x_val = vals[0]['value']
@@ -53,16 +59,14 @@ class TestN2Viewer(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        recorder = om.SqliteRecorder("cases.sql")
         prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
-        prob.driver.add_recorder(recorder)
-        prob.model.add_recorder(recorder)
+        prob.driver.add_recorder(self.recorder)
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        data_dict = _get_viewer_data("cases.sql", case_id=3)
+        data_dict = _get_viewer_data(self.filename, case_id=3)
 
         vals = data_dict['tree']['children'][2]['children']
         x_val = vals[0]['value']
@@ -85,10 +89,8 @@ class TestN2Viewer(unittest.TestCase):
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        recorder = om.SqliteRecorder("cases.sql")
         prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
-        prob.driver.add_recorder(recorder)
-        prob.model.add_recorder(recorder)
+        prob.driver.add_recorder(self.recorder)
 
         prob.setup()
         prob.run_driver()
@@ -97,7 +99,7 @@ class TestN2Viewer(unittest.TestCase):
 
 
         with self.assertRaises(ValueError) as cm:
-            _get_viewer_data("cases.sql", case_id='rank0:DOEDriver_PlackettBurman|3|root')
+            _get_viewer_data(self.filename, case_id='rank0:DOEDriver_PlackettBurman|3|root')
 
         msg = ("case_id is not a driver case. Find valid case_id with "
                "om.CaseReader('cases.sql').list_cases()")

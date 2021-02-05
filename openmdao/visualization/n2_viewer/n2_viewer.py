@@ -381,14 +381,15 @@ def _get_viewer_data(data_source, case_id=None):
             return {}
 
     elif isinstance(data_source, str):
-        if case_id is not None:
-            cr = CaseReader(data_source, pre_load=True)
+        cr = CaseReader(data_source, pre_load=True)
 
-            data_dict = cr.problem_metadata
+        data_dict = cr.problem_metadata
+
+        if case_id is not None:
             if isinstance(case_id, str):
                 if 'root' in case_id:
                     raise ValueError(f"case_id is not a driver case. Find valid case_id with "
-                                     "om.CaseReader('{data_source}').list_cases()")
+                                     f"om.CaseReader('{data_source}').list_cases()")
                 sys_cases = cr._driver_cases._cases[case_id]
             else:
                 cases = [key for key in cr._driver_cases._cases.keys()]
