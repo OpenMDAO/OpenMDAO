@@ -654,15 +654,15 @@ class NonlinearSolver(Solver):
         # conditionals.
         if np.isinf(norm) or np.isnan(norm):
             msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                    "iterations."
+                  "iterations."
             if iprint > -1 and print_flag:
                 print(prefix + msg.format(self.SOLVER, system.pathname,
-                                            self._iter_count))
+                                          self._iter_count))
 
             # Raise AnalysisError if requested.
             if self.options['err_on_non_converge']:
                 raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                self._iter_count))
+                                               self._iter_count))
 
         # Solver hit maxiter without meeting desired tolerances.
         # Or solver stalled.
@@ -675,12 +675,12 @@ class NonlinearSolver(Solver):
 
             if iprint > -1 and print_flag:
                 print(prefix + msg.format(self.SOLVER, system.pathname,
-                                            self._iter_count))
+                                          self._iter_count))
 
             # Raise AnalysisError if requested.
             if self.options['err_on_non_converge']:
                 raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                self._iter_count))
+                                               self._iter_count))
 
         # Solver converged
         elif iprint == 1 and print_flag:
@@ -883,15 +883,15 @@ class LinearSolver(Solver):
         # conditionals.
         if np.isinf(norm) or np.isnan(norm):
             msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
-                    "iterations."
+                  "iterations."
             if iprint > -1 and print_flag:
                 print(prefix + msg.format(self.SOLVER, system.pathname,
-                                            self._iter_count))
+                                          self._iter_count))
 
             # Raise AnalysisError if requested.
             if self.options['err_on_non_converge']:
                 raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                self._iter_count))
+                                               self._iter_count))
 
         # Solver hit maxiter without meeting desired tolerances.
         elif (norm > atol and norm / norm0 > rtol):
@@ -899,12 +899,12 @@ class LinearSolver(Solver):
 
             if iprint > -1 and print_flag:
                 print(prefix + msg.format(self.SOLVER, system.pathname,
-                                            self._iter_count))
+                                          self._iter_count))
 
             # Raise AnalysisError if requested.
             if self.options['err_on_non_converge']:
                 raise AnalysisError(msg.format(self.SOLVER, system.pathname,
-                                                self._iter_count))
+                                               self._iter_count))
 
         # Solver converged
         elif iprint == 1 and print_flag:
