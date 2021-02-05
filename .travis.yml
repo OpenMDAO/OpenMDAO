@@ -138,8 +138,9 @@ install:
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
   pip install .[all];
-  pyppeteer-install;
-
+# Don't want old versions of Pyppeteer's Chromium in the cache:
+- rm -fr /home/travis/.local/share/pyppeteer
+- pyppeteer-install
 # display summary of installed packages and their versions
 - conda list
 

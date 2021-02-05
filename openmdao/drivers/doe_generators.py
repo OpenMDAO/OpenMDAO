@@ -314,7 +314,8 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['global_size'] for name, meta in design_vars.items()])
+        size = sum([meta['global_size'] if meta['distributed'] else meta['size']
+                    for name, meta in design_vars.items()])
 
         doe = self._generate_design(size)
 
@@ -326,7 +327,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         row = 0
         for name, meta in design_vars.items():
-            size = meta['global_size']
+            size = meta['global_size'] if meta['distributed'] else meta['size']
 
             for k in range(size):
                 lower = meta['lower']
@@ -345,7 +346,7 @@ class _pyDOE_Generator(DOEGenerator):
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size = meta['global_size']
+                size = meta['global_size'] if meta['distributed'] else meta['size']
                 val = np.empty(size)
                 for k in range(size):
                     idx = idxs[row + k]

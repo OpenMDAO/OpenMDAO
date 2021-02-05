@@ -1402,6 +1402,20 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+    def test_promote_units_and_none(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('c1', om.ExecComp('y1=x', x={'units': None}),
+                              promotes=['*'])
+        p.model.add_subsystem('c2', om.ExecComp('y2=x', x={'units': 's'}),
+                              promotes=['*'])
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):

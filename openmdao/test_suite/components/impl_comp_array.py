@@ -58,6 +58,9 @@ class TestImplCompArraySparse(TestImplCompArray):
 
 class TestImplCompArrayMatVec(TestImplCompArray):
 
+    def setup_partials(self):
+        pass
+
     def linearize(self, inputs, outputs, jacobian):
         pass
 

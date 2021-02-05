@@ -410,12 +410,12 @@ class Coloring(object):
             wrt_matches = set(['.'.join((system.pathname, n))
                               for n in info['wrt_matches_prom']])
             # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
+            ordered_of_info = system._jac_var_info_abs2prom(system._partial_jac_of_iter())
             ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
+                system._jac_var_info_abs2prom(system._partial_jac_wrt_iter(wrt_matches))
         else:
-            ordered_of_info = list(system._jacobian_of_iter())
-            ordered_wrt_info = list(system._jacobian_wrt_iter(info['wrt_matches']))
+            ordered_of_info = list(system._partial_jac_of_iter())
+            ordered_wrt_info = list(system._partial_jac_wrt_iter(info['wrt_matches']))
 
         of_names = [t[0] for t in ordered_of_info]
         wrt_names = [t[0] for t in ordered_wrt_info]

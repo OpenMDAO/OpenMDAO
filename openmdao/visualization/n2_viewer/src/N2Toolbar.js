@@ -317,8 +317,8 @@ class N2Toolbar {
             "Load Model State", e => { n2ui.n2Diag.loadState() });
 
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
-            ["Show detailed node information", "Hide detailed node information"],
-            pred => { return n2ui.nodeInfoBox.hidden; },
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
             e => {
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
@@ -327,14 +327,8 @@ class N2Toolbar {
 
         new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
-            pred => { return d3.select("#myModal").style('display') == "block"; },
-            e => {
-                d3.select("#myModal").style('display', 'block');
-                d3.select("#idSpanModalClose").on('click', c => {
-                    d3.select("#myModal").style('display', 'none');
-                    d3.select("#idSpanModalClose").on('click', null);
-                });
-            }
+            pred => { return !!(d3.select(".window-theme-help").size()); },
+            e => { new N2Help() }
         );
 
         new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,

@@ -1539,7 +1539,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True, method='fd')
 
             def compute(self, inputs, outputs):
@@ -1602,7 +1601,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True, method='fd', form='central')
 
             def compute(self, inputs, outputs):
@@ -1704,7 +1702,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('x*', directional=True, method='fd')
 
             def compute(self, inputs, outputs):
@@ -2225,7 +2222,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True)
 
             def compute(self, inputs, outputs):
