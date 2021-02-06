@@ -280,7 +280,7 @@ class _pyDOE_Generator(DOEGenerator):
     ----------
     _levels : int or dict(str, int)
         The number of evenly spaced levels between each design variable
-        lower and upper bound.
+        lower and upper bound. Dictionary input is supported by Full Factorial or Generalized Subset Design.
     """
 
     def __init__(self, levels=_LEVELS):
@@ -291,7 +291,8 @@ class _pyDOE_Generator(DOEGenerator):
         ----------
         levels : int or dict, optional
             The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 2.
+            lower and upper bound.  Dictionary input is supported by Full Factorial or Generalized Subset Design.
+            Defaults to 2.
         """
         super().__init__()
         self._levels = levels
@@ -346,7 +347,7 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        self._sizes = OrderedDict([(name, meta['global_size'] if meta['distributed'] else meta['size'])
+        self._sizes = OrderedDict([(name, _get_size(meta))
                                    for name, meta in design_vars.items()])
         size = sum(self._sizes.values())
         doe = self._generate_design(size).astype('int')
@@ -364,7 +365,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         row = 0
         for name, meta in design_vars.items():
-            size = meta['global_size'] if meta['distributed'] else meta['size']
+            size = _get_size(meta)
 
             for k in range(size):
                 lower = meta['lower']
@@ -385,7 +386,7 @@ class _pyDOE_Generator(DOEGenerator):
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size_i = meta['global_size'] if meta['distributed'] else meta['size']
+                size_i = _get_size(meta)
                 val = np.empty(size_i)
                 for k in range(size_i):
                     idx = idxs[row + k]
@@ -678,3 +679,8 @@ class LatinHypercubeGenerator(DOEGenerator):
                 col += size
 
             yield retval
+
+
+def _get_size(dct):
+    # Returns global size of the variable if it is distributed, size otherwise.
+    return dct['global_size'] if dct['distributed'] else dct['size']

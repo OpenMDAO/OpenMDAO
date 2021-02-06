@@ -608,6 +608,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
 
     def test_generalized_subset(self):
+        # All DVs have the same number of levels
         prob = om.Problem()
         model = prob.model
 
@@ -642,6 +643,7 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertEqual(outputs[name], expected_case[name])
 
     def test_generalized_subset_dict_levels(self):
+        # Number of variables specified individually for all DVs (scalars).
         prob = om.Problem()
         model = prob.model
 
@@ -683,6 +685,7 @@ class TestDOEDriver(unittest.TestCase):
                 self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
 
     def test_generalized_subset_array(self):
+        # Number of levels specified individually for all DVs (arrays).
 
         class Digits2Num(om.ExplicitComponent):
             """
@@ -723,9 +726,8 @@ class TestDOEDriver(unittest.TestCase):
 
         objs = [int(cr.get_case(case).outputs['f']) for case in cases]
 
-        self.assertEqual(len(objs), 104)
-        # Testing uniqueness. If all elements are unique, it should be the same length as the
-        # number of cases
+        self.assertEqual(len(objs), 104)  # The number can be verified with standalone pyDOE2
+        # Testing uniqueness. If all elements are unique, it should be the same length as the number of cases
         self.assertEqual(len(set(objs)), 104)
 
     def test_plackett_burman(self):
