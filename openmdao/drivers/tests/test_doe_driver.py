@@ -623,8 +623,8 @@ class TestDOEDriver(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        size = prob.comm.size
-        rank = prob.comm.rank
+        # size = prob.comm.size
+        # rank = prob.comm.rank
 
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
         model.set_input_defaults('x', 0.0)
@@ -643,17 +643,13 @@ class TestDOEDriver(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver', out_stream=None)
 
-        # total number of cases recorded across all procs
-        num_cases = prob.comm.allgather(len(cases))
-        self.assertEqual(sum(num_cases), len(expected))
+        self.assertEqual(len(cases), 6)
 
-        for n in range(num_cases):
-            outputs = cr.get_case(cases[n]).outputs
-            idx = n * size + rank  # index of expected case
-
-            self.assertEqual(outputs['x'], expected[idx]['x'])
-            self.assertEqual(outputs['y'], expected[idx]['y'])
-            self.assertEqual(outputs['f_xy'], expected[idx]['f_xy'])
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            self.assertEqual(outputs['x'], expected_case['x'])
+            self.assertEqual(outputs['y'], expected_case['y'])
+            self.assertEqual(outputs['f_xy'], expected_case['f_xy'])
 
     def test_generalized_subset(self):
         # All DVs have the same number of levels
