@@ -607,6 +607,54 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected_case['xy'][0])
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
 
+    def test_full_fact_dict_levels(self):
+        # Specifying levels only for one DV, the other is defaulted
+        prob = om.Problem()
+        model = prob.model
+
+        expected = [
+            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        ]
+
+        size = prob.comm.size
+        rank = prob.comm.rank
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.set_input_defaults('x', 0.0)
+        model.set_input_defaults('y', 0.0)
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels={"y": 3}))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver', out_stream=None)
+
+        # total number of cases recorded across all procs
+        num_cases = prob.comm.allgather(len(cases))
+        self.assertEqual(sum(num_cases), len(expected))
+
+        for n in range(num_cases):
+            outputs = cr.get_case(cases[n]).outputs
+            idx = n * size + rank  # index of expected case
+
+            self.assertEqual(outputs['x'], expected[idx]['x'])
+            self.assertEqual(outputs['y'], expected[idx]['y'])
+            self.assertEqual(outputs['f_xy'], expected[idx]['f_xy'])
+
     def test_generalized_subset(self):
         # All DVs have the same number of levels
         prob = om.Problem()
@@ -1405,53 +1453,6 @@ class TestParallelDOE(unittest.TestCase):
         # total number of cases recorded across all procs
         num_cases = prob.comm.allgather(num_cases)
         self.assertEqual(sum(num_cases), len(expected))
-
-    def test_full_fact_dict_levels(self):
-        prob = om.Problem()
-        model = prob.model
-
-        expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        ]
-
-        size = prob.comm.size
-        rank = prob.comm.rank
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-        model.set_input_defaults('x', 0.0)
-        model.set_input_defaults('y', 0.0)
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels={"y": 3}))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver', out_stream=None)
-
-        # total number of cases recorded across all procs
-        num_cases = prob.comm.allgather(len(cases))
-        self.assertEqual(sum(num_cases), len(expected))
-
-        for n in range(num_cases):
-            outputs = cr.get_case(cases[n]).outputs
-            idx = n * size + rank  # index of expected case
-
-            self.assertEqual(outputs['x'], expected[idx]['x'])
-            self.assertEqual(outputs['y'], expected[idx]['y'])
-            self.assertEqual(outputs['f_xy'], expected[idx]['f_xy'])
 
     def test_fan_in_grouped_parallel_2x2(self):
         # run cases in parallel with 2 procs per model
