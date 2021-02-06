@@ -280,7 +280,8 @@ class _pyDOE_Generator(DOEGenerator):
     ----------
     _levels : int or dict(str, int)
         The number of evenly spaced levels between each design variable
-        lower and upper bound. Dictionary input is supported by Full Factorial or Generalized Subset Design.
+        lower and upper bound. Dictionary input is supported by Full Factorial or
+        Generalized Subset Design.
     """
 
     def __init__(self, levels=_LEVELS):
@@ -291,7 +292,8 @@ class _pyDOE_Generator(DOEGenerator):
         ----------
         levels : int or dict, optional
             The number of evenly spaced levels between each design variable
-            lower and upper bound.  Dictionary input is supported by Full Factorial or Generalized Subset Design.
+            lower and upper bound.  Dictionary input is supported by Full Factorial or
+            Generalized Subset Design.
             Defaults to 2.
         """
         super().__init__()
@@ -300,10 +302,10 @@ class _pyDOE_Generator(DOEGenerator):
 
     def _get_dv_levels(self, name):
         """
-        Gets the number of levels of a design variable.
+        Get the number of levels of a design variable.
 
-        If the name is not given, it looks for a "default" key in the dictionary. If this is also missing, it uses the
-        default number of levels (2).
+        If the name is not given, it looks for a "default" key in the dictionary. If this is also
+        missing, it uses the default number of levels (2).
 
         Parameters
         ----------
@@ -353,8 +355,10 @@ class _pyDOE_Generator(DOEGenerator):
         doe = self._generate_design(size).astype('int')
 
         # Maximum number of levels, or the default if the maximum is smaller than the default.
-        # This is to ensure that the array will be big enough even if some keys are missing from levels (defaulted).
-        levels_max = self._levels if isinstance(self._levels, int) else max(max(self._levels.values()), _LEVELS)
+        # This is to ensure that the array will be big enough even if some keys are missing
+        # from levels (defaulted).
+        levels_max = self._levels if isinstance(self._levels, int) else \
+            max(max(self._levels.values()), _LEVELS)
 
         # Generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
