@@ -354,11 +354,11 @@ class _pyDOE_Generator(DOEGenerator):
         # This is to ensure that the array will be big enough even if some keys are missing from levels (defaulted).
         levels_max = self._levels if isinstance(self._levels, int) else max(max(self._levels.values()), _LEVELS)
 
-        # generate values for each level for each design variable
+        # Generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
         # rows = vars (# rows/var = var size), cols = levels
         values = np.empty((size, levels_max))  # Initialize array for the largest number of levels
-        values[:] = np.nan
+        values[:] = np.nan  # and fill with NaNs.
 
         row = 0
         for name, meta in design_vars.items():
@@ -372,11 +372,8 @@ class _pyDOE_Generator(DOEGenerator):
                     upper = upper[k]
 
                 levels = self._get_dv_levels(name)
-                print(name, levels)
-                if levels > 1:
-                    values[row, 0:levels] = np.linspace(lower, upper, num=levels)
-                else:
-                    values[row, 0:levels] = np.array([levels])
+                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+
                 row += 1
 
         # yield values for doe generated indices
