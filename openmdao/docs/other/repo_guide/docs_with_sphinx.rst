@@ -72,16 +72,16 @@ can rebuild an .rst file whose embed-code dependency has changed, though the .rs
 
     # to remake only recently-changed files, not the entire document base.
     #  note - first item in makefile is default action of "make"
-    html-update: mock redbaron matplotlib build
+    html-update: redbaron matplotlib build
 
     # to force the rebuild a file when its dependecy (e.g. code-embed) changes, not its rst file
-    single: mock redbaron matplotlib touch build
+    single: redbaron matplotlib touch build
 
     # build it all over again (note: make all == make html)
-    all html: make_srcdocs mock redbaron matplotlib tagg buildall post_remove
+    all html: make_srcdocs redbaron matplotlib tagg buildall post_remove
 
     # build it all on CI machines; all warnings are raised as errors.
-    travis: make_srcdocs mock redbaron matplotlib tagg buildalltravis post_remove
+    travis: make_srcdocs redbaron matplotlib tagg buildalltravis post_remove
 
     clean:
         rm -rf $(BUILDDIR)/*

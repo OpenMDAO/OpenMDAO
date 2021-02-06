@@ -13,10 +13,13 @@ __version__ = re.findall(
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'mock',
         'numpydoc>=0.9.1',
         'redbaron',
         'sphinx>=1.8.5',
+    ],
+    'notebooks': [
+        'notebook',
+        'tabulate'
     ],
     'visualization': [
         'bokeh>=1.3.4',
@@ -29,7 +32,8 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'pyppeteer'
+        'pyppeteer',
+        'aiounittest'
     ]
 }
 

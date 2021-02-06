@@ -552,7 +552,7 @@ function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
         {"color": subjacColor(maxcolor), "value": maxcolor},
     ];
 
-    var grad_id = parent_id + "-lingrad";
+    var grad_id = parent_id.slice(1) + "lingrad";
     var defs = parent.select(".heatmap").append("defs");
     var grad = defs.append("linearGradient")
         .attr('x1', '0%')

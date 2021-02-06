@@ -12,9 +12,8 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.vectors.vector import _full_slice
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.units import valid_units, simplify_unit
+from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
@@ -353,6 +352,11 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
+        if self.matrix_free and self._subjacs_info:
+            simple_warning(f"{self.msginfo}: matrix free component has declared the following "
+                           f"partials: {sorted(self._subjacs_info)}, which will allocate "
+                           "(possibly unnecessary) memory for each of those sub-jacobians.")
+
     def setup_partials(self):
         """
         Declare partials.
@@ -473,11 +477,7 @@ class Component(System):
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
-
-            if not valid_units(units):
-                raise ValueError("%s: The units '%s' are invalid." % (self.msginfo, units))
-
-            units = simplify_unit(units)
+            units = simplify_unit(units, msginfo=self.msginfo)
 
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
@@ -692,18 +692,12 @@ class Component(System):
             if not isinstance(res_units, str):
                 msg = '%s: The res_units argument should be a str or None' % self.msginfo
                 raise TypeError(msg)
-            if not valid_units(res_units):
-                raise ValueError("%s: The res_units '%s' are invalid" % (self.msginfo, res_units))
-
-            res_units = simplify_unit(res_units)
+            res_units = simplify_unit(res_units, msginfo=self.msginfo)
 
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
-            if not valid_units(units):
-                raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
-
-            units = simplify_unit(units)
+            units = simplify_unit(units, msginfo=self.msginfo)
 
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
@@ -1192,16 +1186,11 @@ class Component(System):
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
                                               directional))
 
-    def _get_check_partial_options(self, include_wrt_outputs=True):
+    def _get_check_partial_options(self):
         """
         Return dictionary of partial options with pattern matches processed.
 
         This is called by check_partials.
-
-        Parameters
-        ----------
-        include_wrt_outputs : bool
-            If True, include outputs in the wrt list.
 
         Returns
         -------
@@ -1209,7 +1198,7 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        of, wrt = self._get_potential_partials_lists(include_wrt_outputs=include_wrt_outputs)
+        of, wrt = self._get_partials_varlists()
         invalid_wrt = []
         matrix_free = self.matrix_free
 
@@ -1445,7 +1434,7 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, str) else of
         wrt_list = [wrt] if isinstance(wrt, str) else wrt
-        of, wrt = self._get_potential_partials_lists()
+        of, wrt = self._get_partials_varlists()
 
         of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]

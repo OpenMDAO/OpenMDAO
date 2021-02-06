@@ -346,7 +346,8 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        self._sizes = OrderedDict([(name, meta['global_size']) for name, meta in design_vars.items()])
+        self._sizes = OrderedDict([(name, meta['global_size'] if meta['distributed'] else meta['size'])
+                                   for name, meta in design_vars.items()])
         size = sum(self._sizes.values())
         doe = self._generate_design(size).astype('int')
 
@@ -356,13 +357,16 @@ class _pyDOE_Generator(DOEGenerator):
 
         # Generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
+
         # rows = vars (# rows/var = var size), cols = levels
         values = np.empty((size, levels_max))  # Initialize array for the largest number of levels
         values[:] = np.nan  # and fill with NaNs.
 
         row = 0
         for name, meta in design_vars.items():
-            for k in range(meta['global_size']):  # Size of this design variable
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+
+            for k in range(size):
                 lower = meta['lower']
                 if isinstance(lower, np.ndarray):
                     lower = lower[k]
@@ -381,10 +385,11 @@ class _pyDOE_Generator(DOEGenerator):
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size_i = meta['global_size']
+                size_i = meta['global_size'] if meta['distributed'] else meta['size']
                 val = np.empty(size_i)
                 for k in range(size_i):
-                    val[k] = values[row + k, idxs[row + k]]
+                    idx = idxs[row + k]
+                    val[k] = values[row + k][idx]
                 retval.append((name, val))
                 row += size_i
             yield retval

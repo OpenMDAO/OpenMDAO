@@ -113,5 +113,18 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
 
 
+test_cmd_err = [
+    f"openmdao -scaling {os.path.join(scriptdir, 'circle_opt.py')}",
+]
+
+@use_tempdirs
+class CmdlineTestErrTestCase(unittest.TestCase):
+    @parameterized.expand(test_cmd_err, name_func=_test_func_name)
+    def test_cmd(self, cmd):
+        proc = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+        if 'argument : invalid choice:' not in proc.stderr:
+            self.fail(f"Command '{cmd}' didn't fail in the expected way.\n"
+                      f"Return code: {proc.returncode}.\nstderr: {proc.stderr}\nstdout: {proc.stdout}")
+
 if __name__ == '__main__':
     unittest.main()

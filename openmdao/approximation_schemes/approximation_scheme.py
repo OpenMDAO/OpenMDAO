@@ -157,7 +157,7 @@ class ApproximationScheme(object):
 
         out_slices = outputs.get_slice_dict()
 
-        is_total = isinstance(system, Group)
+        is_group = isinstance(system, Group)
 
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
@@ -173,7 +173,7 @@ class ApproximationScheme(object):
                 if 'coloring' in options:
                     keys.update(a[0] for a in apprx)
 
-        if is_total and system.pathname == '':  # top level approx totals
+        if is_group and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
             full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
                                    system._var_allprocs_abs2meta['input']))
@@ -199,22 +199,22 @@ class ApproximationScheme(object):
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
         jac_slices = tmpJ['@jac_slices']
-        for abs_of, roffset, rend, _ in system._jacobian_of_iter():
+        for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend, _ in system._jacobian_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend, _ in system._partial_jac_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
-            if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
+            if is_group and (approx_of_idx or len_full_ofs > len(of_names)):
                 slc = out_slices[abs_of]
                 if abs_of in approx_of_idx:
                     full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
                 else:
-                    full_idxs.append(range(slc.start, slc.stop))
+                    full_idxs.append(np.arange(slc.start, slc.stop))
         if full_idxs:
             tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
-            if is_total and system.pathname == '':  # top level approx totals
+            if is_group and system.pathname == '':  # top level approx totals
                 a2mi = system._var_allprocs_abs2meta['input']
                 a2mo = system._var_allprocs_abs2meta['output']
                 full_wrt_sizes = [a2mi[wrt]['size'] if wrt in a2mi else a2mo[wrt]['size']
@@ -229,11 +229,11 @@ class ApproximationScheme(object):
 
         # get groups of columns from the coloring and compute proper indices into
         # the inputs and outputs vectors.
-        is_semi = is_total and system.pathname
+        is_semi = is_group and system.pathname
         use_full_cols = isinstance(system, ImplicitComponent) or is_semi
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             ccols = cols if col_map is None else col_map[cols]
-            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_total)
+            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_group)
             self._colored_approx_groups.append((data, cols, tmpJ, idx_info, nzrows))
 
     def _init_approximations(self, system):
@@ -267,20 +267,20 @@ class ApproximationScheme(object):
             directional = key[-1]
             data = self._get_approx_data(system, key)
             if inputs._contains_abs(wrt):
-                arr = inputs
+                vec = inputs
                 slices = in_slices
             elif outputs._contains_abs(wrt):
-                arr = outputs
+                vec = outputs
                 slices = out_slices
             else:  # wrt is remote
-                arr = None
+                vec = None
 
             if wrt in approx_wrt_idx:
                 in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
-                if arr is not None:
+                if vec is not None:
                     in_idx += slices[wrt].start
             else:
-                if arr is None:
+                if vec is None:
                     if wrt in abs2meta['input']:
                         in_idx = range(abs2meta['input'][wrt]['size'])
                     else:
@@ -296,7 +296,7 @@ class ApproximationScheme(object):
             tmpJ = _get_wrt_subjacs(system, approx)
             tmpJ['@out_slices'] = out_slices
 
-            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
+            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(vec, in_idx)], None))
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
@@ -439,8 +439,8 @@ class ApproximationScheme(object):
             if mult != 1.0:
                 self._j_colored.data *= mult
 
-            # convert COO matrix to dense for easier slicing
-            Jcolored = self._j_colored.toarray()
+            # convert COO matrix to CSC for easier slicing
+            Jcolored = self._j_colored.tocsc()
 
         elif is_parallel and not is_distributed:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
@@ -452,10 +452,10 @@ class ApproximationScheme(object):
                     slc = tmpJ['@jac_slices'][key]
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
 
         Jcolored = None  # clean up memory
 

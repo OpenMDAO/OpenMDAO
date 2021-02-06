@@ -43,6 +43,9 @@ class TestExplCompSimpleSparse(TestExplCompSimple):
 
 class TestExplCompSimpleJacVec(TestExplCompSimple):
 
+    def setup_partials(self):
+        pass  # prevent declared partials from base class
+
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
 
         length = inputs['length']

@@ -8,7 +8,14 @@ from collections import defaultdict
 
 import numpy as np
 
+try:
+    from IPython.display import IFrame, display
+except ImportError:
+    IFrame = display = None
+
+import openmdao
 from openmdao.core.problem import Problem
+from openmdao.core.notebook_mode import notebook
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -188,5 +195,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
-    if show_browser:
+    if notebook:
+        display(IFrame(src=outfile, width=1000, height=1000))
+
+    if show_browser and not notebook:
         webview(outfile)
