@@ -100,7 +100,7 @@ install:
 
   if [ "$PYOPTSPARSE" ]; then
     echo " >> Installing pyOptSparse";
-    git clone -q -b fixes https://github.com/tadkollar/build_pyoptsparse.git;
+    git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
 
     cd build_pyoptsparse;
     chmod 755 ./build_pyoptsparse.sh;
