@@ -148,20 +148,20 @@ class InfoPropExpr extends InfoPropDefault {
     addRow(tbody, node) {
         if (!this.canShow(node)) return;
 
-        const val = node[this.key];
-
-        let desc = this.desc;
+        const exprArr = node[this.key];
 
         // Add a subsection header for the option rows to follow
         tbody.append('tr').append('th')
-            .text(desc)
+            .text(this.desc)
             .attr('colspan', '2')
             .attr('class', 'options-header');
 
-        for (const idx in val) {
-            const exprVal = (val[idx] === null) ? 'None' : val[idx];
-            const splitExpr = exprVal.split(/\s*=\s*/);
-            InfoPropDefault.addRowWithVal(tbody, splitExpr[0], splitExpr[1]);
+        for (const idx in exprArr) {
+            const splitExpr = exprArr[idx].split(/\s*=\s*/);
+
+            // In case the equals sign is missing for some reason:
+            const displayVal = (splitExpr.length > 1)? splitExpr : [ 'Expr ' + idx, splitExpr[0]];
+            InfoPropDefault.addRowWithVal(tbody, displayVal[0], displayVal[1]);
         }
     }
 }
