@@ -86,8 +86,7 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        system = self._system()
-        abs2meta = system._var_allprocs_abs2meta
+        abs2meta = self._system()._var_allprocs_abs2meta
         of, wrt = abs_key
         if wrt in abs2meta['input']:
             sz = abs2meta['input'][wrt]['size']

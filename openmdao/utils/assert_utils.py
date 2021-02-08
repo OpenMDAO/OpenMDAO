@@ -43,7 +43,10 @@ def assert_warning(category, msg):
         if (issubclass(warn.category, category) and str(warn.message) == msg):
             break
     else:
-        raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
+        msg = f"Did not see expected {category.__name__}: {msg}"
+        if w:
+            msg += f": Did see warnings {[str(ww.message) for ww in w]}"
+        raise AssertionError(msg)
 
 
 @contextmanager

@@ -69,6 +69,9 @@ class QuadraticLinearize(QuadraticComp):
 
 class QuadraticJacVec(QuadraticComp):
 
+    def setup_partials(self):
+        pass  # prevent declaration of partials from base class
+
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
