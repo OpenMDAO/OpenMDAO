@@ -12,6 +12,12 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDe
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.utils.assert_utils import assert_near_equal
 
+from openmdao.utils.mpi import MPI
+try:
+    from openmdao.api import PETScVector
+except:
+    PETScVector = None
+
 
 class SimpleImp(om.ImplicitComponent):
     def setup(self):
@@ -335,6 +341,57 @@ class TestBGSSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][0], 9.61016296175, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78456955704, .00001)
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ProcTestCase1(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_linear_analysis_error(self):
+
+        # test fwd mode
+        prob = om.Problem()
+        model = prob.model
+
+        # takes 6 iterations normally
+        linear_solver = om.LinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=linear_solver))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=2)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'LN: LNBGS' on system 'sub' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
+
+        # test rev mode
+        prob = om.Problem()
+        model = prob.model
+
+        # takes 6 iterations normally
+        linear_solver = om.LinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=linear_solver))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=2)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'LN: LNBGS' on system 'sub' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
 
 if __name__ == "__main__":
     unittest.main()
