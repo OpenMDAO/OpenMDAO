@@ -591,6 +591,43 @@ class ProcTestCase1(unittest.TestCase):
         # Test that Aitken accelerated the convergence, normally takes 7.
         self.assertTrue(model.nonlinear_solver._iter_count == 6)
 
+    def test_nonlinear_analysis_error(self):
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        p1 = model.add_subsystem('p1', om.ParallelGroup(), promotes=['*'])
+        p1.add_subsystem('d1a', SellarDis1withDerivatives(), promotes=['x', 'z'])
+        p1.add_subsystem('d1b', SellarDis1withDerivatives(), promotes=['x', 'z'])
+
+        p2 = model.add_subsystem('p2', om.ParallelGroup(), promotes=['*'])
+        p2.add_subsystem('d2a', SellarDis2withDerivatives(), promotes=['z'])
+        p2.add_subsystem('d2b', SellarDis2withDerivatives(), promotes=['z'])
+
+        model.connect('d1a.y1', 'd2a.y1')
+        model.connect('d1b.y1', 'd2b.y1')
+        model.connect('d2a.y2', 'd1a.y2')
+        model.connect('d2b.y2', 'd1b.y2')
+
+        model.nonlinear_solver = om.NonlinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        prob.setup()
+        prob.set_solver_print(level=2)
+
+        # Set one branch of Sellar close to the solution.
+        prob.set_val('d2b.y2', 12.05848815)
+        prob.set_val('d1b.y1', 25.58830237)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'NL: NLBGS' on system '' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
+
 
 if __name__ == "__main__":
     unittest.main()
