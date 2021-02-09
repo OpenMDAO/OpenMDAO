@@ -2869,6 +2869,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
         assert_near_equal(last_case.outputs['z'], prob['z'])
         assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
+        
+        print(last_case)
+        
+        assert_near_equal(last_case['y1'], prob['y1'], 1e-10)
 
     def test_feature_solver_recording_options(self):
         import openmdao.api as om
