@@ -1,4 +1,54 @@
 **********************************
+# Release Notes for OpenMDAO 3.7.0
+
+February 11, 2021
+
+OpenMDAO 3.7.0 adds the ability for users to use their own Python functions
+from within ExecComp.  It also adds to OpenMDAO's utility in notebook environment
+by formatting output of the informative methods (list_outputs, view_connections, etc)
+in a notebook-friendly table format.  Other changes include performance improvements
+when using partial derivative coloring, continued improvements to the N2 viewer,
+and removal of the mock dependency
+
+## Backwards Incompatible API Changes:
+
+- None
+
+## Backwards Incompatible NON-API Changes:
+
+- If case recorder outputs are returned scaled, this no longer (erroneously) remains true on subsequent calls. [#1850](https://github.com/OpenMDAO/OpenMDAO/pull/1850)
+
+## New Features:
+
+- ExecComp expressions are visible in the N2 Node Info Panel [#1888](https://github.com/OpenMDAO/OpenMDAO/pull/1888)
+- Added ability to load N2 with specific case [#1883](https://github.com/OpenMDAO/OpenMDAO/pull/1883)
+- [POEM 036](https://github.com/OpenMDAO/POEMs/blob/master/POEM_039.md): User created functions can now be used with ExecComp. ExecComp now allows `shape_by_conn` and `copy_shape` options for IO. [#1852](https://github.com/OpenMDAO/OpenMDAO/pull/1852)
+- Options for all solvers are always recorded [#1845](https://github.com/OpenMDAO/OpenMDAO/pull/1835)
+- Added detection of notebook env, table formatting and in cell HTML output [#1844](https://github.com/OpenMDAO/OpenMDAO/pull/1844)
+- Added a display to the N2 so that if an error occurs the user some idea of what happened [#1838](https://github.com/OpenMDAO/OpenMDAO/pull/1838)
+
+## Bug Fixes:
+
+- Fix for the way AnalysisError is raised in parallel. [#1878](https://github.com/OpenMDAO/OpenMDAO/pull/1878)
+- Fixed a bug in doe when desvars have indices defined. [#1873](https://github.com/OpenMDAO/OpenMDAO/pull/1873)
+- Added a fix to ensure that IPython is an optional import in the N2 viewer and connection viewer [#1869](https://github.com/OpenMDAO/OpenMDAO/pull/1869)
+- Fixed a small bug to give better error message when promoting unit together with unitless inputs. [#1867](https://github.com/OpenMDAO/OpenMDAO/pull/1867)
+- Fixed a bug where declaring partials wrt '*' caused extra subjacs for outputs wrt other outputs to be added to the subjacs. [#1862](https://github.com/OpenMDAO/OpenMDAO/pull/1862)
+- Fixed a bug that prevented the jacobian heatmap legend from displaying in firefox [#1859](https://github.com/OpenMDAO/OpenMDAO/pull/1859)
+- openmdao CLI now reports an error if there is a dashed arg other than -h or --version before the command or filename [#1858](https://github.com/OpenMDAO/OpenMDAO/pull/1858)
+- Case recorder now returns a copy of data when getting variables [#1850](https://github.com/OpenMDAO/OpenMDAO/pull/1850)
+- Fixed bug that made Gatherv call fail when calling list outputs on a distributed model [#1847](https://github.com/OpenMDAO/OpenMDAO/pull/1847)
+
+
+## Miscellaneous:
+
+- Cleanup of N2 window code to remove duplication [#1871](https://github.com/OpenMDAO/OpenMDAO/pull/1871)
+- Got rid of memory allocation for -identity subjacs for matrix free ExplicitComponents [#1863](https://github.com/OpenMDAO/OpenMDAO/pull/1863)
+- Switch from mock to the stdlib unittest.mock [#1860](https://github.com/OpenMDAO/OpenMDAO/pull/1860)
+- Switched Favicon to SVG instead of ICO for dynamic switching of website icon based on theme. [#1848](https://github.com/OpenMDAO/OpenMDAO/pull/1848)
+- Added clarification to docs that one must be running under MPI to use DOEDriver in parallel [#1837](https://github.com/OpenMDAO/OpenMDAO/pull/1837)
+
+**********************************
 # Release Notes for OpenMDAO 3.6.0
 
 January 14, 2021
