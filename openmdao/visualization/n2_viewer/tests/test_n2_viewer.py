@@ -1,6 +1,5 @@
 """Unit Tests for n2_viewer"""
 import unittest
-import os
 
 import numpy as np
 
@@ -8,6 +7,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarProblem
 
 @use_tempdirs
 class TestN2Viewer(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestN2Viewer(unittest.TestCase):
         prob.run_driver()
         prob.cleanup()
 
-        data_dict = _get_viewer_data(self.filename, case_id='rank0:DOEDriver_PlackettBurman|3')
+        data_dict = _get_viewer_data(self.filename, case_id=self.driver_case)
 
         vals = data_dict['tree']['children'][2]['children']
         x_val = vals[0]['value']
@@ -171,3 +171,25 @@ class TestN2Viewer(unittest.TestCase):
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
         self.assertEqual(f_xy_val, np.array([27.]))
+
+    def test_auto_ivc_case(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+
+        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
+        prob.driver.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        first_case = cr.list_cases()[0]
+
+        data_dict = _get_viewer_data(self.filename, case_id=first_case)
+
+        vals = data_dict['tree']['children'][0]['children']
+        ivc_0_val = vals[0]['value']
+        ivc_1_val = vals[1]['value']
+
+        self.assertEqual(ivc_0_val, [5., 2])
+        self.assertEqual(ivc_1_val, np.array([1.]))

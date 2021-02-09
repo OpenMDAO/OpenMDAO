@@ -406,12 +406,13 @@ def _get_viewer_data(data_source, case_id=None):
 
             for i in data_dict['tree']['children']:
                 for j in i['children']:
-                    if j['type'] == 'input' and cases.inputs is not None:
-                        j['value'] = cases.inputs[j['name']]
-                    elif j['type'] == 'output' and cases.outputs is not None:
-                        j['value'] = cases.outputs[j['name']]
-                    else:
-                        j['value'] = 0.
+                    if i['name'] != '_auto_ivc':
+                        if j['type'] == 'input' and cases.inputs is not None:
+                            j['value'] = cases.inputs[j['name']]
+                        elif j['type'] == 'output' and cases.outputs is not None:
+                            j['value'] = cases.outputs[j['name']]
+                        else:
+                            j['value'] = 0.
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
