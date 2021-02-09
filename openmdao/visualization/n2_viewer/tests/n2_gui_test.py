@@ -203,6 +203,40 @@ n2_gui_test_scripts = {
             "selector": "g#n2elements > g.n2cell",
             "count": 40
         },
+        {
+            "desc": "Expand toolbar connections menu",
+            "test": "hover",
+            "selector": ".group-3 > div.expandable:first-child"
+        },
+        {
+            "desc": "Press toolbar show all connections button",
+            "test": "click",
+            "selector": "#show-all-connections",
+            "button": "left"
+        },
+        {
+            "desc": "Check number of arrows",
+            "test": "count",
+            "selector": "g#n2arrows > g",
+            "count": 44
+        },
+        {
+            "desc": "Expand toolbar connections menu",
+            "test": "hover",
+            "selector": ".group-3 > div.expandable:first-child"
+        },
+        {
+            "desc": "Press toolbar hide all connections button",
+            "test": "click",
+            "selector": "#hide-connections-2",
+            "button": "left"
+        },
+        {
+            "desc": "Check number of arrows",
+            "test": "count",
+            "selector": "g#n2arrows > g",
+            "count": 0
+        }
     ],
     "bug_arrow": [
         {
@@ -624,7 +658,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         return handle
 
-    async def hover(self, options, log_test = True):
+    async def hover(self, options, log_test=True):
         """
         Hover over the specified element.
         """
@@ -674,7 +708,7 @@ class n2_gui_test_case(unittest.TestCase):
                       "Dragging '" + options['selector'] + "' to " + options['x'] + "," + options['y'])
 
         hndl = await self.get_handle(options['selector'])
-        
+
         pre_drag_bbox = await hndl.boundingBox()
 
         await hndl.hover()
@@ -686,8 +720,8 @@ class n2_gui_test_case(unittest.TestCase):
         post_drag_bbox = await hndl.boundingBox()
 
         moved = ((pre_drag_bbox['x'] != post_drag_bbox['x']) or
-            (pre_drag_bbox['y'] != post_drag_bbox['y']))
-        
+                 (pre_drag_bbox['y'] != post_drag_bbox['y']))
+
         self.assertIsNot(moved, False,
                          "The '" + options['selector'] + "' element did not move.")
 
@@ -703,12 +737,14 @@ class n2_gui_test_case(unittest.TestCase):
 
         win_hndl = await self.get_handle(options['selector'])
         pre_resize_bbox = await win_hndl.boundingBox()
-        
+
         edge_hndl = await self.get_handle(options['selector'] + ' div.rsz-' + options['side'])
         edge_bbox = await edge_hndl.boundingBox()
 
-        new_x = edge_bbox['x'] + resize_dirs[options['side']][0] * options['distance']
-        new_y = edge_bbox['y'] + resize_dirs[options['side']][1] * options['distance']
+        new_x = edge_bbox['x'] + \
+            resize_dirs[options['side']][0] * options['distance']
+        new_y = edge_bbox['y'] + \
+            resize_dirs[options['side']][1] * options['distance']
 
         await edge_hndl.hover()
         await self.page.mouse.down()
@@ -722,10 +758,10 @@ class n2_gui_test_case(unittest.TestCase):
         resized = ((dw != 0) or (dh != 0))
         if options['expectChange']:
             self.assertIsNot(resized, False,
-                         "The '" + options['selector'] + "' element was NOT resized and should have been.")
+                             "The '" + options['selector'] + "' element was NOT resized and should have been.")
         else:
             self.assertIsNot(resized, True,
-                         "The '" + options['selector'] + "' element was resized and should NOT have been.")
+                             "The '" + options['selector'] + "' element was resized and should NOT have been.")
 
         # await self.page.screenshot({'path': 'postresize.png'})
 
