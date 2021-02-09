@@ -387,20 +387,29 @@ def _get_viewer_data(data_source, case_id=None):
 
         if case_id is not None:
             if isinstance(case_id, str):
-                if 'root' in case_id:
-                    raise ValueError(f"case_id is not a driver case. Find valid case_id with "
-                                     f"om.CaseReader('{data_source}').list_cases()")
-                sys_cases = cr._driver_cases._cases[case_id]
+                if 'root' in case_id and case_id:
+                    try:
+                        cases = cr._system_cases._cases[case_id]
+                    except KeyError:
+                        raise KeyError("Case not found. Add problem level recorder and re-run or "
+                                       "use driver case.")
+                else:
+                    cases = cr._driver_cases._cases[case_id]
             else:
-                cases = [key for key in cr._driver_cases._cases.keys()]
-                sys_cases = cr._driver_cases._cases[cases[case_id]]
+                try:
+                    cases = [key for key in cr._system_cases._cases.keys()]
+                    cases = cr._system_cases._cases[cases[case_id]]
+                except IndexError:
+                    simple_warning("No system case. Using driver cases instead.")
+                    cases = [key for key in cr._driver_cases._cases.keys()]
+                    cases = cr._driver_cases._cases[cases[case_id]]
 
             for i in data_dict['tree']['children']:
                 for j in i['children']:
-                    if j['type'] == 'input' and sys_cases.inputs is not None:
-                        j['value'] = sys_cases.inputs[j['name']]
-                    elif j['type'] == 'output' and sys_cases.outputs is not None:
-                        j['value'] = sys_cases.outputs[j['name']]
+                    if j['type'] == 'input' and cases.inputs is not None:
+                        j['value'] = cases.inputs[j['name']]
+                    elif j['type'] == 'output' and cases.outputs is not None:
+                        j['value'] = cases.outputs[j['name']]
                     else:
                         j['value'] = 0.
 
@@ -499,7 +508,7 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         The Problem or case recorder database containing the model or model data.
 
     case_id : int, str, or None
-        Case name or index of case in SQL file.
+        Case name or index of case in SQL file if data_source is a database.
 
     outfile : str, optional
         The name of the final output file
