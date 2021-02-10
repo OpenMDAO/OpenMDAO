@@ -386,33 +386,31 @@ def _get_viewer_data(data_source, case_id=None):
         data_dict = cr.problem_metadata
 
         if case_id is not None:
-            if isinstance(case_id, str):
-                if 'root' in case_id and case_id:
-                    try:
-                        cases = cr._system_cases._cases[case_id]
-                    except KeyError:
-                        raise KeyError("Case not found. Add problem level recorder and re-run or "
-                                       "use driver case.")
-                else:
-                    cases = cr._driver_cases._cases[case_id]
-            else:
-                try:
-                    cases = [key for key in cr._system_cases._cases.keys()]
-                    cases = cr._system_cases._cases[cases[case_id]]
-                except IndexError:
-                    simple_warning("No system case. Using driver cases instead.")
-                    cases = [key for key in cr._driver_cases._cases.keys()]
-                    cases = cr._driver_cases._cases[cases[case_id]]
+            # if isinstance(case_id, str):
+            #     if 'root' in case_id and case_id:
+            #         try:
+            #             cases = cr._system_cases._cases[case_id]
+            #         except KeyError:
+            #             raise KeyError("Case not found. Add problem level recorder and re-run or "
+            #                            "use driver case.")
+            #     else:
+            #         cases = cr.get_case(case_id)
+            # else:
+            cases = cr.get_case(case_id)
+            print(f"Using source: {cases.source}\nCase: {cases.name}")
 
             for i in data_dict['tree']['children']:
                 for j in i['children']:
                     if i['name'] != '_auto_ivc':
-                        if j['type'] == 'input' and cases.inputs is not None:
-                            j['value'] = cases.inputs[j['name']]
+                        if j['type'] == 'input':
+                            if cases.inputs is not None:
+                                j['value'] = cases.inputs[j['name']]
+                            else:
+                                j['value'] = 'N/A'
                         elif j['type'] == 'output' and cases.outputs is not None:
                             j['value'] = cases.outputs[j['name']]
                         else:
-                            j['value'] = 0.
+                            j['value'] = "N/A"
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
