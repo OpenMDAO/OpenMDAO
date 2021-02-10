@@ -23,12 +23,13 @@ and removal of the mock dependency
 - ExecComp expressions are visible in the N2 Node Info Panel [#1888](https://github.com/OpenMDAO/OpenMDAO/pull/1888)
 - Added ability to load N2 with specific case [#1883](https://github.com/OpenMDAO/OpenMDAO/pull/1883)
 - [POEM 036](https://github.com/OpenMDAO/POEMs/blob/master/POEM_039.md): User created functions can now be used with ExecComp. ExecComp now allows `shape_by_conn` and `copy_shape` options for IO. [#1852](https://github.com/OpenMDAO/OpenMDAO/pull/1852)
-- Options for all solvers are always recorded [#1845](https://github.com/OpenMDAO/OpenMDAO/pull/1835)
+- Options for all solvers are always recorded [#1845](https://github.com/OpenMDAO/OpenMDAO/pull/1845)
 - Added detection of notebook env, table formatting and in cell HTML output [#1844](https://github.com/OpenMDAO/OpenMDAO/pull/1844)
 - Added a display to the N2 so that if an error occurs the user some idea of what happened [#1838](https://github.com/OpenMDAO/OpenMDAO/pull/1838)
 
 ## Bug Fixes:
 
+- Fixed N2 connections toolbar show/hide buttons [#1890](https://github.com/OpenMDAO/OpenMDAO/pull/1890)
 - Fix for the way AnalysisError is raised in parallel. [#1878](https://github.com/OpenMDAO/OpenMDAO/pull/1878)
 - Fixed a bug in doe when desvars have indices defined. [#1873](https://github.com/OpenMDAO/OpenMDAO/pull/1873)
 - Added a fix to ensure that IPython is an optional import in the N2 viewer and connection viewer [#1869](https://github.com/OpenMDAO/OpenMDAO/pull/1869)
