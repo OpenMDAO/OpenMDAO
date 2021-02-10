@@ -262,7 +262,7 @@ class N2Toolbar {
             });
 
         new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Remove all connection arrows",
+            "Control connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
@@ -283,7 +283,7 @@ class N2Toolbar {
             });
 
         new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
-            "Control Solver Tree Display",
+            "Control solver tree display",
             function (target) {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();
