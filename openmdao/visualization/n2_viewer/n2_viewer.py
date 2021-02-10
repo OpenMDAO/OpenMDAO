@@ -381,7 +381,7 @@ def _get_viewer_data(data_source, case_id=None):
             return {}
 
     elif isinstance(data_source, str):
-        cr = CaseReader(data_source, pre_load=True)
+        cr = CaseReader(data_source)
 
         data_dict = cr.problem_metadata
 
