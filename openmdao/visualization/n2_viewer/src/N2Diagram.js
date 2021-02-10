@@ -140,17 +140,88 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
+    /*
+     * Recurse and pull state info from model for saving.
+     */
+    getSubState(dataList, node = this.model.root) {
+        dataList.push(node.isMinimized);
+        dataList.push(node.manuallyExpanded);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.getSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and set state info into model.
+     */
+    setSubState(dataList, node = this.model.root) {
+        node.isMinimized = (dataList.pop() == 'true');
+        node.manuallyExpanded = (dataList.pop() == 'true');
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.setSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and return node given id.
+     */
+    findNodeById(id, node = this.model.root) {
+        if (id == node.id) {
+            return node;
+        }
+        else if (node.hasChildren()) {
+            for (const child of node.children) {
+                let found = this.findNodeById(id, child);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+        else {
+            return false;
+        }
+
+        return false;
+    }
 
     /**
      * Save the model state to a file.
      */
     saveState() {
-        let stateFileName = 'n2.state';
-        let data = this.showLinearSolverNames;
+        let stateFileName = prompt("Filename to save view state as", 'n2.state');
+
+        // Solver toggle state.
+        let showLinearSolverNames = this.showLinearSolverNames;
+        let showSolvers = this.showSolvers;
+
+        // Zoomed node (subsystem).
+        let zoomedElement = this.zoomedElement.id;
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        let expandCollapse = Array()
+        this.getSubState(expandCollapse);
+
+        // Arrow State
+        let arrowState = this.arrowMgr.savePinnedArrows();
+
+        let dataDict = {
+                        'showLinearSolverNames': showLinearSolverNames,
+                        'showSolvers': showSolvers,
+                        'zoomedElement': zoomedElement,
+                        'expandCollapse': expandCollapse,
+                        'arrowState': arrowState,
+                        };
 
         var link = document.createElement('a');
         link.setAttribute('download', stateFileName);
-        let data_blob = new Blob([data], {type: 'text/plain'});
+        let data_blob = new Blob([JSON.stringify(dataDict)],
+                                 {type: 'text/plain'});
 
         // If we are replacing a previously generated file we need to
         // manually revoke the object URL to avoid memory leaks.
@@ -173,22 +244,44 @@ class N2Diagram {
      * Load the model state to a file.
      */
     loadState() {
-        console.log('Loading State');
         let self = this;
+        let arrowstate = null;
         document.getElementById('state-file-input').addEventListener('change', function() {
 
             var fr=new FileReader();
             fr.onload=function(){
-                console.log(fr.result);
-                self.showLinearSolverNames = fr.result
-                self.ui.setSolvers(fr.result)
+                let dataDict = JSON.parse(fr.result);
+
+                // Solver toggle state.
+                self.showLinearSolverNames = dataDict['showLinearSolverNames'];
+                self.ui.setSolvers(dataDict['showLinearSolverNames']);
+                self.showSolvers = dataDict['showSolvers'];
+
+                // Zoomed node (subsystem).
+                self.zoomedElement = self.findNodeById(dataDict['zoomedElement']);
+
+                // Expand/Collapse state of all nodes (subsystems) in model.
+                self.setSubState(dataDict['expandCollapse'].reverse());
+
+                // Force an immediate display update.
+                // Needed to do this so that the arrows don't slip in before the element zoom.
+                self.layout = new N2Layout(self.model, self.zoomedElement,
+                    self.showLinearSolverNames, self.showSolvers, self.dims);
+                self.ui.updateClickedIndices();
+                self.matrix = new N2Matrix(self.model, self.layout,
+                    self.dom.n2Groups, self.arrowMgr, self.ui.lastClickWasLeft,
+                    self.ui.findRootOfChangeFunction, self.matrix.nodeSize);
+                self._updateScale();
+                self.layout.updateTransitionInfo(self.dom, self.transitionStartDelay, self.manuallyResized);
+
+                // Arrow State
+                self.arrowMgr.loadPinnedArrows(dataDict['arrowState']);
+
             }
             fr.readAsText(this.files[0]);
         })
 
         document.getElementById('state-file-input').click();
-        //var fr=new FileReader();
-        //fr.readAsText(document.getElementById('state-file-input').files[0]);
     }
 
     /**

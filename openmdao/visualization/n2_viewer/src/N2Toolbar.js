@@ -311,10 +311,10 @@ class N2Toolbar {
             "Save to SVG", e => { n2ui.n2Diag.saveSvg() });
 
         new N2ToolbarButtonClick('#save-state-button', tooltipBox,
-            "Save Model State", e => { n2ui.n2Diag.saveState() });
+            "Save View State", e => { n2ui.n2Diag.saveState() });
 
         new N2ToolbarButtonClick('#load-state-button', tooltipBox,
-            "Load Model State", e => { n2ui.n2Diag.loadState() });
+            "Load View State", e => { n2ui.n2Diag.loadState() });
 
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
