@@ -386,16 +386,6 @@ def _get_viewer_data(data_source, case_id=None):
         data_dict = cr.problem_metadata
 
         if case_id is not None:
-            # if isinstance(case_id, str):
-            #     if 'root' in case_id and case_id:
-            #         try:
-            #             cases = cr._system_cases._cases[case_id]
-            #         except KeyError:
-            #             raise KeyError("Case not found. Add problem level recorder and re-run or "
-            #                            "use driver case.")
-            #     else:
-            #         cases = cr.get_case(case_id)
-            # else:
             cases = cr.get_case(case_id)
             print(f"Using source: {cases.source}\nCase: {cases.name}")
 
