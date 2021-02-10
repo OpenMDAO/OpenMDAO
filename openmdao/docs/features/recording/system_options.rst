@@ -9,6 +9,7 @@ System Recording
 
 If you need to focus on a smaller part of your model, it may be useful to attach a case recorder to
 a particular :code:`System`. There are slightly different options when recording from these objects.
+System recording can only be used in serial running environments and cannot currently be used in parallel.
 
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^

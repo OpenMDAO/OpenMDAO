@@ -261,8 +261,29 @@ class N2Toolbar {
                 self._setRootButton(target);
             });
 
+        new N2ToolbarButtonClick('#hide-connections', tooltipBox,
+            "Control connection arrows",
+            function (target) {
+                n2ui.n2Diag.clearArrows();
+                self._setRootButton(target);
+            });
+
+        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+            "Remove all connection arrows",
+            function (target) {
+                n2ui.n2Diag.clearArrows();
+                self._setRootButton(target);
+            });
+
+        new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
+            "Show all connections in view",
+            function (target) {
+                n2ui.n2Diag.showAllArrows();
+                self._setRootButton(target);
+            });
+
         new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
-            "Control Solver Tree Display",
+            "Control solver tree display",
             function (target) {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();

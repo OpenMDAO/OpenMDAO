@@ -134,6 +134,38 @@ class InfoPropOptions extends InfoPropDefault {
     }
 }
 
+/** Display a subsection of expression values in the info panel for ExecComps */
+class InfoPropExpr extends InfoPropDefault {
+    constructor(key, desc) {
+        super(key, desc, false);
+    }
+
+    /**
+     * There may be a list of expressions, so create a subsection in the table for them.
+     * @param {Object} tbody D3 reference to an existing table body.
+     * @param {N2TreeNode} node Reference to the node that may have the property.
+     */
+    addRow(tbody, node) {
+        if (!this.canShow(node)) return;
+
+        const exprArr = node[this.key];
+
+        // Add a subsection header for the option rows to follow
+        tbody.append('tr').append('th')
+            .text(this.desc)
+            .attr('colspan', '2')
+            .attr('class', 'options-header');
+
+        for (const idx in exprArr) {
+            const splitExpr = exprArr[idx].split(/\s*=\s*/);
+
+            // In case the equals sign is missing for some reason:
+            const displayVal = (splitExpr.length > 1)? splitExpr : [ 'Expr ' + idx, splitExpr[0]];
+            InfoPropDefault.addRowWithVal(tbody, displayVal[0], displayVal[1]);
+        }
+    }
+}
+
 /**
  * Handles properties that are arrays.
  * @typedef InfoPropArray
@@ -411,6 +443,8 @@ class NodeInfo extends N2Window {
             new InfoPropYesNo('is_parallel', 'Parallel'),
             new InfoPropDefault('linear_solver', 'Linear Solver'),
             new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver'),
+            new InfoPropExpr('expressions', 'Expressions'),
+
             new InfoPropOptions('options', 'Options'),
             new InfoPropOptions('linear_solver_options', 'Linear Solver Options', 'linear'),
             new InfoPropOptions('nonlinear_solver_options', 'Non-Linear Solver Options', 'nonlinear'),
