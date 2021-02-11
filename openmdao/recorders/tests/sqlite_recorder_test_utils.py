@@ -451,7 +451,8 @@ def assertViewerDataRecorded(test, expected):
         if f_version >= 6:
             test.assertEqual(set(model_viewer_data.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list',
-            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            'driver', 'design_vars', 'responses', 'declare_partials_list',
+            'md5_hash'
             })
         else:
             test.assertEqual(set(model_viewer_data.keys()), {

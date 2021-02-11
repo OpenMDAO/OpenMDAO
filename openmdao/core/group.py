@@ -1,7 +1,6 @@
 """Define the Group class."""
 import os
 import sys
-import hashlib
 from collections import Counter, OrderedDict, defaultdict, deque
 from collections.abc import Iterable
 
@@ -3583,46 +3582,3 @@ class Group(System):
                           f"to '{prom}', are connected but their metadata entries {meta}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the {gname} to remove the ambiguity.")
-
-    def _generate_md5_hash(self):
-        """
-        Generate an md5 hash for the data structure of this model.
-
-        The hash is generated from an encoded string containing the physical model hiearchy,
-        including all component and variable names, and all connection information.
-
-        The hash is used by the n2 viewer to determine if a saved view can be reused. It is not
-        intended to accurate track whether a model has been changed, so no options/settings are
-        tracked.
-
-        Returns
-        -------
-        str
-            The md5 hash string for the model.
-        """
-        data = []
-
-        # Model Hierarchy.
-        for sys_name in self.system_iter(include_self=True, recurse=True):
-
-            # System name and depth.
-            pathname = sys_name.pathname
-            if pathname:
-                name_parts = pathname.split('.')
-                depth = len(name_parts)
-
-                data.append((name_parts[-1], depth))
-
-            else:
-                data.append(('model', 0))
-
-            # Local (relative) names for Component inputs and outputs.
-            try:
-                data.append(sys_name._var_rel_names)
-            except AttributeError:
-                continue
-
-        # All Connections.
-        data.append(self._conn_global_abs_in2out)
-
-        return hashlib.md5(str(data).encode()).hexdigest()
