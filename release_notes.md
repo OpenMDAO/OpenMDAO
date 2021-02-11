@@ -25,16 +25,16 @@ and removal of the mock dependency
 - [POEM 036](https://github.com/OpenMDAO/POEMs/blob/master/POEM_039.md): User created functions can now be used with ExecComp. ExecComp now allows `shape_by_conn` and `copy_shape` options for IO. [#1852](https://github.com/OpenMDAO/OpenMDAO/pull/1852)
 - Options for all solvers are always recorded [#1845](https://github.com/OpenMDAO/OpenMDAO/pull/1845)
 - Added detection of notebook env, table formatting and in cell HTML output [#1844](https://github.com/OpenMDAO/OpenMDAO/pull/1844)
-- Added a display to the N2 so that if an error occurs the user some idea of what happened [#1838](https://github.com/OpenMDAO/OpenMDAO/pull/1838)
+- Added a display to the N2 so that if an error occurs the user has some idea of what happened [#1838](https://github.com/OpenMDAO/OpenMDAO/pull/1838)
 
 ## Bug Fixes:
 
 - Fixed N2 connections toolbar show/hide buttons [#1890](https://github.com/OpenMDAO/OpenMDAO/pull/1890)
-- Fix for the way AnalysisError is raised in parallel. [#1878](https://github.com/OpenMDAO/OpenMDAO/pull/1878)
+- Fixed a bug in nonlinear and linear solvers when running under MPI so that AnalysisErrors for non-convergence are raised on all processors instead of just root. [#1878](https://github.com/OpenMDAO/OpenMDAO/pull/1878)
 - Fixed a bug in doe when desvars have indices defined. [#1873](https://github.com/OpenMDAO/OpenMDAO/pull/1873)
 - Added a fix to ensure that IPython is an optional import in the N2 viewer and connection viewer [#1869](https://github.com/OpenMDAO/OpenMDAO/pull/1869)
-- Fixed a small bug to give better error message when promoting unit together with unitless inputs. [#1867](https://github.com/OpenMDAO/OpenMDAO/pull/1867)
-- Fixed a bug where declaring partials wrt '*' caused extra subjacs for outputs wrt other outputs to be added to the subjacs. [#1862](https://github.com/OpenMDAO/OpenMDAO/pull/1862)
+- Fixed a small bug to give better error message when promoting an input with units together with an input without units. [#1867](https://github.com/OpenMDAO/OpenMDAO/pull/1867)
+- Fixed a bug where declaring partials wrt '*' caused extra subjacs for outputs wrt other outputs to be added to the subjacs. This resulted in total derivative colorings that were less efficient than they should be. [#1862](https://github.com/OpenMDAO/OpenMDAO/pull/1862)
 - Fixed a bug that prevented the jacobian heatmap legend from displaying in firefox [#1859](https://github.com/OpenMDAO/OpenMDAO/pull/1859)
 - openmdao CLI now reports an error if there is a dashed arg other than -h or --version before the command or filename [#1858](https://github.com/OpenMDAO/OpenMDAO/pull/1858)
 - Case recorder now returns a copy of data when getting variables [#1850](https://github.com/OpenMDAO/OpenMDAO/pull/1850)
