@@ -417,11 +417,6 @@
     cursor: pointer;
 }
 
-.slider datalist {
-    color: white;
-    display: flex;
-}
-
 #model-slider-label {
     min-width: 30px;
     text-align: center;
