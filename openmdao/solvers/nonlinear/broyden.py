@@ -630,22 +630,6 @@ class BroydenSolver(NonlinearSolver):
 
         return inv_jac
 
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if self.options['iprint'] > 0 and self._system().comm.rank == 0:
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
-
     def cleanup(self):
         """
         Clean up resources prior to exit.
