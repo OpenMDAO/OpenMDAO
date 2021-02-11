@@ -989,19 +989,19 @@ class N2ArrowManager {
         for (var arrowId in pinned.arrows) {
             let arrow = pinned.arrows[arrowId];
 
-            if (arrow['cell'] !== undefined) {
+            if (arrow.cell !== undefined) {
                 // Off screen connection.
-                data[arrowId] = [arrow['cellId'], arrow['direction'],
-                                 arrow['cell']['col'], arrow['cell']['row'],
-                                 arrow['cell']['srcId'], arrow['cell']['tgtId'],
-                                 arrow.attribs['matrixSize'], arrow.attribs['label'], arrow.attribs['offscreenId']];
+                data[arrowId] = [arrow.cellId, arrow.direction,
+                                 arrow.cell.col, arrow.cell.row,
+                                 arrow.cell.srcId, arrow.cell.tgtId,
+                                 arrow.attribs.matrixSize, arrow.attribs.label, arrow.attribs.offscreenId];
             }
             else {
                 // On screen connection.
-                data[arrowId] = [arrow['cellId'],
-                                 arrow['start']['col'], arrow['start']['row'], arrow['start']['id'],
-                                 arrow['end']['col'], arrow['end']['row'], arrow['end']['id'],
-                                 arrow['color']];
+                data[arrowId] = [arrow.cellId,
+                                 arrow.start.col, arrow.start.row, arrow.start.id,
+                                 arrow.end.col, arrow.end.row, arrow.end.id,
+                                 arrow.color];
             }
 
         }

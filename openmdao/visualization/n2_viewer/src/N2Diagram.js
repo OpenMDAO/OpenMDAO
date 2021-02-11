@@ -216,6 +216,7 @@ class N2Diagram {
                         'zoomedElement': zoomedElement,
                         'expandCollapse': expandCollapse,
                         'arrowState': arrowState,
+                        'md5_hash': this.model.md5_hash,
                         };
 
         var link = document.createElement('a');
@@ -252,30 +253,34 @@ class N2Diagram {
             fr.onload=function(){
                 let dataDict = JSON.parse(fr.result);
 
-                // Solver toggle state.
-                self.showLinearSolverNames = dataDict['showLinearSolverNames'];
-                self.ui.setSolvers(dataDict['showLinearSolverNames']);
-                self.showSolvers = dataDict['showSolvers'];
+                // Make sure model didn't change.
+                if (dataDict.md5_hash && dataDict.md5_hash == self.model.md5_hash) {
 
-                // Zoomed node (subsystem).
-                self.zoomedElement = self.findNodeById(dataDict['zoomedElement']);
+                    // Solver toggle state.
+                    self.showLinearSolverNames = dataDict.showLinearSolverNames;
+                    self.ui.setSolvers(dataDict.showLinearSolverNames);
+                    self.showSolvers = dataDict.showSolvers;
 
-                // Expand/Collapse state of all nodes (subsystems) in model.
-                self.setSubState(dataDict['expandCollapse'].reverse());
+                    // Zoomed node (subsystem).
+                    self.zoomedElement = self.findNodeById(dataDict.zoomedElement);
 
-                // Force an immediate display update.
-                // Needed to do this so that the arrows don't slip in before the element zoom.
-                self.layout = new N2Layout(self.model, self.zoomedElement,
-                    self.showLinearSolverNames, self.showSolvers, self.dims);
-                self.ui.updateClickedIndices();
-                self.matrix = new N2Matrix(self.model, self.layout,
-                    self.dom.n2Groups, self.arrowMgr, self.ui.lastClickWasLeft,
-                    self.ui.findRootOfChangeFunction, self.matrix.nodeSize);
-                self._updateScale();
-                self.layout.updateTransitionInfo(self.dom, self.transitionStartDelay, self.manuallyResized);
+                    // Expand/Collapse state of all nodes (subsystems) in model.
+                    self.setSubState(dataDict.expandCollapse.reverse());
 
-                // Arrow State
-                self.arrowMgr.loadPinnedArrows(dataDict['arrowState']);
+                    // Force an immediate display update.
+                    // Needed to do this so that the arrows don't slip in before the element zoom.
+                    self.layout = new N2Layout(self.model, self.zoomedElement,
+                        self.showLinearSolverNames, self.showSolvers, self.dims);
+                    self.ui.updateClickedIndices();
+                    self.matrix = new N2Matrix(self.model, self.layout,
+                        self.dom.n2Groups, self.arrowMgr, self.ui.lastClickWasLeft,
+                        self.ui.findRootOfChangeFunction, self.matrix.nodeSize);
+                    self._updateScale();
+                    self.layout.updateTransitionInfo(self.dom, self.transitionStartDelay, self.manuallyResized);
+
+                    // Arrow State
+                    self.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+                }
 
             }
             fr.readAsText(this.files[0]);
