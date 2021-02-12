@@ -6,6 +6,8 @@ Instructions on editing the icons used for the toolbar.
 	1. Go to https://icomoon.io/app/#/select
 	2. In the top left corner press import icons and select all the icons in
 		the openmdao/visualization/n2_viewer/assets/toolbar_graphics/icomoon_icons/SVG folder
+	3. We use some of the provided free icons too. Add the following icons to your selected set:
+	    - Notification
 	4. Depending on whether you want to remove, replace, or edit an icon:
 		- If you want to remove an icon, in the icomoon toolbar there should be a trash icon.
 			Click that and then click the icon you wish to remove. Click the Select button in the icomoon toolbar
@@ -52,80 +54,89 @@ Instructions on editing the icons used for the toolbar.
   -moz-osx-font-smoothing: grayscale;
 }
 
-.icon-text-height:before {
+.icon-backward:before {
   content: "\e900";
 }
-.icon-no-solver:before {
+.icon-bezier-curve:before {
   content: "\e901";
 }
-.icon-shrink2:before {
+.icon-caret-right:before {
   content: "\e902";
 }
-.icon-shrink:before {
+.icon-chevron-left:before {
   content: "\e903";
 }
-.icon-show-connections:before {
+.icon-collapse-depth:before {
   content: "\e904";
 }
-.icon-search:before {
+.icon-enlarge:before {
   content: "\e905";
 }
-.icon-save:before {
+.icon-enlarge2:before {
   content: "\e906";
 }
-.icon-question-circle:before {
+.icon-floppy-disk:before {
   content: "\e907";
 }
-.icon-nonlinear-solver:before {
+.icon-forward:before {
   content: "\e908";
 }
-.icon-model-height:before {
+.icon-fx-2:before {
   content: "\e909";
 }
-.icon-linear-solver:before {
+.icon-hide-connections:before {
   content: "\e90a";
 }
-.icon-key:before {
+.icon-home2:before {
   content: "\e90b";
 }
 .icon-info-circle:before {
   content: "\e90c";
 }
-.icon-home2:before {
+.icon-key:before {
   content: "\e90d";
 }
-.icon-hide-connections:before {
+.icon-linear-solver:before {
   content: "\e90e";
 }
-.icon-fx-2:before {
+.icon-loadview:before {
   content: "\e90f";
 }
-.icon-forward:before {
+.icon-model-height:before {
   content: "\e910";
 }
-.icon-floppy-disk:before {
+.icon-nonlinear-solver:before {
   content: "\e911";
 }
-.icon-enlarge2:before {
+.icon-no-solver:before {
   content: "\e912";
 }
-.icon-enlarge:before {
+.icon-question-circle:before {
   content: "\e913";
 }
-.icon-collapse-depth:before {
+.icon-save:before {
   content: "\e914";
 }
-.icon-chevron-left:before {
+.icon-savesvg:before {
   content: "\e915";
 }
-.icon-caret-right:before {
+.icon-saveview:before {
   content: "\e916";
 }
-.icon-bezier-curve:before {
+.icon-search:before {
   content: "\e917";
 }
-.icon-backward:before {
+.icon-show-connections:before {
   content: "\e918";
+}
+.icon-shrink:before {
+  content: "\e919";
+}
+.icon-shrink2:before {
+  content: "\e91a";
+}
+.icon-text-height:before {
+  content: "\e91b";
 }
 .icon-notification:before {
   content: "\ea08";
@@ -147,70 +158,5 @@ Instructions on editing the icons used for the toolbar.
 .bigger-font {
 	font-size: 1.33333333em;
 	line-height: 0.75em;
-	vertical-align: -15%;
-}
-
-/* To get SVG and PNG images of these icon fonts, use https://icomoon.io/app/#/select */
-.icon-home:before {
-	content: '\e800';
-}
-
-.icon-left-big:before {
-	content: '\e801';
-}
-
-.icon-right-big:before {
-	content: '\e802';
-}
-
-.icon-up-big:before {
-	content: '\e803';
-}
-
-.icon-resize-full:before {
-	content: '\e804';
-}
-
-.icon-resize-small:before {
-	content: '\e805';
-}
-
-.icon-resize-vertical:before {
-	content: '\e807';
-}
-
-.icon-floppy:before {
-	content: '\e808';
-}
-
-.icon-minus:before {
-	content: '\e80a';
-}
-
-.icon-exchange:before {
-	content: '\f0ec';
-}
-
-.icon-terminal:before {
-	content: '\f120';
-}
-
-.icon-help:before {
-	content: '\f128';
-}
-
-.icon-eraser:before {
-	content: '\f12d';
-}
-
-.icon-sort-number-up:before {
-	content: '\f162';
-}
-
-.icon-right:before {
-	content: '\f178';
-}
-
-.icon-map-signs:before {
-	content: '\f277';
+	vertical-align: -25%;
 }

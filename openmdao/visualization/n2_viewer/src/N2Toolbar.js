@@ -328,8 +328,17 @@ class N2Toolbar {
         new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox, "Set collapse depth");
         new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox, "Set model height");
 
+        new N2ToolbarButtonClick('#save-load-button', tooltipBox,
+            "Save or Load an Image or View");
+
         new N2ToolbarButtonClick('#save-button', tooltipBox,
             "Save to SVG", e => { n2ui.n2Diag.saveSvg() });
+
+        new N2ToolbarButtonClick('#save-state-button', tooltipBox,
+            "Save View", e => { n2ui.n2Diag.saveState() });
+
+        new N2ToolbarButtonClick('#load-state-button', tooltipBox,
+            "Load View", e => { n2ui.n2Diag.loadState() });
 
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],

@@ -140,6 +140,158 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
+    /*
+     * Recurse and pull state info from model for saving.
+     */
+    getSubState(dataList, node = this.model.root) {
+        dataList.push(node.isMinimized);
+        dataList.push(node.manuallyExpanded);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.getSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and set state info into model.
+     */
+    setSubState(dataList, node = this.model.root) {
+        node.isMinimized = (dataList.pop() == 'true');
+        node.manuallyExpanded = (dataList.pop() == 'true');
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.setSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and return node given id.
+     */
+    findNodeById(id, node = this.model.root) {
+        if (id == node.id) {
+            return node;
+        }
+        else if (node.hasChildren()) {
+            for (const child of node.children) {
+                let found = this.findNodeById(id, child);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+        else {
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Save the model state to a file.
+     */
+    saveState() {
+        let stateFileName = prompt("Filename to save view state as", 'n2.state');
+
+        // Solver toggle state.
+        let showLinearSolverNames = this.showLinearSolverNames;
+        let showSolvers = this.showSolvers;
+
+        // Zoomed node (subsystem).
+        let zoomedElement = this.zoomedElement.id;
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        let expandCollapse = Array()
+        this.getSubState(expandCollapse);
+
+        // Arrow State
+        let arrowState = this.arrowMgr.savePinnedArrows();
+
+        let dataDict = {
+                        'showLinearSolverNames': showLinearSolverNames,
+                        'showSolvers': showSolvers,
+                        'zoomedElement': zoomedElement,
+                        'expandCollapse': expandCollapse,
+                        'arrowState': arrowState,
+                        'md5_hash': this.model.md5_hash,
+                        };
+
+        var link = document.createElement('a');
+        link.setAttribute('download', stateFileName);
+        let data_blob = new Blob([JSON.stringify(dataDict)],
+                                 {type: 'text/plain'});
+
+        // If we are replacing a previously generated file we need to
+        // manually revoke the object URL to avoid memory leaks.
+        if (stateFileName !== null) {
+          window.URL.revokeObjectURL(stateFileName);
+        }
+
+        link.href = window.URL.createObjectURL(data_blob);
+        document.body.appendChild(link);
+
+        // wait for the link to be added to the document
+        window.requestAnimationFrame(function () {
+            var event = new MouseEvent('click');
+            link.dispatchEvent(event);
+            document.body.removeChild(link);
+        })
+    }
+
+    /**
+     * Load the model state to a file.
+     */
+    loadState() {
+        let self = this;
+        let arrowstate = null;
+        document.getElementById('state-file-input').addEventListener('change', function() {
+
+            var fr=new FileReader();
+            fr.onload=function(){
+                let dataDict = JSON.parse(fr.result);
+
+                // Make sure model didn't change.
+                if (dataDict.md5_hash && dataDict.md5_hash == self.model.md5_hash) {
+
+                    // Solver toggle state.
+                    self.showLinearSolverNames = dataDict.showLinearSolverNames;
+                    self.ui.setSolvers(dataDict.showLinearSolverNames);
+                    self.showSolvers = dataDict.showSolvers;
+
+                    // Zoomed node (subsystem).
+                    self.zoomedElement = self.findNodeById(dataDict.zoomedElement);
+
+                    // Expand/Collapse state of all nodes (subsystems) in model.
+                    self.setSubState(dataDict.expandCollapse.reverse());
+
+                    // Force an immediate display update.
+                    // Needed to do this so that the arrows don't slip in before the element zoom.
+                    self.layout = new N2Layout(self.model, self.zoomedElement,
+                        self.showLinearSolverNames, self.showSolvers, self.dims);
+                    self.ui.updateClickedIndices();
+                    self.matrix = new N2Matrix(self.model, self.layout,
+                        self.dom.n2Groups, self.arrowMgr, self.ui.lastClickWasLeft,
+                        self.ui.findRootOfChangeFunction, self.matrix.nodeSize);
+                    self._updateScale();
+                    self.layout.updateTransitionInfo(self.dom, self.transitionStartDelay, self.manuallyResized);
+
+                    // Arrow State
+                    self.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+                }
+                else {
+                    alert("Cannot load view. Current model structure is different than in saved view.")
+                }
+
+            }
+            fr.readAsText(this.files[0]);
+        })
+
+        document.getElementById('state-file-input').click();
+    }
+
     /**
      * Replace the current zoomedElement, but preserve its value.
      * @param {Object} newZoomedElement Replacement zoomed element.
