@@ -8,7 +8,6 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarProblem
-from openmdao.recorders.case_reader import CaseReader
 
 
 @use_tempdirs
