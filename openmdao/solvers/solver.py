@@ -356,7 +356,8 @@ class Solver(object):
         rel_res : float
             current relative residual norm.
         """
-        if (self.options['iprint'] == 2 and self._system().comm.rank == 0):
+        if (self.options['iprint'] == 2 and
+                (self._system().comm.rank == 0 or os.environ.get('USE_PROC_FILES'))):
 
             prefix = self._solver_info.prefix
             solver_name = self.SOLVER
@@ -372,7 +373,18 @@ class Solver(object):
         """
         Print header text before solving.
         """
-        pass
+        if (self.options['iprint'] > 0 and
+                (self._system().comm.rank == 0 or os.environ.get('USE_PROC_FILES'))):
+
+            pathname = self._system().pathname
+            if pathname:
+                nchar = len(pathname)
+                prefix = self._solver_info.prefix
+                header = prefix + "\n"
+                header += prefix + nchar * "=" + "\n"
+                header += prefix + pathname + "\n"
+                header += prefix + nchar * "="
+                print(header)
 
     def _iter_initialize(self):
         """

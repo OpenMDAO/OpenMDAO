@@ -243,19 +243,3 @@ class NonlinearBlockGS(NonlinearSolver):
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
                 residuals.set_val(outputs.asarray() - outputs_n)
-
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
