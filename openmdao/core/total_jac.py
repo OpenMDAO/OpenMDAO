@@ -1557,6 +1557,7 @@ class _TotalJacInfo(object):
         model = self.model
         comm = model.comm
         return_format = self.return_format
+        debug_print = self.debug_print
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
@@ -1662,6 +1663,10 @@ class _TotalJacInfo(object):
 
         if return_format == 'array':
             totals = self.J  # change back to array version
+            
+        if debug_print:
+            # Debug outputs scaled derivatives.
+            self._print_derivatives()
 
         return totals
 
