@@ -207,6 +207,9 @@ class N2Diagram {
         let expandCollapse = Array()
         this.getSubState(expandCollapse);
 
+        // Collapse depth of the diagram.
+        let chosenCollapseDepth = this.chosenCollapseDepth;
+
         // Arrow State
         let arrowState = this.arrowMgr.savePinnedArrows();
 
@@ -215,6 +218,7 @@ class N2Diagram {
                         'showSolvers': showSolvers,
                         'zoomedElement': zoomedElement,
                         'expandCollapse': expandCollapse,
+                        'chosenCollapseDepth' : chosenCollapseDepth,
                         'arrowState': arrowState,
                         'md5_hash': this.model.md5_hash,
                         };
@@ -266,6 +270,9 @@ class N2Diagram {
 
                     // Expand/Collapse state of all nodes (subsystems) in model.
                     self.setSubState(dataDict.expandCollapse.reverse());
+
+                    // Collapse depth of the diagram.
+                    self.minimizeToDepth(dataDict.chosenCollapseDepth);
 
                     // Force an immediate display update.
                     // Needed to do this so that the arrows don't slip in before the element zoom.

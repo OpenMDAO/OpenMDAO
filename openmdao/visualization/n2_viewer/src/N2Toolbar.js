@@ -328,7 +328,7 @@ class N2Toolbar {
         new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox, "Set collapse depth");
         new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox, "Set model height");
 
-        new N2ToolbarButtonClick('#save-load-button', tooltipBox,
+        new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
             "Save or Load an Image or View");
 
         new N2ToolbarButtonClick('#save-button', tooltipBox,
