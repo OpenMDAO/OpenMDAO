@@ -281,6 +281,9 @@ class N2Diagram {
                     // Arrow State
                     self.arrowMgr.loadPinnedArrows(dataDict.arrowState);
                 }
+                else {
+                    alert("Cannot load view. Current model structure is different than in saved view.")
+                }
 
             }
             fr.readAsText(this.files[0]);
