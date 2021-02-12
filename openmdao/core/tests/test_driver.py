@@ -319,8 +319,8 @@ class TestDriver(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEqual(output[8], "{('obj_cmp.obj', '_auto_ivc.v0'): array([[9.61001157, 1.78448532]])}")
-        self.assertEqual(output[9], "{('con_cmp1.con1', '_auto_ivc.v0'): array([[-9.61002287, -0.78449156]])}")
+        self.assertIn("{('obj_cmp.obj', '_auto_ivc.v0'):", output[12])
+        self.assertIn("{('con_cmp1.con1', '_auto_ivc.v0'):", output[13])
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = om.Problem()

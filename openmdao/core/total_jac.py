@@ -1519,7 +1519,7 @@ class _TotalJacInfo(object):
                                 model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
-                        print('Elapsed Time:', time.time() - t0, '\n', flush=True)
+                        print(f'Elapsed Time: {time.time() - t0} secs\n', flush=True)
 
                     jac_setter(inds, mode)
 
@@ -1601,6 +1601,8 @@ class _TotalJacInfo(object):
         wrt_idx = model._owns_approx_wrt_idx
         wrt_meta = self.wrt_meta
 
+        t0 = time.time()
+
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
@@ -1653,9 +1655,13 @@ class _TotalJacInfo(object):
                         tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                       prom_out, prom_in, ofidx, wrtidx,
                                                       dist_resp, comm)
+
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
+
+        if debug_print:
+            print(f'Elapsed time to approx totals: {time.time() - t0} secs\n', flush=True)
 
         # Driver scaling.
         if self.has_scaling:
@@ -1663,7 +1669,7 @@ class _TotalJacInfo(object):
 
         if return_format == 'array':
             totals = self.J  # change back to array version
-            
+
         if debug_print:
             # Debug outputs scaled derivatives.
             self._print_derivatives()
