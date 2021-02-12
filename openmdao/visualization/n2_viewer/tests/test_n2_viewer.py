@@ -230,3 +230,35 @@ class TestN2Viewer(unittest.TestCase):
 
         self.assertEqual(ivc_0_val, [5., 2])
         self.assertEqual(ivc_1_val, np.array([1.]))
+
+    def test_problem_case(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
+        prob.add_recorder(self.recorder)
+        prob.recording_options['record_inputs'] = True
+
+        prob.setup()
+        prob.run_driver()
+        prob.record('final')
+        prob.cleanup()
+
+        data_dict = _get_viewer_data(self.filename, case_id='final')
+
+        vals = data_dict['tree']['children'][2]['children']
+        x_val = vals[0]['value']
+        y_val = vals[1]['value']
+        f_xy_val = vals[2]['value']
+
+        self.assertEqual(x_val, np.array([1.]))
+        self.assertEqual(y_val, np.array([1.]))
+        self.assertEqual(f_xy_val, np.array([27.]))
