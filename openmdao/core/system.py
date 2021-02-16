@@ -5068,7 +5068,7 @@ class System(object):
         including all component and variable names, and all connection information.
 
         The hash is used by the n2 viewer to determine if a saved view can be reused. It is not
-        intended to accurate track whether a model has been changed, so no options/settings are
+        intended to accurately track whether a model has been changed, so no options/settings are
         tracked.
 
         Returns
