@@ -81,10 +81,7 @@ CITATIONS = """@article{Wu_pyoptsparse_2020,
 }
 """
 
-try:
-    DEFAULT_SIGNAL = signal.SIGUSR1
-except AttributeError:
-    DEFAULT_SIGNAL = None
+DEFAULT_SIGNAL = None
 
 
 class UserRequestedException(Exception):

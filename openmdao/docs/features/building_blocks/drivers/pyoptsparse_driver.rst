@@ -86,7 +86,7 @@ Setting a limit on the number of major iterations. Here, we set it to just a few
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_snopt_maxit
     :layout: interleave
 
-If you have pyoptsparse 1.1 or greater, then you can send the SIGUSR1 signal to a running SNOPT optimization to tell it to
+If you have pyoptsparse 1.1 or greater, then you can send a signal such as SIGUSR1 to a running SNOPT optimization to tell it to
 terminate cleanly. This is useful if an optimization has gotten close enough to an optimum.  How to do this is dependent
 on your operating system in all cases, on your mpi implementation if you are running mpi, and on your queuing software if
 you are on a supercomputing cluster. Here is a simple example for unix and mpi.
@@ -101,9 +101,9 @@ you are on a supercomputing cluster. Here is a simple example for unix and mpi.
 
     ktmoore1$ kill -SIGUSR1 17955
 
-If SIGUSR1 is already used for something else, or its behavior is not supported on your operating system, mpi implementation,
-or queuing system, then you can choose a different signal by setting the "user_terminate_signal" option and giving it a
-different signal, or None to disable the feature.  Here, we change the signal to SIGUSR2:
+You can enable this feature by setting the "user_terminate_signal" option and giving it a signal (imported from the
+signal library in Python).  By default, user_terminate_signal is None, which disables the feature.
+Here, we set the signal to SIGUSR1:
 
 .. embed-code::
     openmdao.drivers.tests.test_pyoptsparse_driver.TestPyoptSparseSnoptFeature.test_signal_set
