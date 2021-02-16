@@ -102,7 +102,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
                     # if there's a unit conversion, express the value in the
                     # units of the target
                     if units[t] and s in system._outputs:
-                        val = convert_units(val, units[s], units[t])
+                        val = system.get_val(t, flat=True, units=units[t], get_remote=True)
+                    else:
+                        val = system.get_val(t, flat=True, get_remote=True)
             else:
                 val = ''
 
