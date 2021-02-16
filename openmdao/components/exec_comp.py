@@ -398,31 +398,6 @@ class ExecComp(ExplicitComponent):
             if var not in init_vals:
                 init_vals[var] = dct['value']
 
-        if not self._manual_decl_partials:
-            decl_partials = super().declare_partials
-            for i, (outs, tup) in enumerate(exprs_info):
-                vs, funcs = tup
-                ins = sorted(set(vs).difference(outs))
-                for out in sorted(outs):
-                    for inp in ins:
-                        if self.options['has_diag_partials']:
-                            ival = init_vals[inp]
-                            iarray = isinstance(ival, ndarray) and ival.size > 1
-                            oval = init_vals[out]
-                            if iarray and isinstance(oval, ndarray) and oval.size > 1:
-                                if oval.size != ival.size:
-                                    raise RuntimeError(
-                                        "%s: has_diag_partials is True but partial(%s, %s) "
-                                        "is not square (shape=(%d, %d))." %
-                                        (self.msginfo, out, inp, oval.size, ival.size))
-                                # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=int)
-                            else:
-                                inds = None
-                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
-                        else:
-                            decl_partials(of=out, wrt=inp)
-
         self._codes = self._compile_exprs(self._exprs)
 
     def _compile_exprs(self, exprs):
@@ -525,6 +500,32 @@ class ExecComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
+        if not self._manual_decl_partials:
+            meta = self._var_rel2meta
+            decl_partials = super().declare_partials
+            for i, (outs, tup) in enumerate(self._exprs_info):
+                vs, funcs = tup
+                ins = sorted(set(vs).difference(outs))
+                for out in sorted(outs):
+                    for inp in ins:
+                        if self.options['has_diag_partials']:
+                            ival = meta[inp]['value']
+                            iarray = isinstance(ival, ndarray) and ival.size > 1
+                            oval = meta[out]['value']
+                            if iarray and isinstance(oval, ndarray) and oval.size > 1:
+                                if oval.size != ival.size:
+                                    raise RuntimeError(
+                                        "%s: has_diag_partials is True but partial(%s, %s) "
+                                        "is not square (shape=(%d, %d))." %
+                                        (self.msginfo, out, inp, oval.size, ival.size))
+                                # partial will be declared as diagonal
+                                inds = np.arange(oval.size, dtype=int)
+                            else:
+                                inds = None
+                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                        else:
+                            decl_partials(of=out, wrt=inp)
+
         super()._setup_partials()
         if self._manual_decl_partials:
             undeclared = []
