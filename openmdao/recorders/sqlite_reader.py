@@ -614,7 +614,13 @@ class SqliteCaseReader(BaseCaseReader):
 
         elif source == 'problem':
             if self._format_version >= 2:
-                return self._problem_cases.list_cases()
+                cases = self._problem_cases.list_cases()
+                if notebook and tabulate is not None:
+                    return tabulate({'problem': cases}, headers="keys", tablefmt='html')
+                else:
+                    if out_stream:
+                        write_source_table({'problem': cases}, out_stream)
+                    return cases
             else:
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
@@ -636,7 +642,10 @@ class SqliteCaseReader(BaseCaseReader):
                     return tabulate(cases, headers=[source], tablefmt='html')
                 elif not recurse:
                     # return list of cases from the source alone
-                    return case_table.list_cases(source)
+                    cases = case_table.list_cases(source)
+                    if out_stream:
+                        write_source_table({source: cases}, out_stream)
+                    return cases
                 elif flat:
                     # return list of cases from the source plus child cases
                     cases = []
@@ -725,9 +734,6 @@ class SqliteCaseReader(BaseCaseReader):
                 cases.append(case_coord)
 
         if out_stream:
-            if out_stream is _DEFAULT_OUT_STREAM:
-                out_stream = sys.stdout
-
             if notebook:
                 nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
                 return nb_format

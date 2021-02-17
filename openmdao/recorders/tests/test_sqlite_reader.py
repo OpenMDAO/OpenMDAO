@@ -3157,6 +3157,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text[i], line)
 
 @unittest.skipUnless(tabulate, "Tabulate is required")
+@use_tempdirs
 class TestNotebookFormat(unittest.TestCase):
 
     def setUp(self):

@@ -1,9 +1,12 @@
 """
 Utility functions and constants related to writing a table of variable metadata.
 """
+import sys
 import pprint
 
 import numpy as np
+
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 column_widths = {
     'value': 20,
@@ -50,6 +53,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Where to send human readable output.
         Set to None to suppress.
     """
+    if out_stream is None:
+        return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     count = len(var_dict)
 
     # Write header
@@ -172,6 +180,11 @@ def write_source_table(source_dict, out_stream):
         Set to None to suppress.
 
     """
+    if out_stream is None:
+        return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     for key, value in source_dict.items():
         if value:
             out_stream.write(f'{key}\n')
@@ -208,6 +221,9 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     """
     if out_stream is None:
         return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
     for column_name in column_names:
