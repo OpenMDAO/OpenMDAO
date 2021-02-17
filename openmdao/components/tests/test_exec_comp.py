@@ -843,8 +843,11 @@ class TestExecComp(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat,
                                                 x=np.ones(5), y=np.ones(3)))
 
+        p.setup()
+
         with self.assertRaises(Exception) as context:
-            p.setup()
+            p.final_setup()
+
         self.assertEqual(str(context.exception),
                          "'comp' <class ExecComp>: has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
 
@@ -868,6 +871,7 @@ class TestExecComp(unittest.TestCase):
         comp = om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5))
         model.add_subsystem('comp', comp)
         p.setup()
+        p.final_setup()
 
         declared_partials = comp._declared_partials[('y','x')]
         self.assertTrue('rows' in declared_partials )
@@ -885,6 +889,7 @@ class TestExecComp(unittest.TestCase):
         comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],x1=1.0, x2=2.0)
         model.add_subsystem('comp', comp)
         p.setup()
+        p.final_setup()
 
         # make sure only the partials that are needed are declared
         declared_partials = comp._declared_partials
@@ -912,6 +917,7 @@ class TestExecComp(unittest.TestCase):
                            x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5))
         model.add_subsystem('comp', comp)
         p.setup()
+        p.final_setup()
 
         declared_partials = comp._declared_partials
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
@@ -930,6 +936,7 @@ class TestExecComp(unittest.TestCase):
                            x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5) )
         model.add_subsystem('comp', comp)
         p.setup()
+        p.final_setup()
 
         declared_partials = comp._declared_partials
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
@@ -1471,6 +1478,48 @@ class TestFunctionRegistration(unittest.TestCase):
                 p.run_model()
             self.assertEquals(cm.exception.args[0],
                               "'comp' <class ExecComp>: Error occurred evaluating 'y = double(x) * 3.':\n'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast input array from shape (10) into shape (8).")
+
+    def test_shape_by_conn_bug_has_diag_partials_bug(self):
+        # this is for a bug where has_diag_partials was being ignored when shape_by_conn
+        # and/or copy_shape was used.
+
+        prob = om.Problem()
+
+        size = 100000
+        t = np.linspace(0, 1, size)
+
+        prob.model.add_subsystem("ivc",
+                                om.IndepVarComp("t", val=t),
+                                promotes_outputs=["*"])
+
+        comp1 = prob.model.add_subsystem("comp1", om.ExecComp(["x = t + 1"],
+                t={"shape_by_conn":True},
+                x={"shape_by_conn":True, "copy_shape":"t"},
+                has_diag_partials=True), promotes=["*"])
+
+        comp2 = prob.model.add_subsystem("comp2", om.ExecComp(["y = t + 2"],
+                t={"shape":size},
+                y={"copy_shape":"t"},
+                has_diag_partials=True), promotes=["*"])
+
+        comp3 = prob.model.add_subsystem("comp3", om.ExecComp(["z = t + 3"],
+                t={"shape_by_conn":True},
+                z={"shape":size},
+                has_diag_partials=True), promotes=["*"])
+
+        comp4 = prob.model.add_subsystem("comp4", om.ExecComp(["w = t + 4"],
+                t={"shape":size},
+                w={"shape":size},
+                has_diag_partials=True), promotes=["*"])
+
+        prob.setup()
+        prob.final_setup()
+
+        # all subjac values should be size == size from above instead of (size, size)
+        self.assertEqual(comp1._subjacs_info[('comp1.x', 'comp1.t')]['value'].size, size)
+        self.assertEqual(comp2._subjacs_info[('comp2.y', 'comp2.t')]['value'].size, size)
+        self.assertEqual(comp3._subjacs_info[('comp3.z', 'comp3.t')]['value'].size, size)
+        self.assertEqual(comp4._subjacs_info[('comp4.w', 'comp4.t')]['value'].size, size)
 
     def test_register_err_keyword(self):
         with _temporary_expr_dict():
