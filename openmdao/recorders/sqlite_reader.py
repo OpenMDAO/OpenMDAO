@@ -401,9 +401,6 @@ class SqliteCaseReader(BaseCaseReader):
             dct['residuals'] = list(case.residuals)
 
         if out_stream:
-            if out_stream is _DEFAULT_OUT_STREAM:
-                out_stream = sys.stdout
-
             write_source_table(dct, out_stream)
 
         return dct
