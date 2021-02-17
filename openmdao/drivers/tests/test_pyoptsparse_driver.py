@@ -2442,7 +2442,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.options['user_terminate_signal'] = signal.SIGUSR2
+        prob.driver.options['user_terminate_signal'] = signal.SIGUSR1
 
     def test_options_deprecated(self):
         # Not a feature test.
