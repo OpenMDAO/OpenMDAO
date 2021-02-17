@@ -40,6 +40,65 @@ class N2UserInterface {
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this);
         this.toolbar = new N2Toolbar(this);
+
+        // Add listener for reading in a saved view.
+        let self = this;
+        let n2diag = this.n2Diag;
+        document.getElementById('state-file-input').addEventListener('change', function() {
+
+            var fr=new FileReader();
+            fr.onload=function(){
+                let dataDict = false;
+
+                try {
+                    dataDict = JSON.parse(fr.result);
+                }
+                catch (error) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                if (!dataDict.md5_hash) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                // Make sure model didn't change.
+                if (dataDict.md5_hash != n2diag.model.md5_hash) {
+                    alert("Cannot load view. Current model structure is different than in saved view.")
+                    return;
+                }
+
+                self.addBackButtonHistory();
+
+                // Solver toggle state.
+                n2diag.showLinearSolverNames = dataDict.showLinearSolverNames;
+                n2diag.ui.setSolvers(dataDict.showLinearSolverNames);
+                n2diag.showSolvers = dataDict.showSolvers;
+
+                // Zoomed node (subsystem).
+                n2diag.zoomedElement = n2diag.findNodeById(dataDict.zoomedElement);
+
+                // Expand/Collapse state of all nodes (subsystems) in model.
+                n2diag.setSubState(dataDict.expandCollapse.reverse());
+
+                // Force an immediate display update.
+                // Needed to do this so that the arrows don't slip in before the element zoom.
+                n2diag.layout = new N2Layout(n2diag.model, n2diag.zoomedElement,
+                    n2diag.showLinearSolverNames, n2diag.showSolvers, n2diag.dims);
+                n2diag.ui.updateClickedIndices();
+                n2diag.matrix = new N2Matrix(n2diag.model, n2diag.layout,
+                    n2diag.dom.n2Groups, n2diag.arrowMgr, n2diag.ui.lastClickWasLeft,
+                    n2diag.ui.findRootOfChangeFunction, n2diag.matrix.nodeSize);
+                n2diag._updateScale();
+                n2diag.layout.updateTransitionInfo(n2diag.dom, n2diag.transitionStartDelay, n2diag.manuallyResized);
+
+                // Arrow State
+                n2diag.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+            }
+            fr.readAsText(this.files[0]);
+        })
+
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -714,4 +773,60 @@ class N2UserInterface {
             }
         }
     }
+
+    /** Save the model state to a file. */
+    saveState() {
+        const stateFileName = prompt("Filename to save view state as", 'n2.state');
+
+        // Solver toggle state.
+        let showLinearSolverNames = this.n2Diag.showLinearSolverNames;
+        let showSolvers = this.n2Diag.showSolvers;
+
+        // Zoomed node (subsystem).
+        let zoomedElement = this.n2Diag.zoomedElement.id;
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        let expandCollapse = Array()
+        this.n2Diag.getSubState(expandCollapse);
+
+        // Arrow State
+        let arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
+
+        let dataDict = {
+                        'showLinearSolverNames': showLinearSolverNames,
+                        'showSolvers': showSolvers,
+                        'zoomedElement': zoomedElement,
+                        'expandCollapse': expandCollapse,
+                        'arrowState': arrowState,
+                        'md5_hash': this.n2Diag.model.md5_hash,
+                        };
+
+        let link = document.createElement('a');
+        link.setAttribute('download', stateFileName);
+        let data_blob = new Blob([JSON.stringify(dataDict)],
+                                 {type: 'text/plain'});
+
+        // If we are replacing a previously generated file we need to
+        // manually revoke the object URL to avoid memory leaks.
+        if (stateFileName !== null) {
+          window.URL.revokeObjectURL(stateFileName);
+        }
+
+        link.href = window.URL.createObjectURL(data_blob);
+        document.body.appendChild(link);
+
+        // wait for the link to be added to the document
+        window.requestAnimationFrame(function () {
+            var event = new MouseEvent('click');
+            link.dispatchEvent(event);
+            document.body.removeChild(link);
+        })
+    }
+
+    /** Load the model state to a file. */
+    loadState() {
+        document.getElementById('state-file-input').click();
+    }
+
+
 }

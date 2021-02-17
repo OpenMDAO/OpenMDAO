@@ -986,8 +986,8 @@ class N2ArrowManager {
         let pinned = this.pinnedArrows;
         let data = {};
 
-        for (var arrowId in pinned.arrows) {
-            let arrow = pinned.arrows[arrowId];
+        for (const arrowId in pinned.arrows) {
+            const arrow = pinned.arrows[arrowId];
 
             if (arrow.cell !== undefined) {
                 // Off screen connection.
@@ -1012,8 +1012,8 @@ class N2ArrowManager {
     loadPinnedArrows(arrows) {
         this.pinnedArrows.removeAll();
 
-        for(var arrowID in arrows) {
-            let arrow = arrows[arrowID];
+        for(const arrowID in arrows) {
+            const arrow = arrows[arrowID];
 
             if (arrow.length == 9) {
                 // Off screen arrow.

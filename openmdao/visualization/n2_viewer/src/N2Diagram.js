@@ -99,54 +99,6 @@ class N2Diagram {
                 'y': 0
             }
         };
-
-        // Add listener for reading in a saved view.
-        let self = this;
-        document.getElementById('state-file-input').addEventListener('change', function() {
-
-            var fr=new FileReader();
-            fr.onload=function(){
-                let dataDict = JSON.parse(fr.result);
-
-                // Make sure model didn't change.
-                if (dataDict.md5_hash && dataDict.md5_hash == self.model.md5_hash) {
-
-                    // Solver toggle state.
-                    self.showLinearSolverNames = dataDict.showLinearSolverNames;
-                    self.ui.setSolvers(dataDict.showLinearSolverNames);
-                    self.showSolvers = dataDict.showSolvers;
-
-                    // Zoomed node (subsystem).
-                    self.zoomedElement = self.findNodeById(dataDict.zoomedElement);
-
-                    // Expand/Collapse state of all nodes (subsystems) in model.
-                    self.setSubState(dataDict.expandCollapse.reverse());
-
-                    // Collapse depth of the diagram.
-                    self.minimizeToDepth(dataDict.chosenCollapseDepth);
-
-                    // Force an immediate display update.
-                    // Needed to do this so that the arrows don't slip in before the element zoom.
-                    self.layout = new N2Layout(self.model, self.zoomedElement,
-                        self.showLinearSolverNames, self.showSolvers, self.dims);
-                    self.ui.updateClickedIndices();
-                    self.matrix = new N2Matrix(self.model, self.layout,
-                        self.dom.n2Groups, self.arrowMgr, self.ui.lastClickWasLeft,
-                        self.ui.findRootOfChangeFunction, self.matrix.nodeSize);
-                    self._updateScale();
-                    self.layout.updateTransitionInfo(self.dom, self.transitionStartDelay, self.manuallyResized);
-
-                    // Arrow State
-                    self.arrowMgr.loadPinnedArrows(dataDict.arrowState);
-                }
-                else {
-                    alert("Cannot load view. Current model structure is different than in saved view.")
-                }
-
-            }
-            fr.readAsText(this.files[0]);
-        })
-
     }
 
     /**
@@ -194,6 +146,7 @@ class N2Diagram {
     getSubState(dataList, node = this.model.root) {
         dataList.push(node.isMinimized);
         dataList.push(node.manuallyExpanded);
+        dataList.push(node.varIsHidden);
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -206,8 +159,10 @@ class N2Diagram {
      * Recurse and set state info into model.
      */
     setSubState(dataList, node = this.model.root) {
-        node.isMinimized = (dataList.pop() == 'true');
-        node.manuallyExpanded = (dataList.pop() == 'true');
+        node.isMinimized = dataList.pop();
+        node.manuallyExpanded = dataList.pop();
+        node.varIsHidden = dataList.pop();
+        //console.log(node.isMinimized, node.manuallyExpanded);
 
         if (node.hasChildren()) {
             for (const child of node.children) {
@@ -235,68 +190,6 @@ class N2Diagram {
             return false;
         }
         return false;
-    }
-
-    /**
-     * Save the model state to a file.
-     */
-    saveState() {
-        let stateFileName = prompt("Filename to save view state as", 'n2.state');
-
-        // Solver toggle state.
-        let showLinearSolverNames = this.showLinearSolverNames;
-        let showSolvers = this.showSolvers;
-
-        // Zoomed node (subsystem).
-        let zoomedElement = this.zoomedElement.id;
-
-        // Expand/Collapse state of all nodes (subsystems) in model.
-        let expandCollapse = Array()
-        this.getSubState(expandCollapse);
-
-        // Collapse depth of the diagram.
-        let chosenCollapseDepth = this.chosenCollapseDepth;
-
-        // Arrow State
-        let arrowState = this.arrowMgr.savePinnedArrows();
-
-        let dataDict = {
-                        'showLinearSolverNames': showLinearSolverNames,
-                        'showSolvers': showSolvers,
-                        'zoomedElement': zoomedElement,
-                        'expandCollapse': expandCollapse,
-                        'chosenCollapseDepth' : chosenCollapseDepth,
-                        'arrowState': arrowState,
-                        'md5_hash': this.model.md5_hash,
-                        };
-
-        var link = document.createElement('a');
-        link.setAttribute('download', stateFileName);
-        let data_blob = new Blob([JSON.stringify(dataDict)],
-                                 {type: 'text/plain'});
-
-        // If we are replacing a previously generated file we need to
-        // manually revoke the object URL to avoid memory leaks.
-        if (stateFileName !== null) {
-          window.URL.revokeObjectURL(stateFileName);
-        }
-
-        link.href = window.URL.createObjectURL(data_blob);
-        document.body.appendChild(link);
-
-        // wait for the link to be added to the document
-        window.requestAnimationFrame(function () {
-            var event = new MouseEvent('click');
-            link.dispatchEvent(event);
-            document.body.removeChild(link);
-        })
-    }
-
-    /**
-     * Load the model state to a file.
-     */
-    loadState() {
-        document.getElementById('state-file-input').click();
     }
 
     /**

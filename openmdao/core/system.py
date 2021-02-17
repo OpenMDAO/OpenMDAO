@@ -5094,11 +5094,14 @@ class System(object):
 
             # Local (relative) names for Component inputs and outputs.
             try:
-                data.append(sys_name._var_rel_names)
+                data.append(sorted(sys_name._var_rel_names['input']))
+                data.append(sorted(sys_name._var_rel_names['output']))
             except AttributeError:
                 continue
 
         # All Connections.
-        data.append(self._conn_global_abs_in2out)
+        # Note: dictionary can be in any order, so we have to sort.
+        for key in sorted(self._conn_global_abs_in2out):
+            data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
