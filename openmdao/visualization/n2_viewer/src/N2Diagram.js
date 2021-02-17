@@ -234,7 +234,6 @@ class N2Diagram {
         else {
             return false;
         }
-
         return false;
     }
 

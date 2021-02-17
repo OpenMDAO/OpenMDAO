@@ -1008,7 +1008,6 @@ class N2ArrowManager {
         return data;
     }
 
-
     /* Restore all pinnedArrows that were saved in a view. */
     loadPinnedArrows(arrows) {
         this.pinnedArrows.removeAll();
