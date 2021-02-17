@@ -2847,7 +2847,7 @@ class Group(System):
                     coloring._check_config_partial(self)
                 self._setup_approx_coloring()
             # TODO: for top level FD, call below is unnecessary, but we need this
-            # for some tests that just call run_linearize directily without calling
+            # for some tests that just call run_linearize directly without calling
             # compute_totals.
             elif self._approx_schemes:
                 self._setup_approx_partials()
@@ -3064,16 +3064,16 @@ class Group(System):
 
         wrt_color_patterns = info['wrt_patterns']
 
-        for key in self._get_approx_subjac_keys():
-            if wrt_color_patterns:
-                if key[1] in abs2prom['output']:
-                    wrtprom = abs2prom['output'][key[1]]
+        if wrt_color_patterns:
+            for _, wrt in self._get_approx_subjac_keys():
+                if wrt in abs2prom['output']:
+                    wrtprom = abs2prom['output'][wrt]
                 else:
-                    wrtprom = abs2prom['input'][key[1]]
+                    wrtprom = abs2prom['input'][wrt]
 
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
-                        wrt_colors_matched.add(key[1])
+                        wrt_colors_matched.add(wrt)
                         break
 
         baselen = len(self.pathname) + 1 if self.pathname else 0

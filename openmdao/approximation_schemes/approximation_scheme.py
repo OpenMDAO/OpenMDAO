@@ -276,11 +276,11 @@ class ApproximationScheme(object):
                 vec = None
 
             if wrt in approx_wrt_idx:
-                in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
+                in_idx = np.array(approx_wrt_idx[wrt], dtype=int)  # local index into var
                 if vec is not None:
-                    in_idx += slices[wrt].start
+                    in_idx += slices[wrt].start  # convert into index into input or output vector
             else:
-                if vec is None:
+                if vec is None:  # remote wrt
                     if wrt in abs2meta['input']:
                         in_idx = range(abs2meta['input'][wrt]['size'])
                     else:
@@ -336,6 +336,9 @@ class ApproximationScheme(object):
 
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+
+        # only need to compute rows/cols the first time around.  After that, only data, since
+        # the sparsity structure won't change
         do_rows_cols = self._j_colored is None
 
         # do colored solves first
@@ -543,7 +546,8 @@ def _get_wrt_subjacs(system, approxs):
     All nonzero subjacs for a particular wrt are 'compressed' together so they're contiguous.
 
     This allows for setting an entire column of the jacobian at once instead of looping over
-    each subjac.
+    each subjac. It's necessary when using coloring because coloring results are per full jac
+    row/col and not per variable or per row/col within a subjac.
     """
     abs2idx = system._var_allprocs_abs2idx['nonlinear']
     abs2meta_in = system._var_allprocs_abs2meta['input']

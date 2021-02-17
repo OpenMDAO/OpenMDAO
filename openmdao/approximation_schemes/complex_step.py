@@ -129,10 +129,11 @@ class ComplexStep(ApproximationScheme):
         # Turn on complex step.
         system._set_complex_step_mode(True)
 
-        self._compute_approximations(system, jac, total, under_cs=True)
-
-        # Turn off complex step.
-        system._set_complex_step_mode(False)
+        try:
+            self._compute_approximations(system, jac, total, under_cs=True)
+        finally:
+            # Turn off complex step.
+            system._set_complex_step_mode(False)
 
         system._inputs.set_val(saved_inputs)
         system._outputs.set_val(saved_outputs)

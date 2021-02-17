@@ -329,6 +329,9 @@ class ExplicitComponent(Component):
                             oflat = self._vectors['output'][vec_name]._abs_get_val
                             d_out_names = self._vectors['output'][vec_name]._names
                             vnames = self._var_relevant_names[vec_name]['output']
+
+                            # 'val' in the code below is a reference to the part of the
+                            # output or residual array corresponding to the variable 'v'
                             if mode == 'fwd':
                                 for v in vnames:
                                     if v in d_out_names and (v, v) not in self._subjacs_info:

@@ -1310,11 +1310,11 @@ def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSIT
         n_tested = 0
         while itol >= smallest:
             if itol < 1.:
-                rows, cols = np.nonzero(arr > itol)
-                if nzeros and nzeros[-1][1] == len(rows):
+                nz = np.count_nonzero(arr > itol)
+                if nzeros and nzeros[-1][1] == nz:
                     nzeros[-1][0].append(itol)
                 else:
-                    nzeros.append(([itol], len(rows)))
+                    nzeros.append(([itol], nz))
                 n_tested += 1
             itol *= .1
 
@@ -1589,8 +1589,10 @@ def _get_desvar_info(driver, names=None, use_abs_names=True):
     for n in abs_names:
         if n in desvars:
             sizes.append(desvars[n]['size'])
-        else:
+        elif n in abs2meta_out:
             sizes.append(abs2meta_out[n]['global_size'])
+        else:  # it's an input name w/o corresponding design var
+            sizes.append(abs2meta_out[model.get_source(n)]['global_size'])
 
     return abs_names, sizes
 

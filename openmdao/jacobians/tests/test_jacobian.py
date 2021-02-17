@@ -709,7 +709,7 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        class ParaboloidJacVec(Paraboloid):
+        class JacVecComp(Paraboloid):
 
             def setup_partials(self):
                 pass
@@ -717,9 +717,8 @@ class TestJacobian(unittest.TestCase):
             def linearize(self, inputs, outputs, jacobian):
                 return
 
-            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
-                d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
-                d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                pass
 
         # One level deep
 
@@ -729,7 +728,7 @@ class TestJacobian(unittest.TestCase):
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
-        model.add_subsystem('comp', ParaboloidJacVec())
+        model.add_subsystem('comp', JacVecComp())
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
