@@ -288,6 +288,39 @@ class TestDriver(unittest.TestCase):
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
                          "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
+                         
+    def test_debug_print_approx(self):
+
+        prob = om.Problem()
+        prob.model = model = SellarDerivatives()
+
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1', lower=0)
+        model.add_constraint('con2', lower=0, linear=True)
+        prob.set_solver_print(level=0)
+        
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+        prob.driver.options['maxiter'] = 0
+        
+        prob.model.approx_totals()
+        prob.driver.options['debug_print'] = ['totals']
+
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertIn("{('obj_cmp.obj', '_auto_ivc.v0'):", output[12])
+        self.assertIn("{('con_cmp1.con1', '_auto_ivc.v0'):", output[13])
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = om.Problem()
