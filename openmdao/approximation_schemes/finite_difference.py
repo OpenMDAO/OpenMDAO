@@ -254,7 +254,7 @@ class FiniteDifference(ApproximationScheme):
         Returns
         -------
         ndarray
-            The results from running the perturbed system.
+            Copy of the outputs or residuals array after running the perturbed system.
         """
         deltas, coeffs, current_coeff = data
 
@@ -292,7 +292,7 @@ class FiniteDifference(ApproximationScheme):
         Returns
         -------
         ndarray
-            The results from running the perturbed system.
+            Copy of the outputs or residuals array after running the perturbed system.
         """
         for vec, idxs in idx_info:
             if vec is not None:

@@ -6,6 +6,7 @@ from itertools import product
 from copy import copy
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
 
 def shape_to_len(shape):
@@ -483,3 +484,44 @@ def dv_abs_complex(x, x_deriv):
     x_deriv[idx_neg] = -x_deriv[idx_neg]
 
     return x, x_deriv
+
+
+def rand_sparsity(shape, density_ratio, dtype=bool):
+    """
+    Return a random boolean COO matrix of the given shape with given percent density.
+
+    Row and column indices are generated using random integers so some duplication
+    is possible, resulting in a matrix with somewhat lower density than specified.
+
+    Parameters
+    ----------
+    shape : tuple
+        Desired shape of the matrix.
+    density_ratio : float
+        Approximate ratio of nonzero to zero entries in the desired matrix.
+    dtype : type
+        Specifies type of the values in the returned matrix.
+
+    Returns
+    -------
+    coo_matrix
+        A COO matrix with approximately the nonzero density desired.
+
+    """
+    assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
+
+    nrows, ncols = shape
+
+    nnz = int(nrows * ncols * density_ratio)
+
+    data = np.ones(nnz, dtype=dtype)
+    rows = np.random.randint(0, nrows, nnz)
+    cols = np.random.randint(0, ncols, nnz)
+
+    coo = coo_matrix((data, (rows, cols)), shape=shape)
+
+    # get rid of dup rows/cols
+    csc = coo.tocsc()
+
+    # now back to final coo
+    return csc.tocoo()

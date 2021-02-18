@@ -1982,13 +1982,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(derivatives.keys())
+        num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
         if not suppress_output:
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
             out_buffer = StringIO()
-            num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
                 out_buffer.write(header_str)

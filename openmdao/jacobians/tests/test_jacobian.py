@@ -12,6 +12,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
 
@@ -939,6 +940,76 @@ class TestJacobian(unittest.TestCase):
         keys = p.model.ode._jacobian._subjacs_info
         self.assertTrue(('ode.x', 'ode.y') not in keys)
         self.assertTrue(('ode.y', 'ode.x') not in keys)
+
+    def test_set_col(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.ofsizes = [3, 5, 2]
+                self.wrtsizes = [4, 1, 3]
+                for i, sz in enumerate(self.wrtsizes):
+                    self.add_input(f"x{i}", val=np.ones(sz))
+                for i, sz in enumerate(self.ofsizes):
+                    self.add_output(f"y{i}", val=np.ones(sz))
+
+                boolarr = rand_sparsity((sum(self.ofsizes), sum(self.wrtsizes)), .3, dtype=bool)
+                self.sparsity = np.asarray(boolarr.toarray(), dtype=float)
+                ofstart = ofend = 0
+                for i, ofsz in enumerate(self.ofsizes):
+                    wrtstart = wrtend = 0
+                    ofend += ofsz
+                    for j, wrtsz in enumerate(self.wrtsizes):
+                        wrtend += wrtsz
+                        sub = self.sparsity[ofstart:ofend, wrtstart:wrtend]
+                        rows, cols = np.nonzero(sub)
+                        self.declare_partials([f"y{i}"], [f"x{j}"], rows=rows, cols=cols)
+                        wrtstart = wrtend
+                    ofstart = ofend
+
+            def compute(self, inputs, outputs):
+                outputs.set_val(self.sparsity.dot(inputs.asarray()) * 2.)
+
+            def compute_partials(self, inputs, partials):
+                # these partials are actually constant, but...
+                ofstart = ofend = 0
+                for i, ofsz in enumerate(self.ofsizes):
+                    wrtstart = wrtend = 0
+                    ofend += ofsz
+                    for j, wrtsz in enumerate(self.wrtsizes):
+                        wrtend += wrtsz
+                        sub = self.sparsity[ofstart:ofend, wrtstart:wrtend]
+                        subinfo = self._subjacs_info[(f'comp.y{i}', f'comp.x{j}')]
+                        partials[f'y{i}', f'x{j}'] = sub[subinfo['rows'], subinfo['cols']] * 2.
+                        wrtstart = wrtend
+                    ofstart = ofend
+
+        p = Problem()
+        comp = p.model.add_subsystem('comp', MyComp())
+        p.setup()
+        for i, sz in enumerate(comp.wrtsizes):
+            p[f'comp.x{i}'] = np.random.random(sz)
+        p.run_model()
+        ofs = [f'comp.y{i}' for i in range(len(comp.ofsizes))]
+        wrts = [f'comp.x{i}' for i in range(len(comp.wrtsizes))]
+        p.check_partials(out_stream=None, show_only_incorrect=True)
+        p.model.comp._jacobian.set_col(p.model.comp, 5, comp.sparsity[:, 5] * 99)
+        
+        # check dy0/dx2 (3x3)
+        subinfo = comp._subjacs_info['comp.y0', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[0:3, 5] * 99)
+        
+        # check dy1/dx2 (5x3)
+        subinfo = comp._subjacs_info['comp.y1', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[3:8, 5] * 99)
+        
+        # check dy2/dx2 (2x3)
+        subinfo = comp._subjacs_info['comp.y2', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[8:, 5] * 99)
 
 
 class MySparseComp(ExplicitComponent):

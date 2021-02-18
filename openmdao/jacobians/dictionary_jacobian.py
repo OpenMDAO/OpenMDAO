@@ -12,7 +12,6 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
-
     """
 
     def __init__(self, system, **kwargs):

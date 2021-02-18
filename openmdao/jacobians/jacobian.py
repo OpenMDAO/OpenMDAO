@@ -45,6 +45,12 @@ class Jacobian(object):
     _jac_summ : dict or None
         A dict containing a summation of some number of instantaneous absolute values of this
         jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
+    _col_var_info : dict
+        Maps column name to start, end, and slice/indices into the result array.
+    _colnames : list
+        List of column var names.
+    _col2name_ind : ndarray
+        Array that maps jac col index to index of column name.
     """
 
     def __init__(self, system):
@@ -63,6 +69,9 @@ class Jacobian(object):
         self._abs_keys = defaultdict(bool)
         self._randomize = False
         self._jac_summ = None
+        self._col_var_info = None
+        self._colnames = None
+        self._col2name_ind = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -341,7 +350,7 @@ class Jacobian(object):
         J = np.zeros((rend, cend))
 
         for of, roffset, rend, _ in ordered_of_info:
-            for wrt, coffset, cend, _ in ordered_wrt_info:
+            for wrt, coffset, cend in ordered_wrt_info:
                 key = (of, wrt)
                 if key in subjacs:
                     meta = subjacs[key]
@@ -383,3 +392,49 @@ class Jacobian(object):
                 meta['value'] = meta['value'].real
 
         self._under_complex_step = active
+
+    def _setup_col_maps(self, system):
+        self._col_var_info = col_var_info = {t[0]: t for t in system._partial_jac_wrt_iter()}
+        self._colnames = list(col_var_info)   # map var id to varname
+
+        ncols = np.sum(end - start for _, start, end in col_var_info.values())
+        self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
+        start = end = 0
+        for i, (of, _start, _end) in enumerate(col_var_info.values()):
+            end += _end - _start
+            self._col2name_ind[start:end] = i
+            start = end
+
+    def set_col(self, system, icol, value):
+        """
+        Set a column of the jacobian.
+
+        This assumes that the value does not attempt to set any nonzero values that are
+        outside of specified sparsity patterns for any of the subjacs.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        icol : int
+            Column index.
+        value : ndarray
+            Column value.
+
+        """
+        if self._col_var_info is None:
+            # initialize column mapping info
+            self._setup_col_maps(system)
+
+        wrt = self._colnames[self._col2name_ind[icol]]
+        loc_idx = icol - self._col_var_info[wrt][1]  # local col index into subjacs
+        for of, start, end, sub_wrt_idx in system._partial_jac_of_iter():
+            key = (of, wrt)
+            if key in self._subjacs_info:
+                subjac = self._subjacs_info[key]
+                # TODO: support other sparse subjac types
+                if subjac['rows'] is None:
+                    subjac['value'][:, loc_idx] = value[sub_wrt_idx]
+                else:
+                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
+                    subjac['value'][match_inds] = value[sub_wrt_idx][subjac['rows'][match_inds]]

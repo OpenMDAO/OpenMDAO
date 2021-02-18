@@ -1123,12 +1123,11 @@ class System(object):
         """
         Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
         """
-        abs2meta = self._var_allprocs_abs2meta
-        offset = end = 0
+        start = end = 0
         for of, meta in self._var_allprocs_abs2meta['output'].items():
             end += meta['size']
-            yield of, offset, end, _full_slice
-            offset = end
+            yield of, start, end, slice(start, end)
+            start = end
 
     def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
@@ -1141,21 +1140,18 @@ class System(object):
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
         """
-        if wrt_matches is None:
-            wrt_matches = ContainsAll()
-        abs2meta = self._var_allprocs_abs2meta
-        offset = end = 0
-        for of, _offset, _end, sub_of_idx in self._partial_jac_of_iter():
-            if of in wrt_matches:
-                end += (_end - _offset)
-                yield of, offset, end, sub_of_idx
-                offset = end
+        start = end = 0
+        for of, _start, _end, _ in self._partial_jac_of_iter():
+            if wrt_matches is None or of in wrt_matches:
+                end += (_end - _start)
+                yield of, start, end
+                start = end
 
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
-            if wrt in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, offset, end, _full_slice
-                offset = end
+                yield wrt, start, end
+                start = end
 
     def get_approx_coloring_fname(self):
         """
@@ -4164,11 +4160,13 @@ class System(object):
         new_list = []
         abs2prom_in = self._var_allprocs_abs2prom['input']
         abs2prom_out = self._var_allprocs_abs2prom['output']
-        for abs_name, offset, end, idxs in var_info:
-            if abs_name in abs2prom_out:
-                new_list.append((abs2prom_out[abs_name], offset, end, idxs))
+        for tup in var_info:
+            lst = list(tup)
+            if tup[0] in abs2prom_out:
+                lst[0] = abs2prom_out[tup[0]]
             else:
-                new_list.append((abs2prom_in[abs_name], offset, end, idxs))
+                lst[0] = abs2prom_in[tup[0]]
+            new_list.append(lst)
         return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,

@@ -201,7 +201,7 @@ class ApproximationScheme(object):
         jac_slices = tmpJ['@jac_slices']
         for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend, _ in system._partial_jac_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend in system._partial_jac_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
             if is_group and (approx_of_idx or len_full_ofs > len(of_names)):

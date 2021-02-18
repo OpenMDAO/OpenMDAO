@@ -2974,39 +2974,39 @@ class Group(System):
 
     def _partial_jac_of_iter(self):
         """
-        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        Iterate over (name, start, end, idxs) for each row var in the systems's jacobian.
 
-        idxs will usually be a full slice, except in cases where _owns_approx__idx has
-        a value for that variable.
+        idxs will usually be the var slice into the result array, except in cases where
+        _owns_approx__idx has a value for that variable.
 
         Yields
         ------
-        of_name, start, end, intra_variable_slice_or_idxs
+        of_name, start, end, result_variable_slice_or_idxs
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
 
         if self._owns_approx_of:
             # we're computing totals/semi-totals
-            offset = end = 0
+            start = end = vstart = vend = 0
             for of in self._owns_approx_of:
+                vend += abs2meta[of]['size']
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, offset, end, approx_of_idx[of]
+                    inds = np.atleast_1d(approx_of_idx[of]) + vstart
+                    yield of, start, end, inds
                 else:
                     end += abs2meta[of]['size']
-                    yield of, offset, end, _full_slice
+                    yield of, start, end, slice(vstart, vend)
 
-                offset = end
+                start = end
+                vstart = vend
         else:
             yield from super()._partial_jac_of_iter()
 
     def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
-
-        idxs will usually be a full slice, except in cases where _owns_approx_wrt_idx has
-        a value for that variable.
+        Iterate over (name, start, end) for each column var in the systems's jacobian.
 
         Parameters
         ----------
@@ -3017,32 +3017,32 @@ class Group(System):
 
         Yields
         ------
-        wrt_name, start, end, intra_variable_slice_or_idxs
+        wrt_name, start, end
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
 
-            offset = end = 0
+            start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, sub_of_idx in self._partial_jac_of_iter():
+                for of, _start, _end, _ in self._partial_jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
-                        end += (_end - _offset)
-                        yield of, offset, end, sub_of_idx
-                        offset = end
+                        end += (_end - _start)
+                        yield of, start, end
+                        start = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
                     if wrt in approx_wrt_idx:
                         end += len(approx_wrt_idx[wrt])
-                        yield wrt, offset, end, approx_wrt_idx[wrt]
+                        yield wrt, start, end
                     else:
                         if wrt in abs2meta['input']:
                             end += abs2meta['input'][wrt]['size']
                         else:
                             end += abs2meta['output'][wrt]['size']
-                        yield wrt, offset, end, _full_slice
-                    offset = end
+                        yield wrt, start, end
+                    start = end
         else:
             yield from super()._partial_jac_wrt_iter(wrt_matches)
 
