@@ -1,3 +1,15 @@
+/** n2toolbar-icons.css ****************************************************
+ *
+ * AUTOMATICALLY GENERATED FILE - DO NOT EDIT DIRECTLY
+ *
+ * This file links unicode characters to styles for use as N2 icons.
+ *
+ * To generate it, cd to the N2 assets/toolbar_icons directory, and run
+ *   ./gen_toolbar_icons.sh
+ *
+ * This file and the n2toolbar-icons-font.woff file will be overwritten.
+ ***************************************************************************
+ */
 [class^="icon-"]:before,
 [class*=" icon-"]:before {
     font-family:     "n2toolbar-icons";
