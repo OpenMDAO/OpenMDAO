@@ -3135,7 +3135,10 @@ class Group(System):
                     sz = abs2meta['output'][key[1]]['size']
                 shape = (abs2meta['output'][key[0]]['size'], sz)
                 meta['shape'] = shape
-                meta['value'] = np.zeros(shape)
+                if meta['rows'] is not None:  # subjac is sparse
+                    meta['value'] = np.zeros(len(meta['rows']))
+                else:
+                    meta['value'] = np.zeros(shape)
 
             approx.add_approximation(key, self, meta)
 

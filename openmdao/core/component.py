@@ -6,7 +6,7 @@ from itertools import product
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
-from scipy.sparse import issparse
+from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names
@@ -1018,10 +1018,10 @@ class Component(System):
         if dependent:
             meta['value'] = val
             if rows is not None:
-                meta['rows'] = rows
-                meta['cols'] = cols
+                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
+                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
-                # First, check the length of rows and cols to catch this easy mistake and give a
+                # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
                 if len(cols) != len(rows):
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
@@ -1029,14 +1029,32 @@ class Component(System):
                                        " but rows is length {} while cols is length "
                                        "{}.".format(self.msginfo, of, wrt, len(rows), len(cols)))
 
+                if rows.size > 0 and rows.min() < 0:
+                    msg = '{}: d({})/d({}): row indices must be non-negative'
+                    raise ValueError(msg.format(self.msginfo, of, wrt))
+                if cols.size > 0 and cols.min() < 0:
+                    msg = '{}: d({})/d({}): col indices must be non-negative'
+                    raise ValueError(msg.format(self.msginfo, of, wrt))
+
+                meta['rows'] = rows
+                meta['cols'] = cols
+
                 # Check for repeated rows/cols indices.
-                idxset = set(zip(rows, cols))
-                if len(rows) - len(idxset) > 0:
-                    dups = [n for n, val in Counter(zip(rows, cols)).items() if val > 1]
-                    raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
-                                       "with rows and cols that specify the following duplicate "
-                                       "subjacobian entries: {}.".format(self.msginfo, of, wrt,
-                                                                         sorted(dups)))
+                size = len(rows)
+                if size > 0:
+                    coo = coo_matrix((np.ones(size), (rows, cols)), dtype=int)
+                    csc = coo.tocsc()
+                    # csc adds values at duplicate indices together, so result will be that data size
+                    # is less if there are duplicates
+                    if csc.data.size < coo.data.size:
+                        coo2 = csc.tocoo()
+                        del csc
+                        inds = np.where(coo2.data > 1.)
+                        dups = list(zip(coo2.row[inds], coo2.col[inds]))
+                        raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
+                                           "with rows and cols that specify the following duplicate "
+                                           "subjacobian entries: {}.".format(self.msginfo, of, wrt,
+                                                                             sorted(dups)))
 
         if method_func is not None:
             # we're doing approximations
@@ -1284,14 +1302,6 @@ class Component(System):
                 rows = dct['rows']
                 cols = dct['cols']
 
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
-
-                if rows.shape != cols.shape:
-                    raise ValueError('{}: d({})/d({}): rows and cols must have the same shape,'
-                                     ' rows: {}, cols: {}'.format(self.msginfo, of, wrt,
-                                                                  rows.shape, cols.shape))
-
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
                     is_scalar = False
@@ -1311,12 +1321,6 @@ class Component(System):
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
-                    if rows.min() < 0:
-                        msg = '{}: d({})/d({}): row indices must be non-negative'
-                        raise ValueError(msg.format(self.msginfo, of, wrt))
-                    if cols.min() < 0:
-                        msg = '{}: d({})/d({}): col indices must be non-negative'
-                        raise ValueError(msg.format(self.msginfo, of, wrt))
                     rows_max = rows.max()
                     cols_max = cols.max()
                 else:
