@@ -1,17 +1,17 @@
 #!/bin/bash
 #############################################################################
 # The script finds all of the .svg files in the toolbar_icons directory and
-# generates font and css files for them. These are copied to the
+# generates a font and CSS file for them. These are copied to the
 # n2_viewer/styles directory, overwriting the existing files. It's left to
 # the developer to "git add" those two files and commit the changes.
 #
 # This is a replacement for the icomoon website method used previously. That
-# method required a large number of manual steps and produced inconsistent
-# results.
+# required a large number of manual steps and produced inconsistent results.
 #
 # Usage:
 #   ./gen_toolbar_icons.sh  [while in the toolbar_icons directory]
 #
+# Node.js is required to run glyphs2font.
 #############################################################################
 GLYPHS2FONT_REPO=https://github.com/rse/glyphs2font.git
 TEMPLATE=n2toolbar-font-template.yml
@@ -45,10 +45,7 @@ fi
 
 # Create the the working directory, link all the icons to it, and
 # generate the glyphs2font config file from the template.
-[ ! -f $TEMPLATE ] && {
-    echo "Can't find glyphs2font config file template."
-    exit 1;
-}
+[ ! -f $TEMPLATE ] && { echo "Can't find glyphs2font config file template."; exit 1; }
 
 rm -fr $WORKDIR
 mkdir -p $WORKDIR || { echo "Could not create $WORKDIR."; exit 1; }
