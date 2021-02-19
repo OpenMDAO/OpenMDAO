@@ -900,9 +900,11 @@ class Component(System):
                 all_abs2meta_in[iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
-                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
-                               "added without src_indices. Setting src_indices to "
-                               f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
+                connection_is_distributed = all_abs2meta_out[abs_in2out[iname]]['distributed']
+                if not connection_is_distributed:
+                    simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
+                                   "added without src_indices. Setting src_indices to "
+                                   f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
 
         return added_src_inds
 
