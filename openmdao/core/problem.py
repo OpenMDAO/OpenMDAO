@@ -17,6 +17,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
@@ -1299,7 +1300,6 @@ class Problem(object):
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
-        jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
@@ -1368,14 +1368,15 @@ class Problem(object):
                 approximations[fd_options['method']].add_approximation(abs_key, self.model,
                                                                        fd_options, vector=vector)
 
-            approx_jac = {}
+            approx_jac = _CheckingJacobian(comp)
+            # approx_jac = {}
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
-                partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key]['J_fd'] = partial
 
                 # If this is a directional derivative, convert the analytic to a directional one.
                 wrt = rel_key[1]

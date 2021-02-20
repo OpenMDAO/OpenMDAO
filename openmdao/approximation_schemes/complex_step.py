@@ -61,11 +61,10 @@ class ComplexStep(ApproximationScheme):
         options.update(kwargs)
         options['vector'] = vector
 
-        key = (abs_key[1], options['step'], options['directional'])
-        self._exec_dict[key].append((abs_key, options))
+        self._wrt_meta[abs_key[1]] = options
         self._reset()  # force later regen of approx_groups
 
-    def _get_approx_data(self, system, data):
+    def _get_approx_data(self, system, wrt, meta):
         """
         Given approximation metadata, compute necessary delta for complex step.
 
@@ -73,17 +72,19 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System whose derivatives are being approximated.
-        data : tuple
-            Tuple of the form (wrt, delta, directional)
+        wrt : str
+            Name of wrt variable.
+        meta : dict
+            Metadata dict.
 
         Returns
         -------
         float
             Delta needed for complex step perturbation.
         """
-        _, delta, _ = data
-        delta *= 1j
-        return delta
+        step = meta['step']
+        step *= 1j
+        return step
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -98,7 +99,7 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if not self._exec_dict:
+        if not self._wrt_meta:
             return
 
         if system.under_complex_step:
@@ -112,9 +113,8 @@ class ComplexStep(ApproximationScheme):
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
-                for lst in self._exec_dict.values():
-                    for apprx in lst:
-                        fd.add_approximation(apprx[0], system, empty)
+                for wrt in self._wrt_meta:
+                    fd.add_approximation(wrt, system, empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return

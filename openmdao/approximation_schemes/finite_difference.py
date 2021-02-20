@@ -121,13 +121,14 @@ class FiniteDifference(ApproximationScheme):
                                                     list(DEFAULT_ORDER.keys())))
 
         options['vector'] = vector
-
-        key = (abs_key[1], options['form'], options['order'], options['step'],
-               options['step_calc'], options['directional'])
-        self._exec_dict[key].append((abs_key, options))
+        wrt = abs_key[1]
+        if key in self._wrt_meta:
+            simple_warning(f"{self.msginfo}: overriding previous approximation defined for "
+                           f"'{wrt}.")
+        self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
-    def _get_approx_data(self, system, data):
+    def _get_approx_data(self, system, wrt, meta):
         """
         Given approximation metadata, compute necessary deltas and coefficients.
 
@@ -135,15 +136,20 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System whose derivatives are being approximated.
-        data : tuple
-            Tuple of the form (wrt, form, order, step, step_calc, directional)
+        wrt : str
+            Name of wrt variable.
+        meta : dict
+            Metadata dict.
 
         Returns
         -------
         tuple
             Tuple of the form (deltas, coeffs, current_coeff)
         """
-        wrt, form, order, step, step_calc, _ = data
+        form = meta['form']
+        order = meta['order']
+        step = meta['step']
+        step_calc = meta['step_calc']
 
         # FD forms are written as a collection of changes to inputs (deltas) and the associated
         # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -181,15 +187,15 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if not self._exec_dict:
+        if not self._wrt_meta:
             return
 
         if jac is None:
             jac = system._jacobian
 
-        self._starting_outs = system._outputs.asarray(True)
-        self._starting_resids = system._residuals.asarray(True)
-        self._starting_ins = system._inputs.asarray(True)
+        self._starting_outs = system._outputs.asarray(copy=True)
+        self._starting_resids = system._residuals.asarray(copy=True)
+        self._starting_ins = system._inputs.asarray(copy=True)
         if total:
             self._results_tmp = self._starting_outs.copy()
         else:
@@ -198,7 +204,10 @@ class FiniteDifference(ApproximationScheme):
         self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
         # reclaim some memory
-        self._starting_ins = self._starting_outs = self._results_tmp = None
+        self._starting_ins = None
+        self._starting_outs = None
+        self._starting_resids = None
+        self._results_tmp = None
 
     def _get_multiplier(self, data):
         """

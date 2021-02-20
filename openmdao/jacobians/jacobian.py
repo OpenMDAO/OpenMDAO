@@ -405,11 +405,18 @@ class Jacobian(object):
             self._col2name_ind[start:end] = i
             start = end
 
-    def set_col(self, system, icol, value):
+    def _wrt_name2vec(self, wrt):
+        if self._col_var_info is None:
+            # initialize column mapping info
+            self._setup_col_maps(system)
+
+        return self._col_var_info[wrt][3]
+
+    def set_col(self, system, icol, column):
         """
         Set a column of the jacobian.
 
-        This assumes that the value does not attempt to set any nonzero values that are
+        This assumes that the column does not attempt to set any nonzero values that are
         outside of specified sparsity patterns for any of the subjacs.
 
         Parameters
@@ -418,7 +425,7 @@ class Jacobian(object):
             The system that owns this jacobian.
         icol : int
             Column index.
-        value : ndarray
+        column : ndarray
             Column value.
 
         """
@@ -427,14 +434,15 @@ class Jacobian(object):
             self._setup_col_maps(system)
 
         wrt = self._colnames[self._col2name_ind[icol]]
-        loc_idx = icol - self._col_var_info[wrt][1]  # local col index into subjacs
+        _, offset, _, _ = self._col_var_info[wrt]
+        loc_idx = icol - offset  # local col index into subjacs
         for of, start, end, sub_wrt_idx in system._partial_jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 # TODO: support other sparse subjac types
                 if subjac['rows'] is None:
-                    subjac['value'][:, loc_idx] = value[sub_wrt_idx]
+                    subjac['value'][:, loc_idx] = column[sub_wrt_idx]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-                    subjac['value'][match_inds] = value[sub_wrt_idx][subjac['rows'][match_inds]]
+                    subjac['value'][match_inds] = column[sub_wrt_idx][subjac['rows'][match_inds]]

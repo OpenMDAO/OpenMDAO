@@ -102,13 +102,11 @@ class ExplicitComponent(Component):
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
         """
-        if wrt_matches is None:
-            wrt_matches = ContainsAll()
         offset = end = 0
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
-            if wrt in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, offset, end
+                yield wrt, offset, end, self._inputs
                 offset = end
 
     def _setup_partials(self):

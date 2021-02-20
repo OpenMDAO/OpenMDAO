@@ -167,3 +167,15 @@ class DictionaryJacobian(Jacobian):
                             subjac = subjac.transpose()
 
                         left_vec += subjac.dot(right_vec)
+
+
+class _CheckingJacobian(DictionaryJacobian):
+    def __iter__(self):
+        for key, _ in self.items():
+            yield key
+
+    def items(self):
+        for key, meta in self._subjacs_info.items():
+            if key[0] != key[1]:
+                yield key, meta['value']
+

@@ -10,6 +10,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.vectors.vector import _full_slice
 
 
@@ -26,9 +27,8 @@ class ApproximationScheme(object):
     _approx_groups_cached_under_cs : bool
         Flag indicates whether approx_groups was generated under complex step from higher in the
         model hieararchy.
-    _exec_dict : defaultdict(list)
-        A dict that keeps derivatives in execution order. The key is a combination of wrt and
-        various metadata that differs by approximation scheme.
+    _wrt_meta : dict
+        A dict that maps wrt name to its fd/cs metadata.
     _j_colored : coo_matrix
         If coloring is active, cached COO jacobian.
     _j_data_sizes : ndarray of int
@@ -49,7 +49,7 @@ class ApproximationScheme(object):
         self._j_data_sizes = None
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
-        self._exec_dict = defaultdict(list)
+        self._wrt_meta = {}
         self._progress_out = None
 
     def __repr__(self):
@@ -61,7 +61,7 @@ class ApproximationScheme(object):
         str
             String containing class name and added approximation keys.
         """
-        return f"{self.__class__.__name__}: {list(self._exec_dict.keys())}"
+        return f"{self.__class__.__name__}: {list(self._wrt_meta.keys())}"
 
     def _reset(self):
         """
@@ -162,16 +162,11 @@ class ApproximationScheme(object):
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
 
-        data = None
-        keys = set()
-        for key, apprx in self._exec_dict.items():
-            if key[0] in wrt_matches:
-                if data is None:
-                    # data is the same for all colored approxs so we only need the first
-                    data = self._get_approx_data(system, key)
-                options = apprx[0][1]
-                if 'coloring' in options:
-                    keys.update(a[0] for a in apprx)
+        for wrt, meta in self._wrt_meta.items():
+            if wrt in wrt_matches:
+                # data is the same for all colored approxs so we only need the first
+                data = self._get_approx_data(system, wrt, meta)
+                break
 
         if is_group and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
@@ -188,7 +183,6 @@ class ApproximationScheme(object):
             '@nrows': coloring._shape[0],
             '@ncols': coloring._shape[1],
             '@out_slices': out_slices,
-            '@approxs': keys,
             '@jac_slices': {},
         }
 
@@ -201,7 +195,7 @@ class ApproximationScheme(object):
         jac_slices = tmpJ['@jac_slices']
         for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend in system._partial_jac_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend, vec in system._partial_jac_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
             if is_group and (approx_of_idx or len_full_ofs > len(of_names)):
@@ -245,35 +239,19 @@ class ApproximationScheme(object):
         system : System
             The system having its derivs approximated.
         """
-        outputs = system._outputs
-        inputs = system._inputs
         abs2meta = system._var_allprocs_abs2meta
-
-        out_slices = outputs.get_slice_dict()
-        in_slices = inputs.get_slice_dict()
 
         approx_wrt_idx = system._owns_approx_wrt_idx
         coloring = system._get_static_coloring()
 
         self._approx_groups = []
 
-        # must sort _exec_dict keys here or have ordering issues when using MPI
-        for key in sorted(self._exec_dict):
-            approx = self._exec_dict[key]
-            meta = approx[0][1]
+        # must sort _wrt_meta keys here or have ordering issues when using MPI
+        for wrt in sorted(self._wrt_meta):
+            meta = self._wrt_meta[wrt]
             if coloring is not None and 'coloring' in meta:
                 continue
-            wrt = key[0]
-            directional = key[-1]
-            data = self._get_approx_data(system, key)
-            if inputs._contains_abs(wrt):
-                vec = inputs
-                slices = in_slices
-            elif outputs._contains_abs(wrt):
-                vec = outputs
-                slices = out_slices
-            else:  # wrt is remote
-                vec = None
+            data = self._get_approx_data(system, wrt, meta)
 
             if wrt in approx_wrt_idx:
                 in_idx = np.array(approx_wrt_idx[wrt], dtype=int)  # local index into var
@@ -290,13 +268,10 @@ class ApproximationScheme(object):
 
             # Directional derivatives for quick partial checking.
             # We place the indices in a list so that they are all stepped at the same time.
-            if directional:
+            if meta['directional']:
                 in_idx = [list(in_idx)]
 
-            tmpJ = _get_wrt_subjacs(system, approx)
-            tmpJ['@out_slices'] = out_slices
-
-            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(vec, in_idx)], None))
+            self._approx_groups.append((wrt, data, in_idx, meta['directional'], meta['vector']))
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
@@ -309,8 +284,8 @@ class ApproximationScheme(object):
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
         # selectively.
-        uses_voi_indices = (len(system._owns_approx_of_idx) > 0 or
-                            len(system._owns_approx_wrt_idx) > 0) and not isinstance(jac, dict)
+        uses_voi_indices = ((system._owns_approx_of_idx or system._owns_approx_wrt_idx) and
+                            not isinstance(jac, _CheckingJacobian))
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
@@ -337,10 +312,6 @@ class ApproximationScheme(object):
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
 
-        # only need to compute rows/cols the first time around.  After that, only data, since
-        # the sparsity structure won't change
-        do_rows_cols = self._j_colored is None
-
         # do colored solves first
         if colored_approx_groups is not None:
             for data, col_idxs, tmpJ, idx_info, nz_rows in colored_approx_groups:
@@ -356,14 +327,16 @@ class ApproximationScheme(object):
                         result = self._transform_result(result)
 
                         if nz_rows is None:  # uncolored column
-                            if do_rows_cols:
+                            if self._j_colored is None:
                                 nrows = tmpJ['@nrows']
                                 jrows.extend(range(nrows))
                                 jcols.extend(col_idxs * nrows)
                             jdata.extend(result)
                         else:
                             for i, col in enumerate(col_idxs):
-                                if do_rows_cols:
+                                # only need to compute rows/cols the first time around.  After that,
+                                # only data, since the sparsity structure won't change
+                                if self._j_colored is None:
                                     jrows.extend(nz_rows[i])
                                     jcols.extend([col] * len(nz_rows[i]))
                                 jdata.extend(result[nz_rows[i]])
@@ -375,13 +348,9 @@ class ApproximationScheme(object):
                 fd_count += 1
 
         # now do uncolored solves
-        for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+        for wrt, data, col_idxs in approx_groups:
             if self._progress_out:
                 start_time = time.time()
-
-            J = tmpJ[wrt]
-            full_idxs = J['loc_outvec_idxs']
-            out_slices = tmpJ['@out_slices']
 
             if J['vector'] is not None:
                 app_data = self.apply_directional(data, J['vector'])
@@ -434,7 +403,7 @@ class ApproximationScheme(object):
             elif is_parallel:
                 raise NotImplementedError("colored FD/CS over parallel groups not supported yet")
             else:  # serial colored
-                if do_rows_cols:
+                if self._j_colored is None:
                     self._j_colored = coo_matrix((jdata, (jrows, jcols)), shape=colored_shape)
                 else:
                     self._j_colored.data[:] = jdata

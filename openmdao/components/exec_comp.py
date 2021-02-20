@@ -577,7 +577,7 @@ class ExecComp(ExplicitComponent):
         """
         if self._requires_fd:
             if 'fd' in self._approx_schemes:
-                fdins = {tup[0].rsplit('.', 1)[1] for tup in self._approx_schemes['fd']._exec_dict}
+                fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
             else:
                 fdins = set()
 

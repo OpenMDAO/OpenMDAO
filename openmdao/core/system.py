@@ -1141,16 +1141,16 @@ class System(object):
             containing only the matching columns.
         """
         start = end = 0
-        for of, _start, _end, _ in self._partial_jac_of_iter():
+        for of, _start, _end, _, vec in self._partial_jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
-                yield of, start, end
+                yield of, start, end, vec
                 start = end
 
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, start, end
+                yield wrt, start, end, self._inputs
                 start = end
 
     def get_approx_coloring_fname(self):

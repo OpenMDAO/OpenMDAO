@@ -62,7 +62,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(model._approx_schemes['fd']._wrt_meta), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -186,7 +186,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._wrt_meta), 2)
 
     def test_paraboloid_subbed_in_setup(self):
         class MyModel(om.Group):
@@ -220,7 +220,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._wrt_meta), 2)
 
     def test_paraboloid_subbed_with_connections(self):
         prob = om.Problem()
@@ -257,7 +257,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         # 3 outputs x 2 inputs
         n_entries = 0
-        for k, v in sub._approx_schemes['fd']._exec_dict.items():
+        for k, v in sub._approx_schemes['fd']._wrt_meta.items():
             n_entries += len(v)
         self.assertEqual(n_entries, 6)
 
@@ -1000,7 +1000,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['cs']._exec_dict), 2)
+        self.assertEqual(len(model._approx_schemes['cs']._wrt_meta), 2)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1036,7 +1036,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['cs']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['cs']._wrt_meta), 2)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1080,7 +1080,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
         # 3 outputs x 2 inputs
         n_entries = 0
-        for k, v in sub._approx_schemes['cs']._exec_dict.items():
+        for k, v in sub._approx_schemes['cs']._wrt_meta.items():
             n_entries += len(v)
         self.assertEqual(n_entries, 6)
 

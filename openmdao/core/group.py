@@ -2977,7 +2977,8 @@ class Group(System):
         Iterate over (name, start, end, idxs) for each row var in the systems's jacobian.
 
         idxs will usually be the var slice into the result array, except in cases where
-        _owns_approx__idx has a value for that variable.
+        _owns_approx__idx has a value for that variable, in which case it'll be indices
+        into the result array.
 
         Yields
         ------
@@ -3011,7 +3012,7 @@ class Group(System):
         Parameters
         ----------
         wrt_matches : set or None
-            Only include row vars that are contained in this set.  This will determine what
+            Only include vars in each row that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
 
@@ -3022,27 +3023,39 @@ class Group(System):
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
+            seen = set()
 
             start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _start, _end, _ in self._partial_jac_of_iter():
+                for of, _start, _end, _, vec in self._partial_jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _start)
-                        yield of, start, end
+                        yield of, start, end, vec
+                        seen.add(of)
                         start = end
 
-            for wrt in self._owns_approx_wrt:
-                if wrt_matches is None or wrt in wrt_matches:
-                    if wrt in approx_wrt_idx:
-                        end += len(approx_wrt_idx[wrt])
-                        yield wrt, start, end
-                    else:
-                        if wrt in abs2meta['input']:
-                            end += abs2meta['input'][wrt]['size']
-                        else:
-                            end += abs2meta['output'][wrt]['size']
-                        yield wrt, start, end
-                    start = end
+            full = [w for w in self._owns_approx_wrt if (wrt_matches is None or w in wrt_matches)]
+            full -= seen
+            ins = [w for w in full if w in abs2meta['input']]
+            outs = full - ins
+
+            for wrt in outs:
+                if wrt in approx_wrt_idx:
+                    end += len(approx_wrt_idx[wrt])
+                    yield wrt, start, end, self._outputs
+                else:
+                    end += abs2meta['output'][wrt]['size']
+                    yield wrt, start, end, self._outputs
+                start = end
+
+            for wrt in ins:
+                if wrt in approx_wrt_idx:
+                    end += len(approx_wrt_idx[wrt])
+                    yield wrt, start, end, self._inputs
+                else:
+                    end += abs2meta['input'][wrt]['size']
+                    yield wrt, start, end, self._inputs
+                start = end
         else:
             yield from super()._partial_jac_wrt_iter(wrt_matches)
 
@@ -3104,7 +3117,7 @@ class Group(System):
 
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
-        approx._exec_dict = defaultdict(list)
+        approx._wrt_meta = {}
         approx._reset()
 
         approx_keys = self._get_approx_subjac_keys()
