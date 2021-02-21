@@ -1051,7 +1051,6 @@ class System(object):
         ordered_of_info = list(self._partial_jac_of_iter())
         ordered_wrt_info = list(self._partial_jac_wrt_iter(info['wrt_matches']))
         sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
-                                                             num_full_jacs=info['num_full_jacs'],
                                                              tol=info['tol'],
                                                              orders=info['orders'])
         sp_info['sparsity_time'] = sparsity_time

@@ -218,6 +218,30 @@ class Coloring(object):
         for col_chunk in self.color_iter(direction):
             yield col_chunk, [nz_rows[c] for c in col_chunk]
 
+    def var_offset_iter(self, direction):
+        """
+        Given a direction, yield an iterator over (wrtname, offset) or (ofname, offset).
+
+        Parameters
+        ----------
+        direction : str
+            Indicates which coloring subdict ('fwd' or 'rev') to use.
+
+        Yields
+        ------
+        (name, offset)
+            Name and offset of column (fwd) or row (rev) variable.
+        """
+        if direction == 'fwd':
+            start = 0
+            for name, sz in zip(self._col_vars, self._col_var_sizes):
+                yield name, start
+                start += sz
+        else:  # rev
+            for name, sz in zip(self._row_vars, self._row_var_sizes):
+                yield name, start
+                start += sz
+
     def get_row_col_map(self, direction):
         """
         Return mapping of nonzero rows to each column (fwd) or nonzeros columns to each row (rev).

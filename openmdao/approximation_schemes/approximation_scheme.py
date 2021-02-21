@@ -137,7 +137,7 @@ class ApproximationScheme(object):
 
     def _init_colored_approximations(self, system):
         from openmdao.core.group import Group
-        from openmdao.core.implicitcomponent import ImplicitComponent
+        # from openmdao.core.implicitcomponent import ImplicitComponent
 
         self._colored_approx_groups = []
         self._j_colored = None
@@ -148,6 +148,22 @@ class ApproximationScheme(object):
         coloring = system._coloring_info['coloring']
         if not isinstance(coloring, coloring_mod.Coloring):
             return
+
+        system._update_wrt_matches(system._coloring_info)
+        wrt_matches = system._coloring_info['wrt_matches']
+
+        # this maps indices into colored jac into indices into full jac
+        self._colored2full_idx_map = np.empty(coloring._shape[1], dtype=int)
+
+        colored_start = colored_end = 0
+        for abs_wrt, cstart, cend, vec in system._partial_jac_wrt_iter():
+            if abs_wrt in wrt_matches:
+                colored_end += cend - cstart
+                self._colored2full_idx_map[colored_start:colored_end] = \
+                    np.arange(cstart, cend, dtype=int)
+
+
+
 
         outputs = system._outputs
         inputs = system._inputs
@@ -172,12 +188,10 @@ class ApproximationScheme(object):
             of_names = system._owns_approx_of
             full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
                                    system._var_allprocs_abs2meta['input']))
-            wrt_names = system._owns_approx_wrt
         else:
             of_names, wrt_names = system._get_partials_varlists()
-            wrt_names = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
+            full_wrts = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
                          for n in wrt_names]
-            full_wrts = wrt_names
 
         tmpJ = {
             '@nrows': coloring._shape[0],

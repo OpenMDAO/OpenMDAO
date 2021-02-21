@@ -315,7 +315,7 @@ class Jacobian(object):
             for key in subjacs:
                 summ[key] += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, num_full_jacs, tol, orders):
+    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, tol, orders):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
@@ -328,8 +328,6 @@ class Jacobian(object):
             Name, offset, etc. of row variables in the order that they appear in the jacobian.
         ordered_wrt_info : list of (name, offset, end, idxs)
             Name, offset, etc. of column variables in the order that they appear in the jacobian.
-        num_full_jacs : int
-            Number of times to compute partial jacobian when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero.
         orders : int
@@ -397,7 +395,7 @@ class Jacobian(object):
         self._col_var_info = col_var_info = {t[0]: t for t in system._partial_jac_wrt_iter()}
         self._colnames = list(col_var_info)   # map var id to varname
 
-        ncols = np.sum(end - start for _, start, end in col_var_info.values())
+        ncols = np.sum(end - start for _, start, end, _ in col_var_info.values())
         self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
         start = end = 0
         for i, (of, _start, _end) in enumerate(col_var_info.values()):
@@ -406,11 +404,10 @@ class Jacobian(object):
             start = end
 
     def _wrt_name2vec(self, wrt):
-        if self._col_var_info is None:
-            # initialize column mapping info
-            self._setup_col_maps(system)
-
         return self._col_var_info[wrt][3]
+
+    def _wrt_name2range(self, wrt):
+        return self._col_var_info[wrt][1:3]
 
     def set_col(self, system, icol, column):
         """
@@ -429,10 +426,6 @@ class Jacobian(object):
             Column value.
 
         """
-        if self._col_var_info is None:
-            # initialize column mapping info
-            self._setup_col_maps(system)
-
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
