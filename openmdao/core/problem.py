@@ -829,8 +829,15 @@ class Problem(object):
 
         Parameters
         ----------
-        check : boolean
-            whether to run config check after setup is complete.
+        check : None, boolean, list of strings, or the string ‘all’
+           Determines what config checks, if any, are run after setup is complete.
+           If None or False, no checks are run
+           If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
+             'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
+           If list of str, run those config checks
+           If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
+             'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
+             'system', 'unconnected_inputs') are run
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -1850,7 +1857,7 @@ class Problem(object):
                                    "found in the model".format(self.msginfo, name))
                 self[name] = outputs[name]
 
-    def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
+    def check_config(self, logger=None, checks=_default_checks, out_file='openmdao_checks.out'):
         """
         Perform optional error checks on a Problem.
 
@@ -1858,17 +1865,23 @@ class Problem(object):
         ----------
         logger : object
             Logging object.
-        checks : list of str or None
-            List of specific checks to be performed.
+        checks : list of str or None or the string 'all'
+           Determines what config checks are run.
+           If None, no checks are run
+           If list of str, run those config checks
+           If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
+             'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
+             'system', 'unconnected_inputs') are run
         out_file : str or None
             If not None, output will be written to this file in addition to stdout.
         """
+        if checks is None:
+            return
+
         if logger is None:
             logger = get_logger('check_config', out_file=out_file, use_format=True)
 
-        if checks is None:
-            checks = sorted(_default_checks)
-        elif checks == 'all':
+        if checks == 'all':
             checks = sorted(_all_checks)
 
         for c in checks:
