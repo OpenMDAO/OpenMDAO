@@ -378,6 +378,11 @@ class Component(System):
         """
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
+        if '*' in wrt_patterns:
+            info['wrt_matches_prom'] = None
+            info['wrt_matches'] = None
+            return
+
         matches_prom = set()
         for w in wrt_patterns:
             matches_prom.update(find_matches(w, allwrt))

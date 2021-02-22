@@ -3022,40 +3022,31 @@ class Group(System):
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
+            approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
-            seen = set()
-
-            start = end = 0
+    
+            offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _start, _end, _, vec in self._partial_jac_of_iter():
+                for of, _offset, _end, _ in self._partial_jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
-                        end += (_end - _start)
-                        yield of, start, end, vec
-                        seen.add(of)
-                        start = end
-
-            full = [w for w in self._owns_approx_wrt if (wrt_matches is None or w in wrt_matches)]
-            full -= seen
-            ins = [w for w in full if w in abs2meta['input']]
-            outs = full - ins
-
-            for wrt in outs:
-                if wrt in approx_wrt_idx:
-                    end += len(approx_wrt_idx[wrt])
-                    yield wrt, start, end, self._outputs
-                else:
-                    end += abs2meta['output'][wrt]['size']
-                    yield wrt, start, end, self._outputs
-                start = end
-
-            for wrt in ins:
-                if wrt in approx_wrt_idx:
-                    end += len(approx_wrt_idx[wrt])
-                    yield wrt, start, end, self._inputs
-                else:
-                    end += abs2meta['input'][wrt]['size']
-                    yield wrt, start, end, self._inputs
-                start = end
+                        end += (_end - _offset)
+                        yield of, offset, end, self._outputs
+                        offset = end
+    
+            for wrt in self._owns_approx_wrt:
+                if wrt_matches is None or wrt in wrt_matches:
+                    vec = self._inputs if wrt in abs2meta['input'] else self._outputs
+                    if wrt in approx_wrt_idx:
+                        sub_wrt_idx = approx_wrt_idx[wrt]
+                        size = len(sub_wrt_idx)
+                    else:
+                        if wrt in abs2meta['input']:
+                            size = abs2meta['input'][wrt]['size']
+                        else:
+                            size = abs2meta['output'][wrt]['size']
+                    end += size
+                    yield wrt, offset, end, vec
+                    offset = end
         else:
             yield from super()._partial_jac_wrt_iter(wrt_matches)
 
@@ -3071,13 +3062,17 @@ class Group(System):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        abs2prom = self._var_allprocs_abs2prom
+        wrt_color_patterns = info['wrt_patterns']
+
+        if '*' in wrt_color_patterns:
+            info['wrt_matches'] = None
+            info['wrt_matches_prom'] = None
+            return
 
         info['wrt_matches'] = wrt_colors_matched = set()
 
-        wrt_color_patterns = info['wrt_patterns']
-
         if wrt_color_patterns:
+            abs2prom = self._var_allprocs_abs2prom
             for _, wrt in self._get_approx_subjac_keys():
                 if wrt in abs2prom['output']:
                     wrtprom = abs2prom['output'][wrt]

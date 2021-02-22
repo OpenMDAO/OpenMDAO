@@ -255,12 +255,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
-        # 3 outputs x 2 inputs
-        n_entries = 0
-        for k, v in sub._approx_schemes['fd']._wrt_meta.items():
-            n_entries += len(v)
-        self.assertEqual(n_entries, 6)
-
     def test_array_comp(self):
 
         class DoubleArrayFD(DoubleArrayComp):

@@ -398,16 +398,10 @@ class Jacobian(object):
         ncols = np.sum(end - start for _, start, end, _ in col_var_info.values())
         self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
         start = end = 0
-        for i, (of, _start, _end) in enumerate(col_var_info.values()):
+        for i, (of, _start, _end, _) in enumerate(col_var_info.values()):
             end += _end - _start
             self._col2name_ind[start:end] = i
             start = end
-
-    def _wrt_name2vec(self, wrt):
-        return self._col_var_info[wrt][3]
-
-    def _wrt_name2range(self, wrt):
-        return self._col_var_info[wrt][1:3]
 
     def set_col(self, system, icol, column):
         """
@@ -426,6 +420,9 @@ class Jacobian(object):
             Column value.
 
         """
+        if self._colnames is None:
+            self._setup_col_maps(system)
+
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs

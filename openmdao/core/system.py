@@ -1140,10 +1140,10 @@ class System(object):
             containing only the matching columns.
         """
         start = end = 0
-        for of, _start, _end, _, vec in self._partial_jac_of_iter():
+        for of, _start, _end, _ in self._partial_jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
-                yield of, start, end, vec
+                yield of, start, end, self._outputs
                 start = end
 
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():

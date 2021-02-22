@@ -371,12 +371,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         out_size = len(outputs)
         out_idxs = full_idxs[full_idxs < out_size]
         in_idxs = full_idxs[full_idxs >= out_size] - out_size
-        if in_idxs.size > 0:
-            if out_idxs.size > 0:
-                return [(inputs, in_idxs), (outputs, out_idxs)]
-            else:
-                return [(inputs, in_idxs)]
-        return [(outputs, out_idxs)]
+        full = [(outputs, out_idxs), (inputs, in_idxs)]
+        return [(vec, inds) for vec, inds in full if inds.size > 0]
     elif is_total:
         return [(outputs, full_idxs)]
     else:

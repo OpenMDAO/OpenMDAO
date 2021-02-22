@@ -3,10 +3,10 @@ from collections import namedtuple, defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results, _full_slice
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
 from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
+from openmdao.utils.general_utils import simple_warning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -122,8 +122,8 @@ class FiniteDifference(ApproximationScheme):
 
         options['vector'] = vector
         wrt = abs_key[1]
-        if key in self._wrt_meta:
-            simple_warning(f"{self.msginfo}: overriding previous approximation defined for "
+        if wrt in self._wrt_meta:
+            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
                            f"'{wrt}.")
         self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
