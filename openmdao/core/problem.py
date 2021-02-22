@@ -833,11 +833,11 @@ class Problem(object):
             Determines what config checks, if any, are run after setup is complete.
             If None or False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
-             'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
+            'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
-             'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
-             'system', 'unconnected_inputs') are run
+            'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
+            'system', 'unconnected_inputs') are run
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -1870,8 +1870,8 @@ class Problem(object):
             If None, no checks are run
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
-             'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
-             'system', 'unconnected_inputs') are run
+            'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
+            'system', 'unconnected_inputs') are run
         out_file : str or None
             If not None, output will be written to this file in addition to stdout.
         """
