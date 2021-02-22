@@ -830,12 +830,12 @@ class Problem(object):
         Parameters
         ----------
         check : None, boolean, list of strings, or the string ‘all’
-           Determines what config checks, if any, are run after setup is complete.
-           If None or False, no checks are run
-           If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
+            Determines what config checks, if any, are run after setup is complete.
+            If None or False, no checks are run
+            If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
              'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
-           If list of str, run those config checks
-           If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
+            If list of str, run those config checks
+            If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
              'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
              'system', 'unconnected_inputs') are run
         logger : object
@@ -1866,10 +1866,10 @@ class Problem(object):
         logger : object
             Logging object.
         checks : list of str or None or the string 'all'
-           Determines what config checks are run.
-           If None, no checks are run
-           If list of str, run those config checks
-           If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
+            Determines what config checks are run.
+            If None, no checks are run
+            If list of str, run those config checks
+            If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
              'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
              'system', 'unconnected_inputs') are run
         out_file : str or None
