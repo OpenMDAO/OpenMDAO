@@ -776,7 +776,7 @@ class N2UserInterface {
 
     /** Save the model state to a file. */
     saveState() {
-        const stateFileName = prompt("Filename to save view state as", 'n2.state');
+        const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
 
         // Solver toggle state.
         let showLinearSolverNames = this.n2Diag.showLinearSolverNames;
