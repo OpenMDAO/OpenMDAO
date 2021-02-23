@@ -194,6 +194,7 @@ class ComplexStep(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None:
+                # print("run_point: idxs = ", idxs, "delta = ", delta)
                 vec.iadd(delta, idxs)
 
         if total:

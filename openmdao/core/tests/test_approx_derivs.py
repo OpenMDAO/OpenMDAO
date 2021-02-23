@@ -1072,12 +1072,6 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
-        # 3 outputs x 2 inputs
-        n_entries = 0
-        for k, v in sub._approx_schemes['cs']._wrt_meta.items():
-            n_entries += len(v)
-        self.assertEqual(n_entries, 6)
-
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_array_comp_'+'_'.join(title(a) for a in p.args))
@@ -1854,8 +1848,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         class TestImplCompArrayDense(TestImplCompArray):
 
-            def setup(self):
-                super().setup()
+            def setup_partials(self):
                 self.declare_partials('*', '*', method='cs')
 
         prob = self.prob = om.Problem()

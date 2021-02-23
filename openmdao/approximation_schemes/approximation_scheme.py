@@ -139,7 +139,7 @@ class ApproximationScheme(object):
         from openmdao.core.group import Group
         from openmdao.core.implicitcomponent import ImplicitComponent
 
-        # self._colored_approx_groups = []
+        self._colored_approx_groups = []
         # self._j_colored = None
         # self._j_data_sizes = None
         # self._j_data_offsets = None
@@ -161,6 +161,7 @@ class ApproximationScheme(object):
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     col_map[colored_start:colored_end] = np.arange(cstart, cend, dtype=int)
+                    colored_start = colored_end
 
         for wrt, meta in self._wrt_meta.items():
             if wrt_matches is None or wrt in wrt_matches:
@@ -282,14 +283,6 @@ class ApproximationScheme(object):
 
         self._approx_groups = []
 
-        #print("OUTPUTS:")
-        #import pprint
-        #pprint.pprint(system._outputs._views)
-
-        #print("INPUTS:")
-        #import pprint
-        #pprint.pprint(system._inputs._views)
-
         for wrt, start, end, vec in system._partial_jac_wrt_iter():
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
@@ -303,10 +296,17 @@ class ApproximationScheme(object):
                 data = self._get_approx_data(system, wrt, meta)
                 directional = meta['directional']
 
+                in_idx = range(start, end)
+
                 if wrt in approx_wrt_idx:
                     vec_idx = np.array(approx_wrt_idx[wrt], dtype=int)  # local index into var
                     if vec is not None:
                         vec_idx += slices[wrt].start  # convert into index into input or output vector
+                        # Directional derivatives for quick partial checking.
+                        # We place the indices in a list so that they are all stepped at the same time.
+                        if directional:
+                            in_idx = [list(in_idx)]
+                            vec_idx = [vec_idx]
                 else:
                     if vec is None:  # remote wrt
                         if vec is system._inputs:
@@ -316,15 +316,13 @@ class ApproximationScheme(object):
                     else:
                         vec_idx = range(slices[wrt].start, slices[wrt].stop)
 
-                in_idx = range(start, end)
+                    # Directional derivatives for quick partial checking.
+                    # We place the indices in a list so that they are all stepped at the same time.
+                    if directional:
+                        in_idx = [list(in_idx)]
+                        vec_idx = [list(vec_idx)]
 
-                # Directional derivatives for quick partial checking.
-                # We place the indices in a list so that they are all stepped at the same time.
-                if directional:
-                    in_idx = [list(in_idx)]
-                    vec_idx = [list(vec_idx)]
-
-                print("approx:", wrt, start, end, vec._data.size)
+                # print("approx:", wrt, start, end, vec._data.size)
                 self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, meta['vector']))
 
     def _compute_approximations(self, system, jac, total, under_cs):
@@ -394,7 +392,7 @@ class ApproximationScheme(object):
                             for i, col in enumerate(jcols):
                                 scratch[:] = 0.0
                                 scratch[nzrows[i]] = result[nzrows[i]]
-                                jac.set_col(scratch)
+                                jac.set_col(system, col, scratch)
 
                         # if nzrows is None:  # uncolored column
                         #     if self._j_colored is None:
@@ -429,10 +427,10 @@ class ApproximationScheme(object):
 
             mult = self._get_multiplier(data)
 
-            for i_count, idxs in enumerate(jac_col_idxs):
+            for i_count, (idxs, vecidxs) in enumerate(zip(jac_col_idxs, vec_idxs)):
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
-                    result = self._run_point(system, [(vec, vec_idxs)],
+                    result = self._run_point(system, [(vec, vecidxs)],
                                              app_data, results_array, total)
 
                     result = self._transform_result(result)
@@ -450,8 +448,9 @@ class ApproximationScheme(object):
                     # else:
                     #     J['data'][:, i_count] = self._transform_result(result[full_idxs])
 
-                    result = self._transform_result(result)
+                    #result = self._transform_result(result)
 
+                    # print(f"{system.pathname}: setting col {idxs} to {result}")
                     system._jacobian.set_col(system, idxs, result)
 
                 if self._progress_out:

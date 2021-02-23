@@ -498,6 +498,9 @@ class System(object):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
+    def __repr__(self):
+        return self.msginfo
+
     def _get_inst_id(self):
         return self.pathname
 
@@ -3067,7 +3070,7 @@ class System(object):
             recurse=True, its subsystems.
 
         """
-        prom2abs = self._var_allprocs_prom2abs_list['output']
+        prom2abs_out = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
@@ -3077,15 +3080,15 @@ class System(object):
         try:
             out = {}
             for name, data in self._responses.items():
-                if name in prom2abs:
-                    abs_name = prom2abs[name][0]
+                if name in prom2abs_out:
+                    abs_name = prom2abs_out[name][0]
                     out[abs_name] = data
                     out[abs_name]['ivc_source'] = abs_name
                     out[abs_name]['distributed'] = \
                         abs_name in abs2meta_out and abs2meta_out[abs_name]['distributed']
 
                 else:
-                    # A constraint can actaully be on an auto_ivc input, so use connected
+                    # A constraint can be on an auto_ivc input, so use connected
                     # output name.
                     in_abs = prom2abs_in[name][0]
                     ivc_path = conns[in_abs]

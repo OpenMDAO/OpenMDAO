@@ -203,6 +203,13 @@ class Jacobian(object):
         for key in self._subjacs_info.keys():
             yield key
 
+    def keys(self):
+        """
+        Yield next name pair of sub-Jacobian.
+        """
+        for key in self._subjacs_info.keys():
+            yield key
+
     def items(self):
         """
         Yield name pair and value of sub-Jacobian.
@@ -348,7 +355,7 @@ class Jacobian(object):
         J = np.zeros((rend, cend))
 
         for of, roffset, rend, _ in ordered_of_info:
-            for wrt, coffset, cend in ordered_wrt_info:
+            for wrt, coffset, cend, _ in ordered_wrt_info:
                 key = (of, wrt)
                 if key in subjacs:
                     meta = subjacs[key]
@@ -391,7 +398,7 @@ class Jacobian(object):
 
         self._under_complex_step = active
 
-    def _setup_col_maps(self, system):
+    def _setup_index_maps(self, system):
         self._col_var_info = col_var_info = {t[0]: t for t in system._partial_jac_wrt_iter()}
         self._colnames = list(col_var_info)   # map var id to varname
 
@@ -402,6 +409,47 @@ class Jacobian(object):
             end += _end - _start
             self._col2name_ind[start:end] = i
             start = end
+
+        if system.pathname == '':  # for total derivs, we can have sub-indices making some subjacs smaller
+            full = (_full_slice, _full_slice)
+            for key, meta in system._subjacs_info.items():
+                if key[0] in system._owns_approx_of_idx:
+                    ridxs = system._owns_approx_of_idx[key[0]]
+                else:
+                    ridxs = _full_slice
+                if key[1] in system._owns_approx_wrt_idx:
+                    cidxs = system._owns_approx_wrt_idx[key[1]]
+                else:
+                    cidxs = _full_slice
+                if ridxs is not _full_slice or cidxs is not _full_slice:
+                    nrows, ncols = meta['shape']
+                    if ridxs is not _full_slice:
+                        nrows = len(ridxs)
+                    if cidxs is not _full_slice:
+                        ncols = len(cidxs)
+                    if meta['rows'] is None:  # dense
+                        val = meta['value']
+                        val = val[ridxs, :]
+                        val = val[:, cidxs]
+                        meta['value'] = val
+                    else:  # sparse
+                        sprows = meta['rows']
+                        spcols = meta['cols']
+                        if ridxs is not _full_slice:
+                            mask = np.zeros(sprows.size, dtype=bool)
+                            for r in ridxs:
+                                mask |= sprows == r
+                            sprows = sprows[mask]
+                            spcols = spcols[mask]
+                        if cidxs is not _full_slice:
+                            mask = np.zeros(sprows.size, dtype=bool)
+                            for c in cidxs:
+                                mask |= spcols == c
+                            sprows = sprows[mask]
+                            spcols = spcols[mask]
+                        meta['rows'] = sprows
+                        meta['cols'] = spcols
+                    meta['shape'] = (nrows, ncols)
 
     def set_col(self, system, icol, column):
         """
@@ -421,7 +469,7 @@ class Jacobian(object):
 
         """
         if self._colnames is None:
-            self._setup_col_maps(system)
+            self._setup_index_maps(system)
 
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _ = self._col_var_info[wrt]

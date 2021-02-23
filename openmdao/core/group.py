@@ -2986,22 +2986,21 @@ class Group(System):
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
+        slices = self._outputs.get_slice_dict()
 
         if self._owns_approx_of:
             # we're computing totals/semi-totals
-            start = end = vstart = vend = 0
+            start = end = 0
             for of in self._owns_approx_of:
-                vend += abs2meta[of]['size']
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    inds = np.atleast_1d(approx_of_idx[of]) + vstart
+                    inds = np.atleast_1d(approx_of_idx[of]) + slices[of].start
                     yield of, start, end, inds
                 else:
                     end += abs2meta[of]['size']
-                    yield of, start, end, slice(vstart, vend)
+                    yield of, start, end, slices[of]
 
                 start = end
-                vstart = vend
         else:
             yield from super()._partial_jac_of_iter()
 
@@ -3024,7 +3023,7 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
-    
+
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, _offset, _end, _ in self._partial_jac_of_iter():
@@ -3032,7 +3031,7 @@ class Group(System):
                         end += (_end - _offset)
                         yield of, offset, end, self._outputs
                         offset = end
-    
+
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
                     vec = self._inputs if wrt in abs2meta['input'] else self._outputs
@@ -3133,7 +3132,7 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if key[1] in wrt_matches:
+            if wrt_matches is None or key[1] in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
             if meta['value'] is None:

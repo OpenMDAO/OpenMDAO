@@ -2060,7 +2060,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info = derivatives[of, wrt]
             # TODO total derivs may have been computed in rev mode, not fwd
             forward = derivative_info['J_fwd']
-            fd = derivative_info['J_fd']
+            try:
+                fd = derivative_info['J_fd']
+            except KeyError:
+                # this can happen when a partial is not declared, which means it should be zero
+                fd = np.zeros(forward.shape)
+
             if do_rev:
                 reverse = derivative_info.get('J_rev')
 
