@@ -142,9 +142,8 @@ body {
 }
 
 @font-face {
-    /* Subset of fonts from Font Awesome v4.6.3 created using http://fontello.com/ */
-    font-family: 'fontello';
-    src: url('data:application/font-woff;charset=utf-8;base64,{{fontello}}') format('woff');
+    font-family: 'n2toolbar-icons';
+    src: url('data:application/font-woff;charset=utf-8;base64,{{n2toolbar-icons}}') format('woff');
 }
 
 .context-menu {

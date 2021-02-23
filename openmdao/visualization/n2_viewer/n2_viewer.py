@@ -562,14 +562,14 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     style_names = \
         'window', \
         'partition_tree', \
-        'icon', \
+        'n2toolbar-icons', \
         'toolbar', \
         'legend', \
         'awesomplete'
 
     styles = read_files((style_names), style_dir, 'css')
 
-    with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
+    with open(os.path.join(style_dir, "n2toolbar-icons-font.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
@@ -597,7 +597,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         h.insert("non-embedded-n2", "embedded-n2")
 
     # put all style and JS into index
-    h.insert('{{fontello}}', encoded_font)
+    h.insert('{{n2toolbar-icons}}', encoded_font)
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
     h.insert('{{help}}', help_svg)
