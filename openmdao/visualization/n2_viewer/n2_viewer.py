@@ -389,6 +389,10 @@ def _get_viewer_data(data_source):
         if 'variables' in data_dict:
             del data_dict['variables']
 
+        # Older recordings might not have this.
+        if 'md5_hash' not in data_dict:
+            data_dict['md5_hash'] = None
+
         return data_dict
 
     else:
@@ -399,6 +403,7 @@ def _get_viewer_data(data_source):
     comp_exec_idx = [0]  # list so pass by ref
     orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
+    data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
 
