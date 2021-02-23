@@ -476,15 +476,13 @@ class Case(object):
 
                 inputs.append((var_name, var_meta))
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if self.inputs is None or len(self.inputs) == 0:
-                out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
-                                 'settings have record_inputs set to True\n')
-
-            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            if self.inputs:
+                self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            else:
+                ostream = sys.stdout if out_stream is _DEFAULT_OUT_STREAM else out_stream
+                ostream.write('WARNING: Inputs not recorded. Make sure your recording ' +
+                              'settings have record_inputs set to True\n')
 
         return inputs
 
@@ -617,13 +615,11 @@ class Case(object):
             else:
                 impl_outputs.append((var_name, var_meta))
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if self.outputs is None or len(self.outputs) == 0:
-                out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
-                                 'settings have record_outputs set to True\n')
+            if not self.outputs:
+                ostream = sys.stdout if out_stream is _DEFAULT_OUT_STREAM else out_stream
+                ostream.write('WARNING: Outputs not recorded. Make sure your recording ' +
+                              'settings have record_outputs set to True\n')
             if explicit:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:

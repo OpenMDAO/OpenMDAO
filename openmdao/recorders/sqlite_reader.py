@@ -9,13 +9,16 @@ import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
-from openmdao.core.notebook_mode import notebook, tabulate
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
+
+from openmdao.core.notebook_mode import notebook, tabulate
+if notebook:
+    from IPython.display import display, HTML
 
 import pickle
 from json import loads as json_loads
@@ -340,13 +343,14 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if notebook and tabulate is not None:
-            return tabulate([sources], headers=["Source"], tablefmt='html')
-        elif out_stream:
-            if out_stream is _DEFAULT_OUT_STREAM:
-                out_stream = sys.stdout
-            for source in sources:
-                out_stream.write('{}\n'.format(source))
+        if out_stream:
+            if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
+                display(HTML(tabulate([[s] for s in sources],
+                             disable_numparse=True, colalign=["center"],
+                             headers=["Sources"], tablefmt='html')))
+            else:
+                for source in sources:
+                    out_stream.write('{}\n'.format(source))
 
         return sources
 
@@ -603,21 +607,14 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            if notebook and tabulate is not None:
-                cases = self._list_cases_recurse_flat(out_stream=out_stream)
-                return tabulate(cases, headers="keys", tablefmt='html')
-            else:
-                return self._list_cases_recurse_flat(out_stream=out_stream)
+            return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
                 cases = self._problem_cases.list_cases()
-                if notebook and tabulate is not None:
-                    return tabulate({'problem': cases}, headers="keys", tablefmt='html')
-                else:
-                    if out_stream:
-                        write_source_table({'problem': cases}, out_stream)
-                    return cases
+                if out_stream:
+                    write_source_table({'problem': cases}, out_stream)
+                return cases
             else:
                 raise RuntimeError('No problem cases recorded (data format = %d).' %
                                    self._format_version)
@@ -634,10 +631,7 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if notebook and tabulate is not None:
-                    cases = [[case] for case in case_table._cases.keys()]
-                    return tabulate(cases, headers=[source], tablefmt='html')
-                elif not recurse:
+                if not recurse:
                     # return list of cases from the source alone
                     cases = case_table.list_cases(source)
                     if out_stream:
@@ -661,7 +655,7 @@ class SqliteCaseReader(BaseCaseReader):
                 # source is a coordinate
                 if recurse:
                     if flat:
-                        return self._list_cases_recurse_flat(source)
+                        return self._list_cases_recurse_flat(source, out_stream=out_stream)
                     else:
                         return self._list_cases_recurse_nested(source)
             else:
@@ -709,9 +703,13 @@ class SqliteCaseReader(BaseCaseReader):
         cases = []
 
         self.source_cases_table = {'solver': [], 'system': [], 'driver': [], 'problem': []}
+        source_cases = []
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
+        current_table = None
+        current_cases = []
+
         for i in range(0, parent_case_counter):
             global_iter = global_iters[i]
             table, row = global_iter[1], global_iter[2]
@@ -727,15 +725,23 @@ class SqliteCaseReader(BaseCaseReader):
                 raise RuntimeError('Unexpected table name in global iterations:', table)
 
             if case_coord.startswith(coord):
-                self.source_cases_table[table].append(case_coord)
                 cases.append(case_coord)
+                self.source_cases_table[table].append(case_coord)
+
+                if out_stream:
+                    if not current_cases:
+                        current_table = table
+                        current_cases = {table: [case_coord]}
+                    elif table == current_table:
+                        current_cases[table].append(case_coord)
+                    else:
+                        source_cases.append(current_cases)
+                        current_table = table
+                        current_cases = {table: [case_coord]}
 
         if out_stream:
-            if notebook:
-                nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
-                return nb_format
-            else:
-                write_source_table(self.source_cases_table, out_stream)
+            source_cases.append(current_cases)
+            write_source_table(source_cases, out_stream)
 
         return cases
 
