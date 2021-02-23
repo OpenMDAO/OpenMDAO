@@ -103,10 +103,11 @@ class ExplicitComponent(Component):
             containing only the matching columns.
         """
         offset = end = 0
+        local_ins = self._var_abs2meta['input']
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, offset, end, self._inputs
+                yield wrt, offset, end, self._inputs if wrt in local_ins else None
                 offset = end
 
     def _setup_partials(self):

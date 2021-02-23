@@ -311,16 +311,18 @@ class Jacobian(object):
         system : System
             System owning this jacobian.
         """
-        subjacs = self._subjacs_info
+        fdtypes = ('cs', 'fd')
         if self._jac_summ is None:
             # create _jac_summ structure
             self._jac_summ = summ = {}
-            for key in subjacs:
-                summ[key] = np.abs(subjacs[key]['value'])
+            for key, meta in self._subjacs_info.items():
+                if 'method' in meta and meta['method'] in fdtypes:
+                    summ[key] = np.abs(meta['value'])
         else:
             summ = self._jac_summ
-            for key in subjacs:
-                summ[key] += np.abs(subjacs[key]['value'])
+            for key, meta in self._subjacs_info.items():
+                if 'method' in meta and meta['method'] in fdtypes:
+                    summ[key] += np.abs(meta['value'])
 
     def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, tol, orders):
         """
@@ -357,7 +359,7 @@ class Jacobian(object):
         for of, roffset, rend, _ in ordered_of_info:
             for wrt, coffset, cend, _ in ordered_wrt_info:
                 key = (of, wrt)
-                if key in subjacs:
+                if key in summ:
                     meta = subjacs[key]
                     if meta['rows'] is not None:
                         rows = meta['rows'] + roffset

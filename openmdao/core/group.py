@@ -3023,18 +3023,25 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
+            local_ins = self._var_abs2meta['input']
+            local_outs = self._var_abs2meta['output']
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, _offset, _end, _ in self._partial_jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
-                        yield of, offset, end, self._outputs
+                        yield of, offset, end, self._outputs if of in local_outs else None
                         offset = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
-                    vec = self._inputs if wrt in abs2meta['input'] else self._outputs
+                    if wrt in local_ins:
+                        vec = self._inputs
+                    elif wrt in local_outs:
+                        vec = self._outputs
+                    else:
+                        vec = None
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
@@ -3062,11 +3069,6 @@ class Group(System):
             return
 
         wrt_color_patterns = info['wrt_patterns']
-
-        if '*' in wrt_color_patterns:
-            info['wrt_matches'] = None
-            info['wrt_matches_prom'] = None
-            return
 
         info['wrt_matches'] = wrt_colors_matched = set()
 
