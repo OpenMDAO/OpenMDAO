@@ -1676,6 +1676,52 @@ class _TotalJacInfo(object):
 
         return totals
 
+    def check_total_jac(self, raise_error=True, tol=1e-16):
+        """
+        Check recently computed totals derivative jacobian for problems.
+
+        Some optimizers can't handle a jacobian when a design variable has no effect on the
+        constraints, or a constraint is unaffected by a design variable. This method
+        checks for these cases.
+
+        Parameters
+        ----------
+        tol : double
+            Tolerance for the check.
+        raise_error : bool
+            If True, raise an exception if a zero row or column is found.
+        """
+        J = self.J
+        nrows, ncols = J.shape
+        zero_rows = []
+        zero_cols = []
+
+        # Check for zero rows, which correspond to constraints unaffected by any design vars.
+        for j in np.arange(nrows):
+            if np.all(J[j, :] < tol):
+                zero_rows.append(j)
+
+        if zero_rows:
+            msg = f"Constraints {zero_rows} cannot be impacted by the design variables " + \
+                "of the problem."
+            if raise_error:
+                raise RuntimeError(msg)
+            else:
+                simple_warning(msg)
+
+        # Check for zero cols, which correspond to design vars that don't affect anything.
+        for j in np.arange(ncols):
+            if np.all(J[:, j] < tol):
+                zero_cols.append(j)
+
+        if zero_cols:
+            msg = f"Objectives {zero_cols} cannot be impacted by the design variables " + \
+                "of the problem."
+            if raise_error:
+                raise RuntimeError(msg)
+            else:
+                simple_warning(msg)
+
     def _restore_linear_solution(self, vec_names, key, mode):
         """
         Restore the previous linear solution.
