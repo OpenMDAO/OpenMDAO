@@ -413,16 +413,20 @@ class Jacobian(object):
         if system.pathname == '':  # for total derivs, we can have sub-indices making some subjacs smaller
             full = (_full_slice, _full_slice)
             for key, meta in system._subjacs_info.items():
+                nrows, ncols = meta['shape']
                 if key[0] in system._owns_approx_of_idx:
                     ridxs = system._owns_approx_of_idx[key[0]]
+                    if len(ridxs) == nrows:
+                        ridxs = _full_slice  # value was already changed
                 else:
                     ridxs = _full_slice
                 if key[1] in system._owns_approx_wrt_idx:
                     cidxs = system._owns_approx_wrt_idx[key[1]]
+                    if len(cidxs) == ncols:
+                        cidxs = _full_slice  # value was already changed
                 else:
                     cidxs = _full_slice
                 if ridxs is not _full_slice or cidxs is not _full_slice:
-                    nrows, ncols = meta['shape']
                     if ridxs is not _full_slice:
                         nrows = len(ridxs)
                     if cidxs is not _full_slice:

@@ -178,7 +178,12 @@ class _CheckingJacobian(DictionaryJacobian):
             yield key
 
     def items(self):
+        from openmdao.core.explicitcomponent import ExplicitComponent
+        explicit = isinstance(self._system(), ExplicitComponent)
+
         for key, meta in self._subjacs_info.items():
+            if explicit and key[0] == key[1]:
+                continue
             rows = meta['rows']
             if rows is None:
                 yield key, meta['value']
