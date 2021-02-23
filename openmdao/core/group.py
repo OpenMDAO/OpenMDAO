@@ -1670,7 +1670,7 @@ class Group(System):
                     if all_from_meta['has_src_indices']:
                         # in this case we have to set the size of the serial output based on
                         # the largest entry in src_indices across all procs.
-                        mx = np.max(from_meta['src_indices']) if from_var in from_meta else 0
+                        mx = np.max(from_meta['src_indices']) if 'src_indices' in from_meta else 0
                         local_max = np.array([mx], dtype=INT_DTYPE)
                         global_max = np.zeros(1, dtype=INT_DTYPE)
                         self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
