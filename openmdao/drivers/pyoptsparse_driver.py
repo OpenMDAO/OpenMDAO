@@ -190,6 +190,7 @@ class pyOptSparseDriver(Driver):
         self._signal_cache = None
         self._user_termination_flag = False
         self._in_user_function = False
+        self._check_jac = False
 
         self.cite = CITATIONS
 
@@ -209,6 +210,15 @@ class pyOptSparseDriver(Driver):
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
+        self.options.declare('singular_jac_behavior', default='error',
+                             values=['error', 'warn', 'ignore'],
+                             desc='Defines behavior of a zero row/col check after first call to'
+                             'compute_totals:'
+                             'error - raise an error.'
+                             'warn - raise a warning.'
+                             "ignore - don't perform check.")
+        self.options.declare('singular_jac_tol', default=1e-16,
+                             desc='Tolerance for zero row/column check.')
 
         # Deprecated option
         self.options.declare('user_teriminate_signal', default=None, allow_none=True,
@@ -269,6 +279,7 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
 
         self._check_for_missing_objective()
+        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
@@ -615,6 +626,14 @@ class pyOptSparseDriver(Driver):
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
+
+                # First time through, check for zero row/col.
+                if self._check_jac:
+                    raise_error = self.options['singular_jac_behavior'] == 'error'
+                    self._total_jac.check_total_jac(raise_error=raise_error,
+                                                    tol=self.options['singular_jac_tol'])
+                    self._check_jac = False
+
             # Let the optimizer try to handle the error
             except AnalysisError:
                 prob.model._clear_iprint()

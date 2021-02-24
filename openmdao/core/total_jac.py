@@ -1691,7 +1691,7 @@ class _TotalJacInfo(object):
         raise_error : bool
             If True, raise an exception if a zero row or column is found.
         """
-        J = self.J
+        J = np.abs(self.J)
         nrows, ncols = J.shape
         zero_rows = []
         zero_cols = []
@@ -1699,7 +1699,11 @@ class _TotalJacInfo(object):
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
         for j in np.arange(nrows):
             if np.all(J[j, :] < tol):
-                zero_rows.append(j)
+                for name, val in self.of_meta.items():
+                    if j > val[0].stop - 1:
+                        continue
+                    break
+                zero_rows.append(name)
 
         if zero_rows:
             msg = f"Constraints {zero_rows} cannot be impacted by the design variables " + \
@@ -1712,7 +1716,11 @@ class _TotalJacInfo(object):
         # Check for zero cols, which correspond to design vars that don't affect anything.
         for j in np.arange(ncols):
             if np.all(J[:, j] < tol):
-                zero_cols.append(j)
+                for name, val in self.wrt_meta.items():
+                    if j > val[0].stop - 1:
+                        continue
+                    break
+                zero_cols.append(name)
 
         if zero_cols:
             msg = f"Objectives {zero_cols} cannot be impacted by the design variables " + \
