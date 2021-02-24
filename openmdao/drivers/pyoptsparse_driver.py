@@ -422,7 +422,6 @@ class pyOptSparseDriver(Driver):
             opt.setOption(option, value)
 
         self._exc_info = None
-        pyopt_exception = False
         try:
 
             # Execute the optimization problem
@@ -455,7 +454,6 @@ class pyOptSparseDriver(Driver):
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
         except Exception as _:
-            pyopt_exception = True
             if not self._exc_info:
                 raise()
 
