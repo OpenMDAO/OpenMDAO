@@ -3031,7 +3031,8 @@ class Group(System):
                 for of, _offset, _end, _ in self._partial_jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
-                        yield of, offset, end, self._outputs if of in local_outs else None
+                        vec = self._outputs if of in local_outs else None
+                        yield of, offset, end, vec, None
                         offset = end
 
             for wrt in self._owns_approx_wrt:
@@ -3046,12 +3047,13 @@ class Group(System):
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
                     else:
+                        sub_wrt_idx = None
                         if wrt in abs2meta['input']:
                             size = abs2meta['input'][wrt]['size']
                         else:
                             size = abs2meta['output'][wrt]['size']
                     end += size
-                    yield wrt, offset, end, vec
+                    yield wrt, offset, end, vec, sub_wrt_idx
                     offset = end
         else:
             yield from super()._partial_jac_wrt_iter(wrt_matches)

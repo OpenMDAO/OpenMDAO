@@ -151,17 +151,51 @@ class ApproximationScheme(object):
 
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
+        out_slices = system._outputs.get_slice_dict()
 
         if wrt_matches is not None:
-            # this maps indices into colored jac into indices into full jac
-            col_map = np.empty(coloring._shape[1], dtype=int)
+            # this maps column indices into colored jac into indices into full jac
+            ccol2jcol = np.empty(coloring._shape[1], dtype=int)
 
+            # colored col to out vec idx (only used for totals)
+            ccol2vcol = np.empty(coloring._shape[1], dtype=int)
+
+            ordered_wrt_iter = list(system._partial_jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, vec in system._partial_jac_wrt_iter():
+            for abs_wrt, cstart, cend, vec, cinds in ordered_wrt_iter:
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
-                    col_map[colored_start:colored_end] = np.arange(cstart, cend, dtype=int)
+                    ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=int)
+                    if abs_wrt in out_slices:
+                        slc = out_slices[abs_wrt]
+                        rng = np.arange(slc.start, slc.stop)
+                        if cinds is not None:
+                            rng = rng[cinds]
+                        ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
+
+        approx_of_idxs = system._owns_approx_of_idx
+        if approx_of_idxs is None:
+            approx_of_idxs = {}
+        approx_wrt_idxs = system._owns_approx_wrt_idx
+        if approx_wrt_idxs is None:
+            approx_wrt_idxs = {}
+
+        row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
+        row_map = np.empty(coloring._shape[0], dtype=int)
+        abs2prom = system._var_allprocs_abs2prom['output']
+        start = end = colorstart = colorend = 0
+        for name, arr in system._outputs._abs_item_iter():
+            end += arr.size
+            prom = abs2prom[name]
+            if prom in row_var_sizes:
+                colorend += row_var_sizes[prom]
+                vals = np.arange(start, end, dtype=int)
+                if name in approx_of_idxs:
+                    vals = vals[approx_of_idxs[name]]
+                row_map[colorstart:colorend] = vals
+                colorstart = colorend
+            start = end
 
         for wrt, meta in self._wrt_meta.items():
             if wrt_matches is None or wrt in wrt_matches:
@@ -170,7 +204,8 @@ class ApproximationScheme(object):
                 break
 
         is_group = isinstance(system, Group)
-        is_semi = is_group and system.pathname
+        is_total = is_group and system.pathname == ''
+        is_semi = is_group and not is_total
         use_full_cols = is_semi or isinstance(system, ImplicitComponent)
 
         outputs = system._outputs
@@ -180,89 +215,17 @@ class ApproximationScheme(object):
         self._approx_coloring_meta = meta = []
         # get groups of columns from the coloring and compute proper indices into
         # the inputs and outputs vectors.
+
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
-            ccols = cols if wrt_matches is None else col_map[cols]
-            vec_ind_list = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_group)
-            self._colored_approx_groups.append((data, ccols, vec_ind_list, nzrows))
-
-        # outputs = system._outputs
-        # inputs = system._inputs
-        # prom2abs_out = system._var_allprocs_prom2abs_list['output']
-        # prom2abs_in = system._var_allprocs_prom2abs_list['input']
-        # approx_wrt_idx = system._owns_approx_wrt_idx
-
-        # out_slices = outputs.get_slice_dict()
-
-        # is_group = isinstance(system, Group)
-
-        # system._update_wrt_matches(system._coloring_info)
-        # wrt_matches = system._coloring_info['wrt_matches']
-
-        # for wrt, meta in self._wrt_meta.items():
-        #     if wrt in wrt_matches:
-        #         # data is the same for all colored approxs so we only need the first
-        #         data = self._get_approx_data(system, wrt, meta)
-        #         break
-
-        # if is_group and system.pathname == '':  # top level approx totals
-        #     of_names = system._owns_approx_of
-        #     full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
-        #                            system._var_allprocs_abs2meta['input']))
-        # else:
-        #     of_names, wrt_names = system._get_partials_varlists()
-        #     full_wrts = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
-        #                  for n in wrt_names]
-
-        # tmpJ = {
-        #     '@nrows': coloring._shape[0],
-        #     '@ncols': coloring._shape[1],
-        #     '@out_slices': out_slices,
-        #     '@jac_slices': {},
-        # }
-
-        # # FIXME: need to deal with mix of local/remote indices
-
-        # len_full_ofs = len(system._var_allprocs_abs2meta['output'])
-
-        # full_idxs = []
-        # approx_of_idx = system._owns_approx_of_idx
-        # jac_slices = tmpJ['@jac_slices']
-        # for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
-        #     rslice = slice(roffset, rend)
-        #     for abs_wrt, coffset, cend, vec in system._partial_jac_wrt_iter(wrt_matches):
-        #         jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
-
-        #     if is_group and (approx_of_idx or len_full_ofs > len(of_names)):
-        #         slc = out_slices[abs_of]
-        #         if abs_of in approx_of_idx:
-        #             full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
-        #         else:
-        #             full_idxs.append(np.arange(slc.start, slc.stop))
-        # if full_idxs:
-        #     tmpJ['@row_idx_map'] = np.hstack(full_idxs)
-
-        # if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
-        #     if is_group and system.pathname == '':  # top level approx totals
-        #         a2mi = system._var_allprocs_abs2meta['input']
-        #         a2mo = system._var_allprocs_abs2meta['output']
-        #         full_wrt_sizes = [a2mi[wrt]['size'] if wrt in a2mi else a2mo[wrt]['size']
-        #                           for wrt in full_wrts]
-        #     else:
-        #         _, full_wrt_sizes = system._get_partials_var_sizes()
-
-        #     # need mapping from coloring jac columns (subset) to full jac columns
-        #     col_map = sub2full_indices(full_wrts, wrt_matches, full_wrt_sizes, approx_wrt_idx)
-        # else:
-        #     col_map = None
-
-        # # get groups of columns from the coloring and compute proper indices into
-        # # the inputs and outputs vectors.
-        # is_semi = is_group and system.pathname
-        # use_full_cols = isinstance(system, ImplicitComponent) or is_semi
-        # for cols, nzrows in coloring.color_nonzero_iter('fwd'):
-        #     ccols = cols if col_map is None else col_map[cols]
-        #     idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_group)
-        #     self._colored_approx_groups.append((data, cols, tmpJ, idx_info, nzrows))
+            nzrows = [row_map[r] for r in nzrows]
+            jaccols = cols if wrt_matches is None else ccol2jcol[cols]
+            if is_total:
+                vcols = ccol2vcol[cols]
+            else:
+                vcols = jaccols
+            vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols,
+                                               is_total)
+            self._colored_approx_groups.append((data, jaccols, vec_ind_list, nzrows))
 
     def _init_approximations(self, system):
         """
@@ -283,7 +246,7 @@ class ApproximationScheme(object):
 
         self._approx_groups = []
 
-        for wrt, start, end, vec in system._partial_jac_wrt_iter():
+        for wrt, start, end, vec, cinds in system._partial_jac_wrt_iter():
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -356,20 +319,18 @@ class ApproximationScheme(object):
         jacobian = jac if isinstance(jac, Jacobian) else None
 
         fd_count = 0
-        # colored_shape = None
-        # jrows = []
-        # jcols = []
-        # jdata = []
 
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
 
         coloring = system._coloring_info['coloring']
 
-        scratch = np.empty(results_array.size)
+        mycols = []
 
         # do colored solves first
         if isinstance(coloring, coloring_mod.Coloring):
+            scratch = np.empty(len(system._outputs))
+
             for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
                 mult = self._get_multiplier(data)
 
@@ -378,9 +339,6 @@ class ApproximationScheme(object):
                     result = self._run_point(system, vec_ind_list, data, results_array, total)
 
                     if par_fd_w_serial_model or not is_parallel:
-                        # rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
-                        # if rowmap is not None:
-                        #     result = result[rowmap]
                         result = self._transform_result(result)
 
                         if mult != 1.0:
@@ -394,20 +352,9 @@ class ApproximationScheme(object):
                                 scratch[nzrows[i]] = result[nzrows[i]]
                                 jac.set_col(system, col, scratch)
 
-                        # if nzrows is None:  # uncolored column
-                        #     if self._j_colored is None:
-                        #         nrows = tmpJ['@nrows']
-                        #         jrows.extend(range(nrows))
-                        #         jcols.extend(col_idxs * nrows)
-                        #     jdata.extend(result)
-                        # else:
-                        #     for i, col in enumerate(col_idxs):
-                        #         # only need to compute rows/cols the first time around.  After that,
-                        #         # only data, since the sparsity structure won't change
-                        #         if self._j_colored is None:
-                        #             jrows.extend(nzrows[i])
-                        #             jcols.extend([col] * len(nzrows[i]))
-                        #         jdata.extend(result[nzrows[i]])
+                        if use_parallel_fd:
+                            mycols.extend(jcols)
+
                     else:  # parallel model (some vars are remote)
                         raise NotImplementedError("simul approx coloring with parallel FD/CS is "
                                                   "only supported currently when using "

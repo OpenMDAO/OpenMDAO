@@ -107,7 +107,8 @@ class ExplicitComponent(Component):
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, offset, end, self._inputs if wrt in local_ins else None
+                vec = self._inputs if wrt in local_ins else None
+                yield wrt, offset, end, vec, None
                 offset = end
 
     def _setup_partials(self):

@@ -1149,13 +1149,15 @@ class System(object):
         for of, _start, _end, _ in self._partial_jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
-                yield of, start, end, self._outputs if of in local_outs else None
+                vec = self._outputs if of in local_outs else None
+                yield of, start, end, vec, None
                 start = end
 
         for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, start, end, self._inputs if wrt in local_ins else None
+                vec = self._inputs if wrt in local_ins else None
+                yield wrt, start, end, vec, None
                 start = end
 
     def get_approx_coloring_fname(self):

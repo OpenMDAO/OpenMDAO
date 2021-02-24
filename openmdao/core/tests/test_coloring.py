@@ -322,7 +322,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_fwd_simul_coloring_snopt_approx_cs(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
+        #p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
                           has_diag_partials=True, print_results=False,
                           dynamic_total_coloring=True, method='cs')

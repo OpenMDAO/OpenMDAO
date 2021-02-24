@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
-from scipy.sparse import issparse
+from scipy.sparse import issparse, coo_matrix
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
@@ -311,18 +311,17 @@ class Jacobian(object):
         system : System
             System owning this jacobian.
         """
-        fdtypes = ('cs', 'fd')
         if self._jac_summ is None:
+            fdtypes = ('cs', 'fd')
             # create _jac_summ structure
             self._jac_summ = summ = {}
             for key, meta in self._subjacs_info.items():
                 if 'method' in meta and meta['method'] in fdtypes:
                     summ[key] = np.abs(meta['value'])
         else:
-            summ = self._jac_summ
-            for key, meta in self._subjacs_info.items():
-                if 'method' in meta and meta['method'] in fdtypes:
-                    summ[key] += np.abs(meta['value'])
+            subjacs = self._subjacs_info
+            for key, summ in self._jac_summ.items():
+                summ += np.abs(subjacs[key]['value'])
 
     def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, tol, orders):
         """
@@ -352,24 +351,38 @@ class Jacobian(object):
         subjacs = self._subjacs_info
         summ = self._jac_summ
 
-        rend = ordered_of_info[-1][2]
-        cend = ordered_wrt_info[-1][2]
-        J = np.zeros((rend, cend))
+        Jrows = []
+        Jcols = []
+        Jdata = []
 
         for of, roffset, rend, _ in ordered_of_info:
-            for wrt, coffset, cend, _ in ordered_wrt_info:
+            for wrt, coffset, cend, _, _ in ordered_wrt_info:
                 key = (of, wrt)
                 if key in summ:
+                    subsum = summ[key]
                     meta = subjacs[key]
                     if meta['rows'] is not None:
-                        rows = meta['rows'] + roffset
-                        cols = meta['cols'] + coffset
-                        J[rows, cols] = summ[key]
-                    elif issparse(summ[key]):
+                        Jrows.append(meta['rows'] + roffset)
+                        Jcols.append(meta['cols'] + coffset)
+                        Jdata.append(subsum)
+                    elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
                                                   "supported yet.".format(self.msginfo))
-                    else:
-                        J[roffset:rend, coffset:cend] = summ[key]
+                    else:  # dense
+                        for i, r in enumerate(range(roffset, rend)):
+                            Jrows.append([r] * (cend - coffset))
+                            Jcols.append(range(coffset, cend))
+                            Jdata.append(subsum[i, :])
+
+        summ = self._jac_summ = None  # free up some memory
+
+        Jrows = np.hstack(Jrows)
+        Jcols = np.hstack(Jcols)
+        Jdata = np.hstack([d.flat for d in Jdata])
+        shape = (rend, cend)
+
+        # TODO: for now, convert to dense, but later keep as COO
+        J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape).toarray()
 
         J *= (1.0 / np.max(J))
 
@@ -404,10 +417,10 @@ class Jacobian(object):
         self._col_var_info = col_var_info = {t[0]: t for t in system._partial_jac_wrt_iter()}
         self._colnames = list(col_var_info)   # map var id to varname
 
-        ncols = np.sum(end - start for _, start, end, _ in col_var_info.values())
+        ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
         self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
         start = end = 0
-        for i, (of, _start, _end, _) in enumerate(col_var_info.values()):
+        for i, (of, _start, _end, _, _) in enumerate(col_var_info.values()):
             end += _end - _start
             self._col2name_ind[start:end] = i
             start = end
@@ -461,6 +474,9 @@ class Jacobian(object):
         """
         Set a column of the jacobian.
 
+        The column is assumed to be the same size as the outputs vector for the given
+        system.
+
         This assumes that the column does not attempt to set any nonzero values that are
         outside of specified sparsity patterns for any of the subjacs.
 
@@ -478,7 +494,7 @@ class Jacobian(object):
             self._setup_index_maps(system)
 
         wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _ = self._col_var_info[wrt]
+        _, offset, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
         for of, start, end, sub_wrt_idx in system._partial_jac_of_iter():
             key = (of, wrt)
