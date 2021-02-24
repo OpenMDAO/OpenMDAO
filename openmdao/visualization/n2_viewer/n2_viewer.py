@@ -616,6 +616,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     print('updated code')
     # Open in Jupyter Notebook
+    print(colab)
     if notebook and not colab:
         display(IFrame(src=outfile, width=1000, height=1000))
     else:
