@@ -614,14 +614,11 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # Write output file
     h.write(outfile)
 
-    print('updated code')
     # Open in Jupyter Notebook
-    print(colab)
     if notebook and not colab:
         display(IFrame(src=outfile, width=1000, height=1000))
     else:
-        print("display the HTML")
-        display(HTML(outfile))
+        HTML(outfile)
 
     # open it up in the browser
     if show_browser and not notebook:
