@@ -619,7 +619,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     if notebook and not colab:
         display(IFrame(src=outfile, width=1000, height=1000))
     else:
-        HTML(outfile)
+        print("display the HTML")
+        display(HTML(outfile))
 
     # open it up in the browser
     if show_browser and not notebook:
