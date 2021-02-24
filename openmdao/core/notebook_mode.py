@@ -10,6 +10,7 @@ except ImportError:
 
 colab = 'google.colab' in sys.modules
 
+
 def notebook_mode():
     """
     Check if the environment is interactive and if tabulate is installed.
