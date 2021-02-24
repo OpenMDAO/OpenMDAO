@@ -9,8 +9,6 @@ additional MPI capability.
 from collections import OrderedDict
 import json
 import signal
-import sys
-import traceback
 
 import numpy as np
 from scipy.sparse import coo_matrix
