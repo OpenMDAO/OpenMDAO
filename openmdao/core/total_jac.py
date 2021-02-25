@@ -1706,8 +1706,8 @@ class _TotalJacInfo(object):
                 zero_rows.append(name)
 
         if zero_rows:
-            msg = f"Constraints {zero_rows} cannot be impacted by the design variables " + \
-                "of the problem."
+            msg = f"Constraints or objectives {zero_rows} cannot be impacted by the design " + \
+                "variables of the problem."
             if raise_error:
                 raise RuntimeError(msg)
             else:
@@ -1723,8 +1723,7 @@ class _TotalJacInfo(object):
                 zero_cols.append(name)
 
         if zero_cols:
-            msg = f"Objectives {zero_cols} cannot be impacted by the design variables " + \
-                "of the problem."
+            msg =f"Design variables {zero_cols} have no impact on the constraints or objective."
             if raise_error:
                 raise RuntimeError(msg)
             else:

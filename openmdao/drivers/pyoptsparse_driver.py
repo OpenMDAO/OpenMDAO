@@ -190,11 +190,8 @@ class pyOptSparseDriver(Driver):
         self._signal_cache = None
         self._user_termination_flag = False
         self._in_user_function = False
-<<<<<<< HEAD
         self._check_jac = False
-=======
         self._exc_info = None
->>>>>>> 845d93b5fe9735a830b7c3338f3c75acafeda07e
 
         self.cite = CITATIONS
 
