@@ -91,7 +91,7 @@ class ExplicitComponent(Component):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
 
-    def _partial_jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -104,7 +104,7 @@ class ExplicitComponent(Component):
         """
         offset = end = 0
         local_ins = self._var_abs2meta['input']
-        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
+        for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
                 vec = self._inputs if wrt in local_ins else None

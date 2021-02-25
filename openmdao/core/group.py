@@ -2972,7 +2972,7 @@ class Group(System):
 
             yield key
 
-    def _partial_jac_of_iter(self):
+    def _jac_of_iter(self):
         """
         Iterate over (name, start, end, idxs) for each row var in the systems's jacobian.
 
@@ -2989,7 +2989,7 @@ class Group(System):
         slices = self._outputs.get_slice_dict()
 
         if self._owns_approx_of:
-            # we're computing totals/semi-totals
+            # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
@@ -3002,9 +3002,9 @@ class Group(System):
 
                 start = end
         else:
-            yield from super()._partial_jac_of_iter()
+            yield from super()._jac_of_iter()
 
-    def _partial_jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, start, end) for each column var in the systems's jacobian.
 
@@ -3028,7 +3028,7 @@ class Group(System):
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, _ in self._partial_jac_of_iter():
+                for of, _offset, _end, _ in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         vec = self._outputs if of in local_outs else None
@@ -3056,7 +3056,7 @@ class Group(System):
                     yield wrt, offset, end, vec, sub_wrt_idx
                     offset = end
         else:
-            yield from super()._partial_jac_wrt_iter(wrt_matches)
+            yield from super()._jac_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """

@@ -414,7 +414,7 @@ class Jacobian(object):
         self._under_complex_step = active
 
     def _setup_index_maps(self, system):
-        self._col_var_info = col_var_info = {t[0]: t for t in system._partial_jac_wrt_iter()}
+        self._col_var_info = col_var_info = {t[0]: t for t in system._jac_wrt_iter()}
         self._colnames = list(col_var_info)   # map var id to varname
 
         ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
@@ -496,7 +496,7 @@ class Jacobian(object):
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
-        for of, start, end, sub_wrt_idx in system._partial_jac_of_iter():
+        for of, start, end, sub_wrt_idx in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]

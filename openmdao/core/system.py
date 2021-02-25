@@ -536,6 +536,45 @@ class System(object):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
+    def _jac_of_iter(self):
+        """
+        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        """
+        start = end = 0
+        for of, meta in self._var_abs2meta['output'].items():
+            end += meta['size']
+            yield of, start, end, slice(start, end)
+            start = end
+
+    def _jac_wrt_iter(self, wrt_matches=None):
+        """
+        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
+        local_ins = self._var_abs2meta['input']
+        local_outs = self._var_abs2meta['output']
+
+        start = end = 0
+        for of, _start, _end, _ in self._jac_of_iter():
+            if wrt_matches is None or of in wrt_matches:
+                end += (_end - _start)
+                vec = self._outputs if of in local_outs else None
+                yield of, start, end, vec, None
+                start = end
+
+        for wrt, meta in self._var_abs2meta['input'].items():
+            if wrt_matches is None or wrt in wrt_matches:
+                end += meta['size']
+                vec = self._inputs if wrt in local_ins else None
+                yield wrt, start, end, vec, None
+                start = end
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -1051,8 +1090,8 @@ class System(object):
 
         self._update_wrt_matches(info)
 
-        ordered_of_info = list(self._partial_jac_of_iter())
-        ordered_wrt_info = list(self._partial_jac_wrt_iter(info['wrt_matches']))
+        ordered_of_info = list(self._jac_of_iter())
+        ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
         sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
                                                              tol=info['tol'],
                                                              orders=info['orders'])
@@ -1120,45 +1159,6 @@ class System(object):
 
     def _setup_approx_coloring(self):
         pass
-
-    def _partial_jac_of_iter(self):
-        """
-        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
-        """
-        start = end = 0
-        for of, meta in self._var_allprocs_abs2meta['output'].items():
-            end += meta['size']
-            yield of, start, end, slice(start, end)
-            start = end
-
-    def _partial_jac_wrt_iter(self, wrt_matches=None):
-        """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
-
-        Parameters
-        ----------
-        wrt_matches : set or None
-            Only include row vars that are contained in this set.  This will determine what
-            the actual offsets are, i.e. the offsets will be into a reduced jacobian
-            containing only the matching columns.
-        """
-        local_ins = self._var_abs2meta['input']
-        local_outs = self._var_abs2meta['output']
-
-        start = end = 0
-        for of, _start, _end, _ in self._partial_jac_of_iter():
-            if wrt_matches is None or of in wrt_matches:
-                end += (_end - _start)
-                vec = self._outputs if of in local_outs else None
-                yield of, start, end, vec, None
-                start = end
-
-        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
-            if wrt_matches is None or wrt in wrt_matches:
-                end += meta['size']
-                vec = self._inputs if wrt in local_ins else None
-                yield wrt, start, end, vec, None
-                start = end
 
     def get_approx_coloring_fname(self):
         """
