@@ -538,12 +538,15 @@ class System(object):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        Iterate over (name, offset, end, slice) for each 'of' var in the systems's jacobian.
+
+        The slice is internal to the given variable in the result, and this is always a full
+        slice except possible for groups where _owns_approx_of_idx is defined.
         """
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
             end += meta['size']
-            yield of, start, end, slice(start, end)
+            yield of, start, end, _full_slice
             start = end
 
     def _jac_wrt_iter(self, wrt_matches=None):
@@ -565,14 +568,14 @@ class System(object):
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
-                yield of, start, end, vec, None
+                yield of, start, end, vec, _full_slice
                 start = end
 
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, start, end, vec, None
+                yield wrt, start, end, vec, _full_slice
                 start = end
 
     def _declare_options(self):

@@ -108,7 +108,7 @@ class ExplicitComponent(Component):
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, offset, end, vec, None
+                yield wrt, offset, end, vec, _full_slice
                 offset = end
 
     def _setup_partials(self):

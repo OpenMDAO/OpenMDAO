@@ -2263,29 +2263,6 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
             if meta['indices'] is not None
         }
 
-        #if model._owns_approx_of_idx or model._owns_approx_wrt_idx:
-            #for key, meta in model._subjacs_info.items():
-                #of, wrt = key
-                #nrows, ncols = meta['shape']
-                #if of in model._owns_approx_of_idx:
-                    #nrows = len(model._owns_approx_of_idx[of])
-                #if wrt in model._owns_approx_wrt_idx:
-                    #ncols = len(model._owns_approx_wrt_idx[wrt])
-                #if nrows != meta['shape'][0] or ncols != meta['shape'][1]:
-                    #oldnrows, oldncols = meta['shape']
-                    #val = meta['value']
-                    ## replace the subjacs 'value' with smaller value resulting from dv/response indices
-                    #if meta['rows'] is None:  # subjac is dense
-                        #if nrows != oldnrows:
-                            #val = val[model._owns_approx_of_idx[of], :]
-                        #if ncols != oldncols:
-                            #val = val[:, model._owns_approx_wrt_idx[wrt]]
-                        #meta['value'] = val
-                    #else:
-                        ##raise RuntimeError("subindices of sparse subjac not supported yet")
-                        #print("foo")
-                    #meta['shape'] = (nrows, ncols)
-
 
 def _get_coloring_meta(coloring=None):
     if coloring is None:

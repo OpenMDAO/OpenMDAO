@@ -1068,11 +1068,6 @@ class Component(System):
             self._get_approx_scheme(method)
 
             default_opts = method_func.DEFAULT_OPTIONS
-
-            ## If rows/cols is specified
-            #if rows is not None or cols is not None:
-                #raise ValueError("{}: d({})/d({}): Sparse FD specification not supported "
-                                 #"yet.".format(self.msginfo, of, wrt))
         else:
             default_opts = ()
 

@@ -355,6 +355,8 @@ class Jacobian(object):
         Jcols = []
         Jdata = []
 
+        # TODO: this currently doesn't use indices info for total approx derivs that
+        #       could greatly reduce the size of data we need to save
         for of, roffset, rend, _ in ordered_of_info:
             for wrt, coffset, cend, _, _ in ordered_wrt_info:
                 key = (of, wrt)
@@ -496,13 +498,13 @@ class Jacobian(object):
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
-        for of, start, end, sub_wrt_idx in system._jac_of_iter():
+        for of, start, end, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 # TODO: support other sparse subjac types
                 if subjac['rows'] is None:
-                    subjac['value'][:, loc_idx] = column[sub_wrt_idx]
+                    subjac['value'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-                    subjac['value'][match_inds] = column[sub_wrt_idx][subjac['rows'][match_inds]]
+                    subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]

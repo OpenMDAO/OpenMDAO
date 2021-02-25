@@ -2974,11 +2974,11 @@ class Group(System):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, start, end, idxs) for each row var in the systems's jacobian.
+        Iterate over (name, start, end, idxs) for each 'of' var in the systems's jacobian.
 
-        idxs will usually be the var slice into the result array, except in cases where
-        _owns_approx__idx has a value for that variable, in which case it'll be indices
-        into the result array.
+        idxs will usually be the var slice into the full variable in the result array,
+        except in cases where _owns_approx__idx has a value for that variable, in which case it'll
+        be indices into the variable.
 
         Yields
         ------
@@ -2986,7 +2986,6 @@ class Group(System):
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
-        slices = self._outputs.get_slice_dict()
 
         if self._owns_approx_of:
             # we're computing totals/semi-totals (vars may not be local)
@@ -2994,11 +2993,10 @@ class Group(System):
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    inds = np.atleast_1d(approx_of_idx[of]) + slices[of].start
-                    yield of, start, end, inds
+                    yield of, start, end, np.atleast_1d(approx_of_idx[of])
                 else:
                     end += abs2meta[of]['size']
-                    yield of, start, end, slices[of]
+                    yield of, start, end, _full_slice
 
                 start = end
         else:
@@ -3006,7 +3004,7 @@ class Group(System):
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, start, end) for each column var in the systems's jacobian.
+        Iterate over (name, start, end, vec, locinds) for each column var in the systems's jacobian.
 
         Parameters
         ----------
@@ -3017,7 +3015,7 @@ class Group(System):
 
         Yields
         ------
-        wrt_name, start, end
+        wrt_name, start, end, vec, locinds
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
@@ -3032,7 +3030,7 @@ class Group(System):
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         vec = self._outputs if of in local_outs else None
-                        yield of, offset, end, vec, None
+                        yield of, offset, end, vec, _full_slice
                         offset = end
 
             for wrt in self._owns_approx_wrt:

@@ -604,6 +604,8 @@ class pyOptSparseDriver(Driver):
         prob = self._problem()
         fail = 0
 
+        self._in_user_function = True
+
         try:
 
             # Check if we caught a termination signal while SNOPT was running.

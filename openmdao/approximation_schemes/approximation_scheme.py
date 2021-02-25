@@ -140,9 +140,6 @@ class ApproximationScheme(object):
         from openmdao.core.implicitcomponent import ImplicitComponent
 
         self._colored_approx_groups = []
-        # self._j_colored = None
-        # self._j_data_sizes = None
-        # self._j_data_offsets = None
 
         # don't do anything if the coloring doesn't exist yet
         coloring = system._coloring_info['coloring']
@@ -181,18 +178,29 @@ class ApproximationScheme(object):
         if approx_wrt_idxs is None:
             approx_wrt_idxs = {}
 
+        is_group = isinstance(system, Group)
+        is_total = is_group and system.pathname == ''
+        is_semi = is_group and not is_total
+        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
+
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=int)
         abs2prom = system._var_allprocs_abs2prom['output']
+
+        if is_group:
+            it = [(of, end - start) for of, start, end, _ in system._jac_of_iter()]
+        else:
+            it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
+
         start = end = colorstart = colorend = 0
-        for name, arr in system._outputs._abs_item_iter():
-            end += arr.size
+        for name, sz in it:
+            end += sz
             prom = abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
                 vals = np.arange(start, end, dtype=int)
-                if name in approx_of_idxs:
-                    vals = vals[approx_of_idxs[name]]
+                # if name in approx_of_idxs:
+                #     vals = vals[approx_of_idxs[name]]
                 row_map[colorstart:colorend] = vals
                 colorstart = colorend
             start = end
@@ -202,11 +210,6 @@ class ApproximationScheme(object):
                 # data is the same for all colored approxs so we only need the first
                 data = self._get_approx_data(system, wrt, meta)
                 break
-
-        is_group = isinstance(system, Group)
-        is_total = is_group and system.pathname == ''
-        is_semi = is_group and not is_total
-        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
 
         outputs = system._outputs
         inputs = system._inputs
@@ -263,8 +266,10 @@ class ApproximationScheme(object):
                 in_idx = range(start, end)
 
                 if wrt in approx_wrt_idx:
-                    vec_idx = np.array(approx_wrt_idx[wrt], dtype=int)  # local index into var
-                    if vec is not None:
+                    if vec is None:
+                        vec_idx = None
+                    else:
+                        vec_idx = np.atleast_1d(approx_wrt_idx[wrt])  # local index into var
                         vec_idx += slices[wrt].start  # convert into index into input or output vector
                         # Directional derivatives for quick partial checking.
                         # We place the indices in a list so that they are all stepped at the same time.
@@ -273,7 +278,7 @@ class ApproximationScheme(object):
                             vec_idx = [vec_idx]
                 else:
                     if vec is None:  # remote wrt
-                        if vec is system._inputs:
+                        if wrt in abs2meta['input']:
                             vec_idx = range(abs2meta['input'][wrt]['size'])
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['size'])
@@ -300,7 +305,7 @@ class ApproximationScheme(object):
         # Set system flag that we're under approximation to true
         system._set_approx_mode(True)
 
-        # Clean vector for results
+        # Clean vector for results (copy of the outputs or resids)
         results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
 
         # To support driver src_indices, we need to override some checks in Jacobian, but do it
@@ -318,13 +323,27 @@ class ApproximationScheme(object):
         else:
             is_distributed = system._has_distrib_vars and not use_parallel_fd
 
-        results = defaultdict(list)
-        iproc = system.comm.rank
-        owns = system._owning_rank
         mycomm = system._full_comm if use_parallel_fd else system.comm
         jacobian = jac if isinstance(jac, Jacobian) else None
 
         fd_count = 0
+
+        out_slices = system._outputs.get_slice_dict()
+
+        if total:
+            # if we have any remote vars, find the list of vars from this proc that need to be
+            # transferred to other procs
+            if system.comm.size > 1:
+                my_rem_out_vars = [n for n in system._outputs._abs_iter()
+                                if n in system._vars_to_gather and
+                                system._vars_to_gather[n] == system.comm.rank]
+            else:
+                my_rem_out_vars = ()
+            ordered_of_iter = list(system._jac_of_iter())
+            tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            scratch = tot_result.copy()
+        else:
+            scratch = np.empty(len(system._outputs))
 
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
@@ -333,7 +352,6 @@ class ApproximationScheme(object):
 
         # do colored solves first
         if isinstance(coloring, coloring_mod.Coloring):
-            scratch = np.empty(len(system._outputs))
 
             nruns = len(colored_approx_groups)
             tosend = None
@@ -351,6 +369,10 @@ class ApproximationScheme(object):
                         if mult != 1.0:
                             result *= mult
 
+                        if total:
+                            result = self._get_semitotal_result(system, result, tot_result,
+                                                                ordered_of_iter, my_rem_out_vars)
+
                         tosend = (fd_count, result)
 
                     else:  # parallel model (some vars are remote)
@@ -364,7 +386,7 @@ class ApproximationScheme(object):
                 # check if it's time to collect parallel FD columns
                 if use_parallel_fd and ((nruns < num_par_fd and fd_count == nruns) or
                                          fd_count % num_par_fd == 0 or fd_count == nruns):
-                        allres = system._full_comm.allgather(tosend)
+                        allres = mycomm.allgather(tosend)
                         tosend = None
                 else:
                     allres = [tosend]
@@ -411,6 +433,10 @@ class ApproximationScheme(object):
                     if direction is not None or mult != 1.0:
                         result *= mult
 
+                    if total:
+                        result = self._get_semitotal_result(system, result, tot_result,
+                                                            ordered_of_iter, my_rem_out_vars)
+
                     tosend = (group_i, i_count, result)
 
                     if self._progress_out:
@@ -427,7 +453,7 @@ class ApproximationScheme(object):
                 # check if it's time to collect parallel FD columns
                 if use_parallel_fd:
                     if fd_count == nruns or fd_count % num_par_fd == 0:
-                        allres = system._full_comm.allgather(tosend)
+                        allres = mycomm.allgather(tosend)
                         tosend = None
                     else:
                         continue
@@ -439,19 +465,55 @@ class ApproximationScheme(object):
                         continue
                     gi, icount, res = tup
                     # approx_groups[gi] gives tuple (wrt, data, jcol_idxs, vec, vec_idxs, direction)
-                    # [2] gives jcol_idxs, and [icount] gives actual idxs used for the fd run.
+                    # [2] gives jcol_idxs, and [icount] gives actual indices used for the fd run.
                     inds = approx_groups[gi][2][icount]
                     system._jacobian.set_col(system, inds, res)
 
         # Set system flag that we're under approximation to false
         system._set_approx_mode(False)
 
-def _gather_jac_results(comm, results):
-    new_results = defaultdict(list)
+    def _get_semitotal_result(self, system, outarr, totarr, of_iter, my_rem_out_vars):
+        """
+        Convert output array into a column array that matches the size of the jacobian.
 
-    # create full results list
-    for proc_results in comm.allgather(results):
-        for key in proc_results:
-            new_results[key].extend(proc_results[key])
+        Parameters
+        ----------
+        system : System
+            The owning system.
+        outarr : ndarray
+            Array containing local results from the outputs vector.
+        totarr : ndarray
+            Array sized to fit a total jac column.
+        of_iter : list
+            List of (of, start, end, inds) for each 'of' variable in the total jacobian.
+        my_rem_out_vars : list
+            List of names of local variable that need to be transmitted to other procs.
 
-    return new_results
+        Returns
+        -------
+        ndarray
+            totarr, now filled with current values, potentially from other mpi procs.
+        """
+        out_slices = system._outputs.get_slice_dict()
+
+        if system._vars_to_gather:
+            myvars = {}
+            for n in my_rem_out_vars:
+                val = outarr[out_slices[n]]
+                if n in system._owns_approx_of_idx:
+                    val = val[system._owns_approx_of_idx[n]]
+                myvars[n] = val
+            allremvars = system.comm.allgather(myvars)
+
+            for of, start, end, inds in of_iter:
+                for procvars in allremvars:
+                    if of in procvars:
+                        totarr[start:end] = procvars[of]
+                        break
+                else:  # shouldn't get here
+                    raise RuntimeError(f"Couldn't find '{of}'.")
+        else:
+            for of, start, end, inds in of_iter:
+                totarr[start:end] = outarr[out_slices[of]][inds]
+
+        return totarr
