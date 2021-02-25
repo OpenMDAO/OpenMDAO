@@ -10,7 +10,7 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.core.notebook_mode import notebook, tabulate
 try:
     from IPython.display import display, HTML
-except:
+except ImportError:
     display = HTML = None
 
 column_widths = {
@@ -30,7 +30,8 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical=True, top_name='model', print_arrays=False, out_stream=_DEFAULT_OUT_STREAM):
+                    hierarchical=True, top_name='model', print_arrays=False,
+                    out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -100,7 +101,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
                 rows.append([name] + [var_dict[name][field] for field in column_names])
 
             hdrs = ['varname'] + column_names
-            algn = colalign=["center"]*len(hdrs)  # colalign "left" is currently broken
+            algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
             display(HTML(tabulate(rows, headers=hdrs, colalign=algn, tablefmt='html')))
             return
 
