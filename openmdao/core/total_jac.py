@@ -1703,6 +1703,8 @@ class _TotalJacInfo(object):
                     if j > val[0].stop - 1:
                         continue
                     break
+                if name in self.ivc_print_names:
+                    name = self.ivc_print_names[name]
                 zero_rows.append(name)
 
         if zero_rows:
@@ -1720,10 +1722,12 @@ class _TotalJacInfo(object):
                     if j > val[0].stop - 1:
                         continue
                     break
+                if name in self.ivc_print_names:
+                    name = self.ivc_print_names[name]
                 zero_cols.append(name)
 
         if zero_cols:
-            msg =f"Design variables {zero_cols} have no impact on the constraints or objective."
+            msg = f"Design variables {zero_cols} have no impact on the constraints or objective."
             if raise_error:
                 raise RuntimeError(msg)
             else:

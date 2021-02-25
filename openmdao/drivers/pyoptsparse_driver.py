@@ -126,6 +126,8 @@ class pyOptSparseDriver(Driver):
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
+    _check_jac : bool
+        Used internally to control when to perform singular checks on computed total derivs.
     _exc_info : None or <Exception>
         Cached exception that was raised in the _objfunc or _gradfunc callbacks.
     _in_user_function :bool
