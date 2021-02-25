@@ -9,8 +9,6 @@ additional MPI capability.
 from collections import OrderedDict
 import json
 import signal
-import sys
-import traceback
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -128,6 +126,8 @@ class pyOptSparseDriver(Driver):
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
+    _exc_info : None or <Exception>
+        Cached exception that was raised in the _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
@@ -190,7 +190,11 @@ class pyOptSparseDriver(Driver):
         self._signal_cache = None
         self._user_termination_flag = False
         self._in_user_function = False
+<<<<<<< HEAD
         self._check_jac = False
+=======
+        self._exc_info = None
+>>>>>>> 845d93b5fe9735a830b7c3338f3c75acafeda07e
 
         self.cite = CITATIONS
 
@@ -429,33 +433,44 @@ class pyOptSparseDriver(Driver):
         for option, value in self.opt_settings.items():
             opt.setOption(option, value)
 
-        # Execute the optimization problem
-        if self.options['gradient method'] == 'pyopt_fd':
+        self._exc_info = None
+        try:
 
-            # Use pyOpt's internal finite difference
-            # TODO: Need to get this from OpenMDAO
-            # fd_step = problem.model.deriv_options['step_size']
-            fd_step = 1e-6
-            sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
-                      hotStart=self.hotstart_file)
+            # Execute the optimization problem
+            if self.options['gradient method'] == 'pyopt_fd':
 
-        elif self.options['gradient method'] == 'snopt_fd':
-            if self.options['optimizer'] == 'SNOPT':
-
-                # Use SNOPT's internal finite difference
+                # Use pyOpt's internal finite difference
                 # TODO: Need to get this from OpenMDAO
                 # fd_step = problem.model.deriv_options['step_size']
                 fd_step = 1e-6
-                sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
+                sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
                           hotStart=self.hotstart_file)
 
-            else:
-                raise Exception("SNOPT's internal finite difference can only be used with SNOPT")
-        else:
+            elif self.options['gradient method'] == 'snopt_fd':
+                if self.options['optimizer'] == 'SNOPT':
 
-            # Use OpenMDAO's differentiator for the gradient
-            sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
-                      storeHistory=self.hist_file, hotStart=self.hotstart_file)
+                    # Use SNOPT's internal finite difference
+                    # TODO: Need to get this from OpenMDAO
+                    # fd_step = problem.model.deriv_options['step_size']
+                    fd_step = 1e-6
+                    sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
+                              hotStart=self.hotstart_file)
+
+                else:
+                    msg = "SNOPT's internal finite difference can only be used with SNOPT"
+                    self._exc_info = Exception(msg)
+            else:
+
+                # Use OpenMDAO's differentiator for the gradient
+                sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
+                          storeHistory=self.hist_file, hotStart=self.hotstart_file)
+
+        except Exception as _:
+            if not self._exc_info:
+                raise()
+
+        if self._exc_info:
+            raise self._exc_info
 
         # Print results
         if self.options['print_results']:
@@ -572,13 +587,8 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
 
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+        except Exception as raised:
+            self._exc_info = raised
             fail = 1
             func_dict = {}
 
@@ -677,13 +687,9 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
 
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=", flush=True)
+        except Exception as raised:
+            self._exc_info = raised
+            fail = 1
             sens_dict = {}
 
         # print("Derivatives calculated")
