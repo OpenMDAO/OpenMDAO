@@ -2071,7 +2071,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SNOPT'
+        p.driver.options['optimizer'] = 'SLSQP'
 
         p.setup()
 
@@ -2102,7 +2102,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SNOPT'
+        p.driver.options['optimizer'] = 'SLSQP'
 
         p.setup()
 
