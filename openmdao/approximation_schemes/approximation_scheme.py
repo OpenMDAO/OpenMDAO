@@ -512,12 +512,15 @@ class ApproximationScheme(object):
             allremvars = system.comm.allgather(myvars)
 
             for of, start, end, inds in of_iter:
-                for procvars in allremvars:
-                    if of in procvars:
-                        totarr[start:end] = procvars[of]
-                        break
-                else:  # shouldn't get here
-                    raise RuntimeError(f"Couldn't find '{of}'.")
+                if of not in system._vars_to_gather:
+                    totarr[start:end] = outarr[out_slices[of]][inds]
+                else:
+                    for procvars in allremvars:
+                        if of in procvars:
+                            totarr[start:end] = procvars[of]
+                            break
+                    else:  # shouldn't get here
+                        raise RuntimeError(f"Couldn't find '{of}'.")
         else:
             for of, start, end, inds in of_iter:
                 totarr[start:end] = outarr[out_slices[of]][inds]

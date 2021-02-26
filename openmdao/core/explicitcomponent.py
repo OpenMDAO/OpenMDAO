@@ -438,11 +438,11 @@ class ExplicitComponent(Component):
                 # to absolute names (used by all jacobians internally).
 
                 # We used to negate the jacobian here, and then re-negate after the hook.
-                # with self._call_user_function('compute_partials'):
-                if self._discrete_inputs:
-                    self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
-                else:
-                    self.compute_partials(self._inputs, self._jacobian)
+                with self._call_user_function('compute_partials'):
+                    if self._discrete_inputs:
+                        self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                    else:
+                        self.compute_partials(self._inputs, self._jacobian)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
