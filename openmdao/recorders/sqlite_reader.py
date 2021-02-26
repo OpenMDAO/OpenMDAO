@@ -26,6 +26,7 @@ import pickle
 from json import loads as json_loads
 from io import TextIOBase
 
+
 class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.
@@ -348,8 +349,8 @@ class SqliteCaseReader(BaseCaseReader):
         if out_stream:
             if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
                 display(HTML(tabulate([[s] for s in sources],
-                             disable_numparse=True, colalign=["center"],
-                             headers=["Sources"], tablefmt='html')))
+                                      disable_numparse=True, colalign=["center"],
+                                      headers=["Sources"], tablefmt='html')))
             else:
                 if out_stream is _DEFAULT_OUT_STREAM:
                     out_stream = sys.stdout
