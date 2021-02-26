@@ -6,6 +6,11 @@ from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
+try:
+    import tabulate
+except ImportError:
+    tabulate = None
+
 
 def check_even(name, value):
     if value % 2 != 0:
@@ -17,6 +22,7 @@ class TestOptionsDict(unittest.TestCase):
     def setUp(self):
         self.dict = OptionsDictionary()
 
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_reprs(self):
         class MyComp(ExplicitComponent):
             pass
@@ -63,6 +69,7 @@ class TestOptionsDict(unittest.TestCase):
             "====================================================================",
         ]))
 
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_to_table(self):
         class MyComp(ExplicitComponent):
             pass
