@@ -507,7 +507,22 @@ class System(object):
         str
             A simple string representation of this System.
         """
+        # this makes debugging in some IDEs a little more convenient by providing
+        # class and pathname when hovering over a System object.
         return self.msginfo
+
+    def __str__(self):
+        """
+        Return a simple string representation.
+
+        Returns
+        -------
+        str
+            A simple string representation of this System.
+        """
+        # this keeps __repr__ above from messing up pretty-printed output coming from
+        # OptionsDictionary.
+        return super().__repr__()
 
     def _get_inst_id(self):
         return self.pathname
