@@ -24,7 +24,7 @@ except ImportError:
 
 import pickle
 from json import loads as json_loads
-
+from io import TextIOBase
 
 class SqliteCaseReader(BaseCaseReader):
     """
@@ -351,6 +351,10 @@ class SqliteCaseReader(BaseCaseReader):
                              disable_numparse=True, colalign=["center"],
                              headers=["Sources"], tablefmt='html')))
             else:
+                if out_stream is _DEFAULT_OUT_STREAM:
+                    out_stream = sys.stdout
+                elif not isinstance(out_stream, TextIOBase):
+                    raise TypeError("Invalid output stream specified for 'out_stream'.")
                 for source in sources:
                     out_stream.write('{}\n'.format(source))
 

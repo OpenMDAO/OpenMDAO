@@ -460,6 +460,7 @@ def insert_output_start_stop_indicators(src):
         '.check_totals(',
         '.list_inputs(',
         '.list_outputs(',
+        '.list_sources(',
         '.list_source_vars(',
         '.list_problem_vars(',
         '.list_cases(',

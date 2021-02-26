@@ -18,7 +18,6 @@ from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
-from openmdao.core.notebook_mode import notebook_mode, tabulate
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -3111,16 +3110,20 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        expected_cases = [
+        expected_sources = [
             'driver',
             'root.d1',
             'problem'
         ]
 
+        with self.assertRaises(TypeError) as cm:
+            cr.list_sources('problem')
+        self.assertTrue(str(cm.exception), "Invalid output stream specified for 'out_stream'.")
+
         stream = StringIO()
         cases = cr.list_sources(out_stream=stream)
         text = stream.getvalue().split('\n')
-        for i, line in enumerate(expected_cases):
+        for i, line in enumerate(expected_sources):
             self.assertEqual(text[i], line)
 
     def test_list_source_vars_format(self):
@@ -3310,17 +3313,18 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # examine cases to see what was recorded
         cr = om.CaseReader('cases.sql')
 
-        self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['driver', 'root', 'root.nonlinear_solver'])
+        sources = cr.list_sources()
+        self.assertEqual(sorted(sources), ['driver', 'root', 'root.nonlinear_solver'])
 
-        driver_vars = cr.list_source_vars('driver', out_stream=None)
+        driver_vars = cr.list_source_vars('driver')
         self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
                          ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
 
-        model_vars = cr.list_source_vars('root', out_stream=None)
+        model_vars = cr.list_source_vars('root')
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-        solver_vars = cr.list_source_vars('root.nonlinear_solver', out_stream=None)
+        solver_vars = cr.list_source_vars('root.nonlinear_solver')
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 

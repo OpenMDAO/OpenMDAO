@@ -93,6 +93,11 @@ class TestNotebookListIO(unittest.TestCase):
             ('g2.d2.y2', {'value': [0.80000]})
         ]
 
+    def test_invalid_stream(self):
+        with self.assertRaises(TypeError) as cm:
+            self.prob.model.list_outputs(out_stream='stdout')
+        self.assertTrue(str(cm.exception), "Invalid output stream specified for 'out_stream'.")
+
     def test_system_list_inputs(self):
         # when calling <System>.list_inputs() with the default out_stream,
         # the notebook should get an HTML table and no results should be

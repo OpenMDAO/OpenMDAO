@@ -4,6 +4,8 @@ Utility functions and constants related to writing a table of variable metadata.
 import sys
 import pprint
 
+from io import TextIOBase
+
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
@@ -62,7 +64,15 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if out_stream is None:
         return
 
-    ostream = sys.stdout if out_stream is _DEFAULT_OUT_STREAM else out_stream
+    if notebook and tabulate and not hierarchical and out_stream is _DEFAULT_OUT_STREAM:
+        use_tabulate = True
+    else:
+        use_tabulate = False
+
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+    elif not isinstance(out_stream, TextIOBase):
+        raise TypeError("Invalid output stream specified for 'out_stream'.")
 
     count = len(var_dict)
 
@@ -75,7 +85,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     else:
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
 
-    ostream.write(header + '\n')
+    out_stream.write(header + '\n')
 
     if not count:
         return
@@ -94,16 +104,15 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_names = [out_type for out_type in out_types if out_type in outputs]
         break
 
-    if out_stream is _DEFAULT_OUT_STREAM:
-        if notebook and tabulate and not hierarchical and var_list:
-            rows = []
-            for name in var_list:
-                rows.append([name] + [var_dict[name][field] for field in column_names])
+    if use_tabulate and var_list:
+        rows = []
+        for name in var_list:
+            rows.append([name] + [var_dict[name][field] for field in column_names])
 
-            hdrs = ['varname'] + column_names
-            algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
-            display(HTML(tabulate(rows, headers=hdrs, colalign=algn, tablefmt='html')))
-            return
+        hdrs = ['varname'] + column_names
+        algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
+        display(HTML(tabulate(rows, headers=hdrs, colalign=algn, tablefmt='html')))
+        return
 
     # Find with width of the first column in the table
     #    Need to look through all the possible varnames to find the max width
@@ -139,10 +148,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_header += '{:{align}{width}}'.format(column_name, align=align,
                                                     width=column_widths[column_name])
         column_dashes += column_spacing * ' ' + column_widths[column_name] * '-'
-    # ostream.write('-'*len(header) + '\n')
-    ostream.write('\n')
-    ostream.write(column_header + '\n')
-    ostream.write(column_dashes + '\n')
+
+    out_stream.write('\n')
+    out_stream.write(column_header + '\n')
+    out_stream.write(column_dashes + '\n')
 
     # Write out the variable names and optional values and metadata
     if hierarchical:
@@ -170,7 +179,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             # Write the Systems in the var name path
             indent = len(existing_sys_names) * indent_inc
             for i, sys_name in enumerate(remaining_sys_path_parts):
-                ostream.write(indent * ' ' + sys_name + '\n')
+                out_stream.write(indent * ' ' + sys_name + '\n')
                 indent += indent_inc
             cur_sys_names = sys_names
 
@@ -182,7 +191,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             row = '{:{align}{width}}'.format(name[rel_idx:], align=align, width=max_varname_len)
             _write_variable(out_stream, row, column_names, var_dict[name], print_arrays)
 
-    ostream.write('\n\n')
+    out_stream.write('\n\n')
 
 
 def write_source_table(source_dicts, out_stream):
@@ -201,16 +210,19 @@ def write_source_table(source_dicts, out_stream):
     if out_stream is None:
         return
 
-    if not isinstance(source_dicts, list):
-        source_dicts = [source_dicts]
-
     # use tabulate if we are in a notebook, have tabulate and are using the default out_stream
     if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
         use_tabulate = True
     else:
         use_tabulate = False
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
+
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+    elif not isinstance(out_stream, TextIOBase):
+        raise TypeError("Invalid output stream specified for 'out_stream'.")
+
+    if not isinstance(source_dicts, list):
+        source_dicts = [source_dicts]
 
     for source_dict in source_dicts:
         if use_tabulate:
