@@ -195,13 +195,13 @@ class ApproximationScheme(object):
         start = end = colorstart = colorend = 0
         for name, sz in it:
             end += sz
-            prom = abs2prom[name]
+            prom = name if is_group else abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
-                vals = np.arange(start, end, dtype=int)
+                # vals = np.arange(start, end, dtype=int)
                 # if name in approx_of_idxs:
                 #     vals = vals[approx_of_idxs[name]]
-                row_map[colorstart:colorend] = vals
+                row_map[colorstart:colorend] = np.arange(start, end, dtype=int)
                 colorstart = colorend
             start = end
 
