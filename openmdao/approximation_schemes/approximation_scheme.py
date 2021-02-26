@@ -187,7 +187,7 @@ class ApproximationScheme(object):
         row_map = np.empty(coloring._shape[0], dtype=int)
         abs2prom = system._var_allprocs_abs2prom['output']
 
-        if is_group:
+        if is_total:
             it = [(of, end - start) for of, start, end, _ in system._jac_of_iter()]
         else:
             it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
@@ -195,7 +195,7 @@ class ApproximationScheme(object):
         start = end = colorstart = colorend = 0
         for name, sz in it:
             end += sz
-            prom = name if is_group else abs2prom[name]
+            prom = name if is_total else abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
                 # vals = np.arange(start, end, dtype=int)
@@ -270,9 +270,10 @@ class ApproximationScheme(object):
                         vec_idx = None
                     else:
                         vec_idx = np.atleast_1d(approx_wrt_idx[wrt])  # local index into var
-                        vec_idx += slices[wrt].start  # convert into index into input or output vector
+                        # convert into index into input or output vector
+                        vec_idx += slices[wrt].start
                         # Directional derivatives for quick partial checking.
-                        # We place the indices in a list so that they are all stepped at the same time.
+                        # Place the indices in a list so that they are all stepped at the same time.
                         if directional:
                             in_idx = [list(in_idx)]
                             vec_idx = [vec_idx]
@@ -286,7 +287,7 @@ class ApproximationScheme(object):
                         vec_idx = range(slices[wrt].start, slices[wrt].stop)
 
                     # Directional derivatives for quick partial checking.
-                    # We place the indices in a list so that they are all stepped at the same time.
+                    # Place the indices in a list so that they are all stepped at the same time.
                     if directional:
                         in_idx = [list(in_idx)]
                         vec_idx = [list(vec_idx)]
@@ -297,7 +298,8 @@ class ApproximationScheme(object):
                     self._nruns_uncolored += end - start
 
                 # print("approx:", wrt, start, end, vec._data.size)
-                self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, meta['vector']))
+                self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
+                                            meta['vector']))
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
@@ -335,8 +337,8 @@ class ApproximationScheme(object):
             # transferred to other procs
             if system.comm.size > 1:
                 my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                if n in system._vars_to_gather and
-                                system._vars_to_gather[n] == system.comm.rank]
+                                   if n in system._vars_to_gather and
+                                   system._vars_to_gather[n] == system.comm.rank]
             else:
                 my_rem_out_vars = ()
             ordered_of_iter = list(system._jac_of_iter())
@@ -385,9 +387,9 @@ class ApproximationScheme(object):
 
                 # check if it's time to collect parallel FD columns
                 if use_parallel_fd and ((nruns < num_par_fd and fd_count == nruns) or
-                                         fd_count % num_par_fd == 0 or fd_count == nruns):
-                        allres = mycomm.allgather(tosend)
-                        tosend = None
+                                        fd_count % num_par_fd == 0 or fd_count == nruns):
+                    allres = mycomm.allgather(tosend)
+                    tosend = None
                 else:
                     allres = [tosend]
 
@@ -411,7 +413,8 @@ class ApproximationScheme(object):
         tosend = None
 
         # now do uncolored solves
-        for group_i, (wrt, data, jcol_idxs, vec, vec_idxs, direction) in enumerate(approx_groups):
+        for group_i, tup in enumerate(approx_groups):
+            wrt, data, jcol_idxs, vec, vec_idxs, directional, direction = tup
             if self._progress_out:
                 start_time = time.time()
 
@@ -444,9 +447,9 @@ class ApproximationScheme(object):
                         prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out,
                                                                    wrt)
                         self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
-                                                f"derivatives with respect to: "
-                                                f"'{prom_name} [{idxs}]' ... "
-                                                f"{round(end_time-start_time, 4)} seconds\n")
+                                                 f"derivatives with respect to: "
+                                                 f"'{prom_name} [{vecidxs}]' ... "
+                                                 f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 
@@ -458,7 +461,7 @@ class ApproximationScheme(object):
                     else:
                         continue
                 else:
-                    allres = [(group_i, i_count, result)]
+                    allres = [tosend]
 
                 for tup in allres:
                     if tup is None:
@@ -466,8 +469,11 @@ class ApproximationScheme(object):
                     gi, icount, res = tup
                     # approx_groups[gi] gives tuple (wrt, data, jcol_idxs, vec, vec_idxs, direction)
                     # [2] gives jcol_idxs, and [icount] gives actual indices used for the fd run.
-                    inds = approx_groups[gi][2][icount]
-                    system._jacobian.set_col(system, inds, res)
+                    jinds = approx_groups[gi][2][icount]
+                    if directional:
+                        jac.set_col(system, jinds[0], res)
+                    else:
+                        jac.set_col(system, jinds, res)
 
         # Set system flag that we're under approximation to false
         system._set_approx_mode(False)

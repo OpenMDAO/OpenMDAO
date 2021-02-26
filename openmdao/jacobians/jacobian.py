@@ -427,7 +427,8 @@ class Jacobian(object):
             self._col2name_ind[start:end] = i
             start = end
 
-        if system.pathname == '':  # for total derivs, we can have sub-indices making some subjacs smaller
+        # for total derivs, we can have sub-indices making some subjacs smaller
+        if system.pathname == '':
             full = (_full_slice, _full_slice)
             for key, meta in system._subjacs_info.items():
                 nrows, ncols = meta['shape']
@@ -443,7 +444,16 @@ class Jacobian(object):
                         cidxs = _full_slice  # value was already changed
                 else:
                     cidxs = _full_slice
+
                 if ridxs is not _full_slice or cidxs is not _full_slice:
+                    # replace our local subjac with a smaller one but don't
+                    # change the subjac belonging to the system (which has values
+                    # shared with subsystems)
+                    if self._subjacs_info is system._subjacs_info:
+                        self._subjacs_info = system._subjacs_info.copy()
+                    self._subjacs_info[key] = meta.copy()
+                    meta = self._subjacs_info[key]
+
                     if ridxs is not _full_slice:
                         nrows = len(ridxs)
                     if cidxs is not _full_slice:

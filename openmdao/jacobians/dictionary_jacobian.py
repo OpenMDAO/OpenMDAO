@@ -173,6 +173,10 @@ class DictionaryJacobian(Jacobian):
 
 
 class _CheckingJacobian(DictionaryJacobian):
+    def __init__(self, system):
+        super().__init__(system)
+        self._subjacs_info = self._subjacs_info.copy()
+
     def __iter__(self):
         for key, _ in self.items():
             yield key
@@ -192,3 +196,30 @@ class _CheckingJacobian(DictionaryJacobian):
                 dense[rows, meta['cols']] = meta['value']
                 yield key, dense
 
+    def _setup_index_maps(self, system):
+        super()._setup_index_maps(system)
+        from openmdao.core.component import Component
+
+        if isinstance(system, Component):
+            local_opts = system._get_check_partial_options()
+        else:
+            local_opts = None
+
+        for of, start, end, _ in system._jac_of_iter():
+            nrows = end - start
+            for wrt, wstart, wend, _, _ in system._jac_wrt_iter():
+                ncols = wend - wstart
+                loc_wrt = wrt.rsplit('.', 1)[-1]
+                directional = (local_opts is not None and loc_wrt in local_opts and
+                               local_opts[loc_wrt]['directional'])
+                key = (of, wrt)
+                if key not in self._subjacs_info:
+                    # create subjacs_info objects for matrix_free systems that don't have them
+                    self._subjacs_info[key] = sub = {
+                        'rows': None,
+                        'cols': None,
+                        'value': np.zeros((nrows, 1 if directional else ncols)),
+                    }
+                elif directional and self._subjacs_info[key]['value'].shape[1] != 1:
+                    self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
+                    meta['value'] = np.atleast_2d(meta['value'][:, 0]).T

@@ -1049,17 +1049,17 @@ class Component(System):
                 if size > 0:
                     coo = coo_matrix((np.ones(size), (rows, cols)), dtype=int)
                     csc = coo.tocsc()
-                    # csc adds values at duplicate indices together, so result will be that data size
-                    # is less if there are duplicates
+                    # csc adds values at duplicate indices together, so result will be that data
+                    # size is less if there are duplicates
                     if csc.data.size < coo.data.size:
                         coo2 = csc.tocoo()
                         del csc
                         inds = np.where(coo2.data > 1.)
                         dups = list(zip(coo2.row[inds], coo2.col[inds]))
                         raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
-                                           "with rows and cols that specify the following duplicate "
-                                           "subjacobian entries: {}.".format(self.msginfo, of, wrt,
-                                                                             sorted(dups)))
+                                           "with rows and cols that specify the following duplicate"
+                                           " subjacobian entries: {}.".format(self.msginfo, of, wrt,
+                                                                              sorted(dups)))
 
         if method_func is not None:
             # we're doing approximations

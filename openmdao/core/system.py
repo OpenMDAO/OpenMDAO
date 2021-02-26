@@ -499,6 +499,14 @@ class System(object):
         return f"<class {type(self).__name__}>"
 
     def __repr__(self):
+        """
+        Return a simple string representation.
+
+        Returns
+        -------
+        str
+            A simple string representation of this System.
+        """
         return self.msginfo
 
     def _get_inst_id(self):
@@ -2174,9 +2182,9 @@ class System(object):
         except Exception:
             err_type, err, trace = sys.exc_info()
             if str(err).startswith(self.msginfo):
-                raise err
+                raise
             else:
-                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}")
+                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}") from err
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False

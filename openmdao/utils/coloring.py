@@ -435,7 +435,7 @@ class Coloring(object):
                 wrt_matches = None
             else:
                 wrt_matches = set(['.'.join((system.pathname, n))
-                                for n in info['wrt_matches_prom']])
+                                   for n in info['wrt_matches_prom']])
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
             ordered_wrt_info = \
