@@ -17,8 +17,10 @@ from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
 from openmdao.core.notebook_mode import notebook, tabulate
-if notebook:
+try:
     from IPython.display import display, HTML
+except ImportError:
+    display = HTML = None
 
 import pickle
 from json import loads as json_loads

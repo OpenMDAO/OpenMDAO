@@ -215,7 +215,7 @@ def write_source_table(source_dicts, out_stream):
     for source_dict in source_dicts:
         if use_tabulate:
             display(HTML(tabulate(source_dict,
-                         disable_numparse=True, colalign=["center"],
+                         disable_numparse=True, colalign=["center"]*len(source_dict),
                          headers="keys", tablefmt='html')))
         else:
             for key, value in source_dict.items():
