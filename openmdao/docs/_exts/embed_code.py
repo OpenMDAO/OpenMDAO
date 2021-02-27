@@ -48,7 +48,7 @@ class EmbedCodeDirective(Directive):
 
     option_spec = {
         'strip-docstrings': unchanged,
-        'strip-excerpt-tags': unchanged,
+        'dont-strip-excerpt-tags': unchanged,
         'layout': unchanged,
         'scale': unchanged,
         'align': unchanged,
@@ -116,7 +116,7 @@ class EmbedCodeDirective(Directive):
         #
         if 'strip-docstrings' in self.options:
             source = remove_docstrings(source)
-        if 'strip-excerpt-tags' in self.options:
+        if not ('dont-strip-excerpt-tags' in self.options):
             source = remove_excerpt_tags(source)
         if is_test:
             try:

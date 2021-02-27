@@ -337,22 +337,10 @@ def get_source_code(path):
             raise SphinxError("Too many or too few excerpt numbers in sphinx tag '%s'" % path)
         excerpt_number = int(split_path[-1])
         path = split_path[0]
-        if not path.endswith('.py'):
-            raise SphinxError('Script excerpt tags only work with script files ending in .py')
-        if not os.path.isfile(path):
-            raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
-        with open(path, 'r') as f:
-            source = f.read()
-        module = None
+    else:
+        excerpt_number = None
 
-        split_comment = '# EXCERPT ' + str(excerpt_number) + ' #'
-        split_source = source.split(split_comment)
-        if len(split_source) != 3:
-            raise SphinxError("Too few or too many excerpt comment tags \
-                               %s in the Python script %s" % (split_comment, path))
-        else:
-            source = split_source[1]
-    elif path.endswith('.py'):
+    if path.endswith('.py'):
         if not os.path.isfile(path):
             raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
         with open(path, 'r') as f:
@@ -388,7 +376,16 @@ def get_source_code(path):
                 method_obj = getattr(class_obj, method_name)
                 source = inspect.getsource(method_obj)
                 indent = 2
-
+                
+    if excerpt_number is not None:
+        split_comment = '# EXCERPT ' + str(excerpt_number) + ' #'
+        split_source = source.split(split_comment)
+        if len(split_source) != 3:
+            raise SphinxError("Too few or too many excerpt comment tags \
+                                %s in the Python code at %s" % (split_comment, path))
+        else:
+            source = split_source[1]
+            
     return remove_leading_trailing_whitespace_lines(source), indent, module, class_obj, method_obj
 
 

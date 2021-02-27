@@ -248,6 +248,24 @@ embed-code
             openmdao.core.tests.test_expl_comp.RectangleComp
             :strip-docstrings:
 
+        You may also include only an excerpt of the code by including `# EXCERPT 1 #` (and so on) comments above and below the relevant section in the Python code, and then using the following RST directive.
+
+        .. embed-code::
+            openmdao.core.tests.test_expl_comp.RectangleComp
+            :strip-docstrings:
+            :dont-strip-excerpt-tags:
+
+        .. code-block:: rst
+
+          .. embed-code::
+              openmdao.core.tests.test_expl_comp.RectangleComp:EXCERPT:1
+              :strip-docstrings:
+
+        By default, the tags in the code are removed when printing in the docs, but you can include them by using the `:dont-strip-excerpt-tags:` option
+
+        .. embed-code::
+            openmdao.core.tests.test_expl_comp.RectangleComp:EXCERPT:1
+            :strip-docstrings:
 
 Embedding More Than Just Code
 *****************************
@@ -281,14 +299,39 @@ Embedding More Than Just Code
    .. code-block:: rst
 
        .. embed-code::
-           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
-
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py  
 
    Note that, as mentioned above, the default value of :code:`layout` is just "code," so the
    layout is not specified here. The resulting embed looks like this:
 
    .. embed-code::
        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+
+  You may also include one or more excerpts of a script by enclosing the Python code in `# EXCERPT 1 #` (and so on) comments on separate lines, as follows:
+
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:1
+
+  Subsequently only the tagged excerpt is displayed. The number in the script tags must match the number in the RST directive.
+
+   .. embed-code::
+       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:1
+
+  By default these excerpt tags are not shown in the docs printout. If you are embedding an entire script, you can  display the excerpt tags by including the `:dont-strip-excerpt-tags:` option, as follows:
+   
+   .. code-block:: rst
+
+       .. embed-code::
+           ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+           :dont-strip-excerpt-tags:
+
+  The script will print with excerpt tag comments.
+
+  .. embed-code::
+      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
+      :dont-strip-excerpt-tags:
 
 
 2. Embed a piece of code, run it, show a single block of output afterwards.
@@ -300,6 +343,7 @@ Embedding More Than Just Code
        .. embed-code::
            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
            :layout: code, output
+           :strip-except-tags:
 
 
    The resulting embed would look like this:
@@ -308,7 +352,6 @@ Embedding More Than Just Code
    .. embed-code::
        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
        :layout: code, output
-
 
 3. Embed a piece of code, run it, show a single block of output afterwards, then show a plot after that.
    (Remember, that :code:`show()` function needs to be in there for this to work.)
@@ -320,13 +363,11 @@ Embedding More Than Just Code
            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
            :layout: code, output, plot
 
-
    The resulting embed would look like this:
 
    .. embed-code::
        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
        :layout: code, output, plot
-
 
 4. Embed a piece of code, run it, plot it. Show the plot first, then show the code with interleaved output, after that.
    (Remember, that :code:`show()` function needs to be in the embedded code for a plot embed to work.)

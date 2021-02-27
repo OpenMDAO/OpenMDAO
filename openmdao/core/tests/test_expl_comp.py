@@ -23,7 +23,7 @@ class RectangleComp(om.ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
     """
-
+# EXCERPT 1 #
     def setup(self):
         self.add_input('length', val=1.)
         self.add_input('width', val=1.)
@@ -31,7 +31,8 @@ class RectangleComp(om.ExplicitComponent):
 
     def setup_partials(self):
         self.declare_partials('*', '*')
-
+        
+# EXCERPT 1 #
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']
 
