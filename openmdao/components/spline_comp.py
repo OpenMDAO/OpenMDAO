@@ -31,18 +31,20 @@ class SplineComp(ExplicitComponent):
         **kwargs : dict
             Interpolator options to pass onward.
         """
-        super(SplineComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.interp_to_cp = {}
         self.interps = {}
         self._spline_cache = []
         self._n_cp = None
 
+        self._no_check_partials = True
+
     def _declare_options(self):
         """
         Declare options.
         """
-        super(SplineComp, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')

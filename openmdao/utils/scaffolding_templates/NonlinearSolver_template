@@ -19,7 +19,7 @@ class {class_name}(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super({class_name}, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # set other attributes here...
 
@@ -34,7 +34,7 @@ class {class_name}(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super({class_name}, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         # perform any necessary setup here...
 
@@ -42,7 +42,7 @@ class {class_name}(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super({class_name}, self)._declare_options()
+        super()._declare_options()
 
         # for example...
         # self.options.declare('cs_reconverge', types=bool, default=True,
@@ -60,7 +60,7 @@ class {class_name}(NonlinearSolver):
         float
             error at the first iteration.
         """
-        return super({class_name}, self)._iter_initialize()
+        return super()._iter_initialize()
 
     def _single_iteration(self):
         """

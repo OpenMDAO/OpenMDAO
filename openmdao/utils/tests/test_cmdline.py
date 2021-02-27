@@ -41,6 +41,7 @@ cmd_tests = [
     'openmdao trace {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao tree -c {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
     'openmdao view_connections --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
+    'openmdao view_dyn_shapes --no_display {}'.format(os.path.join(scriptdir, 'dyn_system.py')),
 ]
 
 
@@ -56,6 +57,17 @@ try:
 except ImportError:
     psutil = None
 
+
+class CmdlineTestCaseCheck(unittest.TestCase):
+    def test_auto_ivc_warnings_check(self):
+        cmd = 'openmdao check -c auto_ivc_warnings {}'.format(os.path.join(scriptdir, 'auto_ivc_warnings.py'))
+        msg = "WARNING: Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'value'. The value (14.0) from 'G1' will be used."
+
+        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, _ = output.communicate()
+        for i in out.decode('utf-8').split("\n"):
+            if "WARNING:" in i:
+                self.assertEqual(i, msg)
 
 @use_tempdirs
 class CmdlineTestCase(unittest.TestCase):
@@ -100,6 +112,19 @@ class CmdlineTestfuncTestCase(unittest.TestCase):
         except subprocess.CalledProcessError as err:
             self.fail("Command '{}' failed.  Return code: {}".format(cmd, err.returncode))
 
+
+test_cmd_err = [
+    f"openmdao -scaling {os.path.join(scriptdir, 'circle_opt.py')}",
+]
+
+@use_tempdirs
+class CmdlineTestErrTestCase(unittest.TestCase):
+    @parameterized.expand(test_cmd_err, name_func=_test_func_name)
+    def test_cmd(self, cmd):
+        proc = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='UTF-8')
+        if 'argument : invalid choice:' not in proc.stderr:
+            self.fail(f"Command '{cmd}' didn't fail in the expected way.\n"
+                      f"Return code: {proc.returncode}.\nstderr: {proc.stderr}\nstdout: {proc.stdout}")
 
 if __name__ == '__main__':
     unittest.main()

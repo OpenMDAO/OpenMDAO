@@ -17,6 +17,7 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.general_utils import simple_warning
+from openmdao.core.constants import _SetupStatus
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -234,7 +235,7 @@ def config_summary(problem, stream=sys.stdout):
                          if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
-    setup_done = problem._setup_status == 2
+    setup_done = model._problem_meta['setup_status'] == _SetupStatus.POST_FINAL_SETUP
 
     if problem.comm.size > 1:
         local_max = np.array([max_depth])
@@ -314,19 +315,19 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
 
-    input_names = model._var_allprocs_abs_names['input']
+    input_names = model._var_allprocs_abs2meta['input']
     ninputs = len(input_names)
     if setup_done:
         printer("Input variables:         %5d   Total size: %8d" %
-                (ninputs, sum(meta[n]['size'] for n in input_names)))
+                (ninputs, sum(meta['input'][n]['size'] for n in input_names)))
     else:
         printer("Input variables:         %5d" % ninputs)
 
-    output_names = model._var_allprocs_abs_names['output']
+    output_names = model._var_allprocs_abs2meta['output']
     noutputs = len(output_names)
     if setup_done:
         printer("Output variables:        %5d   Total size: %8d" %
-                (noutputs, sum(meta[n]['global_size'] for n in output_names)))
+                (noutputs, sum(meta['output'][n]['global_size'] for n in output_names)))
     else:
         printer("Output variables:        %5d" % noutputs)
 
@@ -334,7 +335,7 @@ def config_summary(problem, stream=sys.stdout):
         printer()
         conns = model._conn_global_abs_in2out
         printer("Total connections: %d   Total transfer data size: %d" %
-                (len(conns), sum(meta[n]['size'] for n in conns)))
+                (len(conns), sum(meta['input'][n]['size'] for n in conns)))
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)
@@ -370,10 +371,11 @@ def profiling(outname='prof.out'):
     prof = cProfile.Profile()
     prof.enable()
 
-    yield prof
-
-    prof.disable()
-    prof.dump_stats(outname)
+    try:
+        yield prof
+    finally:
+        prof.disable()
+        prof.dump_stats(outname)
 
 
 def compare_jacs(Jref, J, rel_trigger=1.0):

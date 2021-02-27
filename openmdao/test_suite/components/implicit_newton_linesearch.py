@@ -22,6 +22,7 @@ class ImplCompOneState(om.ImplicitComponent):
         self.add_input('x', 1.2278849186466743)
         self.add_output('y', val=1.0)
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, resids):
@@ -71,6 +72,7 @@ class ImplCompTwoStates(om.ImplicitComponent):
         self.maxiter = 10
         self.atol = 1.0e-12
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -128,6 +130,7 @@ class ImplCompTwoStatesArrays(om.ImplicitComponent):
         self.maxiter = 10
         self.atol = 1.0e-12
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):

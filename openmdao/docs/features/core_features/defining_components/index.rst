@@ -14,4 +14,5 @@ Working with Components
     indepvarcomp.rst
     units.rst
     scaling.rst
+    discrete_variables.rst
     options.rst

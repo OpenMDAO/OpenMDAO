@@ -175,7 +175,7 @@ class TestBryoden(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.run_model()
 
-        msg = "BroydenSolver in SellarStateConnection (<model>): The following variable names were not found: junk"
+        msg = "BroydenSolver in <model> <class SellarStateConnection>: The following variable names were not found: junk"
         self.assertEqual(str(context.exception), msg)
 
     def test_error_need_direct_solver(self):
@@ -190,7 +190,7 @@ class TestBryoden(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.run_model()
 
-        msg = "BroydenSolver in SellarStateConnection (<model>): Linear solver must be DirectSolver when solving the full model."
+        msg = "BroydenSolver in <model> <class SellarStateConnection>: Linear solver must be DirectSolver when solving the full model."
         self.assertEqual(str(context.exception), msg)
 
     def test_simple_sellar(self):

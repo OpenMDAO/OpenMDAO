@@ -61,7 +61,7 @@ class SimpleGADriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super(SimpleGADriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['integer_design_vars'] = True
@@ -74,6 +74,7 @@ class SimpleGADriver(Driver):
         self.supports['linear_constraints'] = False
         self.supports['simultaneous_derivatives'] = False
         self.supports['active_set'] = False
+        self.supports['distributed_design_vars'] = False
         self.supports._read_only = True
 
         self._desvar_idx = {}
@@ -148,7 +149,7 @@ class SimpleGADriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super(SimpleGADriver, self)._setup_driver(problem)
+        super()._setup_driver(problem)
 
         model_mpi = None
         comm = problem.comm

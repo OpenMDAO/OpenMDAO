@@ -35,22 +35,6 @@ class NonlinearBlockJac(NonlinearSolver):
 
         self._solver_info.pop()
 
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if (self.options['iprint'] > 0):
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
-
     def _run_apply(self):
         """
         Run the apply_nonlinear method on the system.
@@ -60,6 +44,6 @@ class NonlinearBlockJac(NonlinearSolver):
         # If this is a parallel group, check for analysis errors and reraise.
         if len(system._subsystems_myproc) != len(system._subsystems_allprocs):
             with multi_proc_fail_check(system.comm):
-                super(NonlinearBlockJac, self)._run_apply()
+                super()._run_apply()
         else:
-            super(NonlinearBlockJac, self)._run_apply()
+            super()._run_apply()

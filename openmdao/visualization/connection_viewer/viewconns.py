@@ -8,7 +8,14 @@ from collections import defaultdict
 
 import numpy as np
 
+try:
+    from IPython.display import IFrame, display
+except ImportError:
+    IFrame = display = None
+
+import openmdao
 from openmdao.core.problem import Problem
+from openmdao.core.notebook_mode import notebook
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -63,40 +70,41 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     else:
         system = root
 
-    input_srcs = system._problem_meta['connections']
-
-    connections = {
-        tgt: src for tgt, src in input_srcs.items() if src is not None
-    }
+    connections = system._problem_meta['model_ref']()._conn_global_abs_in2out
 
     src2tgts = defaultdict(list)
-    units = {}
-    for n, data in system._var_allprocs_abs2meta.items():
-        u = data.get('units', '')
-        if u is None:
-            u = ''
-        units[n] = u
+    units = defaultdict(lambda: '')
+    for io in ('input', 'output'):
+        for n, data in system._var_allprocs_abs2meta[io].items():
+            u = data.get('units', '')
+            if u is not None:
+                units[n] = u
 
     vals = {}
 
+    prefix = system.pathname + '.' if system.pathname else ''
+    all_vars = {}
+    for io in ('input', 'output'):
+        all_vars[io] = chain(system._var_abs2meta[io].items(),
+                             [(prefix + n, m) for n, m in system._var_discrete[io].items()])
+
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
-        for t in system._var_abs_names['input']:
-            tmeta = system._var_abs2meta[t]
-            idxs = tmeta['src_indices']
-
+        for t, meta in all_vars['input']:
             s = connections[t]
             if show_values:
                 if s.startswith('_auto_ivc.'):
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True,
+                    val = system.get_val(t, flat=True, get_remote=True,
                                          from_src=False)
                 else:
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True)
+                    val = system.get_val(t, flat=True, get_remote=True)
 
                     # if there's a unit conversion, express the value in the
                     # units of the target
                     if units[t] and s in system._outputs:
-                        val = convert_units(val, units[s], units[t])
+                        val = system.get_val(t, flat=True, units=units[t], get_remote=True)
+                    else:
+                        val = system.get_val(t, flat=True, get_remote=True)
             else:
                 val = ''
 
@@ -109,12 +117,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     src_systems = set()
     tgt_systems = set()
-    for s in system._var_abs_names['output']:
+    for s, _ in all_vars['output']:
         parts = s.split('.')
         for i in range(len(parts)):
             src_systems.add('.'.join(parts[:i]))
 
-    for t in system._var_abs_names['input']:
+    for t, _ in all_vars['input']:
         parts = t.split('.')
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
@@ -146,10 +154,10 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         idx += 1
 
     # add rows for unconnected sources
-    for src in system._var_abs_names['output']:
+    for src, _ in all_vars['output']:
         if src not in src2tgts:
             if show_values:
-                v = _val2str(system._outputs[src])
+                v = _val2str(system._abs_get_val(src))
             else:
                 v = ''
             row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
@@ -169,8 +177,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     viewer = 'connect_table.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
-    libs_dir = os.path.join(code_dir, 'libs')
-    style_dir = os.path.join(code_dir, 'style')
+    libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
+    style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
@@ -189,5 +197,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
-    if show_browser:
+    if notebook:
+        display(IFrame(src=outfile, width=1000, height=1000))
+
+    if show_browser and not notebook:
         webview(outfile)

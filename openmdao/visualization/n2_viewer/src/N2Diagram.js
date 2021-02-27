@@ -11,7 +11,6 @@
  * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv The outermost div we work with.
- * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} dom.svgDiv The div containing the SVG element.
  * @property {Object} dom.svg The SVG element.
  * @property {Object} dom.svgStyle Object where SVG style changes can be made.
@@ -39,10 +38,11 @@ class N2Diagram {
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
         this.chosenCollapseDepth = -1;
         this.showLinearSolverNames = true;
+        this.showSolvers = true ;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement,
-            this.showLinearSolverNames, this.dims);
+            this.showLinearSolverNames, this.showSolvers, this.dims);
         this.search = new N2Search(this.zoomedElement, this.model.root);
         this.ui = new N2UserInterface(this);
         // Keep track of arrows to show and hide them
@@ -102,7 +102,7 @@ class N2Diagram {
     }
 
     /**
-     * Switch back and forth between showing the linear or non-linear solver names. 
+     * Switch back and forth between showing the linear or non-linear solver names.
      */
     toggleSolverNameType() {
         this.showLinearSolverNames = !this.showLinearSolverNames;
@@ -140,6 +140,58 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
+    /*
+     * Recurse and pull state info from model for saving.
+     */
+    getSubState(dataList, node = this.model.root) {
+        dataList.push(node.isMinimized);
+        dataList.push(node.manuallyExpanded);
+        dataList.push(node.varIsHidden);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.getSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and set state info into model.
+     */
+    setSubState(dataList, node = this.model.root) {
+        node.isMinimized = dataList.pop();
+        node.manuallyExpanded = dataList.pop();
+        node.varIsHidden = dataList.pop();
+        //console.log(node.isMinimized, node.manuallyExpanded);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.setSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and return node given id.
+     */
+    findNodeById(id, node = this.model.root) {
+        if (id == node.id) {
+            return node;
+        }
+        else if (node.hasChildren()) {
+            for (const child of node.children) {
+                let found = this.findNodeById(id, child);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+        else {
+            return false;
+        }
+        return false;
+    }
+
     /**
      * Replace the current zoomedElement, but preserve its value.
      * @param {Object} newZoomedElement Replacement zoomed element.
@@ -150,14 +202,13 @@ class N2Diagram {
         this.layout.zoomedElement = this.zoomedElement;
     }
 
-    /** 
+    /**
      * Setup internal references to D3 objects so we can avoid running
      * d3.select() over and over later.
      */
     _referenceD3Elements() {
         this.dom = {
             'parentDiv': document.getElementById("ptN2ContentDivId"),
-            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
             'svgDiv': d3.select("#svgDiv"),
             'svg': d3.select("#svgId"),
             'svgStyle': d3.select("#svgId style"),
@@ -174,8 +225,7 @@ class N2Diagram {
                 'partitionTree': d3.select("#partitionTreeClip > rect"),
                 'n2Matrix': d3.select("#n2MatrixClip > rect"),
                 'solverTree': d3.select("#solverTreeClip > rect")
-            },
-
+            }
         };
 
         let n2Groups = {};
@@ -193,8 +243,6 @@ class N2Diagram {
             offgrid[name] = d3elem;
         })
         this.dom.n2Groups.offgrid = offgrid;
-
-
     }
 
     /**
@@ -336,10 +384,7 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
@@ -351,7 +396,7 @@ class N2Diagram {
                 self.ui.nodeInfoBox.clear();
             })
             .on("mousemove", function () {
-                self.ui.nodeInfoBox.move(d3.event);
+                self.ui.nodeInfoBox.moveNearMouse(d3.event);
             });
 
         nodeEnter.append("rect")
@@ -482,16 +527,13 @@ class N2Diagram {
             })
             .on("click", function (d) {
                 if (self.ui.nodeInfoBox.hidden) { self.ui.leftClick(d); } // Zoom if not in info panel mode
-                else { // Pin/unpin the info panel
-                    self.ui.nodeInfoBox.togglePin();
-                    self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
-                }
+                else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
                 self.ui.rightClick(d, this);
             })
             .on("mouseover", function (d) {
-                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'))
+                self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'), true)
 
                 if (self.model.abs2prom != undefined) {
                     if (d.isInput()) {
@@ -512,7 +554,7 @@ class N2Diagram {
                 }
             })
             .on("mousemove", function () {
-                self.ui.nodeInfoBox.move(d3.event);
+                self.ui.nodeInfoBox.moveNearMouse(d3.event);
 
                 if (self.model.abs2prom != undefined) {
                     self.dom.toolTip.style("top", (d3.event.pageY - 30) + "px")
@@ -652,8 +694,22 @@ class N2Diagram {
         }
     }
 
+    showDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', true)
+            );
+        d3.select('.partition_group #_auto_ivc').classed('opt-vars', true)
+    }
+
+    hideDesignVars() {
+        [Object.keys(modelData.design_vars), Object.keys(modelData.responses)].flat().forEach(
+            item => d3.select("#" + item.replaceAll(".", "_")).classed('opt-vars', false)
+            );
+        d3.select("#_auto_ivc").classed('opt-vars', false)
+    }
+
     delay(time) {
-        return new Promise(function(resolve) { 
+        return new Promise(function(resolve) {
             setTimeout(resolve, time)
         });
      }
@@ -661,7 +717,6 @@ class N2Diagram {
     /** Display an animation while the transition is in progress */
     showWaiter() {
         this.dom.waiter.attr('class', 'show');
-
     }
 
     /** Hide the animation after the transition completes */
@@ -684,7 +739,7 @@ class N2Diagram {
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement,
-                this.showLinearSolverNames, this.dims);
+                this.showLinearSolverNames, this.showSolvers, this.dims);
 
             this.ui.updateClickedIndices();
 
@@ -708,6 +763,8 @@ class N2Diagram {
         this.matrix.draw();
 
         if (!d3.selection.prototype.transitionAllowed) this.hideWaiter();
+
+        if (!this.ui.desVars) this.showDesignVars()
     }
 
     /**
@@ -776,7 +833,7 @@ class N2Diagram {
      */
     mouseMoveOnDiagonal(cell) {
         if (this.matrix.cellExists(cell)) {
-            this.ui.nodeInfoBox.move(d3.event);
+            this.ui.nodeInfoBox.moveNearMouse(d3.event);
         }
     }
 
@@ -809,9 +866,8 @@ class N2Diagram {
         if (this.ui.nodeInfoBox.hidden) { // If not in info-panel mode, pin/unpin arrows
             this.arrowMgr.togglePin(cell.id);
         }
-        else { // Pin/unpin the info panel
-            this.ui.nodeInfoBox.togglePin();
-            this.ui.nodeInfoBox.update(d3.event, cell.obj, cell.color());
+        else { // Make a persistent info panel
+            this.ui.nodeInfoBox.pin();
         }
     }
 

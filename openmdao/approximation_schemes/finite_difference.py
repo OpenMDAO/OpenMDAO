@@ -90,7 +90,7 @@ class FiniteDifference(ApproximationScheme):
         """
         Initialize the ApproximationScheme.
         """
-        super(FiniteDifference, self).__init__()
+        super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def add_approximation(self, abs_key, system, kwargs, vector=None):
@@ -232,7 +232,7 @@ class FiniteDifference(ApproximationScheme):
         array
             The givan array, unchanged.
         """
-        return array
+        return array.real
 
     def _run_point(self, system, idx_info, data, results_array, total):
         """
@@ -261,7 +261,7 @@ class FiniteDifference(ApproximationScheme):
         if current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
-            results_array[:] = current_vec._data
+            results_array[:] = current_vec.asarray()
             results_array *= current_coeff
         else:
             results_array[:] = 0.

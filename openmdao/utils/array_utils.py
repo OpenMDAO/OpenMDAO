@@ -8,6 +8,32 @@ from copy import copy
 import numpy as np
 
 
+def shape_to_len(shape):
+    """
+    Compute length given a shape tuple.
+
+    For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
+
+    Parameters
+    ----------
+    shape : tuple
+        Numpy shape tuple.
+
+    Returns
+    -------
+    int
+        Length of multidimensional array.
+    """
+    if shape is None:
+        return None
+
+    length = 1
+    for dim in shape:
+        length *= dim
+
+    return length
+
+
 def evenly_distrib_idxs(num_divisions, arr_size):
     """
     Return evenly distributed entries for the given array size.
@@ -29,8 +55,7 @@ def evenly_distrib_idxs(num_divisions, arr_size):
         a tuple of (sizes, offsets), where sizes and offsets contain values for all
         divisions.
     """
-    base = arr_size // num_divisions
-    leftover = arr_size % num_divisions
+    base, leftover = divmod(arr_size, num_divisions)
     sizes = np.full(num_divisions, base, dtype=int)
 
     # evenly distribute the remainder across size-leftover procs,
@@ -77,15 +102,17 @@ def take_nth(rank, size, seq):
                     return
 
 
-def convert_neg(arr, dim):
+def convert_neg(arr, size):
     """
     Convert any negative indices into their positive equivalent.
+
+    This only works for a 1D array.
 
     Parameters
     ----------
     arr : ndarray
         Array having negative indices converted.
-    dim : int
+    size : int
         Dimension of the array.
 
     Returns
@@ -93,7 +120,7 @@ def convert_neg(arr, dim):
     ndarray
         The converted array.
     """
-    arr[arr < 0] += dim
+    arr[arr < 0] += size
     return arr
 
 
@@ -180,8 +207,8 @@ def array_connection_compatible(shape1, shape2):
     ashape1 = np.asarray(shape1, dtype=int)
     ashape2 = np.asarray(shape2, dtype=int)
 
-    size1 = np.prod(ashape1)
-    size2 = np.prod(ashape2)
+    size1 = shape_to_len(ashape1)
+    size2 = shape_to_len(ashape2)
 
     # Shapes are not connection-compatible if size is different
     if size1 != size2:
@@ -236,10 +263,10 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
         data = data * np.ones(nnz)
 
     if not np.isscalar(nrow):
-        nrow = np.prod(nrow)
+        nrow = shape_to_len(nrow)
 
     if not np.isscalar(ncol):
-        ncol = np.prod(ncol)
+        ncol = shape_to_len(ncol)
 
     repeat_arr = np.repeat(np.arange(num_nodes), nnz)
 

@@ -15,7 +15,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
@@ -26,11 +26,12 @@ try:
 except ImportError:
     PETScVector = None
 
-try:
-    from openmdao.vectors.petsc_vector import PETScVector
-except ImportError:
-    PETScVector = None
 
+arr_order_1x1 = np.array([1, 2, 3, 4])
+arr_2x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13]])
+arr_order_3x3 = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+arr_order_4x4 = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+arr_large_4x4 = np.array([[0, 1, 2, 3], [10, 11, 12, 13], [20, 21, 22, 23], [30, 31, 32, 33]])
 
 class SimpleGroup(om.Group):
 
@@ -68,7 +69,7 @@ class SetOrderGroup(om.Group):
 
 class ReportOrderComp(om.ExplicitComponent):
     def __init__(self, order_list):
-        super(ReportOrderComp, self).__init__()
+        super().__init__()
         self._order_list = order_list
 
     def setup(self):
@@ -98,7 +99,15 @@ class TestSubsystemConfigError(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-                         "SimpleGroup (<model>): Cannot call add_subsystem in the configure method")
+                         "<model> <class SimpleGroup>: Cannot call add_subsystem in the configure method")
+
+class SlicerComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', np.ones(4))
+        self.add_output('y', 1.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = np.sum(inputs['x'])**2.0
 
 
 class TestGroup(unittest.TestCase):
@@ -108,7 +117,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp', om.IndepVarComp)
         except TypeError as err:
-            self.assertEqual(str(err), "Group: Subsystem 'comp' should be an instance, "
+            self.assertEqual(str(err), "<class Group>: Subsystem 'comp' should be an instance, "
                                        "but a IndepVarComp class object was found.")
         else:
             self.fail('Exception expected.')
@@ -122,7 +131,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp2', om.ExecComp('b=2*a'))
         except Exception as err:
-            self.assertEqual(str(err), "Group: Subsystem name 'comp2' is already used.")
+            self.assertEqual(str(err), "<class Group>: Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
 
@@ -173,7 +182,7 @@ class TestGroup(unittest.TestCase):
         g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
         g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
 
-        expected = "Group (gouter): The following inputs have multiple connections: " \
+        expected = "'gouter' <class Group>: The following inputs have multiple connections: " \
                    "gouter.g.c0.x from ['gouter.couter.xx', 'gouter.g.ivc.x']"
 
         with self.assertRaises(RuntimeError) as cm:
@@ -241,7 +250,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "Group: '_bad_name' is not a valid sub-system name.")
+                         "<class Group>: '_bad_name' is not a valid sub-system name.")
 
     def test_subsys_attributes(self):
         p = om.Problem()
@@ -273,7 +282,7 @@ class TestGroup(unittest.TestCase):
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group: Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "<class Group>: Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_promotes(self):
@@ -314,7 +323,7 @@ class TestGroup(unittest.TestCase):
             p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
         self.assertEqual(str(err.exception),
-                         "Group: promotes must be an iterator of strings and/or tuples.")
+                         "<class Group>: promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
         p = om.Problem()
@@ -325,8 +334,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "IndepVarComp (comp1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "'comp1' <class IndepVarComp>: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: [('xx', 'foo')].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
@@ -338,7 +347,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
-                         "is not a string or tuple of size 2")
+                         "is not a string or tuple of size 2.")
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
@@ -398,7 +407,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "SellarDis2 (d1): 'promotes_outputs' failed to find any matches for "
+                         "'d1' <class SellarDis2>: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_group_nested_conn(self):
@@ -495,24 +504,20 @@ class TestGroup(unittest.TestCase):
         np.testing.assert_allclose(p['comp2.y'], 5.)
 
     def test_double_src_indices(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(3), src_indices=[0, 1, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
 
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (<model>): src_indices has been defined in both "
+                         "<model> <class Group>: src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
     def test_incompatible_src_indices_error(self):
@@ -534,12 +539,11 @@ class TestGroup(unittest.TestCase):
 
                 self.connect('comp1.x', 'comp2.x', src_indices=[1])
 
-
         p = om.Problem()
 
         p.model.add_subsystem('phase', Phase())
 
-        msg = "Phase (phase): src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
+        msg = "'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
 
         with self.assertRaises(ValueError) as context:
             p.setup()
@@ -551,83 +555,138 @@ class TestGroup(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             p.setup()
 
-    def test_om_slice_in_connect(self):
-        class MyComp1(om.ExplicitComponent):
+    def test_connect_to_flat_array_with_slice(self):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4))
+                self.add_input('x', np.ones((12,)))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 5, 3, 4], [1, 3, 3, 4], [1, 2, 3, 4], [1, 1, 3, 4]])
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((12,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row123_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        msg = "<class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        with assert_warning(UserWarning, msg):
+            p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                            flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+
+    def test_connect_to_flat_array(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((4,)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', val=arr_large_4x4))
+        p.model.add_subsystem('trace_comp', SlicerComp())
+
+        idxs = np.array([0, 5, 10, 15], dtype=int)
+
+        p.model.connect('indep.x', 'trace_comp.x', src_indices=idxs, flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['trace_comp.x'], np.diag(arr_large_4x4))
+        assert_near_equal(p['trace_comp.y'], np.sum(np.diag(arr_large_4x4)))
+
+    def test_om_slice_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
-        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([5, 3, 2, 1]))
+        assert_near_equal(p['C1.x'], np.array([2, 2, 2, 2]))
 
     def test_om_slice_in_promotes(self):
-
-        arr = np.array([[1, 2, 3], [1, 12, 3], [1, 15, 3]])
 
         p = om.Problem()
 
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
         model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['comp1.a'], [2., 12, 15])
+        assert_near_equal(p['comp1.a'], [2, 2, 2])
 
+    def test_om_slice_in_promotes_flat(self):
         p = om.Problem()
 
         model = p.model
-        model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
         model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['comp1.a'], [2., 12, 15])
+        assert_near_equal(p['comp1.a'], [2, 2, 2])
 
     def test_desvar_indice_slice(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_design_var('indep.x', indices=om.slicer[2:])
 
@@ -636,24 +695,14 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
+        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
 
     def test_om_slice_in_add_response(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_response('indep.x', type_='con', indices=om.slicer[2:])
 
@@ -662,25 +711,15 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
         self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
 
     def test_om_slice_in_add_constraint(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(4))
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])**2.0
-
         p = om.Problem()
 
-        arr = np.array([1, 2, 3, 4])
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_1x1))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
         p.model.add_constraint('indep.x', indices=om.slicer[2:])
 
@@ -689,24 +728,18 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
+        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
         self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
 
     def test_om_slice_in_add_input(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
@@ -715,20 +748,14 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
 
     def test_om_slice_negative_stop(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
-
-        arr = np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]])
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, -1])
 
         p = om.Problem()
 
-        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
@@ -737,26 +764,274 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
 
     def test_om_slice_3d(self):
-        class MyComp1(om.ExplicitComponent):
+        class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])*2.0
 
         arr = np.arange(64, dtype=int).reshape(4, 4, 4)
 
         p = om.Problem()
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
-        p.model.add_subsystem('C1', MyComp1())
+        p.model.add_subsystem('C1', SlicerComp())
         p.model.connect('indep.x', 'C1.x')
 
         p.setup()
         p.run_model()
 
         assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+
+    def test_om_slice_with_ellipsis_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[0, ...])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[3, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row1_comp.x'], arr_large_4x4[0, ...])
+        assert_near_equal(p['row4_comp.x'], arr_large_4x4[3, ...])
+
+    def test_om_slice_4D_with_ellipsis(self):
+
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(shape=(5, 3)))
+
+        # Connect
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[1, ..., 1])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[2, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.x'), arr[1, ..., 1])
+        assert_near_equal(p.get_val('row4_comp.x'), arr[2, ..., 1])
+
+        # Promotes
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr), promotes=['*'])
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((5,3)), b=np.ones((5,3))))
+
+        p.model.promotes('row1_comp', inputs=['a'], src_indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.a'), arr[1, ..., 1])
+
+        # Design Variable
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_design_var('indep.a', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']], arr[1, ..., 1])
+
+        # Response
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_response('indep.a', type_='con', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+
+        # Constraint
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
+        p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
+        p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
+        p.model.add_constraint('indep.a', indices=om.slicer[1, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+
+    def test_om_slice_with_ellipsis_in_promotes(self):
+
+        p = om.Problem()
+
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('a', arr_large_4x4), promotes=['*'])
+        model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+        model.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+        model.add_subsystem('comp3', om.ExecComp('b=2*a', a=np.ones(4), b=np.ones(4)))
+
+        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[0, ...])
+        model.promotes('comp2', inputs=['a'], src_indices=om.slicer[3, ...])
+        model.promotes('comp3', inputs=['a'], src_indices=om.slicer[..., 3])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['comp1.a'], np.array([0,  1,  2,  3]))
+        assert_near_equal(p['comp2.a'], np.array([30, 31, 32, 33]))
+        assert_near_equal(p['comp3.a'], np.array([ 3, 13, 23, 33]))
+
+    def test_om_slice_with_ellipsis_in_desvar(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_design_var('indep.x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']][0], 10)
+
+    def test_om_slice_with_ellipsis_in_add_response(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_response('indep.x', type_='con', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+
+    def test_om_slice_with_ellipsis_in_add_constraint(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_2x4))
+        p.model.add_subsystem('C1', SlicerComp())
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[1, ...])
+        p.model.add_constraint('indep.x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+
+    def test_om_slice_with_ellipsis_auto_ivc(self):
+
+        # Add_constraint
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_constraint('x', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+
+        # Add_response
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_response('x', type_='con', indices=om.slicer[1, ...])
+
+        p.model.add_objective('C1.y')
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._responses['x']['indices'][0], 1)
+        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+
+        # Add_design_var
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', SlicerComp(), promotes_inputs=['x'])
+        p.model.add_design_var('x', indices=om.slicer[1, ...])
+
+        p.setup()
+        p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
+        p.run_model()
+
+        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']],
+                          np.array([10, 11, 12, 13]))
+        self.assertTrue(p.model._design_vars['x']['indices'][0], 1)
+        self.assertTrue(p.model._design_vars['x']['indices'][1], ...)
+        self.assertTrue(p.driver.get_design_var_values()['x'], np.array(11.))
+
+    def test_om_slice_with_indices_and_ellipsis_in_connect(self):
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones((3, 4)))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x']) ** 2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row134_comp', SlicerComp())
+
+        idxs = np.array([0, 2, 3], dtype=int)
+
+        p.model.connect('indep.x', 'row134_comp.x', src_indices=om.slicer[idxs, ...])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['row134_comp.x'], arr_large_4x4[(0, 2, 3), ...])
+        assert_near_equal(p['row134_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...])**2)
 
     def test_promote_not_found1(self):
         p = om.Problem()
@@ -768,8 +1043,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the "
-                         "following pattern: 'x*'.")
+                         "'C2' <class ExecComp>: 'promotes_outputs' failed to find any matches for the "
+                         "following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -781,7 +1056,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_inputs' failed to find any matches for "
+                         "'C2' <class ExecComp>: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
@@ -794,18 +1069,14 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes' failed to find any matches for "
+                         "'C2' <class ExecComp>: 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_empty_group(self):
         p = om.Problem()
         g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for the following "
-                         "pattern: '*'. Group contains no variables.")
+        p.setup()
 
     def test_missing_promote_var(self):
         p = om.Problem()
@@ -819,7 +1090,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (d1): 'promotes_inputs' failed to find any matches for "
+                         "'d1' <class ExecComp>: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_missing_promote_var2(self):
@@ -834,8 +1105,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (d1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo'].")
+                         "'d1' <class ExecComp>: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: [('bar', 'blah'), 'blammo'].")
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
@@ -943,7 +1214,7 @@ class TestGroup(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         self.assertEqual(['C1', 'C2', 'C3'],
-                         [s.name for s in model._static_subsystems_allprocs])
+                         [s.name for s, _ in model._static_subsystems_allprocs.values()])
 
         prob.setup()
         prob.set_val('x', 1.)
@@ -966,22 +1237,22 @@ class TestGroup(unittest.TestCase):
             model.set_order(['C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
+                         "<model> <class Group>: subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): ['C1'] expected in subsystem order and not found.")
+                         "<model> <class Group>: ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
-                         "Group (<model>): subsystem(s) ['junk', 'junk2'] found in subsystem order "
+                         "<model> <class Group>: ['C3'] expected in subsystem order and not found.\n"
+                         "<model> <class Group>: subsystem(s) ['junk', 'junk2'] found in subsystem order "
                          "but don't exist.")
 
         # Dupes
@@ -989,7 +1260,7 @@ class TestGroup(unittest.TestCase):
             model.set_order(['C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
+                         "<model> <class Group>: Duplicate name(s) found in subsystem order list: ['C1']")
 
     def test_set_order_init_subsystems(self):
         prob = om.Problem()
@@ -1023,7 +1294,7 @@ class TestGroup(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, residuals):
 
-                if outputs._data.dtype == np.complex:
+                if outputs.asarray().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # inputs are addressed using full path name, regardless of promotion
@@ -1054,6 +1325,98 @@ class TestGroup(unittest.TestCase):
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-15)
 
+    def test_set_order_in_config_error(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.set_order(['C2', 'C1'])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        msg = "'C1' <class SimpleGroup>: Cannot call set_order in the configure method"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_after_setup(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        prob.model.set_order(['C2', 'C1'])
+
+        msg = "Problem: Cannot call set_order without calling setup after"
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_set_order_normal(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+    def test_double_setup_for_set_order(self):
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', SimpleGroup())
+        model.add_subsystem('C2', SimpleGroup())
+
+        prob.setup()
+        model.set_order(['C2', 'C1'])
+        prob.setup()
+        prob.run_model()
+
+    def test_promote_units_and_none(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('c1', om.ExecComp('y1=x', x={'units': None}),
+                              promotes=['*'])
+        p.model.add_subsystem('c2', om.ExecComp('y2=x', x={'units': 's'}),
+                              promotes=['*'])
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+
+
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
     N_PROCS = 2
@@ -1081,7 +1444,8 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([3, 3, 3, 3]))
+        val = p.get_val('C1.x', get_remote=False)
+        assert_near_equal(val, np.array([3, 3, 3, 3]))
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):
@@ -1106,7 +1470,31 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([6, 22, 38, 54]))
+
+    def test_om_slice_4D_with_ellipsis_mpi(self):
+
+        class SlicerComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(shape=(5, 3)))
+
+        # Connect
+        p = om.Problem()
+
+        arr = np.random.randint(5, size=(3, 5, 3, 2))
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr))
+        p.model.add_subsystem('row1_comp', SlicerComp())
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        p.model.connect('indep.x', 'row1_comp.x', src_indices=om.slicer[1, ..., 1])
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[2, ..., 1])
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('row1_comp.x'), arr[1, ..., 1])
+        assert_near_equal(p.get_val('row4_comp.x'), arr[2, ..., 1])
 
     def test_om_slice_negative_stop_mpi(self):
         class MyComp1(om.ExplicitComponent):
@@ -1131,7 +1519,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -1153,7 +1541,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1173,7 +1561,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['b']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"b\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"b\" not found.'")
 
     def test_promotes_any_in_config(self):
 
@@ -1193,7 +1581,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'SimpleGroup (<model>): Variable \"a\" not found.'")
+                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -1237,7 +1625,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
+                         "'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'.")
 
     def test_promotes_alias_src_indices(self):
 
@@ -1277,12 +1665,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        with self.assertRaises(RuntimeError) as context:
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
             top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
-                         "aliased to 'xx'.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -1301,7 +1686,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        top.setup()
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
+            top.setup()
 
     def test_multiple_promotes(self):
 
@@ -1325,7 +1712,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(str(cm.exception),
-                         "'BranchGroup (<model>): Variable \"Branch1.G1.comp1.a\" not found.'")
+                         "'<model> <class BranchGroup>: Variable \"Branch1.G1.comp1.a\" not found.'")
 
     def test_multiple_promotes_collision(self):
 
@@ -1407,7 +1794,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): Trying to promote inputs='a', "
+            "<model> <class SimpleGroup>: Trying to promote inputs='a', "
             "but an iterator of strings and/or tuples is required.")
 
     def test_promotes_src_indices_bad_type(self):
@@ -1425,7 +1812,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): The src_indices argument should be an int, list, "
+            "<model> <class SimpleGroup>: The src_indices argument should be an int, list, "
             "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
             "<class 'float'>.")
 
@@ -1444,7 +1831,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): src_indices must contain integers, but src_indices "
+            "<model> <class SimpleGroup>: src_indices must contain integers, but src_indices "
             "for promotes from 'comp2' are type <class 'numpy.complex128'>.")
 
     def test_promotes_src_indices_bad_shape(self):
@@ -1456,7 +1843,7 @@ class TestGroupPromotes(unittest.TestCase):
 
             def configure(self):
                 self.indep.add_output('a1', np.ones(3))
-                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2], src_shape=3)
 
         p = om.Problem(model=SimpleGroup())
 
@@ -1464,7 +1851,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
+            "<model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices have shape (3,).")
 
     def test_promotes_src_indices_different(self):
 
@@ -1520,6 +1907,36 @@ class TestGroupPromotes(unittest.TestCase):
         assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
         assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
 
+    def test_promotes_src_indices_mixed_array(self):
+
+        class SimpleGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('comp1', om.ExecComp('z=x+y',
+                                                        x=np.ones(3),
+                                                        y={'value': np.ones(3),
+                                                           'src_indices': [1, 2, 3]},
+                                                        z=np.ones(3)),
+                                    promotes_inputs=['y'])
+
+            def configure(self):
+                self.indep.add_output('x', 2*np.array(range(5)))
+                self.indep.add_output('y', 3*np.array(range(5)))
+                self.promotes('comp1', inputs=['x'],
+                              src_indices=np.array([0, 2, 4]))
+
+        p = om.Problem(model=SimpleGroup())
+
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p['indep.x'], np.array([0, 2, 4, 6, 8]))
+        assert_near_equal(p['indep.y'], np.array([0, 3, 6, 9, 12]))
+
+        assert_near_equal(p['comp1.x'], np.array([0, 4, 8]))
+        assert_near_equal(p['comp1.y'], np.array([3, 6, 9]))
+        assert_near_equal(p['comp1.z'], np.array([3, 10, 17]))
+
     def test_promotes_src_indices_wildcard(self):
 
         class SimpleGroup(om.Group):
@@ -1559,7 +1976,7 @@ class TestGroupPromotes(unittest.TestCase):
         p = om.Problem(model=SimpleGroup())
 
         with assert_warning(UserWarning,
-                            "SimpleGroup (<model>): src_indices have been specified with promotes 'any'. "
+                            "<model> <class SimpleGroup>: src_indices have been specified with promotes 'any'. "
                             "Note that src_indices only apply to matching inputs."):
             p.setup()
 
@@ -1590,7 +2007,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "SimpleGroup (<model>): Trying to promote outputs ['*'] "
+            "<model> <class SimpleGroup>: Trying to promote outputs ['*'] "
             "while specifying src_indices [0, 2, 4] is not meaningful.")
 
     def test_promotes_src_indices_collision(self):
@@ -1622,13 +2039,12 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "SubGroup (sub): Trying to promote input 'a' with src_indices [0 1 2], "
-            "but src_indices have already been specified as [0 2 4].")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
 
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
-        super(MyComp, self).__init__()
+        super().__init__()
         self._input_shape = input_shape
         self._src_indices = src_indices
         self._flat_src_indices = flat_src_indices
@@ -1695,7 +2111,7 @@ class TestConnect(unittest.TestCase):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
-        msg = "Group (sub): Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -1712,7 +2128,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_connect_to_output(self):
-        msg = "Group (sub): Attempted to connect from 'tgt.y' to 'cmp.z', " + \
+        msg = "'sub' <class Group>: Attempted to connect from 'tgt.y' to 'cmp.z', " + \
               "but 'cmp.z' is an output. " + \
               "All connections must be from an output to an input."
 
@@ -1731,7 +2147,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_connect_from_input(self):
-        msg = "Group (sub): Attempted to connect from 'tgt.x' to 'cmp.x', " + \
+        msg = "'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', " + \
               "but 'tgt.x' is an input. " + \
               "All connections must be from an output to an input."
 
@@ -1749,8 +2165,20 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             self.prob.setup()
 
+    def test_explicit_conn_to_prom_inputs(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('foo', val=10., units='ft'))
+        p.model.add_subsystem('C1', om.ExecComp('y=3*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=4*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.connect('indeps.foo', 'x')
+        p.setup()
+        p.final_setup()
+
+        # before bug fix, the following generated an ambiguity error
+        p['x']
+
     def test_invalid_target(self):
-        msg = "Group (sub): Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
+        msg = "'sub' <class Group>: Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -1780,7 +2208,7 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', om.ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Group (sub): Output and input are in the same System for " + \
+        msg = "'sub' <class Group>: Output and input are in the same System for " + \
               "connection from 'y' to 'tgt.x'."
 
         with self.assertRaises(RuntimeError) as ctx:
@@ -1802,19 +2230,17 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected " \
+        msg = "<model> <class Group>: Output 'src.x2' with units of 'degC' is connected " \
               "to input 'tgt.x' which has no units."
 
         with assert_warning(UserWarning, msg):
             prob.setup()
 
-        self.prob.model._raise_connection_errors = False
-
         with assert_warning(UserWarning, msg):
             prob.setup()
 
     def test_connect_incompatible_units(self):
-        msg = "Group (<model>): Output units of 'degC' for 'src.x2' are incompatible " + \
+        msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible " + \
               "with input units of 'm' for 'tgt.x'."
 
         prob = om.Problem()
@@ -1846,7 +2272,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<model>): Input 'tgt.x' with units of 'degC' is " \
+        msg = "<model> <class Group>: Input 'tgt.x' with units of 'degC' is " \
               "connected to output 'src.x2' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1864,7 +2290,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<model>): Input 'tgt.y' with units of 'degC' is " \
+        msg = "<model> <class Group>: Input 'tgt.y' with units of 'degC' is " \
               "connected to output 'src.y' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1883,7 +2309,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (src): 'promotes' cannot be used at the same time as "
+                         "'src' <class ExecComp>: 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_mix_promotes_types2(self):
@@ -1894,7 +2320,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (src): 'promotes' cannot be used at the same time as "
+                         "'src' <class ExecComp>: 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_nested_nested_conn(self):
@@ -1923,7 +2349,7 @@ class TestConnect(unittest.TestCase):
     def test_bad_shapes(self):
         self.sub.connect('src.s', 'arr.x')
 
-        msg = "Group (sub): The source and target shapes do not match or are ambiguous " + \
+        msg = "'sub' <class Group>: The source and target shapes do not match or are ambiguous " + \
               "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
               "but the target shape is (2,)."
 
@@ -1944,7 +2370,7 @@ class TestConnect(unittest.TestCase):
 
         p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
 
-        msg = "Group (<model>): The source indices [[1 1]] do not specify a valid shape " + \
+        msg = "<model> <class Group>: The source indices [[1 1]] do not specify a valid shape " + \
               "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
               "indices are (1, 2)."
 
@@ -1962,10 +2388,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("Group (sub): The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
-               "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
-               "The source has 2 dimensions but the indices expect 3.")
-
+        msg = "'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a valid shape for the connection 'sub.src.x' to 'sub.arr.x'. The source has 2 dimensions but the indices expect 3."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -1983,7 +2406,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = ("Group (sub): The source indices do not specify a valid index for the "
+        msg = ("'sub' <class Group>: The source indices do not specify a valid index for the "
                "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
                "is out of range for source dimension of size 3.")
 
@@ -2026,7 +2449,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '9' is out of range for source dimension of size 9."
 
@@ -2046,7 +2469,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '9' is out of range for source dimension of size 9."
         try:
@@ -2065,7 +2488,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "Group (<model>): The source indices do not specify a valid index " + \
+        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
               "for the connection 'indeps.x' to 'C1.x'. " + \
               "Index '-10' is out of range for source dimension of size 9."
         try:
@@ -2164,7 +2587,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2178,7 +2601,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -2199,7 +2622,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1.G2 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2223,7 +2646,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2236,8 +2659,33 @@ class TestGroupAddInput(unittest.TestCase):
         g1.set_input_defaults('x', units='inch', val=2.)
 
         msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
+
+    def test_units_checking(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+
+        with self.assertRaises(ValueError) as cm:
+            G1.set_input_defaults('x', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.set_input_defaults('x', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # Simplification
+        G1.set_input_defaults('x', units='ft*ft/ft')
+        self.assertEqual(G1._static_group_inputs['x'][0]['units'], 'ft')
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -2250,8 +2698,11 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
         msg = "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sets_parent_meta(self):
         p = om.Problem()
@@ -2262,8 +2713,11 @@ class TestGroupAddInput(unittest.TestCase):
         G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G2.set_input_defaults('x', units='cm')
         msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
-        with assert_warning(UserWarning, msg):
-            p.setup()
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
+        p.final_setup()
+
+        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override2(self):
         p = om.Problem()
@@ -2276,21 +2730,16 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
+        testlogger = TestLogger()
+        p.setup(check=True, logger=testlogger)
         msgs = [
             "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
             "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
         ]
-        with reset_warning_registry():
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                p.setup()
+        p.final_setup()
 
-        for msg in msgs:
-            for warn in w:
-                if (issubclass(warn.category, UserWarning) and str(warn.message) == msg):
-                    break
-            else:
-                raise AssertionError("Did not see expected UserWarning: %s" % msg)
+        self.assertEqual(testlogger.get('warning')[1], msgs[0])
+        self.assertEqual(testlogger.get('warning')[2], msgs[1])
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -2314,7 +2763,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1.G2 and par called set_input_defaults for promoted input 'x' with conflicting values for 'units'. Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
 
     def test_group_input_not_found(self):
         p = self._make_tree_model(diff_units=True)
@@ -2334,7 +2783,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (G1.G2): The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
+        self.assertEqual(cm.exception.args[0], "'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['xx'].")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True)
@@ -2357,7 +2806,369 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "Group (<model>): The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+
+
+class MultComp(om.ExplicitComponent):
+    """
+    This class just performs a list of simple multiplications. It also keeps track of the number
+    of times _setup_var_data is called.
+    """
+    def __init__(self, mults=(), inits=None, **kwargs):
+        super().__init__(**kwargs)
+        self.mults = list(mults)
+        self.var_setup_count = 0
+        if inits is None:
+            inits = {}
+        self.inits = inits
+
+    def _setup_var_data(self):
+        super()._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_mult(self, inp, mult, out):
+        self.mults((inp, mult, out))
+
+    def setup(self):
+        all_ins = set([inp for inp, _, _ in self.mults])
+        all_outs = set([out for _, _, out in self.mults])
+        common = sorted(all_ins.intersection(all_outs))
+        if common:
+            raise RuntimeError(f"{common} are both inputs and outputs.")
+
+        out_list = [o for _, _, o in self.mults]
+        if len(all_outs) < len(out_list):
+            raise RuntimeError(f"Some outputs appear more than once.")
+
+        for inp, _, out in self.mults:
+            self.add_input(inp, val=self.inits.get(inp, 1.))
+            self.add_output(out, val=self.inits.get(out, 1.))
+
+    def compute(self, inputs, outputs):
+        for inp, mult, out in self.mults:
+            outputs[out] = mult * inputs[inp]
+
+
+class ConfigGroup(om.Group):
+    """
+    This group can add IO vars and promotes during configure. It also keeps track of how many
+    times _setup_var_data is called.
+    """
+    def __init__(self, parallel=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cfgproms = []
+        self.cfg_group_ins = []
+        self.cfgio = {}
+        self.cfg_invars = []
+        self.cfg_outvars = []
+        self.io_results = {}
+        self.var_setup_count = 0
+
+        if parallel:
+            self._mpi_proc_allocator.parallel = True
+
+    def _setup_var_data(self):
+        super()._setup_var_data()
+        self.var_setup_count += 1
+
+    def add_config_prom(self, child, prom):
+        self.cfgproms.append((child, prom))
+
+    def add_input_defaults(self, name, val=None, units=None):
+        self.cfg_group_ins.append((name, val, units))
+
+    def add_var_input(self, name, val=None, units=None):
+        self.cfg_invars.append((name, val, units))
+
+    def add_var_output(self, name, val=None, units=None):
+        self.cfg_outvars.append((name, val, units))
+
+    def add_get_io(self, child, **kwargs):
+        if child in self.cfgio:
+            raise RuntimeError(f"Can't set more than 1 call to get_io_metadata for child {child}.")
+
+        self.cfgio[child] = kwargs
+
+    def configure(self):
+        # retrieve metadata
+        for child, kwargs in self.cfgio.items():
+            kid = self._get_subsystem(child)
+            if kid is not None:
+                self.io_results[child] = kid.get_io_metadata(**kwargs)
+            else:
+                print(f"'{kid}' not found locally.")
+
+        # promotes
+        for child, prom in self.cfgproms:
+            if '.' in child:
+                parent, child = child.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+            else:
+                s = self
+            s.promotes(child, any=prom)
+
+        # add inputs
+        for vpath, val, units in self.cfg_invars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_input(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add input var to a Group.")
+
+        # add outputs
+        for vpath, val, units in self.cfg_outvars:
+            if '.' in vpath:
+                parent, vname = vpath.rsplit('.', 1)
+                s = self._get_subsystem(parent)
+                if s is None:
+                    print(f"'{parent}' not found locally.")
+                    continue
+                s.add_output(vname, val, units=units)
+            else:
+                raise RuntimeError("tried to add output var to a Group.")
+
+        # set input defaults
+        for name, val, units in self.cfg_group_ins:
+            self.set_input_defaults(name, val=val, units=units)
+
+
+class Test3Deep(unittest.TestCase):
+    """
+    This creates a system tree with two levels of subgroups below model to allow testing of various
+    changes during configure that may change descendant systems that are not direct children.
+    """
+    cfg_par = False
+    sub_par = False
+
+    def build_model(self):
+        p = om.Problem(model=ConfigGroup())
+
+        minprocs = 3 if self.cfg_par else 1
+        cfg = p.model.add_subsystem('cfg', ConfigGroup(parallel=self.cfg_par), min_procs=minprocs)
+        cfg.add_subsystem('C1', MultComp([('x', 2., 'y')]))
+        cfg.add_subsystem('C2', MultComp([('x', 3., 'y')]))
+
+        minprocs = 2 if self.sub_par else 1
+        sub = cfg.add_subsystem('sub', ConfigGroup(parallel=self.sub_par), min_procs=minprocs)
+        sub.add_subsystem('C3', MultComp([('x', 4., 'y')]))
+        sub.add_subsystem('C4', MultComp([('x', 5., 'y')]))
+
+        return p
+
+    def get_matching_var_setup_counts(self, p, count):
+        """
+        Return pathnames of any systems that have a var_setup_count that matches 'count'.
+        """
+        result = set()
+        for s in p.model.system_iter(include_self=True):
+            if hasattr(s, 'var_setup_count') and s.var_setup_count == count:
+                result.add(s.pathname)
+
+        if p.model.comm.size > 1:
+            newres = set()
+            for res in p.model.comm.allgather(result):
+                newres.update(res)
+            result = newres
+
+        return sorted(result)
+
+    def get_io_results(self, p, parent, path):
+        """
+        Retrieve results of get_io_metadata calls that occurred during config.
+        Results are retrieved from all procs.
+        """
+        s = p.model._get_subsystem(parent)
+        if s is None:
+            raise RuntimeError(f"No parent named {parent}.")
+        res = s.io_results[path]
+        if s.comm.size > 1:
+            allres = {}
+            for procres in s.comm.allgather(res):
+                allres.update(procres)
+            res = allres
+        return res
+
+    def check_vs_meta(self, p, parent, meta_dict):
+        """
+        Compare the given metadata dict to the internal metadata dicts of the given parent.
+        """
+        system = p.model._get_subsystem(parent)
+        metas = (system._var_allprocs_abs2meta['input'], system._var_allprocs_abs2meta['output'],
+                 system._var_abs2meta['input'], system._var_abs2meta['output'])
+        for vname, meta in meta_dict.items():
+            for key, val in meta.items():
+                for mymeta in metas:
+                    if key in mymeta:
+                        if (isinstance(val, np.ndarray) and not np.testing.assert_allclose(val, mymeta[key])) or val != mymeta[key]:
+                            raise RuntimeError(f"{val} != {mymeta[key]}")
+                        break
+
+    def test_io_meta(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('C1', return_rel_names=False)
+        p.model.cfg.add_get_io('C2')
+        p.model.cfg.add_get_io('sub')
+
+        p.setup()
+
+        res = self.get_io_results(p, 'cfg', 'C1')
+        expected = {'cfg.C1.x', 'cfg.C1.y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = self.get_io_results(p, 'cfg', 'C2')
+        expected = {'x', 'y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = self.get_io_results(p, 'cfg', 'sub')
+        expected = {'C3.x', 'C4.x', 'C3.y', 'C4.y'}
+        self.assertEqual({n for n in res}, expected)
+        self.check_vs_meta(p, 'cfg', res)
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_io_meta_local_bad_meta_key(self):
+        p = self.build_model()
+        p.model.cfg.add_get_io('sub', metadata_keys=('value', 'foo'))
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0], "'cfg.sub' <class ConfigGroup>: ['foo'] are not valid metadata entry names.")
+
+    def test_promote_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('sub.C3', ['x'])
+        p.model.cfg.add_config_prom('sub.C4', ['y'])
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_promote_child(self):
+        p = self.build_model()
+        p.model.cfg.add_config_prom('C1', ['x'])
+        p.model.cfg.add_config_prom('C2', ['y'])
+        p.model.cfg.sub.add_config_prom('C3', ['x'])
+        p.model.cfg.sub.add_config_prom('C4', ['y'])
+        p.setup()
+
+        p.model._raise_connection_errors = False
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_input_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_input('C3.ivar0', 3.0, units='ft')
+
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_output_to_child(self):
+        p = self.build_model()
+        p.model.cfg.sub.add_var_output('C3.ovar0', 3.0, units='ft')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_input_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_input('sub.C3.ivar0', 3.0, units='ft')
+        p.model.add_var_input('cfg.sub.C3.ivar1', 4.0, units='inch')
+
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+    def test_add_output_to_descendant(self):
+        p = self.build_model()
+        p.model.cfg.add_var_output('sub.C3.ovar0', 3.0, units='ft')
+        p.model.add_var_output('cfg.sub.C3.ovar1', 4.0, units='inch')
+        p.setup()
+
+        names = self.get_matching_var_setup_counts(p, 1)
+        expected = {'', 'cfg.C1', 'cfg.C2', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg'}
+        self.assertEqual(names, sorted(expected))
+
+        names = self.get_matching_var_setup_counts(p, 3)
+        expected = {'cfg.sub', 'cfg.sub.C3'}
+        self.assertEqual(names, sorted(expected))
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIpar(Test3Deep):
+    N_PROCS = 2
+    sub_par = True
+
+    def test_io_meta_remote(self):
+        p = self.build_model()
+        p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
+        p.model.cfg.add_get_io('sub')
+
+        p.setup()
+
+        res = p.model.io_results['cfg']
+        expected = {'sub.C3.x', 'sub.C3.y', 'sub.C4.x', 'sub.C4.y', 'C1.x', 'C1.y', 'C2.x', 'C2.y'}
+        self.assertEqual(sorted(res), sorted(expected))
+        self.check_vs_meta(p, 'cfg', res)
+
+        res = p.model.cfg.io_results['sub']
+        if p.model.comm.rank == 0:
+            expected = {'C3.y', 'C3.x'}
+        else:
+            expected = {'C4.y', 'C4.x'}
+        self.assertEqual(sorted(res), sorted(expected))
+        self.check_vs_meta(p, 'cfg.sub', res)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInConfigMPIparpar(Test3Deep):
+    N_PROCS = 4
+    cfg_par = True
+    sub_par = True
 
 
 #
@@ -2725,14 +3536,12 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-        #                       promotes_outputs=['x'])
         p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-        p.set_val('x', np.array(range(5)))
-        inp = np.array(range(5))
+        inp = np.random.random(5)
+        p.set_val('x', inp)
         p.run_model()
 
         assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])
@@ -2750,7 +3559,7 @@ class TestFeatureSetOrder(unittest.TestCase):
             """Adds name to list."""
 
             def __init__(self, order_list):
-                super(ReportOrderComp, self).__init__()
+                super().__init__()
                 self._order_list = order_list
 
             def compute(self, inputs, outputs):
@@ -2774,6 +3583,7 @@ class TestFeatureSetOrder(unittest.TestCase):
         # reset the shared order list
         order_list[:] = []
 
+        prob.setup()
         # now swap C2 and C1 in the order
         model.set_order(['C2', 'C1', 'C3'])
 
@@ -2845,6 +3655,18 @@ class TestFeatureConfigure(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    def test_configure_set_input_defaults(self):
+        class ConfigGroup(om.Group):
+            def configure(self):
+                self.set_input_defaults('x', val=99.)
+
+        p = om.Problem(model=ConfigGroup())
+        C1 = p.model.add_subsystem('C1', om.ExecComp('y=2*x'), promotes_inputs=['x'])
+        C2 = p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
+
+        p.setup()
+        self.assertEqual(p['x'], 99.)
+
     def test_configure_add_input_output(self):
         """
         A simple example to compute the resultant force on an aircraft using data
@@ -2887,8 +3709,8 @@ class TestFeatureConfigure(unittest.TestCase):
                 # In this case, we can only determine the 'vec_size' for totalforcecomp
                 # after flightdatacomp has been setup.
 
-                flight_data = dict(self.flightdatacomp.list_outputs(shape=True, out_stream=None))
-                data_shape = flight_data['thrust']['shape']
+                meta = self.flightdatacomp.get_io_metadata('output', includes='thrust')
+                data_shape = meta['thrust']['shape']
 
                 self.totalforcecomp.add_equation('total_force',
                                                  input_names=['thrust', 'drag', 'lift', 'weight'],
@@ -2907,6 +3729,152 @@ class TestFeatureConfigure(unittest.TestCase):
 
         assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
+
+    def test_configure_add_input_output_list_io_group(self):
+        """
+        Like the example above but system we're calling list_outputs on is a Group.
+        """
+        import numpy as np
+        import openmdao.api as om
+
+        class FlightDataComp(om.ExplicitComponent):
+            """
+            Simulate data generated by an external source/code
+            """
+            def setup(self):
+                # number of points may not be known a priori
+                n = 3
+
+                # The vector represents forces at n time points (rows) in 2 dimensional plane (cols)
+                self.add_output(name='thrust', shape=(n, 2), units='kN')
+                self.add_output(name='drag', shape=(n, 2), units='kN')
+                self.add_output(name='lift', shape=(n, 2), units='kN')
+                self.add_output(name='weight', shape=(n, 2), units='kN')
+
+            def compute(self, inputs, outputs):
+                outputs['thrust'][:, 0] = [500, 600, 700]
+                outputs['drag'][:, 0]  = [400, 400, 400]
+                outputs['weight'][:, 1] = [1000, 1001, 1002]
+                outputs['lift'][:, 1]  = [1000, 1000, 1000]
+
+
+        class ForceModel(om.Group):
+            def setup(self):
+                fdgroup = om.Group()
+                fdgroup.add_subsystem('flightdatacomp', FlightDataComp(),
+                                      promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+                self.add_subsystem('flightdatagroup', fdgroup,
+                                   promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+
+                self.add_subsystem('totalforcecomp', om.AddSubtractComp())
+
+            def configure(self):
+                # Some models that require self-interrogation need to be able to add
+                # I/O in components from the configure method of their containing groups.
+                # In this case, we can only determine the 'vec_size' for totalforcecomp
+                # after flightdatagroup has been setup.
+
+                flight_data = dict(self.flightdatagroup.list_outputs(shape=True, prom_name=True,
+                                                                     out_stream=None))
+                data_shape = flight_data['flightdatacomp.thrust']['shape']
+
+                self.totalforcecomp.add_equation('total_force',
+                                                 input_names=['thrust', 'drag', 'lift', 'weight'],
+                                                 vec_size=data_shape[0], length=data_shape[1],
+                                                 scaling_factors=[1, -1, 1, -1], units='kN')
+
+                self.connect('thrust', 'totalforcecomp.thrust')
+                self.connect('drag', 'totalforcecomp.drag')
+                self.connect('lift', 'totalforcecomp.lift')
+                self.connect('weight', 'totalforcecomp.weight')
+
+
+        p = om.Problem(model=ForceModel())
+        p.setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('totalforcecomp.total_force', units='kN'),
+                         np.array([[100, 200, 300], [0, -1, -2]]).T)
+
+    def test_configure_dyn_shape_err(self):
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', shape_by_conn=True, copy_shape='y')
+                self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3*inputs['x']
+
+        class MyGroup(om.Group):
+            def setup(self):
+                self.add_subsystem('comp', MyComp())
+
+            def configure(self):
+                meta = self.comp.get_io_metadata('output', includes='y')
+
+        p = om.Problem()
+        p.model.add_subsystem("G", MyGroup())
+        p.model.add_subsystem("sink", om.ExecComp('y=5*x'))
+        p.model.connect('G.comp.y', 'sink.x')
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        msg="'G.comp' <class MyComp>: Can't retrieve shape, size, or value for dynamically sized variable 'y' because they aren't known yet."
+        self.assertEqual(str(cm.exception), msg)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestConfigureMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_sorting_bug(self):
+        class MyComp(om.ExplicitComponent):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_input(f"x{i+1}", np.ones(i + 1))
+                    self.add_output(f"y{i+1}", np.ones(i + 1))
+
+            def compute(self, inputs, outputs):
+                pass
+
+        class MyGroup(om.Group):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_subsystem(f"C{i+1}", MyComp(i + 1, distributed=True), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.add_output('b')
+
+        class MyGroupUpper(om.Group):
+            def setup(self):
+                self.add_subsystem("G1", MyGroup(1), promotes_inputs=['*'])
+                self.add_subsystem("G2", MyGroup(2), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.promotes('C1', inputs=['*'])
+
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp(distributed=True))
+        indep.add_output("x1", np.ones(1))
+        indep.add_output("x2", np.ones(2))
+
+        p.model.add_subsystem('G', MyGroupUpper())
+
+        p.model.connect("indep.x1", "G.x1")
+        p.model.connect("indep.x2", "G.x2")
+
+        p.setup()
 
 
 class TestFeatureGuessNonlinear(unittest.TestCase):
@@ -3118,6 +4086,9 @@ class TestNaturalNamingMPI(unittest.TestCase):
                 p[name] = 9. + outcount
                 p.model.comm.barrier()
                 self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
+
+        self.assertEqual(set(p.model._vars_to_gather),
+                         {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
 if __name__ == "__main__":

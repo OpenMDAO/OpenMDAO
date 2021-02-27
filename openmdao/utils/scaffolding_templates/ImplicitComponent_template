@@ -23,7 +23,7 @@ class {class_name}(ImplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super({class_name}, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         # set attributes here...
 
     def initialize(self):

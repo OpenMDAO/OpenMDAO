@@ -70,7 +70,7 @@ class BroydenSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(BroydenSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
@@ -98,7 +98,7 @@ class BroydenSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BroydenSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('alpha', default=0.4,
                              desc="Value to scale the starting Jacobian, which is Identity. This "
@@ -149,7 +149,7 @@ class BroydenSolver(NonlinearSolver):
         depth : int
             Depth of the current system (already incremented).
         """
-        super(BroydenSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0
         iproc = system.comm.rank
@@ -182,10 +182,10 @@ class BroydenSolver(NonlinearSolver):
         if len(states) > 0:
             # User has specified states, so we must size them.
             n = 0
-            sizes = system._var_allprocs_abs2meta
+            meta = system._var_allprocs_abs2meta['output']
 
             for i, name in enumerate(states):
-                size = sizes[prom2abs[name][0]]['global_size']
+                size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:
@@ -261,7 +261,7 @@ class BroydenSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(BroydenSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -315,7 +315,7 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
@@ -347,7 +347,7 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system()._residuals._data
+            fxm = self._system()._residuals.asarray()
 
         return self.compute_norm(fxm)
 
@@ -630,27 +630,11 @@ class BroydenSolver(NonlinearSolver):
 
         return inv_jac
 
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if self.options['iprint'] > 0 and self._system().comm.rank == 0:
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
-
     def cleanup(self):
         """
         Clean up resources prior to exit.
         """
-        super(BroydenSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

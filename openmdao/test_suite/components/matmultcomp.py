@@ -10,7 +10,7 @@ import openmdao.api as om
 
 class MatMultComp(om.ExplicitComponent):
     def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
-        super(MatMultComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
         self.sleep_time = sleep_time
@@ -18,9 +18,10 @@ class MatMultComp(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', val=np.ones(self.mat.shape[1]))
         self.add_output('y', val=np.zeros(self.mat.shape[0]))
-
-        self.declare_partials('*', '*', method=self.approx_method)
         self.num_computes = 0
+
+    def setup_partials(self):
+        self.declare_partials('*', '*', method=self.approx_method)
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.mat.dot(inputs['x'])

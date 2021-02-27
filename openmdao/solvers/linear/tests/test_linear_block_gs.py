@@ -12,6 +12,12 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDe
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.utils.assert_utils import assert_near_equal
 
+from openmdao.utils.mpi import MPI
+try:
+    from openmdao.api import PETScVector
+except:
+    PETScVector = None
+
 
 class SimpleImp(om.ImplicitComponent):
     def setup(self):
@@ -46,7 +52,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
         self.assertEqual(str(context.exception),
-                         "Linear solver LinearBlockGS in Group (<model>) doesn't support assembled jacobians.")
+                         "Linear solver LinearBlockGS in <model> <class Group> doesn't support assembled jacobians.")
 
     def test_simple_implicit(self):
         # This verifies that we can perform lgs around an implicit comp and get the right answer
@@ -138,6 +144,49 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         derivs = prob.compute_totals(of=['sub.z'], wrt=['sub.z'])
 
         assert_near_equal(derivs[('sub.z', 'sub.z')], [[0., 1.]])
+
+    def test_aitken(self):
+        prob = om.Problem()
+        model = prob.model
+
+        aitken = om.LinearBlockGS()
+        aitken.options['use_aitken'] = True
+        aitken.options['err_on_non_converge'] = True
+
+        # It takes 6 iterations without Aitken.
+        aitken.options['maxiter'] = 4
+
+        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                           linear_solver=aitken))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('sub.y2'), 12.05848819, .00001)
+
+        prob = om.Problem()
+        model = prob.model
+
+        aitken = om.LinearBlockGS()
+        aitken.options['use_aitken'] = True
+        aitken.options['err_on_non_converge'] = True
+
+        # It takes 6 iterations without Aitken.
+        aitken.options['maxiter'] = 4
+
+        sub = model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                           linear_solver=aitken))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('sub.y2'), 12.05848819, .00001)
 
 
 class TestBGSSolverFeature(unittest.TestCase):
@@ -292,6 +341,57 @@ class TestBGSSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][0], 9.61016296175, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78456955704, .00001)
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ProcTestCase1(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_linear_analysis_error(self):
+
+        # test fwd mode
+        prob = om.Problem()
+        model = prob.model
+
+        # takes 6 iterations normally
+        linear_solver = om.LinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=linear_solver))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='fwd')
+        prob.set_solver_print(level=2)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'LN: LNBGS' on system 'sub' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
+
+        # test rev mode
+        prob = om.Problem()
+        model = prob.model
+
+        # takes 6 iterations normally
+        linear_solver = om.LinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        model.add_subsystem('sub', SellarDerivatives(nonlinear_solver=om.NonlinearRunOnce(),
+                                                     linear_solver=linear_solver))
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+
+        prob.setup(mode='rev')
+        prob.set_solver_print(level=2)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'LN: LNBGS' on system 'sub' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
 
 if __name__ == "__main__":
     unittest.main()

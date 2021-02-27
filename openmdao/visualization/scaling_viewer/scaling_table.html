@@ -1,0 +1,653 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script type="text/javascript">
+    <tabulator_src>
+</script>
+<script type="text/javascript">
+    <d3_src>
+</script>
+<script>
+    var data = <scaling_data>;
+</script>
+<style>
+    <tabulator_style>
+    div.tooltip {
+        position: absolute;
+        text-align: left;
+        padding: 4px;
+        font: 10px sans-serif;
+        background: lightsteelblue;
+        border: 3px;
+        border-radius: 8px;
+        pointer-events: none;
+        -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        opacity: 0;
+    }
+
+    /* Style the tab */
+    .tab {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 10px 16px;
+        transition: 0.3s;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #ccc;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+        display: none;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+    }
+
+    /* Style the close button */
+    .topright {
+        float: right;
+        cursor: pointer;
+        font-size: 28px;
+    }
+
+    .topright:hover {color: red;}
+
+    .spacer {
+        width: 100%;
+        height: 30px;
+    }
+
+    #help-text {
+        display: none;
+    }
+
+</style>
+</head>
+<body onload="startup()">
+
+    <h2 id="scaling_title"></h2>
+    <button id="help-button" onclick="toggleHelp(event)">Help</button>
+    <div id="help-text">
+        <h2>Scaling Process</h2 >
+        <p>All scaling in OpenMDAO results in the following linear transformation:</p>
+        <p><em>Variable<sub>driver</sub> = m * Variable<sub>model</sub> + b</em></p>
+        <p>The computed values for <em>m</em> and <em>b</em> depend on how you specify the scaling, and
+            whether or not you specify units that the
+            driver sees which are different from the units in the model.</p>
+        <h3>If you use driver units</h3>
+        <p>If your model variable is in units of <em>m</em> and you choose to use <em>cm</em> for the driver value then you have a unit_factor of
+        100. This conversion is done before anything else. All other scaling is done relative to the driver unit values. If your
+        model value was 5.2 meters, then the driver value is 520 centimeters. You would then give ref and ref0 or scaler and adder
+        relative to that.</p>
+        <p>In general, unit conversions can include both a multiplicative factor and an offset (thank you, Celsius to Fahrenheit).</p>
+        <p>Given a variable from the model (<em>x<sub>model</sub></em>), the unit converted value (<em>x<sub>driver</sub></em>) is computed by</p>
+        <p><em>x<sub>driver</sub> = unit_factor * (x<sub>model</sub> + offset)</em></p>
+        <h3>If you use ref and ref0:</h3>
+        <p>The ref and ref0 values represent the model values that will get scaled to 1 and 0 respectively.</p>
+        <p><em>1 = m * (ref + b)<br>0 = m * (ref0 + b)</em></p>
+        <p>This gives the following for <em>m</em> and <em>b</em>:</p>
+        <p><em>b = -ref0<br>m = 1/(ref - ref0)</em></p>
+        <h3>If you use scaler and adder:</h3>
+        <p>You are specifying the slope and offset for the scaling directly.</p>
+        <p><em>b = adder<br>m = scaler</em></p>
+        <h3>Full unit scaling equation</h3>
+        <p>All of the scaling combined gives a linear map between the driver scaled value (<em>x<sub>driver</sub></em>),
+            the unit scaled value, and the actual model value (<em>x<sub>model</sub></em>).</p>
+        <p><em>x<sub>driver</sub> = m * (unit_factor * (x<sub>model</sub> + offset) + b)</em></p>
+        <p><em>x<sub>driver</sub> = (m * unit_factor) * (x<sub>model</sub> + offset + b/unit_factor)</em></p>
+        <p>So the overall scaler is (<em>m * unit_factor</em>) and the overall adder is
+            (<em>offset + b/unit_factor</em>).</p>
+    </div>
+    <div id="dvstuff">
+        <h3>Design Variables</h3>
+        <div id="dv-table"></div>
+    </div>
+    <div id="constuff">
+        <h3>Constraints</h3>
+        <div id="con-table"></div>
+    </div>
+    <div id="objstuff">
+        <h3>Objectives</h3>
+        <div id="obj-table"></div>
+    </div>
+    <div class="jac-info">
+        <h3>Jacobian Info</h3>
+        <div id="tab-bar" class="tab">
+            <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')"></button>
+        </div>
+        <div id="jac-tabs">
+            <div id="variable-tab" class="tabcontent">
+                <div id="norm-jac">
+                    <svg id="norm-svg" class="heatmap"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="tooltip"></div>
+
+<script type="text/javascript">
+
+var dv_tabledata = data.dv_table;
+var con_tabledata = data.con_table;
+var obj_tabledata = data.obj_table;
+
+var vname_map = {}  // maps all vnames to and id for use in selectors
+var vname_count = 0;
+
+function get_vname_id(vname) {
+    if (vname_map[vname] === undefined) {
+        vname_map[vname] = vname_count;
+        vname_count = vname_count + 1;
+    }
+    return "varname" + vname_map[vname];
+}
+
+
+function get_subjac_id(ofname, wrtname) {
+    return get_vname_id(ofname) + "-" + get_vname_id(wrtname);
+}
+
+
+document.title = data.title;
+document.getElementById("scaling_title").innerHTML = data.title
+
+var d3_format = d3.format(".6~g");
+
+function norm_format(num) {
+    return "||<b> " + d3_format(num) + " </b>||";
+}
+
+
+function val_cell_formatter(cell, formatterParams, onRendered) {
+    // cell value is actually [value, size]
+    let val = cell.getValue();
+    if (val[1] > 1) {
+        return norm_format(val[0]);
+    }
+    if (val[0] === "") {
+        return "";
+    }
+    return d3_format(val[0]);
+}
+
+function exp_format(num) {
+    return "1e" + num;
+}
+
+
+function val_sorter(a, b, aRow, bRow, column, dir, sorterParams) {
+    if (a === "") {
+        a = [-1e99, 0];
+    }
+    if (b === "") {
+        b = [-1e99, 0];
+    }
+    return a[0] - b[0];
+}
+
+
+function numrow(title, field) {
+    return {
+        title:title,
+        field:field,
+        hozAlign:"right",
+        visible:true,
+        headerFilter:false,
+        formatter:val_cell_formatter,
+        sorter:val_sorter,
+    }
+}
+
+
+if (dv_tabledata.length > 0) {
+    let dvheight = (dv_tabledata.length > 15) ? 450 : null;
+
+    var dvtable = new Tabulator("#dv-table", {
+        // set height of table (in CSS or here), this enables the Virtual DOM and
+        // improves render speed dramatically (can be any valid css height value)
+        height: dvheight,
+        dataTree:true,
+        dataTreeStartExpanded:false,
+        data:dv_tabledata, //assign data to table
+        layout:"fitDataFill", //"fitColumns", "fitDataFill",
+        columns:[ //Define Table Columns
+            {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
+            numrow("upper", "upper"),
+            numrow("lower", "lower"),
+        ],
+    });
+}
+else {
+    d3.select("#dvstuff").style("display", "none");
+}
+
+
+if (con_tabledata.length > 0) {
+    let conheight = (con_tabledata.length > 15) ? 450 : null;
+
+    var contable = new Tabulator("#con-table", {
+        height: conheight,
+        dataTree:true,
+        dataTreeStartExpanded:false,
+        data:con_tabledata, //assign data to table
+        layout:"fitDataFill", //"fitColumns", "fitDataFill",
+        columns: [ //Define Table Columns
+            {title: "name", field:"name", hozAlign:"left", headerFilter:false, visible:true,},
+            {title: "size", field:"size", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
+            numrow("upper", "upper"),
+            numrow("lower", "lower"),
+            numrow("equals", "equals"),
+            {title: "linear", field:"linear", hozAlign:"center", visible:true, formatter:"tickCross",
+            formatterParams: {
+                crossElement: false,  // gets rid of 'x' elements so only check marks show
+            }, headerFilter:false,},
+        ],
+    });
+}
+else {
+    d3.select("#constuff").style("display", "none");
+}
+
+
+if (obj_tabledata.length > 0) {
+    let objheight = (obj_tabledata.length > 15) ? 450 : null;
+    var objtable = new Tabulator("#obj-table", {
+        height: objheight,
+        dataTree:true,
+        dataTreeStartExpanded:false,
+        data:obj_tabledata, //assign data to table
+        layout:"fitColumns", //"fitDataFill",
+        columns:[ //Define Table Columns
+            {title: "name", field:"name", hozAlign:"left", visible:true, headerFilter:false,},
+            {title: "size", field:"size", hozAlign:"center", visible:true, headerFilter:false,},
+            {title: "indices", field:"index", hozAlign:"center", headerFilter:false, visible:true,},
+            {title: "Driver", headerHozAlign: "center", columns: [
+                numrow("value", "driver_val"),
+                {title: "units", field:"driver_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            {title: "Model", headerHozAlign: "center", columns: [
+                numrow("value", "model_val"),
+                {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
+            ]},
+            numrow("ref", "ref"),
+            numrow("ref0", "ref0"),
+            numrow("scaler", "scaler"),
+            numrow("adder", "adder"),
+        ],
+    });
+}
+else {
+    d3.select("#objstuff").style("display", "none");
+}
+
+
+function toggleHelp(event) {
+    let txt = d3.select("#help-text");
+    if (txt.node().style.display === "block") {
+        txt.style("display", "none");
+    }
+    else {
+        txt.style("display", "block");
+    }
+}
+
+
+function add_sub_tab(rowname, colname) {
+    // returns true if the button is already there
+    var name = get_subjac_id(rowname, colname);
+
+    var sel = d3.select("#" + name + "-button");
+    if (!sel.empty()) {
+        sel.node().click();
+        return true;
+    }
+
+    var btn = d3.select("#tab-bar")
+        .append("button")
+        .attr("id", name + "-button")
+        .classed("tablinks", true)
+        .html("<em>" + rowname + "</em>" + " <b>wrt</b> " + "<em>" + colname + "</em>")
+        .on("click", function(evt) {
+            showJac(evt, name);
+        });
+
+    // right click to remove tab (until I add an svg button with an 'x')
+    d3.select("#" + name + "-button").on("contextmenu", function(evt) {
+        evt.preventDefault();
+        btn.remove();
+        d3.select("#" + name + "-tab").remove();
+        d3.select("#varjac-button").node().click();
+    });
+
+    var dv = d3.select("#jac-tabs")
+        .append("div")
+        .attr("id", name + "-tab")
+        .classed("tabcontent", true);
+
+    dv.append("div")
+        .attr("id", name + "-jac")
+        .append("svg")
+        .classed("heatmap", true);
+
+    btn.node().click();
+
+    return false;
+}
+
+
+function openSubjac(subdata, parent_id) {
+    // subdata: [ofname,  wrtname, value]
+    if (add_sub_tab(subdata[0], subdata[1])) {
+        return;
+    }
+
+    let dat = (parent_id == "#norm-jac") ? data : data.linear;
+    let ofslice = dat.ofslices[subdata[0]];
+    let oflow = ofslice[0];
+    let ofhigh = ofslice[1];
+    let wrtslice = dat.wrtslices[subdata[1]];
+    let wrtlow = wrtslice[0];
+    let wrthigh = wrtslice[1];
+    let filtered = dat.mat_list.filter(function(d) {
+        return d[0] >= oflow && d[0] < ofhigh && d[1] >= wrtlow && d[1] < wrthigh;
+    });
+    let shifted = filtered.map(d => [d[0] - oflow, d[1] - wrtlow, d[2]]);
+    ynames = shifted.map(d => d[0].toString());
+    xnames = shifted.map(d => d[1].toString());
+
+    heatmap(ynames, xnames, shifted, "#" + get_subjac_id(subdata[0], subdata[1]) + "-tab", false);
+}
+
+
+function showJac(evt, ident) {
+    d3.selectAll(".tabcontent").style("display", "none");
+    d3.selectAll(".tablinks").classed("active", false);
+    d3.select("#" + ident + "-tab").style("display", "block");
+    d3.select("#" + ident + "-button").classed("active", true);
+}
+
+
+function textSize(text, rotate) {
+    var container = d3.select('body').append('svg');
+    container.append('text')
+        .attr("x", -99999)
+        .attr("y", -99999)
+        .attr("transform", "rotate(" + rotate + ")")
+        .text(text);
+    var bbox = container.node().getBBox();
+    container.remove();
+    return bbox;
+}
+
+
+function sizeOfLongest(strings, start, rotate) {
+    var longest = strings.reduce((accum, val) => accum.length < val.length ? val : accum, start);
+    return textSize(longest, rotate);
+}
+
+
+function heatmap(ofEntries, wrtEntries, jac_data, parent_id, is_top) {
+    var parent = d3.select(parent_id);
+    var minOfHeight = 5 * ofEntries.length;
+    var leftmargin = 10;
+    var bottommargin = 10;
+    var legendwidth = 20;
+    var legendloc = 20;
+
+    var viewport_width = document.documentElement.clientWidth * .95;
+    var viewport_height = document.documentElement.clientHeight * .95;
+
+    var margin = {top: 30, right: 70 + legendloc + legendwidth, bottom: bottommargin, left: leftmargin };
+
+    var width = viewport_width - margin.left - margin.right;
+    var height = viewport_height - margin.top - margin.bottom;
+
+    if (is_top && height < minOfHeight) {
+        viewport_height = viewport_height + (minOfHeight - height);
+        height = minOfHeight;
+    }
+
+    var hmap = parent.select(".heatmap");
+    hmap.selectAll("g").remove();
+
+    // append the svg object to the body of the page
+    var svg = hmap
+        .attr("viewBox", "0 0 " + viewport_width + " " + viewport_height)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    // Build X scales and axis:
+    var x = d3.scaleBand()
+        .range([0, width])
+        .domain(wrtEntries)
+        .padding(0.01);
+
+    // Build Y scales and axis:
+    var y = d3.scaleBand()
+        .range([0, height])
+        .domain(ofEntries)
+        .padding(0.01);
+
+    svg.selectAll()
+        .data(jac_data, d => d[1] + ':' + d[0])
+        .enter()
+        .append("rect")
+        .attr("x", d => x(d[1]))
+        .attr("y", d => y(d[0]))
+        .attr("width", x.bandwidth())
+        .attr("height", y.bandwidth())
+        .style("fill", function(d) {
+            if (d[2] === null) {
+                return "#666";  // dark gray - colored zero
+            }
+            else {
+                if (d[2] === 0) {
+                    return "#CCC";  // light gray - computed zero
+                }
+                else {
+                    return subjacColor(Math.log10(d[2]));
+                }
+            }
+        })
+        .on("mouseover", function () {
+            event.stopPropagation();
+            tooltip.style("opacity", 1);
+            d3.select(this).style("stroke", "black");
+        })
+        .on("mousemove", function(event, d) {
+            event.stopPropagation();
+            var val = (d[2] === null) ? 0 : d3_format(d[2]);
+
+            if (typeof d[0] === 'number') {  // for the subjac view, show (row, col) along with value
+                var txt = "<b>row:</b> " + d[0] + "<br><b>col:</b> " + d[1] + "<br><b>value:</b> " + val;
+            }
+            else {  // for var wrt var jac, show shape along with value
+                var dat = (parent_id == "#norm-jac") ? data : data.linear;
+                var oslc = dat.ofslices[d[0]];
+                var wrtslc = dat.wrtslices[d[1]];
+                var vname = ((oslc[1] - oslc[0]) > 1 || (wrtslc[1] - wrtslc[0]) > 1) ? "max abs" : "value";
+                var txt = "<b>of:</b> " + d[0] + "<br>" + "<b>wrt:</b> " + d[1] + "<br><b>shape:</b> (" + (oslc[1] - oslc[0]) + ", " + (wrtslc[1] - wrtslc[0]) + ")<br><b>" + vname + ":</b> " + val;
+            }
+            var newx;
+            var clientWidthO2 = tooltip.node().clientWidth/2;
+            if (event.layerX < clientWidthO2) {
+                newx = 0;
+            }
+            else if (event.layerX > window.innerWidth-clientWidthO2) {
+                newx = window.innerWidth - tooltip.node().clientWidth;
+            }
+            else {
+                newx = event.layerX - clientWidthO2;
+            }
+
+            tooltip
+                .html(txt)
+                .style("left", (newx) + "px")
+                .style("top", (event.pageY + 10) + "px");
+        })
+        .on("mouseleave", function(event) {
+            event.stopPropagation();
+            tooltip.style("opacity", 0)
+            d3.select(this).style("stroke", "none");
+        })
+        .filter(d => is_top && d[2] != null)  // don't add sub creation to 0 or subjac entries
+        .on("click", function () {
+            openSubjac(this.__data__, parent_id);
+        });
+
+    // create the gradient
+    var grad_data = [
+        {"color": subjacColor(-maxcolor), "value": -maxcolor},
+        {"color": subjacColor(0), "value": 0},
+        {"color": subjacColor(maxcolor), "value": maxcolor},
+    ];
+
+    var grad_id = parent_id.slice(1) + "lingrad";
+    var defs = parent.select(".heatmap").append("defs");
+    var grad = defs.append("linearGradient")
+        .attr('x1', '0%')
+        .attr('y1', '100%')
+        .attr('x2', '0%')
+        .attr('y2', '0%')
+        .attr("id", grad_id);
+
+    grad.selectAll("stop")
+        .data(grad_data)
+        .enter().append("stop")
+        .attr("offset", d => ((d.value + maxcolor) / (2*maxcolor) * 100) + "%")
+        .attr("stop-color", d => d.color);
+
+    // create the legend
+    var leg_axis = d3.scaleLinear()
+        .domain([maxcolor, -maxcolor])
+        .range([0, height])
+        .nice();
+
+    var legend = parent.select(".heatmap")
+        .append("g")
+        .attr("transform", "translate(" + (margin.left + width) + "," + margin.top + ")");
+
+    legend.append("g")
+        .attr("transform", "translate(" + (legendwidth + legendloc + 3) + "," + 0 + ")")
+        .call(d3.axisRight(leg_axis).tickFormat(exp_format));
+
+    legend.append("rect")
+            .attr("x", legendloc)
+            .attr("width", legendwidth)
+            .attr("height", height)
+            .style("fill", "url(#" + grad_id + ")");
+}
+
+// create a tooltip
+var tooltip = d3.select(".tooltip")
+    .style("opacity", 0);
+
+
+function loggable(v) {
+    return !(v[2] === null || v[2] === 0);
+}
+
+
+var maxcolor = d3.max(data.var_mat_list.filter(loggable).map(s => s[2]).map(Math.log10).map(Math.abs));
+if (data.linear.oflabels.length > 0) {
+    let linmaxcolor = d3.max(data.linear.var_mat_list.filter(loggable).map(s => s[2]).map(Math.log10).map(Math.abs));
+    if (maxcolor < linmaxcolor) {
+        maxcolor = linmaxcolor;
+    }
+}
+
+// Build color scale
+var subjacColor = d3.scaleDiverging()
+    .interpolator(d3.interpolateRdYlBu)
+    .domain([maxcolor, 0, -maxcolor]);
+
+
+function startup() {
+    if (data.oflabels.length > 0) {
+        heatmap(data.oflabels, data.wrtlabels, data.var_mat_list, "#norm-jac", true);
+        if (data.linear.oflabels.length > 0) {
+            d3.select("#varjac-button").html("nonlinear responses wrt DVs");
+
+            var btn = d3.select("#tab-bar")
+                .append("button")
+                .attr("id", "linear-button")
+                .classed("tablinks", true)
+                .html("linear constraints wrt DVs")
+                .on("click", function(evt) {
+                                    showJac(evt, "linear");
+                })
+
+                var dv = d3.select("#jac-tabs")
+                .append("div")
+                .attr("id", "linear-tab")
+                .classed("tabcontent", true)
+                .append("div")
+                .attr("id", "linear-jac")
+                .append("svg")
+                .classed("heatmap", true);
+
+            heatmap(data.linear.oflabels, data.wrtlabels, data.linear.var_mat_list, "#linear-jac", true);
+        }
+        else {
+            d3.select("#varjac-button").html("responses wrt DVs");
+        }
+        d3.select("#varjac-button").node().click();
+    }
+    else {  // jacobian display disabled
+        d3.select(".jac-info").style("display", "none");
+    }
+}
+
+</script>
+</body>
+</html>

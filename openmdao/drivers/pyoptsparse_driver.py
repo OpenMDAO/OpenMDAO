@@ -30,14 +30,14 @@ from openmdao.utils.mpi import FakeComm
 
 # names of optimizers that use gradients
 grad_drivers = {'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG'}
+                'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'}
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
 
 # All optimizers in pyoptsparse
 optlist = ['ALPSO', 'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP',
-           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD']
+           'NSGA2', 'PSQP', 'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'NOMAD', 'ParOpt']
 
 # All optimizers that require an initial run
 run_required = ['NSGA2', 'ALPSO']
@@ -49,22 +49,39 @@ DEFAULT_OPT_SETTINGS['IPOPT'] = {
     'linear_solver': 'mumps'
 }
 
-CITATIONS = """@article{Hwang_maud_2018
- author = {Hwang, John T. and Martins, Joaquim R.R.A.},
- title = "{A Computational Architecture for Coupling Heterogeneous
-          Numerical Models and Computing Coupled Derivatives}",
- journal = "{ACM Trans. Math. Softw.}",
- volume = {44},
- number = {4},
- month = jun,
- year = {2018},
- pages = {37:1--37:39},
- articleno = {37},
- numpages = {39},
- doi = {10.1145/3182393},
- publisher = {ACM},
+CITATIONS = """@article{Wu_pyoptsparse_2020,
+    author = {Neil Wu and Gaetan Kenway and Charles A. Mader and John Jasa and
+     Joaquim R. R. A. Martins},
+    title = {{pyOptSparse:} A {Python} framework for large-scale constrained
+     nonlinear optimization of sparse systems},
+    journal = {Journal of Open Source Software},
+    volume = {5},
+    number = {54},
+    month = {October},
+    year = {2020},
+    pages = {2564},
+    doi = {10.21105/joss.02564},
+    publisher = {The Open Journal},
+}
+
+@article{Hwang_maud_2018
+    author = {Hwang, John T. and Martins, Joaquim R.R.A.},
+    title = "{A Computational Architecture for Coupling Heterogeneous
+             Numerical Models and Computing Coupled Derivatives}",
+    journal = "{ACM Trans. Math. Softw.}",
+    volume = {44},
+    number = {4},
+    month = jun,
+    year = {2018},
+    pages = {37:1--37:39},
+    articleno = {37},
+    numpages = {39},
+    doi = {10.1145/3182393},
+    publisher = {ACM},
 }
 """
+
+DEFAULT_SIGNAL = None
 
 
 class UserRequestedException(Exception):
@@ -87,7 +104,7 @@ class pyOptSparseDriver(Driver):
     constrained optimization problems, with additional MPI capability.
     pypptsparse has interfaces to the following optimizers:
     ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
-    SNOPT, NLPY_AUGLAG, NOMAD.
+    SNOPT, NLPY_AUGLAG, NOMAD, ParOpt.
     Note that some of these are not open source and therefore not included
     in the pyoptsparse source code.
 
@@ -137,7 +154,7 @@ class pyOptSparseDriver(Driver):
         if Optimization is None:
             raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
-        super(pyOptSparseDriver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['inequality_constraints'] = True
@@ -151,6 +168,7 @@ class pyOptSparseDriver(Driver):
         # What we don't support yet
         self.supports['active_set'] = False
         self.supports['integer_design_vars'] = False
+        self.supports['distributed_design_vars'] = False
         self.supports._read_only = True
 
         # The user places optimizer-specific settings in here.
@@ -188,7 +206,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('user_terminate_signal', default=signal.SIGUSR1, allow_none=True,
+        self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
 
@@ -210,7 +228,7 @@ class pyOptSparseDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super(pyOptSparseDriver, self)._setup_driver(problem)
+        super()._setup_driver(problem)
 
         self.supports._read_only = False
         self.supports['gradients'] = self.options['optimizer'] in grad_drivers
@@ -344,7 +362,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, lower=lower, upper=upper, wrt=wrt, jac=jac)
@@ -373,7 +391,7 @@ class pyOptSparseDriver(Driver):
             else:
                 if name in self._res_jacs:
                     resjac = self._res_jacs[name]
-                    jac = {n: resjac[n] for n in wrt}
+                    jac = {n: resjac[input_meta[n]['ivc_source']] for n in wrt}
                 else:
                     jac = None
                 opt_prob.addConGroup(name, size, upper=upper, lower=lower, wrt=wrt, jac=jac)
@@ -439,7 +457,11 @@ class pyOptSparseDriver(Driver):
             self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-            model.run_solve_nonlinear()
+            try:
+                model.run_solve_nonlinear()
+            except AnalysisError:
+                model._clear_iprint()
+
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -611,10 +633,12 @@ class pyOptSparseDriver(Driver):
                 res_jacs = self._res_jacs
                 for okey in func_dict:
                     new_sens[okey] = newdv = OrderedDict()
+                    okey_src = self._responses[okey]['ivc_source']
                     for ikey in dv_dict:
-                        if okey in res_jacs and ikey in res_jacs[okey]:
+                        ikey_src = self._designvars[ikey]['ivc_source']
+                        if okey_src in res_jacs and ikey_src in res_jacs[okey_src]:
                             arr = sens_dict[okey][ikey]
-                            coo = res_jacs[okey][ikey]
+                            coo = res_jacs[okey_src][ikey_src]
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo

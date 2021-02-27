@@ -27,10 +27,12 @@ class DemuxComp(ExplicitComponent):
         **kwargs : dict
             Arguments to be passed to the component initialization method.
         """
-        super(DemuxComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._vars = {}
         self._output_names = {}
+
+        self._no_check_partials = True
 
     def initialize(self):
         """

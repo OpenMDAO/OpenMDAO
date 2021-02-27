@@ -7,7 +7,7 @@ import importlib
 import textwrap
 
 from numpydoc.docscrape import NumpyDocString, Reader
-from mock import Mock
+from unittest.mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
 from openmdao.docs._utils.patch import do_monkeypatch
@@ -149,7 +149,7 @@ todo_include_todos = False
 html_theme = '_theme'
 html_theme_path = ['../../docs']
 html_logo = '../../docs/_static/OpenMDAO_Logo.png'
-html_favicon = '../../docs/_static/OpenMDAO_Favicon.ico'
+html_favicon = '../../docs/_static/favicon.svg'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.

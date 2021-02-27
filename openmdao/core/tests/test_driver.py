@@ -9,11 +9,21 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.core.driver import Driver
+from openmdao.utils.units import convert_units
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
+
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 @use_tempdirs
@@ -278,6 +288,39 @@ class TestDriver(unittest.TestCase):
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
                          "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
+                         
+    def test_debug_print_approx(self):
+
+        prob = om.Problem()
+        prob.model = model = SellarDerivatives()
+
+        model.add_design_var('z')
+        model.add_objective('obj')
+        model.add_constraint('con1', lower=0)
+        model.add_constraint('con2', lower=0, linear=True)
+        prob.set_solver_print(level=0)
+        
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+        prob.driver.options['maxiter'] = 0
+        
+        prob.model.approx_totals()
+        prob.driver.options['debug_print'] = ['totals']
+
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        self.assertIn("{('obj_cmp.obj', '_auto_ivc.v0'):", output[12])
+        self.assertIn("{('con_cmp1.con1', '_auto_ivc.v0'):", output[13])
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = om.Problem()
@@ -629,6 +672,30 @@ class TestDriver(unittest.TestCase):
         con = case.get_constraints()
         assert_near_equal(con['comp1.y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
+    def test_units_compute_totals(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('stuff', om.ExecComp(['y = x', 'cy = x'],
+                                                   x={'units': 'inch'},
+                                                   y={'units': 'kg'},
+                                                   cy={'units': 'kg'}),
+                              promotes=['*'])
+
+        p.model.add_design_var('x', units='ft')
+        p.model.add_objective('y', units='lbm')
+        p.model.add_constraint('cy', units='lbm', lower=0)
+
+        p.setup()
+
+        p['x'] = 1.0
+        p.run_model()
+
+        J_driver = p.driver._compute_totals()
+
+        fact = convert_units(1.0, 'kg/inch', 'lbm/ft')
+        assert_near_equal(J_driver['stuff.y', 'x'][0,0], fact, 1e-5)
+        assert_near_equal(J_driver['stuff.cy', 'x'][0,0], fact, 1e-5)
+
     def test_units_error_messages(self):
         prob = om.Problem()
         model = prob.model
@@ -648,7 +715,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for design variable x has 'degF' units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for design variable x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -669,7 +736,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for constraint x has 'degF' units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for constraint x has 'degF' units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -690,7 +757,7 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for design variable x has no units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for design variable x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
         prob = om.Problem()
@@ -711,8 +778,47 @@ class TestDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()
 
-        msg = "Group (<model>): Target for constraint x has no units, but 'ft' units were specified."
+        msg = "<model> <class Group>: Target for constraint x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
+
+    def test_get_desvar_subsystem(self):
+        # Test for a bug where design variables in a subsystem were not fully set up.
+        prob = om.Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+
+        sub.add_design_var('x', lower=-50.0, upper=50.0)
+        sub.add_design_var('y', lower=-50.0, upper=50.0)
+        sub.add_objective('f_xy')
+        sub.add_constraint('y', lower=-40.0)
+
+        prob.setup()
+
+        prob.set_val('sub.x', 50.)
+        prob.set_val('sub.y', 50.)
+
+        failed = prob.run_driver()
+
+        assert_near_equal(prob['sub.x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['sub.y'], -7.3333333, 1e-6)
+
+        prob.set_val('sub.x', 50.)
+        prob.set_val('sub.y', 50.)
+
+        prob.run_model()
+
+        totals=prob.check_totals(out_stream=None)
+
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fwd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fwd'], [[1.58e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.x']['J_fd'], [[1.44e2]], 1e-5)
+        assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
 
 class TestDriverFeature(unittest.TestCase):
@@ -758,6 +864,169 @@ class TestDriverFeature(unittest.TestCase):
         con = prob.driver.get_constraint_values(driver_scaling=True)
         assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDriverMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distrib_desvar_unsupported(self):
+
+        class MyDriver(Driver):
+
+            def __init__(self, generator=None, **kwargs):
+                super().__init__(**kwargs)
+                self.supports['distributed_design_vars'] = False
+                self.supports._read_only = True
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp(distributed=True)
+        ivc.add_output('invec')
+        model.add_subsystem('p', ivc)
+        model.add_design_var('p.invec', lower=0.0, upper=1.0)
+
+        prob.driver = MyDriver()
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        self.assertEqual(str(context.exception),
+                         "Distributed design variables are not supported by this driver, "
+                         "but the following variables are distributed: [p.invec]")
+
+    def test_distrib_desvar_get_set(self):
+
+        comm = MPI.COMM_WORLD
+        size = 3 if comm.rank == 0 else 2
+
+        class DistribComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.options['distributed'] = True
+
+                self.add_input('w', val=1.) # this will connect to a non-distributed IVC
+                self.add_input('x', shape=size) # this will connect to a distributed IVC
+
+                self.add_output('y', shape=1) # all-gathered output, duplicated on all procs
+                self.add_output('z', shape=size) # distributed output
+
+                self.declare_partials('y', 'x')
+                self.declare_partials('y', 'w')
+                self.declare_partials('z', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                local_y = np.sum((x-5)**2)
+                y_g = np.zeros(self.comm.size)
+                self.comm.Allgather(local_y, y_g)
+
+                outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+                outputs['z'] = x**2
+
+            def compute_partials(self, inputs, J):
+                x = inputs['x']
+                J['y', 'x'] = 2*(x-5)
+                J['y', 'w'] = 2*(inputs['w']-10)
+                J['z', 'x'] = np.diag(2*x)
+
+        p = om.Problem()
+        model = p.model
+        driver = p.driver
+
+        # distributed indep var, 'x'
+        d_ivc = model.add_subsystem('d_ivc', om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+        d_ivc.add_output('x', 2*np.ones(size))
+
+        # non-distributed indep var, 'w'
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(distributed=False),
+                                  promotes=['*'])
+        ivc.add_output('w', size)
+
+        # distributed component, 'dc'
+        model.add_subsystem('dc', DistribComp(), promotes=['*'])
+
+        # distributed design var, 'x'
+        model.add_design_var('x', lower=-100, upper=100)
+        model.add_objective('y')
+
+        # driver that supports distributed design vars
+        driver.supports._read_only = False
+        driver.supports['distributed_design_vars'] = True
+
+        # run model
+        p.setup()
+        p.run_model()
+
+        # get distributed design var
+        driver.get_design_var_values(get_remote=None)
+
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+                          [2, 2, 2, 2, 2])
+
+        assert_near_equal(driver.get_design_var_values(get_remote=False)['d_ivc.x'],
+                          2*np.ones(size))
+
+        # set distributed design var, set_remote=True
+        driver.set_design_var('d_ivc.x', [3, 3, 3, 3, 3], set_remote=True)
+
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+                          [3, 3, 3, 3, 3])
+
+        # set distributed design var, set_remote=False
+        if comm.rank == 0:
+            driver.set_design_var('d_ivc.x', 5.0*np.ones(size), set_remote=False)
+        else:
+            driver.set_design_var('d_ivc.x', 9.0*np.ones(size), set_remote=False)
+
+        assert_near_equal(driver.get_design_var_values(get_remote=True)['d_ivc.x'],
+                          [5, 5, 5, 9, 9])
+
+        # run driver
+        p.run_driver()
+
+        assert_near_equal(p.get_val('dc.y', get_remote=True), [81, 96])
+        assert_near_equal(p.get_val('dc.z', get_remote=True), [25, 25, 25, 81, 81])
+
+    def test_distrib_desvar_bug(self):
+        class MiniModel(om.Group):
+            def setup(self):
+                self.add_subsystem('dv', om.IndepVarComp('x', 3.0))
+                self.add_subsystem('comp', om.ExecComp('y = (x-2)**2'))
+                self.connect('dv.x', 'comp.x')
+
+                self.add_design_var('dv.x', lower=-10, upper=10)
+
+        class ParModel(om.ParallelGroup):
+            def setup(self):
+                self.add_subsystem('g0', MiniModel())
+                self.add_subsystem('g1', MiniModel())
+
+        p = om.Problem()
+
+        pg = p.model.add_subsystem('par_group', ParModel())
+        p.model.add_subsystem('obj', om.ExecComp('f = y0 + y1'))
+
+        p.model.connect('par_group.g0.comp.y', 'obj.y0')
+        p.model.connect('par_group.g1.comp.y', 'obj.y1')
+
+        p.model.add_objective('obj.f')
+
+        p.driver = om.ScipyOptimizeDriver()
+
+        p.setup()
+        p.run_driver()
+
+        p.model.list_outputs()
+
+        dvs = p.driver.get_design_var_values(get_remote=True)
+
+        assert_near_equal(dvs['par_group.g0.dv.x'], 2)
+        assert_near_equal(dvs['par_group.g1.dv.x'], 2)
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,8 @@ import sys
 import numpy as np
 from petsc4py import PETSc
 
-from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE, _full_slice
+from openmdao.core.constants import INT_DTYPE
+from openmdao.vectors.default_vector import DefaultVector, _full_slice
 from openmdao.vectors.petsc_transfer import PETScTransfer
 from openmdao.utils.mpi import MPI
 
@@ -56,8 +57,8 @@ class PETScVector(DefaultVector):
         ncol : int
             Number of columns for multi-vectors.
         """
-        super(PETScVector, self).__init__(name, kind, system, root_vector=root_vector,
-                                          alloc_complex=alloc_complex, ncol=ncol)
+        super().__init__(name, kind, system, root_vector=root_vector,
+                         alloc_complex=alloc_complex, ncol=ncol)
 
         self._dup_inds = None
 
@@ -70,11 +71,11 @@ class PETScVector(DefaultVector):
         root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
-        super(PETScVector, self)._initialize_data(root_vector)
+        super()._initialize_data(root_vector)
 
         self._petsc = {}
         self._imag_petsc = {}
-        data = self._data
+        data = self._data.real
 
         if self._ncol == 1:
             if self._alloc_complex:
@@ -92,7 +93,7 @@ class PETScVector(DefaultVector):
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
-            data = self._cplx_data.imag
+            data = self._data.imag
             if self._ncol == 1:
                 self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
             else:
@@ -118,7 +119,7 @@ class PETScVector(DefaultVector):
                 # Here, we find the indices that are not locally owned so that we can
                 # temporarilly zero them out for the norm calculation.
                 dup_inds = []
-                abs2meta = system._var_allprocs_abs2meta
+                abs2meta = system._var_allprocs_abs2meta[self._typ]
                 for name, idx_slice in self.get_slice_dict().items():
                     owning_rank = system._owning_rank[name]
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
@@ -149,18 +150,18 @@ class PETScVector(DefaultVector):
                 data_cache = self.asarray(copy=True)
                 data_cache[dup_inds] = 0.0
             else:
-                data_cache = self._data
+                data_cache = self._get_data()
         else:
             # With Vectorized derivative solves, data contains multiple columns.
             icol = self._icol
             if icol is None:
                 icol = 0
             if has_dups:
-                data_cache = self._data.flatten()
+                data_cache = self._get_data().flatten()
                 data_cache[dup_inds] = 0.0
-                data_cache = data_cache.reshape(self._data.shape)[:, icol]
+                data_cache = data_cache.reshape(self._get_data().shape)[:, icol]
             else:
-                data_cache = self._data[:, icol]
+                data_cache = self._get_data()[:, icol]
 
         return data_cache
 
@@ -172,13 +173,13 @@ class PETScVector(DefaultVector):
         values.
         """
         if self._ncol == 1:
-            self._petsc.array = self._data
+            self._petsc.array = self._get_data()
         else:
             # With Vectorized derivative solves, data contains multiple columns.
             icol = self._icol
             if icol is None:
                 icol = 0
-            self._petsc.array = self._data[:, icol]
+            self._petsc.array = self._get_data()[:, icol]
 
     def get_norm(self):
         """
@@ -211,4 +212,4 @@ class PETScVector(DefaultVector):
         """
         nodup = self._get_nodup()
         # we don't need to _resore_dups here since we don't modify _petsc.array.
-        return self._system().comm.allreduce(np.dot(nodup, vec._data))
+        return self._system().comm.allreduce(np.dot(nodup, vec._get_data()))

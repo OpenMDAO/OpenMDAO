@@ -19,9 +19,10 @@ def database_cursor(filename):
     con = sqlite3.connect(filename)
     cur = con.cursor()
 
-    yield cur
-
-    con.close()
+    try:
+        yield cur
+    finally:
+        con.close()
 
 
 def get_format_version_abs2meta(db_cur):
@@ -450,7 +451,8 @@ def assertViewerDataRecorded(test, expected):
         if f_version >= 6:
             test.assertEqual(set(model_viewer_data.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list',
-            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            'driver', 'design_vars', 'responses', 'declare_partials_list',
+            'md5_hash'
             })
         else:
             test.assertEqual(set(model_viewer_data.keys()), {
@@ -473,11 +475,10 @@ def assertViewerDataRecorded(test, expected):
 
         # model tree
         tr = model_viewer_data['tree']
-        test.assertEqual(expected['tree_length'], len(tr))
-
         test.assertEqual({'name', 'type', 'subsystem_type', 'children', 'linear_solver',
                           'nonlinear_solver', 'is_parallel', 'component_type', 'class',
-                          'expressions'},
+                          'expressions', 'options', 'linear_solver_options',
+                          'nonlinear_solver_options'},
                          set(tr.keys()))
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))
@@ -489,6 +490,7 @@ def assertViewerDataRecorded(test, expected):
                 for var in expected['abs2prom'][io]:
                     test.assertEqual(abs2prom[io][var], expected['abs2prom'][io][var])
 
+        return model_viewer_data
 
 def assertSystemMetadataIdsRecorded(test, ids):
 

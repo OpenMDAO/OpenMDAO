@@ -272,7 +272,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "Group (<model>): The source and target shapes do not match or are " + \
+        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
                    "The source shape is (1,) but the target shape is (2,)."
 
@@ -293,7 +293,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # the shape of arraycomp.inp
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
 
-        expected = "Group (<model>): The source indices [0 1 0] do not specify a valid shape " + \
+        expected = "<model> <class Group>: The source indices [0 1 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
                    "(2,) but indices are (3,)."
 
@@ -314,7 +314,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
                    "for the connection 'idvp.arrout' to 'arraycomp.inp1'. " + \
                    "Index '100000' is out of range for source dimension of size 5."
 
@@ -335,7 +335,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source.  A bug prevented this from being checked.
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "Group (<model>): The source indices do not specify a valid index " + \
+        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
                    "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
                    "Index '100000' is out of range for source dimension of size 5."
 
@@ -435,7 +435,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'value': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "Group (<model>): The source and target shapes do not match or are " + \
+        expected = "<model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
                    "(1, 10, 1, 1) but the target shape is (5, 2)."
 
@@ -471,7 +471,7 @@ class TestMultiConns(unittest.TestCase):
         prob.model.connect('x', 'sub.x')
         prob.model.connect('y', 'sub.y')
 
-        expected = "Group (<model>): The following inputs have multiple connections: " + \
+        expected = "<model> <class Group>: The following inputs have multiple connections: " + \
                    "sub.c2.y from ['indeps.y', 'sub.c1.y']"
 
         with self.assertRaises(Exception) as context:
@@ -499,7 +499,7 @@ class TestMultiConns(unittest.TestCase):
         # make a second, explicit, connection to y (which is c2.y promoted)
         prob.model.connect('indeps.x', 'y')
 
-        expected = "Group (<model>): Input 'c2.y' cannot be connected to 'indeps.x' " + \
+        expected = "<model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' " + \
                    "because it's already connected to 'c1.y'"
 
         with self.assertRaises(Exception) as context:
@@ -541,8 +541,8 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        msg = 'The following inputs [c1.x, c2.x] are defined using src_indices but the total source '
-        msg += 'size is undetermined.  Please add an IndepVarComp as the source.'
+        msg = "The following inputs ['c1.x', 'c2.x'] are defined using src_indices but the total source "
+        msg += "size is undetermined.  You can specify the src size by setting 'val' or 'src_shape' in a call to set_input_defaults, or by adding an IndepVarComp as the source."
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, msg)
@@ -578,7 +578,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.connect("p1.x", "c3.x")
 
         rank = prob.comm.rank
-        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
+        expected = f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
         try:
@@ -613,7 +613,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.connect("p1.x", "c3.x")
 
         rank = prob.comm.rank
-        expected = f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index " + \
+        expected = f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index " + \
                    "for the connection 'p1.x' to 'c3.x'. " + \
                    "Index '2' is out of range for source dimension of size 2."
 
@@ -678,9 +678,61 @@ class TestConnectionsError(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         f"Exception raised on rank {rank}: Group (<model>): The source indices do not specify a valid index for "
+                         f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index for "
                          "the connection 'p1.x' to 'c3.x'. Index '2' is out of range for source "
                          "dimension of size 2.")
+
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestConnectionsMPIBug(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_bug_2d_src_indices(self):
+        # This model gave an exception during setup.
+
+        class Burn(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', np.arange(12))
+                self.add_output('y', np.arange(12))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.0
+
+        class LinkageComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('in1', np.zeros((3, 2)))
+                self.add_input('in2', np.zeros((3, 2)))
+                self.add_output('out', np.zeros((3, 2)))
+
+            def compute(self, inputs, outputs):
+                outputs['out'] = 3 * inputs['in2'] - 2.5 * inputs['in1']
+
+        class Phases(om.ParallelGroup):
+
+            def setup(self):
+                self.add_subsystem('burn1', Burn())
+                self.add_subsystem('burn2', Burn())
+
+        class Linkages(om.Group):
+
+            def setup(self):
+                self.add_subsystem('linkage', LinkageComp())
+
+        class Traj(om.Group):
+
+            def setup(self):
+                self.add_subsystem('phases', Phases())
+                self.add_subsystem('linkages', Linkages())
+
+            def configure(self):
+                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
+                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
+
+        prob = om.Problem(model=Traj())
+        prob.setup()
+        prob.run_model()
 
 
 if __name__ == "__main__":

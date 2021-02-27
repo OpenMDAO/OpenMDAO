@@ -1,11 +1,13 @@
 """Base class used to define the interface for derivative approximation schemes."""
+import time
 from collections import defaultdict
-
+from itertools import chain
 from scipy.sparse import coo_matrix
 import numpy as np
 
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.vectors.vector import _full_slice
@@ -33,6 +35,8 @@ class ApproximationScheme(object):
         Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
     _j_data_offsets : ndarray of int
         Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
+    _progress_out : None or file-like object
+        Attribute to output the progress of check_totals
     """
 
     def __init__(self):
@@ -46,6 +50,7 @@ class ApproximationScheme(object):
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+        self._progress_out = None
 
     def __repr__(self):
         """
@@ -146,14 +151,13 @@ class ApproximationScheme(object):
 
         outputs = system._outputs
         inputs = system._inputs
-        abs2meta = system._var_allprocs_abs2meta
         prom2abs_out = system._var_allprocs_prom2abs_list['output']
         prom2abs_in = system._var_allprocs_prom2abs_list['input']
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         out_slices = outputs.get_slice_dict()
 
-        is_total = isinstance(system, Group)
+        is_group = isinstance(system, Group)
 
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
@@ -169,10 +173,10 @@ class ApproximationScheme(object):
                 if 'coloring' in options:
                     keys.update(a[0] for a in apprx)
 
-        if is_total and system.pathname == '':  # top level approx totals
+        if is_group and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
-            full_wrts = system._var_allprocs_abs_names['output'] + \
-                system._var_allprocs_abs_names['input']
+            full_wrts = list(chain(system._var_allprocs_abs2meta['output'],
+                                   system._var_allprocs_abs2meta['input']))
             wrt_names = system._owns_approx_wrt
         else:
             of_names, wrt_names = system._get_partials_varlists()
@@ -190,28 +194,31 @@ class ApproximationScheme(object):
 
         # FIXME: need to deal with mix of local/remote indices
 
-        len_full_ofs = len(system._var_allprocs_abs_names['output'])
+        len_full_ofs = len(system._var_allprocs_abs2meta['output'])
 
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
         jac_slices = tmpJ['@jac_slices']
-        for abs_of, roffset, rend, _ in system._jacobian_of_iter():
+        for abs_of, roffset, rend, _ in system._partial_jac_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend, _ in system._jacobian_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend, _ in system._partial_jac_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
-            if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
+            if is_group and (approx_of_idx or len_full_ofs > len(of_names)):
                 slc = out_slices[abs_of]
                 if abs_of in approx_of_idx:
                     full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
                 else:
-                    full_idxs.append(range(slc.start, slc.stop))
+                    full_idxs.append(np.arange(slc.start, slc.stop))
         if full_idxs:
             tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
         if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
-            if is_total and system.pathname == '':  # top level approx totals
-                full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in full_wrts]
+            if is_group and system.pathname == '':  # top level approx totals
+                a2mi = system._var_allprocs_abs2meta['input']
+                a2mo = system._var_allprocs_abs2meta['output']
+                full_wrt_sizes = [a2mi[wrt]['size'] if wrt in a2mi else a2mo[wrt]['size']
+                                  for wrt in full_wrts]
             else:
                 _, full_wrt_sizes = system._get_partials_var_sizes()
 
@@ -222,11 +229,11 @@ class ApproximationScheme(object):
 
         # get groups of columns from the coloring and compute proper indices into
         # the inputs and outputs vectors.
-        is_semi = is_total and system.pathname
+        is_semi = is_group and system.pathname
         use_full_cols = isinstance(system, ImplicitComponent) or is_semi
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             ccols = cols if col_map is None else col_map[cols]
-            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_total)
+            idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_group)
             self._colored_approx_groups.append((data, cols, tmpJ, idx_info, nzrows))
 
     def _init_approximations(self, system):
@@ -260,21 +267,24 @@ class ApproximationScheme(object):
             directional = key[-1]
             data = self._get_approx_data(system, key)
             if inputs._contains_abs(wrt):
-                arr = inputs
+                vec = inputs
                 slices = in_slices
             elif outputs._contains_abs(wrt):
-                arr = outputs
+                vec = outputs
                 slices = out_slices
             else:  # wrt is remote
-                arr = None
+                vec = None
 
             if wrt in approx_wrt_idx:
                 in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
-                if arr is not None:
+                if vec is not None:
                     in_idx += slices[wrt].start
             else:
-                if arr is None:
-                    in_idx = range(abs2meta[wrt]['size'])
+                if vec is None:
+                    if wrt in abs2meta['input']:
+                        in_idx = range(abs2meta['input'][wrt]['size'])
+                    else:
+                        in_idx = range(abs2meta['output'][wrt]['size'])
                 else:
                     in_idx = range(slices[wrt].start, slices[wrt].stop)
 
@@ -286,7 +296,7 @@ class ApproximationScheme(object):
             tmpJ = _get_wrt_subjacs(system, approx)
             tmpJ['@out_slices'] = out_slices
 
-            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(arr, in_idx)], None))
+            self._approx_groups.append((wrt, data, in_idx, tmpJ, [(vec, in_idx)], None))
 
     def _compute_approximations(self, system, jac, total, under_cs):
         from openmdao.core.component import Component
@@ -363,6 +373,9 @@ class ApproximationScheme(object):
 
         # now do uncolored solves
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
+            if self._progress_out:
+                start_time = time.time()
+
             J = tmpJ[wrt]
             full_idxs = J['loc_outvec_idxs']
             out_slices = tmpJ['@out_slices']
@@ -387,6 +400,14 @@ class ApproximationScheme(object):
                                             result[out_slices[of]][out_idxs]).copy()))
                     else:
                         J['data'][:, i_count] = self._transform_result(result[full_idxs])
+
+                if self._progress_out:
+                    end_time = time.time()
+                    prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out, wrt)
+                    self._progress_out.write(f"{fd_count+1}/{len(full_idxs)}: Checking "
+                                             f"derivatives with respect to: "
+                                             f"'{prom_name} [{idxs}]' ... "
+                                             f"{round(end_time-start_time, 4)} seconds\n")
 
                 fd_count += 1
 
@@ -418,8 +439,8 @@ class ApproximationScheme(object):
             if mult != 1.0:
                 self._j_colored.data *= mult
 
-            # convert COO matrix to dense for easier slicing
-            Jcolored = self._j_colored.toarray()
+            # convert COO matrix to CSC for easier slicing
+            Jcolored = self._j_colored.tocsc()
 
         elif is_parallel and not is_distributed:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
@@ -431,10 +452,10 @@ class ApproximationScheme(object):
                     slc = tmpJ['@jac_slices'][key]
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc].toarray())
 
         Jcolored = None  # clean up memory
 
@@ -471,9 +492,13 @@ def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_s
     jac : Jacobian or None
         Jacobian object.
     key : (str, str)
-        Tuple of absulute names of of and wrt variables.
+        Tuple of absolute names of of and wrt variables.
     subjac : ndarray
         Dense sub-jacobian to be assigned to the subjac corresponding to key.
+    reduced_rows :
+        Reduced row indices.
+    reduced_cols :
+        Reduced column indices.
     """
     if jac is None:  # we're saving deriv to a dict.  Do no conversion.
         return subjac
@@ -521,7 +546,8 @@ def _get_wrt_subjacs(system, approxs):
     each subjac.
     """
     abs2idx = system._var_allprocs_abs2idx['nonlinear']
-    abs2meta = system._var_allprocs_abs2meta
+    abs2meta_in = system._var_allprocs_abs2meta['input']
+    abs2meta_out = system._var_allprocs_abs2meta['output']
     approx_of_idx = system._owns_approx_of_idx
     approx_wrt_idx = system._owns_approx_wrt_idx
     approx_of = system._owns_approx_of
@@ -530,7 +556,7 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
+    abs_out_names = [n for n in system._var_allprocs_abs2meta['output'] if n in slicedict]
 
     for key, options in approxs:
         of, wrt = key
@@ -546,7 +572,7 @@ def _get_wrt_subjacs(system, approxs):
                 out_idx = approx_of_idx[of]
                 out_size = len(out_idx)
             else:
-                out_size = abs2meta[of]['size']
+                out_size = abs2meta_out[of]['size']
                 out_idx = _full_slice
             ofdict[of] = (out_size, out_idx)
             J[wrt]['tot_rows'] += out_size
@@ -562,7 +588,8 @@ def _get_wrt_subjacs(system, approxs):
         elif wrt_idx is not _full_slice:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(wrt_idx)))
         else:
-            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
+            sz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], sz))
 
         # sort ofs into the proper order to match outputs/resids vecs
         start = end = 0

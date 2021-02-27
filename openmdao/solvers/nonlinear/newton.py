@@ -35,7 +35,7 @@ class NewtonSolver(NonlinearSolver):
         **kwargs : dict
             options dictionary.
         """
-        super(NewtonSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Slot for linear solver
         self.linear_solver = None
@@ -47,7 +47,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(NewtonSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('solve_subsystems', types=bool,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
@@ -75,7 +75,7 @@ class NewtonSolver(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(NewtonSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
@@ -113,7 +113,7 @@ class NewtonSolver(NonlinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(NewtonSolver, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
@@ -184,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -227,6 +227,7 @@ class NewtonSolver(NonlinearSolver):
         system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
         if (my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac):
             my_asm_jac._update(system)
+
         self._linearize()
 
         self.linear_solver.solve(['linear'], 'fwd')
@@ -265,27 +266,11 @@ class NewtonSolver(NonlinearSolver):
             if self.linear_solver._assembled_jac is not None:
                 self.linear_solver._assembled_jac.set_complex_step_mode(active)
 
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
-
     def cleanup(self):
         """
         Clean up resources prior to exit.
         """
-        super(NewtonSolver, self).cleanup()
+        super().cleanup()
 
         if self.linear_solver:
             self.linear_solver.cleanup()

@@ -41,6 +41,7 @@ class CacheLinearTestCase(unittest.TestCase):
                 self.add_input('c', val=1.)
                 self.add_output('states', val=[0,0])
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
@@ -78,15 +79,10 @@ class CacheLinearTestCase(unittest.TestCase):
 
                 if mode == 'fwd':
                     print("incoming initial guess", d_outputs['states'])
-                    if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                        d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
-                    else:
-                        d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'], atol='legacy')[0]
+                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
+
                 elif mode == 'rev':
-                    if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                        d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
-                    else:
-                        d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol='legacy')[0]
+                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
 
         p = om.Problem()
         p.driver = om.ScipyOptimizeDriver()

@@ -29,7 +29,7 @@ def index_to_varname(system, loc):
     """
     start = end = 0
     varsizes = np.sum(system._owned_sizes, axis=0)
-    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
         end += varsizes[i]
         if loc < end:
             varname = system._var_allprocs_abs2prom['output'][name]
@@ -153,7 +153,7 @@ def format_nan_error(system, matrix):
 
     varnames = []
     start = end = 0
-    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
         end += varsizes[i]
         if np.any(nanrows[start:end]):
             varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
@@ -174,7 +174,7 @@ class DirectSolver(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(DirectSolver, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
@@ -200,7 +200,7 @@ class DirectSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(DirectSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
 
     def _linearize_children(self):
@@ -232,7 +232,7 @@ class DirectSolver(LinearSolver):
         x_data = xvec.asarray(copy=True)
 
         nmtx = x_data.size
-        eye = np.eye(nmtx)
+        seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_scope()
         vnames = ['linear']
@@ -240,14 +240,16 @@ class DirectSolver(LinearSolver):
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
             # set value of x vector to provided value
-            xvec.set_val(eye[:, i])
+            seed[i - 1] = 0.
+            seed[i] = 1.
+            xvec.set_val(seed)
 
             # apply linear
             system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
                                  scope_out, scope_in)
 
             # put new value in out_vec
-            mtx[:, i] = bvec._data
+            mtx[:, i] = bvec.asarray()
 
         # Restore the backed-up vectors
         bvec.set_val(b_data)
@@ -430,13 +432,13 @@ class DirectSolver(LinearSolver):
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
-            x_vec = d_outputs._data
-            b_vec = d_residuals._data
+            x_vec = d_outputs.asarray()
+            b_vec = d_residuals.asarray()
             trans_lu = 0
             trans_splu = 'N'
         else:  # rev
-            x_vec = d_residuals._data
-            b_vec = d_outputs._data
+            x_vec = d_residuals.asarray()
+            b_vec = d_outputs.asarray()
             trans_lu = 1
             trans_splu = 'T'
 

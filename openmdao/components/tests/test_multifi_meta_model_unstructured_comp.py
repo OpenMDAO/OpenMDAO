@@ -8,7 +8,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 class MockSurrogate(om.MultiFiSurrogateModel):
 
     def __init__(self):
-        super(MockSurrogate, self).__init__()
+        super().__init__()
         self.xtrain = None
         self.ytrain = None
 
@@ -43,7 +43,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): No surrogate specified for output 'y'")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: No surrogate specified for output 'y'")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of input samples
@@ -71,7 +71,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of output samples
@@ -99,7 +99,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
+        msg = ("'mm' <class MultiFiMetaModelUnStructuredComp>: Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_inputs_wrt_nfidelity(self):
@@ -372,8 +372,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
-        expected = ("mm: Multiple input features cannot have the same value.")
-        self.assertEqual(str(cm.exception), expected)
+        self.assertEqual(str(cm.exception), "'mm' <class MultiFiMetaModelUnStructuredComp>: "
+                         "Error calling compute(), Multiple input features cannot have the same value.")
 
     def test_om_slice_in_add_input(self):
 

@@ -4,24 +4,21 @@ Definition of the SqliteCaseReader.
 import sqlite3
 from collections import OrderedDict
 
-from io import StringIO
-
 import sys
 import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
-
+from openmdao.core.notebook_mode import notebook, tabulate
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 
-from openmdao.recorders.sqlite_recorder import format_version
+from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
 import pickle
 from json import loads as json_loads
-
-_DEFAULT_OUT_STREAM = object()
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -34,7 +31,7 @@ class SqliteCaseReader(BaseCaseReader):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_options : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     _format_version : int
         The version of the format assumed when loading the file.
@@ -78,7 +75,7 @@ class SqliteCaseReader(BaseCaseReader):
         pre_load : bool
             If True, load all the data into memory during initialization.
         """
-        super(SqliteCaseReader, self).__init__(filename, pre_load)
+        super().__init__(filename, pre_load)
 
         check_valid_sqlite3_db(filename)
 
@@ -108,7 +105,7 @@ class SqliteCaseReader(BaseCaseReader):
 
             # collect data from the system_metadata table. this includes:
             #   component metadata and scaling factors for each system,
-            #   which is added to system_options
+            #   which is added to _system_options
             self._collect_system_metadata(cur)
 
             # collect data from the solver_metadata table. this includes:
@@ -164,7 +161,7 @@ class SqliteCaseReader(BaseCaseReader):
         self._format_version = version = row['format_version']
 
         if version not in range(1, format_version + 1):
-            raise ValueError('SQliteCaseReader encountered an unhandled '
+            raise ValueError('SqliteCaseReader encountered an unhandled '
                              'format version: {0}'.format(self._format_version))
 
         if version >= 11:
@@ -263,10 +260,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
         for row in cur:
             id = row[0]
-            self.system_options[id] = {}
+            self._system_options[id] = {}
 
-            self.system_options[id]['scaling_factors'] = pickle.loads(row[1])
-            self.system_options[id]['component_options'] = pickle.loads(row[2])
+            self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
+            self._system_options[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
         """
@@ -343,10 +340,11 @@ class SqliteCaseReader(BaseCaseReader):
         if self._format_version >= 2 and self._problem_cases.count() > 0:
             sources.extend(self._problem_cases.list_sources())
 
-        if out_stream:
+        if notebook and tabulate is not None:
+            return tabulate([sources], headers=["Source"], tablefmt='html')
+        elif out_stream:
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
-
             for source in sources:
                 out_stream.write('{}\n'.format(source))
 
@@ -410,6 +408,159 @@ class SqliteCaseReader(BaseCaseReader):
 
         return dct
 
+    def systems(self, tree=None, path=None, paths=[]):
+        """
+        List pathnames of systems in the system hierarchy.
+
+        Parameters
+        ----------
+        tree : dict
+            Nested dictionary of system information
+        path : str or None
+            Pathname of root system (None for the root model)
+        paths : list
+            List to which pathnames are appended
+
+        Returns
+        -------
+        list
+            List of pathnames of systems
+        """
+        if tree is None:
+            tree = self.problem_metadata['tree']
+
+        path = '.'.join([path, tree['name']]) if path else tree['name']
+        paths.append(path)
+
+        if 'children' in tree:
+            for child in tree['children']:
+                if child['type'] == 'subsystem':
+                    self.systems(child, path, paths)
+
+        return paths
+
+    def list_model_options(self, run_number=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List model options for the specified run.
+
+        Parameters
+        ----------
+        run_number : int
+            Run_driver or run_model iteration to inspect
+        system : str or None
+            Pathname of system (None for all systems)
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {system: {key: val}}
+        """
+        dct = {}
+
+        if not self._system_options:
+            simple_warning("System options not recorded.")
+            return dct
+
+        if out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        num_header = None
+
+        # need to handle edge case for v11 recording
+        if self._format_version < 12:
+            SEP = '_'
+        else:
+            SEP = META_KEY_SEP
+
+        for key in self._system_options:
+            if key.find(SEP) > 0:
+                name, num = key.rsplit(SEP, 1)
+            else:
+                name = key
+                num = 0
+
+            if (system is None or system == name) and (run_number == int(num)):
+
+                if out_stream:
+                    if num_header != num:
+                        out_stream.write(f"Run Number: {num}\n")
+                        num_header = num
+
+                    out_stream.write(f"    Subsystem: {name}\n")
+
+                dct[name] = {}
+
+                comp_options = self._system_options[key]['component_options']
+
+                for opt, val in comp_options.items():
+                    dct[name][opt] = val
+
+                    if out_stream:
+                        out_stream.write(f"        {opt} : {val}\n")
+
+        return dct
+
+    def list_solver_options(self, run_number=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List solver options for the specified run.
+
+        Parameters
+        ----------
+        run_number : int
+            Run_driver or run_model iteration to inspect
+        solver : str or None
+            Pathname of solver (None for all solvers)
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {solver: {key: val}}
+        """
+        dct = {}
+
+        if not self.solver_metadata:
+            simple_warning("Solver options not recorded.")
+            return dct
+
+        if out_stream is _DEFAULT_OUT_STREAM:
+            out_stream = sys.stdout
+
+        num_header = None
+
+        for key in self.solver_metadata:
+            if key.find(META_KEY_SEP) > 0:
+                name, num = key.rsplit(META_KEY_SEP, 1)
+            else:
+                name = key
+                num = 0
+
+            if (solver is None or solver == name) and (run_number == int(num)):
+
+                if out_stream:
+                    if num_header != num:
+                        out_stream.write(f"Run Number: {num}\n")
+                        num_header = num
+
+                    out_stream.write(f"    Solver: {name}\n")
+
+                dct[name] = {}
+
+                comp_options = self.solver_metadata[key]['solver_options']
+
+                for opt, val in comp_options.items():
+                    dct[name][opt] = val
+
+                    if out_stream:
+                        out_stream.write(f"        {opt} : {val}\n")
+
+        return dct
+
     def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
         Iterate over Driver, Solver and System cases in order.
@@ -455,7 +606,11 @@ class SqliteCaseReader(BaseCaseReader):
                             (source, type(source).__name__))
 
         if not source:
-            return self._list_cases_recurse_flat(out_stream=out_stream)
+            if notebook and tabulate is not None:
+                cases = self._list_cases_recurse_flat(out_stream=out_stream)
+                return tabulate(cases, headers="keys", tablefmt='html')
+            else:
+                return self._list_cases_recurse_flat(out_stream=out_stream)
 
         elif source == 'problem':
             if self._format_version >= 2:
@@ -476,7 +631,10 @@ class SqliteCaseReader(BaseCaseReader):
                 case_table = None
 
             if case_table is not None:
-                if not recurse:
+                if notebook and tabulate is not None:
+                    cases = [[case] for case in case_table._cases.keys()]
+                    return tabulate(cases, headers=[source], tablefmt='html')
+                elif not recurse:
                     # return list of cases from the source alone
                     return case_table.list_cases(source)
                 elif flat:
@@ -484,7 +642,7 @@ class SqliteCaseReader(BaseCaseReader):
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.name)
+                        cases += self._list_cases_recurse_flat(case.name, out_stream=out_stream)
                     return cases
                 else:
                     # return nested dict of cases from the source and child cases
@@ -570,7 +728,11 @@ class SqliteCaseReader(BaseCaseReader):
             if out_stream is _DEFAULT_OUT_STREAM:
                 out_stream = sys.stdout
 
-            write_source_table(self.source_cases_table, out_stream)
+            if notebook:
+                nb_format = {key: [val] for key, val in self.source_cases_table.items() if val}
+                return nb_format
+            else:
+                write_source_table(self.source_cases_table, out_stream)
 
         return cases
 
@@ -1151,10 +1313,10 @@ class DriverCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(DriverCases, self).__init__(filename, format_version,
-                                          'driver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'driver_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
         self._var_info = var_info
 
     def cases(self, cache=False):
@@ -1331,10 +1493,10 @@ class SystemCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(SystemCases, self).__init__(filename, format_version,
-                                          'system_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'system_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
 
 class SolverCases(CaseTable):
@@ -1370,10 +1532,10 @@ class SolverCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(SolverCases, self).__init__(filename, format_version,
-                                          'solver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                          var_info)
+        super().__init__(filename, format_version,
+                         'solver_iterations', 'iteration_coordinate', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1437,10 +1599,10 @@ class ProblemCases(CaseTable):
         var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
-        super(ProblemCases, self).__init__(filename, format_version,
-                                           'problem_cases', 'case_name', giter,
-                                           prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
-                                           var_info)
+        super().__init__(filename, format_version,
+                         'problem_cases', 'case_name', giter,
+                         prom2abs, abs2prom, abs2meta, conns, auto_ivc_map,
+                         var_info)
 
     def list_sources(self):
         """

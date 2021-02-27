@@ -15,7 +15,6 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.general_utils import printoptions
 
@@ -257,7 +256,7 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
         self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
         self.assertEqual(expected_msg, str(cm.exception))
 
 

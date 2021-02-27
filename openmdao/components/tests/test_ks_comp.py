@@ -61,6 +61,8 @@ class TestKSFunction(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS', indices=1), 34.0)
         assert_near_equal(prob.get_val('ks.KS', indices=2), 51.0)
 
+        prob.model.ks._no_check_partials = False  # override skipping of check_partials
+
         partials = prob.check_partials(includes=['ks'], out_stream=None)
 
         for (of, wrt) in partials['ks']:
@@ -121,7 +123,7 @@ class TestKSFunction(unittest.TestCase):
         stress0 = prob['parallel.sub_0.stress_comp.stress_0']
         stress1 = prob['parallel.sub_0.stress_comp.stress_1']
 
-        # Test that the the maximum constraint prior to aggregation is close to "active".
+        # Test that the maximum constraint prior to aggregation is close to "active".
         assert_near_equal(max(stress0), 100.0, tolerance=5e-2)
         assert_near_equal(max(stress1), 100.0, tolerance=5e-2)
 

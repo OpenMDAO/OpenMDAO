@@ -160,7 +160,7 @@ class N2Toolbar {
         // Expand the search bar and set focus when search button clicked
         d3.select('#searchbar-container').on('click', function () {
             self.searchCount.html('0 matches');
-            
+
             self.searchBar.node().value = '';
             d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
 
@@ -214,7 +214,7 @@ class N2Toolbar {
 
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
-     * @param {N2UserInterface} n2ui A reference to the UI object 
+     * @param {N2UserInterface} n2ui A reference to the UI object
      */
     _setupButtonFunctions(n2ui) {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
@@ -262,7 +262,7 @@ class N2Toolbar {
             });
 
         new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Remove all connection arrows",
+            "Control connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
@@ -282,11 +282,35 @@ class N2Toolbar {
                 self._setRootButton(target);
             });
 
-        new N2ToolbarButtonToggle('#linear-solver-button', tooltipBox,
-            ["Show non-linear solvers", "Show linear solvers"],
-            pred => { return !n2ui.n2Diag.showLinearSolverNames; },
-            e => { n2ui.toggleSolverNamesCheckboxChange(); }
-        );
+        new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
+            "Control solver tree display",
+            function (target) {
+                n2ui.setSolvers(true);
+                n2ui.showSolvers();
+            });
+
+        new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
+            "Show linear solvers",
+            function (target) {
+                n2ui.setSolvers(true);
+                n2ui.showSolvers();
+                self._setRootButton(target);
+            });
+
+        new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
+            "Show non-linear solvers",
+            function (target) {
+                n2ui.setSolvers(false);
+                n2ui.showSolvers();
+                self._setRootButton(target);
+            });
+
+        new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
+            "Hide solvers",
+            function (target) {
+                n2ui.hideSolvers();
+                self._setRootButton(target);
+            });
 
         new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],
@@ -294,18 +318,32 @@ class N2Toolbar {
             e => { n2ui.toggleLegend(); }
         );
 
+        new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
+            ["Show optimization variables", "Hide optimization variables"],
+            pred => { return n2ui.desVars; },
+            e => { n2ui.toggleDesVars(); }
+        );
+
         new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox, "Set text height");
         new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox, "Set collapse depth");
         new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox, "Set model height");
 
+        new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
+            "Save or Load an Image or View");
+
         new N2ToolbarButtonClick('#save-button', tooltipBox,
             "Save to SVG", e => { n2ui.n2Diag.saveSvg() });
 
+        new N2ToolbarButtonClick('#save-state-button', tooltipBox,
+            "Save View", e => { n2ui.saveState() });
+
+        new N2ToolbarButtonClick('#load-state-button', tooltipBox,
+            "Load View", e => { n2ui.loadState() });
+
         new N2ToolbarButtonToggle('#info-button', tooltipBox,
-            ["Show detailed node information", "Hide detailed node information"],
-            pred => { return n2ui.nodeInfoBox.hidden; },
+            ["Hide detailed node information", "Show detailed node information"],
+            pred => { return n2ui.nodeInfoBox.active; },
             e => {
-                n2ui.nodeInfoBox.unpin();
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
             }
@@ -313,8 +351,8 @@ class N2Toolbar {
 
         new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
-            pred => { return d3.select("#myModal").style('display') == "block"; },
-            DisplayModal
+            pred => { return !!(d3.select(".window-theme-help").size()); },
+            e => { new N2Help() }
         );
 
         new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,

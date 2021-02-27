@@ -32,7 +32,7 @@ class ParaboloidAE(om.ExplicitComponent):
     The AE in ParaboloidAE stands for AnalysisError."""
 
     def __init__(self):
-        super(ParaboloidAE, self).__init__()
+        super().__init__()
         self.fail_hard = False
 
     def setup(self):
@@ -86,7 +86,7 @@ class ParaboloidAE(om.ExplicitComponent):
         self.grad_iter_count += 1
 
 
-class DummyComp(om.ExecComp):
+class DummyComp(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -96,7 +96,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -224,6 +224,47 @@ class TestMPIScatter(unittest.TestCase):
         obj = prob.driver.get_objective_values()
 
         assert_near_equal(obj['sum.f_sum'], 0.0, 2e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.zeros(7),
+                          1e-5)
+
+    def test_paropt_distcomp(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones((size, )))
+        ivc.add_output('y', np.ones((size, )))
+        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+                                               f_sum=np.ones((size, )),
+                                               f_xy=np.ones((size, ))),
+                            promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='ParOpt')
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_driver()
+
+        desvar = prob.driver.get_design_var_values()
+        con = prob.driver.get_constraint_values()
+        obj = prob.driver.get_objective_values()
+
+        assert_near_equal(obj['sum.f_sum'], 0.0, 4e-6)
         assert_near_equal(con['parab.f_xy'],
                           np.zeros(7),
                           1e-5)
@@ -1207,6 +1248,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y2', val=0.0)
                 self.add_output('y1', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -1230,6 +1272,7 @@ class TestPyoptSparse(unittest.TestCase):
                 self.add_input('y1', val=0.0)
                 self.add_output('y2', val=0.0)
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute(self, inputs, outputs):
@@ -1488,6 +1531,77 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='rev')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                                 str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue("('comp.f_xy', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = OPTIMIZER
+        if OPTIMIZER == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['print_results'] = False
+
+        prob.driver.options['debug_print'] = ['totals']
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup(check=False, mode='fwd')
+
+        failed, output = run_driver(prob)
+
+        self.assertFalse(failed, "Optimization failed, info = " +
+                             str(prob.driver.pyopt_solution.optInform))
+
+        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue("('p2.y', [1])" in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+    def test_debug_print_option_totals_no_ivc(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
 
         prob.set_solver_print(level=0)
 
@@ -1910,6 +2024,31 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
+    def test_ParOpt_basic(self):
+        _, local_opt = set_pyoptsparse_opt('ParOpt')
+        if local_opt != 'ParOpt':
+            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped()
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "ParOpt"
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_driver()
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -2178,12 +2317,12 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('x', val=0.)
                 self.add_input('y2', val=1.0)
                 self.add_output('y1', val=1.0)
-
-                self.declare_partials('*', '*')
-
                 self.fail_deriv = [2, 4]
                 self.count_iter = 0
                 self.failed = 0
+
+            def setup_partials(self):
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
 
@@ -2211,6 +2350,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.add_input('y1', val=1.0)
                 self.add_output('y2', val=1.0)
 
+            def setup_partials(self):
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
@@ -2302,7 +2442,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.options['user_terminate_signal'] = signal.SIGUSR2
+        prob.driver.options['user_terminate_signal'] = signal.SIGUSR1
 
     def test_options_deprecated(self):
         # Not a feature test.
@@ -2319,7 +2459,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
 class MatMultCompExact(om.ExplicitComponent):
     def __init__(self, mat, sparse=False, **kwargs):
-        super(MatMultCompExact, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.mat = mat
         self.sparse = sparse
 
@@ -2357,7 +2497,7 @@ class MatMultCompExact(om.ExplicitComponent):
 
 class MyGroup(om.Group):
     def __init__(self, size=5):
-        super(MyGroup, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):

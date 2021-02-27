@@ -6,7 +6,7 @@ Approximating Partial Derivatives
 
 OpenMDAO allows you to specify analytic derivatives for your models, but it is not a requirement.
 If certain partial derivatives are not available, you can ask the framework to approximate the
-derivatives by using the :code:`declare_partials` method inside :code:`setup`, and give it a
+derivatives by using the :code:`declare_partials` method inside :code:`setup_partials`, and give it a
 method that is either 'fd' for finite difference or 'cs' for complex step.
 
 .. automethod:: openmdao.core.component.Component.declare_partials
@@ -41,7 +41,7 @@ Complex Step
 If you have a pure python component (or an external code that can support complex inputs and outputs), then you can also choose to use
 complex step to calculate the Jacobian of that component. This will give more accurate derivatives that are less sensitive to the step size.
 Like finite difference, complex step runs your component using the :code:`apply_nonlinear` or :code:`solve_nonlinear` functions, but it applies a step
-in the complex direction. You can activate it using the :code:`declare_partials` method inside :code:`setup` and giving it a method of 'cs'.
+in the complex direction. You can activate it using the :code:`declare_partials` method inside :code:`setup_partials` and giving it a method of 'cs'.
 In many cases, this will require no other changes to your code, as long as all of the calculation in your :code:`solve_nonlinear` and
 :code:`apply_nonlinear` support complex numbers. During a complex step, the incoming inputs vector will return a complex number when a variable
 is being stepped. Likewise, the outputs and residuals vectors will accept complex values. If you are allocating temporary numpy arrays,

@@ -13,10 +13,13 @@ __version__ = re.findall(
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'mock',
         'numpydoc>=0.9.1',
         'redbaron',
         'sphinx>=1.8.5',
+    ],
+    'notebooks': [
+        'notebook',
+        'tabulate'
     ],
     'visualization': [
         'bokeh>=1.3.4',
@@ -29,7 +32,8 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'pyppeteer2'
+        'pyppeteer',
+        'aiounittest'
     ]
 }
 
@@ -99,16 +103,22 @@ setup(
         'openmdao.test_suite.test_examples',
         'openmdao.test_suite.test_examples.beam_optimization',
         'openmdao.test_suite.test_examples.beam_optimization.components',
+        'openmdao.test_suite.test_examples.cannonball',
         'openmdao.test_suite.test_examples.meta_model_examples',
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
+        'openmdao.visualization' : [
+            'common/libs/*.js',
+            'common/style/*.css'
+        ],
         'openmdao.visualization.n2_viewer': [
             'assets/*',
             'libs/*.js',
@@ -121,8 +131,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
-            'libs/*.js',
-            'style/*.css'
+        ],
+        'openmdao.visualization.scaling_viewer': [
+            '*.html',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
@@ -188,6 +199,7 @@ setup(
             'doedriver=openmdao.drivers.doe_driver:DOEDriver',
             'driver=openmdao.core.driver:Driver',
             'simplegadriver=openmdao.drivers.genetic_algorithm_driver:SimpleGADriver',
+            'differentialevolutiondriver=openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver',
             'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
             'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
         ],

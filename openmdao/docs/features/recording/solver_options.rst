@@ -4,6 +4,9 @@
 Solver Recording
 *****************
 
+Solver recording is useful when you want to record the iterations within a solver.
+The recorder can capture the values of states, errors, and residuals as the solver converges.
+
 Solver Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-options::
@@ -25,6 +28,6 @@ Solver Recording Options
 Solver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_options
+    openmdao.recorders.tests.test_sqlite_recorder.TestFeatureSqliteRecorder.test_feature_solver_recording_options
     :layout: interleave
 

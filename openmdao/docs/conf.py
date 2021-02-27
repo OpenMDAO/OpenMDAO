@@ -5,7 +5,7 @@ import sys
 import os
 import importlib
 
-from mock import Mock
+from unittest.mock import Mock
 
 from openmdao.docs.config_params import MOCK_MODULES
 from openmdao.docs._utils.patch import do_monkeypatch
@@ -156,7 +156,7 @@ html_logo = '_static/OpenMDAO_Logo.png'
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = '_static/OpenMDAO_Favicon.ico'
+html_favicon = '_static/favicon.svg'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.

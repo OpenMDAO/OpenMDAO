@@ -24,10 +24,12 @@ class ArrayComp(om.ExplicitComponent):
         # Outputs
         self.add_output('y1', np.zeros([4]))
 
-        self.declare_partials(of='*', wrt='*')
+        self.exec_count = 0
         self.set_check_partial_options('x*', directional=True)
 
-        self.exec_count = 0
+    def setup_partials(self):
+        self.declare_partials(of='*', wrt='*')
+
 
     def compute(self, inputs, outputs):
         """

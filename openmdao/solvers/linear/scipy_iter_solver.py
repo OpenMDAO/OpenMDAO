@@ -37,7 +37,7 @@ class ScipyKrylov(LinearSolver):
         **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
-        super(ScipyKrylov, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # initialize preconditioner to None
         self.precon = None
@@ -56,7 +56,7 @@ class ScipyKrylov(LinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(ScipyKrylov, self)._declare_options()
+        super()._declare_options()
 
         self.options.declare('solver', default='gmres', values=tuple(_SOLVER_TYPES.keys()),
                              desc='function handle for actual solver')
@@ -81,7 +81,7 @@ class ScipyKrylov(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(ScipyKrylov, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
 
         if self.precon is not None:
             self.precon._setup_solvers(self._system(), self._depth + 1)
@@ -99,7 +99,7 @@ class ScipyKrylov(LinearSolver):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        super(ScipyKrylov, self)._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_)
 
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
@@ -154,9 +154,9 @@ class ScipyKrylov(LinearSolver):
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
-        # print('out', b_vec._data)
+        # print('out', b_vec.asarray())
 
-        return b_vec._data
+        return b_vec.asarray()
 
     def _monitor(self, res):
         """
@@ -215,7 +215,7 @@ class ScipyKrylov(LinearSolver):
                 x_vec = system._vectors['residual'][vec_name]
                 b_vec = system._vectors['output'][vec_name]
 
-            x_vec_combined = x_vec._data
+            x_vec_combined = x_vec.asarray()
             size = x_vec_combined.size
             linop = LinearOperator((size, size), dtype=float,
                                    matvec=self._mat_vec)

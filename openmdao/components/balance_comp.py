@@ -6,6 +6,7 @@ from numbers import Number
 import numpy as np
 
 from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.utils import cs_safe
 
 
 class BalanceComp(ImplicitComponent):
@@ -132,16 +133,18 @@ class BalanceComp(ImplicitComponent):
             (see `add_output` method).
         """
         if 'guess_func' in kwargs:
-            super(BalanceComp, self).__init__(guess_func=kwargs['guess_func'])
+            super().__init__(guess_func=kwargs['guess_func'])
             kwargs.pop('guess_func')
         else:
-            super(BalanceComp, self).__init__()
+            super().__init__()
 
         self._state_vars = {}
 
         if name is not None:
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
                              use_mult, mult_name, mult_val, normalize, val, **kwargs)
+
+        self._no_check_partials = True
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -167,12 +170,12 @@ class BalanceComp(ImplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
 
                 # Compute scaling factors
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
             else:
                 self._scale_factor[:] = 1.0
@@ -209,11 +212,11 @@ class BalanceComp(ImplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(np.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
 
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / np.abs(rhs[idxs_nnz])
+                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
                 self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
@@ -314,7 +317,13 @@ class BalanceComp(ImplicitComponent):
 
         self._state_vars[name] = options
 
-        if val is not None:
+        if val is None:
+            # If user doesn't specify initial guess for val, we can size problem from initial
+            # rhs_val.
+            if 'shape' not in kwargs and not np.isscalar(rhs_val):
+                kwargs['shape'] = rhs_val.shape
+
+        else:
             options['kwargs']['val'] = val
 
         meta = self.add_output(name, **options['kwargs'])

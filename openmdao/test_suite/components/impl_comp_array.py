@@ -18,6 +18,7 @@ class TestImplCompArray(om.ImplicitComponent):
         self.add_input('rhs', val=np.ones(2))
         self.add_output('x', val=np.zeros(2))
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -56,6 +57,9 @@ class TestImplCompArraySparse(TestImplCompArray):
 
 
 class TestImplCompArrayMatVec(TestImplCompArray):
+
+    def setup_partials(self):
+        pass
 
     def linearize(self, inputs, outputs, jacobian):
         pass

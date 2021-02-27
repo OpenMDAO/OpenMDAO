@@ -46,8 +46,8 @@ def _check_cycles(group, infos=None):
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
-    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
-    cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+    cycles = [sorted(s, key=lambda n: group._subsystems_allprocs[n].index)
+              for s in sccs if len(s) > 1]
 
     if cycles and infos is not None:
         infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
@@ -155,13 +155,11 @@ def _get_used_before_calc_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    sub2i = {}
     parallel_solver = {}
-    for i, sub in enumerate(group._subsystems_allprocs):
+    allsubs = group._subsystems_allprocs
+    for sub, i in allsubs.values():
         if hasattr(sub, '_mpi_proc_allocator') and sub._mpi_proc_allocator.parallel:
             parallel_solver[sub.name] = sub.nonlinear_solver.SOLVER
-
-        sub2i[sub.name] = i
 
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
@@ -182,8 +180,8 @@ def _get_used_before_calc_subs(group, input_srcs):
                                "to '%s' when connecting components inside parallel "
                                "groups" % (src_sys))
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
-            if (src_sys in sub2i and tgt_sys in sub2i and
-                    (sub2i[src_sys] > sub2i[tgt_sys])):
+            if (src_sys in allsubs and tgt_sys in allsubs and
+                    (allsubs[src_sys].index > allsubs[tgt_sys].index)):
                 ubcs[tgt_sys].add(src_sys)
 
     return ubcs
@@ -303,9 +301,10 @@ def _list_has_val_mismatch(discretes, names, units, vals):
 
 def _check_hanging_inputs(problem, logger):
     """
-    Issue a logger warning if any inputs are not connected.
+    Issue a logger warning if any model inputs are not connected.
 
-    Promoted inputs are shown alongside their corresponding absolute names.
+    If an input is declared as a design variable, it is considered to be connected. Promoted
+    inputs are shown alongside their corresponding absolute names.
 
     Parameters
     ----------
@@ -314,55 +313,28 @@ def _check_hanging_inputs(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    if isinstance(problem.model, Component):
-        input_srcs = {}
-    else:
-        input_srcs = problem.model._conn_global_abs_in2out
+    model = problem.model
+    if isinstance(model, Component):
+        return
 
-    prom_ins = problem.model._var_allprocs_prom2abs_list['input']
-    abs2meta = problem.model._var_allprocs_abs2meta
+    conns = model._conn_global_abs_in2out
+    abs2prom = model._var_allprocs_abs2prom['input']
+    desvar = problem.driver._designvars
     unconns = []
-    nwid = uwid = 0
+    for abs_tgt, src in conns.items():
+        if src.startswith('_auto_ivc.'):
+            prom_tgt = abs2prom[abs_tgt]
 
-    for prom, abslist in prom_ins.items():
-        unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
-        if unconn:
-            w = max([len(u) for u in unconn])
-            if w > nwid:
-                nwid = w
-            units = [abs2meta[a]['units'] if a in abs2meta else '' for a in unconn]
-            units = [u if u is not None else '' for u in units]
-            lens = [len(u) for u in units]
-            if lens:
-                u = max(lens)
-                if u > uwid:
-                    uwid = u
-            unconns.append((prom, unconn, units))
+            # Ignore inputs that are declared as design vars.
+            if desvar and prom_tgt in desvar:
+                continue
+
+            unconns.append((prom_tgt, abs_tgt))
 
     if unconns:
-        template_abs = "   {:<{nwid}} {:<{uwid}} {}\n"
-        template_prom = "      {:<{nwid}} {:<{uwid}} {}\n"
         msg = ["The following inputs are not connected:\n"]
-        for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
-            if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                a = absnames[0]
-                valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
-            else:  # promoted
-                vals = [problem.get_val(a, get_remote=True) for a in absnames]
-                mismatch = _list_has_val_mismatch(problem.model._var_allprocs_discrete['input'],
-                                                  absnames, units, vals)
-                if mismatch:
-                    msg.append("\n   ----- WARNING: connected input values don't match when "
-                               "converted to consistent units. -----\n")
-                msg.append("   {}  (p):\n".format(prom))
-                for a, u, v in zip(absnames, units, vals):
-                    valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                    msg.append(template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
-                if mismatch:
-                    msg.append("   --------------------------------------------------------------"
-                               "-----------------------------\n\n")
-
+        for prom_tgt, abs_tgt in sorted(unconns):
+            msg.append(f'  {prom_tgt} ({abs_tgt})\n')
         logger.warning(''.join(msg))
 
 
@@ -380,11 +352,25 @@ def _check_comp_has_no_outputs(problem, logger):
     msg = []
 
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
-        if len(comp._var_allprocs_abs_names['output']) == 0:
+        if len(list(comp.abs_name_iter('output', local=False, discrete=True))) == 0:
             msg.append("   %s\n" % comp.pathname)
 
     if msg:
         logger.warning(''.join(["The following Components do not have any outputs:\n"] + msg))
+
+
+def _check_auto_ivc_warnings(problem, logger):
+    """
+    Issue a logger warning if any components have conflicting attributes.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    """
+    if hasattr(problem.model, "_auto_ivc_warnings"):
+        for i in problem.model._auto_ivc_warnings:
+            logger.warning(i)
 
 
 def _check_system_configs(problem, logger):
@@ -433,8 +419,8 @@ def _check_solvers(problem, logger):
         if isinstance(sys, Group):
             graph = sys.compute_sys_graph(comps_only=False)
             sccs = get_sccs_topo(graph)
-            sub2i = {sub.name: i for i, sub in enumerate(sys._subsystems_allprocs)}
-            has_cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+            allsubs = sys._subsystems_allprocs
+            has_cycles = [sorted(s, key=lambda n: allsubs[n].index) for s in sccs if len(s) > 1]
         else:
             has_cycles = []
 
@@ -592,6 +578,7 @@ _default_checks = {
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
+    'auto_ivc_warnings': _check_auto_ivc_warnings
 }
 
 _all_checks = _default_checks.copy()
@@ -664,7 +651,7 @@ def _check_config_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def check_allocate_complex_ln(model, under_cs):
+def check_allocate_complex_ln(group, under_cs):
     """
     Return True if linear vector should be complex.
 
@@ -672,8 +659,8 @@ def check_allocate_complex_ln(model, under_cs):
 
     Parameters
     ----------
-    model : <Group>
-        Model to be checked, usually the root model.
+    group : <Group>
+        Group to be checked.
     under_cs : bool
         Flag indicates if complex vectors were allocated in a containing Group or were force
         allocated in setup.
@@ -683,16 +670,14 @@ def check_allocate_complex_ln(model, under_cs):
     bool
         True if linear vector should be complex.
     """
-    under_cs |= 'cs' in model._approx_schemes
+    under_cs |= 'cs' in group._approx_schemes
 
-    if under_cs and model.nonlinear_solver is not None and \
-       model.nonlinear_solver.supports['gradients']:
+    if under_cs and group.nonlinear_solver is not None and \
+       group.nonlinear_solver.supports['gradients']:
         return True
 
-    for sub in model._subsystems_allprocs:
-        chk = check_allocate_complex_ln(sub, under_cs)
-
-        if chk:
+    for sub, _ in group._subsystems_allprocs.values():
+        if isinstance(sub, Group) and check_allocate_complex_ln(sub, under_cs):
             return True
 
     return False

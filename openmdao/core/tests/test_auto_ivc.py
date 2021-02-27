@@ -38,7 +38,7 @@ def _test_func_name(func, num, param):
 
 class PathCompEx(om.ExplicitComponent):
     def __init__(self, s=''):
-        super(PathCompEx, self).__init__()
+        super().__init__()
         self.s = s
 
     def setup(self):
@@ -206,44 +206,45 @@ class SerialTests(unittest.TestCase):
         try:
             p.setup()
         except Exception as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', value=?), where <group> is the Group named 'par' to remove the ambiguity.")
+            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
+
+    def test_obj_using_input_name(self):
+        class Phase(om.Group):
+            def setup(self):
+                self.add_subsystem('C1', om.ExecComp('y=.5*x'))
+                self.add_subsystem('C2', om.ExecComp('y=g*x'))
+                self.add_subsystem('C3', om.ExecComp('y=-x'))
+
+                # this is the culprit.  Bug when objective is added in group using input name
+                self.add_objective('C2.g')
+                self.add_design_var('C2.g')
+
+                self.connect('C1.y', 'C2.x')
+                self.connect('C2.y', 'C3.x')
+
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x'))
+        indep.add_output('g')
+
+        p.model.add_subsystem('phase0', Phase())
+
+        p.model.connect('indep.x', 'phase0.C1.x')
+
+        p.model.add_design_var('indep.x')
+        p.model.add_constraint('phase0.C3.y', equals=0.0)
+
+        p.setup(force_alloc_complex=True)
+        p['indep.x'] = [9.9]
+        p['indep.g'] = 9.80665
+        p.run_model()
+        totals = p.check_totals(compact_print=True, method='cs', out_stream=None)
+        for key, meta in totals.items():
+            np.testing.assert_allclose(meta['abs error'][0], 0.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(SerialTests):
 
     N_PROCS = 2
-
-
-class C1(om.ExplicitComponent):
-    def setup(self):
-        self.add_input('diameter', 0.0, units='m', src_indices=[0])
-        self.add_output('z_start', 0.0, units='m')
-
-    def compute(self, inputs, outputs):
-        pass
-
-
-class C2(om.ExplicitComponent):
-
-    def setup(self):
-        self.add_input('diameter', np.zeros(3), units='m')
-
-    def compute(self, inputs, outputs):
-        pass
-
-
-class SrcIndicesTests(unittest.TestCase):
-
-    def test_mixed_src_indices_no_src_indices(self):
-        # this test passes if setup doesn't raise an exception.
-        # C1 has src_indices and C2 doesn't.
-        prob = om.Problem()
-        prob.model.add_subsystem('C1', C1(), promotes=['diameter'])
-        prob.model.add_subsystem('C2', C2(), promotes=['diameter'])
-
-        prob.setup()
-
-        prob.run_model()

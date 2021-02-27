@@ -25,10 +25,7 @@ from sphinx.writers.html import HTMLTranslator
 from sphinx.writers.html5 import HTML5Translator
 from redbaron import RedBaron
 
-if sys.version_info[0] == 2:
-    import cgi as cgiesc
-else:
-    import html as cgiesc
+import html as cgiesc
 
 from openmdao.utils.general_utils import printoptions
 
@@ -464,6 +461,9 @@ def insert_output_start_stop_indicators(src):
         '.list_inputs(',
         '.list_outputs(',
         '.list_problem_vars(',
+        '.list_cases(',
+        '.list_model_options(',
+        '.list_solver_options(',
     ]
 
     newlines = []

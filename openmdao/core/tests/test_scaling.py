@@ -1,15 +1,18 @@
 """Define the units/scaling tests."""
 import unittest
 from copy import deepcopy
+from itertools import chain
 
 import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
+from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import all_ancestors
 
 
 class PassThroughLength(om.ExplicitComponent):
@@ -198,7 +201,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -211,7 +214,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -224,7 +227,7 @@ class TestScaling(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', EComp())
 
-        msg = "EComp (comp): When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
+        msg = "'comp' <class EComp>: When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
         with self.assertRaises(ValueError) as context:
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
@@ -515,7 +518,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -557,7 +560,7 @@ class TestScaling(unittest.TestCase):
                 self.add_output('total_volume', val=1.)
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -603,7 +606,7 @@ class TestScaling(unittest.TestCase):
                 self.declare_partials(['*'], ['*'], method='cs')
 
             def compute(self, inputs, outputs):
-                super(ExpCompArrayScale, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = om.Problem()
@@ -679,7 +682,7 @@ class TestScaling(unittest.TestCase):
                 self.declare_partials('*', '*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -738,7 +741,7 @@ class TestScaling(unittest.TestCase):
                                 ref0=np.array([14.0, 17.0]))
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(ImpCompArrayScale, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 residuals['extra'] = 2.0*self.mtx.dot(outputs['x']) - 3.0*inputs['rhs']
 
             def linearize(self, inputs, outputs, jacobian):
@@ -811,7 +814,7 @@ class TestScaling(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 """ Don't need to do much."""
-                #super(ExpCompArrayScale, self).compute(inputs, outputs)
+                #super().compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] * 2
                 outputs['areas'] = inputs['lengths'] * 2
 
@@ -1222,6 +1225,143 @@ class TestScalingOverhaul(unittest.TestCase):
         for (of, wrt) in totals:
             assert_near_equal(totals[of, wrt]['abs error'][0], 0.0, 1e-7)
 
+
+class ExecCompVOI(om.ExecComp):
+    # adds all of its inputs as DVs and all of its outputs as constraints
+    def setup(self):
+        super().setup()
+
+        # add design vars
+        rel2meta = self._var_rel2meta
+        for name in sorted(self._var_rel_names['input']):
+            meta = rel2meta[name]
+            self.add_design_var(name, units=meta['units'])
+
+        # add constraints
+        for name in sorted(self._var_rel_names['output']):
+            meta = rel2meta[name]
+            self.add_constraint(name, units=meta['units'])
+
+
+class _Obj(object):
+    def __init__(self):
+        self.dvs = []
+        self.cons = []
+        self.objs = []
+
+
+@use_tempdirs
+class TestDriverScalingReport(unittest.TestCase):
+
+    def setup_model(self, mult_exp_range=(-10, 4), nins=1, nouts=1, ncomps=10, shape=1):
+        assert nins >= 1
+        assert nouts >= 1
+        assert ncomps >= 1
+        assert mult_exp_range[1] > mult_exp_range[0]
+
+        inidxs = np.arange(nins)
+        outidxs = np.arange(nouts)
+
+        expected = _Obj()
+        expected.objs.append("objective_comp.out")
+
+        p = om.Problem()
+        model = p.model
+        for icomp in range(ncomps):
+            exprs = []
+            for iout in range(nouts):
+
+                inperm = np.random.permutation(inidxs)
+                imults = "+".join([f"in{i} * 10**{(mult_exp_range[1] - mult_exp_range[0]) * np.random.random() + mult_exp_range[0]}" for
+                          i in inperm])
+                exprs.append(f"out{iout} = {imults}")
+
+            comp = model.add_subsystem(f"comp{icomp}", ExecCompVOI(exprs, shape=shape))
+
+            if icomp == 0:
+                # add a comp for the objective
+                model.add_subsystem("objective_comp", om.ExecComp("out=inp * 2", shape=shape))
+                model.add_objective("objective_comp.out")
+                model.connect("comp0.out0", "objective_comp.inp")
+
+            s_ins = sorted(f"in{i}" for i in inidxs)
+            expected.dvs.extend(f"comp{icomp}.{n}" for n in s_ins)
+            s_outs = sorted(f"out{i}" for i in outidxs)
+            expected.cons.extend(f"comp{icomp}.{n}" for n in s_outs)
+
+        p.setup()
+        return p, expected
+
+    def _check_data(self, data, expected):
+        objs = data['oflabels'][0]
+        cons = data['oflabels'][1:]
+        self.assertEqual(expected.objs, [objs])
+        self.assertEqual(expected.cons, cons)
+        self.assertEqual(expected.dvs, data['wrtlabels'])
+        self.assertEqual(0, len(data['linear']['oflabels']))
+        self.assertEqual(len(expected.objs), len(data['obj_table']))
+        self.assertEqual(len(expected.cons), len(data['con_table']))
+        self.assertEqual(len(expected.dvs), len(data['dv_table']))
+        for dvrow in data['dv_table']:
+            if dvrow['size'] > 1:
+                self.assertEqual(dvrow['size'], len(dvrow['_children']))
+                for chrow in dvrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+        for conrow in data['con_table']:
+            if conrow['size'] > 1:
+                self.assertEqual(conrow['size'], len(conrow['_children']))
+                for chrow in conrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+        for objrow in data['obj_table']:
+            if objrow['size'] > 1:
+                self.assertEqual(objrow['size'], len(objrow['_children']))
+                for chrow in objrow['_children']:
+                    self.assertEqual('', chrow['size'])
+                    self.assertTrue('_children' not in chrow)
+
+    def test_40x40_in1_out1(self):
+        p, expected = self.setup_model(ncomps=40)
+        p.final_setup()
+        # compute dict totals to make sure we handle that properly
+        p.driver._compute_totals()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_40x40_in4_out4(self):
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_40x40_in4_out4_shape10(self):
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=10, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_in100out4_shape10(self):
+        p, expected = self.setup_model(nins=100, nouts=4, ncomps=1, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_in4out100_shape10(self):
+        p, expected = self.setup_model(nins=4, nouts=100, ncomps=1, shape=10)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
+
+    def test_big_subjac(self):
+        # this gets slow with larger sizes, e.g. shape=1000 takes > 20 sec to
+        # show/hide table rows or show a subjac in the browser
+        p, expected = self.setup_model(nins=4, nouts=4, ncomps=1, shape=100)
+        p.final_setup()
+        data = p.driver.scaling_report(show_browser=False)
+        self._check_data(data, expected)
 
 if __name__ == '__main__':
     unittest.main()

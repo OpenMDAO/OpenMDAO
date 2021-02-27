@@ -1,8 +1,11 @@
 """Define the ExplicitComponent class."""
 
+import sys
 import numpy as np
 
-from openmdao.core.component import Component, _full_slice
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.core.component import Component
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -31,7 +34,7 @@ class ExplicitComponent(Component):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(ExplicitComponent, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._inst_functs = {name: getattr(self, name, None) for name in _inst_functs}
         self._has_compute_partials = overrides_method('compute_partials', self, ExplicitComponent)
@@ -65,6 +68,13 @@ class ExplicitComponent(Component):
         """
         of = list(self._var_rel_names['output'])
         wrt = list(self._var_rel_names['input'])
+
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            of = [n for n in of if n not in self._discrete_outputs]
+        if self._discrete_inputs:
+            wrt = [n for n in wrt if n not in self._discrete_inputs]
+
         return of, wrt
 
     def _get_partials_var_sizes(self):
@@ -81,7 +91,7 @@ class ExplicitComponent(Component):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
 
-    def _jacobian_wrt_iter(self, wrt_matches=None):
+    def _partial_jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -94,11 +104,10 @@ class ExplicitComponent(Component):
         """
         if wrt_matches is None:
             wrt_matches = ContainsAll()
-        abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
-        for wrt in self._var_allprocs_abs_names['input']:
+        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
             if wrt in wrt_matches:
-                end += abs2meta[wrt]['size']
+                end += meta['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
 
@@ -106,17 +115,13 @@ class ExplicitComponent(Component):
         """
         Call setup_partials in components.
         """
-        super(ExplicitComponent, self)._setup_partials()
+        super()._setup_partials()
 
-        abs2meta = self._var_abs2meta
         abs2prom_out = self._var_abs2prom['output']
 
         # Note: These declare calls are outside of setup_partials so that users do not have to
         # call the super version of setup_partials. This is still in the final setup.
-        for out_abs in self._var_abs_names['output']:
-            meta = abs2meta[out_abs]
-            out_name = abs2prom_out[out_abs]
-            arange = np.arange(meta['size'])
+        for out_abs, meta in self._var_abs2meta['output'].items():
 
             # No need to FD outputs wrt other outputs
             abs_key = (out_abs, out_abs)
@@ -124,16 +129,21 @@ class ExplicitComponent(Component):
                 if 'method' in self._subjacs_info[abs_key]:
                     del self._subjacs_info[abs_key]['method']
 
-            dct = {
-                'rows': arange,
-                'cols': arange,
-                'value': np.full(meta['size'], -1.),
-                'dependent': True,
-            }
+            size = meta['size']
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            if arange.size > 0:
-                self._declare_partials(out_name, out_name, dct)
+            if size > 0 and not self.matrix_free:
+                out_name = abs2prom_out[out_abs]
+                arange = np.arange(size)
+
+                dct = {
+                    'rows': arange,
+                    'cols': arange,
+                    'value': np.full(size, -1.),
+                    'dependent': True,
+                }
+
+                self._declare_partials(out_name, out_name, dct, quick_declare=True)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -148,7 +158,8 @@ class ExplicitComponent(Component):
             self._set_approx_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
+                   shape_by_conn=False, copy_shape=None):
         """
         Add an output variable to the component.
 
@@ -194,6 +205,11 @@ class ExplicitComponent(Component):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs and also when listing results from case recorders.
+        shape_by_conn : bool
+            If True, shape this output to match its connected input(s).
+        copy_shape : str or None
+            If a str, that str is the name of a variable. Shape this output to match that of
+            the named variable.
 
         Returns
         -------
@@ -203,19 +219,19 @@ class ExplicitComponent(Component):
         if res_ref is None:
             res_ref = ref
 
-        return super(ExplicitComponent, self).add_output(name,
-                                                         val=val, shape=shape, units=units,
-                                                         res_units=res_units, desc=desc,
-                                                         lower=lower, upper=upper,
-                                                         ref=ref, ref0=ref0, res_ref=res_ref,
-                                                         tags=tags)
+        return super().add_output(name, val=val, shape=shape, units=units,
+                                  res_units=res_units, desc=desc,
+                                  lower=lower, upper=upper,
+                                  ref=ref, ref0=ref0, res_ref=res_ref,
+                                  tags=tags, shape_by_conn=shape_by_conn,
+                                  copy_shape=copy_shape)
 
     def _approx_subjac_keys_iter(self):
+        is_output = self._outputs._contains_abs
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta:
+            if 'method' in meta and not is_output(abs_key[1]):
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes and
-                        not self._outputs._contains_abs(abs_key[1])):
+                if (method is not None and method in self._approx_schemes):
                     yield abs_key
 
     def _apply_nonlinear(self):
@@ -224,25 +240,23 @@ class ExplicitComponent(Component):
         """
         outputs = self._outputs
         residuals = self._residuals
-        with Recording(self.pathname + '._apply_nonlinear', self.iter_count, self):
-            with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
-                residuals.set_vec(outputs)
+        with self._unscaled_context(outputs=[outputs], residuals=[residuals]):
+            residuals.set_vec(outputs)
 
-                # Sign of the residual is minus the sign of the output vector.
-                residuals *= -1.0
+            # Sign of the residual is minus the sign of the output vector.
+            residuals *= -1.0
 
-                self._inputs.read_only = True
-                try:
-                    if self._discrete_inputs or self._discrete_outputs:
-                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
-                                     self._discrete_outputs)
-                    else:
-                        self.compute(self._inputs, self._outputs)
-                finally:
-                    self._inputs.read_only = False
+            with self._call_user_function('compute'):
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                                 self._discrete_outputs)
+                else:
+                    self.compute(self._inputs, self._outputs)
 
-                residuals += outputs
-                outputs -= residuals
+            residuals += outputs
+            outputs -= residuals
+
+        self.iter_count_apply += 1
 
     def _solve_nonlinear(self):
         """
@@ -251,15 +265,14 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_val(0.0)
-                self._inputs.read_only = True
-                try:
+                with self._call_user_function('compute'):
                     if self._discrete_inputs or self._discrete_outputs:
                         self.compute(self._inputs, self._outputs, self._discrete_inputs,
                                      self._discrete_outputs)
                     else:
                         self.compute(self._inputs, self._outputs)
-                finally:
-                    self._inputs.read_only = False
+
+            # Iteration counter is incremented in the Recording context manager at exit.
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -294,9 +307,9 @@ class ExplicitComponent(Component):
                 # Jacobian and vectors are all scaled, unitless
                 J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because compute_jacvec_product does nothing.
                 if not self.matrix_free:
+                    # if we're not matrix free, we can skip the bottom of
+                    # this loop because compute_jacvec_product does nothing.
                     continue
 
                 # Jacobian and vectors are all unscaled, dimensional
@@ -304,13 +317,29 @@ class ExplicitComponent(Component):
                         outputs=[self._outputs], residuals=[d_residuals]):
 
                     # set appropriate vectors to read_only to help prevent user error
-                    self._inputs.read_only = True
                     if mode == 'fwd':
                         d_inputs.read_only = True
-                    elif mode == 'rev':
+                    else:  # rev
                         d_residuals.read_only = True
 
                     try:
+                        # handle identity subjacs (output_or_resid wrt itself)
+                        if isinstance(J, DictionaryJacobian):
+                            rflat = self._vectors['residual'][vec_name]._abs_get_val
+                            oflat = self._vectors['output'][vec_name]._abs_get_val
+                            d_out_names = self._vectors['output'][vec_name]._names
+                            vnames = self._var_relevant_names[vec_name]['output']
+                            if mode == 'fwd':
+                                for v in vnames:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = rflat(v)
+                                        val -= oflat(v)
+                            else:  # rev
+                                for v in vnames:
+                                    if v in d_out_names and (v, v) not in self._subjacs_info:
+                                        val = oflat(v)
+                                        val -= rflat(v)
+
                         args = [self._inputs, d_inputs, d_residuals, mode]
                         if self._discrete_inputs:
                             args.append(self._discrete_inputs)
@@ -318,20 +347,22 @@ class ExplicitComponent(Component):
                         # We used to negate the residual here, and then re-negate after the hook
                         if d_inputs._ncol > 1:
                             if self.supports_multivecs:
-                                self.compute_multi_jacvec_product(*args)
+                                with self._call_user_function('compute_multi_jacvec_product'):
+                                    self.compute_multi_jacvec_product(*args)
                             else:
                                 for i in range(d_inputs._ncol):
                                     # need to make the multivecs look like regular single vecs
                                     # since the component doesn't know about multivecs.
                                     d_inputs._icol = i
                                     d_residuals._icol = i
-                                    self.compute_jacvec_product(*args)
+                                    with self._call_user_function('compute_jacvec_product'):
+                                        self.compute_jacvec_product(*args)
                                 d_inputs._icol = None
                                 d_residuals._icol = None
                         else:
-                            self.compute_jacvec_product(*args)
+                            with self._call_user_function('compute_jacvec_product'):
+                                self.compute_jacvec_product(*args)
                     finally:
-                        self._inputs.read_only = False
                         d_inputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
@@ -398,20 +429,17 @@ class ExplicitComponent(Component):
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:
-                self._inputs.read_only = True
-
                 # We don't need to set the _system attribute on jac here because jac (if not None)
                 # shares the _subjacs_info metadata with our _jacobian, and our _jacobian knows
                 # how to properly convert relative names (used by the component in compute_partials)
                 # to absolute names (used by all jacobians internally).
-                try:
-                    # We used to negate the jacobian here, and then re-negate after the hook.
+
+                # We used to negate the jacobian here, and then re-negate after the hook.
+                with self._call_user_function('compute_partials'):
                     if self._discrete_inputs:
                         self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
                     else:
                         self.compute_partials(self._inputs, self._jacobian)
-                finally:
-                    self._inputs.read_only = False
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

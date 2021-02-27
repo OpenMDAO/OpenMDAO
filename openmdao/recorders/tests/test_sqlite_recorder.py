@@ -2,6 +2,7 @@
 import errno
 import os
 import unittest
+from io import StringIO
 import numpy as np
 
 import sqlite3
@@ -10,8 +11,6 @@ from shutil import rmtree
 from tempfile import mkdtemp
 
 import openmdao.api as om
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.assert_utils import assert_no_warning
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
@@ -26,11 +25,14 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
     assertDriverDerivDataRecorded, assertProblemDerivDataRecorded
 
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_equal_arrays
-from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, \
+    assert_warning, assert_no_warning
+from openmdao.utils.general_utils import determine_adder_scaler, remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
@@ -247,11 +249,13 @@ class TestSqliteRecorder(unittest.TestCase):
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
+
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
         driver.recording_options['includes'] = ['*']
+
         driver.add_recorder(self.recorder)
 
         prob.setup()
@@ -289,6 +293,188 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
         assertDriverDerivDataRecorded(self, expected_data, self.eps)
 
+    def test_double_run_driver_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+
+        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+
+        # New option and re-run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
+
+        stream = StringIO()
+
+        cr.list_model_options(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            "        shape_by_conn : False",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
+
+        stream = StringIO()
+
+        cr.list_model_options(system='root', run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
+
+    def test_double_run_model_option_overwrite(self):
+        prob = ParaboloidProblem()
+
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_solver_print(0)
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+
+        # New option and re-run of run_driver
+        prob.model.options['assembled_jac_type'] = 'dense'
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
+
+        stream = StringIO()
+
+        cr.list_model_options(out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 0",
+            "    Subsystem: root",
+            "        assembled_jac_type : csc",
+            "    Subsystem: p1",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: p2",
+            "        distributed : False",
+            "        name : UNDEFINED",
+            "        val : 1.0",
+            "        shape : None",
+            "        units : None",
+            "        res_units : None",
+            "        desc : None",
+            "        lower : None",
+            "        upper : None",
+            "        ref : 1.0",
+            "        ref0 : 0.0",
+            "        res_ref : None",
+            "        tags : None",
+            "    Subsystem: comp",
+            "        distributed : False",
+            "    Subsystem: con",
+            "        distributed : False",
+            "        has_diag_partials : False",
+            "        units : None",
+            "        shape : None",
+            "        shape_by_conn : False",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
+
+        stream = StringIO()
+
+        cr.list_model_options(system='root', run_number=1, out_stream=stream)
+
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "Run Number: 1",
+            "    Subsystem: root",
+            "        assembled_jac_type : dense",
+            ""
+        ]
+
+        for i, line in enumerate(text):
+            self.assertEqual(line, expected[i])
+
     def test_simple_driver_recording_with_prefix(self):
         prob = ParaboloidProblem()
 
@@ -299,6 +485,7 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.recording_options['record_derivatives'] = True
         driver.recording_options['includes'] = ['*']
         driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
 
         prob.setup()
         prob.set_solver_print(0)
@@ -437,11 +624,36 @@ class TestSqliteRecorder(unittest.TestCase):
         assertMetadataRecorded(self, prom2abs, abs2prom)
         expected_problem_metadata = {
             'connections_list_length': 11,
-            'tree_length': 10,
-            'tree_children_length': 5,
+            'tree_children_length': 6,
             'abs2prom': abs2prom,
         }
         assertViewerDataRecorded(self, expected_problem_metadata)
+
+    def test_deprecated_option(self):
+        # check that deprecated options are recorded but no warning is issued
+        from openmdao.core.driver import Driver
+        class MyDriver(Driver):
+            def _declare_options(self):
+                # Deprecated option
+                self.options.declare('user_teriminate_signal', default=None, desc='Oops.',
+                                     deprecation="The option was misspelled and is deprecated.")
+
+        prob = om.Problem(driver=MyDriver())
+        prob.driver.add_recorder(om.SqliteRecorder(self.filename))
+
+        prob.setup()
+        with assert_no_warning(DeprecationWarning):
+            prob.final_setup()
+        prob.cleanup()
+
+        expected_problem_metadata = {
+            'connections_list_length': 0,
+            'tree_children_length': 0,
+            'abs2prom': {}
+        }
+        data = assertViewerDataRecorded(self, expected_problem_metadata)
+        self.assertTrue('user_teriminate_signal' in data['driver']['options'],
+                        'Deprecated key not found in recorded options')
 
     def test_system_record_model_metadata(self):
         # first check to see if recorded recursively, which is the default
@@ -458,9 +670,9 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
         # Quick check to see that keys and values were recorded
         for key in ['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']:
-            self.assertTrue(key in cr.system_options.keys())
+            self.assertTrue(key in cr._system_options.keys())
 
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_record_system_options(self):
@@ -481,8 +693,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_driver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
 
         # Recorder on Problem
@@ -496,8 +708,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_problem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a subsystem
@@ -511,8 +723,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_subsystem.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
         # Recorder on a solver
@@ -526,8 +738,8 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader("cases_solver.sql")
         # Quick check to see that keys and values were recorded
         for key in expected_system_options_keys:
-            self.assertTrue(key in cr.system_options.keys())
-        value = cr.system_options['root']['component_options']['assembled_jac_type']
+            self.assertTrue(key in cr._system_options.keys())
+        value = cr._system_options['root']['component_options']['assembled_jac_type']
         self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
 
     def test_warning_system_options_overwriting(self):
@@ -535,16 +747,20 @@ class TestSqliteRecorder(unittest.TestCase):
         prob = ParaboloidProblem()
         prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         prob.add_recorder(self.recorder)
+
         prob.setup()
         prob.set_solver_print(0)
         prob.run_driver()
         prob.record('final')
 
-        prob.setup()
+        prob.final_setup()
+
+        # this warning has been removed, since multiple runs (i.e. calls to final_setup)
+        # are now properly handled by keeping track of run numbers
         msg = "The model is being run again, if the options or scaling of any components " \
               "has changed then only their new values will be recorded."
 
-        with assert_warning(UserWarning, msg):
+        with assert_no_warning(UserWarning, msg):
             prob.run_driver()
 
     def test_without_n2_data(self):
@@ -1058,8 +1274,8 @@ class TestSqliteRecorder(unittest.TestCase):
         nl = model.nonlinear_solver = om.NewtonSolver()
         nl.options['solve_subsystems'] = True
         nl.options['max_sub_solves'] = 4
+        nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
-        ls = nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         model.add_recorder(self.recorder)
 
         try:
@@ -2288,6 +2504,17 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.cleanup()
 
+    def test_deprecation(self):
+        # this is not technically part of the user-facing API, but
+        # could have been used in a custom recording implementation
+        from openmdao.recorders.recording_manager import RecordingManager
+
+        rec_mgr = RecordingManager()
+        msg = "The 'record_metadata' function is deprecated. " \
+              "All system and solver options are recorded automatically."
+        with assert_warning(DeprecationWarning, msg):
+            rec_mgr.record_metadata(None)
+
 
 @use_tempdirs
 class TestFeatureSqliteRecorder(unittest.TestCase):
@@ -2365,12 +2592,13 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),
-                         {'name', 'type', 'subsystem_type', 'children', 'linear_solver',
-                          'nonlinear_solver', 'is_parallel', 'component_type', 'class',
-                          'expressions'})
+                         {'name', 'type', 'class', 'expressions', 'component_type',
+                          'subsystem_type', 'is_parallel', 'linear_solver', 'linear_solver_options',
+                          'nonlinear_solver', 'nonlinear_solver_options', 'children', 'options'})
+
         self.assertEqual(cr.problem_metadata['tree']['name'], 'root')
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
-                         ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
+                         ['_auto_ivc', 'con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
         import openmdao.api as om
@@ -2420,70 +2648,89 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                                                "tol": 1e-03, "maxiter": 200, "disp": True})
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
-    def test_feature_solver_metadata(self):
+    def test_feature_solver_options(self):
         import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = om.Problem(model=SellarDerivatives())
+        # configure a Newton solver with linesearch for the Sellar MDA Group
+        newton = om.NewtonSolver(solve_subsystems=True, max_sub_solves=4)
+        newton.linesearch = om.BoundsEnforceLS()
+
+        model = SellarDerivativesGrouped(mda_nonlinear_solver=newton)
+
+        prob = om.Problem(model)
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.setup()
 
-        # create recorder
-        recorder = om.SqliteRecorder("cases.sql")
-
-        # add recorder to the nonlinear solver for the model
-        prob.model.nonlinear_solver = om.NonlinearBlockGS()
-        prob.model.nonlinear_solver.add_recorder(recorder)
-
-        # add recorder to the nonlinear solver for Component 'd1'
-        d1 = prob.model.d1
-        d1.nonlinear_solver = om.NonlinearBlockGS()
-        d1.nonlinear_solver.options['maxiter'] = 5
-        d1.nonlinear_solver.add_recorder(recorder)
-
+        # initial run
+        newton.linesearch.options['bound_enforcement'] = 'vector'
         prob.run_model()
-        prob.cleanup()
 
+        # change linesearch and run again
+        newton.linesearch.options['bound_enforcement'] = 'wall'
+        prob.run_model()
+
+        # clean up after runs and open a case reader
+        prob.cleanup()
         cr = om.CaseReader("cases.sql")
 
-        metadata = cr.solver_metadata
+        # get/display options for initial run
+        options = cr.list_solver_options()
 
-        self.assertEqual(sorted(metadata.keys()), [
-            'd1.NonlinearBlockGS', 'root.NonlinearBlockGS'
+        self.assertEqual(sorted(options.keys()), [
+            'mda.BoundsEnforceLS', 'mda.NewtonSolver', 'mda.ScipyKrylov',
+            'root.NonlinearBlockGS', 'root.ScipyKrylov'
         ])
-        self.assertEqual(metadata['d1.NonlinearBlockGS']['solver_options']['maxiter'], 5)
-        self.assertEqual(metadata['root.NonlinearBlockGS']['solver_options']['maxiter'], 10)
+        self.assertEqual(options['root.NonlinearBlockGS']['maxiter'], 10)
+        self.assertEqual(options['root.ScipyKrylov']['maxiter'], 1000)
+        self.assertEqual(options['mda.NewtonSolver']['maxiter'], 10)
 
-    def test_feature_recording_system_options(self):
+        self.assertEqual(options['mda.NewtonSolver']['solve_subsystems'], True)
+        self.assertEqual(options['mda.NewtonSolver']['max_sub_solves'], 4)
+
+        self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'vector')
+
+        # get options for second run
+        options = cr.list_solver_options(run_number=1, out_stream=None)
+        self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'wall')
+
+    def test_feature_system_options(self):
         import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
+        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = om.Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivativesGrouped())
+        prob.add_recorder(om.SqliteRecorder("cases.sql"))
 
+        # set option and run model
+        prob.model.options['nl_maxiter'] = 1
         prob.setup()
-
-        # declare two options
-        d1 = prob.model.d1
-        d1.options.declare('options value 1', 1)
-
-        # create recorder and attach to driver and d1
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.driver.add_recorder(recorder)
-        d1.add_recorder(recorder)
-
         prob.run_model()
-        prob.cleanup()
 
+        # change option and run again
+        prob.model.options['nl_maxiter'] = 9
+        prob.setup()
+        prob.run_model()
+
+        # clean up after runs and open a case reader
+        prob.cleanup()
         cr = om.CaseReader("cases.sql")
 
-        # metadata for all the systems in the model
-        metadata = cr.system_options
+        # get/display options for initial run
+        options = cr.list_model_options()
 
-        self.assertEqual(sorted(metadata.keys()),
-                         sorted(['root', '_auto_ivc', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
+        self.assertEqual(sorted(options.keys()),
+                         sorted(['root', '_auto_ivc', 'con_cmp1', 'con_cmp2',
+                                 'mda', 'mda.d1', 'mda.d2', 'obj_cmp']))
 
-        # options for system 'd1', with second option excluded
-        self.assertEqual(metadata['d1']['component_options']['distributed'], False)
-        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
+        self.assertEqual(sorted(options['mda.d1'].keys()),
+                         sorted(prob.model.mda.d1.options._dict.keys()))
+
+        self.assertEqual(options['root']['nl_maxiter'], 1)
+
+        # get options for the second run
+        options = cr.list_model_options(run_number=1, out_stream=None)
+
+        self.assertEqual(options['root']['nl_maxiter'], 9)
 
     def test_feature_system_recording_options(self):
         import openmdao.api as om
@@ -2573,7 +2820,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(design_vars['x'], 0., 1e-4)
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
 
-    def test_feature_driver_options(self):
+    def test_feature_driver_recording_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -2622,8 +2869,12 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
         assert_near_equal(last_case.outputs['z'], prob['z'])
         assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
+        
+        print(last_case)
+        
+        assert_near_equal(last_case['y1'], prob['y1'], 1e-10)
 
-    def test_feature_solver_options(self):
+    def test_feature_solver_recording_options(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -3096,7 +3347,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(design_vars['z'][1], 1.25035459e-15, 1e-8)
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
         assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
-
 
     def test_feature_problem_recorder(self):
         import openmdao.api as om

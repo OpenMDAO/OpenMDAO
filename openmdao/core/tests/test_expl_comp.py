@@ -6,12 +6,15 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.double_sellar import SubSellar
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
-    TestExplCompSimpleDense
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 from openmdao.utils.mpi import MPI
+from openmdao.test_suite.components.double_sellar import SubSellar
+from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
+    TestExplCompSimpleDense
+from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
+     SellarDis2withDerivatives
+from openmdao.utils.assert_utils import assert_warning
 
 # Note: The following class definitions are used in feature docs
 
@@ -26,6 +29,7 @@ class RectangleComp(om.ExplicitComponent):
         self.add_input('width', val=1.)
         self.add_output('area', val=1.)
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -42,6 +46,7 @@ class RectangleCompWithTags(om.ExplicitComponent):
         self.add_input('width', val=1., tags=["tag2"])
         self.add_output('area', val=1., tags=["tag1"])
 
+    def setup_partials(self):
         self.declare_partials('*', '*')
 
     def compute(self, inputs, outputs):
@@ -98,25 +103,23 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "RectangleGroup (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        # list explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, out_stream=None)
+        expected = {
+            'comp1.area': {'value': np.array([1.])},
+            'comp2.area': {'value': np.array([1.])}
+        }
+        self.assertEqual(dict(outputs), expected)
 
-        msg = "RectangleGroup (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertTrue(msg == str(err))
-        else:
-            self.fail("Exception expected")
+        # list states
+        states = prob.model.list_outputs(explicit=False, out_stream=None)
+        self.assertEqual(states, [])
 
         prob.set_val('length', 3.)
         prob.set_val('width', 2.)
-        prob.run_model()
+        with assert_warning(UserWarning, "'comp2' <class RectangleJacVec>: matrix free component has declared the following partials: [('comp2.area', 'comp2.length'), ('comp2.area', 'comp2.width')], which will allocate (possibly unnecessary) memory for each of those sub-jacobians."):
+            prob.run_model()
+
         assert_near_equal(prob['comp1.area'], 6.)
         assert_near_equal(prob['comp2.area'], 6.)
 
@@ -183,13 +186,13 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
 
         # list outputs before model has been run will raise an exception
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        outputs = dict(prob.model.list_outputs(out_stream=None))
+        expected = {
+            'p1.x': {'value': 12.},
+            'p2.y': {'value': 1.},
+            'comp.z': {'value': 0.},
+        }
+        self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
@@ -227,8 +230,7 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value",
             "-------  -----",
-            "p1",
-            "  x      [12.]",
+            "x        [12.]",
             "",
             "",
             "0 Implicit Output(s) in 'p1'",
@@ -279,10 +281,9 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value  units  shape",
             "-------  -----  -----  -----",
-            "model",
-            "  comp",
-            "    x    [12.]  inch   (1,)",
-            "    y    [12.]  inch   (1,)"
+            "comp",
+            "  x    [12.]  inch   (1,)",
+            "  y    [12.]  inch   (1,)"
         ]
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
@@ -322,13 +323,12 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
             "-------  -----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
-            "model",
-            "  p1",
-            "    x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
-            "  p2",
-            "    y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
-            "  comp",
-            "    z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
+            "p1",
+            "  x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
+            "p2",
+            "  y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
+            "comp",
+            "  z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
             "",
             "",
             "0 Implicit Output(s) in 'model'",
@@ -464,13 +464,12 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("10 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(23, num_non_empty_lines)
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  sub1'))
-        self.assertEqual(1, text.count('\n    sub2'))
-        self.assertEqual(1, text.count('\n      g1'))
-        self.assertEqual(1, text.count('\n        d1'))
-        self.assertEqual(2, text.count('\n          z'))
+        self.assertEqual(22, num_non_empty_lines)
+        self.assertEqual(1, text.count('\nsub1'))
+        self.assertEqual(1, text.count('\n  sub2'))
+        self.assertEqual(1, text.count('\n    g1'))
+        self.assertEqual(1, text.count('\n      d1'))
+        self.assertEqual(2, text.count('\n        z'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -505,11 +504,10 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('\nmodel'), 1)
-        self.assertEqual(text.count('\n          y1'), 1)
-        self.assertEqual(text.count('\n  g2'), 1)
+        self.assertEqual(text.count('\n        y1'), 1)
+        self.assertEqual(text.count('\ng2'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 21)
+        self.assertEqual(num_non_empty_lines, 20)
 
     def test_array_list_vars_options(self):
 
@@ -519,7 +517,7 @@ class ExplCompTestCase(unittest.TestCase):
             """
 
             def __init__(self, size):
-                super(ArrayAdder, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):
@@ -567,10 +565,9 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('\nmodel'))
-        self.assertEqual(1, text.count('\n  mult'))
-        self.assertEqual(1, text.count('\n    x'))
+        self.assertEqual(6, num_non_empty_lines)
+        self.assertEqual(1, text.count('\nmult'))
+        self.assertEqual(1, text.count('\n  x'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -598,10 +595,10 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('    x       |10.0|   x'), 1)
-        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        self.assertEqual(text.count('  x       |10.0|   x'), 1)
+        self.assertEqual(text.count('  y       |110.0|  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Hierarchical - no print arrays
         stream = StringIO()
@@ -615,13 +612,12 @@ class ExplCompTestCase(unittest.TestCase):
                                 print_arrays=False,
                                 out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('\nmodel'), 1)
-        self.assertEqual(text.count('\n  des_vars'), 1)
-        self.assertEqual(text.count('\n    x'), 1)
-        self.assertEqual(text.count('\n  mult'), 1)
-        self.assertEqual(text.count('\n    y'), 1)
+        self.assertEqual(text.count('\ndes_vars'), 1)
+        self.assertEqual(text.count('\n  x'), 1)
+        self.assertEqual(text.count('\nmult'), 1)
+        self.assertEqual(text.count('\n  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
+        self.assertEqual(num_non_empty_lines, 10)
 
         # Need to explicitly set this to make sure all ways of running this test
         #   result in the same format of the output. When running this test from the
@@ -680,13 +676,12 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('\nmodel'), 1)
-            self.assertEqual(text.count('\n  des_vars'), 1)
-            self.assertEqual(text.count('\n    x'), 1)
-            self.assertEqual(text.count('\n  mult'), 1)
-            self.assertEqual(text.count('\n    y'), 1)
+            self.assertEqual(text.count('\ndes_vars'), 1)
+            self.assertEqual(text.count('\n  x'), 1)
+            self.assertEqual(text.count('\nmult'), 1)
+            self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 49)
+            self.assertEqual(num_non_empty_lines, 48)
 
     def test_for_docs_array_list_vars_options(self):
 
@@ -701,7 +696,7 @@ class ExplCompTestCase(unittest.TestCase):
             """
 
             def __init__(self, size):
-                super(ArrayAdder, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):
@@ -806,6 +801,34 @@ class ExplCompTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
+    def test_tags_error_messages(self):
+
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', 1.0, tags=['a', dict()])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Comp1())
+
+        with self.assertRaises(TypeError) as cm:
+            prob.setup(self)
+
+        msg = "Items in tags should be of type string, but type 'dict' was found."
+        self.assertEqual(str(cm.exception), msg)
+
+        class Comp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', 1.0, tags=333)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Comp1())
+
+        with self.assertRaises(TypeError) as cm:
+            prob.setup(self)
+
+        msg = "The tags argument should be a str or list"
+        self.assertEqual(str(cm.exception), msg)
+
     def test_feature_simple_var_tags(self):
         from openmdao.api import Problem, ExplicitComponent
 
@@ -819,6 +842,7 @@ class ExplCompTestCase(unittest.TestCase):
                 self.add_input('width', val=1., tags=["tag2"])
                 self.add_output('area', val=1., tags="tag1")
 
+            def setup_partials(self):
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
@@ -877,7 +901,7 @@ class ExplCompTestCase(unittest.TestCase):
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):
-                super(BadComp, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 inputs['length'] = 0.  # should not be allowed
 
         prob = om.Problem(BadComp())
@@ -887,12 +911,12 @@ class ExplCompTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector when it is read only.")
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector when it is read only.")
 
     def test_compute_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):
-                super(BadComp, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem(BadComp())
@@ -906,7 +930,7 @@ class ExplCompTestCase(unittest.TestCase):
     def test_compute_partials_inputs_read_only(self):
         class BadComp(TestExplCompSimpleDense):
             def compute_partials(self, inputs, partials):
-                super(BadComp, self).compute_partials(inputs, partials)
+                super().compute_partials(inputs, partials)
                 inputs['length'] = 0.  # should not be allowed
 
         prob = om.Problem(BadComp())
@@ -917,13 +941,13 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_partials_inputs_read_only_reset(self):
         class BadComp(TestExplCompSimpleDense):
             def compute_partials(self, inputs, partials):
-                super(BadComp, self).compute_partials(inputs, partials)
+                super().compute_partials(inputs, partials)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem(BadComp())
@@ -939,7 +963,7 @@ class ExplCompTestCase(unittest.TestCase):
     def test_compute_jacvec_product_inputs_read_only(self):
         class BadComp(RectangleJacVec):
             def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-                super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+                super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 inputs['length'] = 0.  # should not be allowed
 
         prob = om.Problem(BadComp())
@@ -950,13 +974,13 @@ class ExplCompTestCase(unittest.TestCase):
             prob.check_partials()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (<model>): Attempt to set value of 'length' in input vector "
+                         "<model> <class BadComp>: Attempt to set value of 'length' in input vector "
                          "when it is read only.")
 
     def test_compute_jacvec_product_inputs_read_only_reset(self):
         class BadComp(RectangleJacVec):
             def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-                super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
+                super().compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem(BadComp())
@@ -968,6 +992,37 @@ class ExplCompTestCase(unittest.TestCase):
 
         # verify read_only status is reset after AnalysisError
         prob['length'] = 111.
+
+    def test_iter_count(self):
+        # Make sure we correctly count iters in both _apply_nonlinear and _solve_nonlinear
+        class SellarMDF(om.Group):
+            def setup(self):
+                self.set_input_defaults('x', 1.0)
+                self.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
+                cycle.add_subsystem('d1', SellarDis1withDerivatives(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', SellarDis2withDerivatives(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.linear_solver = om.ScipyKrylov()
+
+                cycle.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+
+        prob = om.Problem()
+        prob.model = SellarMDF()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_model()
+        self.assertEqual(prob.model.cycle.d1.iter_count, 0)
+        self.assertEqual(prob.model.cycle.d2.iter_count, 0)
+        self.assertEqual(prob.model.cycle.d1.iter_count_apply, 10)
+        self.assertEqual(prob.model.cycle.d2.iter_count_apply, 10)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIExplComp(unittest.TestCase):
@@ -1023,18 +1078,17 @@ class TestMPIExplComp(unittest.TestCase):
                 "",
                 "varname     value",
                 "----------  -----",
-                "model",
                 "p1",
-                "    x       [1.]",
+                "  x       [1.]",
                 "p2",
-                "    x       [1.]",
+                "  x       [1.]",
                 "parallel",
-                "    c1",
-                "   y     [1.]",
-                "    c2",
+                "  c1",
+                "    y     [1.]",
+                "  c2",
                 "    y     [1.]",
                 "c3",
-                "    y       [10.]",
+                "  y       [10.]",
                 "",
                 "",
                 "0 Implicit Output(s) in 'model'",
@@ -1056,15 +1110,14 @@ class TestMPIExplComp(unittest.TestCase):
                 "",
                 "varname     value",
                 "----------  -----",
-                "model",
                 "parallel",
-                "    c1",
+                "  c1",
                 "    x     [1.]",
-                "    c2",
+                "  c2",
                 "    x     [1.]",
                 "c3",
-                "    x1      [1.]",
-                "    x2      [1.]",
+                "  x1      [1.]",
+                "  x2      [1.]",
             ]
 
             for i, line in enumerate(expected_text):

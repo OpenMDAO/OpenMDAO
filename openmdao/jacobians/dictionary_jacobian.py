@@ -1,8 +1,7 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
-from scipy.sparse import csc_matrix
 
-from openmdao.jacobians.jacobian import Jacobian, _full_slice
+from openmdao.jacobians.jacobian import Jacobian
 
 
 class DictionaryJacobian(Jacobian):
@@ -27,7 +26,7 @@ class DictionaryJacobian(Jacobian):
         **kwargs : dict
             options dictionary.
         """
-        super(DictionaryJacobian, self).__init__(system, **kwargs)
+        super().__init__(system, **kwargs)
         self._iter_keys = {}
 
     def _iter_abs_keys(self, system, vec_name):
@@ -51,7 +50,6 @@ class DictionaryJacobian(Jacobian):
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
-            ncol = system._vectors['residual'][vec_name]._ncol
             subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
@@ -102,14 +100,8 @@ class DictionaryJacobian(Jacobian):
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
-                subjac_info = subjacs_info[abs_key]
-                if self._randomize:
-                    subjac = self._randomize_subjac(subjac_info['value'], abs_key)
-                else:
-                    subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
-
                     if other_name in d_out_names:
                         # skip the matvec mult completely for identity subjacs
                         if is_explicit and res_name is other_name:
@@ -120,7 +112,6 @@ class DictionaryJacobian(Jacobian):
                                 val = oflat(other_name)
                                 val -= rflat(res_name)
                             continue
-
                         if fwd:
                             left_vec = rflat(res_name)
                             right_vec = oflat(other_name)
@@ -137,6 +128,11 @@ class DictionaryJacobian(Jacobian):
                     else:
                         continue
 
+                    subjac_info = subjacs_info[abs_key]
+                    if self._randomize:
+                        subjac = self._randomize_subjac(subjac_info['value'], abs_key)
+                    else:
+                        subjac = subjac_info['value']
                     rows = subjac_info['rows']
                     if rows is not None:  # our homegrown COO format
                         linds, rinds = rows, subjac_info['cols']

@@ -166,6 +166,8 @@ class TestLinearSystemComp(unittest.TestCase):
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
+        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
+
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b', 'lin.x'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)
         assert_near_equal(J['lin.x', 'p2.b'], dx_db, .0001)
@@ -226,6 +228,8 @@ class TestLinearSystemComp(unittest.TestCase):
         lingrp.run_solve_linear(['linear'], 'rev')
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
+
+        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
 
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)
@@ -296,6 +300,8 @@ class TestLinearSystemComp(unittest.TestCase):
         lingrp.run_solve_linear(['linear'], 'rev')
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
+
+        prob.model.lingrp.lin._no_check_partials = False  # override skipping of check_partials
 
         J = prob.compute_totals(['lin.x'], ['p1.A', 'p2.b'], return_format='flat_dict')
         assert_near_equal(J['lin.x', 'p1.A'], dx_dA, .0001)

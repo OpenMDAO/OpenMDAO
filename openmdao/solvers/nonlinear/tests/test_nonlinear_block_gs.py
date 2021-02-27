@@ -134,19 +134,29 @@ class TestNLBGaussSeidel(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
-        nlbgs.options['maxiter'] = 2
-
         prob.setup()
+        nlbgs = model.nonlinear_solver = om.NonlinearBlockGS()
 
+        #basic test of number of iterations
+        nlbgs.options['maxiter'] = 1
+        prob.run_model()
+        self.assertEqual(model.nonlinear_solver._iter_count, 1)
+
+        nlbgs.options['maxiter'] = 5
+        prob.run_model()
+        self.assertEqual(model.nonlinear_solver._iter_count, 5)
+
+        #test of number of iterations AND solution after exit at maxiter
         prob.set_val('x', 1.)
         prob.set_val('z', np.array([5.0, 2.0]))
 
+        nlbgs.options['maxiter'] = 3
         prob.set_solver_print()
         prob.run_model()
 
         assert_near_equal(prob.get_val('y1'), 25.58914915, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05857185, .00001)
+        self.assertEqual(model.nonlinear_solver._iter_count, 3)
 
     def test_feature_rtol(self):
         import numpy as np
@@ -242,7 +252,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertEqual(model.nonlinear_solver._iter_count, 7)
+        self.assertEqual(model.nonlinear_solver._iter_count, 8)
 
         # Only one extra execution
         self.assertEqual(model.d1.execution_count, 8)
@@ -324,7 +334,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
             with derivatives."""
 
             def __init__(self):
-                super(SellarModified, self).__init__()
+                super().__init__()
 
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
@@ -364,7 +374,66 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+        self.assertTrue(model.nonlinear_solver._iter_count == 6)
+
+        #check that the relaxation factor is updated correctly
+        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
+
+    def test_NLBGS_Aitken_initial_factor(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup()
+
+        y1_0 = prob.get_val('y1')
+        y2_0 = prob.get_val('y2')
+        model.nonlinear_solver.options['use_aitken'] = True
+        model.nonlinear_solver.options['aitken_initial_factor'] = 0.33
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.33)
+
+
+        model.nonlinear_solver.options['maxiter'] = 10
+        prob.run_model()
+
+        # should converge to the same solution
+        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
+        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
+
+        # in more iterations
+        self.assertTrue(model.nonlinear_solver._iter_count == 7)
+
+        #check that the relaxation factor is updated correctly (should tend towards 1)
+        assert_near_equal(model.nonlinear_solver._theta_n_1, 1.00, 0.001)
+
+
+    def test_NLBGS_Aitken_min_max_factor(self):
+
+        prob = om.Problem(model=SellarDerivatives())
+        model = prob.model
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup()
+
+        y1_0 = prob.get_val('y1')
+        y2_0 = prob.get_val('y2')
+        model.nonlinear_solver.options['use_aitken'] = True
+        model.nonlinear_solver.options['aitken_min_factor'] = 1.2
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 1.2)
+
+        model.nonlinear_solver.options['aitken_max_factor'] = 0.7
+        model.nonlinear_solver.options['aitken_min_factor'] = 0.1
+
+        model.nonlinear_solver.options['maxiter'] = 1
+        prob.run_model()
+        self.assertTrue(model.nonlinear_solver._theta_n_1 == 0.7)
+
+
 
     def test_NLBGS_Aitken_cs(self):
 
@@ -412,10 +481,10 @@ class TestNLBGaussSeidel(unittest.TestCase):
         class ContrivedSellarDis1(SellarDis1):
 
             def setup(self):
-                super(ContrivedSellarDis1, self).setup()
+                super().setup()
                 self.add_output('highly_nonlinear', val=1.0, res_ref=1e-4)
             def compute(self, inputs, outputs):
-                super(ContrivedSellarDis1, self).compute(inputs, outputs)
+                super().compute(inputs, outputs)
                 outputs['highly_nonlinear'] = 10*np.sin(10*inputs['y2'])
 
         p = om.Problem()
@@ -436,7 +505,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
+        self.assertEqual(nlbgs._iter_count, 10, 'res_ref should make this take more iters.')
 
     def test_guess_nonlinear(self):
         class SmartGroup(om.Group):
@@ -520,7 +589,44 @@ class ProcTestCase1(unittest.TestCase):
         assert_near_equal(prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
 
         # Test that Aitken accelerated the convergence, normally takes 7.
-        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+        self.assertTrue(model.nonlinear_solver._iter_count == 6)
+
+    def test_nonlinear_analysis_error(self):
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        p1 = model.add_subsystem('p1', om.ParallelGroup(), promotes=['*'])
+        p1.add_subsystem('d1a', SellarDis1withDerivatives(), promotes=['x', 'z'])
+        p1.add_subsystem('d1b', SellarDis1withDerivatives(), promotes=['x', 'z'])
+
+        p2 = model.add_subsystem('p2', om.ParallelGroup(), promotes=['*'])
+        p2.add_subsystem('d2a', SellarDis2withDerivatives(), promotes=['z'])
+        p2.add_subsystem('d2b', SellarDis2withDerivatives(), promotes=['z'])
+
+        model.connect('d1a.y1', 'd2a.y1')
+        model.connect('d1b.y1', 'd2b.y1')
+        model.connect('d2a.y2', 'd1a.y2')
+        model.connect('d2b.y2', 'd1b.y2')
+
+        model.nonlinear_solver = om.NonlinearBlockGS(maxiter=2, err_on_non_converge=True)
+
+        prob.setup()
+        prob.set_solver_print(level=2)
+
+        # Set one branch of Sellar close to the solution.
+        prob.set_val('d2b.y2', 12.05848815)
+        prob.set_val('d1b.y1', 25.58830237)
+
+        # test if the analysis error is raised properly on all procs
+        try:
+            prob.run_model()
+        except om.AnalysisError as err:
+            self.assertEqual(str(err), "Solver 'NL: NLBGS' on system '' failed to converge in 2 iterations.")
+        else:
+            self.fail("expected AnalysisError")
 
 
 if __name__ == "__main__":

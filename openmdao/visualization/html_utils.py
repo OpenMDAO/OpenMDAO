@@ -498,36 +498,39 @@ class TemplateWriter(object):
     """
     Writes HTML files using templates.
 
-    Opens an HTML template files, text can be inserted into the template, and writes a new HTML
+    Opens an HTML template file, text can be inserted into the template, and writes a new HTML
     file with the replacements.
 
     Attributes
     ----------
-    filename : str
-        Filename of file to write to.
     template : str
         Contents of template file.
     """
 
-    def __init__(self, filename, embeddable=False, title=None, styles=None):
+    def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
 
         Parameters
         ----------
         filename : str
-            Filename of file to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
             Title of diagram.
         styles : dict
             Dictionary of CSS styles.
+        head_srcs : dict
+            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
-        self.filename = filename
         # Load template
-        with open(self.filename, "r") as f:
+        with open(filename, "r") as f:
             self.template = template = f.read()
+
+        head_scripts = ''
+        for name, code in head_srcs.items():
+            head_scripts += write_script(code, indent=_IND)
 
         if styles is not None:
             style_elems = '\n\n'.join([write_style(content=s) for s in styles.values()])
@@ -538,9 +541,11 @@ class TemplateWriter(object):
                 meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
                 if title:
                     title_tag = "<title>%s</title>" % title
-                    head = '\n\n'.join([title_tag, meta, style_elems])  # Write styles to head
+                    # Write styles and scripts to head
+                    head = '\n\n'.join([title_tag, meta, head_scripts, style_elems])
                 else:
-                    head = '\n\n'.join([meta, style_elems])  # Write styles to head
+                    # Write styles and scripts to head
+                    head = '\n\n'.join([meta, head_scripts, style_elems])
                 self.template = head_and_body(head=head, body=template)
 
         if title is not None:
@@ -591,23 +596,25 @@ class DiagramWriter(TemplateWriter):
         String of HTML for the help dialog.
     """
 
-    def __init__(self, filename, embeddable=False, title=None, styles=None):
+    def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
 
         Parameters
         ----------
         filename : str
-            Filename to write to.
+            Name of template file.
         embeddable : bool
             If true, create file so that it can be embedded in a webpage.
         title : str
             Title of diagram.
         styles : dict
             Dictionary of CSS styles.
+        head_srcs : dict
+            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
-        super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
-                                            styles=styles)
+        super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles,
+                         head_srcs=head_srcs)
         self.toolbar = Toolbar()
         self.help = None
 
@@ -647,4 +654,4 @@ class DiagramWriter(TemplateWriter):
         self.insert('{{toolbar}}', self.toolbar.write())
         if self.help is not None:
             self._replace('{{help}}', self.help)
-        super(DiagramWriter, self).write(outfile)
+        super().write(outfile)

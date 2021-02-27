@@ -116,7 +116,8 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except om.AnalysisError as exc:
-            self.assertEqual(str(exc), 'Timed out after 1.0 sec.')
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
+                             "Timed out after 1.0 sec.")
         else:
             self.fail('Expected AnalysisError')
 
@@ -194,8 +195,8 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except ValueError as exc:
-            msg = "The command to be executed, 'no-such-command', cannot be found"
-            self.assertEqual(str(exc), msg)
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
+                             "The command to be executed, 'no-such-command', cannot be found")
             self.assertEqual(self.extcode.return_code, -999999)
         else:
             self.fail('Expected ValueError')
@@ -208,7 +209,8 @@ class TestExternalCodeComp(unittest.TestCase):
         try:
             self.prob.run_model()
         except ValueError as exc:
-            self.assertEqual(str(exc), 'Empty command list')
+            self.assertEqual(str(exc), "'extcode' <class ExternalCodeComp>: Error calling compute(), "
+                             "Empty command list")
         else:
             self.fail('Expected ValueError')
         finally:
@@ -287,7 +289,7 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
             input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeComp, self).compute(inputs, outputs)
+        super().compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -315,6 +317,7 @@ class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
             sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         ]
 
+    def setup_partials(self):
         # this external code does not provide derivatives, use finite difference
         self.declare_partials(of='*', wrt='*', method='fd')
 
@@ -327,7 +330,7 @@ class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
             input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeCompFD, self).compute(inputs, outputs)
+        super().compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -357,6 +360,7 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
             self.input_file, self.output_file, self.derivs_file
         ]
 
+    def setup_partials(self):
         # this external code does provide derivatives
         self.declare_partials(of='*', wrt='*')
 
@@ -369,7 +373,7 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
             input_file.write('%.16f\n%.16f\n' % (x, y))
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeCompDerivs, self).compute(inputs, outputs)
+        super().compute(inputs, outputs)
 
         # parse the output file from the external code and set the value of f_xy
         with open(self.output_file, 'r') as output_file:
@@ -381,7 +385,7 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
         outputs = {}
 
         # the parent compute function actually runs the external code
-        super(ParaboloidExternalCodeCompDerivs, self).compute(inputs, outputs)
+        super().compute(inputs, outputs)
 
         # parse the derivs file from the external code and set partials
         with open(self.derivs_file, 'r') as derivs_file:
@@ -549,7 +553,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
             def setup(self):
                 self.add_input('area_ratio', val=1.0, units=None)
                 self.add_output('mach', val=1., units=None)
-                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
 
                 self.input_file = 'mach_input.dat'
                 self.output_file = 'mach_output.dat'
@@ -570,6 +573,9 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 # If you want to write your own string command, the code below will also work.
                 # self.options['command_apply'] = ('python extcode_mach.py {} {}').format(self.input_file, self.output_file)
 
+            def setup_partials(self):
+                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
+
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:
                     input_file.write('residuals\n')
@@ -577,7 +583,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                     input_file.write('{}\n'.format(outputs['mach'][0]))
 
                 # the parent apply_nonlinear function actually runs the external code
-                super(MachExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
 
                 # parse the output file from the external code and set the value of mach
                 with open(self.output_file, 'r') as output_file:
@@ -590,7 +596,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                     input_file.write('{}\n'.format(inputs['area_ratio'][0]))
                     input_file.write('{}\n'.format(self.options['super_sonic']))
                 # the parent apply_nonlinear function actually runs the external code
-                super(MachExternalCodeComp, self).solve_nonlinear(inputs, outputs)
+                super().solve_nonlinear(inputs, outputs)
 
                 # parse the output file from the external code and set the value of mach
                 with open(self.output_file, 'r') as output_file:

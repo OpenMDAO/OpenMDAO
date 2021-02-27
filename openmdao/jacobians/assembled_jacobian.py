@@ -10,7 +10,6 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import unit_conversion
-from openmdao.utils.array_utils import _flatten_src_indices
 
 _empty_dict = {}
 
@@ -56,7 +55,7 @@ class AssembledJacobian(Jacobian):
         # avoid circular imports
         from openmdao.core.component import Component
 
-        super(AssembledJacobian, self).__init__(system)
+        super().__init__(system)
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
@@ -82,11 +81,10 @@ class AssembledJacobian(Jacobian):
         OrderedDict
             Tuples of the form (start, end) keyed on variable name.
         """
-        abs2meta = system._var_abs2meta
         ranges = OrderedDict()
         start = end = 0
-        for name in system._var_abs_names[vtype]:
-            end += abs2meta[name]['size']
+        for name, meta in system._var_abs2meta[vtype].items():
+            end += meta['size']
             ranges[name] = (start, end)
             start = end
         return ranges
@@ -103,7 +101,7 @@ class AssembledJacobian(Jacobian):
         # var_indices are the *global* indices for variables on this proc
         is_top = system.pathname == ''
 
-        abs2meta = system._var_abs2meta
+        abs2meta_in = system._var_abs2meta['input']
         all_meta = system._var_allprocs_abs2meta
 
         self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
@@ -138,8 +136,8 @@ class AssembledJacobian(Jacobian):
                     if out_abs_name not in out_ranges:
                         continue
 
-                    meta_in = abs2meta[wrt_abs_name]
-                    all_out_meta = all_meta[out_abs_name]
+                    meta_in = abs2meta_in[wrt_abs_name]
+                    all_out_meta = all_meta['output'][out_abs_name]
                     # calculate unit conversion
                     in_units = meta_in['units']
                     out_units = all_out_meta['units']
@@ -153,19 +151,14 @@ class AssembledJacobian(Jacobian):
                     out_offset, out_end = out_ranges[out_abs_name]
                     out_size = out_end - out_offset
                     shape = (res_size, out_size)
-                    src_indices = abs2meta[wrt_abs_name]['src_indices']
+                    src_indices = abs2meta_in[wrt_abs_name]['src_indices']
 
                     if src_indices is not None:
                         # need to add an entry for d(output)/d(source)
                         # instead of d(output)/d(input).  int_mtx is a square matrix whose
                         # rows and columns map to output/resid vars only.
                         abs_key2 = (res_abs_name, out_abs_name)
-
                         shape = abs_key2shape(abs_key2)
-                        if len(src_indices.shape) > 1:
-                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                               all_out_meta['global_shape'],
-                                                               all_out_meta['global_size'])
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
@@ -192,7 +185,7 @@ class AssembledJacobian(Jacobian):
         in_ranges = self._in_ranges
         out_ranges = self._out_ranges
 
-        input_names = system._var_abs_names['input']
+        input_names = list(system._var_abs2meta['input'])
         if input_names:
             min_in_offset = in_ranges[input_names[0]][0]
             max_in_offset = in_ranges[input_names[-1]][1]
@@ -200,7 +193,7 @@ class AssembledJacobian(Jacobian):
             min_in_offset = sys.maxsize
             max_in_offset = 0
 
-        output_names = system._var_abs_names['output']
+        output_names = list(system._var_abs2meta['output'])
         if output_names:
             min_res_offset = out_ranges[output_names[0]][0]
             max_res_offset = out_ranges[output_names[-1]][1]
@@ -220,7 +213,7 @@ class AssembledJacobian(Jacobian):
         system : <System>
             The system being solved using a sub-view of the jacobian.
         """
-        abs2meta = system._var_abs2meta
+        abs2meta = system._var_abs2meta['output']
         ranges = self._view_ranges[system.pathname]
 
         ext_mtx = self._matrix_class(system.comm, False)
@@ -230,17 +223,17 @@ class AssembledJacobian(Jacobian):
         sizes = system._var_sizes['linear']['input']
         abs2idx = system._var_allprocs_abs2idx['linear']
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
-                     system._var_abs_names['input'] if n not in conns}
+                     system._var_abs2meta['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
         sizes = system._var_sizes['linear']['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name in s._var_abs_names['output']:
+            for res_abs_name, res_meta in s._var_abs2meta['output'].items():
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
-                res_size = abs2meta[res_abs_name]['size']
+                res_size = res_meta['size']
 
-                for in_abs_name in s._var_abs_names['input']:
+                for in_abs_name in s._var_abs2meta['input']:
                     if in_abs_name not in conns:  # unconnected input
                         abs_key = (res_abs_name, in_abs_name)
 
@@ -277,8 +270,8 @@ class AssembledJacobian(Jacobian):
             else:
                 global_conns = system._conn_global_abs_in2out
 
-            output_names = set(system._var_abs_names['output'])
-            input_names = set(system._var_abs_names['input'])
+            output_names = set(system._var_abs2meta['output'])
+            input_names = set(system._var_abs2meta['input'])
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():
@@ -364,6 +357,11 @@ class AssembledJacobian(Jacobian):
         if ext_mtx is not None:
             ext_mtx._post_update()
 
+        if self._under_complex_step:
+            # If we create a new _int_mtx while under complex step, we need to convert it to a
+            # complex data type.
+            self._int_mtx.set_complex_step_mode(True)
+
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
@@ -396,18 +394,19 @@ class AssembledJacobian(Jacobian):
                     mask = ext_mtx._create_mask_cache(d_inputs)
                     self._mask_caches[(d_inputs._names, mode)] = mask
 
+            dresids = d_residuals.asarray()
+
             if mode == 'fwd':
                 if d_outputs._names:
-                    d_residuals._data += int_mtx._prod(d_outputs._data, mode)
+                    dresids += int_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
+                    dresids += ext_mtx._prod(d_inputs.asarray(), mode, mask=mask)
 
             else:  # rev
-                dresids = d_residuals._data
                 if d_outputs._names:
-                    d_outputs._data += int_mtx._prod(dresids, mode)
+                    d_outputs += int_mtx._prod(dresids, mode)
                 if do_mask:
-                    d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)
+                    d_inputs += ext_mtx._prod(dresids, mode, mask=mask)
 
     def set_complex_step_mode(self, active):
         """
@@ -421,7 +420,7 @@ class AssembledJacobian(Jacobian):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        super(AssembledJacobian, self).set_complex_step_mode(active)
+        super().set_complex_step_mode(active)
 
         if self._int_mtx is not None:
             self._int_mtx.set_complex_step_mode(active)
@@ -444,7 +443,7 @@ class DenseJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(DenseJacobian, self).__init__(DenseMatrix, system=system)
+        super().__init__(DenseMatrix, system=system)
 
 
 class COOJacobian(AssembledJacobian):
@@ -461,7 +460,7 @@ class COOJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(COOJacobian, self).__init__(COOMatrix, system=system)
+        super().__init__(COOMatrix, system=system)
 
 
 class CSRJacobian(AssembledJacobian):
@@ -478,7 +477,7 @@ class CSRJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSRJacobian, self).__init__(CSRMatrix, system=system)
+        super().__init__(CSRMatrix, system=system)
 
 
 class CSCJacobian(AssembledJacobian):
@@ -495,4 +494,4 @@ class CSCJacobian(AssembledJacobian):
         system : System
             Parent system to this jacobian.
         """
-        super(CSCJacobian, self).__init__(CSCMatrix, system=system)
+        super().__init__(CSCMatrix, system=system)

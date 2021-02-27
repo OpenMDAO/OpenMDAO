@@ -63,7 +63,6 @@ class N2TreeNode {
             'width': 1e-6,
             'height': 1e-6
         };
-
     }
 
     /** Run when a node is collapsed. */
@@ -91,7 +90,7 @@ class N2TreeNode {
         this.prevRootIndex = this.rootIndex;
     }
 
-    /** 
+    /**
      * Determine if the children array exists and has members.
      * @param {string} [childrenPropName = 'children'] Usually children, but
      *   sometimes 'subsystem_children'
@@ -171,7 +170,7 @@ class N2TreeNode {
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -246,12 +245,16 @@ class N2TreeNode {
     /**
      * If the node has a lot of descendants and it wasn't manually expanded,
      * minimize it.
+     * @param {Number} depthCount The number of nodes at the next depth down.
      * @returns {Boolean} True if minimized here, false otherwise.
      */
-    minimizeIfLarge() {
+    minimizeIfLarge(depthCount) {
         if ( ! (this.isRoot() || this.manuallyExpanded) &&
-            (this.numDescendants > PRECOLLAPSE_THRESHOLD &&
-                this.children.length > 1 ) ) {
+            ( this.depth >= (this.isComponent()?
+                Precollapse.cmpDepthStart : Precollapse.grpDepthStart) &&
+                this.numDescendants > Precollapse.threshold &&
+                this.children.length > Precollapse.children - this.depth &&
+                depthCount > Precollapse.depthLimit )) {
             debugInfo(`Precollapsing node ${this.absPathName}`)
             this.minimize();
             return true;

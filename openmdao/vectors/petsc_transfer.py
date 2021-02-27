@@ -6,10 +6,10 @@ from collections import defaultdict
 
 from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer, _merge
-from openmdao.vectors.vector import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import convert_neg, _flatten_src_indices
-from openmdao.utils.general_utils import _is_slice, _slice_indices
+from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.general_utils import _is_slicer_op
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -43,7 +43,7 @@ class PETScTransfer(DefaultTransfer):
         comm : MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
-        super(PETScTransfer, self).__init__(in_vec, out_vec, in_inds, out_inds, comm)
+        super().__init__(in_vec, out_vec, in_inds, out_inds, comm)
         in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
         out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=self._comm)
 
@@ -68,8 +68,9 @@ class PETScTransfer(DefaultTransfer):
         for subsys in group._subgroups_myproc:
             subsys._setup_transfers()
 
-        abs2meta = group._var_abs2meta
-        allprocs_abs2meta = group._var_allprocs_abs2meta
+        abs2meta_in = group._var_abs2meta['input']
+        abs2meta_out = group._var_abs2meta['output']
+        allprocs_abs2meta_out = group._var_allprocs_abs2meta['output']
         myproc = group.comm.rank
 
         transfers = group._transfers = {}
@@ -78,21 +79,21 @@ class PETScTransfer(DefaultTransfer):
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
-        mypathlen = len(group.pathname + '.' if group.pathname else '')
-        sub_inds = group._subsystems_inds
+        mypathlen = len(group.pathname) + 1 if group.pathname else 0
+        allsubs = group._subsystems_allprocs
 
         for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(group._subsystems_allprocs)
+            nsub_allprocs = len(allsubs)
             xfer_in = []
             xfer_out = []
-            fwd_xfer_in = [[] for s in group._subsystems_allprocs]
-            fwd_xfer_out = [[] for s in group._subsystems_allprocs]
+            fwd_xfer_in = defaultdict(list)
+            fwd_xfer_out = defaultdict(list)
             if rev:
-                rev_xfer_in = [[] for s in group._subsystems_allprocs]
-                rev_xfer_out = [[] for s in group._subsystems_allprocs]
+                rev_xfer_in = defaultdict(list)
+                rev_xfer_out = defaultdict(list)
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
@@ -106,11 +107,11 @@ class PETScTransfer(DefaultTransfer):
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta:
+                if abs_in in abs2meta_in:
 
                     # Get meta
-                    meta_in = abs2meta[abs_in]
-                    meta_out = allprocs_abs2meta[abs_out]
+                    meta_in = abs2meta_in[abs_in]
+                    meta_out = allprocs_abs2meta_out[abs_out]
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
@@ -125,14 +126,7 @@ class PETScTransfer(DefaultTransfer):
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
-                        if _is_slice(src_indices):
-                            indices = _slice_indices(src_indices, meta_out['global_size'],
-                                                     meta_out['global_shape'])
-                            src_indices = convert_neg(indices, meta_out['global_size'])
-                    else:
-                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
-                                                           meta_out['global_shape'],
-                                                           meta_out['global_size'])
+                        src_indices = convert_neg(src_indices, meta_out['global_size'])
 
                     # 1. Compute the output indices
                     # NOTE: src_indices are relative to a single, possibly distributed variable,
@@ -151,7 +145,7 @@ class PETScTransfer(DefaultTransfer):
                                                     out_offset + meta_out['global_size'],
                                                     dtype=INT_DTYPE)
                         else:
-                            rank = myproc if abs_out in abs2meta else owner
+                            rank = myproc if abs_out in abs2meta_out else owner
                             offset = offsets_out[rank, idx_out]
                             output_inds = np.arange(offset, offset + meta_in['size'],
                                                     dtype=INT_DTYPE)
@@ -187,44 +181,59 @@ class PETScTransfer(DefaultTransfer):
 
                     # Now the indices are ready - input_inds, output_inds
                     sub_in = abs_in[mypathlen:].split('.', 1)[0]
-                    isub = sub_inds[sub_in]
-                    fwd_xfer_in[isub].append(input_inds)
-                    fwd_xfer_out[isub].append(output_inds)
+                    fwd_xfer_in[sub_in].append(input_inds)
+                    fwd_xfer_out[sub_in].append(output_inds)
                     if rev:
                         sub_out = abs_out[mypathlen:].split('.', 1)[0]
-                        isub = sub_inds[sub_out]
-                        rev_xfer_in[isub].append(input_inds)
-                        rev_xfer_out[isub].append(output_inds)
+                        rev_xfer_in[sub_out].append(input_inds)
+                        rev_xfer_out[sub_out].append(output_inds)
+                else:
+                    # not a local input but still need entries in the transfer dicts to
+                    # avoid hangs
+                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    fwd_xfer_in[sub_in]  # defaultdict will create an empty list there
+                    fwd_xfer_out[sub_in]
+                    if rev:
+                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        rev_xfer_in[sub_out]
+                        rev_xfer_out[sub_out]
 
             transfers[vec_name] = {}
 
-            for isub in range(nsub_allprocs):
-                fwd_xfer_in[isub] = _merge(fwd_xfer_in[isub])
-                fwd_xfer_out[isub] = _merge(fwd_xfer_out[isub])
-                if rev:
-                    rev_xfer_in[isub] = _merge(rev_xfer_in[isub])
-                    rev_xfer_out[isub] = _merge(rev_xfer_out[isub])
+            for sname, inds in fwd_xfer_in.items():
+                fwd_xfer_in[sname] = _merge(inds)
+                fwd_xfer_out[sname] = _merge(fwd_xfer_out[sname])
+            if rev:
+                for sname, inds in rev_xfer_out.items():
+                    rev_xfer_in[sname] = _merge(rev_xfer_in[sname])
+                    rev_xfer_out[sname] = _merge(inds)
 
-            xfer_in = np.concatenate(fwd_xfer_in)
-            xfer_out = np.concatenate(fwd_xfer_out)
+            if fwd_xfer_in:
+                xfer_in = np.concatenate(list(fwd_xfer_in.values()))
+                xfer_out = np.concatenate(list(fwd_xfer_out.values()))
+            else:
+                xfer_in = xfer_out = np.zeros(0, dtype=INT_DTYPE)
 
             out_vec = vectors['output'][vec_name]
 
             xfer_all = PETScTransfer(vectors['input'][vec_name], out_vec,
                                      xfer_in, xfer_out, group.comm)
 
-            transfers[vec_name]['fwd', None] = xfer_all
+            transfers[vec_name]['fwd'] = xfwd = {}
+            xfwd[None] = xfer_all
             if rev:
-                transfers[vec_name]['rev', None] = xfer_all
+                transfers[vec_name]['rev'] = xrev = {}
+                xrev[None] = xfer_all
 
-            for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = PETScTransfer(
+            for sname, inds in fwd_xfer_in.items():
+                transfers[vec_name]['fwd'][sname] = PETScTransfer(
                     vectors['input'][vec_name], vectors['output'][vec_name],
-                    fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
-                if rev:
-                    transfers[vec_name]['rev', isub] = PETScTransfer(
+                    inds, fwd_xfer_out[sname], group.comm)
+            if rev:
+                for sname, inds in rev_xfer_out.items():
+                    transfers[vec_name]['rev'][sname] = PETScTransfer(
                         vectors['input'][vec_name], vectors['output'][vec_name],
-                        rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                        rev_xfer_in[sname], inds, group.comm)
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
@@ -274,15 +283,16 @@ class PETScTransfer(DefaultTransfer):
             # the petsc vector does not directly reference the _data.
 
             if in_vec._alloc_complex:
-                in_petsc.array = in_vec._data
+                in_petsc.array = in_vec._get_data()
 
             if out_vec._alloc_complex:
-                out_petsc.array = out_vec._data
+                out_petsc.array = out_vec._get_data()
 
             self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             if in_vec._alloc_complex:
-                in_vec._data[:] = in_petsc.array
+                data = in_vec._get_data()
+                data[:] = in_petsc.array
 
     def _multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
@@ -321,17 +331,21 @@ class PETScTransfer(DefaultTransfer):
                     in_vec._data[:, i] = in_petsc.array + in_petsc_imag.array * 1j
 
             else:
+                in_data = in_vec._get_data()
+                out_data = out_vec._get_data()
                 for i in range(in_vec._ncol):
-                    in_petsc.array = in_vec._data[:, i]
-                    out_petsc.array = out_vec._data[:, i]
+                    in_petsc.array = in_data[:, i]
+                    out_petsc.array = out_data[:, i]
                     self._scatter(out_petsc, in_petsc, addv=False, mode=False)
-                    in_vec._data[:, i] = in_petsc.array
+                    in_data[:, i] = in_petsc.array
 
         elif mode == 'rev':
             in_petsc = in_vec._petsc
             out_petsc = out_vec._petsc
+            in_data = in_vec._get_data()
+            out_data = out_vec._get_data()
             for i in range(in_vec._ncol):
-                in_petsc.array = in_vec._data[:, i]
-                out_petsc.array = out_vec._data[:, i]
+                in_petsc.array = in_data[:, i]
+                out_petsc.array = out_data[:, i]
                 self._scatter(in_petsc, out_petsc, addv=True, mode=True)
-                out_vec._data[:, i] = out_petsc.array
+                out_data[:, i] = out_petsc.array

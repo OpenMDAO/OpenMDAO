@@ -56,6 +56,7 @@ class SimpleCompDependence(SimpleComp):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         self.declare_partials('f', 'y1', dependent=False)
         self.declare_partials('f', 'y2', dependent=False)
         self.declare_partials('f', 'y3', dependent=False)
@@ -73,6 +74,7 @@ class SimpleCompGlob(SimpleComp):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         # This matches y1, y2, and y3.
         self.declare_partials('f', 'y*', dependent=False)
 
@@ -91,6 +93,7 @@ class SimpleCompConst(om.ExplicitComponent):
         self.add_output('f', shape=1)
         self.add_output('g', shape=(2, 2))
 
+    def setup_partials(self):
         # Declare derivatives
 
         self.declare_partials('f', ['y1', 'y2', 'y3'], dependent=False)
@@ -114,12 +117,10 @@ class SimpleCompConst(om.ExplicitComponent):
 
 class SimpleCompFD(SimpleComp):
     def __init__(self, **kwargs):
-        super(SimpleCompFD, self).__init__()
+        super().__init__()
         self.kwargs = kwargs
 
-    def setup(self):
-        super(SimpleCompFD, self).setup()
-
+    def setup_partials(self):
         self.declare_partials('*', '*', method='fd', **self.kwargs)
 
     def compute_partials(self, inputs, partials):
@@ -128,12 +129,10 @@ class SimpleCompFD(SimpleComp):
 
 class SimpleCompMixedFD(SimpleComp):
     def __init__(self, **kwargs):
-        super(SimpleCompMixedFD, self).__init__()
+        super().__init__()
         self.kwargs = kwargs
 
-    def setup(self):
-        super(SimpleCompMixedFD, self).setup()
-
+    def setup_partials(self):
         self.declare_partials('f', ['x', 'z'])
         self.declare_partials('g', ['y1', 'y3'])
 
@@ -153,11 +152,9 @@ class SimpleCompMixedFD(SimpleComp):
 class SimpleCompKwarg(SimpleComp):
     def __init__(self, partial_kwargs):
         self.partial_kwargs = partial_kwargs
-        super(SimpleCompKwarg, self).__init__()
+        super().__init__()
 
-    def setup(self):
-        super(SimpleCompKwarg, self).setup()
-
+    def setup_partials(self):
         self.declare_partials(**self.partial_kwargs)
 
     def compute_partials(self, inputs, partials):
@@ -202,20 +199,20 @@ class TestJacobianFeatures(unittest.TestCase):
 
     @parameterized.expand([
         ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): Expected 1x4 but val is 1x5"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): row indices must be non-negative'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): row indices must be non-negative"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): col indices must be non-negative'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): col indices must be non-negative"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified."),
         ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified."),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
-         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If rows and cols are specified, val must be a scalar or have the same shape, '
-         'val: \(2L?,\), rows/cols: \(3L?,\)'),
+         "'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If rows and cols are specified, val must be a scalar or have the same shape, "
+         "val: \(2L?,\), rows/cols: \(3L?,\)"),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
         # This tests various shape mismatches. Basic size mismatch is now tested earlier in the
@@ -233,10 +230,10 @@ class TestJacobianFeatures(unittest.TestCase):
         self.assertRegexpMatches(str(ex.exception), error_msg)
 
     @parameterized.expand([
-        ({'of': 'q', 'wrt': 'z'}, 'SimpleCompKwarg (simple): No matches were found for of="q"'),
-        ({'of': 'f?', 'wrt': 'x'}, 'SimpleCompKwarg (simple): No matches were found for of="f?"'),
-        ({'of': 'f', 'wrt': 'q'}, 'SimpleCompKwarg (simple): No matches were found for wrt="q"'),
-        ({'of': 'f', 'wrt': 'x?'}, 'SimpleCompKwarg (simple): No matches were found for wrt="x?"'),
+        ({'of': 'q', 'wrt': 'z'}, "'simple' <class SimpleCompKwarg>: " + 'No matches were found for of="q"'),
+        ({'of': 'f?', 'wrt': 'x'}, "'simple' <class SimpleCompKwarg>: " + 'No matches were found for of="f?"'),
+        ({'of': 'f', 'wrt': 'q'}, "'simple' <class SimpleCompKwarg>: " + 'No matches were found for wrt="q"'),
+        ({'of': 'f', 'wrt': 'x?'}, "'simple' <class SimpleCompKwarg>: " + 'No matches were found for wrt="x?"'),
     ])
     def test_bad_names(self, partials_kwargs, error_msg):
         comp = SimpleCompKwarg(partials_kwargs)
@@ -344,6 +341,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('flow:T', val=284., units="degR", desc="Temperature")
                 self.add_output('flow:P', val=1., units='lbf/inch**2', desc="Pressure")
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*', method='fd')
 
             def compute(self, inputs, outputs):
@@ -390,6 +388,7 @@ class TestJacobianFeatures(unittest.TestCase):
                 self.add_output('z', shape=(3, ))
                 self.add_input('x', shape=(3, ), units='degF')
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def compute_partials(self, inputs, partials):
@@ -452,6 +451,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3])
@@ -492,6 +492,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('x', shape=(4,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3])
@@ -522,6 +523,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials(of='f', wrt='x',
                                       rows=[0, 1, 1, 1],
                                       cols=[0, 1, 2, 3],
@@ -554,6 +556,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials('f', 'y*', method='fd')
                 self.declare_partials('f', 'x', method='fd')
 
@@ -591,6 +594,7 @@ class TestJacobianForDocs(unittest.TestCase):
                 self.add_input('y2', shape=(2,))
                 self.add_output('f', shape=(2,))
 
+            def setup_partials(self):
                 self.declare_partials('f', 'y*', method='fd', form='backward', step=1e-6)
                 self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
 

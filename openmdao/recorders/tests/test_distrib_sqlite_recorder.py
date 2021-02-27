@@ -29,7 +29,7 @@ class DistributedAdder(ExplicitComponent):
     """
 
     def __init__(self, size):
-        super(DistributedAdder, self).__init__()
+        super().__init__()
 
         self.options['distributed'] = True
 
@@ -72,7 +72,7 @@ class Summer(ExplicitComponent):
     """
 
     def __init__(self, size):
-        super(Summer, self).__init__()
+        super().__init__()
         self.size = size
 
     def setup(self):
@@ -121,7 +121,7 @@ class DistributedRecorderTest(unittest.TestCase):
         try:
             prob.model.add_recorder(self.recorder)
         except RuntimeError as err:
-            msg = "Group: Recording of Systems when running parallel code is not supported yet"
+            msg = "<class Group>: Recording of Systems when running parallel code is not supported yet"
             self.assertEqual(str(err), msg)
         else:
             self.fail('RuntimeError expected.')
@@ -216,7 +216,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # current values in the problem. This next section is about getting those values
 
         # These involve collective gathers so all ranks need to run this
-        expected_outputs = driver.get_design_var_values()
+        expected_outputs = driver.get_design_var_values(get_remote=True)
         expected_outputs.update(driver.get_objective_values())
         expected_outputs.update(driver.get_constraint_values())
 

@@ -44,7 +44,7 @@ class MatrixVectorProductComp(ExplicitComponent):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
-        super(MatrixVectorProductComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._products = []
 
@@ -52,6 +52,8 @@ class MatrixVectorProductComp(ExplicitComponent):
         self.add_product(b_name=opt['b_name'], A_name=opt['A_name'], x_name=opt['x_name'],
                          b_units=opt['b_units'], A_units=opt['A_units'], x_units=opt['x_units'],
                          vec_size=opt['vec_size'], A_shape=opt['A_shape'])
+
+        self._no_check_partials = True
 
     def initialize(self):
         """

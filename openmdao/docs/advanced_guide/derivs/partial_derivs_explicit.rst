@@ -22,10 +22,15 @@ Here is an example, based on the :ref:`Betz Limit Example <betz_limit_tutorial>`
 
 
 The calls to :code:`declare_partials` tell OpenMDAO which partial derivatives to expect.
-This is always done inside the :code:`setup` method.
-In this example, not all the outputs depend on all the inputs, and you'll see that if you look at the derivative declarations.
-Any partial that is not declared is assumed to be zero.
-You may declare all the partials in just one line as follows (see the documentation on :ref:`specifying partials <feature_specify_partials>` for more details):
+This should be done inside the :code:`setup_partials` method.  It's not illegal to do it in
+:code:`setup`, but there are some cases where it must be called in :code:`setup_partials`, for
+example the case where a component has dynamically sized variables.  :code:`setup_partials` is
+called after all shapes, even dynamic ones, are known, so it works on all cases.  For the sake of
+consistency then, it's best to always call :code:`declare_partials` in :code:`setup_partials`.
+In this example, not all the outputs depend on all the inputs, and you'll see that if you look at
+the derivative declarations. Any partial that is not declared is assumed to be zero.
+You may declare all the partials in just one line as follows (see the documentation on
+:ref:`specifying partials <feature_specify_partials>` for more details):
 
 .. code::
 

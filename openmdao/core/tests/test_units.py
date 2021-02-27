@@ -280,7 +280,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': None}))
         prob.model.connect('src.x2', 'tgt.xx')
 
-        msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
+        msg = "<model> <class Group>: Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
 
         with assert_warning(UserWarning, msg):
             prob.setup()
@@ -458,7 +458,7 @@ class TestUnitConversion(unittest.TestCase):
             #"""
 
             #def __init__(self, n=2):
-                #super(Attitude_Angular, self).__init__()
+                #super().__init__()
 
                 #self.n = n
 
@@ -574,7 +574,7 @@ class TestUnitConversion(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "Group (<model>): Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
+        expected_msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -585,7 +585,7 @@ class TestUnitConversion(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "Group (<model>): Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
+        expected_msg = "<model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -721,7 +721,7 @@ class TestUnitConversion(unittest.TestCase):
         #class TestComp(Component):
 
             #def __init__(self):
-                #super(TestComp, self).__init__()
+                #super().__init__()
 
                 ## Params
                 #self.add_param('x1', 1.0, units='mm')
@@ -879,6 +879,55 @@ class TestUnitConversion(unittest.TestCase):
         #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
+
+    def test_promotes_equivalent_units(self):
+        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
+        p = om.Problem()
+
+        g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s/s'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'W'}),
+                                            promotes_inputs=['x', 'z'])
+        g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s**2'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            promotes_inputs=['x', 'z'])
+        # converting m/s/s to m/s**2 is allowed
+        p.setup()
+
+    def test_promotes_non_equivalent_units(self):
+        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
+        p = om.Problem()
+
+        g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+        g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
+                                            x={'value': 5.0, 'units': 'J/s/s'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'W'}),
+                                            promotes_inputs=['x', 'z'])
+        g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
+                                            x={'value': 5.0, 'units': 'm/s**2'},
+                                            y={'value': 1.0, 'units': None},
+                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            promotes_inputs=['x', 'z'])
+        # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
+        with self.assertRaises(TypeError) as e:
+            p.setup()
+        self.assertEqual(str(e.exception), "Units 'm/s**2' and 'J/s**2' are incompatible.")
+
+    def test_input_defaults_unit_compat(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('comp', om.ExecComp('y=2*x', units='inch'))
+
+        with self.assertRaises(ValueError) as cm:
+            p.model.set_input_defaults('comp.x', val=2., units='in**2')
+
+        msg = ("<class Group>: The units 'in**2' are invalid.")
+        self.assertEqual(cm.exception.args[0], msg)
 
 
 if __name__ == "__main__":

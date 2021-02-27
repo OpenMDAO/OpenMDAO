@@ -13,7 +13,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class TestArmejoGoldsteinBounds(unittest.TestCase):
@@ -245,7 +245,8 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as context:
             top.run_model()
 
-        self.assertEqual(str(context.exception), 'Try Again.')
+        self.assertEqual(str(context.exception),
+                         "'par' <class ParaboloidAE>: Error calling compute(), Try Again.")
 
 
 class ImplCompTwoStatesAE(om.ImplicitComponent):
@@ -441,23 +442,19 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
+        msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.33333333 1.33333333 1.33333333]\n  Upper: [1.5 1.5 1.5]\n")
+        with assert_warning(UserWarning, msg):
+            top.run_model()
+
+        top.setup()
         # Test upper bounds: should go to the minimum upper bound and stall
         top['px.x'] = 0.5
         top['comp.y'] = 0.
         top['comp.z'] = 2.4
 
-        stdout = sys.stdout
-        strout = StringIO()
-
-        sys.stdout = strout
-        try:
+        msg = (f"'comp.z' exceeds upper bounds\n  Val: [2.66666667 2.66666667 2.66666667]\n  Upper: [2.6  2.5  2.65]\n")
+        with assert_warning(UserWarning, msg):
             top.run_model()
-        finally:
-            sys.stdout = stdout
-
-        txt = strout.getvalue()
-
-        self.assertTrue("'comp.z' exceeds upper bound" in txt)
 
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [2.5], 1e-8)
@@ -594,7 +591,7 @@ class SellarDis1withDerivativesMod(SellarDis1):
     # Version of Sellar discipline 1 with a slightly incorrect x derivative.
     # This will still solve, but will require some backtracking at times.
 
-    def _do_declares(self):
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def compute_partials(self, inputs, partials):
@@ -606,7 +603,7 @@ class SellarDis1withDerivativesMod(SellarDis1):
 class SubSellarMod(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(SubSellarMod, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('d1', SellarDis1withDerivativesMod(units=units, scaling=scaling),
                            promotes=['x', 'z', 'y1', 'y2'])
@@ -617,7 +614,7 @@ class SubSellarMod(om.Group):
 class DoubleSellarMod(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
-        super(DoubleSellarMod, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.add_subsystem('g1', SubSellarMod(units=units, scaling=scaling))
         self.add_subsystem('g2', SubSellarMod(units=units, scaling=scaling))

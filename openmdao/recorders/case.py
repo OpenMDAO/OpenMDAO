@@ -9,14 +9,14 @@ from collections import OrderedDict
 
 import numpy as np
 
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import make_set, match_includes_excludes
-from openmdao.utils.units import unit_conversion
+from openmdao.utils.general_utils import make_set, match_prom_or_abs
+from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
-_DEFAULT_OUT_STREAM = object()
 _AMBIGOUS_PROM_NAME = object()
 
 
@@ -266,16 +266,17 @@ class Case(object):
 
         if units is not None:
             base_units = self._get_units(name)
+            simp_units = simplify_unit(units)
 
             if base_units is None:
                 msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(name, units))
+                raise TypeError(msg.format(name, simp_units))
 
             try:
-                scale, offset = unit_conversion(base_units, units)
+                scale, offset = unit_conversion(base_units, simp_units)
             except TypeError:
                 msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                raise TypeError(msg.format(name, base_units, simp_units))
 
             val = (val + offset) * scale
 
@@ -430,11 +431,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
@@ -456,7 +457,7 @@ class Case(object):
 
                 var_name_prom = self._abs2prom['input'][var_name]
 
-                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+                if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                     continue
 
                 val = self.inputs[var_name]
@@ -547,11 +548,11 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or list_like
-            List of glob patterns for pathnames to include in the check. Default is None, which
-            includes all components in the model.
-        excludes : None or list_like
-            List of glob patterns for pathnames to exclude from the check. Default is None, which
+        includes : iter of str or None
+            Glob patterns for pathnames to include in the check. Default is None, which
+            includes all.
+        excludes : iter of str or None
+            Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         list_autoivcs : bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
@@ -578,11 +579,11 @@ class Case(object):
 
             var_name_prom = self._abs2prom['output'][var_name]
 
-            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
+            if not match_prom_or_abs(var_name, var_name_prom, includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance
-            if self.residuals and var_name in self.residuals.absolute_names():
+            if residuals and self.residuals and var_name in self.residuals.absolute_names():
                 resids = self.residuals[var_name]
                 if residuals_tol and np.linalg.norm(resids) < residuals_tol:
                     continue
@@ -685,8 +686,9 @@ class Case(object):
             # don't have execution order, just sort for determinism
             var_list = sorted(var_dict.keys())
 
+        top_name = pathname if pathname else 'model'
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical=hierarchical, top_name='model',
+                        hierarchical=hierarchical, top_name=top_name,
                         print_arrays=print_arrays, out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
@@ -732,7 +734,7 @@ class Case(object):
                     return_name = auto_ivc_map[name]
                 else:
                     return_name = name
-                ret_vars[return_name] = val = self.outputs[name]
+                ret_vars[return_name] = val = self.outputs[name].copy()
                 if update_vals and name in self._var_info:
                     meta = self._var_info[name]
                     if use_indices and meta['indices'] is not None:
@@ -791,7 +793,7 @@ class PromAbsDict(dict):
             connections or a promoted input name for multiple connections. This is for output
             display.
         """
-        super(PromAbsDict, self).__init__()
+        super().__init__()
 
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
@@ -811,27 +813,27 @@ class PromAbsDict(dict):
                     # key is auto_ivc, so translate to a readable input name.
                     self._values[key] = values[key]
                     in_key = auto_ivc_map[key]
-                    super(PromAbsDict, self).__setitem__(in_key, values[key])
+                    super().__setitem__(in_key, values[key])
                 elif key in abs2prom:
                     # key is absolute name
                     self._values[key] = values[key]
                     prom_key = abs2prom[key]
-                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                    super().__setitem__(prom_key, values[key])
                 elif key in prom2abs:
                     # key is promoted name
                     for abs_key in prom2abs[key]:
                         self._values[abs_key] = values[key]
-                    super(PromAbsDict, self).__setitem__(key, values[key])
+                    super().__setitem__(key, values[key])
                 elif isinstance(key, tuple) or DERIV_KEY_SEP in key:
                     # derivative keys can be either (of, wrt) or 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
-                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                    super().__setitem__(prom_key, values[key])
                 elif in_prom2abs is not None and key in in_prom2abs:
                     # Auto-ivc outputs, use abs source (which is prom source.)
                     self._values[key] = values[key]
-                    super(PromAbsDict, self).__setitem__(key, values[key])
+                    super().__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
@@ -841,24 +843,24 @@ class PromAbsDict(dict):
                 if key in auto_ivc_map:
                     # key is auto_ivc, so translate to a readable input name.
                     in_key = auto_ivc_map[key]
-                    super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+                    super().__setitem__(in_key, self._values[key])
                 elif key in abs2prom:
                     prom_key = abs2prom[key]
                     if prom_key in self:
                         # We already set a value for this promoted name, which means
                         # it is an input that maps to multiple absolute names. Set the
                         # value to AMBIGOUS and require access via absolute name.
-                        super(PromAbsDict, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
+                        super().__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
                     else:
-                        super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
+                        super().__setitem__(prom_key, self._values[key])
                 elif DERIV_KEY_SEP in key:
                     # derivative keys will be a string in the form of 'of!wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
-                    super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
+                    super().__setitem__(prom_key, self._values[key])
                 elif in_prom2abs is not None and key in in_prom2abs:
                     # Auto-ivc outputs, use abs source (which is prom source.)
                     # TODO - maybe get rid of this by always saving the source name
-                    super(PromAbsDict, self).__setitem__(key, self._values[key])
+                    super().__setitem__(key, self._values[key])
 
     def __str__(self):
         """
@@ -869,7 +871,7 @@ class PromAbsDict(dict):
         str
             String representation of the dictionary.
         """
-        return super(PromAbsDict, self).__str__()
+        return super().__str__()
 
     def _deriv_keys(self, key):
         """
@@ -943,7 +945,7 @@ class PromAbsDict(dict):
 
         elif key in self:
             # promoted name
-            val = super(PromAbsDict, self).__getitem__(key)
+            val = super().__getitem__(key)
             if val is _AMBIGOUS_PROM_NAME:
                 msg = "The promoted name '%s' is invalid because it refers to multiple " + \
                       "inputs: %s. Access the value using an absolute path name or the " + \
@@ -955,7 +957,7 @@ class PromAbsDict(dict):
         elif isinstance(key, tuple) or self._DERIV_KEY_SEP in key:
             # derivative keys can be either (of, wrt) or 'of!wrt'
             abs_keys, prom_key = self._deriv_keys(key)
-            return super(PromAbsDict, self).__getitem__(prom_key)
+            return super().__getitem__(prom_key)
 
         raise KeyError('Variable name "%s" not found.' % key)
 
@@ -981,28 +983,28 @@ class PromAbsDict(dict):
             for abs_key in abs_keys:
                 self._values[abs_key] = value
 
-            super(PromAbsDict, self).__setitem__(prom_key, value)
+            super().__setitem__(prom_key, value)
 
         elif key in abs2prom:
             if key in auto_ivc_map:
                 # key is auto_ivc, so translate to a readable input name.
                 self._values[key] = value
                 in_key = auto_ivc_map[key]
-                super(PromAbsDict, self).__setitem__(in_key, self._values[key])
+                super().__setitem__(in_key, self._values[key])
             else:
                 # absolute name
                 self._values[key] = value
-                super(PromAbsDict, self).__setitem__(self._abs2prom[key], value)
+                super().__setitem__(self._abs2prom[key], value)
         elif key in prom2abs:
             # promoted name, propagate to all connected absolute names
             for abs_key in self._prom2abs[key]:
                 if abs_key in self._keys:
                     self._values[abs_key] = value
-            super(PromAbsDict, self).__setitem__(key, value)
+            super().__setitem__(key, value)
         else:
             # Design variable by promoted input name.
             self._values[key] = value
-            super(PromAbsDict, self).__setitem__(key, value)
+            super().__setitem__(key, value)
 
     def absolute_names(self):
         """

@@ -18,7 +18,7 @@ if OPTIMIZER:
 class TrajDesignParameterOptionsDictionary(om.OptionsDictionary):
 
     def __init__(self, read_only=False):
-        super(TrajDesignParameterOptionsDictionary, self).__init__(read_only)
+        super().__init__(read_only)
 
         self.declare(name='name')
         self.declare(name='val', default=np.zeros(1))
@@ -29,7 +29,7 @@ class TrajDesignParameterOptionsDictionary(om.OptionsDictionary):
 class StateOptionsDictionary(om.OptionsDictionary):
 
     def __init__(self, read_only=False):
-        super(StateOptionsDictionary, self).__init__(read_only)
+        super().__init__(read_only)
 
         self.declare(name='name')
         self.declare(name='val', default=0.0)
@@ -286,7 +286,7 @@ class StateIndependentsComp(om.ImplicitComponent):
 class Trajectory(om.Group):
 
     def __init__(self):
-        super(Trajectory, self).__init__()
+        super().__init__()
 
         self.design_parameter_options = {}
         self._phases = {}
@@ -314,7 +314,7 @@ class Trajectory(om.Group):
                                  shape=(1, np.prod(options['shape'])))
 
     def setup(self):
-        super(Trajectory, self).setup()
+        super().setup()
         self._setup_design_parameters()
 
         phases_group = self.add_subsystem('phases', subsys=om.ParallelGroup(), promotes_inputs=['*'],
@@ -334,7 +334,7 @@ class Phase(om.Group):
         self.state_options = {}
         self._objectives = {}
 
-        super(Phase, self).__init__(**_kwargs)
+        super().__init__(**_kwargs)
 
     def initialize(self):
         self.options.declare('ode_class', default=None)

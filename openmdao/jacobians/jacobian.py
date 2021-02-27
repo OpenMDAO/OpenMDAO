@@ -86,10 +86,13 @@ class Jacobian(object):
         in_size : int
             local size of the input variable.
         """
-        system = self._system()
-        abs2meta = system._var_allprocs_abs2meta
+        abs2meta = self._system()._var_allprocs_abs2meta
         of, wrt = abs_key
-        return (abs2meta[of]['size'], abs2meta[wrt]['size'])
+        if wrt in abs2meta['input']:
+            sz = abs2meta['input'][wrt]['size']
+        else:
+            sz = abs2meta['output'][wrt]['size']
+        return (abs2meta['output'][of]['size'], sz)
 
     def __contains__(self, key):
         """

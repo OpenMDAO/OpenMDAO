@@ -17,6 +17,10 @@ from itertools import chain
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
+    _scaling_cmd
+from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
+    _view_dyn_shapes_cmd
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
@@ -470,7 +474,10 @@ _command_map = {
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
-    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
+    'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
+                        'View the dynamic shape dependency graph.'),
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 
 
@@ -488,6 +495,8 @@ def openmdao_cmd():
         user_args = []
 
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
+                                     usage='openmdao [-h] [--version] command [command_options] '
+                                     'filename',
                                      epilog='Use -h after any sub-command for sub-command help.'
                                      ' If using a tool on a script that takes its own command line'
                                      ' arguments, place those arguments after a "--". For example:'
@@ -531,7 +540,8 @@ def openmdao_cmd():
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
+    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version')]
+    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
         _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True

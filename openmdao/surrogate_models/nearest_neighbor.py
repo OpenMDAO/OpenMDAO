@@ -39,7 +39,7 @@ class NearestNeighbor(SurrogateModel):
         **kwargs : dict
             options dictionary.
         """
-        super(NearestNeighbor, self).__init__()
+        super().__init__()
 
         # Note: don't pass kwargs to parent because most of them are specific to choice of
         # interpolant.
@@ -67,9 +67,7 @@ class NearestNeighbor(SurrogateModel):
         y : array-like
             Model responses at given inputs.
         """
-        super(NearestNeighbor, self).train(x, y)
-        nn_opts = self.interpolant_init_args
-        nn_opts['parent_name'] = self._parent_name
+        super().train(x, y)
         self.interpolant = _interpolators[self.options['interpolant_type']](
             x, y, **self.interpolant_init_args)
 
@@ -89,7 +87,7 @@ class NearestNeighbor(SurrogateModel):
         float
             Predicted value.
         """
-        super(NearestNeighbor, self).predict(x)
+        super().predict(x)
         return self.interpolant(x, **kwargs)
 
     def linearize(self, x, **kwargs):

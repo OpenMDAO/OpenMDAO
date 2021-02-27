@@ -549,23 +549,23 @@ class TestNewton(unittest.TestCase):
             """ This version of Newton also counts how many times it runs in total."""
 
             def __init__(self, **kwargs):
-                super(CountNewton, self).__init__(**kwargs)
+                super().__init__(**kwargs)
                 self.options['solve_subsystems'] = True
                 self.total_count = 0
 
             def _single_iteration(self):
-                super(CountNewton, self)._single_iteration()
+                super()._single_iteration()
                 self.total_count += 1
 
         class CountDS(om.DirectSolver):
             """ This version of Newton also counts how many times it linearizes"""
 
             def __init__(self, **kwargs):
-                super(CountDS, self).__init__(**kwargs)
+                super().__init__(**kwargs)
                 self.lin_count = 0
 
             def _linearize(self):
-                super(CountDS, self)._linearize()
+                super()._linearize()
                 self.lin_count += 1
 
         prob = om.Problem(model=DoubleSellar())
@@ -840,7 +840,7 @@ class TestNewton(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             prob.run_model()
 
-        msg = "NewtonSolver in Group (<model>): solve_subsystems must be set by the user."
+        msg = "NewtonSolver in <model> <class Group>: solve_subsystems must be set by the user."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -871,7 +871,7 @@ class TestNewtonFeatures(unittest.TestCase):
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         prob.setup()
-        
+
         prob.set_val('x', 1.)
         prob.set_val('z', np.array([5.0, 2.0]))
 
@@ -908,7 +908,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
         prob.set_val('x', 1.)
         prob.set_val('z', np.array([5.0, 2.0]))
-        
+
         prob.run_model()
 
         assert_near_equal(prob.get_val('y1'), 25.5878516779, .00001)

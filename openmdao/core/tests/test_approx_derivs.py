@@ -111,7 +111,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
         self.assertEqual(model.parab.iter_count_without_approx, 1)
-        self.assertEqual(model.parab.iter_count, 3)
+        self.assertEqual(model.parab.iter_count, 1)
+        self.assertEqual(model.parab.iter_count_apply, 2)
 
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
@@ -298,7 +299,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         class TestImplCompArrayDense(TestImplCompArray):
 
             def setup(self):
-                super(TestImplCompArrayDense, self).setup()
+                super().setup()
                 self.declare_partials('*', '*', method='fd')
 
         prob = om.Problem()
@@ -791,6 +792,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         p.driver = pyOptSparseDriver()
         p.driver.options['print_results'] = False
+
         p.model.approx_totals(method='fd')
 
         p.model.add_design_var('x')
@@ -903,8 +905,8 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         prob = om.Problem()
         prob.model = FanInSubbedIDVC()
 
-        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.model.approx_totals()
+        prob.setup(local_vector_class=vector_class, check=False, mode='rev')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1254,8 +1256,6 @@ class TestGroupComplexStep(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
-                            promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
         model.add_design_var('x1', indices=[1, 3])
@@ -1849,8 +1849,8 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
 
@@ -1861,7 +1861,7 @@ class TestComponentComplexStep(unittest.TestCase):
         class TestImplCompArrayDense(TestImplCompArray):
 
             def setup(self):
-                super(TestImplCompArrayDense, self).setup()
+                super().setup()
                 self.declare_partials('*', '*', method='cs')
 
         prob = self.prob = om.Problem()
@@ -1962,8 +1962,8 @@ class TestComponentComplexStep(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
         outs = prob.model.list_outputs(residuals=True, out_stream=None)
-        for j in range(len(outs)):
-            val = np.linalg.norm(outs[j][1]['resids'])
+        for name, meta in outs:
+            val = np.linalg.norm(meta['resids'])
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):
@@ -2236,7 +2236,7 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_near_equal(prob['y2'], 12.05848819, .00001)
 
         # Make sure we aren't iterating like crazy
-        self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
+        self.assertLess(prob.model.nonlinear_solver._iter_count, 9)
 
 
 class ParallelFDParametricTestCase(unittest.TestCase):

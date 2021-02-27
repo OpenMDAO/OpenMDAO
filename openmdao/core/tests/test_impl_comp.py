@@ -7,6 +7,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
@@ -27,6 +28,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.add_input('c', val=1.)
         self.add_output('x', val=0., tags=['tag_x'])
 
+    def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -66,6 +68,9 @@ class QuadraticLinearize(QuadraticComp):
 
 
 class QuadraticJacVec(QuadraticComp):
+
+    def setup_partials(self):
+        pass  # prevent declaration of partials from base class
 
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
@@ -144,13 +149,16 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_inputs_before_run(self):
         # cannot list_inputs on a Group before running
-        msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
-        try:
-            self.prob.model.list_inputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
+        expected = {
+            'comp1.a': {'value': [1.], 'desc': ''},
+            'comp1.b': {'value': [1.], 'desc': ''},
+            'comp1.c': {'value': [1.], 'desc': ''},
+            'comp2.a': {'value': [1.], 'desc': ''},
+            'comp2.b': {'value': [1.], 'desc': ''},
+            'comp2.c': {'value': [1.], 'desc': ''},
+        }
+        self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
         c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
@@ -186,18 +194,17 @@ class ImplicitCompTestCase(unittest.TestCase):
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
-        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
-        try:
-            self.prob.model.list_outputs()
-        except Exception as err:
-            self.assertEqual(str(err), msg)
-        else:
-            self.fail("Exception expected")
+        model_outputs = self.prob.model.list_outputs(out_stream=None)
+        expected = {
+            'comp1.x': {'value': [0.]},
+            'comp2.x': {'value': [0.]},
+        }
+        self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
         expected = {
-            'x': {'value': [0.]}
+            'x': {'value': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
@@ -212,9 +219,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
         self.assertEqual(dict(c2_outputs), {})
 
-        # specifying residuals_tol should not cause an error
+        # specifying residuals_tol should not cause an error. However this will be empty because
+        # of the residuals_tol
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(c2_outputs), expected)
+        self.assertEqual(dict(c2_outputs), {})
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
@@ -280,7 +288,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  c  '), 4)
 
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 13)
+        self.assertEqual(num_non_empty_lines, 12)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -320,8 +328,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
-        self.assertTrue(('comp1.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
-        self.assertTrue(('comp2.x', {'value': [3.], 'resids': [0.]}) in states, msg=None)
+        self.assertEqual([('comp1.x', {'value': [3.], 'resids': [0.]}),
+                          ('comp2.x', {'value': [3.], 'resids': [0.]})], sorted(states))
         text = stream.getvalue()
         self.assertEqual(1, text.count('comp1.x'))
         self.assertEqual(1, text.count('comp2.x'))
@@ -340,7 +348,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 9)
+        self.assertEqual(num_non_empty_lines, 8)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -359,6 +367,33 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('varname'), 1)
         self.assertEqual(text.count('value'), 0)
         self.assertEqual(text.count('resids'), 1)
+
+    def test_list_residuals_with_tol(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
+
+        prob.setup()
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        stdout = StringIO()
+        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        text = stdout.getvalue().split('\n')
+        # P1 and D1 should not appear in the outputs section. This is being checked below
+        self.assertEqual(text[14], 'd2')
+        self.assertFalse('d1' in text)
 
 
 class ImplicitCompGuessTestCase(unittest.TestCase):
@@ -440,7 +475,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, resids):
 
-                if outputs._data.dtype == np.complex:
+                if outputs.asarray().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # Default initial state of zero for x takes us to x=1 solution.
@@ -801,7 +836,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "ImpWithInitial (comp1): Attempt to set value of 'x' in input vector "
+                         "'comp1' <class ImpWithInitial>: Attempt to set value of 'x' in input vector "
                          "when it is read only.")
 
     def test_guess_nonlinear_inputs_read_only_reset(self):
@@ -865,7 +900,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "ImpWithInitial (comp1): Attempt to set value of 'y' in residual vector "
+                         "'comp1' <class ImpWithInitial>: Attempt to set value of 'y' in residual vector "
                          "when it is read only.")
 
 
@@ -874,7 +909,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -887,13 +922,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'a' in input vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_outputs_read_only(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -906,13 +941,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_nonlinear()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in output vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_nonlinear_read_only_reset(self):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
-                super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
+                super().apply_nonlinear(inputs, outputs, residuals)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -930,7 +965,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_nonlinear_inputs_read_only(self):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
-                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                super().solve_nonlinear(inputs, outputs)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -942,13 +977,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'a' in input vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_solve_nonlinear_inputs_read_only_reset(self):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
-                super(BadComp, self).solve_nonlinear(inputs, outputs)
+                super().solve_nonlinear(inputs, outputs)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -964,7 +999,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_linearize_inputs_read_only(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 inputs['a'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -977,13 +1012,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'a' in input vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_linearize_outputs_read_only(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -996,13 +1031,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_linearize()
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in output vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_linearize_read_only_reset(self):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
-                super(BadComp, self).linearize(inputs, outputs, partials)
+                super().linearize(inputs, outputs, partials)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -1020,7 +1055,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_apply_linear_inputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 inputs['a'] = 0.  # should not be allowed
 
@@ -1034,13 +1069,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'a' in input vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_outputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 outputs['x'] = 0.  # should not be allowed
 
@@ -1054,13 +1089,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in output vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dinputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_inputs['a'] = 0.  # should not be allowed
 
@@ -1074,13 +1109,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'a' in input vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
                          "when it is read only.")
 
     def test_apply_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
@@ -1094,13 +1129,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in output vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_apply_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
@@ -1114,13 +1149,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_apply_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_apply_linear_read_only_reset(self):
         class BadComp(QuadraticJacVec):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
-                super(BadComp, self).apply_linear(inputs, outputs,
+                super().apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
@@ -1140,7 +1175,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
     def test_solve_linear_doutputs_read_only(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -1154,13 +1189,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'rev')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in output vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
                          "when it is read only.")
 
     def test_solve_linear_dresids_read_only(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
         prob = om.Problem()
@@ -1174,13 +1209,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             prob.model.run_solve_linear(['linear'], 'fwd')
 
         self.assertEqual(str(cm.exception),
-                         "BadComp (bad): Attempt to set value of 'x' in residual vector "
+                         "'bad' <class BadComp>: Attempt to set value of 'x' in residual vector "
                          "when it is read only.")
 
     def test_solve_linear_read_only_reset(self):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
-                super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
+                super().solve_linear(d_outputs, d_residuals, mode)
                 raise om.AnalysisError("It's just a scratch.")
 
         prob = om.Problem()
@@ -1298,6 +1333,7 @@ class ListFeatureTestCase(unittest.TestCase):
                                 ref=1.1, ref0=2.1,
                                 units='inch')
 
+            def setup_partials(self):
                 self.declare_partials(of='*', wrt='*')
 
             def apply_nonlinear(self, inputs, outputs, residuals):
@@ -1353,12 +1389,11 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp3.c', {}),
         ])
         self.assertEqual(1, text.count("6 Input(s) in 'model'"))
-        self.assertEqual(1, text.count("\nmodel"))
-        self.assertEqual(1, text.count("\n  sub"))
-        self.assertEqual(1, text.count("\n    comp2"))
-        self.assertEqual(2, text.count("\n      a"))
+        self.assertEqual(1, text.count("\nsub"))
+        self.assertEqual(1, text.count("\n  comp2"))
+        self.assertEqual(2, text.count("\n    a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 14)
+        self.assertEqual(num_non_empty_lines, 13)
 
         # list_outputs tests
         # list implicit outputs

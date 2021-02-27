@@ -254,7 +254,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             vmc.add_magnitude('a_mag', 'aa')
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: "
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: "
                          "Multiple definition of output 'a_mag'.")
 
     def test_input_as_output(self):
@@ -263,7 +263,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             vmc.add_magnitude('a', 'aa')
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: 'a' specified as"
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: 'a' specified as"
                          " an output, but it has already been defined as an input.")
 
     def test_output_as_input(self):
@@ -272,7 +272,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(NameError) as ctx:
             vmc.add_magnitude('aa', 'a_mag')
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: 'a_mag' specified as"
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: 'a_mag' specified as"
                          " an input, but it has already been defined as an output.")
 
     def test_vec_size_mismatch(self):
@@ -281,7 +281,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             vmc.add_magnitude('a_mag2', 'a', vec_size=10)
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: "
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: "
                          "Conflicting vec_size=10 specified for input 'a', "
                          "which has already been defined with vec_size=1.")
 
@@ -291,7 +291,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             vmc.add_magnitude('a_mag2', 'a', length=5)
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: "
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: "
                          "Conflicting length=5 specified for input 'a', "
                          "which has already been defined with length=1.")
 
@@ -301,7 +301,7 @@ class TestMultipleErrors(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             vmc.add_magnitude('a_mag2', 'a', units='ft')
 
-        self.assertEqual(str(ctx.exception), "VectorMagnitudeComp: "
+        self.assertEqual(str(ctx.exception), "<class VectorMagnitudeComp>: "
                          "Conflicting units 'ft' specified for input 'a', "
                          "which has already been defined with units 'None'.")
 

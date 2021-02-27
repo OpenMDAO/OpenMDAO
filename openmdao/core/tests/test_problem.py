@@ -8,12 +8,12 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
+from openmdao.utils.units import convert_units
 
 try:
     from parameterized import parameterized
@@ -116,6 +116,29 @@ class SellarOneComp(om.ImplicitComponent):
 
 
 class TestProblem(unittest.TestCase):
+
+    def test_simple_component_model_with_units(self):
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', units='N')
+                self.add_output('bar', units='N')
+                self.declare_partials('bar', 'foo')
+
+            def compute(self, inputs, outputs):
+                outputs['bar'] = inputs['foo']
+
+            def compute_partials(self, inputs, J):
+                J['bar', 'foo'] = 1.
+
+        p = om.Problem(model=TestComp())
+        p.setup()
+
+        p.set_val('foo', 5, units='lbf')
+        p.run_model()
+
+        lbf_val = convert_units(5, 'lbf', 'N')
+        self.assertEqual(p.get_val('foo'), lbf_val)
+        self.assertEqual(p.get_val('bar'), lbf_val)
 
     def test_feature_simple_run_once_no_promote(self):
         import openmdao.api as om
@@ -333,7 +356,7 @@ class TestProblem(unittest.TestCase):
         bad_val = -10*np.ones((10))
         prob['indep.num'] = bad_val
         with self.assertRaisesRegex(ValueError,
-                "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
+                "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
             prob.final_setup()
         prob._initial_condition_cache = {}
 
@@ -348,7 +371,7 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
-        msg = "Group (.*): Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
+        msg = "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
         # check bad array value
         bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
@@ -832,6 +855,26 @@ class TestProblem(unittest.TestCase):
 
         prob.check_totals(method='cs')
 
+    def test_set_cs_error_messages(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+
+        msg = "Problem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Paraboloid())
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_complex_step_mode(True)
+        msg = "Problem: set_complex_step_mode cannot be called before `Problem.run_model()`, " + \
+            "`Problem.run_driver()`, or `Problem.final_setup()`."
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_feature_run_driver(self):
         import numpy as np
 
@@ -1044,7 +1087,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "Group (<model>): The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, value=?), where <group> is the model to remove the ambiguity.")
+            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1105,12 +1148,12 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         # set G1.x to 2.0 m, based on the units we gave in the set_input_defaults call
-        prob['G1.x'] = 2.0
+        prob['G1.x'] = np.ones(3) * 2.0
 
         prob.run_model()
 
         # we gave 'G1.x' units of 'm' in the set_input_defaults call
-        assert_near_equal(prob['G1.x'], 2.0, 1e-6)
+        assert_near_equal(prob['G1.x'], np.ones(3) * 2.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'cm'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
@@ -1151,12 +1194,12 @@ class TestProblem(unittest.TestCase):
 
         assert_near_equal(prob['indeps.x'], 2.0, 1e-6)
 
-        # using the promoted name of the inputs will give the value in the units set in set_input_defaults,
-        # which is 'dm'
+        # using the promoted name of the inputs will give the value
+        # in the units set in set_input_defaults, which is 'dm'
         assert_near_equal(prob['G1.x'], 20.0, 1e-6)
 
-        # test _get_val on lower level group
-        assert_near_equal( G1.get_val('x'), 20.0, 1e-6)
+        # get value from lower level group
+        assert_near_equal(G1.get_val('x'), 20.0, 1e-6)
 
         # using absolute value will give us the value of the input C1.x, in its units of 'inch'
         assert_near_equal(prob['G1.C1.x'], 200.0, 1e-6)
@@ -1201,7 +1244,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             x = prob['G1.x']
 
-        msg = "Group (<model>): The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
@@ -1508,9 +1551,8 @@ class TestProblem(unittest.TestCase):
 
         p.setup(check=False, mode='rev')
 
-        relevant = get_relevant_vars(model._conn_global_abs_in2out,
-                                     ['indep1.x', 'indep2.x'],
-                                     ['C8.y', 'Unconnected.y'], mode='rev')
+        relevant = model.get_relevant_vars(['indep1.x', 'indep2.x'],
+                                           ['C8.y', 'Unconnected.y'], mode='rev')
 
         indep1_ins = set(['C3.b', 'C3.c', 'C8.b', 'G1.C1.a', 'G2.C5.a', 'G2.C5.b'])
         indep1_outs = set(['C3.y', 'C8.y', 'G1.C1.z', 'G2.C5.x', 'indep1.x'])
@@ -2044,6 +2086,15 @@ class TestProblem(unittest.TestCase):
                                           'vectorize_derivs',
                                           'cache_linear_solution'])
 
+    def test_error_msg_set_val_before_setup(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.set_val('x', 0.)
+        self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
+
 
 class NestedProblemTestCase(unittest.TestCase):
 
@@ -2059,7 +2110,7 @@ class NestedProblemTestCase(unittest.TestCase):
                 p.setup()
                 p.run_model()
 
-                return super(_ProblemSolver, self).solve()
+                return super().solve()
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
@@ -2069,6 +2120,69 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
         p.run_model()
+
+    def test_cs_across_nested(self):
+
+        class NestedAnalysis(om.ExplicitComponent):
+
+            def __init__(self):
+                super().__init__()
+                self._problem = None
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+                # Setup sub-problem
+                self._problem = prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('parab', Paraboloid(), promotes=['*'])
+                prob.setup(force_alloc_complex=True)
+
+            def setup_partials(self):
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                prob = self._problem
+                under_cs = self.under_complex_step
+
+                if under_cs:
+                    prob.set_complex_step_mode(True)
+
+                # Set inputs
+                prob.set_val('x', inputs['x'])
+                prob.set_val('y', inputs['y'])
+
+                # Run model
+                prob.run_model()
+
+                # Extract outputs
+                outputs['f_xy'] = prob.get_val('f_xy')
+
+                if under_cs:
+                    prob.set_complex_step_mode(False)
+
+            def compute_partials(self, inputs, partials):
+                totals = self._problem.compute_totals(of='f_xy', wrt=['x', 'y'])
+                partials['f_xy', 'x'] = totals['f_xy', 'x']
+                partials['f_xy', 'y'] = totals['f_xy', 'y']
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('nested', NestedAnalysis(), promotes=['*'])
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.set_val('x', 3.5)
+        prob.set_val('y', 1.5)
+
+        prob.run_model()
+
+        totals = prob.check_totals(of='f_xy', wrt=['x', 'y'], method='cs', out_stream=None)
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-12)
 
 
 class SystemInTwoProblemsTestCase(unittest.TestCase):

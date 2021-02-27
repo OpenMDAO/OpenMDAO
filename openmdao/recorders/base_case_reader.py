@@ -3,6 +3,7 @@ Base class for all CaseReaders.
 """
 
 from openmdao.utils.assert_utils import warn_deprecation
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 
 class BaseCaseReader(object):
@@ -17,7 +18,7 @@ class BaseCaseReader(object):
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
         The solver options for each solver in the recorded model.
-    system_options : dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
     """
 
@@ -35,7 +36,21 @@ class BaseCaseReader(object):
         self._format_version = None
         self.problem_metadata = {}
         self.solver_metadata = {}
-        self.system_options = {}
+        self._system_options = {}
+
+    @property
+    def system_options(self):
+        """
+        Provide '_system_options' property for backwards compatibility.
+
+        Returns
+        -------
+        dict
+            reference to the _system_options attribute.
+        """
+        warn_deprecation("The system_options attribute is deprecated. "
+                         "Use `list_model_options` instead.")
+        return self._system_options
 
     @property
     def system_metadata(self):
@@ -45,11 +60,11 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            reference to the 'system_options' attribute.
+            reference to the '_system_options' attribute.
         """
         warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
-                         "Use the BaseCaseReader.system_option attribute instead.")
-        return self.system_options
+                         "Use `list_model_options` instead.")
+        return self._system_options
 
     def get_cases(self, source, recurse=True, flat=False):
         """
@@ -91,19 +106,25 @@ class BaseCaseReader(object):
         """
         pass
 
-    def list_sources(self):
+    def list_sources(self, out_stream=_DEFAULT_OUT_STREAM):
         """
         List of all the different recording sources for which there is recorded data.
+
+        Parameters
+        ----------
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
         list
-            One or more of: 'problem', 'driver', <system hierarchy location>,
-                            <solver hierarchy location>
+            One or more of: `problem`, `driver`, `<system hierarchy location>`,
+                            `<solver hierarchy location>`
         """
         pass
 
-    def list_source_vars(self, source):
+    def list_source_vars(self, source, out_stream=_DEFAULT_OUT_STREAM):
         """
         List of all inputs and outputs recorded by the specified source.
 
@@ -111,15 +132,18 @@ class BaseCaseReader(object):
         ----------
         source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
         dict
-            {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+            {'inputs':[key list], 'outputs':[key list], 'residuals':[key list]}. No recurse.
         """
         pass
 
-    def list_cases(self, source=None, recurse=True, flat=True):
+    def list_cases(self, source=None, recurse=True, flat=True, out_stream=_DEFAULT_OUT_STREAM):
         """
         Iterate over Driver, Solver and System cases in order.
 
@@ -133,10 +157,55 @@ class BaseCaseReader(object):
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
 
         Returns
         -------
         iterator or dict
             An iterator or a nested dictionary of identified cases.
+        """
+        pass
+
+    def list_model_options(self, run_number=0, system=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List model options for the specified run.
+
+        Parameters
+        ----------
+        run_number : int
+            Run_driver or run_model iteration to inspect
+        system : str or None
+            Pathname of system (None for all systems)
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {system: {key: val}}
+        """
+        pass
+
+    def list_solver_options(self, run_number=0, solver=None, out_stream=_DEFAULT_OUT_STREAM):
+        """
+        List solver options for the specified run.
+
+        Parameters
+        ----------
+        run_number : int
+            Run_driver or run_model iteration to inspect
+        solver : str or None
+            Pathname of solver (None for all solvers)
+        out_stream : file-like object
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+
+        Returns
+        -------
+        dict
+            {solver: {key: val}}
         """
         pass

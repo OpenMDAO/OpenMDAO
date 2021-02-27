@@ -41,7 +41,7 @@ class DistribExecComp(om.ExecComp):
     """
 
     def __init__(self, exprs, arr_size=11, **kwargs):
-        super(DistribExecComp, self).__init__(exprs, **kwargs)
+        super().__init__(exprs, **kwargs)
         self.arr_size = arr_size
         self.options['distributed'] = True
 
@@ -67,7 +67,8 @@ class DistribExecComp(om.ExecComp):
         for expr in exprs:
             lhs, _ = expr.split('=', 1)
             outs.update(self._parse_for_out_vars(lhs))
-            allvars.update(self._parse_for_vars(expr))
+            v, _ = self._parse_for_names(expr)
+            allvars.update(v)
 
         sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
         start = offsets[rank]
@@ -86,12 +87,12 @@ class DistribExecComp(om.ExecComp):
                 meta['value'] = np.ones(sizes[rank], float)
                 meta['src_indices'] = np.arange(start, end, dtype=int)
 
-        super(DistribExecComp, self).setup()
+        super().setup()
 
 
 class DistribCoordComp(om.ExplicitComponent):
     def __init__(self, **kwargs):
-        super(DistribCoordComp, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.options['distributed'] = True
 
@@ -632,7 +633,7 @@ class MPITests2(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.run_model()
 
-        msg = "Group (sub) : Approx_totals is not supported on a group with a distributed "
+        msg = "'sub' <class Group> : Approx_totals is not supported on a group with a distributed "
         msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
         self.assertEqual(str(context.exception), msg)
 
@@ -1284,9 +1285,9 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         prob.run_model()
 
         if model.comm.rank < 3:
-            assert_near_equal(prob['C2.invec'],
+            assert_near_equal(prob.get_val('C2.invec', get_remote=False),
                             np.ones(1) if model.comm.rank == 0 else np.ones(1))
-            assert_near_equal(prob['C2.outvec'],
+            assert_near_equal(prob.get_val('C2.outvec', get_remote=False),
                             2*np.ones(1) if model.comm.rank == 0 else -3*np.ones(1))
         assert_near_equal(prob['C3.sum'], -4.)
 

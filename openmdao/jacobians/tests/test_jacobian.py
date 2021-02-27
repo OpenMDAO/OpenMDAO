@@ -23,7 +23,7 @@ except ImportError:
 
 class MyExplicitComp(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -71,7 +71,7 @@ class MyExplicitComp(ExplicitComponent):
 
 class MyExplicitComp2(ExplicitComponent):
     def __init__(self, jac_type):
-        super(MyExplicitComp2, self).__init__()
+        super().__init__()
         self._jac_type = jac_type
 
     def setup(self):
@@ -117,7 +117,7 @@ class ExplicitSetItemComp(ExplicitComponent):
         self._shape = shape
         self._value = value
         self._constructor = constructor
-        super(ExplicitSetItemComp, self).__init__()
+        super().__init__()
 
     def setup(self):
         if self._shape == 'scalar':
@@ -292,7 +292,7 @@ class TestJacobian(unittest.TestCase):
         # fwd apply_linear test
         d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals.set_val(d_residuals._data - check_vec)
+        d_residuals.set_val(d_residuals.asarray() - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
@@ -312,7 +312,7 @@ class TestJacobian(unittest.TestCase):
         # rev apply_linear test
         d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs.set_val(d_outputs._data - check_vec)
+        d_outputs.set_val(d_outputs.asarray() - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
@@ -596,7 +596,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp1())
 
-        msg = "Comp1 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = "'comp' <class Comp1>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
         with self.assertRaisesRegex(RuntimeError, msg):
@@ -606,7 +606,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp2())
 
-        msg = "Comp2 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
+        msg = "'comp' <class Comp2>: d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
         with self.assertRaisesRegex(RuntimeError, msg):
@@ -710,6 +710,9 @@ class TestJacobian(unittest.TestCase):
         prob.final_setup()
 
         class ParaboloidJacVec(Paraboloid):
+
+            def setup_partials(self):
+                pass
 
             def linearize(self, inputs, outputs, jacobian):
                 return
@@ -848,6 +851,96 @@ class TestJacobian(unittest.TestCase):
                 [e[1] for e in sorted(expected)],
                 ):
             assert_near_equal(act,exp, 1e-5)
+
+    def test_compute_totals_relevancy(self):
+        # When a model has desvars and responses defined, components that don't lie in the relevancy
+        # graph between them do not take part in the linear solve. This led to some derivatives
+        # being returned as zero in certain instances when it was called with wrt or of not in the
+        # set.
+        class DParaboloid(ExplicitComponent):
+
+            def setup(self):
+                ndvs = 3
+                self.add_input('w', val=1.)
+                self.add_input('x', shape=ndvs)
+
+                self.add_output('y', shape=1)
+                self.add_output('z', shape=ndvs)
+                self.declare_partials('y', 'x')
+                self.declare_partials('y', 'w')
+                self.declare_partials('z', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y_g = np.sum((x-5)**2)
+                outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+                outputs['z'] = x**2
+
+            def compute_partials(self, inputs, J):
+                x = inputs['x']
+                J['y', 'x'] = 2*(x-5)
+                J['y', 'w'] = 2*(inputs['w']-10)
+                J['z', 'x'] = np.diag(2*x)
+
+        p = Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                       IndepVarComp(),
+                                       promotes=['*'])
+        ndvs = 3
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    IndepVarComp(),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DParaboloid(), promotes=['*'])
+
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode='rev')
+        p.run_model()
+        J = p.compute_totals(of=['y', 'z'], wrt=['w', 'x'])
+
+        assert(J['y','w'][0,0] == -16)
+
+    def test_wildcard_partials_bug(self):
+        # Test for a bug where using wildcards when declaring partials resulted in extra
+        # derivatives of an output wrt other outputs.
+
+        class ODE(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', 1.0)
+                self.add_output('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials(of='*', wrt='*', method='cs')
+
+            def compute(self, inputs, outputs):
+                a = inputs['a']
+                outputs['x'] = 3.0 * a
+                outputs['y'] = 7.0 * a
+
+        p = Problem()
+
+        p.model.add_subsystem('ode', ODE())
+
+        p.model.linear_solver = DirectSolver()
+        p.model.add_design_var('ode.a')
+        p.model.add_constraint('ode.x', lower=0.0)
+        p.model.add_constraint('ode.y', lower=0.0)
+
+        p.setup()
+        p.run_model()
+
+        p.compute_totals()
+        keys = p.model.ode._jacobian._subjacs_info
+        self.assertTrue(('ode.x', 'ode.y') not in keys)
+        self.assertTrue(('ode.y', 'ode.x') not in keys)
+
 
 class MySparseComp(ExplicitComponent):
     def setup(self):

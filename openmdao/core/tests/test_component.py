@@ -8,8 +8,7 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
-from openmdao.utils.assert_utils import assert_near_equal
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 class TestExplicitComponent(unittest.TestCase):
 
@@ -20,13 +19,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # check optional metadata (desc)
         self.assertEqual(
-            comp._var_abs2meta['length']['desc'],
+            comp._var_abs2meta['input']['length']['desc'],
             'length of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['width']['desc'],
+            comp._var_abs2meta['input']['width']['desc'],
             'width of rectangle')
         self.assertEqual(
-            comp._var_abs2meta['area']['desc'],
+            comp._var_abs2meta['output']['area']['desc'],
             'area of rectangle')
 
         prob['length'] = 3.
@@ -130,6 +129,14 @@ class TestExplicitComponent(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=5.0, res_units=val)
 
+    def test_unit_simplify(self):
+        comp = Component()
+        comp.add_input('y', units='ft*ft/ft')
+        comp.add_output('z', units='ft*ft/ft')
+
+        self.assertEqual(comp._static_var_rel2meta['y']['units'], 'ft')
+        self.assertEqual(comp._static_var_rel2meta['z']['units'], 'ft')
+
     def test_invalid_name(self):
         comp = ExplicitComponent()
 
@@ -138,13 +145,13 @@ class TestExplicitComponent(unittest.TestCase):
 
         # Test some forbidden names.
         invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
-        invalid_error = "ExplicitComponent: '%s' is not a valid %s name."
+        invalid_error = "<class ExplicitComponent>: '%s' is not a valid %s name."
 
         nostr_names = [3, None, object, object()]
-        nostr_error = "ExplicitComponent: The name argument should be a string."
+        nostr_error = "<class ExplicitComponent>: The name argument should be a string."
 
-        empty_in_error = "ExplicitComponent: '' is not a valid input name."
-        empty_out_error = "ExplicitComponent: '' is not a valid output name."
+        empty_in_error = "<class ExplicitComponent>: '' is not a valid input name."
+        empty_out_error = "<class ExplicitComponent>: '' is not a valid output name."
 
         for func in add_input_methods:
             for name in invalid_names:
@@ -190,11 +197,11 @@ class TestExplicitComponent(unittest.TestCase):
 
         class NewBase(ExplicitComponent):
             def __init__(self, **kwargs):
-                super(NewBase, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
         class MyComp(NewBase):
             def __init__(self, **kwargs):
-                super(MyComp, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
             def setup(self):
                 self.add_input('x', val=0.0)
@@ -205,13 +212,13 @@ class TestExplicitComponent(unittest.TestCase):
         comp = model.add_subsystem('comp', MyComp())
 
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
         prob.run_model()
         prob.setup()
-        self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
-        self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
+        self.assertEqual(list(comp._var_abs2meta['input']), ['comp.x'])
+        self.assertEqual(list(comp._var_abs2meta['output']), ['comp.y'])
 
     def test_add_input_output_dupes(self):
 
@@ -315,7 +322,7 @@ class TestRangePartials(unittest.TestCase):
     def test_range_partials(self):
         class RangePartialsComp(ExplicitComponent):
             def __init__(self, size=4):
-                super(RangePartialsComp, self).__init__()
+                super().__init__()
                 self.size = size
 
             def setup(self):
@@ -352,7 +359,13 @@ class TestRangePartials(unittest.TestCase):
         comp = RangePartialsComp()
 
         prob = Problem(model=comp)
-        prob.setup()
+
+        with assert_warning(DeprecationWarning,
+                            f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input` is"
+                            "deprecated and will become an error in a future release.  Add "
+                            "`src_indices` to a `promotes` or `connect` call instead."):
+            prob.setup()
+
         prob.run_model()
 
         assert_near_equal(prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)

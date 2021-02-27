@@ -32,14 +32,12 @@ def _print_violations(outputs, lower, upper):
     for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
-            print("'%s' exceeds upper bounds" % name)
-            print("  Val:", val)
-            print("  Upper:", upper[start:end], '\n')
+            msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
+            simple_warning(msg)
 
         if lower is not None and any(val < lower[start:end]):
-            print("'%s' exceeds lower bounds" % name)
-            print("  Val:", val)
-            print("  Lower:", lower[start:end], '\n')
+            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Upper: {lower[start:end]}\n")
+            simple_warning(msg)
 
         start = end
 
@@ -68,7 +66,7 @@ class LinesearchSolver(NonlinearSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(LinesearchSolver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
         self._lower_bounds = None
@@ -78,7 +76,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(LinesearchSolver, self)._declare_options()
+        super()._declare_options()
         opt = self.options
         opt.declare(
             'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
@@ -103,13 +101,13 @@ class LinesearchSolver(NonlinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super(LinesearchSolver, self)._setup_solvers(system, depth)
+        super()._setup_solvers(system, depth)
         if system._has_bounds:
-            abs2meta = system._var_abs2meta
+            abs2meta_out = system._var_abs2meta['output']
             start = end = 0
             for abs_name, val in system._outputs._abs_item_iter():
                 end += val.size
-                meta = abs2meta[abs_name]
+                meta = abs2meta_out[abs_name]
                 var_lower = meta['lower']
                 var_upper = meta['upper']
 
@@ -190,7 +188,7 @@ class BoundsEnforceLS(LinesearchSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(BoundsEnforceLS, self)._declare_options()
+        super()._declare_options()
         opt = self.options
 
         # Remove unused options from base options here, so that users
@@ -225,10 +223,8 @@ class BoundsEnforceLS(LinesearchSolver):
 
             self._run_apply()
             norm = self._iter_get_norm()
-            # With solvers, we want to record the norm AFTER
-            # the call, but the call needs to
-            # be wrapped in the with for stack purposes,
-            # so we locally assign  norm & norm0 into the class.
+
+            # Save the norm values in the context manager so they can also be recorded.
             rec.abs = norm
             rec.rel = norm / norm0
 
@@ -256,7 +252,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         **kwargs : dict
             Options dictionary.
         """
-        super(ArmijoGoldsteinLS, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._analysis_error_raised = False
 
@@ -324,7 +320,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
-        super(ArmijoGoldsteinLS, self)._declare_options()
+        super()._declare_options()
         opt = self.options
         opt['maxiter'] = 5
         opt.declare('c', default=0.1, lower=0.0, upper=1.0, desc="Slope parameter for line of "
@@ -444,9 +440,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
                     phi = self._line_search_objective()
 
-                    # With solvers, we want to report the norm AFTER
-                    # the iter_execute call, but the i_e call needs to
-                    # be wrapped in the with for stack purposes.
+                    # Save the norm values in the context manager so they can also be recorded.
                     rec.abs = phi
                     rec.rel = phi / phi0
 
@@ -555,7 +549,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
+    u_data = u.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
@@ -569,9 +563,8 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     change_upper = 0. if upper_bounds is None else np.minimum(u_data, upper_bounds) - u_data
 
     change = change_lower + change_upper
-
     u_data += change
-    du._data += change / alpha
+    du += change / alpha
 
 
 def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
@@ -600,8 +593,8 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
-    du_data = du._data
+    u_data = u.asarray()
+    du_data = du.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.

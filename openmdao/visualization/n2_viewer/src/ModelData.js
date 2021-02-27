@@ -16,6 +16,7 @@ class ModelData {
         this.autoivcSources = 0;
         this.nodePaths = {};
         this.nodeIds = [];
+        this.depthCount = [];
 
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
@@ -24,6 +25,8 @@ class ModelData {
         startTimer('ModelData._setParentsAndDepth');
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
+
+        this.md5_hash = modelJSON.md5_hash;
 
         if (this.unconnectedInputs > 0)
             console.info("Unconnected nodes: ", this.unconnectedInputs);
@@ -36,6 +39,8 @@ class ModelData {
         this._computeConnections();
         stopTimer('ModelData._computeConnections');
 
+        this._updateAutoIvcNames();
+
         debugInfo("New model: ", this);
         // this.errorCheck();
     }
@@ -43,6 +48,9 @@ class ModelData {
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
         const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+        /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
+            console.log(pos, jsonStr.substring(pos, pos+99));
+        } */
         return JSON.parse(jsonStr);
     }
 
@@ -67,7 +75,7 @@ class ModelData {
     }
 
     /**
-     * Recurse over the tree and replace the JSON objects 
+     * Recurse over the tree and replace the JSON objects
      * provided by n2_viewer.py with N2TreeNodes.
      * @param {Object} element The current element being updated.
      */
@@ -100,6 +108,10 @@ class ModelData {
         node.id = this.nodeIds.length;
         this.nodeIds.push(node);
 
+        // Track # of nodes at each depth
+        if (depth > this.depthCount.length) { this.depthCount.push(1); }
+        else { this.depthCount[depth - 1]++; }
+
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
                 node.absPathName += node.parent.absPathName + ".";
@@ -108,6 +120,13 @@ class ModelData {
             node.absPathName += node.name;
 
             this.nodePaths[node.absPathName] = node;
+
+            if (this.abs2prom.input[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.input[node.absPathName];
+            }
+            else if (this.abs2prom.output[node.absPathName] !== undefined) {
+                node.promotedName = this.abs2prom.output[node.absPathName];
+            }
         }
 
         this.identifyUnconnectedInput(node);
@@ -141,7 +160,7 @@ class ModelData {
                 node.numDescendants += child.numDescendants;
 
                 // Add absolute pathnames of children to a set for quick searching
-                if (!node.isRoot()) { // All nodes are children of the model root 
+                if (!node.isRoot()) { // All nodes are children of the model root
                     node.childNames.add(child.absPathName);
                     for (let childName of child.childNames) {
                         node.childNames.add(childName);
@@ -217,6 +236,24 @@ class ModelData {
     }
 
     /**
+     * Find the target of an Auto-IVC variable.
+     * @param {String} elementPath The full path of the element to check. Must start with _auto_ivc.
+     * @return {String} The absolute path of the target element, or undefined if not found.
+     */
+    getAutoIvcTgt(elementPath) {
+        if (!elementPath.match(/^_auto_ivc.*$/)) return undefined;
+
+        for (let conn of this.conns) {
+            if (conn.src == elementPath) {
+                return conn.tgt;
+            }
+        }
+
+        console.warn(`No target connection found for ${elementPath}.`)
+        return undefined;
+    }
+
+    /**
      * Create an array in each node containing references to its
      * children that are subsystems. Runs recursively over the node's
      * children array.
@@ -251,7 +288,7 @@ class ModelData {
         return this.declarePartialsList.includes(partialsStr);
     }
 
-    /** 
+    /**
      * Add all leaf descendents of specified node to the array.
      * @param {N2TreeNode} node Current node to work on.
      * @param {N2TreeNode[]} objArray Array to add to.
@@ -281,9 +318,6 @@ class ModelData {
         let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
-            // Ignore connections from _auto_ivc, which is intentionally not included.
-            if (conn.src.match(/^_auto_ivc.*$/)) continue;
-
             // Process sources
             let srcObj = this.nodePaths[conn.src];
 
@@ -393,6 +427,21 @@ class ModelData {
     }
 
     /**
+     *
+     */
+    _updateAutoIvcNames() {
+        const aivc = this.nodePaths['_auto_ivc'];
+        if (aivc !== undefined && aivc.hasChildren()) {
+            for (const ivc of aivc.children) {
+                const tgtPath = this.getAutoIvcTgt(ivc.absPathName);
+                if (tgtPath !== undefined) {
+                    ivc.promotedName = this.nodePaths[tgtPath].promotedName;
+                }
+            }
+        }
+    }
+
+    /**
      * If an element has no connection naming it as a source or target,
      * relabel it as unconnected.
      * @param {N2TreeNode} node The tree node to work on.
@@ -410,5 +459,4 @@ class ModelData {
             }
         }
     }
-
 }

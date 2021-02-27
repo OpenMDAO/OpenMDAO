@@ -17,6 +17,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.add_input('c', val=1.)
         self.add_output('x', val=0.)
 
+    def setup_partials(self):
         self.declare_partials(of='x', wrt='*')
 
     def apply_nonlinear(self, inputs, outputs, residuals):

@@ -21,7 +21,7 @@ class DynComp(ExplicitComponent):
     def __init__(self, ninputs, noutputs,
                  nl_sleep=0.001, ln_sleep=0.001,
                  var_factory=float, vf_args=()):
-        super(DynComp, self).__init__()
+        super().__init__()
 
         self.ninputs = ninputs
         self.noutputs = noutputs

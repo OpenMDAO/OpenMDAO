@@ -1,240 +1,4 @@
 /**
- * Manage info for each node metadata property
- * @typedef InfoPropDefault
- * @property {String} key The identifier of the property.
- * @property {String} desc The description (label) to display.
- * @property {Boolean} capitalize Whether to capitialize every word in the desc.
- */
-class InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
-        this.key = key;
-        this.desc = desc;
-        this.capitalize = capitalize;
-    }
-
-    /** Return the same message since this is the base class */
-    output(msg) { return msg; }
-}
-
-/**
- * Outputs a Yes or No to display. 
- * @typedef InfoPropYesNo
- */
-class InfoPropYesNo extends InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
-        super(key, desc, capitalize);
-    }
-
-    /** Return Yes or No when given True or False */
-    output(boolVal) { return boolVal ? 'Yes' : 'No'; }
-}
-
-/**
- * Rename inputs to inputs and outputs to outputs. 
- * @typedef InfoPropYesNo
- */
-class InfoUpdateType extends InfoPropDefault {
-    constructor(key, desc, capitalize = false) {
-        super(key, desc, capitalize);
-    }
-
-    /** Replace the old terms with new ones */
-    output(msg) {
-        return msg
-            .replace(/input/, 'input')
-            .replace(/output/, 'output')
-            .replace('_', ' ');
-    }
-}
-
-/**
- * Manage a table containing all available metadata properties for
- * the currently active node, as well as whether the table is
- * visible or not.
- * @typedef NodeInfo
- */
-class NodeInfo {
-    /**
-     * Build a list of the properties we care about and set up
-     * references to the HTML elements.
-     * @param {Object} abs2prom Object containing promoted variable names.
-     */
-    constructor(abs2prom) {
-        this.propList = [
-            new InfoPropDefault('absPathName', 'Absolute Name'),
-            new InfoPropDefault('class', 'Class'),
-            new InfoUpdateType('type', 'Type', true),
-            new InfoPropDefault('dtype', 'DType'),
-            new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
-            new InfoPropDefault('component_type', 'Component Type', true),
-            new InfoPropYesNo('implicit', 'Implicit'),
-            new InfoPropYesNo('is_parallel', 'Parallel'),
-            new InfoPropDefault('linear_solver', 'Linear Solver'),
-            new InfoPropDefault('nonlinear_solver', 'Non-Linear Solver')
-        ];
-
-        this.abs2prom = abs2prom;
-        this.table = d3.select('#node-info-table');
-        this.container = d3.select('#node-info-container');
-        this.thead = this.table.select('thead');
-        this.tbody = this.table.select('tbody');
-        this.toolbarButton = d3.select('#info-button');
-        this.hidden = true;
-        this.pinned = false;
-
-        const self = this;
-        this.pinButton = d3.select('#node-info-pin')
-            .on('click', e => { self.unpin(); })
-    }
-
-    /** Make the info box visible if it's hidden */
-    show() {
-        this.toolbarButton.attr('class', 'fas icon-info-circle active-tab-icon');
-        this.hidden = false;
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', true);
-    }
-
-    /** Make the info box hidden if it's visible */
-    hide() {
-        this.toolbarButton.attr('class', 'fas icon-info-circle');
-        this.hidden = true;
-        d3.select('#all_pt_n2_content_div').classed('node-data-cursor', false);
-    }
-
-    /** Toggle the visibility setting */
-    toggle() {
-        if (this.hidden) this.show();
-        else this.hide();
-    }
-
-    pin() { 
-        this.pinned = true;
-        this.pinButton.attr('class', 'info-visible');
-    }
-    
-    unpin() {
-        this.pinned = false;
-        this.pinButton.attr('class', 'info-hidden');
-        this.clear();
-    }
-
-    togglePin() {
-        if (this.pinned) this.unpin();
-        else this.pin();
-    }
-
-    _addPropertyRow(label, val, capitalize = false) {
-        const newRow = this.tbody.append('tr');
-
-        newRow.append('th')
-            .attr('scope', 'row')
-            .text(label);
-
-        const td = newRow.append('td')
-            .text(val);
-
-        if (capitalize) td.attr('class', 'caps');
-    }
-
-    /**
-     * Iterate over the list of known properties and display them
-     * if the specified object contains them.
-     * @param {Object} event The related event so we can get position.
-     * @param {N2TreeNode} obj The node to examine.
-     * @param {N2TreeNode} color The color to make the title bar.
-     */
-    update(event, obj, color = '#42926b') {
-        if (this.hidden || this.pinned) return;
-
-        this.clear();
-        // Put the name in the title
-        this.table.select('thead th')
-            .style('background-color', color)
-            .text(obj.name);
-
-        this.table.select('tfoot th')
-            .style('background-color', color);
-
-        if (this.abs2prom) {
-            if (obj.isInput()) {
-                this._addPropertyRow('Promoted Name', this.abs2prom.input[obj.absPathName]);
-            }
-            else if (obj.isOutput()) {
-                this._addPropertyRow('Promoted Name', this.abs2prom.output[obj.absPathName]);
-            }
-        }
-
-        if (DebugFlags.info && obj.hasChildren()) {
-            this._addPropertyRow('Children', obj.children.length);
-            this._addPropertyRow('Descendants', obj.numDescendants);
-            this._addPropertyRow('Leaves', obj.numLeaves);
-            this._addPropertyRow('Manually Expanded', obj.manuallyExpanded.toString())
-        }
-
-        for (const prop of this.propList) {
-            if (obj.propExists(prop.key) && obj[prop.key] != '') {
-                this._addPropertyRow(prop.desc, prop.output(obj[prop.key]), prop.capitalize)
-            }
-        }
-
-        // Solidify the size of the table after populating so that
-        // it can be positioned reliably by move().
-        this.table
-            .style('width', this.table.node().scrollWidth + 'px')
-            .style('height', this.table.node().scrollHeight + 'px')
-
-        this.move(event);
-        this.container.attr('class', 'info-visible');
-    }
-
-    /** Wipe the contents of the table body */
-    clear() {
-        if (this.hidden || this.pinned) return;
-        this.container
-            .attr('class', 'info-hidden')
-            .style('width', 'auto')
-            .style('height', 'auto');
-
-        this.table
-            .style('width', 'auto')
-            .style('height', 'auto');
-
-        this.tbody.html('');
-    }
-
-    /**
-     * Relocate the table to a position near the mouse
-     * @param {Object} event The triggering event containing the position.
-     */
-    move(event) {
-        if (this.hidden || this.pinned) return;
-        const offset = 30;
-
-        // Mouse is in left half of window, put box to right of mouse
-        if (event.clientX < window.innerWidth / 2) {
-            this.container.style('right', 'auto');
-            this.container.style('left', (event.clientX + offset) + 'px')
-        }
-        // Mouse is in right half of window, put box to left of mouse
-        else {
-            this.container.style('left', 'auto');
-            this.container.style('right', (window.innerWidth - event.clientX + offset) + 'px')
-        }
-
-        // Mouse is in top half of window, put box below mouse
-        if (event.clientY < window.innerHeight / 2) {
-            this.container.style('bottom', 'auto');
-            this.container.style('top', (event.clientY - offset) + 'px')
-        }
-        // Mouse is in bottom half of window, put box above mouse
-        else {
-            this.container.style('top', 'auto');
-            this.container.style('bottom', (window.innerHeight - event.clientY - offset) + 'px')
-        }
-    }
-}
-
-/**
  * Handle input events for the matrix and toolbar.
  * @typedef N2UserInterface
  * @property {N2Diagram} n2Diag Reference to the main diagram.
@@ -262,6 +26,7 @@ class N2UserInterface {
         this.leftClickIsForward = true;
         this.findRootOfChangeFunction = null;
         this.callSearchFromEnterKeyPressed = false;
+        this.desVars = true;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
@@ -273,8 +38,67 @@ class N2UserInterface {
         this._setupWindowResizer();
 
         this.legend = new N2Legend(this.n2Diag.modelData);
-        this.nodeInfoBox = new NodeInfo(this.n2Diag.model.abs2prom);
+        this.nodeInfoBox = new NodeInfo(this);
         this.toolbar = new N2Toolbar(this);
+
+        // Add listener for reading in a saved view.
+        let self = this;
+        let n2diag = this.n2Diag;
+        document.getElementById('state-file-input').addEventListener('change', function() {
+
+            var fr=new FileReader();
+            fr.onload=function(){
+                let dataDict = false;
+
+                try {
+                    dataDict = JSON.parse(fr.result);
+                }
+                catch (error) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                if (!dataDict.md5_hash) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                // Make sure model didn't change.
+                if (dataDict.md5_hash != n2diag.model.md5_hash) {
+                    alert("Cannot load view. Current model structure is different than in saved view.")
+                    return;
+                }
+
+                self.addBackButtonHistory();
+
+                // Solver toggle state.
+                n2diag.showLinearSolverNames = dataDict.showLinearSolverNames;
+                n2diag.ui.setSolvers(dataDict.showLinearSolverNames);
+                n2diag.showSolvers = dataDict.showSolvers;
+
+                // Zoomed node (subsystem).
+                n2diag.zoomedElement = n2diag.findNodeById(dataDict.zoomedElement);
+
+                // Expand/Collapse state of all nodes (subsystems) in model.
+                n2diag.setSubState(dataDict.expandCollapse.reverse());
+
+                // Force an immediate display update.
+                // Needed to do this so that the arrows don't slip in before the element zoom.
+                n2diag.layout = new N2Layout(n2diag.model, n2diag.zoomedElement,
+                    n2diag.showLinearSolverNames, n2diag.showSolvers, n2diag.dims);
+                n2diag.ui.updateClickedIndices();
+                n2diag.matrix = new N2Matrix(n2diag.model, n2diag.layout,
+                    n2diag.dom.n2Groups, n2diag.arrowMgr, n2diag.ui.lastClickWasLeft,
+                    n2diag.ui.findRootOfChangeFunction, n2diag.matrix.nodeSize);
+                n2diag._updateScale();
+                n2diag.layout.updateTransitionInfo(n2diag.dom, n2diag.transitionStartDelay, n2diag.manuallyResized);
+
+                // Arrow State
+                n2diag.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+            }
+            fr.readAsText(this.files[0]);
+        })
+
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -343,7 +167,11 @@ class N2UserInterface {
                     box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
-                    handle.attr('class', 'inactive-resizer-handle');
+                    if (n2Diag.showSolvers) {
+                        handle.attr('class', 'inactive-resizer-handle');
+                    } else {
+                        handle.attr('class', 'inactive-resizer-handle-without-solvers');
+                    }
                     box.attr('class', 'inactive-resizer-box');
 
                     // Get rid of the drag event handlers
@@ -517,7 +345,7 @@ class N2UserInterface {
         enterIndex = exitIndex = 0;
 
         if (this.lastClickWasLeft) {
-            let lcRootIndex = (! this.leftClickedNode || ! this.leftClickedNode.rootIndex)? 0 :
+            let lcRootIndex = (!this.leftClickedNode || !this.leftClickedNode.rootIndex) ? 0 :
                 this.leftClickedNode.rootIndex;
 
             if (this.leftClickIsForward) {
@@ -793,19 +621,15 @@ class N2UserInterface {
     }
 
     /**
-     * React to the toggle-solver-name button press and show non-linear if linear
-     * is currently shown, and vice-versa.
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
-    toggleSolverNamesCheckboxChange() {
-        testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+    setSolvers(linear) {
 
-        this.n2Diag.toggleSolverNameType();
-        this.n2Diag.dom.parentDiv.querySelector(
-            '#linear-solver-button'
-        ).className = !this.n2Diag.showLinearSolverNames ?
-                'fas icon-nonlinear-solver solver-button' :
-                'fas icon-linear-solver solver-button';
+        // Update the diagram
+        this.n2Diag.showLinearSolverNames = linear;
 
+        // update the legend
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
         if (this.legend.shown)
@@ -816,6 +640,26 @@ class N2UserInterface {
         this.n2Diag.update();
     }
 
+    /**
+     * React to the toggle-solver-name button press and show non-linear if linear
+     * is currently shown, and vice-versa.
+     */
+    showSolvers() {
+        // d3.select('#solver_tree').style('display','block');
+        n2Diag.showSolvers = true;
+        this.n2Diag.update();
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
+        }
+    hideSolvers() {
+        // d3.select('#solver_tree').style('display','none');
+        // d3.select('#solver_tree').attr('width',0);
+        n2Diag.showSolvers = false;
+        this.n2Diag.update();
+        // const handle = d3.select('#n2-resizer-handle');
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
+        // n2-resizer-handle
+        }
+
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
@@ -823,6 +667,21 @@ class N2UserInterface {
 
         d3.select('#legend-button').attr('class',
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
+    }
+
+    toggleDesVars() {
+        testThis(this, 'N2UserInterface', 'toggleDesVars');
+
+        if (this.desVars) {
+            this.n2Diag.showDesignVars();
+            this.desVars = false;
+        } else {
+            this.n2Diag.hideDesignVars();
+            this.desVars = true;
+        }
+
+        d3.select('#desvars-button').attr('class',
+            this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
     }
 
     /** Show or hide the node info panel button */
@@ -914,4 +773,60 @@ class N2UserInterface {
             }
         }
     }
+
+    /** Save the model state to a file. */
+    saveState() {
+        const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
+
+        // Solver toggle state.
+        let showLinearSolverNames = this.n2Diag.showLinearSolverNames;
+        let showSolvers = this.n2Diag.showSolvers;
+
+        // Zoomed node (subsystem).
+        let zoomedElement = this.n2Diag.zoomedElement.id;
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        let expandCollapse = Array()
+        this.n2Diag.getSubState(expandCollapse);
+
+        // Arrow State
+        let arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
+
+        let dataDict = {
+                        'showLinearSolverNames': showLinearSolverNames,
+                        'showSolvers': showSolvers,
+                        'zoomedElement': zoomedElement,
+                        'expandCollapse': expandCollapse,
+                        'arrowState': arrowState,
+                        'md5_hash': this.n2Diag.model.md5_hash,
+                        };
+
+        let link = document.createElement('a');
+        link.setAttribute('download', stateFileName);
+        let data_blob = new Blob([JSON.stringify(dataDict)],
+                                 {type: 'text/plain'});
+
+        // If we are replacing a previously generated file we need to
+        // manually revoke the object URL to avoid memory leaks.
+        if (stateFileName !== null) {
+          window.URL.revokeObjectURL(stateFileName);
+        }
+
+        link.href = window.URL.createObjectURL(data_blob);
+        document.body.appendChild(link);
+
+        // wait for the link to be added to the document
+        window.requestAnimationFrame(function () {
+            var event = new MouseEvent('click');
+            link.dispatchEvent(event);
+            document.body.removeChild(link);
+        })
+    }
+
+    /** Load the model state to a file. */
+    loadState() {
+        document.getElementById('state-file-input').click();
+    }
+
+
 }
