@@ -7,6 +7,7 @@ if __name__ == '__main__':
 
     Path = mpath.Path
 
+# EXCERPT 1 #
     fig, ax = plt.subplots()
     pp1 = mpatches.PathPatch(
         Path([(0, 0), (1, 0), (1, 1), (0, 0)],
@@ -14,7 +15,7 @@ if __name__ == '__main__':
         fc="none", transform=ax.transData)
 
     print("Here's some output.")
-
+# EXCERPT 1 #
     ax.add_patch(pp1)
     ax.plot([0.75], [0.25], "ro")
 

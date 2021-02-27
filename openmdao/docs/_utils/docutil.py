@@ -85,6 +85,53 @@ def node_setup(app):
     app.add_node(skipped_or_failed_node, html=(visit_skipped_or_failed_node, depart_skipped_or_failed_node))
     app.add_node(in_or_out_node, html=(visit_in_or_out_node, depart_in_or_out_node))
 
+def remove_excerpt_tags(source):
+    """
+    Return 'source' minus script excerpt tags.
+    Parameters
+    ----------
+    source : str
+        Original source code.
+    Returns
+    -------
+    str
+        Source with script excerpt tags removed.
+    """
+    io_obj = StringIO(source)
+    out = ""
+    prev_toktype = tokenize.INDENT
+    last_lineno = -1
+    last_col = 0
+    pattern = re.compile(r"# EXCERPT [0-9]+ #")
+
+    prev_token_was_excerpt = False
+    for tok in tokenize.generate_tokens(io_obj.readline):
+        token_type = tok[0]
+        token_string = tok[1]
+        start_line, start_col = tok[2]
+        end_line, end_col = tok[3]
+        # ltext = tok[4] # in original code but not used here
+        # The following two conditionals preserve indentation.
+        # This is necessary because we're not using tokenize.untokenize()
+        # (because it spits out code with copious amounts of oddly-placed
+        # whitespace).
+        if start_line > last_lineno:
+            last_col = 0
+        if start_col > last_col:
+            out += (" " * (start_col - last_col))
+        # This series of conditionals removes excerpt tags:
+        if token_type == tokenize.COMMENT and pattern.match(token_string):
+            prev_token_was_excerpt = True
+        elif token_type == tokenize.NL and prev_token_was_excerpt:
+            # kill newlines immediately after token comments
+            prev_token_was_excerpt = False
+        else:
+            out += token_string
+            prev_token_was_excerpt = False
+        prev_toktype = token_type
+        last_col = end_col
+        last_lineno = end_line
+    return out
 
 def remove_docstrings(source):
     """
@@ -282,8 +329,30 @@ def get_source_code(path):
     indent = 0
     class_obj = None
     method_obj = None
+    
+    # check if it's a script excerpt
+    if len(path.split(':EXCERPT:')) > 1:
+        split_path = path.split(':EXCERPT:')
+        if len(split_path) != 2:
+            raise SphinxError("Too many or too few excerpt numbers in sphinx tag '%s'" % path)
+        excerpt_number = int(split_path[-1])
+        path = split_path[0]
+        if not path.endswith('.py'):
+            raise SphinxError('Script excerpt tags only work with script files ending in .py')
+        if not os.path.isfile(path):
+            raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
+        with open(path, 'r') as f:
+            source = f.read()
+        module = None
 
-    if path.endswith('.py'):
+        split_comment = '# EXCERPT ' + str(excerpt_number) + ' #'
+        split_source = source.split(split_comment)
+        if len(split_source) != 3:
+            raise SphinxError("Too few or too many excerpt comment tags \
+                               %s in the Python script %s" % (split_comment, path))
+        else:
+            source = split_source[1]
+    elif path.endswith('.py'):
         if not os.path.isfile(path):
             raise SphinxError("Can't find file '%s' cwd='%s'" % (path, os.getcwd()))
         with open(path, 'r') as f:

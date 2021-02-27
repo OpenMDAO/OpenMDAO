@@ -15,7 +15,7 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     strip_header, dedent, insert_output_start_stop_indicators, run_code, \
     get_skip_output_node, get_interleaved_io_nodes, get_output_block_node, \
     split_source_into_input_blocks, extract_output_blocks, consolidate_input_blocks, node_setup, \
-    strip_decorators
+    strip_decorators, remove_excerpt_tags
 
 
 _plot_count = 0
@@ -48,6 +48,7 @@ class EmbedCodeDirective(Directive):
 
     option_spec = {
         'strip-docstrings': unchanged,
+        'strip-excerpt-tags': unchanged,
         'layout': unchanged,
         'scale': unchanged,
         'align': unchanged,
@@ -115,7 +116,8 @@ class EmbedCodeDirective(Directive):
         #
         if 'strip-docstrings' in self.options:
             source = remove_docstrings(source)
-
+        if 'strip-excerpt-tags' in self.options:
+            source = remove_excerpt_tags(source)
         if is_test:
             try:
                 source = dedent(source)
