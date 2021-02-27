@@ -343,8 +343,6 @@ Embedding More Than Just Code
        .. embed-code::
            ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
            :layout: code, output
-           :strip-except-tags:
-
 
    The resulting embed would look like this:
 
