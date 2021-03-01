@@ -315,10 +315,15 @@ class Jacobian(object):
             fdtypes = ('cs', 'fd')
             # create _jac_summ structure
             self._jac_summ = summ = {}
-            for key, meta in self._subjacs_info.items():
-                if key[0] in system._owns_approx_of_idx or ('method' in meta and
-                                                            meta['method'] in fdtypes):
-                    summ[key] = np.abs(meta['value'])
+            if system.pathname == '':  # totals
+                for of in system._owns_approx_of:
+                    for wrt in system._owns_approx_wrt:
+                        key = (of, wrt)
+                        summ[key] = np.abs(self._subjacs_info[key]['value'])
+            else:
+                for key, meta in self._subjacs_info.items():
+                    if 'method' in meta and meta['method'] in fdtypes:
+                        summ[key] = np.abs(meta['value'])
         else:
             subjacs = self._subjacs_info
             for key, summ in self._jac_summ.items():
@@ -357,8 +362,6 @@ class Jacobian(object):
         Jcols = []
         Jdata = []
 
-        # TODO: this currently doesn't use indices info for total approx derivs that
-        #       could greatly reduce the size of data we need to save
         for of, roffset, rend, _ in ordered_of_info:
             for wrt, coffset, cend, _, _ in ordered_wrt_info:
                 key = (of, wrt)
@@ -375,14 +378,13 @@ class Jacobian(object):
                             mask = np.zeros(sprows.size, dtype=bool)
                             for r in meta['rows']:
                                 mask |= sprows == r
-                            sprows = sprows[mask]
                             spcols = spcols[mask]
                             subsum = subsum[mask]
                         if sysmeta['cols'].size != meta['cols'].size:
                             mask = np.zeros(spcols.size, dtype=bool)
                             for c in meta['cols']:
                                 mask |= spcols == c
-                            sprows = sprows[mask]
+                            subsum = subsum[mask]
                         Jdata.append(subsum)
                     elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
