@@ -2049,7 +2049,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
-
     def test_error_objfun_reraise(self):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
