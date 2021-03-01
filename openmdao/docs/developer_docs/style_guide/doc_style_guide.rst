@@ -248,12 +248,15 @@ embed-code
             openmdao.core.tests.test_expl_comp.RectangleComp
             :strip-docstrings:
 
-        You may also include only an excerpt of the code by including `# EXCERPT 1 #` (and so on) comments above and below the relevant section in the Python code, and then using the following RST directive.
+        You may also include only an excerpt of the code by including `# EXCERPT 1 #` (and so on) comments above, and `# /EXCERPT 1 #` below the relevant section in the Python code.
+        The Python source will look like this:
 
         .. embed-code::
             openmdao.core.tests.test_expl_comp.RectangleComp
             :strip-docstrings:
             :dont-strip-excerpt-tags:
+
+        Using the following RST directive will embed the marked snippet in the source doc.
 
         .. code-block:: rst
 
@@ -261,11 +264,15 @@ embed-code
               openmdao.core.tests.test_expl_comp.RectangleComp:EXCERPT:1
               :strip-docstrings:
 
-        By default, the tags in the code are removed when printing in the docs, but you can include them by using the `:dont-strip-excerpt-tags:` option
+        The resulting embed in the documentation looks like this:
 
         .. embed-code::
             openmdao.core.tests.test_expl_comp.RectangleComp:EXCERPT:1
             :strip-docstrings:
+            :dont-strip-excerpt-tags:
+
+        By default, the tags in the code are removed when printing in the docs, but you can include them by using the `:dont-strip-excerpt-tags:` option.
+        Excerpts can be nested or overlapping as long as the tags numbers are unique.
 
 Embedding More Than Just Code
 *****************************
@@ -307,7 +314,9 @@ Embedding More Than Just Code
    .. embed-code::
        ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
 
-  You may also include one or more excerpts of a script by enclosing the Python code in `# EXCERPT 1 #` (and so on) comments on separate lines, as follows:
+  You may also include one or more excerpts of a script by enclosing the Python code in special comments.
+  Place a `# EXCERPT 1 #` comment on its own line above the snippet, and use a `# /EXCERPT 1 #` closing tag on its own line below.
+  Then, place the following RST directive in the documentation to access the snippet.
 
    .. code-block:: rst
 
@@ -333,6 +342,16 @@ Embedding More Than Just Code
       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py
       :dont-strip-excerpt-tags:
 
+  Overlapping or fully-nested excerpt tags can also be used.
+  For example, here is the snippet Excerpt 2 which overlaps with Excerpt 1:
+
+  .. embed-code::
+      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:2
+
+and Excerpt 3 which is fully-nested:
+
+  .. embed-code::
+      ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:3
 
 2. Embed a piece of code, run it, show a single block of output afterwards.
    In your .rst file, you'd insert this:

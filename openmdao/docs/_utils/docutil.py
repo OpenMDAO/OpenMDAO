@@ -103,6 +103,7 @@ def remove_excerpt_tags(source):
     last_lineno = -1
     last_col = 0
     pattern = re.compile(r"# EXCERPT [0-9]+ #")
+    pattern2 = re.compile(r"# /EXCERPT [0-9]+ #")
 
     prev_token_was_excerpt = False
     for tok in tokenize.generate_tokens(io_obj.readline):
@@ -120,7 +121,8 @@ def remove_excerpt_tags(source):
         if start_col > last_col:
             out += (" " * (start_col - last_col))
         # This series of conditionals removes excerpt tags:
-        if token_type == tokenize.COMMENT and pattern.match(token_string):
+        if token_type == tokenize.COMMENT and (pattern.match(token_string) or 
+                                               pattern2.match(token_string)):
             prev_token_was_excerpt = True
         elif token_type == tokenize.NL and prev_token_was_excerpt:
             # kill newlines immediately after token comments
@@ -378,13 +380,27 @@ def get_source_code(path):
                 indent = 2
                 
     if excerpt_number is not None:
-        split_comment = '# EXCERPT ' + str(excerpt_number) + ' #'
-        split_source = source.split(split_comment)
-        if len(split_source) != 3:
-            raise SphinxError("Too few or too many excerpt comment tags \
-                                %s in the Python code at %s" % (split_comment, path))
-        else:
-            source = split_source[1]
+        excerpt_open_tag = '# EXCERPT ' + str(excerpt_number) + ' #'
+        excerpt_close_tag = '# /EXCERPT ' + str(excerpt_number) + ' #'
+
+        split_source = source.split(excerpt_open_tag)
+        if len(split_source) == 1:
+            raise SphinxError("Missing %s start tag  \
+                               in the Python code at %s" % (excerpt_open_tag, path))
+        elif len(split_source) > 2:
+            raise SphinxError("Too many %s start tags  \
+                               in the Python code at %s" % (excerpt_open_tag, path))
+        
+        split_source = split_source[-1].split(excerpt_close_tag)
+        
+        if len(split_source) == 1:
+            raise SphinxError("Missing %s end tag  \
+                               in the Python code at %s" % (excerpt_close_tag, path))
+        elif len(split_source) > 2:
+            raise SphinxError("Too many %s end tags  \
+                               in the Python code at %s" % (excerpt_close_tag, path))
+
+        source = split_source[0]
             
     return remove_leading_trailing_whitespace_lines(source), indent, module, class_obj, method_obj
 

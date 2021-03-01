@@ -32,7 +32,7 @@ class RectangleComp(om.ExplicitComponent):
     def setup_partials(self):
         self.declare_partials('*', '*')
         
-# EXCERPT 1 #
+# /EXCERPT 1 #
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']
 
