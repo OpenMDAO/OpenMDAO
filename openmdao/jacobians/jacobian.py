@@ -316,7 +316,8 @@ class Jacobian(object):
             # create _jac_summ structure
             self._jac_summ = summ = {}
             for key, meta in self._subjacs_info.items():
-                if 'method' in meta and meta['method'] in fdtypes:
+                if key[0] in system._owns_approx_of_idx or ('method' in meta and
+                                                            meta['method'] in fdtypes):
                     summ[key] = np.abs(meta['value'])
         else:
             subjacs = self._subjacs_info
@@ -349,6 +350,7 @@ class Jacobian(object):
         from openmdao.utils.coloring import _tol_sweep
 
         subjacs = self._subjacs_info
+        sys_subjacs = self._system()._subjacs_info
         summ = self._jac_summ
 
         Jrows = []
@@ -364,8 +366,23 @@ class Jacobian(object):
                     subsum = summ[key]
                     meta = subjacs[key]
                     if meta['rows'] is not None:
+                        sysmeta = sys_subjacs[key]
                         Jrows.append(meta['rows'] + roffset)
                         Jcols.append(meta['cols'] + coffset)
+                        sprows = sysmeta['rows']
+                        spcols = sysmeta['cols']
+                        if sysmeta['rows'].size != meta['rows'].size:
+                            mask = np.zeros(sprows.size, dtype=bool)
+                            for r in meta['rows']:
+                                mask |= sprows == r
+                            sprows = sprows[mask]
+                            spcols = spcols[mask]
+                            subsum = subsum[mask]
+                        if sysmeta['cols'].size != meta['cols'].size:
+                            mask = np.zeros(spcols.size, dtype=bool)
+                            for c in meta['cols']:
+                                mask |= spcols == c
+                            sprows = sprows[mask]
                         Jdata.append(subsum)
                     elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
@@ -429,7 +446,6 @@ class Jacobian(object):
 
         # for total derivs, we can have sub-indices making some subjacs smaller
         if system.pathname == '':
-            full = (_full_slice, _full_slice)
             for key, meta in system._subjacs_info.items():
                 nrows, ncols = meta['shape']
                 if key[0] in system._owns_approx_of_idx:
@@ -486,10 +502,9 @@ class Jacobian(object):
         """
         Set a column of the jacobian.
 
-        The column is assumed to be the same size as the outputs vector for the given
-        system.
+        The column is assumed to be the same size as a column of the jacobian.
 
-        This assumes that the column does not attempt to set any nonzero values that are
+        This also assumes that the column does not attempt to set any nonzero values that are
         outside of specified sparsity patterns for any of the subjacs.
 
         Parameters
@@ -508,6 +523,7 @@ class Jacobian(object):
         wrt = self._colnames[self._col2name_ind[icol]]
         _, offset, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
+
         for of, start, end, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:

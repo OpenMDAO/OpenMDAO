@@ -3019,7 +3019,6 @@ class Group(System):
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
-            approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
