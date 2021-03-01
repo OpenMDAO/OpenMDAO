@@ -2050,6 +2050,68 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
 
+    def test_error_objfun_reraise(self):
+        # Tests that we re-raise any unclassified error encountered during callback eval.
+
+        class EComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials('*', '*', method='fd')
+
+            def compute(self, inputs, outputs):
+                raise RuntimeError('This comp will fail.')
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', EComp())
+
+        p.model.add_objective('comp.y')
+        p.model.add_design_var('comp.x')
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            p.run_driver()
+
+        self.assertTrue("This comp will fail." in msg.exception.args[0])
+
+    def test_error_gradfun_reraise(self):
+        # Tests that we re-raise any unclassified error encountered during callback eval.
+
+        class EComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 4.8 * inputs['x'] - 3.0
+
+            def compute_partials(self, inputs, partials):
+                raise RuntimeError('This gradient will fail.')
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', EComp())
+
+        p.model.add_objective('comp.y')
+        p.model.add_design_var('comp.x')
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            p.run_driver()
+
+        self.assertTrue("This gradient will fail." in msg.exception.args[0])
+
+
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
 class TestPyoptSparseFeature(unittest.TestCase):
