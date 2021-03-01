@@ -2100,7 +2100,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',
-            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            'driver', 'design_vars', 'responses', 'declare_partials_list', 'md5_hash'
         })
 
         self.assertEqual(len(cr._driver_cases._cases), 0)
@@ -2128,7 +2128,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(set(cr.problem_metadata.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'variables', 'abs2prom',
-            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            'driver', 'design_vars', 'responses', 'declare_partials_list', 'md5_hash'
         })
 
         self.assertEqual(len(cr._driver_cases._cases), num_driver_cases)
