@@ -348,7 +348,7 @@ Embedding More Than Just Code
   .. embed-code::
       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:2
 
-and Excerpt 3 which is fully-nested:
+  and Excerpt 3 which is fully-nested:
 
   .. embed-code::
       ../devtools/docs_experiment/experimental_guide/examples/bezier_plot.py:EXCERPT:3
