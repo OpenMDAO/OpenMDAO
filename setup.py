@@ -1,9 +1,6 @@
 import re
-import sys
 
 from setuptools import setup
-from subprocess import check_call
-import distutils.spawn
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
@@ -16,6 +13,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'redbaron',
         'sphinx>=1.8.5',
+        'tabulate'
     ],
     'notebooks': [
         'notebook',

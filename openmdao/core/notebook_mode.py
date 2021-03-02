@@ -1,10 +1,14 @@
 """Checking for interactive notebook mode."""
+import sys
+
 from openmdao.utils.general_utils import simple_warning
 
 try:
     from tabulate import tabulate
 except ImportError:
     tabulate = None
+
+colab = 'google.colab' in sys.modules
 
 
 def notebook_mode():
