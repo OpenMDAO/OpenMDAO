@@ -297,7 +297,6 @@ class ApproximationScheme(object):
                 else:
                     self._nruns_uncolored += end - start
 
-                # print("approx:", wrt, start, end, vec._data.size)
                 self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
                                             meta['vector']))
 
@@ -401,13 +400,10 @@ class ApproximationScheme(object):
 
                     _, jcols, _, nzrows = colored_approx_groups[i]
 
-                    if nzrows is None:  # uncolored column
-                        jac.set_col(jcols[0], res)
-                    else:
-                        for i, col in enumerate(jcols):
-                            scratch[:] = 0.0
-                            scratch[nzrows[i]] = res[nzrows[i]]
-                            jac.set_col(system, col, scratch)
+                    for i, col in enumerate(jcols):
+                        scratch[:] = 0.0
+                        scratch[nzrows[i]] = res[nzrows[i]]
+                        jac.set_col(system, col, scratch)
 
         nruns = self._nruns_uncolored
         tosend = None

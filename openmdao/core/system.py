@@ -1034,19 +1034,20 @@ class System(object):
                 if 'method' in meta and meta['method']:
                     break
             else:  # no approx derivs found
-                simple_warning("%s: No approx partials found but coloring was requested.  "
-                               "Declaring ALL partials as dense and approx (method='%s')" %
-                               (self.msginfo, self._coloring_info['method']))
-                try:
-                    self.declare_partials('*', '*', method=self._coloring_info['method'])
-                except AttributeError:  # this system must be a group
-                    from openmdao.core.component import Component
-                    from openmdao.core.indepvarcomp import IndepVarComp
-                    from openmdao.components.exec_comp import ExecComp
-                    for s in self.system_iter(recurse=True, typ=Component):
-                        if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                            s.declare_partials('*', '*', method=self._coloring_info['method'])
-                self._setup_partials()
+                if not (self._owns_approx_of or self._owns_approx_wrt):
+                    simple_warning("%s: No approx partials found but coloring was requested.  "
+                                   "Declaring ALL partials as dense and approx (method='%s')" %
+                                   (self.msginfo, self._coloring_info['method']))
+                    try:
+                        self.declare_partials('*', '*', method=self._coloring_info['method'])
+                    except AttributeError:  # this system must be a group
+                        from openmdao.core.component import Component
+                        from openmdao.core.indepvarcomp import IndepVarComp
+                        from openmdao.components.exec_comp import ExecComp
+                        for s in self.system_iter(recurse=True, typ=Component):
+                            if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
+                                s.declare_partials('*', '*', method=self._coloring_info['method'])
+                    self._setup_partials()
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 

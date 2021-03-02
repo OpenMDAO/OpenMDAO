@@ -2901,7 +2901,7 @@ class Group(System):
             info.update(subsys._subjacs_info)
 
         if self._has_distrib_vars and self._owns_approx_jac:
-            # We current cannot approximate across a group with a distributed component if the
+            # We currently cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             for iname, meta in self._var_allprocs_abs2meta['input'].items():
                 if meta['has_src_indices'] and \
@@ -3044,7 +3044,7 @@ class Group(System):
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
                     else:
-                        sub_wrt_idx = None
+                        sub_wrt_idx = _full_slice
                         if wrt in abs2meta['input']:
                             size = abs2meta['input'][wrt]['size']
                         else:

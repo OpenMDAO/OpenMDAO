@@ -215,7 +215,7 @@ class _CheckingJacobian(DictionaryJacobian):
                 key = (of, wrt)
                 if key not in self._subjacs_info:
                     # create subjacs_info objects for matrix_free systems that don't have them
-                    self._subjacs_info[key] = sub = {
+                    self._subjacs_info[key] = {
                         'rows': None,
                         'cols': None,
                         'value': np.zeros((nrows, 1 if directional else ncols)),

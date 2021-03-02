@@ -617,6 +617,7 @@ class pyOptSparseDriver(Driver):
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
+
             # Let the optimizer try to handle the error
             except AnalysisError:
                 prob.model._clear_iprint()

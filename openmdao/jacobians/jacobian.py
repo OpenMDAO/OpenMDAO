@@ -369,9 +369,10 @@ class Jacobian(object):
                     subsum = summ[key]
                     meta = subjacs[key]
                     if meta['rows'] is not None:
-                        sysmeta = sys_subjacs[key]
                         Jrows.append(meta['rows'] + roffset)
                         Jcols.append(meta['cols'] + coffset)
+
+                        sysmeta = sys_subjacs[key]
                         sprows = sysmeta['rows']
                         spcols = sysmeta['cols']
                         if sysmeta['rows'].size != meta['rows'].size:
@@ -385,6 +386,7 @@ class Jacobian(object):
                             for c in meta['cols']:
                                 mask |= spcols == c
                             subsum = subsum[mask]
+
                         Jdata.append(subsum)
                     elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
@@ -441,7 +443,7 @@ class Jacobian(object):
         ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
         self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
         start = end = 0
-        for i, (of, _start, _end, _, _) in enumerate(col_var_info.values()):
+        for i, (wrt, _start, _end, _, _) in enumerate(col_var_info.values()):
             end += _end - _start
             self._col2name_ind[start:end] = i
             start = end
@@ -471,13 +473,13 @@ class Jacobian(object):
                         self._subjacs_info = system._subjacs_info.copy()
                     self._subjacs_info[key] = meta.copy()
                     meta = self._subjacs_info[key]
+                    val = meta['value']
 
                     if ridxs is not _full_slice:
                         nrows = len(ridxs)
                     if cidxs is not _full_slice:
                         ncols = len(cidxs)
                     if meta['rows'] is None:  # dense
-                        val = meta['value']
                         val = val[ridxs, :]
                         val = val[:, cidxs]
                         meta['value'] = val
@@ -490,14 +492,17 @@ class Jacobian(object):
                                 mask |= sprows == r
                             sprows = sprows[mask]
                             spcols = spcols[mask]
+                            # val = val[mask]
                         if cidxs is not _full_slice:
                             mask = np.zeros(sprows.size, dtype=bool)
                             for c in cidxs:
                                 mask |= spcols == c
                             sprows = sprows[mask]
                             spcols = spcols[mask]
+                            # val = val[mask]
                         meta['rows'] = sprows
                         meta['cols'] = spcols
+                        # meta['value'] = val
                     meta['shape'] = (nrows, ncols)
 
     def set_col(self, system, icol, column):
@@ -535,4 +540,5 @@ class Jacobian(object):
                     subjac['value'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-                    subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+                    if match_inds.size > 0:
+                        subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]

@@ -171,7 +171,6 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
-    p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
     if use_vois:
@@ -475,11 +474,14 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
@@ -490,7 +492,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
