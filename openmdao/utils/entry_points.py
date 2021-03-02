@@ -400,16 +400,19 @@ def find_plugins(types=None):
 
         resdict = response.json()
 
-        items = resdict['items']
-        for item in items:
-            url = item['html_url']
-            name = item['name']
-            topics = [t for t in item['topics'] if t in allowed_set]
-            if len(name) > wid1:
-                wid1 = len(name)
-            if len(url) > wid2:
-                wid2 = len(url)
-            pkgs[url] = (name, topics)
+        if 'items' not in resdict:
+            print(f"Query returned no items for topic '{_github_topics[type_]}'.")
+        else:
+            items = resdict['items']
+            for item in items:
+                url = item['html_url']
+                name = item['name']
+                topics = [t for t in item['topics'] if t in allowed_set]
+                if len(name) > wid1:
+                    wid1 = len(name)
+                if len(url) > wid2:
+                    wid2 = len(url)
+                pkgs[url] = (name, topics)
 
     template = '{:<{wid1}}  {:<{wid2}}  {}'
     if pkgs:
