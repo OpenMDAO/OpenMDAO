@@ -3623,7 +3623,6 @@ class System(object):
             for name in to_remove:
                 del outputs[name]
 
-
         # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3638,7 +3637,6 @@ class System(object):
         for _, meta in outputs.items():
             for key in to_remove:
                 del meta[key]
-
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout

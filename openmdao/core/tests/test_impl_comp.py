@@ -8,6 +8,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import remove_whitespace
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
@@ -416,8 +417,11 @@ class ImplicitCompTestCase(unittest.TestCase):
             ""
         ]
         captured_output = stdout.getvalue()
+
         for i, line in enumerate(captured_output.split('\n')):
-            self.assertEqual(line.strip(), expected_text[i].strip())
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(line),
+                                 remove_whitespace(expected_text[i]).replace('1L', ''))
 
 
 class ImplicitCompGuessTestCase(unittest.TestCase):
