@@ -116,6 +116,11 @@ class EmbedCodeDirective(Directive):
         if 'strip-docstrings' in self.options:
             source = remove_docstrings(source)
 
+        setup_code = ''
+        teardown_code = ''
+        mpl_import = ''
+        mpl_figure = ''
+
         if is_test:
             try:
                 source = dedent(source)
@@ -165,14 +170,20 @@ class EmbedCodeDirective(Directive):
             imports_not_required = 'imports-not-required' in self.options
 
             if shows_plot:
-                # import matplotlib AFTER __future__ (if it's there)
-                mpl_import = "\nimport matplotlib\nmatplotlib.use('Agg')\n"
-                idx = code_to_run.find("from __future__")
-                idx = code_to_run.find('\n', idx) if idx >= 0 else 0
-                code_to_run = code_to_run[:idx] + mpl_import + code_to_run[idx:]
+                # NOTE: import matplotlib AFTER __future__ (if it's there)
+                # All use of __future__ has been removed from OpenMDAO with v3.x
+                # so the related code has been removed here as well.
+                mpl_import = "\n".join([
+                    "import warnings",
+                    "import matplotlib",
+                    "warnings.filterwarnings('ignore')",
+                    "matplotlib.use('Agg')\n"
+                ])
+                code_to_run = mpl_import + code_to_run
 
                 if 'plot' in layout:
-                    code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
+                    mpl_figure = '\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs
+                    code_to_run = code_to_run + mpl_figure
 
             if is_test and getattr(method, '__unittest_skip__', False):
                 skipped = True
@@ -205,8 +216,8 @@ class EmbedCodeDirective(Directive):
 
             elif 'interleave' in layout:
                 if is_test:
-                    start = len(self_code) + len(setup_code)
-                    end = len(code_to_run) - len(teardown_code)
+                    start = len(self_code) + len(setup_code) + len(mpl_import)
+                    end = len(code_to_run) - len(teardown_code) - len(mpl_figure)
                     input_blocks = split_source_into_input_blocks(code_to_run[start:end])
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
