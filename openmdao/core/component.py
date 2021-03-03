@@ -379,21 +379,21 @@ class Component(System):
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
         if '*' in wrt_patterns:
-            info['wrt_matches_prom'] = None
+            info['wrt_matches_rel'] = None
             info['wrt_matches'] = None
             return
 
-        matches_prom = set()
+        matches_rel = set()
         for w in wrt_patterns:
-            matches_prom.update(find_matches(w, allwrt))
+            matches_rel.update(find_matches(w, allwrt))
 
         # error if nothing matched
-        if not matches_prom:
+        if not matches_rel:
             raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
                              "options: {}.".format(self.msginfo, wrt_patterns))
 
-        info['wrt_matches_prom'] = matches_prom
-        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_prom]
+        info['wrt_matches_rel'] = matches_rel
+        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_rel]
 
     def _update_subjac_sparsity(self, sparsity):
         """

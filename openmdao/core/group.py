@@ -3085,7 +3085,7 @@ class Group(System):
                         break
 
         baselen = len(self.pathname) + 1 if self.pathname else 0
-        info['wrt_matches_prom'] = [n[baselen:] for n in wrt_colors_matched]
+        info['wrt_matches_rel'] = [n[baselen:] for n in wrt_colors_matched]
 
         if info.get('dynamic') and info['coloring'] is None and self._owns_approx_of:
             if not wrt_colors_matched:
