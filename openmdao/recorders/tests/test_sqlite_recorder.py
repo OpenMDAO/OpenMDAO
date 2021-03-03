@@ -38,6 +38,10 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
+# do not show matplotlib plots
+import matplotlib
+matplotlib.use('Agg')
+
 
 class Cycle(om.Group):
 
@@ -2859,6 +2863,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         last_case = cr.get_case(driver_cases[-1])
 
+        self.assertEqual(last_case, cr.get_case(-1))
+
         objectives = last_case.get_objectives()
         design_vars = last_case.get_design_vars()
         constraints = last_case.get_constraints()
@@ -2869,9 +2875,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(last_case.inputs['obj_cmp.x'], prob['x'])
         assert_near_equal(last_case.outputs['z'], prob['z'])
         assert_near_equal(last_case.residuals['obj'], 0.0, tolerance = 1e-10)
-        
-        print(last_case)
-        
+
         assert_near_equal(last_case['y1'], prob['y1'], 1e-10)
 
     def test_feature_solver_recording_options(self):
@@ -3252,40 +3256,45 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        import numpy as np
         import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
-        import numpy as np
-        import matplotlib.pyplot as plt
 
         # build the model
         prob = om.Problem(model=SellarMDAWithUnits())
 
         model = prob.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                                upper=np.array([10.0, 10.0]))
+                                  upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
         model.add_objective('obj')
         model.add_constraint('con1', upper=0.0)
         model.add_constraint('con2', upper=0.0)
 
         # setup the optimization
-        driver = prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
-        # Here we show how to attach recorders to each of the four objects; problem, driver, solver, and system
-        # Create a recorder variable
+        # Here we show how to attach recorders to each of the four objects:
+        #   problem, driver, solver, and system
+
+        # Create a recorder
         recorder = om.SqliteRecorder('cases.sql')
-        # Attach a recorder to the problem
-        prob.add_recorder(recorder)
-        # Attach a recorder to the driver
-        driver.add_recorder(recorder)
 
+        # Attach recorder to the problem
+        prob.add_recorder(recorder)
+
+        # Attach recorder to the driver
+        prob.driver.add_recorder(recorder)
+
+        # To attach a recorder to a subsystem or solver, you need to call `setup`
+        # first so that the model hierarchy has been generated
         prob.setup()
 
-        # To attach a recorder to the system, you need to call it after `setup` so the model hierarchy has been generated
-        obj_cmp = prob.model.obj_cmp
-        obj_cmp.add_recorder(recorder)
-        # Attach a recorder to the solver
-        model.cycle.add_recorder(recorder)
+        # Attach recorder to a subsystem
+        model.obj_cmp.add_recorder(recorder)
+
+        # Attach recorder to a solver
+        model.cycle.nonlinear_solver.add_recorder(recorder)
 
         prob.set_solver_print(0)
         prob.run_driver()
@@ -3293,6 +3302,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         prob.cleanup()
 
     def test_feature_system_recorder(self):
+        import numpy as np
         import openmdao.api as om
 
         # Instantiate your CaseReader
@@ -3300,32 +3310,58 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         system_cases = cr.list_cases('root.obj_cmp')
 
-        # Number of cases in the optimization
-        num_cases = len(system_cases)
-        print("Number of cases:", num_cases)
+        # Number of cases recorded for 'obj_cmp'
+        self.assertEqual(f"Number of cases: {len(system_cases)}", "Number of cases: 14")
 
-        # Get the keys of all the inputs to the obj_func
+        # Get the keys of all the inputs to the objective function
         case = cr.get_case(system_cases[0])
         self.assertEqual(list(case.inputs.keys()), ['x', 'y1', 'y2', 'z'])
 
-        for i in range(num_cases):
-            case = cr.get_case(system_cases[i])
-            print(case['y1'])
+        assert_near_equal([np.asscalar(case['y1']) for case in cr.get_cases('root.obj_cmp')],
+                          [25.6, 25.6, 8.33, 4.17, 3.30, 3.18, 3.16,
+                           3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
+                          tolerance=1e-1)
 
     def test_feature_solver_recorder(self):
+        import numpy as np
+        import matplotlib.pyplot as plt
         import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
-        solver_cases = cr.list_cases('root.cycle')
+        # Get list of cases, without displaying them
+        solver_cases = cr.list_cases('root.cycle.nonlinear_solver', out_stream=None)
 
-        num_cases = len(solver_cases)
-        print("Number of cases:", num_cases)
+        self.assertEqual(f"Number of cases: {len(solver_cases)}", "Number of cases: 76")
 
-        case = cr.get_case(solver_cases[3])
-        assert_near_equal(case['y1'], 4.17430704, 1e-8)
-        assert_near_equal(case['y2'], 4.28622419, 1e-8)
+        # Plot the convergence of the two coupling variables (last 35 iterations)
+        y1_history = []
+        y2_history = []
+
+        for case_id in solver_cases[-35:]:
+            case = cr.get_case(case_id)
+            y1_history.append(case['y1'])
+            y2_history.append(case['y2'])
+
+        iterations = np.arange(-len(y1_history), 0, 1)
+
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+
+        ax1.plot(iterations, np.array(y1_history))
+        ax1.set(ylabel='Coupling Output: y1', title='Solver History')
+        ax1.grid()
+
+        ax2.plot(iterations, np.array(y2_history))
+        ax2.set(ylabel='Coupling Parameter: y2', xlabel='Iterations')
+        ax2.grid()
+
+        plt.show()
+
+        # Get the final values
+        case = cr.get_case(solver_cases[-1])
+        assert_near_equal(case['y1'], 3.16, 1e-8)
+        assert_near_equal(case['y2'], 3.75527777, 1e-8)
 
     def test_feature_driver_recorder(self):
         import openmdao.api as om
@@ -3333,7 +3369,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
 
-        driver_cases = cr.list_cases('driver')
+        # List driver cases (do not recurse to system/solver cases)
+        driver_cases = cr.list_cases('driver', recurse=False)
 
         last_case = cr.get_case(driver_cases[-1])
 
@@ -3343,8 +3380,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
         assert_near_equal(design_vars['x'], 0., 1e-8)
-        assert_near_equal(design_vars['z'][0], 1.97763888, 1e-8)
-        assert_near_equal(design_vars['z'][1], 1.25035459e-15, 1e-8)
+        assert_near_equal(design_vars['z'], [1.97763888, 1.25035459e-15], 1e-8)
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-8)
         assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
 
@@ -3358,19 +3394,17 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         problem_cases = cr.list_cases('problem')
         self.assertEqual(problem_cases, ['final_state'])
 
-        # get list of output variables recorded on problem
-        problem_vars = cr.list_source_vars('problem', out_stream=None)
+        # get list of variables recorded on problem
+        problem_vars = cr.list_source_vars('problem')
         self.assertEqual(sorted(problem_vars['outputs']),
                          ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # get the recorded case and check values
         case = cr.get_case('final_state')
 
-        objectives = case.get_objectives()
-        design_vars = case.get_design_vars()
-        constraints = case.get_constraints()
-
-        assert_near_equal(objectives['obj'], 3.18339395, 1e-8)
+        assert_near_equal(case.get_design_vars(), {'x': 0., 'z': [1.9776, 1.25e-15]}, tolerance=1e-4)
+        assert_near_equal(case.get_constraints(), {'con1': 0., 'con2': -20.2447}, tolerance=1e-4)
+        assert_near_equal(case.get_objectives(), {'obj': 3.18339395}, tolerance=1e-4)
 
     def test_feature_plot_des_vars(self):
         import matplotlib.pyplot as plt
@@ -3379,18 +3413,20 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
-        driver_cases = cr.list_cases('driver')
 
+        # List driver cases (do not recurse to system/solver cases, suppress display)
+        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
+
+        # Plot the path the design variables took to convergence
+        # Note that there are two lines in the right plot because "Z"
+        # contains two variables that are being optimized
         dv_x_values = []
         dv_z_values = []
-        for i in range(len(driver_cases)):
-            last_case = cr.get_case(driver_cases[i])
-            design_vars = last_case.get_design_vars()
-            if design_vars:
-                dv_x_values.append(design_vars['x'])
-                dv_z_values.append(design_vars['z'])
-
-        # Below is a short script to see the path the design variables took to convergence
+        for case_id in driver_cases:
+            case = cr.get_case(case_id)
+            design_vars = case.get_design_vars()
+            dv_x_values.append(design_vars['x'])
+            dv_z_values.append(design_vars['z'])
 
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
@@ -3403,8 +3439,8 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         ax2.set(xlabel='Iterations', ylabel='Design Var: Z', title='Optimization History')
         ax2.grid()
-        # There are two lines in the right plot because "Z" contains two variables that are being
-        # optimized
+
+        plt.show()
 
 
 @use_tempdirs
