@@ -2111,7 +2111,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertTrue("This gradient will fail." in msg.exception.args[0])
 
-    def test_singular_jac_check_responses(self):
+    def test_singular_jac_error_responses(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab',
                                  om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
@@ -2125,6 +2125,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
@@ -2144,7 +2145,7 @@ class TestPyoptSparse(unittest.TestCase):
                          "Constraints or objectives ['parab.z'] cannot be impacted by the design " + \
                          "variables of the problem.")
 
-    def test_singular_jac_check_desvars(self):
+    def test_singular_jac_error_desvars(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab',
                                      om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
@@ -2158,6 +2159,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
@@ -2221,7 +2223,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['singular_jac_behavior'] = 'warn'
+        # Default behavior is 'warn'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)

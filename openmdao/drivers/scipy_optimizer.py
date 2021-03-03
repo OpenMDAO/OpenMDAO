@@ -167,7 +167,7 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
-        self.options.declare('singular_jac_behavior', default='error',
+        self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to'
                              'compute_totals:'

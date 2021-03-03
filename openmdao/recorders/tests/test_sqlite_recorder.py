@@ -2649,7 +2649,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
-                                               "tol": 1e-03, "maxiter": 200, "disp": True})
+                                               "tol": 1e-03, "maxiter": 200, "disp": True,
+                                                'singular_jac_behavior': 'warn', 'singular_jac_tol': 1e-16})
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
     def test_feature_solver_options(self):

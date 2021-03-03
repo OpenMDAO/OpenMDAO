@@ -213,7 +213,7 @@ class pyOptSparseDriver(Driver):
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
-        self.options.declare('singular_jac_behavior', default='error',
+        self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to'
                              'compute_totals:'
