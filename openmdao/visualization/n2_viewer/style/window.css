@@ -648,6 +648,74 @@ div#help-svg {
     overflow: hidden;
 }
 
+div.help-graphic {
+    position: absolute;
+    height: auto;
+    width: 100%;
+}
+
+div.help-graphic > p {
+    position: absolute;
+    font: Helvetica;
+    font-size: 15pt;
+    padding: 2px 0 2px 5px;
+    margin: 0;
+}
+
+/*
+p.help-button-group {
+    border-top-width: 1px;
+    border-right-width: 0px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-color: green;
+    border-style: solid;   
+    border-radius: 5px 0px 0px 5px; 
+}
+*/
+
+div.help-button-group {
+    position: absolute;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 0;
+    border-color: green;
+    border-style: solid;
+    left: 620px;
+    border-radius: 0px 10px 10px 0px;
+    background-color: #e0e0e0;
+}
+
+div.help-button-group > p {
+    font: Helvetica;
+    font-size: 15pt;
+    padding: 0;
+    margin: 12px 10px 14px 10px;
+}
+
+i.help-text-icon {
+    color: white;
+    background-color: #42926b;
+    padding: 5px;
+    margin-right: 5px;
+}
+
+#help-graphic-svg {
+    top: 0;
+    left: 0;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+}
+
+#help-graphic-svg .help-line {
+    stroke: green;
+    fill: #e0e0e0;
+    stroke-width: 1;
+}
+
 /* ^^^^^^^^^^ End Help N2 Window theme ^^^^^^^^^^ */
 
 /* vvvvvvvvvv Begin Legend N2 Window theme vvvvvvvvvv */

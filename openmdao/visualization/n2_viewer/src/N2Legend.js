@@ -10,7 +10,7 @@ class N2Legend extends N2WindowDraggable {
      */
     constructor(modelData) {
         super('n2win-legend');
-    
+
         // TODO: The legend should't have to search through modelData itself,
         // this info can be collected as modelData is built.
         this.nodes = modelData.tree.children;
@@ -55,7 +55,7 @@ class N2Legend extends N2WindowDraggable {
 
         const legendDiv = d3.select('#legend-div');
         legendDiv.style('visibility', null);
-        this.body.node().appendChild(legendDiv.node());      
+        this.body.node().appendChild(legendDiv.node());
         this._setDisplayBooleans(this.nodes);
 
         this.title('<span class="icon-key"></span>');
@@ -236,10 +236,11 @@ class N2Legend extends N2WindowDraggable {
  * @typedef N2Help
  */
 class N2Help extends N2Window {
-    constructor() {
+    constructor(helpInfo) {
         super();
+
         this.theme('help')
-            .setList({ left: '100px', top: '20px', right: '100px', height: '800px' })
+            .setList({ left: '100px', top: '20px', right: '100px', height: '850px' })
             .title('Instructions')
             .footerText('OpenMDAO Model Hierarchy and N2 diagram');
 
@@ -250,8 +251,81 @@ class N2Help extends N2Window {
                 'A click on any element in the N2 diagram will allow those arrows to persist.');
 
         this.body.append('h1').text('Toolbar Help');
-        this.body.append('svg').append('use').attr('href', '#help-graphic');
+        this.helpDiv = this.body.append('div').attr('class', 'help-graphic');
+        this.helpDiv.append('img').attr('src', helpInfo.toolbarImg);
+
+        // The SVG will be the same dimensions as the div so we can draw an overlay
+        this.helpSvg = this.helpDiv.append('svg').attr('id', 'help-graphic-svg');
+
+        this._addButtonHelpText(helpInfo);
 
         this.show().modal(true);
+    }
+
+    _addButtonHelpText(helpInfo) {
+        let topPx = 70;
+        for (const btnId in helpInfo.buttons) {
+            const btn = helpInfo.buttons[btnId];
+
+            if (!btn.expansionItem) {
+                const btnText = this.helpDiv.append('p').attr('class', 'help-text');
+                btn.helpWinText = btnText;
+                btnText.style('left', helpInfo.width + 5 + 'px')
+                    .style('top', btn.bbox.top + btn.bbox.height / 2 - 13 + 'px')
+                    .text(btn.desc);
+
+                let grp = null;
+                if (btnId in helpInfo.primaryButtons) {
+                    btnText.classed('help-button-group', true)
+                    grp = this.helpDiv.append('div')
+                        .attr('id', btnId + '-help-group')
+                        .attr('class', 'help-button-group')
+                        .style('top', topPx + 'px')
+
+                    for (const memId of helpInfo.primaryButtons[btnId]) {
+                        const memClasses = d3.select('#' + memId).attr('class').split(/ /);
+
+                        let memClass = '';
+                        for (const mc of memClasses) {
+                            if (mc.match(/^icon-/)) {
+                                memClass = mc;
+                                break;
+                            }
+                        }
+                        topPx += 38;
+                        grp.append('p').attr('class', 'help-text')
+                            .html(`<i class="fas ${memClass} help-text-icon"></i>${helpInfo.buttons[memId].desc}`)
+                    }
+
+                    topPx += 30;
+
+                    this._drawGroupLines(btnText, grp)
+                }
+            }
+        }
+    }
+
+    _drawGroupLines(btnText, grp) {
+        const winBRect = this.helpDiv.node().getBoundingClientRect(),
+            textBRect = btnText.node().getBoundingClientRect(),
+            grpBRect = grp.node().getBoundingClientRect();
+
+        const coords = {
+            ul: { x: textBRect.right - winBRect.left + 5, y: textBRect.top - winBRect.top },
+            ur: { x: grpBRect.left - winBRect.left, y: grpBRect.top - winBRect.top + 0.5 },
+            bl: { x: textBRect.right - winBRect.left + 5, y: textBRect.bottom - winBRect.top },
+            br: { x: grpBRect.left - winBRect.left, y: grpBRect.bottom - winBRect.top - 0.5 }
+        }
+
+        const curve = {
+            ul: { x: coords.ul.x + 5, y: coords.ul.y + 5},
+            bl: { x: coords.bl.x + 5, y: coords.bl.y - 5}
+        }
+
+        const path = `M${coords.ur.x},${coords.ur.y} L${coords.ul.x},${coords.ul.y} ` +
+         `C${curve.ul.x},${curve.ul.y} ${curve.bl.x},${curve.bl.y} ${coords.bl.x},${coords.bl.y} ` +
+         `L${coords.br.x},${coords.br.y}`
+
+        this.helpSvg.append('path').attr('d', path).attr('class', 'help-line');
     }
 }

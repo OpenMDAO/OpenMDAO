@@ -534,7 +534,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'd3': 'd3.v5.min',
         'awesomplete': 'awesomplete',
         'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min'
+        'pako_inflate': 'pako_inflate.min',
+        'html2canvas': 'html2canvas.min'
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \

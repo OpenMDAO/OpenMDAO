@@ -74,37 +74,46 @@
 .icon-linear-solver:before {
     content:         "\e015";
 }
-.icon-model-height:before {
+.icon-loadview:before {
     content:         "\e016";
 }
-.icon-no-solver:before {
+.icon-model-height:before {
     content:         "\e017";
 }
-.icon-nonlinear-solver:before {
+.icon-no-solver:before {
     content:         "\e018";
 }
-.icon-notification:before {
+.icon-nonlinear-solver:before {
     content:         "\e019";
 }
-.icon-question-circle:before {
+.icon-notification:before {
     content:         "\e020";
 }
-.icon-save:before {
+.icon-question-circle:before {
     content:         "\e021";
 }
-.icon-search:before {
+.icon-save:before {
     content:         "\e022";
 }
-.icon-show-connections:before {
+.icon-savesvg:before {
     content:         "\e023";
 }
-.icon-shrink:before {
+.icon-saveview:before {
     content:         "\e024";
 }
-.icon-shrink2:before {
+.icon-search:before {
     content:         "\e025";
 }
-.icon-text-height:before {
+.icon-show-connections:before {
     content:         "\e026";
+}
+.icon-shrink:before {
+    content:         "\e027";
+}
+.icon-shrink2:before {
+    content:         "\e028";
+}
+.icon-text-height:before {
+    content:         "\e029";
 }
 

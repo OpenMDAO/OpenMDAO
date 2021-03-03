@@ -16,8 +16,10 @@ class N2ToolbarButtonNoClick {
     constructor(id, tooltipBox, tooltipText) {
         this.tooltips = [tooltipText];
 
+        this.id = id;
         this.toolbarButton = d3.select(id);
         this.tooltipBox = tooltipBox;
+        this.help = null;
 
         this.toolbarButton
             .on("mouseover", this.mouseOver.bind(this))
@@ -41,6 +43,35 @@ class N2ToolbarButtonNoClick {
     mouseMove() {
         this.tooltipBox.style("top", (d3.event.pageY - 30) + "px")
             .style("left", (d3.event.pageX + 5) + "px");
+    }
+
+    /**
+     * Use when the info displayed on the help screen is different than the tooltip.
+     * @param {String} helpText The info to display on the help screen for this button.
+     * @returns {N2ToolbarButtonNoClick} Reference to this.
+     */
+    setHelpInfo(helpText) {
+        this.help = helpText;
+        return this;
+    }
+
+    getHelpInfo() {
+        const parent = d3.select(this.toolbarButton.node().parentNode);
+        let primaryGrpBtnId = null;
+        const expansionItem = parent.classed('toolbar-group-expandable');
+
+        if (expansionItem) {
+            const grandparent = d3.select(parent.node().parentNode);
+            primaryGrpBtnId = grandparent.select(':first-child').attr('id');
+        }
+
+        return {
+            'id': this.id.replace('#', ''),
+            'desc': this.help ? this.help : this.tooltips[0],
+            'bbox': this.toolbarButton.node().getBoundingClientRect(),
+            'expansionItem': expansionItem,
+            'primaryGrpBtnId': primaryGrpBtnId
+        };
     }
 }
 
@@ -147,8 +178,10 @@ class N2Toolbar {
         this.hideToolbarIcon = this.hideToolbarButton.select('i');
         this.searchBar = d3.select('#awesompleteId');
         this.searchCount = d3.select('#searchCountId');
+        this.buttons = [];
 
         this.hidden = true;
+        this.helpInfo = null;
 
         // Display toolbar if not embedded, or if embedded doc location
         // href include the #toolbar anchor
@@ -156,25 +189,44 @@ class N2Toolbar {
             this.show();
 
         this._setupButtonFunctions(n2ui);
+    }
 
-        // Expand the search bar and set focus when search button clicked
-        d3.select('#searchbar-container').on('click', function () {
-            self.searchCount.html('0 matches');
+    /**
+     * Generate the data structure that describes all of the toolbar buttons. Nothing
+     * is actually rendered here (that is done in the N2Help constructor.)
+     */
+    async _setupHelp() {
+        const self = this;
 
-            self.searchBar.node().value = '';
-            d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
+        // Take a "screenshot" of the toolbar
+        html2canvas(document.querySelector("#toolbarLoc"), { logging: false }).then(canvas => {
+            self.helpInfo = {
+                toolbarImg: canvas.toDataURL(), // Convert the canvas to a PNG
+                width: canvas.width,
+                height: canvas.height,
+                buttons: {},
+                primaryButtons: {},
+                groups: 0
+            }
+        }).then(e => {
+            for (const btn of this.buttons) {
+                const info = btn.getHelpInfo();
+                this.helpInfo.buttons[info.id] = info;
+                if (info.primaryGrpBtnId) { // Is this a "child" of a group?
+                    // Keep track of which buttons are at the front of collapsing groups
+                    // and the group member ids
+                    if (info.primaryGrpBtnId in self.helpInfo.primaryButtons) {
+                        self.helpInfo.primaryButtons[info.primaryGrpBtnId].push(info.id);
+                    }
+                    else {
+                        self.helpInfo.primaryButtons[info.primaryGrpBtnId] = [info.id];
+                    }
+                }
+            }
 
-            // This is necessary rather than just calling focus() due to the
-            // transition animation
-            window.setTimeout(function () {
-                self.searchBar.node().focus();
-            }, 200);
-        });
+            new N2Help(self.helpInfo);
+        })
 
-        // Retract search bar when focus is lost
-        this.searchBar.on('focusout', function () {
-            d3.select('#searchbar-and-label').attr('class', 'searchbar-hidden')
-        });
     }
 
     /** Slide everything to the left offscreen 75px, rotate the button */
@@ -212,6 +264,12 @@ class N2Toolbar {
             .node().onclick = button.node().onclick;
     }
 
+
+    _addButton(btn) {
+        this.buttons.push(btn);
+        return btn;
+    }
+
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
      * @param {N2UserInterface} n2ui A reference to the UI object
@@ -220,141 +278,171 @@ class N2Toolbar {
         const self = this; // For callbacks that change "this". Alternative to using .bind().
         const tooltipBox = d3.select(".tool-tip");
 
-        new N2ToolbarButtonClick('#reset-graph', tooltipBox,
-            "View entire model starting from root", e => { n2ui.homeButtonClick(); });
+        this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
+            "Collapse model to only variables that match search term",
+            e => {
+                self.searchCount.html('0 matches');
 
-        new N2ToolbarButtonClick('#undo-graph', tooltipBox,
-            "Move back in view history", e => { n2ui.backButtonPressed() });
+                self.searchBar.node().value = '';
+                d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
 
-        new N2ToolbarButtonClick('#redo-graph', tooltipBox,
-            "Move forward in view history", e => { n2ui.forwardButtonPressed() });
+                // This is necessary rather than just calling focus() due to the
+                // transition animation
+                window.setTimeout(function () {
+                    self.searchBar.node().focus();
+                }, 200);
 
-        new N2ToolbarButtonClick('#collapse-element', tooltipBox,
+                // Retract search bar when focus is lost
+                self.searchBar.on('focusout', function () {
+                    d3.select('#searchbar-and-label').attr('class', 'searchbar-hidden')
+                    self.searchBar.on('focusout', null);
+                });
+            })
+        );
+
+        this._addButton(new N2ToolbarButtonClick('#reset-graph', tooltipBox,
+            "View entire model starting from root", e => { n2ui.homeButtonClick(); }));
+
+        this._addButton(new N2ToolbarButtonClick('#undo-graph', tooltipBox,
+            "Move back in view history", e => { n2ui.backButtonPressed() }));
+
+        this._addButton(new N2ToolbarButtonClick('#redo-graph', tooltipBox,
+            "Move forward in view history", e => { n2ui.forwardButtonPressed() }));
+
+        this._addButton(new N2ToolbarButtonClick('#collapse-element', tooltipBox,
             "Control variable collapsing",
-            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) });
+            e => { n2ui.collapseAll(n2ui.n2Diag.zoomedElement) }));
 
-        new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#collapse-element-2', tooltipBox,
             "Collapse only variables in current view",
             function (target) {
                 n2ui.collapseAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#collapse-all', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#collapse-all', tooltipBox,
             "Collapse all variables in entire model",
             function (target) {
                 n2ui.collapseAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#expand-element', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#expand-element', tooltipBox,
             "Expand only variables in current view",
             function (target) {
                 n2ui.expandAll(n2ui.n2Diag.zoomedElement);
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#expand-all', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#expand-all', tooltipBox,
             "Expand all variables in entire model",
             function (target) {
                 n2ui.expandAll(n2ui.n2Diag.model.root);
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#hide-connections', tooltipBox,
-            "Control connection arrows",
+        this._addButton(new N2ToolbarButtonClick('#hide-connections', tooltipBox,
+            "Set connections visibility",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#hide-connections-2', tooltipBox,
             "Remove all connection arrows",
             function (target) {
                 n2ui.n2Diag.clearArrows();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#show-all-connections', tooltipBox,
             "Show all connections in view",
             function (target) {
                 n2ui.n2Diag.showAllArrows();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#linear-solver-button', tooltipBox,
             "Control solver tree display",
             function (target) {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();
-            });
+            }));
 
-        new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#linear-solver-button-2', tooltipBox,
             "Show linear solvers",
             function (target) {
                 n2ui.setSolvers(true);
                 n2ui.showSolvers();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#non-linear-solver-button', tooltipBox,
             "Show non-linear solvers",
             function (target) {
                 n2ui.setSolvers(false);
                 n2ui.showSolvers();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonClick('#no-solver-button', tooltipBox,
             "Hide solvers",
             function (target) {
                 n2ui.hideSolvers();
                 self._setRootButton(target);
-            });
+            }));
 
-        new N2ToolbarButtonToggle('#legend-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonToggle('#legend-button', tooltipBox,
             ["Show legend", "Hide legend"],
             pred => { return n2ui.legend.hidden; },
             e => { n2ui.toggleLegend(); }
-        );
+        ));
 
-        new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show optimization variables", "Hide optimization variables"],
             pred => { return n2ui.desVars; },
             e => { n2ui.toggleDesVars(); }
-        );
+        ));
 
-        new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox, "Set text height");
-        new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox, "Set collapse depth");
-        new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox, "Set model height");
+        this._addButton(new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox,
+            "Set text height"));
+        this._addButton(new N2ToolbarButtonNoClick('#depth-slider-button', tooltipBox,
+            "Set collapse depth"));
+        this._addButton(new N2ToolbarButtonNoClick('#model-slider-button', tooltipBox,
+            "Set model height"));
 
-        new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
-            "Save or Load an Image or View");
+        this._addButton(new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
+            "Save or Load an Image or View"));
 
-        new N2ToolbarButtonClick('#save-button', tooltipBox,
-            "Save to SVG", e => { n2ui.n2Diag.saveSvg() });
+        this._addButton(new N2ToolbarButtonClick('#save-button', tooltipBox,
+            "Save to SVG", e => { n2ui.n2Diag.saveSvg() }));
 
-        new N2ToolbarButtonClick('#save-state-button', tooltipBox,
-            "Save View", e => { n2ui.saveState() });
+        this._addButton(new N2ToolbarButtonClick('#save-state-button', tooltipBox,
+            "Save View", e => { n2ui.saveState() }));
 
-        new N2ToolbarButtonClick('#load-state-button', tooltipBox,
-            "Load View", e => { n2ui.loadState() });
+        this._addButton(new N2ToolbarButtonClick('#load-state-button', tooltipBox,
+            "Load View", e => { n2ui.loadState() }));
 
-        new N2ToolbarButtonToggle('#info-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonToggle('#info-button', tooltipBox,
             ["Hide detailed node information", "Show detailed node information"],
             pred => { return n2ui.nodeInfoBox.active; },
             e => {
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
             }
-        );
+        ));
 
-        new N2ToolbarButtonToggle('#question-button', tooltipBox,
+        this._addButton(new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
             pred => { return !!(d3.select(".window-theme-help").size()); },
-            e => { new N2Help() }
-        );
+            e => {
+                if (!self.helpInfo) self._setupHelp();
+                else new N2Help(self.helpInfo);
+            }
+        ));
 
+        // Don't add this to the array of tracked buttons because it confuses
+        // the help screen generation
         new N2ToolbarButtonToggle('#hide-toolbar', tooltipBox,
             ["Show toolbar", "Hide toolbar"],
             pred => { return self.hidden },
