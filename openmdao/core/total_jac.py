@@ -1705,7 +1705,8 @@ class _TotalJacInfo(object):
                     break
                 if name in self.ivc_print_names:
                     name = self.ivc_print_names[name]
-                zero_rows.append(name)
+                if name not in zero_rows:
+                    zero_rows.append(name)
 
         if zero_rows:
             msg = f"Constraints or objectives {zero_rows} cannot be impacted by the design " + \
@@ -1724,7 +1725,8 @@ class _TotalJacInfo(object):
                     break
                 if name in self.ivc_print_names:
                     name = self.ivc_print_names[name]
-                zero_cols.append(name)
+                if name not in zero_cols:
+                    zero_cols.append(name)
 
         if zero_cols:
             msg = f"Design variables {zero_cols} have no impact on the constraints or objective."

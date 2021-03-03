@@ -92,6 +92,8 @@ class ScipyOptimizeDriver(Driver):
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
+    _check_jac : bool
+        Used internally to control when to perform singular checks on computed total derivs.
     _con_cache : dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
@@ -147,6 +149,7 @@ class ScipyOptimizeDriver(Driver):
         self._lincongrad_cache = None
         self.fail = False
         self.iter_count = 0
+        self._check_jac = False
         self._exc_info = None
 
         self.cite = CITATIONS
@@ -164,6 +167,15 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('singular_jac_behavior', default='error',
+                             values=['error', 'warn', 'ignore'],
+                             desc='Defines behavior of a zero row/col check after first call to'
+                             'compute_totals:'
+                             'error - raise an error.'
+                             'warn - raise a warning.'
+                             "ignore - don't perform check.")
+        self.options.declare('singular_jac_tol', default=1e-16,
+                             desc='Tolerance for zero row/column check.')
 
     def _get_name(self):
         """
@@ -196,6 +208,7 @@ class ScipyOptimizeDriver(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
         self.supports._read_only = True
+        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
@@ -695,6 +708,13 @@ class ScipyOptimizeDriver(Driver):
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format='array')
             self._grad_cache = grad
+
+            # First time through, check for zero row/col.
+            if self._check_jac:
+                raise_error = self.options['singular_jac_behavior'] == 'error'
+                self._total_jac.check_total_jac(raise_error=raise_error,
+                                                tol=self.options['singular_jac_tol'])
+                self._check_jac = False
 
         except Exception as msg:
             self._exc_info = msg
