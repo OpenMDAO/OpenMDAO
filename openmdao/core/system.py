@@ -1,6 +1,7 @@
 """Define the base System class."""
 import sys
 import os
+import hashlib
 import time
 
 from contextlib import contextmanager
@@ -3528,22 +3529,9 @@ class System(object):
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if notebook and tabulate is not None:
-                nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
-                             "global_shape": []}
-                for output, attrs in inputs.items():
-                    nb_format["Inputs"].append(output)
-                    for key, val in attrs.items():
-                        nb_format[key].append(val)
-
-                return tabulate(nb_format, headers="keys", tablefmt='html')
-            else:
-                self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
-                                  out_stream)
+            self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
+                              out_stream)
 
         if self.pathname:
             # convert to relative names
@@ -3677,27 +3665,14 @@ class System(object):
         if not outputs or (not all_procs and self.comm.rank != 0):
             return []
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                if notebook and tabulate is not None:
-                    nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
-                                 "global_shape": []}
-                    for output, attrs in expl_outputs.items():
-                        nb_format["Explicit Output"].append(output)
-                        for key, val in attrs.items():
-                            nb_format[key].append(val)
-
-                    return tabulate(nb_format, headers="keys", tablefmt='html')
-                else:
-                    self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                      all_procs, out_stream)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
 
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
@@ -3719,18 +3694,8 @@ class System(object):
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                if notebook and tabulate is not None:
-                    nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
-                                 "global_shape": []}
-                    for output, attrs in expl_outputs.items():
-                        nb_format["Implicit Output"].append(output)
-                        for key, val in attrs.items():
-                            nb_format[key].append(val)
-
-                    return tabulate(nb_format, headers="keys", tablefmt='html')
-                else:
-                    self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                      all_procs, out_stream)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
@@ -5113,3 +5078,49 @@ class System(object):
         relevant['nonlinear'] = relevant['linear']
 
         return relevant
+
+    def _generate_md5_hash(self):
+        """
+        Generate an md5 hash for the data structure of this model.
+
+        The hash is generated from an encoded string containing the physical model hiearchy,
+        including all component and variable names, and all connection information.
+
+        The hash is used by the n2 viewer to determine if a saved view can be reused. It is not
+        intended to accurately track whether a model has been changed, so no options/settings are
+        tracked.
+
+        Returns
+        -------
+        str
+            The md5 hash string for the model.
+        """
+        data = []
+
+        # Model Hierarchy.
+        for sys_name in self.system_iter(include_self=True, recurse=True):
+
+            # System name and depth.
+            pathname = sys_name.pathname
+            if pathname:
+                name_parts = pathname.split('.')
+                depth = len(name_parts)
+
+                data.append((name_parts[-1], depth))
+
+            else:
+                data.append(('model', 0))
+
+            # Local (relative) names for Component inputs and outputs.
+            try:
+                data.append(sorted(sys_name._var_rel_names['input']))
+                data.append(sorted(sys_name._var_rel_names['output']))
+            except AttributeError:
+                continue
+
+        # All Connections.
+        # Note: dictionary can be in any order, so we have to sort.
+        for key in sorted(self._conn_global_abs_in2out):
+            data.append(self._conn_global_abs_in2out[key])
+
+        return hashlib.md5(str(data).encode()).hexdigest()

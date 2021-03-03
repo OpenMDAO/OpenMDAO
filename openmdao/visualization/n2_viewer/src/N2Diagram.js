@@ -140,6 +140,58 @@ class N2Diagram {
         document.body.removeChild(downloadLink);
     }
 
+    /*
+     * Recurse and pull state info from model for saving.
+     */
+    getSubState(dataList, node = this.model.root) {
+        dataList.push(node.isMinimized);
+        dataList.push(node.manuallyExpanded);
+        dataList.push(node.varIsHidden);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.getSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and set state info into model.
+     */
+    setSubState(dataList, node = this.model.root) {
+        node.isMinimized = dataList.pop();
+        node.manuallyExpanded = dataList.pop();
+        node.varIsHidden = dataList.pop();
+        //console.log(node.isMinimized, node.manuallyExpanded);
+
+        if (node.hasChildren()) {
+            for (const child of node.children) {
+                this.setSubState(dataList, child);
+            }
+        }
+    }
+
+    /*
+     * Recurse and return node given id.
+     */
+    findNodeById(id, node = this.model.root) {
+        if (id == node.id) {
+            return node;
+        }
+        else if (node.hasChildren()) {
+            for (const child of node.children) {
+                let found = this.findNodeById(id, child);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+        else {
+            return false;
+        }
+        return false;
+    }
+
     /**
      * Replace the current zoomedElement, but preserve its value.
      * @param {Object} newZoomedElement Replacement zoomed element.

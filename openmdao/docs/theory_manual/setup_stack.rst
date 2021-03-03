@@ -16,8 +16,9 @@ Setup also performs some level of model checking, mainly for critical errors. Mo
 checking can be done by setting "check" when calling `setup`, or by using the :ref:`openmdao command
 line check<om-command>`. It is recommended that you do this after making any changes to the configuration
 of your model.  The "check" argument to `setup` can be set to `True`, which will cause a default
-set of checks to run.  It can also be set to 'all', which will run all available checks.  Finally,
-it can be set to a specific list of checks to run.  The checks that are available can be
+set of checks to run.  It can also be set to 'all', which will run all available checks.
+A value of `None` or `True` will result in no checks being run. Finally,
+it can be set to a specific list of checks to run as a list of strings.  The checks that are available can be
 determined by running the following command:
 
 .. embed-shell-cmd::

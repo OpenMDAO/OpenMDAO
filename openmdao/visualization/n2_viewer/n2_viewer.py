@@ -9,14 +9,14 @@ import networkx as nx
 import numpy as np
 
 try:
-    from IPython.display import IFrame, display
+    from IPython.display import IFrame, display, HTML
 except ImportError:
     IFrame = display = None
 
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.notebook_mode import notebook
+from openmdao.core.notebook_mode import notebook, colab
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -337,7 +337,7 @@ def _get_declare_partials(system):
     return declare_partials_list
 
 
-def _get_viewer_data(data_source):
+def _get_viewer_data(data_source, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
 
@@ -345,6 +345,9 @@ def _get_viewer_data(data_source):
     ----------
     data_source : <Problem> or <Group> or str
         A Problem or Group or case recorder file name containing the model or model data.
+
+    case_id : int or str or None
+        Case name or index of case in SQL file.
 
     Returns
     -------
@@ -383,11 +386,45 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        data_dict = CaseReader(data_source, pre_load=False).problem_metadata
+        cr = CaseReader(data_source)
+
+        data_dict = cr.problem_metadata
+
+        if case_id is not None:
+            cases = cr.get_case(case_id)
+            print(f"Using source: {cases.source}\nCase: {cases.name}")
+
+            def recurse(children, stack):
+                for child in children:
+                    if child['type'] == 'subsystem':
+                        if child['name'] != '_auto_ivc':
+                            stack.append(child['name'])
+                            recurse(child['children'], stack)
+                            stack.pop()
+                    elif child['type'] == 'input':
+                        if cases.inputs is None:
+                            child['value'] = 'N/A'
+                        else:
+                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                            child['value'] = cases.inputs[path]
+                    elif child['type'] == 'output':
+                        if cases.outputs is None:
+                            child['value'] = 'N/A'
+                        else:
+                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                            try:
+                                child['value'] = cases.outputs[path]
+                            except KeyError:
+                                child['value'] = 'N/A'
+            recurse(data_dict['tree']['children'], [])
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
             del data_dict['variables']
+
+        # Older recordings might not have this.
+        if 'md5_hash' not in data_dict:
+            data_dict['md5_hash'] = None
 
         return data_dict
 
@@ -399,6 +436,7 @@ def _get_viewer_data(data_source):
     comp_exec_idx = [0]  # list so pass by ref
     orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
+    data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
 
@@ -467,7 +505,7 @@ def _get_viewer_data(data_source):
     return data_dict
 
 
-def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddable=False,
        title=None, use_declare_partial_info=False):
     """
     Generate an HTML file containing a tree viewer.
@@ -478,6 +516,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     ----------
     data_source : <Problem> or str
         The Problem or case recorder database containing the model or model data.
+
+    case_id : int, str, or None
+        Case name or index of case in SQL file if data_source is a database.
 
     outfile : str, optional
         The name of the final output file
@@ -499,7 +540,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     """
     # grab the model viewer data
-    model_data = _get_viewer_data(data_source)
+    model_data = _get_viewer_data(data_source, case_id=case_id)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
@@ -610,8 +651,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     h.write(outfile)
 
     # Open in Jupyter Notebook
-    if notebook:
+    if notebook and not colab:
         display(IFrame(src=outfile, width=1000, height=1000))
+    else:
+        display(HTML(outfile))
 
     # open it up in the browser
     if show_browser and not notebook:

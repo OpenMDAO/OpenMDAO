@@ -26,6 +26,8 @@ class ModelData {
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
 
+        this.md5_hash = modelJSON.md5_hash;
+
         if (this.unconnectedInputs > 0)
             console.info("Unconnected nodes: ", this.unconnectedInputs);
 
