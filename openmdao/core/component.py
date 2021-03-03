@@ -1486,7 +1486,7 @@ class Component(System):
         subjacs = self._subjacs_info
         wrtset = set()
         subjac_keys = self._get_approx_subjac_keys()
-        # got through subjac keys in reverse and only add approx for the last of each wrt
+        # go through subjac keys in reverse and only add approx for the last of each wrt
         # (this prevents warnings that could confuse users)
         for i in range(len(subjac_keys) - 1, -1, -1):
             key = subjac_keys[i]

@@ -23,7 +23,6 @@ class TestImplCompArray(om.ImplicitComponent):
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         residuals['x'] = self.mtx.dot(outputs['x']) - inputs['rhs']
-        print(f"{self.pathname}: apply_nonlinear: inputs[rhs] = {inputs['rhs']}, outputs[x] = {outputs['x']}, resids[x] = {residuals['x']}")
 
     def solve_nonlinear(self, inputs, outputs):
         outputs['x'] = np.linalg.solve(self.mtx, inputs['rhs'])

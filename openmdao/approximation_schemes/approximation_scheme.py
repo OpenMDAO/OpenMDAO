@@ -139,6 +139,11 @@ class ApproximationScheme(object):
         from openmdao.core.group import Group
         from openmdao.core.implicitcomponent import ImplicitComponent
 
+        is_group = isinstance(system, Group)
+        is_total = is_group and system.pathname == ''
+        is_semi = is_group and not is_total
+        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
+
         self._colored_approx_groups = []
 
         # don't do anything if the coloring doesn't exist yet
@@ -154,8 +159,9 @@ class ApproximationScheme(object):
             # this maps column indices into colored jac into indices into full jac
             ccol2jcol = np.empty(coloring._shape[1], dtype=int)
 
-            # colored col to out vec idx (only used for totals)
-            ccol2vcol = np.empty(coloring._shape[1], dtype=int)
+            # colored col to out vec idx
+            if is_total:
+                ccol2vcol = np.empty(coloring._shape[1], dtype=int)
 
             ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
@@ -168,7 +174,8 @@ class ApproximationScheme(object):
                         rng = np.arange(slc.start, slc.stop)
                         if cinds is not None:
                             rng = rng[cinds]
-                        ccol2vcol[colored_start:colored_end] = rng
+                        if is_total:
+                            ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
 
         approx_of_idxs = system._owns_approx_of_idx
@@ -177,11 +184,6 @@ class ApproximationScheme(object):
         approx_wrt_idxs = system._owns_approx_wrt_idx
         if approx_wrt_idxs is None:
             approx_wrt_idxs = {}
-
-        is_group = isinstance(system, Group)
-        is_total = is_group and system.pathname == ''
-        is_semi = is_group and not is_total
-        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=int)
@@ -198,9 +200,6 @@ class ApproximationScheme(object):
             prom = name if is_total else abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
-                # vals = np.arange(start, end, dtype=int)
-                # if name in approx_of_idxs:
-                #     vals = vals[approx_of_idxs[name]]
                 row_map[colorstart:colorend] = np.arange(start, end, dtype=int)
                 colorstart = colorend
             start = end
@@ -213,11 +212,6 @@ class ApproximationScheme(object):
 
         outputs = system._outputs
         inputs = system._inputs
-
-        # create a list to map color index to coloring approx metadata
-        self._approx_coloring_meta = meta = []
-        # get groups of columns from the coloring and compute proper indices into
-        # the inputs and outputs vectors.
 
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             nzrows = [row_map[r] for r in nzrows]

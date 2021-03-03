@@ -132,7 +132,6 @@ class DictionaryJacobian(Jacobian):
                         subjac = self._randomize_subjac(subjac_info['value'], abs_key)
                     else:
                         subjac = subjac_info['value']
-                    # print(f"{system.msginfo}: apply {abs_key}: {subjac}")
                     rows = subjac_info['rows']
                     if rows is not None:  # our homegrown COO format
                         linds, rinds = rows, subjac_info['cols']
@@ -168,8 +167,6 @@ class DictionaryJacobian(Jacobian):
                             subjac = subjac.transpose()
 
                         left_vec += subjac.dot(right_vec)
-                        # print("right_vec:", right_vec)
-                        # print("left_vec:", left_vec)
 
 
 class _CheckingJacobian(DictionaryJacobian):

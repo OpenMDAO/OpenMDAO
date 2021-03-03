@@ -2222,9 +2222,9 @@ class System(object):
         except Exception:
             err_type, err, trace = sys.exc_info()
             if str(err).startswith(self.msginfo):
-                raise
+                raise err
             else:
-                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}") from err
+                raise err_type(f"{self.msginfo}: Error calling {fname}(), {err}")
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False

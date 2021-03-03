@@ -200,22 +200,20 @@ class Jacobian(object):
         """
         Yield next name pair of sub-Jacobian.
         """
-        for key in self._subjacs_info.keys():
-            yield key
+        yield from self._subjacs_info.keys()
 
     def keys(self):
         """
         Yield next name pair of sub-Jacobian.
         """
-        for key in self._subjacs_info.keys():
-            yield key
+        yield from self._subjacs_info.keys()
 
     def items(self):
         """
         Yield name pair and value of sub-Jacobian.
         """
-        for key, val in self._subjacs_info.items():
-            yield key, val['value']
+        for key, meta in self._subjacs_info.items():
+            yield key, meta['value']
 
     @property
     def msginfo(self):

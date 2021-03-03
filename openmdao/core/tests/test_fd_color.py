@@ -508,8 +508,7 @@ class TestColoringSemitotals(unittest.TestCase):
         prob.run_model()
 
         derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
-        sub._coloring_info['coloring'].display_txt()
-        
+
         start_nruns = sub._nruns
         derivs = prob.driver._compute_totals()
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
@@ -1021,7 +1020,6 @@ class TestStaticColoring(unittest.TestCase):
         # try just manually computing the coloring here instead of using declare_coloring
         coloring = compute_total_coloring(prob)
         model._save_coloring(coloring)
-        coloring.display_txt()
 
         # new Problem, loading the coloring we just computed
         prob = Problem(coloring_dir=self.tempdir)

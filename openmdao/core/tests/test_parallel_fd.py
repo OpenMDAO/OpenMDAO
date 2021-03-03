@@ -144,7 +144,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         size = 15
         mult = 2.0
         add = 1.0
-        
+
         prob = setup_1comp_model(2, size, mult, add, 'cs')
 
         J = prob.compute_totals(['C1.y'], ['P1.x'], return_format='dict')
@@ -353,8 +353,6 @@ class MatMultParallelTestCase(unittest.TestCase):
         p.setup(mode='fwd', force_alloc_complex=(method == 'cs'))
         p.run_model()
 
-        #import wingdbstub
-        
         J = p.compute_totals(of=['par.C1.y', 'par.C2.y'], wrt=['indep.x'])
 
         norm = np.linalg.norm(J['par.C1.y','indep.x'] - C1.mat)
