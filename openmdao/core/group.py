@@ -161,8 +161,6 @@ class Group(System):
         or subname can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
-    _approx_subjac_keys : list
-        List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
     _has_distrib_vars : bool
@@ -208,7 +206,6 @@ class Group(System):
         self._conn_discrete_in2out = {}
         self._transfers = {}
         self._discrete_transfers = {}
-        self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
         self._contains_parallel_group = False
@@ -520,8 +517,6 @@ class Group(System):
                 simple_warning(msg)
 
         self.comm = comm
-
-        self._approx_subjac_keys = None
 
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
@@ -2910,20 +2905,6 @@ class Group(System):
                     msg = "{} : Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
-
-    def _get_approx_subjac_keys(self):
-        """
-        Return a list of (of, wrt) keys needed for approx derivs for this group.
-
-        Returns
-        -------
-        list
-            List of approx derivative subjacobian keys.
-        """
-        if self._approx_subjac_keys is None:
-            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
-
-        return self._approx_subjac_keys
 
     def _approx_subjac_keys_iter(self):
         pro2abs = self._var_allprocs_prom2abs_list

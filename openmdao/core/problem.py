@@ -1311,6 +1311,7 @@ class Problem(object):
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
+            added_wrts = set()
 
             of, wrt = comp._get_partials_varlists()
 
@@ -1365,8 +1366,12 @@ class Problem(object):
                 else:
                     vector = None
 
-                approximations[fd_options['method']].add_approximation(abs_key, self.model,
-                                                                       fd_options, vector=vector)
+                # prevent adding multiple approxs with same wrt (and confusing users with warnings)
+                if abs_key[1] not in added_wrts:
+                    approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                           fd_options,
+                                                                           vector=vector)
+                    added_wrts.add(abs_key[1])
 
             approx_jac = _CheckingJacobian(comp)
             # approx_jac = {}

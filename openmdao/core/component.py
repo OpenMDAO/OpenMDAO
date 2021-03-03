@@ -1104,7 +1104,8 @@ class Component(System):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
+                         ignore_user_sparsity=True):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1140,11 +1141,14 @@ class Component(System):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        ignore_user_sparsity : bool
+            If True (the default) compute the sparsity instead of using any user-specified
+            rows/cols in their declared partials.
         """
         super().declare_coloring(wrt, method, form, step, per_instance,
                                  num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
-                                 show_summary, show_sparsity)
+                                 show_summary, show_sparsity, ignore_user_sparsity)
 
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)
@@ -1480,9 +1484,16 @@ class Component(System):
         """
         self._get_static_wrt_matches()
         subjacs = self._subjacs_info
-        for key in self._approx_subjac_keys_iter():
-            meta = subjacs[key]
-            self._approx_schemes[meta['method']].add_approximation(key, self, meta)
+        wrtset = set()
+        subjac_keys = self._get_approx_subjac_keys()
+        # got through subjac keys in reverse and only add approx for the last of each wrt
+        # (this prevents warnings that could confuse users)
+        for i in range(len(subjac_keys) - 1, -1, -1):
+            key = subjac_keys[i]
+            if key[1] not in wrtset:
+                wrtset.add(key[1])
+                meta = subjacs[key]
+                self._approx_schemes[meta['method']].add_approximation(key, self, meta)
 
     def _guess_nonlinear(self):
         """

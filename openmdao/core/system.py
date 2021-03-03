@@ -260,6 +260,8 @@ class System(object):
     _subjacs_info : dict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
+    _approx_subjac_keys : list
+        List of subjacobian keys used for approximated derivatives.
     _design_vars : dict of dict
         dict of all driver design vars added to the system.
     _responses : dict of dict
@@ -426,6 +428,7 @@ class System(object):
         self._jacobian = None
         self._approx_schemes = OrderedDict()
         self._subjacs_info = {}
+        self._approx_subjac_keys = None
         self.matrix_free = False
 
         self.under_approx = False
@@ -864,6 +867,20 @@ class System(object):
 
         self.set_initial_values()
 
+    def _get_approx_subjac_keys(self):
+        """
+        Return a list of (of, wrt) keys needed for approx derivs for this group.
+
+        Returns
+        -------
+        list
+            List of approx derivative subjacobian keys.
+        """
+        if self._approx_subjac_keys is None:
+            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+
+        return self._approx_subjac_keys
+
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
         Use a precomputed coloring for this System.
@@ -910,7 +927,8 @@ class System(object):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
+                         ignore_user_sparsity=True):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -946,6 +964,9 @@ class System(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
+        ignore_user_sparsity : bool
+            If True (the default) compute the sparsity instead of using any user-specified
+            rows/cols in their declared partials.
         """
         if method not in ('fd', 'cs'):
             raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.msginfo))
@@ -974,6 +995,7 @@ class System(object):
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
         options['coloring'] = self._coloring_info['coloring']
+        options['ignore_user_sparsity'] = ignore_user_sparsity
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1398,6 +1420,7 @@ class System(object):
         self._is_local = True
         self._vectors = {}
         self._full_comm = None
+        self._approx_subjac_keys = None
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
