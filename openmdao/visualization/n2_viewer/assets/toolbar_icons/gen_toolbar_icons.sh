@@ -93,5 +93,12 @@ popd > /dev/null
 
 rm -fr $WORKDIR
 
-echo "Be sure to git add the new .css and .woff files before committing!"
+read -p "Run 'git add' on ${PREFIX}.css and ${PREFIX}-font.woff? " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    git add -v ../../style/${PREFIX}.css ../../style/${PREFIX}-font.woff
+else
+    echo "Be sure to git add the new .css and .woff files before committing!"
+fi
+
 

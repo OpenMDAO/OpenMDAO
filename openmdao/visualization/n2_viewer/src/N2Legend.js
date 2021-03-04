@@ -244,6 +244,17 @@ class N2Help extends N2Window {
             .title('Instructions')
             .footerText('OpenMDAO Model Hierarchy and N2 diagram');
 
+
+        const newParent = this.body.node();
+        const oldParent = d3.select('#toolbar-help-container').node();
+            
+        while (oldParent.childNodes.length > 0) {
+            newParent.appendChild(oldParent.childNodes[0]);
+        }
+
+        oldParent.remove();
+
+        /*
         this.body.append('p')
             .text(
                 'Left clicking on a node in the partition tree will navigate to that node. ' +
@@ -256,6 +267,9 @@ class N2Help extends N2Window {
 
         // The SVG will be the same dimensions as the div so we can draw an overlay
         this.helpSvg = this.helpDiv.append('svg').attr('id', 'help-graphic-svg');
+            */
+        this.helpDiv = this.body.select('div.help-graphic');
+        this.helpSvg = this.helpDiv.select('#help-graphic-svg');
 
         this._addButtonHelpText(helpInfo);
 

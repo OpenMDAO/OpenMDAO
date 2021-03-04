@@ -534,8 +534,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'd3': 'd3.v5.min',
         'awesomplete': 'awesomplete',
         'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min',
-        'html2canvas': 'html2canvas.min'
+        'pako_inflate': 'pako_inflate.min'
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
@@ -579,8 +578,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
         waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
 
-    with open(os.path.join(assets_dir, "toolbar_help.svg"), "r") as f:
-        help_svg = str(f.read())
+    with open(os.path.join(assets_dir, "n2toolbar_screenshot_png.b64"), "r") as f:
+        n2toolbar_png = str(f.read())
 
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
@@ -601,7 +600,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     h.insert('{{n2toolbar-icons}}', encoded_font)
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
-    h.insert('{{help}}', help_svg)
+    h.insert('{{n2toolbar_png}}', n2toolbar_png)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
