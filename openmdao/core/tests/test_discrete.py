@@ -352,7 +352,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "3 Input(s) in 'model'",
-            "---------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -376,7 +375,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "4 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -389,7 +387,6 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "",
             "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
