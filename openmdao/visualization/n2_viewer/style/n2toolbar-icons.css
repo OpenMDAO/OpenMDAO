@@ -12,12 +12,12 @@
  */
 [class^="icon-"]:before,
 [class*=" icon-"]:before {
-    font-family:     "n2toolbar-icons";
+    font-family:     "N2ToolbarIcons";
     font-style:      normal;
     font-weight:     normal;
     font-stretch:    normal;
     font-variant:    normal;
-    font-size:       14px/1
+    font-size:       14px/1;
     text-rendering:  auto;
     display:         inline-block;
     transform:       translate(0, 0);

@@ -142,7 +142,7 @@ body {
 }
 
 @font-face {
-    font-family: 'n2toolbar-icons';
+    font-family: 'N2ToolbarIcons';
     src: url('data:application/font-woff;charset=utf-8;base64,{{n2toolbar-icons}}') format('woff');
 }
 

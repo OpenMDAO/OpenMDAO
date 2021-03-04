@@ -85,7 +85,7 @@ EODOC
 
 # Remove parts of the file we don't need, and change the value of font-size.
 # Output the css and woff files to the style dir.
-sed -n 's#font-size:.*inherit;#font-size:       14px/1#;20,1000p' ${PREFIX}.css >> $TARGET_CSS
+sed -n 's#font-size:.*inherit;#font-size:       14px/1;#;20,1000p' ${PREFIX}.css >> $TARGET_CSS
 cp -v ${PREFIX}-font.woff ../${STYLE_RELDIR}/
 
 echo "Finished with working directory."

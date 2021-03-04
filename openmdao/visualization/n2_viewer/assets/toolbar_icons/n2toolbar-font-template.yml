@@ -5,7 +5,7 @@ font:
   woff:       n2toolbar-icons-font.woff
   css:        n2toolbar-icons.css
   html:       n2toolbar-icons.html
-  name:       n2toolbar-icons
+  name:       N2ToolbarIcons
   prefix:     icon
   height:     1000
   descent:    150
