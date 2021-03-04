@@ -244,36 +244,28 @@ class N2Help extends N2Window {
             .title('Instructions')
             .footerText('OpenMDAO Model Hierarchy and N2 diagram');
 
-
         const newParent = this.body.node();
         const oldParent = d3.select('#toolbar-help-container').node();
-            
+
         while (oldParent.childNodes.length > 0) {
             newParent.appendChild(oldParent.childNodes[0]);
         }
 
         oldParent.remove();
 
-        /*
-        this.body.append('p')
-            .text(
-                'Left clicking on a node in the partition tree will navigate to that node. ' +
-                'Right clicking on a node in the model hierarchy will collapse/expand it. ' +
-                'A click on any element in the N2 diagram will allow those arrows to persist.');
-
-        this.body.append('h1').text('Toolbar Help');
-        this.helpDiv = this.body.append('div').attr('class', 'help-graphic');
-        this.helpDiv.append('img').attr('src', helpInfo.toolbarImg);
-
-        // The SVG will be the same dimensions as the div so we can draw an overlay
-        this.helpSvg = this.helpDiv.append('svg').attr('id', 'help-graphic-svg');
-            */
         this.helpDiv = this.body.select('div.help-graphic');
         this.helpSvg = this.helpDiv.select('#help-graphic-svg');
 
         this._addButtonHelpText(helpInfo);
 
         this.show().modal(true);
+    }
+
+    /** Override N2Window::close() to just hide the help window. */
+    close() {
+        this.modal(false);
+        this.hide();
+        return this;
     }
 
     _addButtonHelpText(helpInfo) {
@@ -332,13 +324,13 @@ class N2Help extends N2Window {
         }
 
         const curve = {
-            ul: { x: coords.ul.x + 5, y: coords.ul.y + 5},
-            bl: { x: coords.bl.x + 5, y: coords.bl.y - 5}
+            ul: { x: coords.ul.x + 5, y: coords.ul.y + 5 },
+            bl: { x: coords.bl.x + 5, y: coords.bl.y - 5 }
         }
 
         const path = `M${coords.ur.x},${coords.ur.y} L${coords.ul.x},${coords.ul.y} ` +
-         `C${curve.ul.x},${curve.ul.y} ${curve.bl.x},${curve.bl.y} ${coords.bl.x},${coords.bl.y} ` +
-         `L${coords.br.x},${coords.br.y}`
+            `C${curve.ul.x},${curve.ul.y} ${curve.bl.x},${curve.bl.y} ${coords.bl.x},${coords.bl.y} ` +
+            `L${coords.br.x},${coords.br.y}`
 
         this.helpSvg.append('path').attr('d', path).attr('class', 'help-line');
     }

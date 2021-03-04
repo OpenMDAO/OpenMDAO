@@ -55,6 +55,9 @@ class N2ToolbarButtonNoClick {
         return this;
     }
 
+    /**
+     * Grab all the info about the button that will help with generating the help screen.
+     */
     getHelpInfo() {
         const parent = d3.select(this.toolbarButton.node().parentNode);
         let primaryGrpBtnId = null;
@@ -192,6 +195,7 @@ class N2Toolbar {
 
         this._setupButtonFunctions(n2ui);
         this._setupHelp();
+        this._helpWindow = null;
     }
 
     /**
@@ -223,6 +227,11 @@ class N2Toolbar {
                 }
             }
         }
+    }
+
+    _showHelp() {
+        if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
+        else this._helpWindow.show().modal(true);
     }
 
     /** Slide everything to the left offscreen 75px, rotate the button */
@@ -260,6 +269,7 @@ class N2Toolbar {
             .node().onclick = button.node().onclick;
     }
 
+    /** Minimal management of buttons which will be described on the help window. */
     _addButton(btn) {
         this.buttons.push(btn);
         return btn;
@@ -430,7 +440,7 @@ class N2Toolbar {
         this._addButton(new N2ToolbarButtonToggle('#question-button', tooltipBox,
             ["Hide N2 diagram help", "Show N2 diagram help"],
             pred => { return !!(d3.select(".window-theme-help").size()); },
-            e => { new N2Help(self.helpInfo); }
+            e => { self._showHelp() }
         ));
 
         // Don't add this to the array of tracked buttons because it confuses
