@@ -229,6 +229,7 @@ class N2Toolbar {
         }
     }
 
+    /** Either create the help window the first time or redisplay it */
     _showHelp() {
         if (!this._helpWindow) this._helpWindow = new N2Help(this.helpInfo);
         else this._helpWindow.show().modal(true);
@@ -401,13 +402,13 @@ class N2Toolbar {
             ["Show legend", "Hide legend"],
             pred => { return n2ui.legend.hidden; },
             e => { n2ui.toggleLegend(); }
-        ));
+        )).setHelpInfo("Toggle legend");
 
         this._addButton(new N2ToolbarButtonToggle('#desvars-button', tooltipBox,
             ["Show optimization variables", "Hide optimization variables"],
             pred => { return n2ui.desVars; },
             e => { n2ui.toggleDesVars(); }
-        ));
+        )).setHelpInfo("Toggle optimization variables");
 
         this._addButton(new N2ToolbarButtonNoClick('#text-slider-button', tooltipBox,
             "Set text height"));
@@ -417,7 +418,7 @@ class N2Toolbar {
             "Set model height"));
 
         this._addButton(new N2ToolbarButtonNoClick('#save-load-button', tooltipBox,
-            "Save or Load an Image or View"));
+            "Save or load an image or view"));
 
         this._addButton(new N2ToolbarButtonClick('#save-button', tooltipBox,
             "Save to SVG", e => { n2ui.n2Diag.saveSvg() }));
@@ -435,13 +436,10 @@ class N2Toolbar {
                 n2ui.nodeInfoBox.clear();
                 n2ui.nodeInfoBox.toggle();
             }
-        ));
+        )).setHelpInfo("Toggle detailed node information");
 
-        this._addButton(new N2ToolbarButtonToggle('#question-button', tooltipBox,
-            ["Hide N2 diagram help", "Show N2 diagram help"],
-            pred => { return !!(d3.select(".window-theme-help").size()); },
-            e => { self._showHelp() }
-        ));
+        this._addButton(new N2ToolbarButtonClick('#question-button', tooltipBox,
+            "Show N2 diagram help", e => { self._showHelp() }));
 
         // Don't add this to the array of tracked buttons because it confuses
         // the help screen generation
