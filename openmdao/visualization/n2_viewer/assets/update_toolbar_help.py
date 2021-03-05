@@ -1,13 +1,13 @@
 """
-This should be run whenever there's an update to the appearance of the
-N2 Toolbar. It generates an N2 html file, uses Pyppeteer w/Chromium
-to load it up, then takes a snapshot of the toolbar and saves it as
-a base64-encoded PNG.
+To be run when there's an update to the appearance of the N2 Toolbar.
+
+It generates an N2 html file, uses Pyppeteer w/Chromium to load it up,
+then takes a snapshot of the toolbar and saves it as a base64-encoded PNG.
 """
+
 import asyncio
 import pyppeteer
 import os
-import subprocess
 import base64
 
 MODEL_FILE = '../tests/gui_test_models/circuit.py'
@@ -18,8 +18,10 @@ URL_PREFIX = 'file://'
 DEBUG = False
 LINE_STR = '-' * 78
 
+
 async def main():
-    """ Create a browser instance and print user agent info. """
+    """Create a browser instance and print user agent info."""
+
     print("Opening browser")
     browser = await pyppeteer.launch({
         'defaultViewport': {
@@ -43,14 +45,14 @@ async def main():
 
     # Milliseconds to allow for the last transition animation to finish.
     # Obtain value defined in N2 code.
-    transition_wait = \
-        await page.evaluate("N2TransitionDefaults.durationSlow")
+    transition_wait = await page.evaluate("N2TransitionDefaults.durationSlow")
     transition_wait += 100
 
     await page.waitFor(transition_wait)
 
-    tb_height = await page.evaluate("d3.select('#toolbarLoc').node().getBoundingClientRect().height")
-    tb_width = await page.evaluate("d3.select('#toolbarLoc').node().getBoundingClientRect().width")
+    br_call_str = "d3.select('#toolbarLoc').node().getBoundingClientRect()"
+    tb_height = await page.evaluate(f"{br_call_str}.height")
+    tb_width = await page.evaluate(f"{br_call_str}.width")
 
     clip = {
         'x': 0,
@@ -58,8 +60,9 @@ async def main():
         'width': tb_width - 8,
         'height': tb_height - 8
     }
-    
+
     print(f"Taking {tb_width}x{tb_height} screenshot and saving to {TMP_PNG_FILE}")
+
     await page.screenshot({
         'path': TMP_PNG_FILE,
         'clip': clip,
@@ -67,13 +70,13 @@ async def main():
         'type': 'png'
     })
 
-    print (f"Converting to b64 and saving as {OUTPUT_FILE}")
+    print(f"Converting to b64 and saving as {OUTPUT_FILE}")
     with open(TMP_PNG_FILE, "rb") as png_file:
         encoded_png = str(base64.b64encode(png_file.read()).decode("ascii"))
         png_file.close()
         print(f"Removing {TMP_PNG_FILE}")
         os.remove(TMP_PNG_FILE)
-    
+
     with open(OUTPUT_FILE, "w") as b64_file:
         b64_file.write(encoded_png)
         b64_file.close()
