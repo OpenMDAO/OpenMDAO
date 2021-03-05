@@ -819,8 +819,7 @@ class Coloring(object):
             Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
-            J = self.get_dense_sparsity()
-            return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
+            return _jac2subjac_sparsity(self._nzrows, self._nzcols, self._row_vars, self._col_vars,
                                         self._row_var_sizes, self._col_var_sizes)
 
     def _subjac_sparsity_iter(self):
@@ -1487,14 +1486,16 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     return boolJ, info
 
 
-def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes):
+def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
     """
     Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
 
     Parameters
     ----------
-    J : ndarray
-        Boolean jacobian.
+    nzrows : ndarray
+        Nonzero row indices.
+    nzcols : ndarray
+        Nonzero column indices.
     ofs : list of str
         List of variables corresponding to rows.
     wrts : list of str
@@ -1506,22 +1507,25 @@ def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes):
 
     Returns
     -------
-    OrderedDict
-        Nested OrderedDict of form sparsity[of][wrt] = (rows, cols, shape)
+    dict
+        Nested dict of form sparsity[of][wrt] = (rows, cols, shape)
     """
-    sparsity = OrderedDict()
+    sparsity = {}
     row_start = row_end = 0
 
     for of, of_size in zip(ofs, of_sizes):
-        sparsity[of] = OrderedDict()
+        sparsity[of] = {}
         row_end += of_size
         col_start = col_end = 0
         for wrt, wrt_size in zip(wrts, wrt_sizes):
             col_end += wrt_size
 
             # save sparsity structure as  (rows, cols, shape)
-            irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
-            sparsity[of][wrt] = (irows, icols, (of_size, wrt_size))
+            rowbool = np.logical_and(nzrows >= row_start, nzrows < row_end)
+            colbool = np.logical_and(nzcols >= col_start, nzcols < col_end)
+            mask = np.logical_and(rowbool, colbool)
+            sparsity[of][wrt] = (nzrows[mask] - row_start, nzcols[mask] - col_start,
+                                 (of_size, wrt_size))
 
             col_start = col_end
 
@@ -1663,7 +1667,8 @@ def get_tot_jac_sparsity(problem, mode='fwd',
     ofs, of_sizes = _get_response_info(driver)
     wrts, wrt_sizes = _get_desvar_sizes(driver)
 
-    sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
+    nzrows, nzcols = np.nonzero(J)
+    sparsity = _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes)
 
     driver._total_jac = None
 

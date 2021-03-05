@@ -520,3 +520,33 @@ class Jacobian(object):
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+
+    def _remove_approx_sparsity(self):
+        """
+        Turn all subjacs into dense ones for purposes of computing the coloring.
+        """
+        system = self._system()
+        abs2meta_out = system._var_allprocs_abs2meta['output']
+        abs2meta_in = system._var_allprocs_abs2meta['input']
+        fd_types = ('cs', 'fd')
+        self._subjacs_info = system._subjacs_info.copy()
+        for key, meta in self._subjacs_info.items():
+            if meta['rows'] is not None and 'method' in meta and meta['method'] in fd_types:
+                of, wrt = key
+                nrows, ncols = meta['shape']
+                self._subjacs_info[key] = m = meta.copy()
+                val = meta['value']
+                rows = meta['rows']
+                cols = meta['cols']
+                # create dense subjac
+                m['value'] = np.zeros(meta['shape'])
+                m['value'][rows, cols] = val
+                m['rows'] = None
+                m['cols'] = None
+
+    def _restore_approx_sparsity(self):
+        """
+        Revert all subjacs back to the way they were as declared by the user.
+        """
+        self._subjacs_info = self._system()._subjacs_info
+        self._colnames = None  # force recompute of internal index maps on next set_col

@@ -472,6 +472,8 @@ class ApproximationScheme(object):
         """
         Convert output array into a column array that matches the size of the jacobian.
 
+        Also gather any remote vars, if necessary, into the column array.
+
         Parameters
         ----------
         system : System
@@ -483,7 +485,7 @@ class ApproximationScheme(object):
         of_iter : list
             List of (of, start, end, inds) for each 'of' variable in the total jacobian.
         my_rem_out_vars : list
-            List of names of local variable that need to be transmitted to other procs.
+            List of names of local variables that are remote on other procs.
 
         Returns
         -------
@@ -509,7 +511,7 @@ class ApproximationScheme(object):
                         if of in procvars:
                             totarr[start:end] = procvars[of]
                             break
-                    else:  # shouldn't get here
+                    else:  # shouldn't ever get here
                         raise RuntimeError(f"Couldn't find '{of}'.")
         else:
             for of, start, end, inds in of_iter:

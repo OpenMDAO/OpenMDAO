@@ -1105,7 +1105,7 @@ class Component(System):
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
                          show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         ignore_user_sparsity=True):
+                         ignore_approx_sparsity=True):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1141,14 +1141,14 @@ class Component(System):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
-        ignore_user_sparsity : bool
+        ignore_approx_sparsity : bool
             If True (the default) compute the sparsity instead of using any user-specified
             rows/cols in their declared partials.
         """
         super().declare_coloring(wrt, method, form, step, per_instance,
                                  num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
-                                 show_summary, show_sparsity, ignore_user_sparsity)
+                                 show_summary, show_sparsity, ignore_approx_sparsity)
 
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)

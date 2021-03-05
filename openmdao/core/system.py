@@ -66,6 +66,7 @@ _DEFAULT_COLORING_META = {
     'dynamic': False,        # True if dynamic coloring is being used
     'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
                              # if use_fixed_coloring was called
+    'ignore_approx_sparsity': True,  # Perform coloring while ignoring subjac rows/cols if True
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -502,32 +503,6 @@ class System(object):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def __repr__(self):
-        """
-        Return a simple string representation.
-
-        Returns
-        -------
-        str
-            A simple string representation of this System.
-        """
-        # this makes debugging in some IDEs a little more convenient by providing
-        # class and pathname when hovering over a System object.
-        return self.msginfo
-
-    def __str__(self):
-        """
-        Return a simple string representation.
-
-        Returns
-        -------
-        str
-            A simple string representation of this System.
-        """
-        # this keeps __repr__ above from messing up pretty-printed output coming from
-        # OptionsDictionary.
-        return super().__repr__()
-
     def _get_inst_id(self):
         return self.pathname
 
@@ -929,7 +904,7 @@ class System(object):
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
                          show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         ignore_user_sparsity=True):
+                         ignore_approx_sparsity=True):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -965,7 +940,7 @@ class System(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
-        ignore_user_sparsity : bool
+        ignore_approx_sparsity : bool
             If True (the default) compute the sparsity instead of using any user-specified
             rows/cols in their declared partials.
         """
@@ -996,7 +971,7 @@ class System(object):
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
         options['coloring'] = self._coloring_info['coloring']
-        options['ignore_user_sparsity'] = ignore_user_sparsity
+        options['ignore_approx_sparsity'] = ignore_approx_sparsity
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1114,6 +1089,10 @@ class System(object):
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
 
+        if info['ignore_approx_sparsity']:
+            # update jacobian subjac metadata to get rid of rows/cols
+            self._jacobian._remove_approx_sparsity()
+
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
@@ -1145,6 +1124,9 @@ class System(object):
         sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
                                                              tol=info['tol'],
                                                              orders=info['orders'])
+
+        self._jacobian._restore_approx_sparsity()
+
         sp_info['sparsity_time'] = sparsity_time
         sp_info['pathname'] = self.pathname
         sp_info['class'] = type(self).__name__
