@@ -82,14 +82,14 @@ class InterpND(object):
         """
         Initialize an InterpND object.
 
-        This object can be setup and used to interpolate on a curve or multi-dimensional table
+        This object can be setup and used to interpolate on a curve or multi-dimensional table.
 
         It can also be used to setup an interpolating spline that can be evaluated at fixed
         locations.
 
         For interpolation, specify values and points.
 
-        For spline evaulation, specifiy x_interp and either points or num_cp.
+        For spline evaluation, specifiy x_interp and either points or num_cp.
 
         Parameters
         ----------
@@ -99,8 +99,8 @@ class InterpND(object):
             The points defining the regular grid in n dimensions.
             For 1D interpolation, this can be an ndarray of table locations.
             For table interpolation, it can be a tuple or an ndarray. If it is a tuple, it should
-            contain one ndarry for each table dimension.
-            For spline evaulation, num_cp can be specified instead of points.
+            contain one ndarray for each table dimension.
+            For spline evaluation, num_cp can be specified instead of points.
         values : ndarray or tuple of ndarray or None
             These must be specified for interpolation.
             The data on the regular grid in n dimensions.
@@ -126,8 +126,7 @@ class InterpND(object):
                              '%s.' % (method, all_m))
         self.extrapolate = extrapolate
 
-        # The table points are always defined, either by specifying the number of the points
-        # directly.
+        # The table points are always defined, by specifying either the points directly, or num_cp.
         if points is None:
             if num_cp is not None:
                 points = [np.linspace(0.0, 1.0, num_cp)]
