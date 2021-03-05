@@ -329,7 +329,6 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
         # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
         # - (total_solves - 2) / (solves_per_iter) should be equal to

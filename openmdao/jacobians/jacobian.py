@@ -8,6 +8,7 @@ from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
+from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
 from openmdao.vectors.vector import _full_slice
 
@@ -369,22 +370,6 @@ class Jacobian(object):
                     if meta['rows'] is not None:
                         Jrows.append(meta['rows'] + roffset)
                         Jcols.append(meta['cols'] + coffset)
-
-                        sysmeta = sys_subjacs[key]
-                        sprows = sysmeta['rows']
-                        spcols = sysmeta['cols']
-                        if sysmeta['rows'].size != meta['rows'].size:
-                            mask = np.zeros(sprows.size, dtype=bool)
-                            for r in meta['rows']:
-                                mask |= sprows == r
-                            spcols = spcols[mask]
-                            subsum = subsum[mask]
-                        if sysmeta['cols'].size != meta['cols'].size:
-                            mask = np.zeros(spcols.size, dtype=bool)
-                            for c in meta['cols']:
-                                mask |= spcols == c
-                            subsum = subsum[mask]
-
                         Jdata.append(subsum)
                     elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
@@ -469,14 +454,14 @@ class Jacobian(object):
                     # shared with subsystems)
                     if self._subjacs_info is system._subjacs_info:
                         self._subjacs_info = system._subjacs_info.copy()
-                    self._subjacs_info[key] = meta.copy()
-                    meta = self._subjacs_info[key]
+                    meta = self._subjacs_info[key] = meta.copy()
                     val = meta['value']
 
                     if ridxs is not _full_slice:
                         nrows = len(ridxs)
                     if cidxs is not _full_slice:
                         ncols = len(cidxs)
+
                     if meta['rows'] is None:  # dense
                         val = val[ridxs, :]
                         val = val[:, cidxs]
@@ -485,22 +470,17 @@ class Jacobian(object):
                         sprows = meta['rows']
                         spcols = meta['cols']
                         if ridxs is not _full_slice:
-                            mask = np.zeros(sprows.size, dtype=bool)
-                            for r in ridxs:
-                                mask |= sprows == r
-                            sprows = sprows[mask]
+                            sprows, mask = sparse_subinds(sprows, ridxs)
                             spcols = spcols[mask]
-                            # val = val[mask]
+                            val = val[mask]
                         if cidxs is not _full_slice:
-                            mask = np.zeros(sprows.size, dtype=bool)
-                            for c in cidxs:
-                                mask |= spcols == c
+                            spcols, mask = sparse_subinds(spcols, cidxs)
                             sprows = sprows[mask]
-                            spcols = spcols[mask]
-                            # val = val[mask]
+                            val = val[mask]
                         meta['rows'] = sprows
                         meta['cols'] = spcols
-                        # meta['value'] = val
+                        meta['value'] = val
+
                     meta['shape'] = (nrows, ncols)
 
     def set_col(self, system, icol, column):
@@ -534,7 +514,7 @@ class Jacobian(object):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 # TODO: support other sparse subjac types
-                if subjac['rows'] is None:
+                if subjac['cols'] is None:
                     subjac['value'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]

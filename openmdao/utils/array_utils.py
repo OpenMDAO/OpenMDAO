@@ -521,3 +521,36 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     # now back to final coo
     return csc.tocoo()
+
+
+def sparse_subinds(orig, inds):
+    """
+    Compute new rows or cols resulting from applying inds on top of an existing sparsity pattern.
+
+    This only comes into play when we have an approx total jacobian where some dv/resp have
+    indices.
+
+    Parameters
+    ----------
+    orig : ndarray
+        Either row or col indices (part of a subjac sparsity pattern).
+    inds : ndarray or list
+        Sub-indices introduced when adding a desvar or response.
+
+    Returns
+    -------
+    ndarray
+        New compressed rows or cols.
+    ndarray
+        Mask array that can be used to update subjac value and corresponding index array to orig.
+    """
+    mask = np.zeros(orig.size, dtype=bool)
+    for i in inds:
+        mask |= orig == i
+    newsp = orig[mask]
+
+    # replace the index with the 'compressed' index after we've masked out entries
+    for r, i in enumerate(np.sort(inds)):
+        newsp[newsp == i] = r
+
+    return newsp, mask
