@@ -235,10 +235,9 @@ class N2Toolbar {
         else this._helpWindow.show().modal(true);
     }
 
-    /** Slide everything to the left offscreen 75px, rotate the button */
+    /** Slide everything to the left offscreen, rotate the button */
     hide() {
         this.toolbarContainer.style('left', '-65px');
-        this.hideToolbarButton.style('left', '-20px');
         this.hideToolbarIcon.style('transform', 'rotate(-180deg)');
         d3.select('#d3_content_div').style('margin-left', '-65px');
         this.hidden = true;
@@ -248,7 +247,6 @@ class N2Toolbar {
     show() {
         this.hideToolbarIcon.style('transform', 'rotate(0deg)');
         this.toolbarContainer.style('left', '0px');
-        this.hideToolbarButton.style('left', '45px');
         d3.select('#d3_content_div').style('margin-left', '0px');
         this.hidden = false;
     }

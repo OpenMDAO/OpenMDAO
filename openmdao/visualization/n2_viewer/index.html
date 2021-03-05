@@ -95,12 +95,13 @@
                     <i class="fas icon-question-circle" id="question-button"></i>
                 </div>
             </div>
+            <!-- Hide toolbar button -->
+            <div class="toolbar-hide-container" id="hide-toolbar">
+                <i class="fas icon-chevron-left hide-toolbar-button"></i>
+            </div>
         </div>
 
-        <!-- Hide toolbar button -->
-        <div class="toolbar-hide-container" id="hide-toolbar">
-            <i class="fas icon-chevron-left hide-toolbar-button"></i>
-        </div>
+
 
         <div id="d3_content_div">
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
@@ -247,7 +248,8 @@
             A click on any element in the N2 diagram will allow those arrows to persist.</p>
         <h1>Toolbar Help</h1>
         <div class='help-graphic'>
-            <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons" src="data:image/png;base64,{{n2toolbar_png}}" />
+            <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
+                src="data:image/png;base64,{{n2toolbar_png}}" />
             <svg id='help-graphic-svg'></svg>
         </div>
     </div>
