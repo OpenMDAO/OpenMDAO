@@ -3131,8 +3131,6 @@ class Group(System):
 
             approx.add_approximation(key, self, meta)
 
-        # self._jacobian._setup_index_maps(self)
-
         if self.pathname:
             abs_outs = self._var_allprocs_abs2meta['output']
             abs_ins = self._var_allprocs_abs2meta['input']
