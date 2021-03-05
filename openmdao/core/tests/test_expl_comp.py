@@ -226,7 +226,6 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue().split('\n')
         expected_text = [
             "1 Explicit Output(s) in 'p1'",
-            "----------------------------",
             "",
             "varname  value",
             "-------  -----",
@@ -234,7 +233,6 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "",
             "0 Implicit Output(s) in 'p1'",
-            "----------------------------"
         ]
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
@@ -277,7 +275,6 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue().split('\n')
         expected_text = [
             "2 Input(s) in 'model'",
-            "---------------------",
             "",
             "varname  value  units  shape",
             "-------  -----  -----  -----",
@@ -319,7 +316,6 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue().split('\n')
         expected_text = [
             "3 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
             "-------  -----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
@@ -332,7 +328,6 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "",
             "0 Implicit Output(s) in 'model'",
-            "-------------------------------",
         ]
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
@@ -428,6 +423,7 @@ class ExplCompTestCase(unittest.TestCase):
         g2.linear_solver.precon.options['maxiter'] = 2
 
         prob.setup()
+        prob.set_solver_print(0)
         prob.run_driver()
 
         # logging inputs
@@ -452,7 +448,7 @@ class ExplCompTestCase(unittest.TestCase):
                         text.find('g2.d2.z') <
                         text.find('g2.d2.y1'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(14, num_non_empty_lines)
+        self.assertEqual(13, num_non_empty_lines)
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
@@ -464,7 +460,7 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("10 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(22, num_non_empty_lines)
+        self.assertEqual(21, num_non_empty_lines)
         self.assertEqual(1, text.count('\nsub1'))
         self.assertEqual(1, text.count('\n  sub2'))
         self.assertEqual(1, text.count('\n    g1'))
@@ -490,7 +486,7 @@ class ExplCompTestCase(unittest.TestCase):
                         text.find('sub1.sub2.g1.d2.y2') <
                         text.find('g2.d1.y1') < text.find('g2.d2.y2'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(11, num_non_empty_lines)
+        self.assertEqual(9, num_non_empty_lines)
 
         # Hierarchical
         stream = StringIO()
@@ -507,7 +503,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('\n        y1'), 1)
         self.assertEqual(text.count('\ng2'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 20)
+        self.assertEqual(num_non_empty_lines, 18)
 
     def test_array_list_vars_options(self):
 
@@ -553,7 +549,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         self.assertEqual(1, text.count('mult.x'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(5, num_non_empty_lines)
+        self.assertEqual(4, num_non_empty_lines)
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = StringIO()
@@ -565,7 +561,7 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(6, num_non_empty_lines)
+        self.assertEqual(5, num_non_empty_lines)
         self.assertEqual(1, text.count('\nmult'))
         self.assertEqual(1, text.count('\n  x'))
 
@@ -586,7 +582,7 @@ class ExplCompTestCase(unittest.TestCase):
         # make sure they are in the correct order
         self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(8, num_non_empty_lines)
+        self.assertEqual(6, num_non_empty_lines)
 
         # Promoted names - no print arrays
         stream = StringIO()
@@ -598,7 +594,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  x       |10.0|   x'), 1)
         self.assertEqual(text.count('  y       |110.0|  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 10)
+        self.assertEqual(num_non_empty_lines, 8)
 
         # Hierarchical - no print arrays
         stream = StringIO()
@@ -617,7 +613,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('\nmult'), 1)
         self.assertEqual(text.count('\n  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 10)
+        self.assertEqual(num_non_empty_lines, 8)
 
         # Need to explicitly set this to make sure all ways of running this test
         #   result in the same format of the output. When running this test from the
@@ -658,7 +654,7 @@ class ExplCompTestCase(unittest.TestCase):
             # make sure they are in the correct order
             self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(46, num_non_empty_lines)
+            self.assertEqual(44, num_non_empty_lines)
 
             # Hierarchical
             stream = StringIO()
@@ -681,7 +677,7 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(text.count('\nmult'), 1)
             self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 48)
+            self.assertEqual(num_non_empty_lines, 46)
 
     def test_for_docs_array_list_vars_options(self):
 
@@ -1074,7 +1070,6 @@ class TestMPIExplComp(unittest.TestCase):
             text = stream.getvalue().split('\n')
             expected_text = [
                 "5 Explicit Output(s) in 'model'",
-                "-------------------------------",
                 "",
                 "varname     value",
                 "----------  -----",
@@ -1092,7 +1087,6 @@ class TestMPIExplComp(unittest.TestCase):
                 "",
                 "",
                 "0 Implicit Output(s) in 'model'",
-                "-------------------------------",
             ]
             for i, line in enumerate(expected_text):
                 if line and not line.startswith('-'):
@@ -1106,7 +1100,6 @@ class TestMPIExplComp(unittest.TestCase):
             text = stream.getvalue().split('\n')
             expected_text = [
                 "4 Input(s) in 'model'",
-                "---------------------",
                 "",
                 "varname     value",
                 "----------  -----",

@@ -280,7 +280,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "6 Input(s) in 'model'",
-                    '---------------------',
                     '',
                     'varname   value',
                     '--------  -----',
@@ -310,7 +309,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "6 Input(s) in 'model'",
-                    '---------------------',
                     '',
                     'varname  value',
                     '-------  -----',
@@ -347,7 +345,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "7 Explicit Output(s) in 'model'",
-                    '-------------------------------',
                     '',
                     'varname   value   resids',
                     '--------  -----   ------',
@@ -361,7 +358,6 @@ class DistributedListVarsTest(unittest.TestCase):
                     '',
                     '',
                     "0 Implicit Output(s) in 'model'",
-                    '-------------------------------',
                 ]
 
                 for i, line in enumerate(expected):
@@ -382,7 +378,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "7 Explicit Output(s) in 'model'",
-                    '-------------------------------',
                     '',
                     'varname  value   resids',
                     '-------  -----   ------',
@@ -404,7 +399,6 @@ class DistributedListVarsTest(unittest.TestCase):
                     '',
                     '',
                     "0 Implicit Output(s) in 'model'",
-                    '-------------------------------',
                 ]
 
                 for i, line in enumerate(expected):
@@ -443,7 +437,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Input(s) in 'C2'",
-                '------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -467,7 +460,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Explicit Output(s) in 'C2'",
-                '----------------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -497,7 +489,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Input(s) in 'C2'",
-                '------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -520,7 +511,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Explicit Output(s) in 'C2'",
-                '----------------------------',
                 '',
                 'varname  value           shape  global_shape',
                 '-------  --------------  -----  ------------',
@@ -548,7 +538,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
         expected = [
             "1 Input(s) in 'C3'",
-            '------------------',
             '',
             'varname  value                shape  global_shape',
             '-------  -------------------  -----  ------------',
