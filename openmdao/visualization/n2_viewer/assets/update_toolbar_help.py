@@ -21,8 +21,8 @@ LINE_STR = '-' * 78
 
 async def main():
     """Create a browser instance and print user agent info."""
-
     print("Opening browser")
+    
     browser = await pyppeteer.launch({
         'defaultViewport': {
             'width': 1600,
