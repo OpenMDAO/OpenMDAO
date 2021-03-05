@@ -5,9 +5,14 @@ It generates an N2 html file, uses Pyppeteer w/Chromium to load it up,
 then takes a snapshot of the toolbar and saves it as a base64-encoded PNG.
 """
 
+import os
+
+if not os.path.exists("./update_toolbar_help.py"):
+    print("Only run from the directory where the script is located.")
+    exit(0)
+
 import asyncio
 import pyppeteer
-import os
 import base64
 
 MODEL_FILE = '../tests/gui_test_models/circuit.py'
