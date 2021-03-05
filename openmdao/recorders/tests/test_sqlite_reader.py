@@ -1129,7 +1129,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         expected_text = [
             "1 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  resids",
             "-------  -----  ------",
@@ -1138,7 +1137,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "",
             "3 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  resids",
             "-------  -----  ------",
@@ -1168,10 +1166,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         #       tolerance check uses the norm, which is always gives positive.
         expected_text = [
             "0 Explicit Output(s) in 'model'",
-            "-------------------------------",
+            "",
             "",
             "2 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  resids",
             "-------  -----  ------",
