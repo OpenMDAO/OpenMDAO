@@ -3571,7 +3571,6 @@ class System(object):
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
-        # print(self.msginfo, 'list_outputs()')
         keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
         keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags],
                                                   dtype=bool)]]
@@ -3585,7 +3584,6 @@ class System(object):
                                        rank=None if all_procs or values or residuals else 0,
                                        return_rel_names=False)
 
-        print(self.msginfo, outputs)
         # filter auto_ivcs if requested
         if outputs and not list_autoivcs:
             outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
@@ -3595,14 +3593,11 @@ class System(object):
             to_remove = []
 
             for name, meta in outputs.items():
-                print(self.msginfo, name, meta)
                 if values:
-                    print(self.msginfo, 'get_abs_val')
                     # we want value from the input vector, not from the metadata
                     meta['value'] = self._abs_get_val(name, get_remote=True,
                                                       rank=None if all_procs else 0, kind='output')
                 if residuals or residuals_tol:
-                    print(self.msginfo, 'get_abs_val resids')
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
                                                kind='residual')
@@ -3611,15 +3606,12 @@ class System(object):
                     elif residuals:
                         meta['resids'] = resids
 
-            # print(self.msginfo, 'to_remove:', to_remove)
-
             # remove any outputs that don't pass the residuals_tol filter
             for name in to_remove:
                 del outputs[name]
 
         # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
-            print(self.msginfo, 'return')
             return []
 
         # remove metadata we don't want to show/return
@@ -3629,18 +3621,13 @@ class System(object):
         if not prom_name:
             to_remove.append('prom_name')
 
-        # print(self.msginfo, 'to_remove:', to_remove)
         for _, meta in outputs.items():
             for key in to_remove:
                 del meta[key]
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
         states = set(self._list_states())
-        print(self.msginfo, 'states:', states)
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
