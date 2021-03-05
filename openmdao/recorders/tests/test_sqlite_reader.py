@@ -3,6 +3,7 @@
 import errno
 import sys
 import os
+import sys
 import unittest
 
 from shutil import rmtree
@@ -18,7 +19,6 @@ from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
-from openmdao.core.notebook_mode import notebook_mode, tabulate
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -259,7 +259,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # check that we got the correct number of cases
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
 
         self.assertEqual(driver_cases, [
             'rank0:ScipyOptimize_SLSQP|0', 'rank0:ScipyOptimize_SLSQP|1', 'rank0:ScipyOptimize_SLSQP|2',
@@ -321,7 +321,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['outputs']), ['c', 'f_xy', 'x', 'y'])
 
         # Test values from the last case
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         last_case = cr.get_case(driver_cases[-1])
         np.testing.assert_almost_equal(last_case.outputs['f_xy'], prob['f_xy'])
         np.testing.assert_almost_equal(last_case.outputs['x'], prob['x'])
@@ -354,7 +354,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['residuals']), ['c', 'f_xy', 'x', 'y'])
 
         # Test values from the last case
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         last_case = cr.get_case(driver_cases[-1])
         np.testing.assert_almost_equal(last_case.residuals['f_xy'], 0.0)
         np.testing.assert_almost_equal(last_case.residuals['x'], 0.0)
@@ -398,9 +398,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['outputs']), ['obj'])
 
         # Test to see if we got the correct number of cases
-        self.assertEqual(len(cr.list_cases('root', recurse=False)), 1)
-        self.assertEqual(len(cr.list_cases('root.d1', recurse=False)), 7)
-        self.assertEqual(len(cr.list_cases('root.obj_cmp', recurse=False)), 7)
+        self.assertEqual(len(cr.list_cases('root', recurse=False, out_stream=None)), 1)
+        self.assertEqual(len(cr.list_cases('root.d1', recurse=False, out_stream=None)), 7)
+        self.assertEqual(len(cr.list_cases('root.obj_cmp', recurse=False, out_stream=None)), 7)
 
         # Test values from cases
         case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
@@ -409,12 +409,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
 
         # Test to see if the case keys (iteration coords) come back correctly
-        for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False)):
+        for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False, out_stream=None)):
             self.assertEqual(iter_coord,
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{iter}|'
                              'd1._solve_nonlinear|{iter}'.format(iter=i))
 
-        for i, iter_coord in enumerate(cr.list_cases('root.obj_cmp', recurse=False)):
+        for i, iter_coord in enumerate(cr.list_cases('root.obj_cmp', recurse=False, out_stream=None)):
             self.assertEqual(iter_coord,
                              'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|{iter}|'
                              'obj_cmp._solve_nonlinear|{iter}'.format(iter=i))
@@ -444,7 +444,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['outputs']), ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'])
 
         # Test to see if we got the correct number of cases
-        solver_cases = cr.list_cases('root.nonlinear_solver')
+        solver_cases = cr.list_cases('root.nonlinear_solver', out_stream=None)
         self.assertEqual(len(solver_cases), 7)
 
         # Test values from cases
@@ -501,7 +501,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         # Test values from the last case
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         last_case = cr.get_case(driver_cases[-1])
 
         np.testing.assert_almost_equal(last_case.outputs['z'], prob['z'])
@@ -709,7 +709,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # get a recursive dict of all cases (nested)
         #
-        cases = cr.list_cases(recurse=True, flat=False)
+        cases = cr.list_cases(recurse=True, flat=False, out_stream=None)
 
         num_cases = count_keys(cases)
 
@@ -733,7 +733,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             parent_coord
         ]
 
-        cases = cr.list_cases(parent_coord, recurse=True, flat=True)
+        cases = cr.list_cases(parent_coord, recurse=True, flat=True, out_stream=None)
 
         # verify the cases are all there and are as expected
         self.assertEqual(len(cases), len(expected_coords))
@@ -761,7 +761,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         root_counter = 0
         for source in sources:
             expected = expected_coord[source]
-            cases = cr.list_cases(source, recurse=False)
+            cases = cr.list_cases(source, recurse=False, out_stream=None)
             for case in cases:
                 counter += 1
                 if source.startswith('root.mda'):  # count all cases for/under mda system
@@ -777,7 +777,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         counter = 0
 
-        cases = cr.list_cases('root.mda', recurse=True, flat=True)
+        cases = cr.list_cases('root.mda', recurse=True, flat=True, out_stream=None)
         for case in cases:
             self.assertTrue(case.index('|mda._solve_nonlinear|') > 0)
             counter += 1
@@ -789,7 +789,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         counter = 0
 
-        cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True, out_stream=None)
         for case in cases:
             self.assertTrue(case.index('|NLRunOnce|') > 0)
             counter += 1
@@ -832,7 +832,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # get a recursive dict of all cases (nested)
         #
-        cases = cr.list_cases(recurse=True, flat=False)
+        cases = cr.list_cases(recurse=True, flat=False, out_stream=None)
 
         num_cases = count_keys(cases)
 
@@ -1021,7 +1021,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         # check the system case for 'd1' (there should be only one output, 'd1.y1')
-        system_cases = cr.list_cases('root.d1')
+        system_cases = cr.list_cases('root.d1', out_stream=None)
         case = cr.get_case(system_cases[-1])
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
@@ -1209,7 +1209,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             'd1.y2': {'value': [12.0584882], 'desc': ''}
         }
 
-        system_cases = cr.list_cases('root.d1')
+        system_cases = cr.list_cases('root.d1', out_stream=None)
 
         case = cr.get_case(system_cases[-1])
 
@@ -1336,7 +1336,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        system_cases = cr.list_cases('root.d1')
+        system_cases = cr.list_cases('root.d1', out_stream=None)
         case = cr.get_case(system_cases[-1])
 
         # inputs with no includes or excludes. Should get d1.z, d1.x, and d1.y2
@@ -1428,7 +1428,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         expected = [
             "2 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
@@ -1491,7 +1490,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         expected = [
             "2 Input(s) in 'sub'",
-            "-------------------",
             "",
             "varname     value",
             "----------  -----",
@@ -1513,7 +1511,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         expected = [
             "1 Explicit Output(s) in 'sub'",
-            "-----------------------------",
             "",
             "varname   value",
             "--------  -----",
@@ -1523,7 +1520,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "",
             "1 Implicit Output(s) in 'sub'",
-            "-----------------------------",
             "",
             "varname   value",
             "-------   -----",
@@ -1630,7 +1626,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         # driver will record design vars, objectives and constraints
-        cases = cr.list_cases('driver', recurse=False)
+        cases = cr.list_cases('driver', recurse=False, out_stream=None)
         case = cr.get_case(cases[0])
 
         for name in expected:
@@ -1658,7 +1654,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 np.testing.assert_almost_equal(case[name], expected[name])
 
         # system will record inputs and outputs at the system level
-        cases = cr.list_cases('root.d1')
+        cases = cr.list_cases('root.d1', out_stream=None)
         case = cr.get_case(cases[-1])
 
         for name in expected:
@@ -1854,7 +1850,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[0])
 
         desvars = driver_case.get_design_vars()
@@ -1894,7 +1890,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        system_cases = cr.list_cases('root')
+        system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
 
         # Add one to all the inputs and outputs just to change the model
@@ -1928,7 +1924,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        system_cases = cr.list_cases('root')
+        system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
 
         # try to load it into a completely different model
@@ -1956,7 +1952,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        system_cases = cr.list_cases('root.d2')
+        system_cases = cr.list_cases('root.d2', out_stream=None)
         case = cr.get_case(system_cases[0])
 
         # Add one to all the inputs just to change the model
@@ -1992,7 +1988,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        system_cases = cr.list_cases('root')
+        system_cases = cr.list_cases('root', out_stream=None)
         case = cr.get_case(system_cases[0])
 
         # Add one to all the inputs just to change the model
@@ -2049,7 +2045,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         # get third case
-        system_cases = cr.list_cases('root')
+        system_cases = cr.list_cases('root', out_stream=None)
         third_case = cr.get_case(system_cases[2])
 
         iter_count_before = driver.iter_count
@@ -2095,7 +2091,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        solver_cases = cr.list_cases('root.nonlinear_solver')
+        solver_cases = cr.list_cases('root.nonlinear_solver', out_stream=None)
         case = cr.get_case(solver_cases[0])
 
         # Add one to all the inputs just to change the model
@@ -2138,7 +2134,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(driver_cases[0])
 
         # Add one to all the inputs just to change the model
@@ -2202,10 +2198,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         # without pre_load, we should get format_version and metadata but no cases
         cr = om.CaseReader(self.filename, pre_load=False)
 
-        num_driver_cases = len(cr.list_cases('driver', recurse=False))
-        num_system_cases = len(cr.list_cases('root', recurse=False))
-        num_solver_cases = len(cr.list_cases('root.nonlinear_solver', recurse=False))
-        num_problem_cases = len(cr.list_cases('problem'))
+        num_driver_cases = len(cr.list_cases('driver', recurse=False, out_stream=None))
+        num_system_cases = len(cr.list_cases('root', recurse=False, out_stream=None))
+        num_solver_cases = len(cr.list_cases('root.nonlinear_solver', recurse=False, out_stream=None))
+        num_problem_cases = len(cr.list_cases('problem', out_stream=None))
 
         self.assertEqual(num_driver_cases, 1)
         self.assertEqual(num_system_cases, 1)
@@ -2230,10 +2226,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         # with pre_load, we should get format_version, metadata and all cases
         cr = om.CaseReader(self.filename, pre_load=True)
 
-        num_driver_cases = len(cr.list_cases('driver', recurse=False))
-        num_system_cases = len(cr.list_cases('root', recurse=False))
-        num_solver_cases = len(cr.list_cases('root.nonlinear_solver', recurse=False))
-        num_problem_cases = len(cr.list_cases('problem'))
+        num_driver_cases = len(cr.list_cases('driver', recurse=False, out_stream=None))
+        num_system_cases = len(cr.list_cases('root', recurse=False, out_stream=None))
+        num_solver_cases = len(cr.list_cases('root.nonlinear_solver', recurse=False, out_stream=None))
+        num_problem_cases = len(cr.list_cases('problem', out_stream=None))
 
         self.assertEqual(num_driver_cases, 1)
         self.assertEqual(num_system_cases, 1)
@@ -2443,7 +2439,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # Now load in the case we recorded
         cr = om.CaseReader(self.filename)
 
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(driver_cases[0])
 
         prob.load_case(case)
@@ -2488,7 +2484,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader("cases.sql")
 
         # Test values from the last case
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         last_case = cr.get_case(driver_cases[-1])
 
         dvs = last_case.get_design_vars(scaled=False)
@@ -2568,7 +2564,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check system cases
         #
 
-        system_cases = cr.list_cases('root.obj_cmp', recurse=False)
+        system_cases = cr.list_cases('root.obj_cmp', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|obj_cmp._solve_nonlinear|0',
             'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|obj_cmp._solve_nonlinear|1',
@@ -2599,7 +2595,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check solver cases
         #
 
-        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
             'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
@@ -2644,7 +2640,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
 
         # check that there are multiple iterations and mda solver is part of the coordinate
-        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False)
+        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False, out_stream=None)
         self.assertTrue(len(mda_solver_cases) > 1)
         for coord in mda_solver_cases:
             self.assertTrue('mda._solve_nonlinear' in coord)
@@ -2690,7 +2686,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
 
         # check that the recurse option returns root and mda solver cases plus child system cases
-        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True, out_stream=None)
         self.assertEqual(len(all_solver_cases),
                          len(root_solver_cases) + len(mda_solver_cases) + len(system_cases))
 
@@ -2698,7 +2694,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check driver cases
         #
 
-        driver_cases = cr.list_cases('driver', recurse=False)
+        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:ScipyOptimize_SLSQP|0',
             'rank0:ScipyOptimize_SLSQP|1',
@@ -2754,7 +2750,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key])
 
         # check that the recurse option also returns system and solver cases (all_solver_cases)
-        all_driver_cases = cr.list_cases('driver', recurse=True, flat=True)
+        all_driver_cases = cr.list_cases('driver', recurse=True, flat=True, out_stream=None)
 
         expected_cases = driver_cases + \
             [c for c in all_solver_cases if c.startswith('rank0:ScipyOptimize_SLSQP')]
@@ -2882,7 +2878,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         self.assertEqual(1, text.count('mult.x'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(5, num_non_empty_lines)
+        self.assertEqual(4, num_non_empty_lines)
         self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
 
         # out_stream - hierarchical - extras - no print_arrays
@@ -2896,7 +2892,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(6, num_non_empty_lines)
+        self.assertEqual(5, num_non_empty_lines)
         self.assertEqual(1, text.count('\nmult'))
         self.assertEqual(1, text.count('\n  x      |10.0|  inch   (100'))
 
@@ -2918,7 +2914,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # FIXME: disabled until Case orders outputs
         # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(8, num_non_empty_lines)
+        self.assertEqual(6, num_non_empty_lines)
 
         # Promoted names - no print arrays
         stream = StringIO()
@@ -2930,7 +2926,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(text.count('  x       |10.0|   x'), 1)
         self.assertEqual(text.count('  y       |110.0|  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 10)
+        self.assertEqual(num_non_empty_lines, 8)
 
         # Hierarchical - no print arrays
         stream = StringIO()
@@ -2949,7 +2945,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(text.count('\nmult'), 1)
         self.assertEqual(text.count('\n  y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 10)
+        self.assertEqual(num_non_empty_lines, 8)
 
         # Need to explicitly set this to make sure all ways of running this test
         #   result in the same format of the output. When running this test from the
@@ -2991,7 +2987,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             # FIXME: disabled until Case orders outputs
             # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(46, num_non_empty_lines)
+            self.assertEqual(44, num_non_empty_lines)
 
             # Hierarchical
             stream = StringIO()
@@ -3014,7 +3010,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('\nmult'), 1)
             self.assertEqual(text.count('\n  y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 48)
+            self.assertEqual(num_non_empty_lines, 46)
 
     def test_system_metadata_attribute_deprecated(self):
         model = om.Group()
@@ -3100,7 +3096,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader('cases.sql')
 
-        num_problem_cases = len(cr.list_cases('problem'))
+        num_problem_cases = len(cr.list_cases('problem', out_stream=None))
         self.assertEqual(num_problem_cases, 1)
 
         c1 = cr.get_case('c1')
@@ -3229,16 +3225,20 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
 
-        expected_cases = [
+        expected_sources = [
             'driver',
             'root.d1',
             'problem'
         ]
 
+        with self.assertRaises(TypeError) as cm:
+            cr.list_sources('problem')
+        self.assertTrue(str(cm.exception), "Invalid output stream specified for 'out_stream'.")
+
         stream = StringIO()
         cases = cr.list_sources(out_stream=stream)
         text = stream.getvalue().split('\n')
-        for i, line in enumerate(expected_cases):
+        for i, line in enumerate(expected_sources):
             self.assertEqual(text[i], line)
 
     def test_list_source_vars_format(self):
@@ -3271,161 +3271,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
-@unittest.skipUnless(tabulate, "Tabulate is required")
-class TestNotebookFormat(unittest.TestCase):
-
-    def setUp(self):
-        openmdao.core.system.notebook = True
-        openmdao.recorders.sqlite_reader.notebook = True
-
-        self.filename = "sqlite_test"
-        self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
-
-    def tearDown(self):
-        openmdao.core.system.notebook = False
-        openmdao.recorders.sqlite_reader.notebook = False
-
-    def test_list_inputs_and_outputs_notebook_format(self):
-
-        prob = om.Problem()
-        model = prob.model = DoubleSellar()
-
-        driver = prob.driver
-
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.model.add_recorder(recorder)
-
-        driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_objectives'] = False
-        driver.recording_options['record_constraints'] = False
-        driver.recording_options['record_derivatives'] = False
-        driver.add_recorder(recorder)
-
-        # each SubSellar group converges itself
-        g1 = model.g1
-        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
-        g1.linear_solver = om.DirectSolver()  # used for derivatives
-
-        g2 = model.g2
-        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
-        g2.linear_solver = om.DirectSolver()
-
-        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nonlinear_solver = om.NonlinearBlockGS(rtol=1.0e-5)
-        model.linear_solver = om.ScipyKrylov()
-        model.linear_solver.precon = om.LinearBlockGS()
-
-        prob.setup()
-        prob.run_model()
-
-        inputs = prob.model.list_inputs()
-
-        self.assertTrue("g1.d1.z" in inputs)
-        self.assertTrue("[0. 0.]" in inputs)
-        self.assertTrue("g1.d1.y2" in inputs)
-        self.assertTrue("[0.80000249]" in inputs)
-        self.assertTrue("Inputs" in inputs)
-        self.assertTrue("value" in inputs)
-        self.assertTrue("units" in inputs)
-        self.assertTrue("shape" in inputs)
-        self.assertTrue("global_shape" in inputs)
-
-        outputs = prob.model.list_outputs(units=True)
-
-        self.assertTrue("g1.d1.y1" in outputs)
-        self.assertTrue("0.640004" in outputs)
-        self.assertTrue("g1.d2.y2" in outputs)
-        self.assertTrue("0.800002" in outputs)
-        self.assertTrue("Explicit Output" in outputs)
-        self.assertTrue("value" in outputs)
-        self.assertTrue("units" in outputs)
-        self.assertTrue("shape" in outputs)
-        self.assertTrue("global_shape" in outputs)
-
-    def test_list_cases_format(self):
-
-        recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
-
-        prob = SellarProblem()
-        prob.setup()
-
-        prob.add_recorder(recorder)
-        prob.driver.add_recorder(recorder)
-        prob.model.d1.add_recorder(recorder)
-
-        prob.run_driver()
-
-        prob.record('final')
-        prob.cleanup()
-
-        cr = om.CaseReader(self.filename)
-
-        expected_cases = [
-            'system',
-            '    rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|2|d1._solve_nonlinear|2',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|3|d1._solve_nonlinear|3',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|4|d1._solve_nonlinear|4',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|5|d1._solve_nonlinear|5',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|6|d1._solve_nonlinear|6',
-            '    rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|7|d1._solve_nonlinear|7',
-            'driver',
-            '    rank0:Driver|0',
-            'problem',
-            '    final',
-        ]
-
-        cases = cr.list_cases()
-
-        expected_case_outputs = [
-            'system',
-            'driver',
-            'problem',
-            'rank0:Driver|0|root._solve_nonlinear|0|d1._solve_nonlinear|0',
-            'rank0:Driver|0|root._solve_nonlinear|0|NonlinearBlockGS|1|d1._solve_nonlinear|1',
-            'rank0:Driver|0',
-            'final']
-
-        for i in expected_case_outputs:
-            self.assertTrue(i in cases)
-
-    def test_driver_source_list_cases(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        # create a list of DOE cases
-        case_gen = om.FullFactorialGenerator(levels=3)
-        cases = list(case_gen(model.get_design_vars(recurse=True)))
-
-        # create DOEDriver using provided list of cases
-        prob.driver = om.DOEDriver(cases)
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
-
-        expected_output = [
-            'driver',
-            'rank0:DOEDriver_List|0',
-            'rank0:DOEDriver_List|1'
-        ]
-
-        for i in expected_output:
-            self.assertTrue(i in cases)
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
@@ -3583,17 +3428,18 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # examine cases to see what was recorded
         cr = om.CaseReader('cases.sql')
 
-        self.assertEqual(sorted(cr.list_sources(out_stream=None)), ['driver', 'root', 'root.nonlinear_solver'])
+        sources = cr.list_sources()
+        self.assertEqual(sorted(sources), ['driver', 'root', 'root.nonlinear_solver'])
 
-        driver_vars = cr.list_source_vars('driver', out_stream=None)
+        driver_vars = cr.list_source_vars('driver')
         self.assertEqual(('inputs:', sorted(driver_vars['inputs']), 'outputs:', sorted(driver_vars['outputs'])),
                          ('inputs:', [], 'outputs:', ['con1', 'con2', 'obj', 'x', 'z']))
 
-        model_vars = cr.list_source_vars('root', out_stream=None)
+        model_vars = cr.list_source_vars('root')
         self.assertEqual(('inputs:', sorted(model_vars['inputs']), 'outputs:', sorted(model_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
-        solver_vars = cr.list_source_vars('root.nonlinear_solver', out_stream=None)
+        solver_vars = cr.list_source_vars('root.nonlinear_solver')
         self.assertEqual(('inputs:', sorted(solver_vars['inputs']), 'outputs:', sorted(solver_vars['outputs'])),
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
@@ -3964,7 +3810,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.set_val('y', 2.5)
 
         prob.run_driver()
-        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
+        assert_near_equal([prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy')],
+                          [[3.01960159], [3.01960159], [18.97639468]], 1e-6)
         case_name_1 = "c1"
         prob.record(case_name_1)
 
@@ -3972,7 +3819,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
         prob.set_val('x', 0.1)
         prob.set_val('y', -0.1)
         prob.run_driver()
-        print(prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy'))
+        assert_near_equal([prob.get_val('x'), prob.get_val('y'), prob.get_val('f_xy')],
+                          [[-2.14311975e-08], [2.14312031e-08], [2.388341e-14]], 1e-6)
+
         case_name_2 = "c2"
         prob.record(case_name_2)
         prob.cleanup()
@@ -4015,7 +3864,7 @@ class TestPromAbsDict(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
 
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[-1])
 
         dvs = driver_case.get_design_vars()
@@ -4103,7 +3952,7 @@ class TestPromAbsDict(unittest.TestCase):
 
         cr = om.CaseReader("cases.sql")
 
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         driver_case = cr.get_case(driver_cases[-1])
 
         dvs = driver_case.get_design_vars()
@@ -4462,7 +4311,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check that we got the correct number of cases
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         self.assertEqual(len(driver_cases), 5)
 
         case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
@@ -4509,7 +4358,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # check system cases
         #
 
-        system_cases = cr.list_cases('root.pz', recurse=False)
+        system_cases = cr.list_cases('root.pz', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
             'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
@@ -4527,7 +4376,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # check solver cases
         #
 
-        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
+        root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:root._solve_nonlinear|0|NLRunOnce|0',
             'rank0:SLSQP|0|root._solve_nonlinear|1|NLRunOnce|0',
@@ -4555,7 +4404,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         #
 
         # check that there are multiple iterations and mda solver is part of the coordinate
-        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False)
+        mda_solver_cases = cr.list_cases('root.mda.nonlinear_solver', recurse=False, out_stream=None)
         self.assertTrue(len(mda_solver_cases) > 1)
         for coord in mda_solver_cases:
             self.assertTrue('mda._solve_nonlinear' in coord)
@@ -4572,7 +4421,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # check that inputs & outputs are in sorted order, since exec/setup order is not available
         expected = [
             "5 Input(s) in 'mda'",
-            "-------------------",
             "",
             "varname    value               ",
             "---------  --------------------",
@@ -4594,7 +4442,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         expected = [
             "2 Explicit Output(s) in 'mda'",
-            "-----------------------------",
             "",
             "varname    value       ",
             "---------  ------------",
@@ -4619,7 +4466,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
 
         # check that the recurse option returns root and mda solver cases plus child system cases
-        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True)
+        all_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=True, flat=True, out_stream=None)
         self.assertEqual(len(all_solver_cases),
                          len(root_solver_cases) + len(mda_solver_cases) + len(system_cases))
 
@@ -4627,7 +4474,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         # check driver cases
         #
 
-        driver_cases = cr.list_cases('driver', recurse=False)
+        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
         expected_cases = [
             'rank0:SLSQP|0',
             'rank0:SLSQP|1',
@@ -4658,7 +4505,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cr = om.CaseReader(filename)
 
         # list just the driver cases
-        driver_cases = cr.list_cases('driver', recurse=False)
+        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
 
         # check that we got the correct number of cases
         self.assertEqual(len(driver_cases), 6)
@@ -4710,7 +4557,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cr = om.CaseReader(filename)
 
         # list just the driver cases
-        driver_cases = cr.list_cases('driver', recurse=False)
+        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
 
         # check that we got the correct number of cases
         self.assertEqual(len(driver_cases), 7)
@@ -4756,7 +4603,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cases = om.CaseReader(filename)
 
         # list just the solver cases
-        solver_cases = cases.list_cases('root.nonlinear_solver', recurse=False)
+        solver_cases = cases.list_cases('root.nonlinear_solver', recurse=False, out_stream=None)
 
         # check that we got the correct number of cases
         self.assertEqual(len(solver_cases), 7)
@@ -4786,7 +4633,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         cr = om.CaseReader(filename)
 
         # list just the system cases
-        system_cases = cr.list_cases('root', recurse=False)
+        system_cases = cr.list_cases('root', recurse=False, out_stream=None)
 
         # check that we got the correct number of cases
         self.assertEqual(len(system_cases), 7)
@@ -4823,7 +4670,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check that we got the correct number of cases
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         self.assertEqual(len(driver_cases), 7)
 
         # check that the access by case keys works:
@@ -4870,7 +4717,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(cr.list_sources(out_stream=None), ['driver'])
 
         # check that we got the correct number of cases
-        driver_cases = cr.list_cases('driver')
+        driver_cases = cr.list_cases('driver', out_stream=None)
         self.assertEqual(len(driver_cases), 7)
 
         # check that the access by case keys works:

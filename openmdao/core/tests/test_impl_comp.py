@@ -292,7 +292,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  c  '), 4)
 
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 12)
+        self.assertEqual(num_non_empty_lines, 11)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -352,7 +352,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 8)
+        self.assertEqual(num_non_empty_lines, 7)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -403,10 +403,9 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         expected_text = [
             "0 Explicit Output(s) in 'model'",
-            "-------------------------------",
+            "",
             "",
             "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value         resids     ",
             "-------  ------------  -----------",
@@ -1421,7 +1420,7 @@ class ListFeatureTestCase(unittest.TestCase):
         self.assertEqual(1, text.count("\n  comp2"))
         self.assertEqual(2, text.count("\n    a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 13)
+        self.assertEqual(num_non_empty_lines, 12)
 
         # list_outputs tests
         # list implicit outputs

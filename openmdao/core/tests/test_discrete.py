@@ -352,7 +352,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "3 Input(s) in 'model'",
-            "---------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -376,7 +375,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "4 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -389,7 +387,6 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "",
             "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -693,7 +690,7 @@ class DiscreteTestCase(unittest.TestCase):
         indep.add_discrete_output('x', 11)
         model.add_subsystem('comp', ModCompEx2(3), promotes=['*'])
 
-        rec = om.SqliteRecorder('test')
+        rec = om.SqliteRecorder('test.db')
         prob.driver.add_recorder(rec)
         prob.add_recorder(rec)
 

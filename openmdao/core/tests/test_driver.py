@@ -288,7 +288,7 @@ class TestDriver(unittest.TestCase):
             prob.driver.options['debug_print'] = ['bad_option']
         self.assertEqual(str(context.exception),
                          "Option 'debug_print' contains value 'bad_option' which is not one of ['desvars', 'nl_cons', 'ln_cons', 'objs', 'totals'].")
-                         
+
     def test_debug_print_approx(self):
 
         prob = om.Problem()
@@ -299,13 +299,13 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0)
         model.add_constraint('con2', lower=0, linear=True)
         prob.set_solver_print(level=0)
-        
+
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = False
         prob.driver.options['maxiter'] = 0
-        
+
         prob.model.approx_totals()
         prob.driver.options['debug_print'] = ['totals']
 
