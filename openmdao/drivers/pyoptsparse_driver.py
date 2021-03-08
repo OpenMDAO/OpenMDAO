@@ -9,8 +9,6 @@ additional MPI capability.
 from collections import OrderedDict
 import json
 import signal
-import sys
-import traceback
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -128,6 +126,10 @@ class pyOptSparseDriver(Driver):
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
+    _check_jac : bool
+        Used internally to control when to perform singular checks on computed total derivs.
+    _exc_info : None or <Exception>
+        Cached exception that was raised in the _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
@@ -190,6 +192,8 @@ class pyOptSparseDriver(Driver):
         self._signal_cache = None
         self._user_termination_flag = False
         self._in_user_function = False
+        self._check_jac = False
+        self._exc_info = None
 
         self.cite = CITATIONS
 
@@ -209,6 +213,15 @@ class pyOptSparseDriver(Driver):
         self.options.declare('user_terminate_signal', default=DEFAULT_SIGNAL, allow_none=True,
                              desc='OS signal that triggers a clean user-termination. Only SNOPT'
                              'supports this option.')
+        self.options.declare('singular_jac_behavior', default='warn',
+                             values=['error', 'warn', 'ignore'],
+                             desc='Defines behavior of a zero row/col check after first call to'
+                             'compute_totals:'
+                             'error - raise an error.'
+                             'warn - raise a warning.'
+                             "ignore - don't perform check.")
+        self.options.declare('singular_jac_tol', default=1e-16,
+                             desc='Tolerance for zero row/column check.')
 
         # Deprecated option
         self.options.declare('user_teriminate_signal', default=None, allow_none=True,
@@ -269,6 +282,7 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
 
         self._check_for_missing_objective()
+        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.
@@ -418,33 +432,44 @@ class pyOptSparseDriver(Driver):
         for option, value in self.opt_settings.items():
             opt.setOption(option, value)
 
-        # Execute the optimization problem
-        if self.options['gradient method'] == 'pyopt_fd':
+        self._exc_info = None
+        try:
 
-            # Use pyOpt's internal finite difference
-            # TODO: Need to get this from OpenMDAO
-            # fd_step = problem.model.deriv_options['step_size']
-            fd_step = 1e-6
-            sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
-                      hotStart=self.hotstart_file)
+            # Execute the optimization problem
+            if self.options['gradient method'] == 'pyopt_fd':
 
-        elif self.options['gradient method'] == 'snopt_fd':
-            if self.options['optimizer'] == 'SNOPT':
-
-                # Use SNOPT's internal finite difference
+                # Use pyOpt's internal finite difference
                 # TODO: Need to get this from OpenMDAO
                 # fd_step = problem.model.deriv_options['step_size']
                 fd_step = 1e-6
-                sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
+                sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
                           hotStart=self.hotstart_file)
 
-            else:
-                raise Exception("SNOPT's internal finite difference can only be used with SNOPT")
-        else:
+            elif self.options['gradient method'] == 'snopt_fd':
+                if self.options['optimizer'] == 'SNOPT':
 
-            # Use OpenMDAO's differentiator for the gradient
-            sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
-                      storeHistory=self.hist_file, hotStart=self.hotstart_file)
+                    # Use SNOPT's internal finite difference
+                    # TODO: Need to get this from OpenMDAO
+                    # fd_step = problem.model.deriv_options['step_size']
+                    fd_step = 1e-6
+                    sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
+                              hotStart=self.hotstart_file)
+
+                else:
+                    msg = "SNOPT's internal finite difference can only be used with SNOPT"
+                    self._exc_info = Exception(msg)
+            else:
+
+                # Use OpenMDAO's differentiator for the gradient
+                sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
+                          storeHistory=self.hist_file, hotStart=self.hotstart_file)
+
+        except Exception as _:
+            if not self._exc_info:
+                raise()
+
+        if self._exc_info:
+            raise self._exc_info
 
         # Print results
         if self.options['print_results']:
@@ -561,13 +586,8 @@ class pyOptSparseDriver(Driver):
                 rec.abs = 0.0
                 rec.rel = 0.0
 
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=")
+        except Exception as raised:
+            self._exc_info = raised
             fail = 1
             func_dict = {}
 
@@ -615,6 +635,14 @@ class pyOptSparseDriver(Driver):
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
+
+                # First time through, check for zero row/col.
+                if self._check_jac:
+                    raise_error = self.options['singular_jac_behavior'] == 'error'
+                    self._total_jac.check_total_jac(raise_error=raise_error,
+                                                    tol=self.options['singular_jac_tol'])
+                    self._check_jac = False
+
             # Let the optimizer try to handle the error
             except AnalysisError:
                 prob.model._clear_iprint()
@@ -658,13 +686,9 @@ class pyOptSparseDriver(Driver):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
 
-        except Exception as msg:
-            tb = traceback.format_exc()
-
-            # Exceptions seem to be swallowed by the C code, so this
-            # should give the user more info than the dreaded "segfault"
-            print("Exception: %s" % str(msg))
-            print(70 * "=", tb, 70 * "=", flush=True)
+        except Exception as raised:
+            self._exc_info = raised
+            fail = 1
             sens_dict = {}
 
         # print("Derivatives calculated")

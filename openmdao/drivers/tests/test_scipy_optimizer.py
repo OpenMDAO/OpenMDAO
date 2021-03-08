@@ -1772,6 +1772,136 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
         assert_near_equal(prob['f'], 0.0, 1e-2)
 
+    def test_singular_jac_error_responses(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives ['parab.z'] cannot be impacted by the design " + \
+                         "variables of the problem.")
+
+    def test_singular_jac_error_desvars(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
+                                                  ]), #'foo = 0.0 * z'],),
+                                     promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Design variables ['z'] have no impact on the constraints or objective.")
+
+    def test_singular_jac_ignore(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        # Will not raise an exception.
+        prob.run_driver()
+
+    def test_singular_jac_warn(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # Default behavior is 'warn'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        msg = "Constraints or objectives ['parab.z'] cannot be impacted by the design variables of the problem."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
+
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 

@@ -2,6 +2,9 @@ import unittest
 
 import openmdao.api as om
 
+from openmdao.utils.testing_utils import use_tempdirs
+
+
 class BadOptionComp(om.ExplicitComponent):
 
     def initialize(self):
@@ -12,6 +15,7 @@ class BadOptionComp(om.ExplicitComponent):
         self.add_output('y')
 
 
+@use_tempdirs
 class SerializeTestCase(unittest.TestCase):
     def test_serialize_n2(self):
         p = om.Problem()

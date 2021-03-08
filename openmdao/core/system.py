@@ -3476,22 +3476,9 @@ class System(object):
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if notebook and tabulate is not None:
-                nb_format = {"Inputs": [], "value": [], "units": [], "shape": [],
-                             "global_shape": []}
-                for output, attrs in inputs.items():
-                    nb_format["Inputs"].append(output)
-                    for key, val in attrs.items():
-                        nb_format[key].append(val)
-
-                return tabulate(nb_format, headers="keys", tablefmt='html')
-            else:
-                self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
-                                  out_stream)
+            self._write_table('input', inputs, hierarchical, print_arrays, all_procs,
+                              out_stream)
 
         if self.pathname:
             # convert to relative names
@@ -3597,36 +3584,46 @@ class System(object):
                                        rank=None if all_procs or values or residuals else 0,
                                        return_rel_names=False)
 
-        if outputs:
-            if not list_autoivcs:
-                outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
+        # filter auto_ivcs if requested
+        if outputs and not list_autoivcs:
+            outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
 
-            to_remove = ['discrete']
-            if tags:
-                to_remove.append('tags')
-            if not prom_name:
-                to_remove.append('prom_name')
+        # get values & resids
+        if self._outputs is not None and (values or residuals or residuals_tol):
+            to_remove = []
 
-            for _, meta in outputs.items():
-                for key in to_remove:
-                    del meta[key]
-
-        if self._outputs is not None and (values or residuals):
-            # we want value from the input vector, not from the metadata
-            for n, meta in outputs.items():
+            for name, meta in outputs.items():
                 if values:
-                    meta['value'] = self._abs_get_val(n, get_remote=True,
+                    # we want value from the input vector, not from the metadata
+                    meta['value'] = self._abs_get_val(name, get_remote=True,
                                                       rank=None if all_procs else 0, kind='output')
-                if residuals:
-                    meta['resids'] = self._abs_get_val(n, get_remote=True,
-                                                       rank=None if all_procs else 0,
-                                                       kind='residual')
+                if residuals or residuals_tol:
+                    resids = self._abs_get_val(name, get_remote=True,
+                                               rank=None if all_procs else 0,
+                                               kind='residual')
+                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                        to_remove.append(name)
+                    elif residuals:
+                        meta['resids'] = resids
 
+            # remove any outputs that don't pass the residuals_tol filter
+            for name in to_remove:
+                del outputs[name]
+
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
             return []
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
+        # remove metadata we don't want to show/return
+        to_remove = ['discrete']
+        if tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+
+        for _, meta in outputs.items():
+            for key in to_remove:
+                del meta[key]
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
@@ -3634,18 +3631,8 @@ class System(object):
         if explicit:
             expl_outputs = {n: m for n, m in outputs.items() if n not in states}
             if out_stream:
-                if notebook and tabulate is not None:
-                    nb_format = {"Explicit Output": [], "value": [], "units": [], "shape": [],
-                                 "global_shape": []}
-                    for output, attrs in expl_outputs.items():
-                        nb_format["Explicit Output"].append(output)
-                        for key, val in attrs.items():
-                            nb_format[key].append(val)
-
-                    return tabulate(nb_format, headers="keys", tablefmt='html')
-                else:
-                    self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                      all_procs, out_stream)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
 
             if self.name:  # convert to relative name
                 expl_outputs = [(n[rel_idx:], meta) for n, meta in expl_outputs.items()]
@@ -3656,29 +3643,17 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states:
-                        if not np.isscalar(m['resids']) and len(m['resids']) > 1:
-                            for i in m['resids']:
-                                if i > residuals_tol:
-                                    impl_outputs[n] = m
-                                    break
-                        elif m['resids'] > residuals_tol:
+                    if n in states:
+                        if residuals_tol and 'resids' in m:
+                            if np.linalg.norm(m['resids']) >= residuals_tol:
+                                impl_outputs[n] = m
+                        else:
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}
             if out_stream:
-                if notebook and tabulate is not None:
-                    nb_format = {"Implicit Output": [], "value": [], "units": [], "shape": [],
-                                 "global_shape": []}
-                    for output, attrs in expl_outputs.items():
-                        nb_format["Implicit Output"].append(output)
-                        for key, val in attrs.items():
-                            nb_format[key].append(val)
-
-                    return tabulate(nb_format, headers="keys", tablefmt='html')
-                else:
-                    self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                      all_procs, out_stream)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
             if self.name:  # convert to relative name
                 impl_outputs = [(n[rel_idx:], meta) for n, meta in impl_outputs.items()]
             else:
