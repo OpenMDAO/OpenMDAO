@@ -442,8 +442,7 @@ class Group(System):
                     a1 = (ref - ref0) * factor
 
                 scale_factors[abs_in] = {
-                    ('input', 'phys'): (a0, a1),
-                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
+                    'input': (a0, a1),
                 }
 
         return scale_factors
@@ -2164,9 +2163,9 @@ class Group(System):
         if mode == 'fwd':
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale('norm')
+                    vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale('phys')
+                    vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
@@ -2175,9 +2174,9 @@ class Group(System):
         else:  # rev
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale('phys')
+                    vec_inputs.scale_to_phys()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale('norm')
+                    vec_inputs.scale_to_norm()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 

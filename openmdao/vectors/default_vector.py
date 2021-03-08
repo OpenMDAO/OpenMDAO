@@ -76,20 +76,15 @@ class DefaultVector(Vector):
 
         data = root_vec._data[myslice]
 
-        scaling = {}
+        scaling = None
         if self._do_scaling:
-            scaling['phys'] = {}
-            scaling['norm'] = {}
+            root_scale = root_vec._scaling
+            rs0 = root_scale[0]
+            if rs0 is None:
+                scaling = (rs0, root_scale[1][myslice])
+            else:
+                scaling = (rs0[myslice], root_scale[1][myslice])
 
-            for typ in ('phys', 'norm'):
-                root_scale = root_vec._scaling[typ]
-                rs0 = root_scale[0]
-                if rs0 is None:
-                    scaling[typ] = (rs0, root_scale[1][myslice])
-                else:
-                    scaling[typ] = (rs0[myslice], root_scale[1][myslice])
-
-        # return data, scaling
         return data, scaling
 
     def _initialize_data(self, root_vector):
@@ -105,19 +100,15 @@ class DefaultVector(Vector):
             self._data = self._create_data()
 
             if self._do_scaling:
-                self._scaling = {}
                 data = self._data
                 if self._name == 'nonlinear':
-                    self._scaling['phys'] = (np.zeros(data.size), np.ones(data.size))
-                    self._scaling['norm'] = (np.zeros(data.size), np.ones(data.size))
+                    self._scaling = (np.zeros(data.size), np.ones(data.size))
                 elif self._name == 'linear':
                     # reuse the nonlinear scaling vecs since they're the same as ours
                     nlvec = self._system()._root_vecs[self._kind]['nonlinear']
-                    self._scaling['phys'] = (None, nlvec._scaling['phys'][1])
-                    self._scaling['norm'] = (None, nlvec._scaling['norm'][1])
+                    self._scaling = (None, nlvec._scaling[1])
                 else:
-                    self._scaling['phys'] = (None, np.ones(data.size))
-                    self._scaling['norm'] = (None, np.ones(data.size))
+                    self._scaling = (None, np.ones(data.size))
         else:
             self._data, self._scaling = self._extract_root_data()
 
@@ -160,12 +151,11 @@ class DefaultVector(Vector):
             views[abs_name] = v
 
             if do_scaling:
-                for scaleto in ('phys', 'norm'):
-                    scale0, scale1 = factors[abs_name][kind, scaleto]
-                    vec = scaling[scaleto]
-                    if vec[0] is not None:
-                        vec[0][start:end] = scale0
-                    vec[1][start:end] = scale1
+                scale0, scale1 = factors[abs_name][kind]
+                vec = scaling
+                if vec[0] is not None:
+                    vec[0][start:end] = scale0
+                vec[1][start:end] = scale1
 
             start = end
 
@@ -286,16 +276,26 @@ class DefaultVector(Vector):
         data = self.asarray()
         data[idxs] = val
 
-    def scale(self, scale_to):
+    def scale_to_norm(self):
         """
-        Scale this vector to normalized or physical form.
+        Scale this vector to normalized form.
+        """
+        adder, scaler = self._scaling
+        data = self.asarray()
+        if self._ncol == 1:
+            if adder is not None:  # nonlinear only
+                data -= adder
+            data /= scaler
+        else:
+            if adder is not None:  # nonlinear only
+                data -= adder
+            data /= scaler[:, np.newaxis]
 
-        Parameters
-        ----------
-        scale_to : str
-            Values are "phys" or "norm" to scale to physical or normalized.
+    def scale_to_phys(self):
         """
-        adder, scaler = self._scaling[scale_to]
+        Scale this vector to physical form.
+        """
+        adder, scaler = self._scaling
         data = self.asarray()
         if self._ncol == 1:
             data *= scaler
