@@ -17,6 +17,7 @@ from pprint import pprint
 from itertools import groupby
 
 import numpy as np
+from scipy.sparse import coo_matrix
 from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
@@ -987,34 +988,59 @@ def _order_by_ID(col_matrix):
         yield col
 
 
-def _J2col_matrix(J):
+def _2col_adj_rows_cols(J):
     """
-    Convert boolean jacobian sparsity matrix to a column adjacency matrix.
+    Convert nonzero rows/cols of jacobian sparsity matrix to those of a column adjacency matrix.
 
     Parameters
     ----------
-    J : ndarray
-        Boolean jacobian sparsity matrix.
+    nzrows : ndarray
+        Nonzero rows.
+    nzcols : ndarray
+        Nonzero columns.
+    shape : tuple
+        Shape of the matrix containing the given nonzero rows and columns.
 
     Returns
     -------
     ndarray
-        Column adjacency matrix.
+        Nonzero rows of column adjacency matrix.
+    ndarray
+        Nonzero columns of column adjacency matrix.
     """
+    nzrows, nzcols = np.nonzero(J)
     nrows, ncols = J.shape
 
-    col_matrix = np.zeros((ncols, ncols), dtype=bool)
+    adjrows = []
+    adjcols = []
 
     # mark col_matrix entries as True when nonzero row entries make them dependent
-    for row in range(nrows):
-        nzro = np.nonzero(J[row])[0]
-        for col in nzro:
-            col_matrix[col, nzro] = True
+    for row in np.unique(nzrows):
+        row_nzcols = nzcols[nzrows == row]
 
-    # zero out diagonal (column is not adjacent to itself)
-    np.fill_diagonal(col_matrix, False)
+        if row_nzcols.size > 0:
+            for c in row_nzcols:
+                nodiag = row_nzcols[row_nzcols != c]
+                if nodiag.size > 0:
+                    adjrows.append(nodiag)
+                    adjcols.append(np.full(nodiag.size, c))
 
-    return col_matrix
+    if adjrows:
+        adjrows = np.hstack(adjrows)
+        adjcols = np.hstack(adjcols)
+
+        # there could be duplicates, so remove them
+        coo = coo_matrix((np.empty(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
+        coo.sum_duplicates()
+        adjrows = coo.row
+        adjcols = coo.col
+    else:
+        adjrows = np.zeros(0, dtype=int)
+        adjcols = np.zeros(0, dtype=int)
+
+    # return adjrows, adjcols, (ncols, ncols)
+    return coo_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols)).toarray()
+
 
 
 def _Jc2col_matrix_direct(J, Jc):
@@ -1074,7 +1100,7 @@ def _get_full_disjoint_cols(J):
     list
         List of lists of disjoint columns
     """
-    return _get_full_disjoint_col_matrix_cols(_J2col_matrix(J))
+    return _get_full_disjoint_col_matrix_cols(_2col_adj_rows_cols(J))
 
 
 def _get_full_disjoint_col_matrix_cols(col_matrix):
