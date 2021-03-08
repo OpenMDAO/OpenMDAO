@@ -950,45 +950,44 @@ class Coloring(object):
         return var_name_and_sub_indices
 
 
-def _order_by_ID(col_matrix):
+def _order_by_ID(nzrows, nzcols, shape):
     """
     Return columns in order of incidence degree (ID).
 
     ID is the number of already colored neighbors (neighbors are dependent columns).
 
+    The parameters given are assumed to correspond to a those of a column dependency matrix,
+    i.e., (i, j) nonzero entries in the matrix indicate that column i is dependent on column j.
+
     Parameters
     ----------
-    col_matrix : ndarray
-        Boolean array of column dependencies.
+    nzrows : ndarray
+        Nonzero rows.
+    nzcols : ndarray
+        Nonzero columns.
+    shape : tuple
+        Shape of the matrix containing the given nonzero rows and columns.
 
     Yields
     ------
     int
         Column index.
     """
-    degrees = _count_nonzeros(col_matrix, axis=0)
-    ncols = degrees.size
+    _, ncols = shape
 
     if ncols == 0:
         return
 
-    # use max degree column as a starting point instead of just choosing a random column
-    # since all have incidence degree of 0 when we start.
-    start = degrees.argmax()
-    yield start
+    colored_degrees = np.zeros(ncols, dtype=int)
 
-    colored_degrees = np.zeros(degrees.size, dtype=get_index_dtype(maxval=degrees[start]))
-    colored_degrees[col_matrix[start]] += 1
-    colored_degrees[start] = -ncols  # ensure that this col will never have max degree again
-
-    for i in range(ncols - 1):
+    for i in range(ncols):
         col = colored_degrees.argmax()
-        colored_degrees[col_matrix[col]] += 1
+        colored_degrees[nzrows[nzcols == col]] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
         yield col
 
 
-def _2col_adj_rows_cols(J):
+def _2col_adj_rows_cols(nzrows, nzcols, shape):
     """
     Convert nonzero rows/cols of jacobian sparsity matrix to those of a column adjacency matrix.
 
@@ -1008,8 +1007,7 @@ def _2col_adj_rows_cols(J):
     ndarray
         Nonzero columns of column adjacency matrix.
     """
-    nzrows, nzcols = np.nonzero(J)
-    nrows, ncols = J.shape
+    nrows, ncols = shape
 
     adjrows = []
     adjcols = []
@@ -1038,9 +1036,7 @@ def _2col_adj_rows_cols(J):
         adjrows = np.zeros(0, dtype=int)
         adjcols = np.zeros(0, dtype=int)
 
-    # return adjrows, adjcols, (ncols, ncols)
-    return coo_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols)).toarray()
-
+    return adjrows, adjcols, (ncols, ncols)
 
 
 def _Jc2col_matrix_direct(J, Jc):
@@ -1100,17 +1096,23 @@ def _get_full_disjoint_cols(J):
     list
         List of lists of disjoint columns
     """
-    return _get_full_disjoint_col_matrix_cols(_2col_adj_rows_cols(J))
+    nzrows, nzcols = np.nonzero(J)
+    shape = J.shape
+    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, shape))
 
 
-def _get_full_disjoint_col_matrix_cols(col_matrix):
+def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape):
     """
     Find sets of disjoint columns in a column intersection matrix.
 
     Parameters
     ----------
-    col_matrix : ndarray
-        Column intersection matrix
+    nzrows : ndarray
+        Nonzero rows.
+    nzcols : ndarray
+        Nonzero columns.
+    shape : tuple
+        Shape of the matrix containing the given nonzero rows and columns.
 
     Returns
     -------
@@ -1118,13 +1120,13 @@ def _get_full_disjoint_col_matrix_cols(col_matrix):
         List of lists of disjoint columns
     """
     color_groups = []
-    _, ncols = col_matrix.shape
+    _, ncols = shape
 
     # -1 indicates that a column has not been colored
-    colors = np.full(ncols, -1, dtype=get_index_dtype(maxval=ncols))
+    colors = np.full(ncols, -1, dtype=int)
 
-    for col in _order_by_ID(col_matrix):
-        neighbor_colors = set(colors[col_matrix[col]])
+    for col in _order_by_ID(nzrows, nzcols, shape):
+        neighbor_colors = set(colors[nzrows[nzcols == col]])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
                 grp.append(col)
@@ -1170,7 +1172,9 @@ def _color_partition(J, Jpart):
     intersection_mat = intersection_mat[col_keep]
     intersection_mat = intersection_mat[:, col_keep]
 
-    col_groups = _get_full_disjoint_col_matrix_cols(intersection_mat)
+    nzrows, nzcols = np.nonzero(intersection_mat)
+    shape = intersection_mat.shape
+    col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape)
 
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
