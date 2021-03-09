@@ -12,6 +12,7 @@ exclude = [
     'test_suite',
     'tests',
     'test',
+    'assets',  # Script for processing N2 icons.
 ]
 
 directories = []
