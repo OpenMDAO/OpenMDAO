@@ -442,7 +442,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
-        msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.33333333 1.33333333 1.33333333]\n  Upper: [1.5 1.5 1.5]\n")
+        msg = (f"'comp.z' exceeds lower bounds\n  Val: [1.33333333 1.33333333 1.33333333]\n  Lower: [1.5 1.5 1.5]\n")
         with assert_warning(UserWarning, msg):
             top.run_model()
 
