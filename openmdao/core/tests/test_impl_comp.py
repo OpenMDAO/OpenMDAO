@@ -1,4 +1,5 @@
 """Simple example demonstrating how to implement an implicit component."""
+import sys
 import unittest
 
 from io import StringIO
@@ -7,6 +8,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import remove_whitespace
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
@@ -219,10 +221,12 @@ class ImplicitCompTestCase(unittest.TestCase):
         c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
         self.assertEqual(dict(c2_outputs), {})
 
-        # specifying residuals_tol should not cause an error. However this will be empty because
-        # of the residuals_tol
+        # specifying residuals_tol should not cause an error
+        # there are no residuals yet, so nothing should be filtered
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(c2_outputs), {})
+        self.assertEqual(dict(c2_outputs), {
+            'x': {'value': 0.}
+        })
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
@@ -388,12 +392,35 @@ class ImplicitCompTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        stdout = StringIO()
-        outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
-        text = stdout.getvalue().split('\n')
-        # P1 and D1 should not appear in the outputs section. This is being checked below
-        self.assertEqual(text[12], 'd2')
-        self.assertFalse('d1' in text)
+        # list outputs with residuals, p1 and d1 should not appear
+        sysout = sys.stdout
+        try:
+            stdout = StringIO()
+            sys.stdout = stdout
+            outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        finally:
+            sys.stdout = sysout
+
+        expected_text = [
+            "0 Explicit Output(s) in 'model'",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "",
+            "varname  value         resids     ",
+            "-------  ------------  -----------",
+            "d2",
+            "  y2",  # values removed from comparison
+            "",
+            "",
+            ""
+        ]
+        captured_output = stdout.getvalue()
+
+        for i, line in enumerate(captured_output.split('\n')):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(line.split('[')[0]),
+                                 remove_whitespace(expected_text[i]))
 
 
 class ImplicitCompGuessTestCase(unittest.TestCase):

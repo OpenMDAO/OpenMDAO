@@ -118,7 +118,7 @@ setup(
             'common/style/*.css'
         ],
         'openmdao.visualization.n2_viewer': [
-            'assets/*',
+            'assets/*png*',
             'libs/*.js',
             'src/*.js',
             'style/*',

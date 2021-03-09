@@ -72,6 +72,8 @@ class N2Window {
             right: parentPos.right - childPos.right,
             bottom: parentPos.bottom - childPos.bottom,
             left: childPos.left - parentPos.left,
+            x: childPos.x - parentPos.x,
+            y: childPos.y - parentPos.y,
             width: childPos.width,
             height: childPos.height,
             parentWidth: parentPos.width,
