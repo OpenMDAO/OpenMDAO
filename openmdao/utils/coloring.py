@@ -156,10 +156,16 @@ class Coloring(object):
         col_var_sizes : ndarray or None
             Sizes of column variables.
         """
-        # store the nonzero row and column indices if jac sparsity is provided
-        self._nzrows, self._nzcols = np.nonzero(sparsity)
         self._shape = sparsity.shape
-        self._pct_nonzero = np.count_nonzero(sparsity) / (self._shape[0] * self._shape[1]) * 100
+
+        if isinstance(sparsity, np.ndarray):
+            self._nzrows, self._nzcols = np.nonzero(sparsity)
+            self._pct_nonzero = np.count_nonzero(sparsity) / (self._shape[0] * self._shape[1]) * 100
+        else:  # sparse
+            coo = sparsity.tocoo()
+            self._nzrows = coo.row
+            self._nzcols = coo.col
+            self._pct_nonzero = coo.row.size / (self._shape[0] * self._shape[1]) * 100
 
         self._row_vars = row_vars
         self._row_var_sizes = row_var_sizes
@@ -1148,9 +1154,11 @@ def _get_full_disjoint_cols(J):
     list
         List of lists of disjoint columns
     """
-    nzrows, nzcols = np.nonzero(J)
+    if isinstance(J, np.ndarray):
+        nzrows, nzcols = np.nonzero(J)
+    else:
+        nzrows, nzcols = J.row, J.col
     shape = J.shape
-
 
     # rng = np.arange(shape[1], dtype=int)
     # mask = np.zeros(np.max(nzcols) + 1, dtype=bool)
@@ -1854,11 +1862,18 @@ def _compute_coloring(J, mode):
 
     col_groups = _split_groups(_get_full_disjoint_cols(J))
 
+    if isinstance(J, np.ndarray):
+        nzrows, nzcols = np.nonzero(J)
+    else:
+        nzrows, nzcols = J.row, J.col
+
     full_slice = slice(None)
     col2rows = [full_slice] * J.shape[1]  # will contain list of nonzero rows for each column
     for lst in col_groups:
         for col in lst:
-            col2rows[col] = np.nonzero(J[:, col])[0]
+            rows = nzrows[nzcols == col]
+            rows.sort()
+            col2rows[col] = rows  # np.nonzero(J[:, col])[0]
 
     if rev:
         coloring._rev = (col_groups, col2rows)

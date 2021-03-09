@@ -387,16 +387,16 @@ class Jacobian(object):
         Jdata = np.hstack([d.flat for d in Jdata])
         shape = (rend, cend)
 
-        # TODO: for now, convert to dense, but later keep as COO
-        J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape).toarray()
+        J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape)
 
-        J *= (1.0 / np.max(J))
+        J *= (1.0 / np.max(J.data))
 
-        tol_info = _tol_sweep(J, tol, orders)
+        tol_info = _tol_sweep(J.data, tol, orders)
 
-        boolJ = np.zeros(J.shape, dtype=bool)
-        boolJ[J > tol_info['good_tol']] = True
+        mask = J.data > tol_info['good_tol']
+        size = np.count_nonzero(mask)
 
+        boolJ = coo_matrix((np.ones(size, dtype=bool), (Jrows[mask], Jcols[mask])), shape=shape)
         return boolJ, tol_info
 
     def set_complex_step_mode(self, active):
