@@ -1090,11 +1090,10 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         rows = np.zeros(0, dtype=int)
         cols = np.zeros(0, dtype=int)
 
-    #col_matrix = coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols)).toarray()
+    col_matrix = coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols)).toarray()
 
-    #return col_matrix
-
-    return rows, cols, (ncols, ncols)
+    return col_matrix
+    # return rows, cols, (ncols, ncols)
 
 def _get_full_disjoint_cols(J):
     """
@@ -1190,23 +1189,23 @@ def _color_partition(J, Jpart):
     # use this to map indices back to the full J indices.
     idxmap = np.arange(ncols, dtype=int)[col_keep]
 
-    nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, Jpart.shape)
-    #intersection_mat = intersection_mat[col_keep]
-    #intersection_mat = intersection_mat[:, col_keep]
+    intersection_mat = _Jc2col_matrix_direct(Jprows, Jpcols, Jpart.shape)
+    intersection_mat = intersection_mat[col_keep]
+    intersection_mat = intersection_mat[:, col_keep]
 
-    #nzrows, nzcols = np.nonzero(intersection_mat)
-    #shape = intersection_mat.shape
+    nzrows, nzcols = np.nonzero(intersection_mat)
+    shape = intersection_mat.shape
     col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape)
 
     for i, group in enumerate(col_groups):
-        col_groups[i] = sorted(group)  # [idxmap[c] for c in group if col_keep[idxmap[c]]])
+        col_groups[i] = sorted([idxmap[c] for c in group if col_keep[idxmap[c]]])
     col_groups = _split_groups(col_groups)
 
     col2row = [None] * ncols
-    #for col in idxmap:
-        #col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
-    for col in Jpcols:
-        col2row[col] = sorted(Jprows[Jpcols == col])  # [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
+    for col in idxmap:
+        col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
+    # for col in Jpcols:
+    #     col2row[col] = sorted(Jprows[Jpcols == col])  # [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
 
     import pprint
     pprint.pprint(col_groups)
