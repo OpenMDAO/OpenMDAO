@@ -1048,10 +1048,10 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
 
         if row_nzcols.size > 0:
             for c in row_nzcols:
-                nodiag = row_nzcols[row_nzcols != c]
-                if nodiag.size > 0:
-                    adjrows.append(nodiag)
-                    adjcols.append(np.full(nodiag.size, c))
+                #nodiag = row_nzcols[row_nzcols != c]
+                #if nodiag.size > 0:
+                adjrows.append(row_nzcols)
+                adjcols.append(np.full(row_nzcols.size, c))
 
     if adjrows:
         adjrows = np.hstack(adjrows)
@@ -1110,12 +1110,16 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         nzr = []
         nzc = []
         nzro = Jcols[Jrows == row]
-        Jrow[:] = False
-        Jrow[nzro] = True
-        for col1, col2 in combinations(nzro, 2):
-            if col1 != col2 and (Jrow[col1] or Jrow[col2]):
-                nzr.append(col1)
-                nzc.append(col2)
+        if nzro.size == 1:
+            nzr.append(nzro[0])
+            nzc.append(nzro[0])
+        else:
+            Jrow[:] = False
+            Jrow[nzro] = True
+            for col1, col2 in combinations(nzro, 2):
+                if col1 != col2 and (Jrow[col1] or Jrow[col2]):
+                    nzr.append(col1)
+                    nzc.append(col2)
         if nzr:
             allnzr.append(nzr)
             allnzc.append(nzc)
