@@ -1039,7 +1039,7 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
     return adjrows, adjcols, (ncols, ncols)
 
 
-def _Jc2col_matrix_direct(Jc):
+def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     """
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
@@ -1050,7 +1050,7 @@ def _Jc2col_matrix_direct(Jc):
 
     Parameters
     ----------
-    Jc : ndarray
+    Jpart : ndarray
         Boolean sparsity matrix of a partition of J.
 
     Returns
@@ -1058,20 +1058,24 @@ def _Jc2col_matrix_direct(Jc):
     ndarray
         Column adjacency matrix.
     """
-    Jcrows, Jccols = np.nonzero(Jc)
+    # Jrows, Jcols = np.nonzero(Jpart)
 
-    nrows, ncols = Jc.shape
+    nrows, ncols = shape
 
     allnzr = []
     allnzc = []
 
-    # mark col_matrix[col1, col2] as True when Jc[row, col1] is True OR Jc[row, col2] is True
+    Jrow = np.zeros(ncols, dtype=bool)
+
+    # mark col_matrix[col1, col2] as True when Jpart[row, col1] is True OR Jpart[row, col2] is True
     for row in range(nrows):
         nzr = []
         nzc = []
-        nzro = Jccols[Jcrows == row]
+        nzro = Jcols[Jrows == row]
+        Jrow[:] = False
+        Jrow[nzro] = True
         for col1, col2 in combinations(nzro, 2):
-            if col1 != col2 and (Jc[row, col1] or Jc[row, col2]):
+            if col1 != col2 and (Jrow[col1] or Jrow[col2]):
                 nzr.append(col1)
                 nzc.append(col2)
         if nzr:
@@ -1079,7 +1083,7 @@ def _Jc2col_matrix_direct(Jc):
             allnzc.append(nzc)
 
     if allnzr:
-        # matrix is symmetric
+        # matrix is symmetric, so duplicate
         rows = np.hstack(allnzr + allnzc)
         cols = np.hstack(allnzc + allnzr)
     else:
@@ -1089,7 +1093,6 @@ def _Jc2col_matrix_direct(Jc):
     col_matrix = coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols)).toarray()
 
     return col_matrix
-
 
 def _get_full_disjoint_cols(J):
     """
@@ -1185,7 +1188,7 @@ def _color_partition(J, Jpart):
     # use this to map indices back to the full J indices.
     idxmap = np.arange(ncols, dtype=int)[col_keep]
 
-    intersection_mat = _Jc2col_matrix_direct(Jpart)
+    intersection_mat = _Jc2col_matrix_direct(Jprows, Jpcols, Jpart.shape)
     intersection_mat = intersection_mat[col_keep]
     intersection_mat = intersection_mat[:, col_keep]
 
@@ -1200,6 +1203,8 @@ def _color_partition(J, Jpart):
     col2row = [None] * ncols
     for col in idxmap:
         col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
+    # for col in Jpcols:
+    #     col2row[col] = sorted(Jprows[Jpcols == col])  # [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
 
     return [col_groups, col2row]
 
@@ -1232,23 +1237,23 @@ def MNCO_bidir(J):
     coloring = Coloring(sparsity=J)
 
     M_col_nonzeros = np.zeros(ncols, dtype=int)
-    for i in np.unique(nzcols):
-        M_col_nonzeros[i] = np.count_nonzero(nzcols == i)
+    for c in np.unique(nzcols):
+        M_col_nonzeros[c] = np.count_nonzero(nzcols == c)
     M_row_nonzeros = np.zeros(nrows, dtype=int)
-    for i in np.unique(nzrows):
-        M_row_nonzeros[i] = np.count_nonzero(nzrows == i)
+    for r in np.unique(nzrows):
+        M_row_nonzeros[r] = np.count_nonzero(nzrows == r)
 
     M_rows, M_cols = coloring._nzrows, coloring._nzcols
 
-    Jc_rows = [None] * nrows
+    Jf_rows = [None] * nrows
     Jr_cols = [None] * ncols
 
     row_i = col_i = 0
 
-    # partition J into Jc and Jr
-    # Jc is colored by column and those columns will be solved in fwd mode
+    # partition J into Jf and Jr
+    # Jf is colored by column and those columns will be solved in fwd mode
     # Jr is colored by row and those rows will be solved in reverse mode
-    # We build Jc from bottom up (by row) and Jr from right to left (by column).
+    # We build Jf from bottom up (by row) and Jr from right to left (by column).
 
     # get index of row with fewest nonzeros and col with fewest nonzeros
     r = M_row_nonzeros.argmin()
@@ -1257,23 +1262,23 @@ def MNCO_bidir(J):
     nnz_r = M_row_nonzeros[r]
     nnz_c = M_col_nonzeros[c]
 
-    Jc_nz_max = 0   # max row nonzeros in Jc
+    Jf_nz_max = 0   # max row nonzeros in Jf
     Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size + M_cols.size > 0:
         # what the algorithm is doing is basically minimizing the total of the max number of nonzero
-        # columns in Jc + the max number of nonzero rows in Jr, so it's basically minimizing
+        # columns in Jf + the max number of nonzero rows in Jr, so it's basically minimizing
         # the upper bound of the number of colors that will be needed.
 
         # we differ from the algorithm in the paper here slightly because we add ncols and nrows to
         # different sides of the inequality in order to prevent bad colorings when we have
         # matrices that have many more rows than columns or many more columns than rows.
-        if ncols + Jr_nz_max + max(Jc_nz_max, nnz_r) < (nrows + Jc_nz_max + max(Jr_nz_max, nnz_c)):
-            Jc_rows[r] = M_cols[M_rows == r]
-            Jc_nz_max = max(nnz_r, Jc_nz_max)
+        if ncols + Jr_nz_max + max(Jf_nz_max, nnz_r) < (nrows + Jf_nz_max + max(Jr_nz_max, nnz_c)):
+            Jf_rows[r] = M_cols[M_rows == r]
+            Jf_nz_max = max(nnz_r, Jf_nz_max)
 
             M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
-            M_col_nonzeros[Jc_rows[r]] -= 1
+            M_col_nonzeros[Jf_rows[r]] -= 1
 
             keep = M_rows != r
             r = M_row_nonzeros.argmin()
@@ -1298,18 +1303,18 @@ def MNCO_bidir(J):
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
 
-    nnz_Jc = nnz_Jr = 0
+    nnz_Jf = nnz_Jr = 0
     jac = np.zeros(J.shape, dtype=bool)
 
     if row_i > 0:
-        Jc = jac
-        # build Jc and do fwd coloring on it
-        for i, cols in enumerate(Jc_rows):
+        Jf = jac
+        # build Jf and do fwd coloring on it
+        for i, cols in enumerate(Jf_rows):
             if cols is not None:
-                Jc[i][cols] = True
-                nnz_Jc += len(cols)
+                Jf[i][cols] = True
+                nnz_Jf += len(cols)
 
-        coloring._fwd = _color_partition(J, Jc)
+        coloring._fwd = _color_partition(J, Jf)
         jac[:] = False  # reset for use with Jr
 
     if col_i > 0:
@@ -1322,8 +1327,8 @@ def MNCO_bidir(J):
 
         coloring._rev = _color_partition(J.T, Jr.T)
 
-    if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
-        raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
+    if np.count_nonzero(J) != nnz_Jf + nnz_Jr:
+        raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
 
     coloring._meta['coloring_time'] = time.time() - start_time
     coloring._meta['bidirectional'] = True
