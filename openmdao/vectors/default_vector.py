@@ -152,10 +152,9 @@ class DefaultVector(Vector):
 
             if do_scaling:
                 scale0, scale1 = factors[abs_name][kind]
-                vec = scaling
-                if vec[0] is not None:
-                    vec[0][start:end] = scale0
-                vec[1][start:end] = scale1
+                if scaling[0] is not None:
+                    scaling[0][start:end] = scale0
+                scaling[1][start:end] = scale1
 
             start = end
 
