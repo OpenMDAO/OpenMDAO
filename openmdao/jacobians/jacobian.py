@@ -387,13 +387,13 @@ class Jacobian(object):
         Jdata = np.hstack([d.flat for d in Jdata])
         shape = (rend, cend)
 
-        J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape)
+        # J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape)
 
-        J *= (1.0 / np.max(J.data))
+        Jdata *= (1.0 / np.max(Jdata))
 
-        tol_info = _tol_sweep(J.data, tol, orders)
+        tol_info = _tol_sweep(Jdata, tol, orders)
 
-        mask = J.data > tol_info['good_tol']
+        mask = Jdata > tol_info['good_tol']
         size = np.count_nonzero(mask)
 
         boolJ = coo_matrix((np.ones(size, dtype=bool), (Jrows[mask], Jcols[mask])), shape=shape)
