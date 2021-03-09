@@ -368,7 +368,7 @@ class TestInterpNDPython(unittest.TestCase):
             assert r_err < 2.5 * self.tol[method]
 
             # test that gradients have been cached
-            assert_equal_arrays(interp._xi, test_pt)
+            assert_equal_arrays(interp._xi.flatten(), test_pt.flatten())
             assert_equal_arrays(interp._d_dx.flatten(), computed.flatten())
 
     def test_gradients_returned_by_xi(self):
@@ -564,6 +564,33 @@ class TestInterpNDPython(unittest.TestCase):
         self.assertEqual(err.lower, 0)
         self.assertEqual(err.upper, 1)
 
+    def test_interp_1Dflat(self):
+
+        x = np.array([0.,1.,2.,3.,4.])
+        y = x**2
+        f = InterpND(points=x, values=y)
+
+        computed = f.interpolate(np.array([2.5, 3.5]))
+        assert_equal_arrays(computed, np.array([6.5, 12.5]))
+
+    def test_interp_1Dflat_list_points(self):
+
+        x = np.array([0.,1.,2.,3.,4.])
+        y = x**2
+        f = InterpND(points=[x], values=y)
+
+        computed = f.interpolate(np.array([2.5, 3.5]))
+        assert_equal_arrays(computed, np.array([6.5, 12.5]))
+
+    def test_interp_1Dflat_list_x(self):
+
+        x = np.array([0.,1.,2.,3.,4.])
+        y = x**2
+        f = InterpND(points=x, values=y)
+
+        computed = f.interpolate([np.array([2.5]), np.array([3.5])])
+        assert_equal_arrays(computed, np.array([6.5, 12.5]))
+
     def test_error_messages(self):
         points, values = self._get_sample_4d_large()
 
@@ -629,6 +656,12 @@ class TestInterpNDPython(unittest.TestCase):
             interp = InterpND(method='bsplines', points=points, values=values)
 
         msg = "Method 'bsplines' is not supported for table interpolation."
+        self.assertTrue(str(cm.exception).startswith(msg))
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpND(method='bsplines', points=points)
+
+        msg = "Either 'values' or 'x_interp' must be specified."
         self.assertTrue(str(cm.exception).startswith(msg))
 
 if __name__ == '__main__':

@@ -35,7 +35,7 @@ Object.freeze(defaultDims);
 // TODO: Probably move this into N2Diagram or other class
 let N2TransitionDefaults = {
     'startDelay': 100,
-    'duration': 1000,
+    'duration': 0,
     'durationFast': 1000,
     'durationSlow': 1500,
     'maxNodes': 150

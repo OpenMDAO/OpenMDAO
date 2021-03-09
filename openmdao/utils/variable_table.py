@@ -88,6 +88,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     out_stream.write(header + '\n')
 
     if not count:
+        out_stream.write('\n\n')
         return
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs

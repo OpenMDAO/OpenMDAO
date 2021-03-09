@@ -3581,33 +3581,46 @@ class System(object):
                                        rank=None if all_procs or values or residuals else 0,
                                        return_rel_names=False)
 
-        if outputs:
-            if not list_autoivcs:
-                outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
+        # filter auto_ivcs if requested
+        if outputs and not list_autoivcs:
+            outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
 
-            to_remove = ['discrete']
-            if tags:
-                to_remove.append('tags')
-            if not prom_name:
-                to_remove.append('prom_name')
+        # get values & resids
+        if self._outputs is not None and (values or residuals or residuals_tol):
+            to_remove = []
 
-            for _, meta in outputs.items():
-                for key in to_remove:
-                    del meta[key]
-
-        if self._outputs is not None and (values or residuals):
-            # we want value from the input vector, not from the metadata
-            for n, meta in outputs.items():
+            for name, meta in outputs.items():
                 if values:
-                    meta['value'] = self._abs_get_val(n, get_remote=True,
+                    # we want value from the input vector, not from the metadata
+                    meta['value'] = self._abs_get_val(name, get_remote=True,
                                                       rank=None if all_procs else 0, kind='output')
-                if residuals:
-                    meta['resids'] = self._abs_get_val(n, get_remote=True,
-                                                       rank=None if all_procs else 0,
-                                                       kind='residual')
+                if residuals or residuals_tol:
+                    resids = self._abs_get_val(name, get_remote=True,
+                                               rank=None if all_procs else 0,
+                                               kind='residual')
+                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                        to_remove.append(name)
+                    elif residuals:
+                        meta['resids'] = resids
 
+            # remove any outputs that don't pass the residuals_tol filter
+            for name in to_remove:
+                del outputs[name]
+
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
             return []
+
+        # remove metadata we don't want to show/return
+        to_remove = ['discrete']
+        if tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+
+        for _, meta in outputs.items():
+            for key in to_remove:
+                del meta[key]
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
@@ -3627,13 +3640,11 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states:
-                        if not np.isscalar(m['resids']) and len(m['resids']) > 1:
-                            for i in m['resids']:
-                                if i > residuals_tol:
-                                    impl_outputs[n] = m
-                                    break
-                        elif m['resids'] > residuals_tol:
+                    if n in states:
+                        if residuals_tol and 'resids' in m:
+                            if np.linalg.norm(m['resids']) >= residuals_tol:
+                                impl_outputs[n] = m
+                        else:
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}

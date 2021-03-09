@@ -1,6 +1,7 @@
 """ Unit tests for the SqliteCaseReader. """
 
 import errno
+import sys
 import os
 import sys
 import unittest
@@ -1070,6 +1071,117 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             self.assertEqual(text[i], line)
+
+    def test_list_residuals_tol(self):
+        import numpy as np
+        import openmdao.api as om
+
+        class EComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1)
+                self.add_output('y', val=1)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2*inputs['x']
+
+        class IComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('y', val=1)
+                self.add_output('z1', val=1)
+                self.add_output('z2', val=1)
+                self.add_output('z3', val=1)
+
+            def solve_nonlinear(self, inputs, outputs):
+                # only solving z1 so that one specific residual goes to 0
+                outputs['z1'] = 2*inputs['y']
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                residuals['z1'] = outputs['z1'] - 2*inputs['y']
+                residuals['z2'] = outputs['z2'] - 2*inputs['y']
+                residuals['z3'] = 2*inputs['y'] - outputs['z3']
+
+
+        p = om.Problem()
+        p.model.add_subsystem('ec', EComp(), promotes=['*'])
+        p.model.add_subsystem('ic', IComp(), promotes=['*'])
+
+        p.setup()
+        p.add_recorder(self.recorder)
+        p.recording_options['record_residuals'] = True
+
+        p.run_model()
+        p.model.run_apply_nonlinear()
+        p.record('final')
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case('final')
+
+        # list outputs with residuals
+        sysout = sys.stdout
+        try:
+            capture_stdout = StringIO()
+            sys.stdout = capture_stdout
+            case.list_outputs(residuals=True)
+        finally:
+            sys.stdout = sysout
+
+        expected_text = [
+            "1 Explicit Output(s) in 'model'",
+            "",
+            "varname  value  resids",
+            "-------  -----  ------",
+            "ec",
+            "  y      [2.]   [0.]  ",
+            "",
+            "",
+            "3 Implicit Output(s) in 'model'",
+            "",
+            "varname  value  resids",
+            "-------  -----  ------",
+            "ic",
+            "  z1     [4.]   [0.]  ",
+            "  z2     [1.]   [-3.] ",
+            "  z3     [1.]   [3.]  ",
+            "",
+            "",
+            "",
+        ]
+        captured_output = capture_stdout.getvalue()
+        for i, line in enumerate(captured_output.split('\n')):
+            self.assertEqual(line.strip(), expected_text[i].strip())
+
+        # list outputs filtered by residuals_tol
+        sysout = sys.stdout
+        try:
+            capture_stdout = StringIO()
+            sys.stdout = capture_stdout
+            case.list_outputs(residuals=True, residuals_tol=1e-2)
+        finally:
+            sys.stdout = sysout
+
+        # Note: Explicit output has 0 residual, so it should not be included.
+        # Note: Implicit outputs Z2 and Z3 should both be shown, because the
+        #       tolerance check uses the norm, which is always gives positive.
+        expected_text = [
+            "0 Explicit Output(s) in 'model'",
+            "",
+            "",
+            "2 Implicit Output(s) in 'model'",
+            "",
+            "varname  value  resids",
+            "-------  -----  ------",
+            "ic",
+              "z2     [1.]   [-3.]",
+              "z3     [1.]   [3.]",
+            "",
+            "",
+            "",
+        ]
+        captured_output = capture_stdout.getvalue()
+        for i, line in enumerate(captured_output.split('\n')):
+            self.assertEqual(line.strip(), expected_text[i].strip())
 
     def test_list_inputs(self):
         prob = SellarProblem()
