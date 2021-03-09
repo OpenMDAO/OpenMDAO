@@ -21,6 +21,7 @@ exclude = [
     'test_suite',
     'tests',
     'test',
+    'assets',  # Script for processing N2 icons.
 ]
 
 # we will build a list of dirs in which to do linting.

@@ -21,6 +21,7 @@ dir_excludes = [
     'tests',
     'test_suite',  # TODO: this should really be included, but currently has failures
     'devtools',   # TODO: add this back after problem_viewer is fixed
+    'assets',  # Script for processing N2 icons.
 ]
 
 file_excludes = [
