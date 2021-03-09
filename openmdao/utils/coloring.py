@@ -1206,6 +1206,10 @@ def _color_partition(J, Jpart):
     # for col in Jpcols:
     #     col2row[col] = sorted(Jprows[Jpcols == col])  # [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
 
+    import pprint
+    pprint.pprint(col_groups)
+    print('-' * 50)
+    pprint.pprint(col2row)
     return [col_groups, col2row]
 
 
