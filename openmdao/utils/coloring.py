@@ -1039,7 +1039,7 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
     return adjrows, adjcols, (ncols, ncols)
 
 
-def _Jc2col_matrix_direct(J, Jc):
+def _Jc2col_matrix_direct(Jc):
     """
     Convert a partitioned jacobian sparsity matrix to a column adjacency matrix.
 
@@ -1050,8 +1050,6 @@ def _Jc2col_matrix_direct(J, Jc):
 
     Parameters
     ----------
-    J : ndarray
-        Boolean jacobian sparsity matrix.
     Jc : ndarray
         Boolean sparsity matrix of a partition of J.
 
@@ -1060,24 +1058,35 @@ def _Jc2col_matrix_direct(J, Jc):
     ndarray
         Column adjacency matrix.
     """
-    assert J.shape == Jc.shape
+    Jcrows, Jccols = np.nonzero(Jc)
 
-    nrows, ncols = J.shape
+    nrows, ncols = Jc.shape
 
-    col_matrix = np.zeros((ncols, ncols), dtype=bool)
-
-    col_keep = _count_nonzeros(Jc, axis=0) > 0
+    allnzr = []
+    allnzc = []
 
     # mark col_matrix[col1, col2] as True when Jc[row, col1] is True OR Jc[row, col2] is True
     for row in range(nrows):
-        nzro = np.nonzero(J[row] & col_keep)[0]
+        nzr = []
+        nzc = []
+        nzro = Jccols[Jcrows == row]
         for col1, col2 in combinations(nzro, 2):
-            if Jc[row, col1] or Jc[row, col2]:
-                col_matrix[col1, col2] = True
-                col_matrix[col2, col1] = True
+            if col1 != col2 and (Jc[row, col1] or Jc[row, col2]):
+                nzr.append(col1)
+                nzc.append(col2)
+        if nzr:
+            allnzr.append(nzr)
+            allnzc.append(nzc)
 
-    # zero out diagonal (column is not adjacent to itself)
-    np.fill_diagonal(col_matrix, False)
+    if allnzr:
+        # matrix is symmetric
+        rows = np.hstack(allnzr + allnzc)
+        cols = np.hstack(allnzc + allnzr)
+    else:
+        rows = np.zeros(0, dtype=int)
+        cols = np.zeros(0, dtype=int)
+
+    col_matrix = coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols)).toarray()
 
     return col_matrix
 
@@ -1159,16 +1168,24 @@ def _color_partition(J, Jpart):
     list
         List of nonzero rows for each column.
     """
-    ncols = Jpart.shape[1]
-    col_nonzeros = _count_nonzeros(Jpart, axis=0)
-    row_nonzeros = _count_nonzeros(Jpart, axis=1)
+    Jprows, Jpcols = np.nonzero(Jpart)
+    shape = Jpart.shape
+    nrows, ncols = shape
+
+    col_nonzeros = np.zeros(ncols, dtype=int)
+    for i in np.unique(Jpcols):
+        col_nonzeros[i] = np.count_nonzero(Jpcols == i)
+    row_nonzeros = np.zeros(nrows, dtype=int)
+    for i in np.unique(Jprows):
+        row_nonzeros[i] = np.count_nonzero(Jprows == i)
+
     col_keep = col_nonzeros > 0
     row_keep = row_nonzeros > 0
 
     # use this to map indices back to the full J indices.
     idxmap = np.arange(ncols, dtype=int)[col_keep]
 
-    intersection_mat = _Jc2col_matrix_direct(J, Jpart)
+    intersection_mat = _Jc2col_matrix_direct(Jpart)
     intersection_mat = intersection_mat[col_keep]
     intersection_mat = intersection_mat[:, col_keep]
 
@@ -1207,12 +1224,19 @@ def MNCO_bidir(J):
     """
     start_time = time.time()
 
-    nrows, ncols = J.shape
+    nzrows, nzcols = np.nonzero(J)
+    shape = J.shape
+
+    nrows, ncols = shape
 
     coloring = Coloring(sparsity=J)
 
-    M_col_nonzeros = _count_nonzeros(J, axis=0)
-    M_row_nonzeros = _count_nonzeros(J, axis=1)
+    M_col_nonzeros = np.zeros(ncols, dtype=int)
+    for i in np.unique(nzcols):
+        M_col_nonzeros[i] = np.count_nonzero(nzcols == i)
+    M_row_nonzeros = np.zeros(nrows, dtype=int)
+    for i in np.unique(nzrows):
+        M_row_nonzeros[i] = np.count_nonzero(nzrows == i)
 
     M_rows, M_cols = coloring._nzrows, coloring._nzcols
 
@@ -1300,8 +1324,6 @@ def MNCO_bidir(J):
 
     if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
-
-    # check_coloring(J, coloring)
 
     coloring._meta['coloring_time'] = time.time() - start_time
     coloring._meta['bidirectional'] = True
