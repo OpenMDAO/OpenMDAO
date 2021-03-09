@@ -956,7 +956,7 @@ class Coloring(object):
         return var_name_and_sub_indices
 
 
-def _order_by_ID(nzrows, nzcols, shape, rowmap, colmap):
+def _order_by_ID(nzrows, nzcols, colmap):
     """
     Return columns in order of incidence degree (ID).
 
@@ -979,13 +979,7 @@ def _order_by_ID(nzrows, nzcols, shape, rowmap, colmap):
     int
         Column index.
     """
-    _, ncols = shape
-
-    if ncols == 0:
-        return
-
     f2c = _full2compressed_map(nzrows)
-    # ncols = np.max(amap) + 1
     ncols = colmap.size
     colored_degrees = np.zeros(ncols, dtype=int)
 
@@ -1054,8 +1048,6 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
 
         if row_nzcols.size > 0:
             for c in row_nzcols:
-                #nodiag = row_nzcols[row_nzcols != c]
-                #if nodiag.size > 0:
                 adjrows.append(row_nzcols)
                 adjcols.append(np.full(row_nzcols.size, c))
 
@@ -1077,12 +1069,7 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
     mask[adjcols] = True
     colmap = rng[mask]
 
-    # col dep matrix is symmetric, so max col same as max row
-    mask[:] = False
-    mask[adjrows] = True
-    rowmap = rng[mask]
-
-    return adjrows, adjcols, (ncols, ncols), rowmap, colmap
+    return adjrows, adjcols, (ncols, ncols), colmap
 
 
 def _Jc2col_matrix_direct(Jrows, Jcols, shape):
@@ -1158,21 +1145,11 @@ def _get_full_disjoint_cols(J):
         nzrows, nzcols = np.nonzero(J)
     else:
         nzrows, nzcols = J.row, J.col
-    shape = J.shape
 
-    # rng = np.arange(shape[1], dtype=int)
-    # mask = np.zeros(np.max(nzcols) + 1, dtype=bool)
-    # mask[nzcols] = True
-    # colmap = rng[mask]
-
-    # # col dep matrix is symmetric, so max col same as max row
-    # mask[:] = False
-    # mask[nzrows] = True
-    # rowmap = rng[mask]
-    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, shape))
+    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, J.shape))
 
 
-def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, rowmap, colmap):
+def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
     """
     Find sets of disjoint columns in a column intersection matrix.
 
@@ -1196,7 +1173,7 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, rowmap, colmap):
     # -1 indicates that a column has not been colored
     colors = np.full(ncols, -1, dtype=int)
 
-    for col in _order_by_ID(nzrows, nzcols, shape, rowmap, colmap):
+    for col in _order_by_ID(nzrows, nzcols, colmap):
         neighbor_colors = set(colors[nzrows[nzcols == col]])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
@@ -1234,54 +1211,24 @@ def _color_partition(J, Jpart):
     shape = Jpart.shape
     nrows, ncols = shape
 
-    # col_nonzeros = np.zeros(ncols, dtype=int)
-    # for i in np.unique(Jpcols):
-    #     col_nonzeros[i] = np.count_nonzero(Jpcols == i)
-    # row_nonzeros = np.zeros(nrows, dtype=int)
-    # for i in np.unique(Jprows):
-    #     row_nonzeros[i] = np.count_nonzero(Jprows == i)
-
-    # col_keep = col_nonzeros > 0
-    # row_keep = row_nonzeros > 0
-
-    # use this to map indices back to the full J indices.
-    # idxmap = np.arange(ncols, dtype=int)[col_keep]
-
     nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, Jpart.shape)
-    # intersection_mat = coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)),
-    #                               shape=shape).toarray()
-    # intersection_mat = intersection_mat[col_keep]
-    # intersection_mat = intersection_mat[:, col_keep]
 
     rng = np.arange(ncols, dtype=int)
 
-    # nzrows, nzcols = np.nonzero(intersection_mat)
     mask = np.zeros(ncols, dtype=bool)
     mask[nzcols] = True
     colmap = rng[mask]
 
-    # col dep matrix is symmetric, so max col same as max row
-    mask[:] = False
-    mask[nzrows] = True
-    rowmap = rng[mask]
-    col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, rowmap, colmap)
+    col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap)
 
-    # for i, group in enumerate(col_groups):
-    #     col_groups[i] = sorted([colmap[c] for c in group if col_keep[colmap[c]]])
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted(group)
     col_groups = _split_groups(col_groups)
 
     col2row = [None] * ncols
-    # for col in colmap:
-    #     col2row[col] = [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
     for col in Jpcols:
-        col2row[col] = sorted(Jprows[Jpcols == col])  # [r for r in np.nonzero(Jpart[:, col])[0] if row_keep[r]]
+        col2row[col] = sorted(Jprows[Jpcols == col])
 
-    import pprint
-    pprint.pprint(col_groups)
-    print('-' * 50)
-    pprint.pprint(col2row)
     return [col_groups, col2row]
 
 

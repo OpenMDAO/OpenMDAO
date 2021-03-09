@@ -387,8 +387,6 @@ class Jacobian(object):
         Jdata = np.hstack([d.flat for d in Jdata])
         shape = (rend, cend)
 
-        # J = coo_matrix((Jdata, (Jrows, Jcols)), shape=shape)
-
         Jdata *= (1.0 / np.max(Jdata))
 
         tol_info = _tol_sweep(Jdata, tol, orders)
