@@ -100,8 +100,7 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    left: -65px;
-    /* Start hidden */
+    left: -65px;  /* Start hidden */
     transition: left 0.5s;
     z-index: 24;
     border-right: 1px solid gray;
@@ -131,13 +130,12 @@
     position: absolute;
     top: 275px;
     margin-left: 20px;
-    left: -20px;
-    /* Start hidden */
+    left: 45px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     cursor: pointer;
-    z-index: 25;
+    z-index: 24;
     transition: left 0.5s, transform 0.5s;
     border-top: 1px solid gray;
     border-right: 1px solid gray;
