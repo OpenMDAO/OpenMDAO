@@ -1093,7 +1093,6 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     #col_matrix = coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols)).toarray()
 
     #return col_matrix
-
     return rows, cols, (ncols, ncols)
 
 def _get_full_disjoint_cols(J):
