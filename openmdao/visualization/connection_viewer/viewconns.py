@@ -197,10 +197,14 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
-    if notebook and not colab:
-        display(IFrame(src=outfile, width=1000, height=1000))
-    else:
-        display(HTML(outfile))
+    if notebook:
+        # display in Jupyter Notebook
+        if not colab:
+            display(IFrame(src=outfile, width=1000, height=1000))
+        else:
+            display(HTML(outfile))
 
-    if show_browser and not notebook:
+    elif show_browser:
+        # open it up in the browser
+        from openmdao.utils.webview import webview
         webview(outfile)
