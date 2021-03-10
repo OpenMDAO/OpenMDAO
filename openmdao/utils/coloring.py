@@ -979,13 +979,13 @@ def _order_by_ID(nzrows, nzcols, colmap):
     int
         Column index.
     """
-    f2c = _full2compressed_map(nzrows)
     ncols = colmap.size
     colored_degrees = np.zeros(ncols, dtype=int)
+    reduced_rows = _full2compressed_map(nzrows)[nzrows]
 
     for i in range(ncols):
         col = colored_degrees.argmax()
-        colored_degrees[f2c[nzrows[nzcols == colmap[col]]]] += 1
+        colored_degrees[reduced_rows[nzcols == colmap[col]]] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
         yield colmap[col]
 
