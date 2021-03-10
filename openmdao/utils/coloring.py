@@ -981,7 +981,7 @@ def _order_by_ID(nzrows, nzcols, colmap):
     """
     ncols = colmap.size
     colored_degrees = np.zeros(ncols, dtype=int)
-    reduced_rows = _full2compressed_map(nzrows)[nzrows]
+    reduced_rows = _full2compressed(nzrows)
 
     for i in range(ncols):
         col = colored_degrees.argmax()
@@ -990,15 +990,12 @@ def _order_by_ID(nzrows, nzcols, colmap):
         yield colmap[col]
 
 
-def _full2compressed_map(idxs):
+def _full2compressed(idxs):
     """
-    For an index array, return array that maps full indices into those of a compressed array.
+    For an index array, return that array with indices converted to index into a compressed array.
 
     Compressed array is an array that includes only entries corresponding to idxs.
     idxs can contain multiple copies of the same index.
-
-    Note that the returned mapping array only has valid values in the entries corresponding
-    to the specific indices found in idxs.  Other entries are not initialized.
 
     Parameters
     ----------
@@ -1011,13 +1008,16 @@ def _full2compressed_map(idxs):
         Array that maps full indices into compressed ones.
     """
     if idxs.size == 0:
-        return np.zeros(0, dtype=int)
+        return idxs
 
     unique = np.unique(idxs)
     # array only needs to be large enough to hold the highest index in idxs
-    f2c = np.empty(np.max(unique) + 1, dtype=int)
-    f2c[unique] = np.arange(unique.size, dtype=int)
-    return f2c
+    full2comp = np.empty(np.max(unique) + 1, dtype=int)
+    full2comp[unique] = np.arange(unique.size, dtype=int)
+
+    # Note that the full2comp mapping array only has valid values in the entries corresponding
+    # to the specific indices found in idxs.  Other entries are not initialized.
+    return full2comp[idxs]
 
 
 def _2col_adj_rows_cols(nzrows, nzcols, shape):
