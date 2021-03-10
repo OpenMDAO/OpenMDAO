@@ -971,8 +971,8 @@ def _order_by_ID(nzrows, nzcols, colmap):
         Nonzero rows.
     nzcols : ndarray
         Nonzero columns.
-    shape : tuple
-        Shape of the matrix containing the given nonzero rows and columns.
+    colmap : ndarray
+        Mapping array from reduced index to index into the full matrix.
 
     Yields
     ------
@@ -997,6 +997,9 @@ def _full2compressed_map(idxs):
     Compressed array is an array that includes only entries corresponding to idxs.
     idxs can contain multiple copies of the same index.
 
+    Note that the returned mapping array only has valid values in the entries corresponding
+    to the specific indices found in idxs.  Other entries are not initialized.
+
     Parameters
     ----------
     idxs : ndarray
@@ -1010,11 +1013,10 @@ def _full2compressed_map(idxs):
     if idxs.size == 0:
         return np.zeros(0, dtype=int)
 
-    size = np.max(idxs) + 1
-    rng = np.arange(size, dtype=int)
     unique = np.unique(idxs)
-    rng[unique] = np.arange(unique.size, dtype=int)
-    return rng
+    f2c = np.empty(np.max(idxs) + 1, dtype=int)
+    f2c[unique] = np.arange(unique.size, dtype=int)
+    return f2c
 
 
 def _2col_adj_rows_cols(nzrows, nzcols, shape):
@@ -1056,7 +1058,8 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
         adjcols = np.hstack(adjcols)
 
         # there could be duplicates, so remove them
-        coo = coo_matrix((np.empty(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
+        coo = coo_matrix((np.empty(adjrows.size, dtype=bool), (adjrows, adjcols)),
+                         shape=(ncols, ncols))
         coo.sum_duplicates()
         adjrows = coo.row
         adjcols = coo.col
@@ -1064,10 +1067,9 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
         adjrows = np.zeros(0, dtype=int)
         adjcols = np.zeros(0, dtype=int)
 
-    rng = np.arange(ncols, dtype=int)
-    mask = np.zeros(rng.size, dtype=bool)
+    mask = np.zeros(ncols, dtype=bool)
     mask[adjcols] = True
-    colmap = rng[mask]
+    colmap = np.arange(ncols, dtype=int)[mask]
 
     return adjrows, adjcols, (ncols, ncols), colmap
 
@@ -1083,8 +1085,12 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
 
     Parameters
     ----------
-    Jpart : ndarray
-        Boolean sparsity matrix of a partition of J.
+    Jrows : ndarray
+        Nonzero rows of a partition of J.
+    Jcols : ndarray
+        Nonzero columns of a partition of J.
+    shape : tuple
+        Shape of the partition of J.
 
     Returns
     -------
@@ -1104,13 +1110,14 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         nzc = []
         nzro = Jcols[Jrows == row]
         if nzro.size == 1:
+            # if there's only 1 nonzero column in a row, include it
             nzr.append(nzro[0])
             nzc.append(nzro[0])
         else:
             Jrow[:] = False
             Jrow[nzro] = True
             for col1, col2 in combinations(nzro, 2):
-                if col1 != col2 and (Jrow[col1] or Jrow[col2]):
+                if Jrow[col1] or Jrow[col2]:
                     nzr.append(col1)
                     nzc.append(col2)
         if nzr:
@@ -1126,6 +1133,7 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         cols = np.zeros(0, dtype=int)
 
     return rows, cols, (ncols, ncols)
+
 
 def _get_full_disjoint_cols(J):
     """
