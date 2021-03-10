@@ -1014,14 +1014,15 @@ def _full2compressed_map(idxs):
         return np.zeros(0, dtype=int)
 
     unique = np.unique(idxs)
-    f2c = np.empty(np.max(idxs) + 1, dtype=int)
+    # array only needs to be large enough to hold the highest index in idxs
+    f2c = np.empty(np.max(unique) + 1, dtype=int)
     f2c[unique] = np.arange(unique.size, dtype=int)
     return f2c
 
 
 def _2col_adj_rows_cols(nzrows, nzcols, shape):
     """
-    Convert nonzero rows/cols of jacobian sparsity matrix to those of a column adjacency matrix.
+    Convert nonzero rows/cols of sparsity matrix to those of a column adjacency matrix.
 
     Parameters
     ----------
@@ -1069,6 +1070,8 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
 
     mask = np.zeros(ncols, dtype=bool)
     mask[adjcols] = True
+
+    # this maps a reduced index into an index into the full matrix
     colmap = np.arange(ncols, dtype=int)[mask]
 
     return adjrows, adjcols, (ncols, ncols), colmap
@@ -1086,11 +1089,11 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     Parameters
     ----------
     Jrows : ndarray
-        Nonzero rows of a partition of J.
+        Nonzero rows of a partition of the matrix being colored.
     Jcols : ndarray
-        Nonzero columns of a partition of J.
+        Nonzero columns of a partition of the matrix being colored.
     shape : tuple
-        Shape of the partition of J.
+        Shape of the partition of the matrix being colored.
 
     Returns
     -------
@@ -1141,8 +1144,8 @@ def _get_full_disjoint_cols(J):
 
     Parameters
     ----------
-    J : ndarray
-        The total jacobian.
+    J : 2d ndarray or coo_matrix
+        The matrix being colored.
 
     Returns
     -------
@@ -1169,11 +1172,13 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
         Nonzero columns.
     shape : tuple
         Shape of the matrix containing the given nonzero rows and columns.
+    colmap : ndarray
+        Maps reduced index into an index into the full column intersection matrix.
 
     Returns
     -------
     list
-        List of lists of disjoint columns
+        List of lists of disjoint columns.
     """
     color_groups = []
     _, ncols = shape
@@ -1203,8 +1208,12 @@ def _color_partition(Jprows, Jpcols, shape):
 
     Parameters
     ----------
-    Jpart : ndarray or coo_matrix
-        Partition of the jacobian sparsity matrix.
+    Jprows : ndarray
+        Nonzero rows of a partition of the matrix being colored.
+    Jpcols : ndarray
+        Nonzero columns of a partition of the matrix being colored.
+    shape : tuple
+        Shape of a partition of the matrix being colored.
 
     Returns
     -------
@@ -1331,8 +1340,7 @@ def MNCO_bidir(J):
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
 
-    del M_row_nonzeros
-    del M_col_nonzeros
+    M_row_nonzeros = M_col_nonzeros = None
 
     nnz_Jf = nnz_Jr = 0
 
@@ -1346,11 +1354,11 @@ def MNCO_bidir(J):
                 Jfr.append(np.full(cols.size, i, dtype=int))
                 nnz_Jf += len(cols)
 
+        Jf_rows = None
         Jfr = np.hstack(Jfr)
         Jfc = np.hstack(Jfc)
         coloring._fwd = _color_partition(Jfr, Jfc, J.shape)
-        del Jfr
-        del Jfc
+        Jfr = Jfc = None
 
     if col_i > 0:
         Jrr = []
@@ -1362,6 +1370,7 @@ def MNCO_bidir(J):
                 Jrc.append(np.full(rows.size, i, dtype=int))
                 nnz_Jr += len(rows)
 
+        Jr_cols = None
         Jrr = np.hstack(Jrr)
         Jrc = np.hstack(Jrc)
         coloring._rev = _color_partition(Jrc, Jrr, J.T.shape)
