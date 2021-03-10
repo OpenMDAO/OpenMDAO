@@ -9,13 +9,13 @@ from collections import defaultdict
 import numpy as np
 
 try:
-    from IPython.display import IFrame, display
+    from IPython.display import IFrame, display, HTML
 except ImportError:
     IFrame = display = None
 
 import openmdao
 from openmdao.core.problem import Problem
-from openmdao.core.notebook_mode import notebook
+from openmdao.core.notebook_mode import notebook, colab
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
@@ -198,7 +198,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         f.write(s)
 
     if notebook:
-        display(IFrame(src=outfile, width=1000, height=1000))
+        # display in Jupyter Notebook
+        if not colab:
+            display(IFrame(src=outfile, width=1000, height=1000))
+        else:
+            display(HTML(outfile))
 
-    if show_browser and not notebook:
+    elif show_browser:
+        # open it up in the browser
+        from openmdao.utils.webview import webview
         webview(outfile)
