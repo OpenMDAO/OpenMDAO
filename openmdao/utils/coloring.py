@@ -27,6 +27,7 @@ from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
+from openmdao.devtools.memory import mem_usage
 
 
 CITATIONS = """
@@ -551,6 +552,9 @@ class Coloring(object):
         coloring_time = meta.get('coloring_time')
         if coloring_time is not None:
             print("Time to compute coloring: %f sec." % coloring_time)
+        coloring_mem = meta.get('coloring_memory')
+        if coloring_mem is not None:
+            print("Memory to compute coloring: %f MB." % coloring_mem)
 
     def display_txt(self):
         """
@@ -1262,6 +1266,10 @@ def MNCO_bidir(J):
         See docstring for Coloring class.
     """
     start_time = time.time()
+    try:
+        start_mem = mem_usage()
+    except RuntimeError:
+        start_mem = None
 
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
@@ -1379,6 +1387,8 @@ def MNCO_bidir(J):
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    if start_mem is not None:
+        coloring._meta['coloring_memory'] = mem_usage() - start_mem
     coloring._meta['bidirectional'] = True
 
     return coloring
@@ -1812,6 +1822,10 @@ def _compute_coloring(J, mode):
         See Coloring class docstring.
     """
     start_time = time.time()
+    try:
+        start_mem = mem_usage()
+    except RuntimeError:
+        start_mem = None
     nrows, ncols = J.shape
 
     if mode == 'auto':  # use bidirectional coloring
@@ -1854,6 +1868,8 @@ def _compute_coloring(J, mode):
         coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    if start_mem is not None:
+        coloring._meta['coloring_memory'] = mem_usage() - start_mem
 
     return coloring
 
