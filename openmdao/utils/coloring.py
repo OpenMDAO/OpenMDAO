@@ -1187,7 +1187,7 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
     return color_groups
 
 
-def _color_partition(Jpart):
+def _color_partition(Jprows, Jpcols, shape):
     """
     Compute a single directional fwd coloring using partition Jpart.
 
@@ -1195,7 +1195,7 @@ def _color_partition(Jpart):
 
     Parameters
     ----------
-    Jpart : ndarray
+    Jpart : ndarray or coo_matrix
         Partition of the jacobian sparsity matrix.
 
     Returns
@@ -1205,11 +1205,9 @@ def _color_partition(Jpart):
     list
         List of nonzero rows for each column.
     """
-    Jprows, Jpcols = np.nonzero(Jpart)
-    shape = Jpart.shape
     nrows, ncols = shape
 
-    nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, Jpart.shape)
+    nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
 
     rng = np.arange(ncols, dtype=int)
 
@@ -1240,8 +1238,8 @@ def MNCO_bidir(J):
 
     Parameters
     ----------
-    J : ndarray
-        Dense Jacobian sparsity matrix (boolean)
+    J : ndarray or coo_matrix
+        Jacobian sparsity matrix (boolean)
 
     Returns
     -------
@@ -1250,7 +1248,10 @@ def MNCO_bidir(J):
     """
     start_time = time.time()
 
-    nzrows, nzcols = np.nonzero(J)
+    if isinstance(J, np.ndarray):
+        nzrows, nzcols = np.nonzero(J)
+    else:
+        nzrows, nzcols = J.row, J.col
     shape = J.shape
 
     nrows, ncols = shape
@@ -1324,31 +1325,42 @@ def MNCO_bidir(J):
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
 
+    del M_row_nonzeros
+    del M_col_nonzeros
+
     nnz_Jf = nnz_Jr = 0
-    jac = np.zeros(J.shape, dtype=bool)
 
     if row_i > 0:
-        Jf = jac
+        Jfr = []
+        Jfc = []
         # build Jf and do fwd coloring on it
         for i, cols in enumerate(Jf_rows):
             if cols is not None:
-                Jf[i][cols] = True
+                Jfc.append(cols)
+                Jfr.append(np.full(cols.size, i, dtype=int))
                 nnz_Jf += len(cols)
 
-        coloring._fwd = _color_partition(Jf)
-        jac[:] = False  # reset for use with Jr
+        Jfr = np.hstack(Jfr)
+        Jfc = np.hstack(Jfc)
+        coloring._fwd = _color_partition(Jfr, Jfc, J.shape)
+        del Jfr
+        del Jfc
 
     if col_i > 0:
-        Jr = jac
+        Jrr = []
+        Jrc = []
         # build Jr and do rev coloring
         for i, rows in enumerate(Jr_cols):
             if rows is not None:
-                Jr[rows, i] = True
+                Jrr.append(rows)
+                Jrc.append(np.full(rows.size, i, dtype=int))
                 nnz_Jr += len(rows)
 
-        coloring._rev = _color_partition(Jr.T)
+        Jrr = np.hstack(Jrr)
+        Jrc = np.hstack(Jrc)
+        coloring._rev = _color_partition(Jrc, Jrr, J.T.shape)
 
-    if np.count_nonzero(J) != nnz_Jf + nnz_Jr:
+    if nzrows.size != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
 
     coloring._meta['coloring_time'] = time.time() - start_time

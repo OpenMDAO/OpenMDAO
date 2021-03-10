@@ -958,8 +958,8 @@ class BidirectionalTestCase(unittest.TestCase):
         if not os.path.exists(matfile):
             raise unittest.SkipTest("Matrix test file were not included.")
 
-        mat = load_npz(matfile).toarray()
-        mat = np.asarray(mat, dtype=bool)
+        mat = load_npz(matfile).tocoo()
+        mat.data = np.asarray(mat.data, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
         mat = None
 

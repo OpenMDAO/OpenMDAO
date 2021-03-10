@@ -348,7 +348,7 @@ class Jacobian(object):
 
         Returns
         -------
-        ndarray
+        coo_matrix
             Boolean sparsity matrix.
         """
         from openmdao.utils.coloring import _tol_sweep
