@@ -1205,15 +1205,13 @@ def _color_partition(Jprows, Jpcols, shape):
     list
         List of nonzero rows for each column.
     """
-    nrows, ncols = shape
+    _, ncols = shape
 
     nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
 
-    rng = np.arange(ncols, dtype=int)
-
     mask = np.zeros(ncols, dtype=bool)
     mask[nzcols] = True
-    colmap = rng[mask]
+    colmap = np.arange(ncols, dtype=int)[mask]
 
     col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap)
 
@@ -1548,15 +1546,17 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
         fullJ = None
         for i in range(num_full_jacs):
             if use_driver:
-                J = prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
-                                                use_abs_names=use_abs_names)
+                Jabs = np.abs(prob.driver._compute_totals(of=of, wrt=wrt, return_format='array',
+                                                          use_abs_names=use_abs_names))
             else:
-                J = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                        use_abs_names=use_abs_names)
+                Jabs = np.abs(prob.compute_totals(of=of, wrt=wrt, return_format='array',
+                                                  use_abs_names=use_abs_names))
             if fullJ is None:
-                fullJ = np.abs(J)
+                fullJ = Jabs
             else:
-                fullJ += np.abs(J)
+                fullJ += Jabs
+
+        Jabs = None
         elapsed = time.time() - start_time
 
     fullJ *= (1.0 / np.max(fullJ))
@@ -1570,10 +1570,9 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                                                                              elapsed))
     print("Total jacobian shape:", fullJ.shape, "\n")
 
-    boolJ = np.zeros(fullJ.shape, dtype=bool)
-    boolJ[fullJ > info['good_tol']] = True
+    nzrows, nzcols = np.nonzero(fullJ > info['good_tol'])
 
-    return boolJ, info
+    return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=fullJ.shape), info
 
 
 def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
