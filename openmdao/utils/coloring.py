@@ -1187,7 +1187,7 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
     return color_groups
 
 
-def _color_partition(J, Jpart):
+def _color_partition(Jpart):
     """
     Compute a single directional fwd coloring using partition Jpart.
 
@@ -1195,8 +1195,6 @@ def _color_partition(J, Jpart):
 
     Parameters
     ----------
-    J : ndarray
-        Dense jacobian sparsity matrix
     Jpart : ndarray
         Partition of the jacobian sparsity matrix.
 
@@ -1337,7 +1335,7 @@ def MNCO_bidir(J):
                 Jf[i][cols] = True
                 nnz_Jf += len(cols)
 
-        coloring._fwd = _color_partition(J, Jf)
+        coloring._fwd = _color_partition(Jf)
         jac[:] = False  # reset for use with Jr
 
     if col_i > 0:
@@ -1348,7 +1346,7 @@ def MNCO_bidir(J):
                 Jr[rows, i] = True
                 nnz_Jr += len(rows)
 
-        coloring._rev = _color_partition(J.T, Jr.T)
+        coloring._rev = _color_partition(Jr.T)
 
     if np.count_nonzero(J) != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
