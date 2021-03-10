@@ -274,6 +274,20 @@ class N2Toolbar {
         return btn;
     }
 
+    /** Get a snapshot of the search term and match count. */
+    getSearchState() {
+        return {
+                'term': this.searchBar.node().value,
+                'matches': this.searchCount.html()
+        }
+    }
+
+    /** Restore a snapshot of the search term and match count. */
+    setSearchState(searchInfo) {
+        this.searchBar.node().value = searchInfo.term;
+        this.searchCount.html(searchInfo.matches);
+    }
+
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
      * @param {N2UserInterface} n2ui A reference to the UI object

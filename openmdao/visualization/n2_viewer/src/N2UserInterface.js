@@ -44,10 +44,10 @@ class N2UserInterface {
         // Add listener for reading in a saved view.
         let self = this;
         let n2diag = this.n2Diag;
-        document.getElementById('state-file-input').addEventListener('change', function() {
+        document.getElementById('state-file-input').addEventListener('change', function () {
 
-            var fr=new FileReader();
-            fr.onload=function(){
+            var fr = new FileReader();
+            fr.onload = function () {
                 let dataDict = false;
 
                 try {
@@ -367,7 +367,8 @@ class N2UserInterface {
 
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,
-            'hidden': formerHidden
+            'hidden': formerHidden,
+            'search': this.toolbar.getSearchState()
         });
 
         if (clearForward) this.forwardButtonHistory = [];
@@ -384,7 +385,8 @@ class N2UserInterface {
 
         this.forwardButtonHistory.push({
             'node': node,
-            'hidden': formerHidden
+            'hidden': formerHidden,
+            'search': this.toolbar.getSearchState()
         });
     }
 
@@ -407,6 +409,8 @@ class N2UserInterface {
 
         const history = this.backButtonHistory.pop();
         const node = history.node;
+
+        this.toolbar.setSearchState(history.search);
 
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
@@ -447,6 +451,8 @@ class N2UserInterface {
 
         const history = this.forwardButtonHistory.pop();
         const node = history.node;
+
+        this.toolbar.setSearchState(history.search);
 
         d3.select('#redo-graph').classed('disabled-button',
             (this.forwardButtonHistory.length == 0));
@@ -649,7 +655,7 @@ class N2UserInterface {
         n2Diag.showSolvers = true;
         this.n2Diag.update();
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
-        }
+    }
     hideSolvers() {
         // d3.select('#solver_tree').style('display','none');
         // d3.select('#solver_tree').attr('width',0);
@@ -658,7 +664,7 @@ class N2UserInterface {
         // const handle = d3.select('#n2-resizer-handle');
         d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
         // n2-resizer-handle
-        }
+    }
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
@@ -793,23 +799,23 @@ class N2UserInterface {
         let arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
 
         let dataDict = {
-                        'showLinearSolverNames': showLinearSolverNames,
-                        'showSolvers': showSolvers,
-                        'zoomedElement': zoomedElement,
-                        'expandCollapse': expandCollapse,
-                        'arrowState': arrowState,
-                        'md5_hash': this.n2Diag.model.md5_hash,
-                        };
+            'showLinearSolverNames': showLinearSolverNames,
+            'showSolvers': showSolvers,
+            'zoomedElement': zoomedElement,
+            'expandCollapse': expandCollapse,
+            'arrowState': arrowState,
+            'md5_hash': this.n2Diag.model.md5_hash,
+        };
 
         let link = document.createElement('a');
         link.setAttribute('download', stateFileName);
         let data_blob = new Blob([JSON.stringify(dataDict)],
-                                 {type: 'text/plain'});
+            { type: 'text/plain' });
 
         // If we are replacing a previously generated file we need to
         // manually revoke the object URL to avoid memory leaks.
         if (stateFileName !== null) {
-          window.URL.revokeObjectURL(stateFileName);
+            window.URL.revokeObjectURL(stateFileName);
         }
 
         link.href = window.URL.createObjectURL(data_blob);
