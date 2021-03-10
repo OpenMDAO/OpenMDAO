@@ -407,7 +407,7 @@ class N2Diagram {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
             })
             .attr("id", function (d) {
-                return d.absPathName.replace(/[\.:]/g, '_');
+                return N2TreeNode.absPathToId(d.absPathName);
             })
             .attr('rx', 12)
             .attr('ry', 12);
