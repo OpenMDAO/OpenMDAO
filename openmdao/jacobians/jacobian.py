@@ -377,7 +377,7 @@ class Jacobian(object):
                     else:  # dense
                         for i, r in enumerate(range(roffset, rend)):
                             Jrows.append([r] * (cend - coffset))
-                            Jcols.append(range(coffset, cend))
+                            Jcols.append(np.arange(coffset, cend))
                             Jdata.append(subsum[i, :])
 
         summ = self._jac_summ = None  # free up some memory
