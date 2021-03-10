@@ -285,9 +285,10 @@ class N2Toolbar {
         this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
             "Collapse model to only variables that match search term",
             e => {
-                self.searchCount.html('0 matches');
+                if (self.searchBar.node().value == '') {
+                    self.searchCount.html('0 matches');
+                }
 
-                self.searchBar.node().value = '';
                 d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
 
                 // This is necessary rather than just calling focus() due to the
