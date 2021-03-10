@@ -1265,12 +1265,6 @@ def MNCO_bidir(J):
     Coloring
         See docstring for Coloring class.
     """
-    start_time = time.time()
-    try:
-        start_mem = mem_usage()
-    except RuntimeError:
-        start_mem = None
-
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
     else:
@@ -1386,9 +1380,6 @@ def MNCO_bidir(J):
     if nzrows.size != nnz_Jf + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jf and Jr")
 
-    coloring._meta['coloring_time'] = time.time() - start_time
-    if start_mem is not None:
-        coloring._meta['coloring_memory'] = mem_usage() - start_mem
     coloring._meta['bidirectional'] = True
 
     return coloring
@@ -1810,7 +1801,7 @@ def _compute_coloring(J, mode):
 
     Parameters
     ----------
-    J : ndarray
+    J : ndarray or coo_matrix
         The boolean total jacobian.
     mode : str
         The direction for solving for total derivatives.  Must be 'fwd', 'rev' or 'auto'.
@@ -1830,14 +1821,20 @@ def _compute_coloring(J, mode):
 
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
-        fwdcoloring = _compute_coloring(J, 'fwd')
-        if coloring.total_solves() >= fwdcoloring.total_solves():
-            coloring = fwdcoloring
+        fallback = _compute_coloring(J, 'fwd')
+        if coloring.total_solves() >= fallback.total_solves():
+            coloring = fallback
             coloring._meta['fallback'] = True
-        revcoloring = _compute_coloring(J, 'rev')
-        if coloring.total_solves() > revcoloring.total_solves():
-            coloring = revcoloring
+        fallback = _compute_coloring(J, 'rev')
+        if coloring.total_solves() > fallback.total_solves():
+            coloring = fallback
             coloring._meta['fallback'] = True
+        fallback = None
+
+        # record the total time and memory usage for bidir, fwd, and rev
+        coloring._meta['coloring_time'] = time.time() - start_time
+        if start_mem is not None:
+            coloring._meta['coloring_memory'] = mem_usage() - start_mem
         return coloring
 
     rev = mode == 'rev'

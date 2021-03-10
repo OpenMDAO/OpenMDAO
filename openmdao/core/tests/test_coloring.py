@@ -917,8 +917,6 @@ class BidirectionalTestCase(unittest.TestCase):
             builder = TotJacBuilder.eisenstat(n)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
-            if tot_colors == n // 2 + 3:
-                raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
             self.assertLessEqual(tot_colors, n // 2 + 2,
                                  "Eisenstat's example of size %d required %d colors but shouldn't "
                                  "need more than %d." % (n, tot_colors, n // 2 + 2))
