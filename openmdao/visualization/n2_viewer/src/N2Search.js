@@ -174,10 +174,14 @@ class N2Search {
     /** Do some escaping and replacing of globbing with regular expressions. */
     _getSearchRegExp(searchValsArray) {
         let regexStr = new String("(^" + searchValsArray.join("$|^") + "$)")
-            .replace(/\./g, "\\.") //convert . to regex
-            .replace(/\?/g, ".") //convert ? to regex
-            .replace(/\*/g, ".*?") //convert * to regex
-            .replace(/\^/g, "^.*?"); //prepend *
+            .replace(/[\.\?\*\^]/g, function(c) {
+                return {
+                    '.': "\\.",
+                    '?': ".",
+                    '*': ".*?",
+                    '^': "^.*?"
+                }[c];
+            });
 
         return new RegExp(regexStr, "i"); // case insensitive
     }
