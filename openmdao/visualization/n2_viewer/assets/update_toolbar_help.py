@@ -6,11 +6,6 @@ then takes a snapshot of the toolbar and saves it as a base64-encoded PNG.
 """
 
 import os
-
-if not os.path.exists("./update_toolbar_help.py"):
-    print("Only run from the directory where the script is located.")
-    exit(0)
-
 import asyncio
 import pyppeteer
 import base64
@@ -93,7 +88,13 @@ async def main():
     if do_add[0].lower() == 'y':
         os.system(f"git add -v {OUTPUT_FILE}")
 
-print(f"Generating N2 from {MODEL_FILE}")
-os.system(f"openmdao n2 -o {N2_FILE} --no_browser {MODEL_FILE}")
 
-asyncio.get_event_loop().run_until_complete(main())
+if os.path.exists("./update_toolbar_help.py"):
+    print(f"Generating N2 from {MODEL_FILE}")
+    os.system(f"openmdao n2 -o {N2_FILE} --no_browser {MODEL_FILE}")
+
+    asyncio.get_event_loop().run_until_complete(main())
+else:
+    print("Only run from the directory where the script is located.")
+
+
