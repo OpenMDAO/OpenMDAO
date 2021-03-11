@@ -98,30 +98,46 @@ class N2UserInterface {
             }
             fr.readAsText(this.files[0]);
         })
-
     }
+
+    /**
+     * Set the range and current value of the collapse depth slider.
+     * @param {Number} opts.min The shallowest elements to allow to collapse via slider.
+     * @param {Number} opts.max The deepest elements to allow to collapse via slider.
+     * @param {Number} opts.val The current slider collapse depth value.
+     */
+    setCollapseDepthSlider(opts = {}) {
+        const min = opts.min ? opts.min : 2;
+        const max = opts.max ? opts.max : this.n2Diag.model.maxDepth;
+        const val = opts.val ? opts.val : max;
+
+        this.collapseDepthSlider
+            .property('min', min)
+            .property('max', max)
+            .property('value', val);
+
+        this.collapseDepthLabel.text(val);
+    }
+
+    get collapseDepthSliderVal() { return Number(this.collapseDepthSlider.property('value')); }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
     _setupCollapseDepthSlider() {
-        const self = this,
-            collapseDepthSlider = d3.select('input#depth-slider'),
-            collapseDepthLabel = d3.select('p#depth-slider-label'),
-            max = this.n2Diag.model.maxDepth;
+        const self = this;
 
-        collapseDepthLabel.text(max)
+        this.collapseDepthSlider = d3.select('input#depth-slider'),
+            this.collapseDepthLabel = d3.select('p#depth-slider-label');
 
-        collapseDepthSlider
-            .property('max', max)
-            .property('value', max)
+        this.setCollapseDepthSlider();
+
+        this.collapseDepthSlider
             .on('mouseup', e => {
-                self.collapseToDepth(collapseDepthSlider.property('value'));
+                const val = self.collapseDepthSlider.property('value');
+                self.collapseToDepth(val);
             })
             .on('input', e => {
-                const val = Number(collapseDepthSlider.property('value'));
-                collapseDepthLabel.text(val)
+                self.collapseDepthLabel.text(self.collapseDepthSliderVal);
             });
-
-        // console.log(`Collapse depth slider starting val/max: ${max}`)
     }
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
@@ -374,7 +390,8 @@ class N2UserInterface {
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,
             'hidden': formerHidden,
-            'search': this.toolbar.getSearchState()
+            'search': this.toolbar.getSearchState(),
+            'collapseDepth': this.currentCollapseDepth
         });
 
         if (clearForward) this.forwardButtonHistory = [];
@@ -392,7 +409,8 @@ class N2UserInterface {
         this.forwardButtonHistory.push({
             'node': node,
             'hidden': formerHidden,
-            'search': this.toolbar.getSearchState()
+            'search': this.toolbar.getSearchState(),
+            'collapseDepth': this.currentCollapseDepth
         });
     }
 
@@ -417,6 +435,7 @@ class N2UserInterface {
         const node = history.node;
 
         this.toolbar.setSearchState(history.search);
+        this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
@@ -459,6 +478,7 @@ class N2UserInterface {
         const node = history.node;
 
         this.toolbar.setSearchState(history.search);
+        this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         d3.select('#redo-graph').classed('disabled-button',
             (this.forwardButtonHistory.length == 0));
@@ -522,6 +542,7 @@ class N2UserInterface {
         this.leftClickIsForward = false;
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         this.addBackButtonHistory();
+        this.setCollapseDepthSlider();
 
         this.n2Diag.reset();
     }
@@ -621,7 +642,6 @@ class N2UserInterface {
      */
     collapseToDepth(depth) {
         testThis(this, 'N2UserInterface', 'collapseToDepth');
-        // console.log(`New collapse depth: ${depth}`);
 
         this.addBackButtonHistory();
         this.n2Diag.minimizeToDepth(depth);
@@ -735,6 +755,8 @@ class N2UserInterface {
     /** Make sure UI controls reflect history and current reality. */
     update() {
         testThis(this, 'N2UserInterface', 'update');
+
+        this.currentCollapseDepth = this.collapseDepthSliderVal;
 
         d3.select('#undo-graph').classed('disabled-button',
             (this.backButtonHistory.length == 0));
