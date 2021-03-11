@@ -36,7 +36,7 @@ def _print_violations(outputs, lower, upper):
             simple_warning(msg)
 
         if lower is not None and any(val < lower[start:end]):
-            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Upper: {lower[start:end]}\n")
+            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Lower: {lower[start:end]}\n")
             simple_warning(msg)
 
         start = end
