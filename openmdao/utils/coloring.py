@@ -1170,9 +1170,9 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
     Parameters
     ----------
     nzrows : ndarray
-        Nonzero rows.
+        Nonzero rows in the column intersection matrix.
     nzcols : ndarray
-        Nonzero columns.
+        Nonzero columnsin the column intersection matrix.
     shape : tuple
         Shape of the matrix containing the given nonzero rows and columns.
     colmap : ndarray
@@ -1802,7 +1802,6 @@ def _compute_coloring(J, mode):
         start_mem = mem_usage()
     except RuntimeError:
         start_mem = None
-    nrows, ncols = J.shape
 
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
@@ -1829,6 +1828,8 @@ def _compute_coloring(J, mode):
     if rev:
         J = J.T
 
+    nrows, ncols = J.shape
+
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
     else:
@@ -1836,13 +1837,17 @@ def _compute_coloring(J, mode):
 
     col_groups = _get_full_disjoint_cols(nzrows, nzcols, J.shape)
 
-    full_slice = slice(None)
-    col2rows = [full_slice] * J.shape[1]  # will contain list of nonzero rows for each column
-    for lst in col_groups:
-        for col in lst:
-            rows = nzrows[nzcols == col]
-            rows.sort()
-            col2rows[col] = rows
+    col2rows = [None] * ncols  # will contain list of nonzero rows for each column
+
+    for r, c in zip(nzrows, nzcols):
+        if col2rows[c] is None:
+            col2rows[c] = [r]
+        else:
+            col2rows[c].append(r)
+
+    for c, rows in enumerate(col2rows):
+        if rows is not None:
+            col2rows[c] = sorted(rows)
 
     if rev:
         coloring._rev = (col_groups, col2rows)
