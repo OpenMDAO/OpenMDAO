@@ -1488,12 +1488,13 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                             if key == '@simul_coloring':
+                                print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
+                                print('In mode: %s.' % mode)
                                 print_key = key
                                 if key in self.ivc_print_names:
                                     print_key = self.ivc_print_names[key]
