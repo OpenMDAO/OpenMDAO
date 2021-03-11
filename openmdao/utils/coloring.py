@@ -979,6 +979,8 @@ def _order_by_ID(nzrows, nzcols, colmap):
     ------
     int
         Column index.
+    ndarray
+        Boolean array that's True where the column matches nzcols.
     """
     ncols = colmap.size
     colored_degrees = np.zeros(ncols, dtype=int)
@@ -986,9 +988,10 @@ def _order_by_ID(nzrows, nzcols, colmap):
 
     for i in range(ncols):
         col = colored_degrees.argmax()
-        colored_degrees[reduced_rows[nzcols == colmap[col]]] += 1
+        colmatch = nzcols == colmap[col]
+        colored_degrees[reduced_rows[colmatch]] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
-        yield colmap[col]
+        yield colmap[col], colmatch
 
 
 def _full2compressed(idxs):
@@ -1139,26 +1142,25 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     return rows, cols, (ncols, ncols)
 
 
-def _get_full_disjoint_cols(J):
+def _get_full_disjoint_cols(nzrows, nzcols, shape):
     """
     Find sets of disjoint columns in J and their corresponding rows using a col adjacency matrix.
 
     Parameters
     ----------
-    J : 2d ndarray or coo_matrix
-        The matrix being colored.
+    nzrows : ndarray
+        Nonzero rows.
+    nzcols : ndarray
+        Nonzero columns.
+    shape : tuple
+        Shape of the matrix containing the given nonzero rows and columns.
 
     Returns
     -------
     list
         List of lists of disjoint columns
     """
-    if isinstance(J, np.ndarray):
-        nzrows, nzcols = np.nonzero(J)
-    else:
-        nzrows, nzcols = J.row, J.col
-
-    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, J.shape))
+    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, shape))
 
 
 def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
@@ -1187,8 +1189,8 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
     # -1 indicates that a column has not been colored
     colors = np.full(ncols, -1, dtype=int)
 
-    for col in _order_by_ID(nzrows, nzcols, colmap):
-        neighbor_colors = set(colors[nzrows[nzcols == col]])
+    for col, colmatch in _order_by_ID(nzrows, nzcols, colmap):
+        neighbor_colors = set(colors[nzrows[colmatch]])
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
                 grp.append(col)
@@ -1827,12 +1829,12 @@ def _compute_coloring(J, mode):
     if rev:
         J = J.T
 
-    col_groups = _get_full_disjoint_cols(J)
-
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
     else:
         nzrows, nzcols = J.row, J.col
+
+    col_groups = _get_full_disjoint_cols(nzrows, nzcols, J.shape)
 
     full_slice = slice(None)
     col2rows = [full_slice] * J.shape[1]  # will contain list of nonzero rows for each column
