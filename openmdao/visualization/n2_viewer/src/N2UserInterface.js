@@ -31,7 +31,7 @@ class N2UserInterface {
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
 
-        this._setupCollapseDepthElement();
+        this._setupCollapseDepthSlider();
         this.updateClickedIndices();
         this._setupSearch();
         this._setupResizerDrag();
@@ -102,20 +102,27 @@ class N2UserInterface {
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
-    _setupCollapseDepthElement() {
-        let self = this;
+    _setupCollapseDepthSlider() {
+        const self = this,
+            collapseDepthSlider = d3.select('input#depth-slider'),
+            collapseDepthLabel = d3.select('p#depth-slider-label'),
+            max = this.n2Diag.model.maxDepth,
+            unicodeCircleOne = 9312;
 
-        let collapseDepthElement = this.n2Diag.dom.parentDiv.querySelector(
-            '#depth-slider'
-        );
+        collapseDepthLabel.html(`&#${unicodeCircleOne + max - 1};`)
 
-        collapseDepthElement.max = this.n2Diag.model.maxDepth - 1;
-        collapseDepthElement.value = collapseDepthElement.max;
+        collapseDepthSlider
+            .property('max', max)
+            .property('value', max)
+            .on('mouseup', e => {
+                self.collapseToDepth(collapseDepthSlider.property('value'));
+            })
+            .on('mousemove', e => {
+                const val = Number(collapseDepthSlider.property('value'));
+                collapseDepthLabel.html(`&#${unicodeCircleOne + val - 1};`)
+            });
 
-        collapseDepthElement.onmouseup = function (e) {
-            const modelDepth = parseInt(e.target.value);
-            self.collapseToDepthSelectChange(modelDepth);
-        };
+        // console.log(`Collapse depth slider starting val/max: ${max}`)
     }
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
@@ -610,14 +617,15 @@ class N2UserInterface {
     }
 
     /**
-     * React to a new selection in the collapse-to-depth drop-down.
-     * @param {Number} newChosenCollapseDepth Selected depth to collapse to.
+     * React to a new selection in the collapse-to-depth toolbar slider.
+     * @param {Number} depth Selected depth to collapse to.
      */
-    collapseToDepthSelectChange(newChosenCollapseDepth) {
-        testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
+    collapseToDepth(depth) {
+        testThis(this, 'N2UserInterface', 'collapseToDepth');
+        // console.log(`New collapse depth: ${depth}`);
 
         this.addBackButtonHistory();
-        this.n2Diag.minimizeToDepth(newChosenCollapseDepth);
+        this.n2Diag.minimizeToDepth(depth);
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
