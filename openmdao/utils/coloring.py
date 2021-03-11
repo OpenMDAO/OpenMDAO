@@ -175,7 +175,9 @@ class Coloring(object):
 
         self._fwd = None
         self._rev = None
-        self._meta = {}
+        self._meta = {
+            'version': '1.0',
+        }
 
         self._names_array = {'fwd': None, 'rev': None}
         self._local_array = {'fwd': None, 'rev': None}
@@ -201,11 +203,7 @@ class Coloring(object):
         else:
             raise RuntimeError("Invalid direction '%s' in color_iter" % direction)
 
-        for i in colors[0]:
-            yield [i]
-
-        for i in range(1, len(colors)):
-            yield colors[i]
+        yield from colors
 
     def color_nonzero_iter(self, direction):
         """
@@ -305,10 +303,10 @@ class Coloring(object):
                 tot_size = min(fwd_size, rev_size)
 
             if fwd_lists:
-                fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
+                fwd_solves = len(fwd_lists)
 
             if rev_lists:
-                rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
+                rev_solves = len(rev_lists)
 
             if tot_size <= 0:
                 pct = 0.
@@ -338,16 +336,10 @@ class Coloring(object):
         """
         total = 0
 
-        # lists[0] are the uncolored columns or rows, which are solved individually so
-        # we add all of them, along with the number of remaining lists, where each
-        # sublist is a bunch of columns or rows that are solved together, to get the total colors
-        # (which equals the total number of linear solves).
         if do_fwd and self._fwd:
-            row_lists, _ = self._fwd
-            total += len(row_lists[0]) + len(row_lists) - 1
+            total += len(self._fwd[0])
         if do_rev and self._rev:
-            col_lists, _ = self._rev
-            total += len(col_lists[0]) + len(col_lists) - 1
+            total += len(self._rev[0])
 
         return total
 
@@ -367,7 +359,21 @@ class Coloring(object):
             See docstring for Coloring class.
         """
         with open(fname, 'rb') as f:
-            return pickle.load(f)
+            coloring = pickle.load(f)
+            if 'version' not in coloring._meta:
+                # old format, have to update color groups
+                if coloring._fwd:
+                    old = coloring._fwd[0]
+                    newgrps = [[c] for c in old[0]]
+                    newgrps.extend(old[1:])
+                    coloring._fwd = (newgrps, coloring._fwd[1])
+                if coloring._rev:
+                    old = coloring._rev[0]
+                    newgrps = [[c] for c in old[0]]
+                    newgrps.extend(old[1:])
+                    coloring._rev = (newgrps, coloring._rev[1])
+
+            return coloring
 
     def save(self, fname):
         """
@@ -769,8 +775,6 @@ class Coloring(object):
                     idx = icol / fwd_solves
                     for r in rows:
                         J[r, c][:] = cmap(idx)[:3]
-                    if i == 0:  # group 0 are uncolored (each col has different color)
-                        icol += 1
                     entry_xcolors[c] = icol
                 icol += 1
 
@@ -789,8 +793,6 @@ class Coloring(object):
                     idx = icol / rev_solves
                     for c in cols:
                         J[r, c][:] = cmap(idx)[:3]
-                    if i == 0:  # group 0 are uncolored (each col has different color)
-                        icol += 1
                     entry_ycolors[r] = icol
                 icol += 1
 
@@ -902,23 +904,18 @@ class Coloring(object):
             subJ = J[row_slice, col_slice]
 
             if self._fwd:
-                uncolored = [[c] for c in self._fwd[0][0]]
-
-                colored = self._fwd[0][1:]
                 nzrows = self._fwd[1]
-                for color_group in chain(uncolored, colored):
+                for color_group in self.color_iter('fwd'):
                     subJ[:, :] = False
-                    # if any color in the group has nonzeros in our variable, add a solve
                     for c in color_group:
                         J[nzrows[c], c] = True
 
+                    # if any color in the group has nonzeros in our variable, add a solve
                     if np.any(subJ):
                         fwd_solves += 1
 
             if self._rev:
-                uncolored = [[r] for r in self._rev[0][0]]
-                colored = self._rev[0][1:]
-                for color_group in chain(uncolored, colored):
+                for color_group in self.color_iter('rev'):
                     subJ[:, :] = False
                     J[color_group, :] = True
 
@@ -1238,7 +1235,6 @@ def _color_partition(Jprows, Jpcols, shape):
 
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted(group)
-    col_groups = _split_groups(col_groups)
 
     col2row = [None] * ncols
     for col in Jpcols:
@@ -1782,19 +1778,6 @@ def get_tot_jac_sparsity(problem, mode='fwd',
     return sparsity, J
 
 
-def _split_groups(groups):
-    uncolored = [grp[0] for grp in groups if len(grp) == 1]
-    groups = [grp for grp in groups if len(grp) > 1]
-
-    # the first lists entry corresponds to all uncolored columns (columns that are not
-    # disjoint wrt any other columns).  The other entries are groups of columns that do not
-    # share any nonzero row entries in common.
-    clists = [uncolored]
-    clists.extend(groups)
-
-    return clists
-
-
 def _compute_coloring(J, mode):
     """
     Compute a good coloring in a specified dominant direction.
@@ -1844,7 +1827,7 @@ def _compute_coloring(J, mode):
     if rev:
         J = J.T
 
-    col_groups = _split_groups(_get_full_disjoint_cols(J))
+    col_groups = _get_full_disjoint_cols(J)
 
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
@@ -1857,7 +1840,7 @@ def _compute_coloring(J, mode):
         for col in lst:
             rows = nzrows[nzcols == col]
             rows.sort()
-            col2rows[col] = rows  # np.nonzero(J[:, col])[0]
+            col2rows[col] = rows
 
     if rev:
         coloring._rev = (col_groups, col2rows)

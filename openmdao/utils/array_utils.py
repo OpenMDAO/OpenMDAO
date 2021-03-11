@@ -517,10 +517,9 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     coo = coo_matrix((data, (rows, cols)), shape=shape)
 
     # get rid of dup rows/cols
-    csc = coo.tocsc()
+    coo.sum_duplicates()
 
-    # now back to final coo
-    return csc.tocoo()
+    return coo
 
 
 def sparse_subinds(orig, inds):
