@@ -106,10 +106,9 @@ class N2UserInterface {
         const self = this,
             collapseDepthSlider = d3.select('input#depth-slider'),
             collapseDepthLabel = d3.select('p#depth-slider-label'),
-            max = this.n2Diag.model.maxDepth,
-            unicodeCircleOne = 9312;
+            max = this.n2Diag.model.maxDepth;
 
-        collapseDepthLabel.html(`&#${unicodeCircleOne + max - 1};`)
+        collapseDepthLabel.text(max)
 
         collapseDepthSlider
             .property('max', max)
@@ -117,9 +116,9 @@ class N2UserInterface {
             .on('mouseup', e => {
                 self.collapseToDepth(collapseDepthSlider.property('value'));
             })
-            .on('mousemove', e => {
+            .on('input', e => {
                 const val = Number(collapseDepthSlider.property('value'));
-                collapseDepthLabel.html(`&#${unicodeCircleOne + val - 1};`)
+                collapseDepthLabel.text(val)
             });
 
         // console.log(`Collapse depth slider starting val/max: ${max}`)
@@ -186,7 +185,7 @@ class N2UserInterface {
                         .on('mousemove', null)
                         .on('mouseup', null);
                 })
-                .on('mousemove', e => {
+                .on('input', e => {
                     const newHeight = d3.event.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = {
