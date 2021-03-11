@@ -293,10 +293,14 @@ class System(object):
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
         True if this system has output scaling.
+    _has_output_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_resid_scaling : bool
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
+    _has_input_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
     _owning_rank : dict
@@ -465,8 +469,10 @@ class System(object):
 
         self._has_guess = False
         self._has_output_scaling = False
+        self._has_output_adder = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+        self._has_input_adder = False
         self._has_bounds = False
 
         self._vector_class = None
@@ -596,7 +602,7 @@ class System(object):
         if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
             self._scale_factors = self._compute_root_scale_factors()
         else:
-            self._scale_factors = {}
+            self._scale_factors = None
 
         if self._vector_class is None:
             self._vector_class = self._local_vector_class

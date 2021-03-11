@@ -382,8 +382,12 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
+        # The output and residual vectors are handled in system.py.
         scale_factors = super()._compute_root_scale_factors()
 
+        # Input scaling for connected inputs is added here.
+        # This is a combined scale factor that includes the scaling of the connected source
+        # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
             abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
@@ -444,6 +448,10 @@ class Group(System):
                 scale_factors[abs_in] = {
                     'input': (a0, a1),
                 }
+
+                # Check whether we need to allocate an adder for the input vector.
+                if np.any(np.asarray(a0)):
+                    self._has_input_adder = True
 
         return scale_factors
 
@@ -959,6 +967,7 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
+            self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             if isinstance(subsys, Component):
                 self._has_distrib_vars |= subsys.options['distributed']
@@ -1018,12 +1027,14 @@ class Group(System):
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
-                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
+                       self._has_output_scaling, self._has_output_adder,
+                       self._has_resid_scaling, self._group_inputs)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
+                    False,
                     False,
                     False,
                     {}
@@ -1040,8 +1051,9 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, rscale, ginputs) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs) in enumerate(gathered):
                 self._has_output_scaling |= oscale
+                self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
 
                 if rank != myrank:

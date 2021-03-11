@@ -1,13 +1,8 @@
 """Define the default Vector class."""
-from copy import deepcopy
-import numbers
-
 import numpy as np
 
-from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 
 class DefaultVector(Vector):
@@ -102,7 +97,10 @@ class DefaultVector(Vector):
             if self._do_scaling:
                 data = self._data
                 if self._name == 'nonlinear':
-                    self._scaling = (np.zeros(data.size), np.ones(data.size))
+                    if self._do_adder:
+                        self._scaling = (np.zeros(data.size), np.ones(data.size))
+                    else:
+                        self._scaling = (None, np.ones(data.size))
                 elif self._name == 'linear':
                     # reuse the nonlinear scaling vecs since they're the same as ours
                     nlvec = self._system()._root_vecs[self._kind]['nonlinear']
