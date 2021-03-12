@@ -17,7 +17,7 @@ from pprint import pprint
 from itertools import groupby
 
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
@@ -981,44 +981,13 @@ def _order_by_ID(col_adj_matrix):
     ncols = col_adj_matrix.shape[1]
     colored_degrees = np.zeros(ncols, dtype=int)
     colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
-    niters = np.nonzero(colored_degrees)[0].size
 
-    for i in range(niters):
+    for i in range(np.nonzero(colored_degrees)[0].size):
         col = colored_degrees.argmax()
         colnzrows = col_adj_matrix._get_submatrix(major=col).indices
         colored_degrees[colnzrows] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
         yield col, colnzrows
-
-
-def _full2compressed(idxs):
-    """
-    For an index array, return that array with indices converted to index into a compressed array.
-
-    Compressed array is an array that includes only entries corresponding to idxs.
-    idxs can contain multiple copies of the same index.
-
-    Parameters
-    ----------
-    idxs : ndarray
-        Array of full indices.
-
-    Returns
-    -------
-    ndarray
-        Array that maps full indices into compressed ones.
-    """
-    if idxs.size == 0:
-        return idxs
-
-    unique = np.unique(idxs)
-    # array only needs to be large enough to hold the highest index in idxs
-    full2comp = np.empty(np.max(unique) + 1, dtype=int)
-    full2comp[unique] = np.arange(unique.size, dtype=int)
-
-    # Note that the full2comp mapping array only has valid values in the entries corresponding
-    # to the specific indices found in idxs.  Other entries are not initialized.
-    return full2comp[idxs]
 
 
 def _2col_adj_rows_cols(J):
@@ -1041,9 +1010,11 @@ def _2col_adj_rows_cols(J):
     adjrows = []
     adjcols = []
 
+    csr = csr_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
+
     # mark col_matrix entries as True when nonzero row entries make them dependent
     for row in np.unique(nzrows):
-        row_nzcols = nzcols[nzrows == row]
+        row_nzcols = csr._get_submatrix(major=row).indices
 
         if row_nzcols.size > 0:
             for c in row_nzcols:
@@ -1057,8 +1028,7 @@ def _2col_adj_rows_cols(J):
         adjrows = np.zeros(0, dtype=int)
         adjcols = np.zeros(0, dtype=int)
 
-    return coo_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)),
-                      shape=(ncols, ncols)).tocsc()
+    return csc_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
 
 
 def _Jc2col_matrix_direct(Jrows, Jcols, shape):
@@ -1119,8 +1089,7 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         rows = np.zeros(0, dtype=int)
         cols = np.zeros(0, dtype=int)
 
-    return coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)),
-                      shape=(ncols, ncols)).tocsc()
+    return csc_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols))
 
 
 def _get_full_disjoint_cols(J):
