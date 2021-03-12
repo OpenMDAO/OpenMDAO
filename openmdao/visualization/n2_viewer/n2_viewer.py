@@ -33,6 +33,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
+from openmdao import __version__ as openmdao_version
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -188,6 +189,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
     tree_dict['expressions'] = None
+    tree_dict['om_version'] = openmdao_version
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
@@ -637,6 +639,7 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
     h.insert('{{n2toolbar_png}}', n2toolbar_png)
+    h.insert('{{om_version}}', openmdao_version)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
