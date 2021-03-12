@@ -730,8 +730,10 @@ class Component(System):
 
         if isscalar(ref0):
             self._has_output_scaling |= ref0 != 0.0
+            self._has_output_adder |= ref0 != 0.0
         else:
             self._has_output_scaling |= np.any(ref0)
+            self._has_output_adder |= np.any(ref0)
 
         if isscalar(res_ref):
             self._has_resid_scaling |= res_ref != 1.0
