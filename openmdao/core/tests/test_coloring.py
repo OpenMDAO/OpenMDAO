@@ -942,8 +942,8 @@ class BidirectionalTestCase(unittest.TestCase):
             self.assertEqual(tot_colors, 3)
 
     @parameterized.expand(itertools.product(
-        [('n4c6-b15', 3), ('can_715', 20), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 27), ('Harvard500', 23), ('illc1033', 5)],
+        [('n4c6-b15', 3), ('can_715', 21), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
+         ('D_6', 27), ('Harvard500', 26), ('illc1033', 5)],
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")

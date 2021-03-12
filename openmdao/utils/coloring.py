@@ -1259,6 +1259,7 @@ def MNCO_bidir(J):
     r = M_row_nonzeros.argmin()
     c = M_col_nonzeros.argmin()
 
+    # get number of nonzeros in the selected row and column
     nnz_r = M_row_nonzeros[r]
     nnz_c = M_col_nonzeros[c]
 
@@ -1284,7 +1285,7 @@ def MNCO_bidir(J):
             keep = M_rows != r
             r = M_row_nonzeros.argmin()
             c = M_col_nonzeros.argmin()
-            #nnz_r = M_row_nonzeros[r]
+            nnz_r = M_row_nonzeros[r]
 
             row_i += 1
         else:
@@ -1298,12 +1299,9 @@ def MNCO_bidir(J):
             keep = M_cols != c
             r = M_row_nonzeros.argmin()
             c = M_col_nonzeros.argmin()
-            #nnz_c = M_col_nonzeros[c]
+            nnz_c = M_col_nonzeros[c]
 
             col_i += 1
-
-        nnz_r = M_row_nonzeros[r]
-        nnz_c = M_col_nonzeros[c]
 
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
