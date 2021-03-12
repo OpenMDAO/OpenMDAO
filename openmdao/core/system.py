@@ -293,10 +293,14 @@ class System(object):
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
         True if this system has output scaling.
+    _has_output_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_resid_scaling : bool
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
+    _has_input_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
     _owning_rank : dict
@@ -465,8 +469,10 @@ class System(object):
 
         self._has_guess = False
         self._has_output_scaling = False
+        self._has_output_adder = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+        self._has_input_adder = False
         self._has_bounds = False
 
         self._vector_class = None
@@ -596,7 +602,7 @@ class System(object):
         if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
             self._scale_factors = self._compute_root_scale_factors()
         else:
-            self._scale_factors = {}
+            self._scale_factors = None
 
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
@@ -1738,8 +1744,7 @@ class System(object):
         """
         # make this a defaultdict to handle the case of access using unconnected inputs
         scale_factors = defaultdict(lambda: {
-            ('input', 'phys'): (0.0, 1.0),
-            ('input', 'norm'): (0.0, 1.0)
+            'input': (0.0, 1.0),
         })
 
         for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
@@ -1748,10 +1753,8 @@ class System(object):
             a0 = ref0
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
-                ('output', 'phys'): (a0, a1),
-                ('output', 'norm'): (-a0 / a1, 1.0 / a1),
-                ('residual', 'phys'): (0.0, res_ref),
-                ('residual', 'norm'): (0.0, 1.0 / res_ref),
+                'output': (a0, a1),
+                'residual': (0.0, res_ref),
             }
         return scale_factors
 
@@ -2034,10 +2037,10 @@ class System(object):
         """
         if self._has_output_scaling:
             for vec in outputs:
-                vec.scale('phys')
+                vec.scale_to_phys()
         if self._has_resid_scaling:
             for vec in residuals:
-                vec.scale('phys')
+                vec.scale_to_phys()
 
         try:
 
@@ -2047,11 +2050,11 @@ class System(object):
 
             if self._has_output_scaling:
                 for vec in outputs:
-                    vec.scale('norm')
+                    vec.scale_to_norm()
 
             if self._has_resid_scaling:
                 for vec in residuals:
-                    vec.scale('norm')
+                    vec.scale_to_norm()
 
     @contextmanager
     def _scaled_context_all(self):
@@ -2060,10 +2063,10 @@ class System(object):
         """
         if self._has_output_scaling:
             for vec in self._vectors['output'].values():
-                vec.scale('norm')
+                vec.scale_to_norm()
         if self._has_resid_scaling:
             for vec in self._vectors['residual'].values():
-                vec.scale('norm')
+                vec.scale_to_norm()
 
         try:
 
@@ -2073,10 +2076,10 @@ class System(object):
 
             if self._has_output_scaling:
                 for vec in self._vectors['output'].values():
-                    vec.scale('phys')
+                    vec.scale_to_phys()
             if self._has_resid_scaling:
                 for vec in self._vectors['residual'].values():
-                    vec.scale('phys')
+                    vec.scale_to_phys()
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):

@@ -277,14 +277,14 @@ class N2Toolbar {
     /** Get a snapshot of the search term and match count. */
     getSearchState() {
         return {
-                'term': this.searchBar.node().value,
+                'term': this.searchBar.property('value'),
                 'matches': this.searchCount.html()
         }
     }
 
     /** Restore a snapshot of the search term and match count. */
     setSearchState(searchInfo) {
-        this.searchBar.node().value = searchInfo.term;
+        this.searchBar.property('value', searchInfo.term);
         this.searchCount.html(searchInfo.matches);
     }
 

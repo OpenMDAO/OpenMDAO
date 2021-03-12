@@ -64,6 +64,8 @@ class Vector(object):
         a component that does not support multivectors.
     _do_scaling : bool
         True if this vector performs scaling.
+    _do_adder : bool
+        True if this vector's scaling includes an additive term.
     _scaling : dict
         Contains scale factors to convert data arrays.
     read_only : bool
@@ -121,8 +123,11 @@ class Vector(object):
         self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
                             (kind == 'output' and system._has_output_scaling) or
                             (kind == 'residual' and system._has_resid_scaling))
+        self._do_adder = ((kind == 'input' and system._has_input_adder) or
+                          (kind == 'output' and system._has_output_adder) or
+                          (kind == 'residual' and system._has_resid_scaling))
 
-        self._scaling = {}
+        self._scaling = None
 
         if root_vector is None:
             self._root_vector = self
