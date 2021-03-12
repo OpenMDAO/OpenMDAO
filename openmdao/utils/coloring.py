@@ -980,11 +980,11 @@ def _order_by_ID(col_adj_matrix):
     """
     ncols = col_adj_matrix.shape[1]
     colored_degrees = np.zeros(ncols, dtype=int)
-    # reduced_rows = _full2compressed(nzrows)
+    colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
+    niters = np.nonzero(colored_degrees)[0].size
 
-    for i in range(ncols):
+    for i in range(niters):
         col = colored_degrees.argmax()
-        # colmatch = (nzcols == colmap[col]).nonzero()[0]
         colnzrows = col_adj_matrix._get_submatrix(major=col).indices
         colored_degrees[colnzrows] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
@@ -1778,19 +1778,13 @@ def _compute_coloring(J, mode):
 
         coloring = MNCO_bidir(J)
         fallback = _compute_coloring(J, 'fwd')
-        print("BIDIR")
-        coloring.display_txt()
         if coloring.total_solves() >= fallback.total_solves():
             coloring = fallback
             coloring._meta['fallback'] = True
-            print("FWD")
-            coloring.display_txt()
         fallback = _compute_coloring(J, 'rev')
         if coloring.total_solves() > fallback.total_solves():
             coloring = fallback
             coloring._meta['fallback'] = True
-            print("REV")
-            coloring.display_txt()
         fallback = None
 
         # record the total time and memory usage for bidir, fwd, and rev
