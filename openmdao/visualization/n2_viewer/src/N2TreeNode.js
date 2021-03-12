@@ -112,7 +112,7 @@ class N2TreeNode {
     isUnconnectedInput() { return (this.type == 'unconnected_input'); }
 
     /** True if this is an input whose source is an auto-ivc'd output */
-    isAutoIvcInput() { return (this.type == 'autoivc_input');}
+    isAutoIvcInput() { return (this.type == 'autoivc_input'); }
 
     /** True if this.type is 'output'. */
     isOutput() { return (this.type == 'output'); }
@@ -133,22 +133,22 @@ class N2TreeNode {
     isSubsystem() { return (this.type == 'subsystem'); }
 
     /** True if it's a subsystem and this.subsystem_type is 'group' */
-    isGroup() { return ( this.isSubsystem() && this.subsystem_type == 'group'); }
+    isGroup() { return (this.isSubsystem() && this.subsystem_type == 'group'); }
 
     /** True if it's a subsystem and this.subsystem_type is 'component' */
-    isComponent() { return ( this.isSubsystem() && this.subsystem_type == 'component'); }
+    isComponent() { return (this.isSubsystem() && this.subsystem_type == 'component'); }
 
     /** Not connectable if this is a input group or parents are minimized. */
     isConnectable() {
         if (this.isInputOrOutput() && !(this.hasChildren() ||
-                this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
+            this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
 
         return this.isMinimized;
     }
 
     /** Return false if the node is minimized or hidden */
     isVisible() {
-        return ! (this.varIsHidden || this.isMinimized);
+        return !(this.varIsHidden || this.isMinimized);
     }
 
     /**
@@ -183,7 +183,7 @@ class N2TreeNode {
     hasNode(compareNode, parentLimit = null) {
         if (this.type == 'root') return true;
 
-        if ( this === compareNode) return true;
+        if (this === compareNode) return true;
 
         // Check parents first.
         if (this.hasParent(compareNode, parentLimit)) return true;
@@ -249,17 +249,34 @@ class N2TreeNode {
      * @returns {Boolean} True if minimized here, false otherwise.
      */
     minimizeIfLarge(depthCount) {
-        if ( ! (this.isRoot() || this.manuallyExpanded) &&
-            ( this.depth >= (this.isComponent()?
+        if (!(this.isRoot() || this.manuallyExpanded) &&
+            (this.depth >= (this.isComponent() ?
                 Precollapse.cmpDepthStart : Precollapse.grpDepthStart) &&
                 this.numDescendants > Precollapse.threshold &&
                 this.children.length > Precollapse.children - this.depth &&
-                depthCount > Precollapse.depthLimit )) {
+                depthCount > Precollapse.depthLimit)) {
             debugInfo(`Precollapsing node ${this.absPathName}`)
             this.minimize();
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Convert an absolute path name to a string that's safe to use as an HTML id.
+     * @param {String} absPathName The name to convert.
+     * @returns {String} The HTML-safe id.
+     */
+    static absPathToId(absPathName) {
+        return absPathName.replace(/[\.<> :]/g, function (c) {
+            return {
+                ' ': '__',
+                '<': '_LT',
+                '>': '_GT',
+                '.': '_',
+                ':': '-'
+            }[c];
+        })
     }
 }

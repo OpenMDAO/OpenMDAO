@@ -1,0 +1,15 @@
+font:
+  svg:        n2toolbar-icons-font.svg
+  ttf:        n2toolbar-icons-font.ttf
+  eot:        n2toolbar-icons-font.eot
+  woff:       n2toolbar-icons-font.woff
+  css:        n2toolbar-icons.css
+  html:       n2toolbar-icons.html
+  name:       N2ToolbarIcons
+  prefix:     icon
+  height:     1000
+  descent:    150
+  normalize:  true
+  center:     true
+  round:      10e12
+glyphs:

@@ -1,6 +1,5 @@
 <div id="all_pt_n2_content_div" class="non-embedded-n2">
     <div id="ptN2ContentDivId">
-        <div id='help-svg'><svg id='help-graphic'>{{help}}</svg></div>
         <!-- Toolbar -->
         <div id="toolbarLoc">
             <div class="searchbar-container" id="searchbar-container">
@@ -10,7 +9,7 @@
                 <div id='searchbar-and-label' class='searchbar-hidden'>
                     <label id='searchCountId' for='awesompleteId'>0 matches</label>
                     <input type="text" tabindex="-1" size="80" placeholder="Search" id="awesompleteId"
-                        class="searchbar" />
+                        class="searchbar" autocomplete="off"/>
                 </div>
             </div>
             <div class="toolbar" id="true-toolbar">
@@ -75,7 +74,7 @@
                         <i class="fas icon-model-height" id="model-slider-button"></i>
                         <i class="fas icon-caret-right caret"></i>
                         <div class="toolbar-group-expandable" id="model-height-expandable">
-                            <input type="range" min='50' max='200' value='95' class="slider" id="model-slider"/>
+                            <input type="range" min='50' max='200' value='95' class="slider" id="model-slider" />
                             <p id='model-slider-label'>95%</p>
                             <button id='model-slider-fit'>Fit</button>
                         </div>
@@ -96,12 +95,13 @@
                     <i class="fas icon-question-circle" id="question-button"></i>
                 </div>
             </div>
+            <!-- Hide toolbar button -->
+            <div class="toolbar-hide-container" id="hide-toolbar">
+                <i class="fas icon-chevron-left hide-toolbar-button"></i>
+            </div>
         </div>
 
-        <!-- Hide toolbar button -->
-        <div class="toolbar-hide-container" id="hide-toolbar">
-            <i class="fas icon-chevron-left hide-toolbar-button"></i>
-        </div>
+
 
         <div id="d3_content_div">
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
@@ -240,6 +240,20 @@
         <button id="show-error-button">
             <i class="fas icon-notification"></i> Show N2 Error
         </button>
+    </div>
+
+    <div id="toolbar-help-container" class='window-inactive'>
+        <p>Left clicking on a node in the model hierarchy will navigate to that node.<br>
+            Right clicking on a node in the model hierarchy will collapse/expand it.<br>
+            Hovering over any cell in the matrix will display its connections
+            as arrows. Clicking that cell will cause those arrows to persist.
+        </p>
+        <h1>Toolbar Help</h1>
+        <div class='help-graphic'>
+            <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
+                src="data:image/png;base64,{{n2toolbar_png}}" />
+            <svg id='help-graphic-svg'></svg>
+        </div>
     </div>
 
     {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}

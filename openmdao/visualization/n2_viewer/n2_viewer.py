@@ -598,14 +598,14 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     style_names = \
         'window', \
         'partition_tree', \
-        'icon', \
+        'n2toolbar-icons', \
         'toolbar', \
         'legend', \
         'awesomplete'
 
     styles = read_files((style_names), style_dir, 'css')
 
-    with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
+    with open(os.path.join(style_dir, "n2toolbar-icons-font.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
@@ -614,8 +614,8 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
         waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
 
-    with open(os.path.join(assets_dir, "toolbar_help.svg"), "r") as f:
-        help_svg = str(f.read())
+    with open(os.path.join(assets_dir, "n2toolbar_screenshot_png.b64"), "r") as f:
+        n2toolbar_png = str(f.read())
 
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
@@ -633,10 +633,10 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         h.insert("non-embedded-n2", "embedded-n2")
 
     # put all style and JS into index
-    h.insert('{{fontello}}', encoded_font)
+    h.insert('{{n2toolbar-icons}}', encoded_font)
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
-    h.insert('{{help}}', help_svg)
+    h.insert('{{n2toolbar_png}}', n2toolbar_png)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
@@ -650,13 +650,13 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     # Write output file
     h.write(outfile)
 
-    # Open in Jupyter Notebook
-    if notebook and not colab:
-        display(IFrame(src=outfile, width=1000, height=1000))
-    else:
-        display(HTML(outfile))
-
-    # open it up in the browser
-    if show_browser and not notebook:
+    if notebook:
+        # display in Jupyter Notebook
+        if not colab:
+            display(IFrame(src=outfile, width=1000, height=1000))
+        else:
+            display(HTML(outfile))
+    elif show_browser:
+        # open it up in the browser
         from openmdao.utils.webview import webview
         webview(outfile)

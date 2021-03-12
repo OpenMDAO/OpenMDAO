@@ -690,7 +690,7 @@ class DiscreteTestCase(unittest.TestCase):
         indep.add_discrete_output('x', 11)
         model.add_subsystem('comp', ModCompEx2(3), promotes=['*'])
 
-        rec = om.SqliteRecorder('test')
+        rec = om.SqliteRecorder('test.db')
         prob.driver.add_recorder(rec)
         prob.add_recorder(rec)
 

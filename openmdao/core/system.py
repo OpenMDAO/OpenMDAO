@@ -296,10 +296,14 @@ class System(object):
         True if this system has or contains a system with a `guess_nonlinear` method defined.
     _has_output_scaling : bool
         True if this system has output scaling.
+    _has_output_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_resid_scaling : bool
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
+    _has_input_adder : bool
+        True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
     _owning_rank : dict
@@ -469,8 +473,10 @@ class System(object):
 
         self._has_guess = False
         self._has_output_scaling = False
+        self._has_output_adder = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+        self._has_input_adder = False
         self._has_bounds = False
 
         self._vector_class = None
@@ -642,7 +648,7 @@ class System(object):
         if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
             self._scale_factors = self._compute_root_scale_factors()
         else:
-            self._scale_factors = {}
+            self._scale_factors = None
 
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
@@ -1773,8 +1779,7 @@ class System(object):
         """
         # make this a defaultdict to handle the case of access using unconnected inputs
         scale_factors = defaultdict(lambda: {
-            ('input', 'phys'): (0.0, 1.0),
-            ('input', 'norm'): (0.0, 1.0)
+            'input': (0.0, 1.0),
         })
 
         for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
@@ -1783,10 +1788,8 @@ class System(object):
             a0 = ref0
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
-                ('output', 'phys'): (a0, a1),
-                ('output', 'norm'): (-a0 / a1, 1.0 / a1),
-                ('residual', 'phys'): (0.0, res_ref),
-                ('residual', 'norm'): (0.0, 1.0 / res_ref),
+                'output': (a0, a1),
+                'residual': (0.0, res_ref),
             }
         return scale_factors
 
@@ -2069,10 +2072,10 @@ class System(object):
         """
         if self._has_output_scaling:
             for vec in outputs:
-                vec.scale('phys')
+                vec.scale_to_phys()
         if self._has_resid_scaling:
             for vec in residuals:
-                vec.scale('phys')
+                vec.scale_to_phys()
 
         try:
 
@@ -2082,11 +2085,11 @@ class System(object):
 
             if self._has_output_scaling:
                 for vec in outputs:
-                    vec.scale('norm')
+                    vec.scale_to_norm()
 
             if self._has_resid_scaling:
                 for vec in residuals:
-                    vec.scale('norm')
+                    vec.scale_to_norm()
 
     @contextmanager
     def _scaled_context_all(self):
@@ -2095,10 +2098,10 @@ class System(object):
         """
         if self._has_output_scaling:
             for vec in self._vectors['output'].values():
-                vec.scale('norm')
+                vec.scale_to_norm()
         if self._has_resid_scaling:
             for vec in self._vectors['residual'].values():
-                vec.scale('norm')
+                vec.scale_to_norm()
 
         try:
 
@@ -2108,10 +2111,10 @@ class System(object):
 
             if self._has_output_scaling:
                 for vec in self._vectors['output'].values():
-                    vec.scale('phys')
+                    vec.scale_to_phys()
             if self._has_resid_scaling:
                 for vec in self._vectors['residual'].values():
-                    vec.scale('phys')
+                    vec.scale_to_phys()
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
@@ -3619,33 +3622,46 @@ class System(object):
                                        rank=None if all_procs or values or residuals else 0,
                                        return_rel_names=False)
 
-        if outputs:
-            if not list_autoivcs:
-                outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
+        # filter auto_ivcs if requested
+        if outputs and not list_autoivcs:
+            outputs = {n: m for n, m in outputs.items() if not n.startswith('_auto_ivc.')}
 
-            to_remove = ['discrete']
-            if tags:
-                to_remove.append('tags')
-            if not prom_name:
-                to_remove.append('prom_name')
+        # get values & resids
+        if self._outputs is not None and (values or residuals or residuals_tol):
+            to_remove = []
 
-            for _, meta in outputs.items():
-                for key in to_remove:
-                    del meta[key]
-
-        if self._outputs is not None and (values or residuals):
-            # we want value from the input vector, not from the metadata
-            for n, meta in outputs.items():
+            for name, meta in outputs.items():
                 if values:
-                    meta['value'] = self._abs_get_val(n, get_remote=True,
+                    # we want value from the input vector, not from the metadata
+                    meta['value'] = self._abs_get_val(name, get_remote=True,
                                                       rank=None if all_procs else 0, kind='output')
-                if residuals:
-                    meta['resids'] = self._abs_get_val(n, get_remote=True,
-                                                       rank=None if all_procs else 0,
-                                                       kind='residual')
+                if residuals or residuals_tol:
+                    resids = self._abs_get_val(name, get_remote=True,
+                                               rank=None if all_procs else 0,
+                                               kind='residual')
+                    if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                        to_remove.append(name)
+                    elif residuals:
+                        meta['resids'] = resids
 
+            # remove any outputs that don't pass the residuals_tol filter
+            for name in to_remove:
+                del outputs[name]
+
+        # NOTE: calls to _abs_get_val() above are collective calls and must be done on all procs
         if not outputs or (not all_procs and self.comm.rank != 0):
             return []
+
+        # remove metadata we don't want to show/return
+        to_remove = ['discrete']
+        if tags:
+            to_remove.append('tags')
+        if not prom_name:
+            to_remove.append('prom_name')
+
+        for _, meta in outputs.items():
+            for key in to_remove:
+                del meta[key]
 
         rel_idx = len(self.pathname) + 1 if self.pathname else 0
 
@@ -3665,13 +3681,11 @@ class System(object):
             impl_outputs = {}
             if residuals_tol:
                 for n, m in outputs.items():
-                    if "resids" in m and n in states:
-                        if not np.isscalar(m['resids']) and len(m['resids']) > 1:
-                            for i in m['resids']:
-                                if i > residuals_tol:
-                                    impl_outputs[n] = m
-                                    break
-                        elif m['resids'] > residuals_tol:
+                    if n in states:
+                        if residuals_tol and 'resids' in m:
+                            if np.linalg.norm(m['resids']) >= residuals_tol:
+                                impl_outputs[n] = m
+                        else:
                             impl_outputs[n] = m
             else:
                 impl_outputs = {n: m for n, m in outputs.items() if n in states}

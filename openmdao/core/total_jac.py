@@ -1489,12 +1489,14 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                             if key == '@simul_coloring':
+                                print(f'In mode: {mode}, Solving variable(s) using simul '
+                                      'coloring:')
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
+                                print('In mode: %s.' % mode)
                                 print_key = key
                                 if key in self.ivc_print_names:
                                     print_key = self.ivc_print_names[key]
@@ -1679,6 +1681,65 @@ class _TotalJacInfo(object):
 
         return totals
 
+    def check_total_jac(self, raise_error=True, tol=1e-16):
+        """
+        Check recently computed totals derivative jacobian for problems.
+
+        Some optimizers can't handle a jacobian when a design variable has no effect on the
+        constraints, or a constraint is unaffected by a design variable. This method
+        checks for these cases.
+
+        Parameters
+        ----------
+        tol : double
+            Tolerance for the check.
+        raise_error : bool
+            If True, raise an exception if a zero row or column is found.
+        """
+        J = np.abs(self.J)
+        nrows, ncols = J.shape
+        zero_rows = []
+        zero_cols = []
+
+        # Check for zero rows, which correspond to constraints unaffected by any design vars.
+        for j in np.arange(nrows):
+            if np.all(J[j, :] < tol):
+                for name, val in self.of_meta.items():
+                    if j > val[0].stop - 1:
+                        continue
+                    break
+                if name in self.ivc_print_names:
+                    name = self.ivc_print_names[name]
+                if name not in zero_rows:
+                    zero_rows.append(name)
+
+        if zero_rows:
+            msg = f"Constraints or objectives {zero_rows} cannot be impacted by the design " + \
+                "variables of the problem."
+            if raise_error:
+                raise RuntimeError(msg)
+            else:
+                simple_warning(msg)
+
+        # Check for zero cols, which correspond to design vars that don't affect anything.
+        for j in np.arange(ncols):
+            if np.all(J[:, j] < tol):
+                for name, val in self.wrt_meta.items():
+                    if j > val[0].stop - 1:
+                        continue
+                    break
+                if name in self.ivc_print_names:
+                    name = self.ivc_print_names[name]
+                if name not in zero_cols:
+                    zero_cols.append(name)
+
+        if zero_cols:
+            msg = f"Design variables {zero_cols} have no impact on the constraints or objective."
+            if raise_error:
+                raise RuntimeError(msg)
+            else:
+                simple_warning(msg)
+
     def _restore_linear_solution(self, vec_names, key, mode):
         """
         Restore the previous linear solution.
@@ -1774,6 +1835,8 @@ class _TotalJacInfo(object):
             J_dict = self.J_dict
             for of, wrt_dict in J_dict.items():
                 for wrt, J_sub in wrt_dict.items():
+                    if wrt in self.ivc_print_names:
+                        wrt = self.ivc_print_names[wrt]
                     pprint.pprint({(of, wrt): J_sub})
         else:
             J = self.J
@@ -1783,7 +1846,10 @@ class _TotalJacInfo(object):
                 out_slice = self.of_meta[of][0]
                 for j, wrt in enumerate(self.wrt):
                     if wrt not in self.remote_vois:
-                        pprint.pprint({(of, wrt): J[out_slice, self.wrt_meta[wrt][0]]})
+                        deriv = J[out_slice, self.wrt_meta[wrt][0]]
+                        if wrt in self.ivc_print_names:
+                            wrt = self.ivc_print_names[wrt]
+                        pprint.pprint({(of, wrt): deriv})
 
         print('')
         sys.stdout.flush()

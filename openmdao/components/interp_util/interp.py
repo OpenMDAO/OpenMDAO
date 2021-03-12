@@ -80,17 +80,30 @@ class InterpND(object):
     def __init__(self, method="slinear", points=None, values=None, x_interp=None, extrapolate=False,
                  num_cp=None, **kwargs):
         """
-        Initialize instance of interpolation class.
+        Initialize an InterpND object.
+
+        This object can be setup and used to interpolate on a curve or multi-dimensional table.
+
+        It can also be used to setup an interpolating spline that can be evaluated at fixed
+        locations.
+
+        For interpolation, specify values and points.
+
+        For spline evaluation, specifiy x_interp and either points or num_cp.
 
         Parameters
         ----------
-        points : ndarray or tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
-            The points defining the regular grid in n dimensions.  For 1D interpolation, this
-            can be an ndarray.
-        values : array_like, shape (m1, ..., mn, ...)
-            The data on the regular grid in n dimensions.
         method : str
-            Name of interpolation method(s).
+            Name of interpolation method.
+        points : ndarray or tuple of ndarray
+            The points defining the regular grid in n dimensions.
+            For 1D interpolation, this can be an ndarray of table locations.
+            For table interpolation, it can be a tuple or an ndarray. If it is a tuple, it should
+            contain one ndarray for each table dimension.
+            For spline evaluation, num_cp can be specified instead of points.
+        values : ndarray or tuple of ndarray or None
+            These must be specified for interpolation.
+            The data on the regular grid in n dimensions.
         x_interp : ndarray or None
             If we are always interpolating at a fixed set of locations, then they can be
             specified here.
@@ -113,7 +126,33 @@ class InterpND(object):
                              '%s.' % (method, all_m))
         self.extrapolate = extrapolate
 
+        # The table points are always defined, by specifying either the points directly, or num_cp.
+        if points is None:
+            if num_cp is not None:
+                points = [np.linspace(0.0, 1.0, num_cp)]
+            else:
+                msg = "Either 'points' or 'num_cp' must be specified."
+                raise ValueError(msg)
+        else:
+
+            if isinstance(points, np.ndarray):
+                points = [points]
+
+            for i, p in enumerate(points):
+                n_p = len(p)
+                if not np.all(np.diff(p) > 0.):
+                    raise ValueError("The points in dimension %d must be strictly "
+                                     "ascending" % i)
+                if not np.asarray(p).ndim == 1:
+                    raise ValueError("The points in dimension %d must be "
+                                     "1-dimensional" % i)
+
+        # Table Interpolation
         if x_interp is None:
+
+            if values is None:
+                msg = "Either 'values' or 'x_interp' must be specified."
+                raise ValueError(msg)
 
             if method == 'bsplines':
                 msg = "Method 'bsplines' is not supported for table interpolation."
@@ -135,26 +174,9 @@ class InterpND(object):
                 msg = "Interpolation method '%s' does not support complex values." % method
                 raise ValueError(msg)
 
-        if points is None:
-            if num_cp is not None:
-                points = [np.linspace(0.0, 1.0, num_cp)]
-            else:
-                msg = "Either 'points' or 'num_cp' must be specified."
-                raise ValueError(msg)
-        else:
-
-            if isinstance(points, np.ndarray):
-                points = [points]
-
             for i, p in enumerate(points):
                 n_p = len(p)
-                if not np.all(np.diff(p) > 0.):
-                    raise ValueError("The points in dimension %d must be strictly "
-                                     "ascending" % i)
-                if not np.asarray(p).ndim == 1:
-                    raise ValueError("The points in dimension %d must be "
-                                     "1-dimensional" % i)
-                if values is not None and not values.shape[i] == n_p:
+                if values.shape[i] != n_p:
                     raise ValueError("There are %d points and %d values in "
                                      "dimension %d" % (len(p), values.shape[i], i))
 
@@ -186,8 +208,8 @@ class InterpND(object):
 
         Parameters
         ----------
-        x : ndarray of shape (..., ndim)
-            Location to provide interpolation.
+        x : ndarray or tuple
+            Locations to interpolate.
         compute_derivative : bool
             Set to True to compute derivatives with respect to x.
 
@@ -203,7 +225,19 @@ class InterpND(object):
         self.table._compute_d_dx = compute_derivative
         self.table._compute_d_dvalues = False
 
-        xnew = self._interpolate(np.atleast_1d(x))
+        if isinstance(x, np.ndarray):
+            if len(x.shape) < 2:
+                if len(self.grid) > 1:
+                    # Input is an array containing multi-D coordinates of a single point.
+                    x = np.atleast_2d(x)
+                else:
+                    # Input is an array of separate points on a 1D table.
+                    x = np.atleast_2d(x).T
+        else:
+            # Input is a list or tuple of separate points.
+            x = np.atleast_2d(x)
+
+        xnew = self._interpolate(x)
 
         if compute_derivative:
             return xnew, self._d_dx
@@ -217,7 +251,7 @@ class InterpND(object):
         Parameters
         ----------
         values : ndarray(n_points)
-            The data on the regular grid in n dimensions.
+            New data values for all points on the regular grid.
         compute_derivative : bool
             Set to True to compute derivatives with respect to x.
 
@@ -252,7 +286,7 @@ class InterpND(object):
         """
         Interpolate at the sample coordinates.
 
-        This method is called from OpenMDAO
+        This method is called from OpenMDAO, and is not meant for standalone use.
 
         Parameters
         ----------
@@ -328,7 +362,7 @@ class InterpND(object):
         """
         Interpolate at all fixed output coordinates given the new table values.
 
-        This method is called from OpenMDAO.
+        This method is called from OpenMDAO, and is not meant for standalone use.
 
         Parameters
         ----------

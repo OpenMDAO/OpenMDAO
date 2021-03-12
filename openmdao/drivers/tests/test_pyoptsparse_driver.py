@@ -1554,7 +1554,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1588,7 +1588,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1625,7 +1625,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1659,7 +1659,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -2049,7 +2049,6 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
-
     def test_error_objfun_reraise(self):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
@@ -2110,6 +2109,169 @@ class TestPyoptSparse(unittest.TestCase):
             p.run_driver()
 
         self.assertTrue("This gradient will fail." in msg.exception.args[0])
+
+    def test_singular_jac_error_responses(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives ['parab.z'] cannot be impacted by the design " + \
+                         "variables of the problem.")
+
+    def test_singular_jac_error_desvars(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
+                                                  ]), #'foo = 0.0 * z'],),
+                                     promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Design variables ['z'] have no impact on the constraints or objective.")
+
+    def test_singular_jac_ignore(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        # Will not raise an exception.
+        prob.run_driver()
+
+    def test_singular_jac_warn(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # Default behavior is 'warn'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        msg = "Constraints or objectives ['parab.z'] cannot be impacted by the design variables of the problem."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
+
+    def test_singular_jac_tol(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 1e-20*z',
+                                                  ]), #'foo = 0.0 * z'],),
+                                     promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # Set a very low tolerance to accept '-1e-20*z' as nonzero.
+        prob.driver.options['singular_jac_tol'] = 1e-25
+
+        prob.setup()
+
+        prob.run_driver()
+
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
