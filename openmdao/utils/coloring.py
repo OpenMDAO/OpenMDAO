@@ -957,7 +957,7 @@ class Coloring(object):
         return var_name_and_sub_indices
 
 
-def _order_by_ID(nzrows, nzcols, colmap):
+def _order_by_ID(col_adj_matrix):
     """
     Return columns in order of incidence degree (ID).
 
@@ -968,12 +968,8 @@ def _order_by_ID(nzrows, nzcols, colmap):
 
     Parameters
     ----------
-    nzrows : ndarray
-        Nonzero rows.
-    nzcols : ndarray
-        Nonzero columns.
-    colmap : ndarray
-        Mapping array from reduced index to index into the full matrix.
+    col_adj_matrix : csc matrix
+        CSC column adjacency matrix.
 
     Yields
     ------
@@ -982,16 +978,17 @@ def _order_by_ID(nzrows, nzcols, colmap):
     ndarray
         Boolean array that's True where the column matches nzcols.
     """
-    ncols = colmap.size
+    ncols = col_adj_matrix.shape[1]
     colored_degrees = np.zeros(ncols, dtype=int)
-    reduced_rows = _full2compressed(nzrows)
+    # reduced_rows = _full2compressed(nzrows)
 
     for i in range(ncols):
         col = colored_degrees.argmax()
-        colmatch = (nzcols == colmap[col]).nonzero()[0]
-        colored_degrees[reduced_rows[colmatch]] += 1
+        # colmatch = (nzcols == colmap[col]).nonzero()[0]
+        colnzrows = col_adj_matrix._get_submatrix(major=col).indices
+        colored_degrees[colnzrows] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
-        yield colmap[col], colmatch
+        yield col, colnzrows
 
 
 def _full2compressed(idxs):
@@ -1024,27 +1021,22 @@ def _full2compressed(idxs):
     return full2comp[idxs]
 
 
-def _2col_adj_rows_cols(nzrows, nzcols, shape):
+def _2col_adj_rows_cols(J):
     """
     Convert nonzero rows/cols of sparsity matrix to those of a column adjacency matrix.
 
     Parameters
     ----------
-    nzrows : ndarray
-        Nonzero rows.
-    nzcols : ndarray
-        Nonzero columns.
-    shape : tuple
-        Shape of the matrix containing the given nonzero rows and columns.
+    J : coo_matrix
+        Sparse matrix to be colored.
 
     Returns
     -------
-    ndarray
-        Nonzero rows of column adjacency matrix.
-    ndarray
-        Nonzero columns of column adjacency matrix.
+    csc_matrix
+        Sparse column adjacency matrix.
     """
-    nrows, ncols = shape
+    nrows, ncols = J.shape
+    nzrows, nzcols = J.row, J.col
 
     adjrows = []
     adjcols = []
@@ -1061,24 +1053,12 @@ def _2col_adj_rows_cols(nzrows, nzcols, shape):
     if adjrows:
         adjrows = np.hstack(adjrows)
         adjcols = np.hstack(adjcols)
-
-        # there could be duplicates, so remove them
-        coo = coo_matrix((np.empty(adjrows.size, dtype=bool), (adjrows, adjcols)),
-                         shape=(ncols, ncols))
-        coo.sum_duplicates()
-        adjrows = coo.row
-        adjcols = coo.col
     else:
         adjrows = np.zeros(0, dtype=int)
         adjcols = np.zeros(0, dtype=int)
 
-    mask = np.zeros(ncols, dtype=bool)
-    mask[adjcols] = True
-
-    # this maps a reduced index into an index into the full matrix
-    colmap = np.arange(ncols, dtype=int)[mask]
-
-    return adjrows, adjcols, (ncols, ncols), colmap
+    return coo_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)),
+                      shape=(ncols, ncols)).tocsc()
 
 
 def _Jc2col_matrix_direct(Jrows, Jcols, shape):
@@ -1139,44 +1119,35 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         rows = np.zeros(0, dtype=int)
         cols = np.zeros(0, dtype=int)
 
-    return rows, cols, (ncols, ncols)
+    return coo_matrix((np.ones(rows.size, dtype=bool), (rows, cols)),
+                      shape=(ncols, ncols)).tocsc()
 
 
-def _get_full_disjoint_cols(nzrows, nzcols, shape):
+def _get_full_disjoint_cols(J):
     """
     Find sets of disjoint columns in J and their corresponding rows using a col adjacency matrix.
 
     Parameters
     ----------
-    nzrows : ndarray
-        Nonzero rows.
-    nzcols : ndarray
-        Nonzero columns.
-    shape : tuple
-        Shape of the matrix containing the given nonzero rows and columns.
+    J : coo_matrix
+        Sparse matrix to be colored.
 
     Returns
     -------
     list
         List of lists of disjoint columns
     """
-    return _get_full_disjoint_col_matrix_cols(*_2col_adj_rows_cols(nzrows, nzcols, shape))
+    return _get_full_disjoint_col_matrix_cols(_2col_adj_rows_cols(J))
 
 
-def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
+def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
     """
     Find sets of disjoint columns in a column intersection matrix.
 
     Parameters
     ----------
-    nzrows : ndarray
-        Nonzero rows in the column intersection matrix.
-    nzcols : ndarray
-        Nonzero columnsin the column intersection matrix.
-    shape : tuple
-        Shape of the matrix containing the given nonzero rows and columns.
-    colmap : ndarray
-        Maps reduced index into an index into the full column intersection matrix.
+    col_adj_matrix : csc_matrix
+        Sparse column adjacency matrix.
 
     Returns
     -------
@@ -1184,21 +1155,22 @@ def _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap):
         List of lists of disjoint columns.
     """
     color_groups = []
-    _, ncols = shape
+    _, ncols = col_adj_matrix.shape
 
     # -1 indicates that a column has not been colored
     colors = np.full(ncols, -1, dtype=int)
 
-    for col, colmatch in _order_by_ID(nzrows, nzcols, colmap):
-        neighbor_colors = set(colors[nzrows[colmatch]])
+    for icol, colnzrows in _order_by_ID(col_adj_matrix):
+        # neighbor_colors = set(colors[nzrows[colnzrows]])
+        neighbor_colors = colors[colnzrows]
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
-                grp.append(col)
-                colors[col] = color
+                grp.append(icol)
+                colors[icol] = color
                 break
         else:
-            colors[col] = len(color_groups)
-            color_groups.append([col])
+            colors[icol] = len(color_groups)
+            color_groups.append([icol])
 
     return color_groups
 
@@ -1227,13 +1199,9 @@ def _color_partition(Jprows, Jpcols, shape):
     """
     _, ncols = shape
 
-    nzrows, nzcols, shape = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
+    col_adj_matrix = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
 
-    mask = np.zeros(ncols, dtype=bool)
-    mask[nzcols] = True
-    colmap = np.arange(ncols, dtype=int)[mask]
-
-    col_groups = _get_full_disjoint_col_matrix_cols(nzrows, nzcols, shape, colmap)
+    col_groups = _get_full_disjoint_col_matrix_cols(col_adj_matrix)
 
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted(group)
@@ -1255,7 +1223,7 @@ def MNCO_bidir(J):
 
     Parameters
     ----------
-    J : ndarray or coo_matrix
+    J : coo_matrix
         Jacobian sparsity matrix (boolean)
 
     Returns
@@ -1263,24 +1231,19 @@ def MNCO_bidir(J):
     Coloring
         See docstring for Coloring class.
     """
-    if isinstance(J, np.ndarray):
-        nzrows, nzcols = np.nonzero(J)
-    else:
-        nzrows, nzcols = J.row, J.col
-    shape = J.shape
-
-    nrows, ncols = shape
+    nzrows, nzcols = J.row, J.col
+    nrows, ncols = J.shape
 
     coloring = Coloring(sparsity=J)
 
     M_col_nonzeros = np.zeros(ncols, dtype=int)
-    for c in np.unique(nzcols):
+    for c in range(ncols):
         M_col_nonzeros[c] = np.count_nonzero(nzcols == c)
     M_row_nonzeros = np.zeros(nrows, dtype=int)
-    for r in np.unique(nzrows):
+    for r in range(nrows):
         M_row_nonzeros[r] = np.count_nonzero(nzrows == r)
 
-    M_rows, M_cols = coloring._nzrows, coloring._nzcols
+    M_rows, M_cols = nzrows, nzcols
 
     Jf_rows = [None] * nrows
     Jr_cols = [None] * ncols
@@ -1302,7 +1265,7 @@ def MNCO_bidir(J):
     Jf_nz_max = 0   # max row nonzeros in Jf
     Jr_nz_max = 0   # max col nonzeros in Jr
 
-    while M_rows.size + M_cols.size > 0:
+    while M_rows.size > 0:
         # what the algorithm is doing is basically minimizing the total of the max number of nonzero
         # columns in Jf + the max number of nonzero rows in Jr, so it's basically minimizing
         # the upper bound of the number of colors that will be needed.
@@ -1317,10 +1280,11 @@ def MNCO_bidir(J):
             M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
             M_col_nonzeros[Jf_rows[r]] -= 1
 
+            # remove row r
             keep = M_rows != r
             r = M_row_nonzeros.argmin()
             c = M_col_nonzeros.argmin()
-            nnz_r = M_row_nonzeros[r]
+            #nnz_r = M_row_nonzeros[r]
 
             row_i += 1
         else:
@@ -1330,12 +1294,16 @@ def MNCO_bidir(J):
             M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
+            # remove column c
             keep = M_cols != c
             r = M_row_nonzeros.argmin()
             c = M_col_nonzeros.argmin()
-            nnz_c = M_col_nonzeros[c]
+            #nnz_c = M_col_nonzeros[c]
 
             col_i += 1
+
+        nnz_r = M_row_nonzeros[r]
+        nnz_c = M_col_nonzeros[c]
 
         M_rows = M_rows[keep]
         M_cols = M_cols[keep]
@@ -1804,21 +1772,32 @@ def _compute_coloring(J, mode):
         start_mem = None
 
     if mode == 'auto':  # use bidirectional coloring
+        if isinstance(J, np.ndarray):
+            nzrows, nzcols = np.nonzero(J)
+            J = coo_matrix((np.ones(nzrows.size), (nzrows, nzcols)), shape=J.shape)
+
         coloring = MNCO_bidir(J)
         fallback = _compute_coloring(J, 'fwd')
+        print("BIDIR")
+        coloring.display_txt()
         if coloring.total_solves() >= fallback.total_solves():
             coloring = fallback
             coloring._meta['fallback'] = True
+            print("FWD")
+            coloring.display_txt()
         fallback = _compute_coloring(J, 'rev')
         if coloring.total_solves() > fallback.total_solves():
             coloring = fallback
             coloring._meta['fallback'] = True
+            print("REV")
+            coloring.display_txt()
         fallback = None
 
         # record the total time and memory usage for bidir, fwd, and rev
         coloring._meta['coloring_time'] = time.time() - start_time
         if start_mem is not None:
             coloring._meta['coloring_memory'] = mem_usage() - start_mem
+
         return coloring
 
     rev = mode == 'rev'
@@ -1832,10 +1811,10 @@ def _compute_coloring(J, mode):
 
     if isinstance(J, np.ndarray):
         nzrows, nzcols = np.nonzero(J)
-    else:
-        nzrows, nzcols = J.row, J.col
+        J = coo_matrix((np.ones(nzrows.size), (nzrows, nzcols)), shape=J.shape)
 
-    col_groups = _get_full_disjoint_cols(nzrows, nzcols, J.shape)
+    nzrows, nzcols = J.row, J.col
+    col_groups = _get_full_disjoint_cols(J)
 
     col2rows = [None] * ncols  # will contain list of nonzero rows for each column
 
