@@ -6,13 +6,13 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 
 """
 
-import sys
 import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, SolverWarning
 
 
 def _print_violations(outputs, lower, upper):
@@ -33,11 +33,11 @@ def _print_violations(outputs, lower, upper):
         end += val.size
         if upper is not None and any(val > upper[start:end]):
             msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
-            simple_warning(msg)
+            issue_warning(SolverWarning(msg))
 
         if lower is not None and any(val < lower[start:end]):
             msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Lower: {lower[start:end]}\n")
-            simple_warning(msg)
+            issue_warning(SolverWarning(msg))
 
         start = end
 
