@@ -988,7 +988,7 @@ def _order_by_ID(nzrows, nzcols, colmap):
 
     for i in range(ncols):
         col = colored_degrees.argmax()
-        colmatch = nzcols == colmap[col]
+        colmatch = (nzcols == colmap[col]).nonzero()[0]
         colored_degrees[reduced_rows[colmatch]] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
         yield colmap[col], colmatch
