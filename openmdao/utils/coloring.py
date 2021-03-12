@@ -1060,26 +1060,30 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     allnzc = []
 
     Jrow = np.zeros(ncols, dtype=bool)
+    csr = csr_matrix((np.ones(Jrows.size, dtype=bool), (Jrows, Jcols)), shape=shape)
 
     # mark col_matrix[col1, col2] as True when Jpart[row, col1] is True OR Jpart[row, col2] is True
-    for row in range(nrows):
+    for row in np.unique(Jrows):
         nzr = []
         nzc = []
-        nzro = Jcols[Jrows == row]
-        if nzro.size == 1:
+        row_nzcols = csr._get_submatrix(major=row).indices
+
+        if row_nzcols.size == 1:
             # if there's only 1 nonzero column in a row, include it
-            nzr.append(nzro[0])
-            nzc.append(nzro[0])
+            nzr.append(row_nzcols[0])
+            nzc.append(row_nzcols[0])
         else:
             Jrow[:] = False
-            Jrow[nzro] = True
-            for col1, col2 in combinations(nzro, 2):
+            Jrow[row_nzcols] = True
+            for col1, col2 in combinations(row_nzcols, 2):
                 if Jrow[col1] or Jrow[col2]:
                     nzr.append(col1)
                     nzc.append(col2)
         if nzr:
             allnzr.append(nzr)
             allnzc.append(nzc)
+
+    csr = Jrow = None  # free up memory
 
     if allnzr:
         # matrix is symmetric, so duplicate
@@ -1088,6 +1092,8 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     else:
         rows = np.zeros(0, dtype=int)
         cols = np.zeros(0, dtype=int)
+
+    allnzr = allnzc = None
 
     return csc_matrix((np.ones(rows.size, dtype=bool), (rows, cols)), shape=(ncols, ncols))
 
@@ -1130,7 +1136,6 @@ def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
     colors = np.full(ncols, -1, dtype=int)
 
     for icol, colnzrows in _order_by_ID(col_adj_matrix):
-        # neighbor_colors = set(colors[nzrows[colnzrows]])
         neighbor_colors = colors[colnzrows]
         for color, grp in enumerate(color_groups):
             if color not in neighbor_colors:
@@ -1169,15 +1174,17 @@ def _color_partition(Jprows, Jpcols, shape):
     _, ncols = shape
 
     col_adj_matrix = _Jc2col_matrix_direct(Jprows, Jpcols, shape)
-
     col_groups = _get_full_disjoint_col_matrix_cols(col_adj_matrix)
+
+    col_adj_matrix = None
 
     for i, group in enumerate(col_groups):
         col_groups[i] = sorted(group)
 
+    csc = csc_matrix((np.ones(Jprows.size), (Jprows, Jpcols)), shape=shape)
     col2row = [None] * ncols
-    for col in Jpcols:
-        col2row[col] = sorted(Jprows[Jpcols == col])
+    for col in np.unique(Jpcols):
+        col2row[col] = csc._get_submatrix(major=col).indices
 
     return [col_groups, col2row]
 
@@ -1206,11 +1213,17 @@ def MNCO_bidir(J):
     coloring = Coloring(sparsity=J)
 
     M_col_nonzeros = np.zeros(ncols, dtype=int)
-    for c in range(ncols):
-        M_col_nonzeros[c] = np.count_nonzero(nzcols == c)
     M_row_nonzeros = np.zeros(nrows, dtype=int)
+
+    sparse = csc_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
+
+    for c in range(ncols):
+        M_col_nonzeros[c] = sparse._get_submatrix(major=c).indices.size
+    sparse = sparse.tocsr()
     for r in range(nrows):
-        M_row_nonzeros[r] = np.count_nonzero(nzrows == r)
+        M_row_nonzeros[r] = sparse._get_submatrix(major=r).indices.size
+
+    sparse = None
 
     M_rows, M_cols = nzrows, nzcols
 
