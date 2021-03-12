@@ -30,6 +30,7 @@ class N2Search {
         this.numMatches = 0;
         this.searchInputDiv = d3.select("#awesompleteId").node();
         this.searchCountDiv = d3.select("#searchCountId");
+        this.searchInputDiv.value = '';
 
         this._setupAwesomplete();
         this._addEventListeners();
@@ -38,12 +39,12 @@ class N2Search {
 
     /** Initialize the Awesomplete widget. */
     _setupAwesomplete() {
-        let self = this;
+        const self = this;
         this.searchAwesomplete = new Awesomplete(self.searchInputDiv, {
             "minChars": 1,
             "maxItems": 15,
             "list": [],
-            "filter": function(text, input) {
+            "filter": function (text, input) {
                 if (self.inDataFunction) {
                     self.inDataFunction = false;
                     self.filterSet = {};
@@ -62,10 +63,10 @@ class N2Search {
                 return Awesomplete.FILTER_CONTAINS(text,
                     self.filteredWord.value);
             },
-            "item": function(text, input) {
+            "item": function (text, input) {
                 return Awesomplete.ITEM(text, self.filteredWord.value);
             },
-            "replace": function(text) {
+            "replace": function (text) {
                 let newVal = "";
                 let cursorPos = 0;
                 for (let i = 0; i < self.searchVals.length; ++i) {
@@ -75,7 +76,7 @@ class N2Search {
                 this.input.value = newVal;
                 self.searchInputDiv.setSelectionRange(cursorPos, cursorPos);
             },
-            "data": function(item /*, input*/ ) {
+            "data": function (item /*, input*/) {
                 self.inDataFunction = true;
                 if (self.filteredWord.containsDot) {
                     let baseIndex = item.toLowerCase().indexOf("." +
@@ -92,14 +93,15 @@ class N2Search {
      * than in N2UserInterface.
      */
     _addEventListeners() {
-        let self = this;
+        const self = this;
 
-       d3.select('body').on('awesomplete-selectcomplete', function() {
-           self.searchInputEventListener();
-           self.searchAwesomplete.evaluate();
-       });
+        d3.select('#awesompleteId').on('awesomplete-selectcomplete', function () {
+            self.searchInputEventListener();
+            self.searchAwesomplete.evaluate();
+        });
 
-       d3.select('body').on('input', this.searchInputEventListener.bind(this));
+        d3.select('#awesompleteId').on('input', this.searchInputEventListener.bind(this));
+        d3.select('#awesompleteId').on('focus', this.searchInputEventListener.bind(this));
     }
 
     /**
@@ -174,7 +176,7 @@ class N2Search {
     /** Do some escaping and replacing of globbing with regular expressions. */
     _getSearchRegExp(searchValsArray) {
         let regexStr = new String("(^" + searchValsArray.join("$|^") + "$)")
-            .replace(/[\.\?\*\^]/g, function(c) {
+            .replace(/[\.\?\*\^]/g, function (c) {
                 return {
                     '.': "\\.",
                     '?': ".",
@@ -197,11 +199,10 @@ class N2Search {
     searchInputEventListener() {
         testThis(this, 'N2Search', 'searchInputEventListener');
 
-        let target = d3.event.target;
-        if (target.id != "awesompleteId") return;
+        const target = d3.event.target;
 
         //valid characters AlphaNumeric : _ ? * space .
-        let newVal = target.value.replace(/([^a-zA-Z0-9:_\?\*\s\.])/g, "");
+        const newVal = target.value.replace(/([^a-zA-Z0-9:_\?\*\s\.])/g, "");
 
         if (newVal != target.value) {
             target.value = newVal; // won't trigger new event
@@ -209,10 +210,10 @@ class N2Search {
 
         this.searchVals = target.value.split(" ");
 
-        let filtered = this.searchVals.filter(this._isValid);
+        const filtered = this.searchVals.filter(this._isValid);
         this.searchVals = filtered;
 
-        let lastLetterTypedIndex = target.selectionStart - 1;
+        const lastLetterTypedIndex = target.selectionStart - 1;
 
         let endIndex = target.value.indexOf(" ", lastLetterTypedIndex);
         if (endIndex == -1) endIndex = target.value.length;
@@ -220,7 +221,7 @@ class N2Search {
         let startIndex = target.value.lastIndexOf(" ", lastLetterTypedIndex);
         if (startIndex == -1) startIndex = 0;
 
-        let sub = target.value.substring(startIndex, endIndex).trim();
+        const sub = target.value.substring(startIndex, endIndex).trim();
         // valid openmdao character types: AlphaNumeric : _ .
         this.filteredWord.value = sub.replace(/([^a-zA-Z0-9:_\.])/g, "");
 
@@ -272,7 +273,7 @@ class N2Search {
         if (node === this.zoomedElement) return;
 
         let nodeName = node.name;
-        if (! node.isInputOrOutput()) nodeName += ".";
+        if (!node.isInputOrOutput()) nodeName += ".";
         let namesToAdd = [nodeName];
 
         for (let name of namesToAdd) {
