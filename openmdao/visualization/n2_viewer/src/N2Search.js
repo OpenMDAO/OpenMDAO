@@ -30,6 +30,7 @@ class N2Search {
         this.numMatches = 0;
         this.searchInputDiv = d3.select("#awesompleteId").node();
         this.searchCountDiv = d3.select("#searchCountId");
+        this.searchInputDiv.value = '';
 
         this._setupAwesomplete();
         this._addEventListeners();
@@ -38,7 +39,7 @@ class N2Search {
 
     /** Initialize the Awesomplete widget. */
     _setupAwesomplete() {
-        let self = this;
+        const self = this;
         this.searchAwesomplete = new Awesomplete(self.searchInputDiv, {
             "minChars": 1,
             "maxItems": 15,
