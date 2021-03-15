@@ -939,9 +939,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.add_subsystem('ser2', ser2(), promotes=["*"])
         p.model.add_subsystem('par2', par2(), promotes=["*"])
 
-        # setup
         p.setup()
-
         p.run_model()
 
         # test all of the i/o sizes set by shape_by_conn
