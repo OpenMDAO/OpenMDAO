@@ -781,5 +781,171 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
 
 
+# following 4 classes are used in TestDistribDynShapeCombos
+class ser1(om.ExplicitComponent):
+    def setup(self):
+        rank = self.comm.rank
+        var_shape = 2 * rank
+
+        # this component outputs all serial => * connections
+        self.add_output("ser_ser_fwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("ser_ser_bwd", shape_by_conn=True)
+
+        self.add_output("ser_par_fwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("ser_par_bwd", shape_by_conn=True)
+
+    def compute(self, inputs, outputs):
+        pass
+
+class par1(om.ExplicitComponent):
+    def setup(self):
+        rank = self.comm.rank
+        var_shape = 2 * rank
+        self.options['distributed'] = True
+
+        # this component outputs all parallel => * connections
+        self.add_output("par_ser_fwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("par_ser_bwd", shape_by_conn=True)
+
+        self.add_output("par_par_fwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("par_par_bwd", shape_by_conn=True)
+
+    def compute(self, inputs, outputs):
+        pass
+
+class ser2(om.ExplicitComponent):
+    def setup(self):
+        rank = self.comm.rank
+        var_shape = 2 * rank
+        # dummy output
+        self.add_output('foo_ser2', val=1.)
+
+        # this component receives all * => serial connections
+        self.add_input("ivc_ser_fwd", shape_by_conn=True)
+        self.add_input("ivc_ser_bwd", shape=var_shape, val=np.ones(var_shape))
+
+        self.add_input("ser_ser_fwd", shape_by_conn=True)
+        self.add_input("ser_ser_bwd", shape=var_shape, val=np.ones(var_shape))
+
+        self.add_input("par_ser_fwd", shape_by_conn=True)
+        self.add_input("par_ser_bwd", shape=var_shape, val=np.ones(var_shape))
+
+    def compute(self, inputs, outputs):
+        pass
+
+class par2(om.ExplicitComponent):
+    def setup(self):
+        rank = self.comm.rank
+        var_shape = 2 * rank
+        self.options['distributed'] = True
+
+        # dummy output
+        self.add_output('foo_par2', val=1.)
+
+        # this component receives all * => parallel connections
+        self.add_input("ivc_par_fwd", shape_by_conn=True)
+        self.add_input("ivc_par_bwd", shape=var_shape, val=np.ones(var_shape))
+
+        self.add_input("ser_par_fwd", shape_by_conn=True)
+        self.add_input("ser_par_bwd", shape=var_shape, val=np.ones(var_shape))
+
+        self.add_input("par_par_fwd", shape_by_conn=True)
+        self.add_input("par_par_bwd", shape=var_shape, val=np.ones(var_shape))
+
+    def compute(self, inputs, outputs):
+        pass
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistribDynShapeCombos(unittest.TestCase):
+    """
+    This will test the dynamic shaping on parallel runs with all of the possible
+    combinations of connections and dynamic shaping "directions". In words, we have
+    independent variable components, serial components, and parallel components.
+    Here is a list of possible connections (ser: serial, par: parallel):
+
+    ivc => ser
+    ivc => par
+    ser => ser
+    ser => par
+    par => ser
+    par => par
+
+    We can use dynamic shaping for all 6 of these connection types, and the information
+    for each connection can either be propagated "forward"/"fwd" (the upstream output
+    is explicitly size, the downstream input is shaped by conn), or "backward"/"bwd"
+    (the downstream input shape is explicitly specified, upstream output is shaped
+    by conn). With 6 connection types and 2 connection direction, this results in 12
+    dynamically sized connections to be checked. In these checks, we want to make sure
+    OpenMDAO has an "expected" behavior, where the local size of the parameters are preserved
+    on each processor regardless of connection type.
+
+    In this test, we have a single model with 5 components in this order:
+    ivc:  Independent variable comp. This will only be connected to a parallel or serial
+    group and only has outputs by design.
+    ser1: Serial component. This will be connected to serial or parallel. Again, only outputs variables and no inputs
+    par1: Parallel component. This will be connected to serial or parallel. Again, only outputs variables and no inputs
+    ser2: Serial component to receive connections that only has inputs and no outputs (only a dummy output)
+    par2: Parallel component to receive connections that only has inputs and no outputs (only a dummy output)
+
+    The variable naming convention goes like type1_type2_dir:
+    type1 is the upstream component with the output
+    type2 is the downstream component with the input
+    direction is the direction of information in the dynamic sizing (see above for fwd, bwd)
+
+    With all this context, here is a table that lists what variables test what i/o:
+
+    Connection:    Forward direction   Backward direction
+    ivc => ser2       ivc_ser_fwd         ivc_ser_bwd
+    ivc => par2       ivc_par_fwd         ivc_par_bwd
+    ser1 => ser2      ser_ser_fwd         ser_ser_bwd
+    ser1 => par2      ser_par_fwd         ser_par_bwd
+    par1 => ser2      par_ser_fwd         par_ser_bwd
+    par1 => par2      par_par_fwd         par_par_bwd
+
+    The reason we have this tests is that the parallel tests above do not cover every possible combination
+    to keep things a bit simple, we do the combination tests here, and other features of the dynamic
+    sizing is tested above (chain connections, shape copies etc.). In this test, we just focus on the
+    individual dynamic shape copies in parallel runs and do not worry about dependencies.
+
+    we use 3 processors for this:
+    proc0: will have a size of 0 on all i/o. we dont really need to set different sizes
+    since each connection does its own dynamic sizing
+    proc1: will have a size of 2 on all i/o
+    proc2: will have a size of 4 on all i/o
+
+    So the variable sizes simply need to be rank*2
+    """
+
+    N_PROCS = 3
+
+    def test_dyn_shape_combos(self):
+
+        rank = self.comm.rank
+        var_shape = 2 * rank
+
+        p = om.Problem()
+
+        # build the ivc
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp(), promotes=["*"])
+        ivc.add_output('ivc_ser_fwd', shape=var_shape, val=np.ones(var_shape))
+        ivc.add_output('ivc_ser_bwd', shape_by_conn=True)
+
+        ivc.add_output('ivc_par_fwd', shape=var_shape, val=np.ones(var_shape))
+        ivc.add_output('ivc_par_bwd', shape_by_conn=True)
+
+        # add the other components
+        p.model.add_subsystem('ser1', ser1(), promotes=["*"])
+        p.model.add_subsystem('par1', par1(), promotes=["*"])
+        p.model.add_subsystem('ser2', ser2(), promotes=["*"])
+        p.model.add_subsystem('par2', par2(), promotes=["*"])
+
+        # setup
+        p.setup()
+
+        p.run_model()
+
+        # test all of the i/o sizes set by shape_by_conn
+
+
 if __name__ == "__main__":
     unittest.main()
