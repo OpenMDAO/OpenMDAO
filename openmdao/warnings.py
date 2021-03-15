@@ -175,6 +175,19 @@ _warnings = {_class.name: _class for _, _class in
              inspect.getmembers(sys.modules[__name__], inspect.isclass) if issubclass(_class, Warning)}
 
 
+def get_warning_defaults():
+    """
+    Return a dictionary of the default action of each warning type.
+    Returns
+    -------
+
+    """
+    defaults = {_class.name: _class.action for _, _class in
+                inspect.getmembers(sys.modules[__name__], inspect.isclass)
+                if issubclass(_class, Warning) and not _class.name.startswith('_')}
+    return defaults
+
+
 def filter_warnings(reset_to_defaults=False, **kwargs):
     """
     Apply the warning filters as given by warning_options.
