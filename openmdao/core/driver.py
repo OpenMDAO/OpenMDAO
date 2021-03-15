@@ -477,7 +477,8 @@ class Driver(object):
 
         vars2record = {
             'input': myinputs,
-            'output': list(myoutputs),
+            'output': list(myoutputs).sort(), # sorting the list ensures the outputs are iterated  
+                                              # over in the same order even on mulitple procs
             'residual': myresiduals
         }
 
