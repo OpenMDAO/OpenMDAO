@@ -946,6 +946,30 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
         # test all of the i/o sizes set by shape_by_conn
 
+        # ivc => serial
+        self.assertEqual(p.get_val('ser2.ivc_ser_fwd').size, var_shape)
+        self.assertEqual(p.get_val('ivc.ivc_ser_bwd').size, var_shape)
+
+        # ivc => parallel
+        self.assertEqual(p.get_val('par2.ivc_par_fwd').size, var_shape)
+        self.assertEqual(p.get_val('ivc.ivc_par_bwd').size, var_shape)
+
+        # serial => serial
+        self.assertEqual(p.get_val('ser2.ser_ser_fwd').size, var_shape)
+        self.assertEqual(p.get_val('ser1.ser_ser_bwd').size, var_shape)
+
+        # serial => parallel
+        self.assertEqual(p.get_val('par2.ser_par_fwd').size, var_shape)
+        self.assertEqual(p.get_val('ser1.ser_par_bwd').size, var_shape)
+
+        # parallel => serial
+        self.assertEqual(p.get_val('ser2.par_ser_fwd').size, var_shape)
+        self.assertEqual(p.get_val('par1.par_ser_bwd').size, var_shape)
+
+        # parallel => parallel
+        self.assertEqual(p.get_val('par2.par_par_fwd').size, var_shape)
+        self.assertEqual(p.get_val('par1.par_par_bwd').size, var_shape)
+
 
 if __name__ == "__main__":
     unittest.main()
