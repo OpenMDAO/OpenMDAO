@@ -77,20 +77,6 @@ class ExplicitComponent(Component):
 
         return of, wrt
 
-    def _get_partials_var_sizes(self):
-        """
-        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(ndarray, ndarray)
-            'of' and 'wrt' variable sizes.
-        """
-        iproc = self.comm.rank
-        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
-        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
-        return out_sizes, in_sizes
-
     def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.

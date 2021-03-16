@@ -4133,20 +4133,6 @@ class System(object):
         # wrt should include implicit states
         return of, of + wrt
 
-    def _get_partials_var_sizes(self):
-        """
-        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(ndarray, ndarray, is_implicit)
-            'of' and 'wrt' variable sizes.
-        """
-        iproc = self.comm.rank
-        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
-        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
-        return out_sizes, np.hstack((out_sizes, in_sizes))
-
     def _get_gradient_nl_solver_systems(self):
         """
         Return a set of all Systems, including this one, that have a gradient nonlinear solver.

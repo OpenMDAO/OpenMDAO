@@ -26,8 +26,6 @@ class Matrix(object):
         dictionary of sub-jacobian data keyed by (out_name, in_name).
     _metadata : dict
         implementation-specific data for the sub-jacobians.
-    _is_internal : bool
-        If True, this is the int_mtx of an AssembledJacobian.
     """
 
     def __init__(self, comm, is_internal):
@@ -45,7 +43,6 @@ class Matrix(object):
         self._matrix = None
         self._submats = OrderedDict()
         self._metadata = OrderedDict()
-        self._is_internal = is_internal
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """

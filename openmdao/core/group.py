@@ -792,11 +792,6 @@ class Group(System):
             if meta_name in meta:
                 return meta[meta_name]
 
-    def _set_group_input_meta(self, prom_in, meta_name, value):
-        if prom_in not in self._group_inputs:
-            self._group_inputs[prom_in] = [{'path': self.pathname, 'prom': prom_in, 'auto': True}]
-        meta = self._group_inputs[prom_in][0][meta_name] = value
-
     def _get_promotes_call_info(self, abs_in):
         prefix_len = len(self.pathname) + 1 if self.pathname else 0
         subname = abs_in[prefix_len:].split('.', 1)[0]

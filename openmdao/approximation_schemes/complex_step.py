@@ -6,7 +6,6 @@ import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
 from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
 
 

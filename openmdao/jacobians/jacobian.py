@@ -356,7 +356,6 @@ class Jacobian(object):
         from openmdao.utils.coloring import _tol_sweep
 
         subjacs = self._subjacs_info
-        sys_subjacs = self._system()._subjacs_info
         summ = self._jac_summ
 
         Jrows = []

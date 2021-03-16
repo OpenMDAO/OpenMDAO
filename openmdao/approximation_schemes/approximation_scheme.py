@@ -6,7 +6,7 @@ from scipy.sparse import coo_matrix
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
+from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
@@ -30,12 +30,6 @@ class ApproximationScheme(object):
         model hieararchy.
     _wrt_meta : dict
         A dict that maps wrt name to its fd/cs metadata.
-    _j_colored : coo_matrix
-        If coloring is active, cached COO jacobian.
-    _j_data_sizes : ndarray of int
-        Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
-    _j_data_offsets : ndarray of int
-        Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
     _progress_out : None or file-like object
         Attribute to output the progress of check_totals
     """
@@ -46,9 +40,6 @@ class ApproximationScheme(object):
         """
         self._approx_groups = None
         self._colored_approx_groups = None
-        self._j_colored = None
-        self._j_data_sizes = None
-        self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._wrt_meta = {}
         self._progress_out = None
@@ -302,11 +293,6 @@ class ApproximationScheme(object):
 
         # Clean vector for results (copy of the outputs or resids)
         results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
-
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_voi_indices = ((system._owns_approx_of_idx or system._owns_approx_wrt_idx) and
-                            not isinstance(jac, _CheckingJacobian))
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)

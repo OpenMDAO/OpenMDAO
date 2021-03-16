@@ -18,7 +18,6 @@ from itertools import groupby
 
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
-from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.jacobian import Jacobian
@@ -84,26 +83,6 @@ _DEF_COMP_SPARSITY_ARGS = {
 # this dict can be checked for an existing class version of the coloring that can be used
 # for that instance.
 _CLASS_COLORINGS = {}
-
-
-# numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
-# return an int instead of an array of ints, so create our own function for those versions.
-if LooseVersion(np.__version__) >= LooseVersion("1.12"):
-    _count_nonzeros = np.count_nonzero
-else:
-    def _count_nonzeros(arr, axis=None):
-        if axis == 1:  # rows
-            count = np.empty(arr.shape[0], dtype=INT_DTYPE)
-            for row in range(arr.shape[0]):
-                count[row] = np.count_nonzero(arr[row])
-        elif axis == 0:  # cols
-            count = np.empty(arr.shape[1], dtype=INT_DTYPE)
-            for col in range(arr.shape[1]):
-                count[col] = np.count_nonzero(arr[:, col])
-        else:
-            return np.count_nonzero(arr)
-
-        return count
 
 
 class Coloring(object):
@@ -760,7 +739,6 @@ class Coloring(object):
             fig.canvas.mpl_connect('button_press_event', on_press)
             fig.canvas.mpl_connect('resize_event', on_resize)
 
-        color_arrays = []
         if self._fwd:
             # winter is a blue/green color map
             cmap = cm.get_cmap('winter')
@@ -1589,47 +1567,6 @@ def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
         row_start = row_end
 
     return sparsity
-
-
-def _write_sparsity(sparsity, stream):
-    """
-    Write the sparsity structure to the given stream.
-
-    Parameters
-    ----------
-    sparsity : dict
-        Nested dict of subjac sparsity for each total derivative.
-    stream : file-like
-        Output stream.
-    """
-    stream.write("{\n")
-
-    last_res_idx = len(sparsity) - 1
-    for i, out in enumerate(sorted(sparsity)):
-        out_dict = sparsity[out]
-        stream.write('"%s": {\n' % out)
-        last_dv_idx = len(out_dict) - 1
-        for j, inp in enumerate(sorted(out_dict)):
-            subjac = out_dict[inp]
-            rows, cols, shape = subjac
-            if len(rows) > 15:
-                stream.write('   "%s": [\n' % inp)
-                stream.write('        %s,\n' % rows)
-                stream.write('        %s,\n' % cols)
-                stream.write('        %s]' % list(shape))
-            else:
-                stream.write('   "%s": [%s, %s, %s]' % (inp, rows, cols, list(shape)))
-            if j == last_dv_idx:
-                stream.write('\n')
-            else:
-                stream.write(',\n')
-        stream.write("}")
-        if i == last_res_idx:
-            stream.write('\n')
-        else:
-            stream.write(',\n')
-
-    stream.write("}\n")
 
 
 def _get_desvar_info(driver, names=None, use_abs_names=True):

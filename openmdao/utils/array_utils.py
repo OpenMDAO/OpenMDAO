@@ -307,44 +307,6 @@ def _global2local_offsets(global_offsets):
     return offsets
 
 
-def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
-    """
-    Return the given indices converted into indices into the full vector.
-
-    This routine is used to compute how column indices computed during coloring of a subset
-    of the jacobian map to column indices corresponding to the full jacobian.
-
-    Parameters
-    ----------
-    all_names : ordered iter of str
-        An ordered list of variable names containing all variables of the appropriate type.
-    matching_names : set of str
-        Subset of all_names that make up the reduced index set.
-    sizes : ndarray of int
-        Array of variable sizes.
-    idx_map : dict
-        Mapping of var name to some subset of its full indices.
-
-    Returns
-    -------
-    ndarray
-        Full array indices that map to the provided subset of variables.
-    """
-    global_idxs = []
-    start = end = 0
-    for name, size in zip(all_names, sizes):
-        end += size
-        if size > 0 and (matching_names is None or name in matching_names):
-            if name in idx_map:
-                global_idxs.append(np.arange(start, end)[idx_map[name]])
-            else:
-                global_idxs.append(np.arange(start, end))
-        start = end
-
-    if global_idxs:
-        return np.hstack(global_idxs)
-
-
 def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
