@@ -20,20 +20,20 @@ well formulated.
 
 - Added debug printing for totals for approx_totals [#1902](https://github.com/OpenMDAO/OpenMDAO/pull/1902)
 - New N2 capability to save and load views. [#1904](https://github.com/OpenMDAO/OpenMDAO/pull/1904)
-- user_teriminate_signal now defaults to None [#1906](https://github.com/OpenMDAO/OpenMDAO/pull/1906)
+- `user_terminate_signal` now defaults to None [#1906](https://github.com/OpenMDAO/OpenMDAO/pull/1906)
 - Added check for Google Colab environment in notebook_mode [#1921](https://github.com/OpenMDAO/OpenMDAO/pull/1921)
 - Cleaned up pyoptSparseDriver error handling so that unhandled exceptions are re-raised in place of the cryptic pyoptsparse one. [#1923](https://github.com/OpenMDAO/OpenMDAO/pull/1923)
 - Added `to_table` method to OptionsDictionary to provide `embed_options` replacement capability in Jupyter. [#1924](https://github.com/OpenMDAO/OpenMDAO/pull/1924)
 - In pyoptsparse and scipyoptimizer drivers, raise a warning during first full derivative calculation if a row or column of the total derivatives matrix is all zero. [#1938](https://github.com/OpenMDAO/OpenMDAO/pull/1938)
 - Overhaul internal storage of scaling vectors. [#1947](https://github.com/OpenMDAO/OpenMDAO/pull/1947)
-- Added code to show view_connections in nb/colab/docs [#1948](https://github.com/OpenMDAO/OpenMDAO/pull/1948)
+- Added code to show view_connections in notebook/colab/docs [#1948](https://github.com/OpenMDAO/OpenMDAO/pull/1948)
 - Add N2 search terms to forward/back history [#1952](https://github.com/OpenMDAO/OpenMDAO/pull/1952)
 
 ## Bug Fixes:
 
-- Fixed problem where has_diag_partials was ignored when shape_by_conn or copy_shape were used. [#1907](https://github.com/OpenMDAO/OpenMDAO/pull/1907)
-- Fixed shape_by_conn bug for dist input to serial output. [#1914](https://github.com/OpenMDAO/OpenMDAO/pull/1914)
-- Fixed bugs in list_outputs residuals_tol filtering. [#1937](https://github.com/OpenMDAO/OpenMDAO/pull/1937)
+- Fixed problem where `has_diag_partials` was ignored when `shape_by_conn` or `copy_shape` were used. [#1907](https://github.com/OpenMDAO/OpenMDAO/pull/1907)
+- Fixed `shape_by_conn` bug for distributed input to serial output. [#1914](https://github.com/OpenMDAO/OpenMDAO/pull/1914)
+- Fixed bugs in `list_outputs` `residuals_tol` filtering. [#1937](https://github.com/OpenMDAO/OpenMDAO/pull/1937)
 - Fixed bug when using InterpND to interpolate on 1D data. [#1941](https://github.com/OpenMDAO/OpenMDAO/pull/1941)
 - Fixed NaNs that may still show up in the N2 diagram [#1945](https://github.com/OpenMDAO/OpenMDAO/pull/1945)
 - Fixed text mistake when a linesearch prints its violations. [#1949](https://github.com/OpenMDAO/OpenMDAO/pull/1949)
