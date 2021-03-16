@@ -169,13 +169,12 @@ class ApproximationScheme(object):
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=int)
-                    if abs_wrt in out_slices:
+                    if is_total and abs_wrt in out_slices:
                         slc = out_slices[abs_wrt]
                         rng = np.arange(slc.start, slc.stop)
                         if cinds is not None:
                             rng = rng[cinds]
-                        if is_total:
-                            ccol2vcol[colored_start:colored_end] = rng
+                        ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
 
         approx_of_idxs = system._owns_approx_of_idx
