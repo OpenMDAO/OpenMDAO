@@ -17,23 +17,15 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
-# Attempt to import petsc4py.
-# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
-# and raise exception on failure. If set to anything else, no import is attempted.
-if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
-        from petsc4py import PETSc
-    else:
-        PETSc = None
-# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
-# with a notification.
-else:
-    try:
-        from petsc4py import PETSc
-    except ImportError:
-        PETSc = None
-        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
-        sys.stdout.flush()
+# Attempt to import petsc4py. If OPENMDAO_REQUIRE_MPI is set to a recognized
+# positive value, raise exception on failure.
+try:
+    from petsc4py import PETSc
+except ImportError:
+    PETSc = None
+    if 'OPENMDAO_REQUIRE_MPI' in os.environ and \
+            os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        raise ImportError("Unable to import petsc4py, but OPENMDAO_REQUIRE_MPI set.\n")
 
 _contains_all = ContainsAll()
 
