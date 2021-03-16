@@ -1032,7 +1032,7 @@ class System(object):
         if info['method'] is None and self._approx_schemes:
             info['method'] = list(self._approx_schemes)[0]
 
-        if self._coloring_info['coloring'] is None:
+        if info['coloring'] is None:
             # check to see if any approx derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
@@ -1041,22 +1041,22 @@ class System(object):
                 if not (self._owns_approx_of or self._owns_approx_wrt):
                     simple_warning("%s: No approx partials found but coloring was requested.  "
                                    "Declaring ALL partials as dense and approx (method='%s')" %
-                                   (self.msginfo, self._coloring_info['method']))
+                                   (self.msginfo, info['method']))
                     try:
-                        self.declare_partials('*', '*', method=self._coloring_info['method'])
+                        self.declare_partials('*', '*', method=info['method'])
                     except AttributeError:  # this system must be a group
                         from openmdao.core.component import Component
                         from openmdao.core.indepvarcomp import IndepVarComp
                         from openmdao.components.exec_comp import ExecComp
                         for s in self.system_iter(recurse=True, typ=Component):
                             if not isinstance(s, ExecComp) and not isinstance(s, IndepVarComp):
-                                s.declare_partials('*', '*', method=self._coloring_info['method'])
+                                s.declare_partials('*', '*', method=info['method'])
                     self._setup_partials()
 
-        approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+        approx_scheme = self._get_approx_scheme(info['method'])
 
-        if self._coloring_info['coloring'] is None and self._coloring_info['static'] is None:
-            self._coloring_info['dynamic'] = True
+        if info['coloring'] is None and info['static'] is None:
+            info['dynamic'] = True
 
         coloring_fname = self.get_approx_coloring_fname()
 
@@ -1131,14 +1131,10 @@ class System(object):
                                                              tol=info['tol'],
                                                              orders=info['orders'])
 
-        self._jacobian._restore_approx_sparsity()
-
         sp_info['sparsity_time'] = sparsity_time
         sp_info['pathname'] = self.pathname
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
-
-        info = self._coloring_info
 
         self._jacobian._jac_summ = None  # reclaim the memory
         if self.pathname:

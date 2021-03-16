@@ -1535,8 +1535,10 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
     print("Total jacobian shape:", fullJ.shape, "\n")
 
     nzrows, nzcols = np.nonzero(fullJ > info['good_tol'])
+    shape = fullJ.shape
+    fullJ = None
 
-    return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=fullJ.shape), info
+    return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), info
 
 
 def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
@@ -1569,14 +1571,15 @@ def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
     for of, of_size in zip(ofs, of_sizes):
         sparsity[of] = {}
         row_end += of_size
+        rowbool = np.logical_and(nzrows >= row_start, nzrows < row_end)
+
         col_start = col_end = 0
         for wrt, wrt_size in zip(wrts, wrt_sizes):
             col_end += wrt_size
-
-            # save sparsity structure as  (rows, cols, shape)
-            rowbool = np.logical_and(nzrows >= row_start, nzrows < row_end)
             colbool = np.logical_and(nzcols >= col_start, nzcols < col_end)
             mask = np.logical_and(rowbool, colbool)
+
+            # save sparsity structure as  (rows, cols, shape)
             sparsity[of][wrt] = (nzrows[mask] - row_start, nzcols[mask] - col_start,
                                  (of_size, wrt_size))
 

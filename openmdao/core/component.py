@@ -417,8 +417,16 @@ class Component(System):
                 wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
                 abs_key = (of_abs, wrt_abs)
                 if abs_key in self._subjacs_info:
+                    meta = self._subjacs_info[abs_key]
+                    if meta['rows'] is not None:
+                        rows, cols = tup[:2]
+                        if not np.all(meta['rows'] == rows) or not np.all(meta['cols'] == cols):
+                            raise RuntimeError(f"{self.msginfo}: User sparsity pattern "
+                                               f"(rows={rows}, cols={cols}) for sub-jacobian "
+                                               f"{abs_key} does not match the computed sparsity "
+                                               f"(rows={meta['rows']}, cols={meta['cols']}).")
                     # add sparsity info to existing partial info
-                    self._subjacs_info[abs_key]['sparsity'] = tup
+                    meta['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
@@ -1522,6 +1530,7 @@ class Component(System):
                     if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+                self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self, my_tdict, top):
         abs2meta_in = self._var_abs2meta['input']

@@ -15,7 +15,7 @@ from scipy.sparse import coo_matrix
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring, Coloring
 
@@ -45,24 +45,52 @@ else:
     pyOptSparseDriver = None
 
 
-def setup_vars(self, ofs, wrts):
-    matrix = self.sparsity
-    isplit = self.isplit
-    osplit = self.osplit
+def setup_vars(comp, ofs, wrts, sparse_partials=False, bad_sparsity=False):
+    matrix = comp.sparsity
+    isplit = comp.isplit
+    osplit = comp.osplit
 
+    slices = {}
     isizes, _ = evenly_distrib_idxs(isplit, matrix.shape[1])
+    start = end = 0
     for i, sz in enumerate(isizes):
-        self.add_input('x%d' % i, np.zeros(sz))
+        end += sz
+        wrt = f"x{i}"
+        comp.add_input(wrt, np.zeros(sz))
+        slices[wrt] = slice(start, end)
+        start = end
 
     osizes, _ = evenly_distrib_idxs(osplit, matrix.shape[0])
+    start = end = 0
     for i, sz in enumerate(osizes):
-        self.add_output('y%d' % i, np.zeros(sz))
+        end += sz
+        of = f"y{i}"
+        comp.add_output(of, np.zeros(sz))
+        slices[of] = slice(start, end)
+        start = end
 
-    self.declare_partials(of=ofs, wrt=wrts, method=self.method)
+    if sparse_partials:
+        flipped = 0
+        for i in range(len(osizes)):
+            of = f"y{i}"
+            for j in range(len(isizes)):
+                wrt = f"x{j}"
+                subjac = comp.sparsity[slices[of], slices[wrt]]
+                if np.any(subjac):
+                    rows, cols = np.nonzero(subjac)
+                    if bad_sparsity and rows.size > 1 and flipped < 5:
+                        rows[0], rows[-1] = rows[-1], rows[0]
+                        cols[0], cols[-1] = cols[-1], cols[0]
+                        flipped += 1
+                    comp.declare_partials(of=of, wrt=wrt, rows=rows, cols=cols, method=comp.method)
+                else:
+                    comp.declare_partials(of=of, wrt=wrt, method=comp.method, dependent=False)
+    else:
+        comp.declare_partials(of=ofs, wrt=wrts, method=comp.method)
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+    sparsity = np.random.random(mask.shape)
     return sparsity * mask
 
 
@@ -126,16 +154,18 @@ class SparseCompImplicit(ImplicitComponent):
 
 class SparseCompExplicit(ExplicitComponent):
 
-    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
+    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, sparse_partials=False, bad_sparsity=False, **kwargs):
         super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
         self.method = method
+        self.sparse_partials = sparse_partials
+        self.bad_sparsity = bad_sparsity
         self._nruns = 0
 
     def setup(self):
-        setup_vars(self, ofs='*', wrts='*')
+        setup_vars(self, ofs='*', wrts='*', sparse_partials=self.sparse_partials, bad_sparsity=self.bad_sparsity)
 
     def compute(self, inputs, outputs):
         prod = self.sparsity.dot(inputs.asarray())
@@ -156,12 +186,23 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs2meta['output']:
+    for of, ofmeta in system._var_allprocs_abs2meta['output'].items():
         cblocks = []
-        for wrt in system._var_allprocs_abs2meta['input']:
+        for wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
             key = (of, wrt)
             if key in jac:
-                cblocks.append(jac[key]['value'])
+                meta = jac[key]
+                if meta['rows'] is not None:
+                    cblocks.append(coo_matrix((meta['value'], (meta['rows'], meta['cols'])), shape=meta['shape']).toarray())
+                elif meta['dependent']:
+                    cblocks.append(meta['value'])
+                else:
+                    cblocks.append(np.zeros(meta['shape']))
+            else: # sparsity was all zeros so we declared this subjac as not dependent
+                relof = of.rsplit('.', 1)[-1]
+                relwrt = wrt.rsplit('.', 1)[-1]
+                if (relof, relwrt) in system._declared_partials and not system._declared_partials[(relof, relwrt)].get('dependent'):
+                    cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
         if cblocks:
             blocks.append(np.hstack(cblocks))
     fullJ = np.vstack(blocks)
@@ -273,6 +314,68 @@ class TestColoringExplicit(unittest.TestCase):
         self.assertEqual(comp._nruns - start_nruns, 10)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
+
+    def test_partials_sparse_explicit(self):
+        method = 'cs'
+        isplit = 7
+        osplit = 11
+        sparsity = rand_sparsity((100, 100), .01).toarray()
+
+        totsizes = []
+        for sparse in [True, False]:
+            prob = Problem(coloring_dir=self.tempdir)
+            model = prob.model
+            indeps, conns = setup_indeps(isplit, sparsity.shape[1], 'indeps', 'comp')
+            model.add_subsystem('indeps', indeps)
+            comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                                  isplit=isplit, osplit=osplit,
+                                                                  sparse_partials=sparse))
+            comp.declare_coloring('x*', method=method, ignore_approx_sparsity=False)
+
+            for conn in conns:
+                model.connect(*conn)
+
+            prob.setup(check=False, mode='fwd')
+            prob.set_solver_print(level=0)
+            prob.run_model()
+
+            comp.run_linearize()
+            prob.run_model()
+            comp.run_linearize()
+            jac = comp._jacobian._subjacs_info
+            _check_partial_matrix(comp, jac, sparsity, method)
+            totsizes.append(comp._jacobian._get_tot_array_size())
+
+        # sparse memory usage in this case should be less than 1/2 that of dense
+        self.assertLess(totsizes[0] * 2, totsizes[1])
+
+    def test_partials_bad_sparse_explicit(self):
+        method = 'cs'
+        isplit = 7
+        osplit = 11
+        sparsity = rand_sparsity((100, 100), .01).toarray()
+
+        prob = Problem(coloring_dir=self.tempdir)
+        model = prob.model
+        indeps, conns = setup_indeps(isplit, sparsity.shape[1], 'indeps', 'comp')
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                              isplit=isplit, osplit=osplit,
+                                                              sparse_partials=True, bad_sparsity=True))
+        comp.declare_coloring('x*', method=method, ignore_approx_sparsity=True)
+
+        for conn in conns:
+            model.connect(*conn)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(RuntimeError) as cm:
+            comp.run_linearize()
+
+        self.assertTrue("User sparsity pattern" in str(cm.exception) and "does not match the computed sparsity" in str(cm.exception),
+                        msg="Missing expected exception about incorrect user sparsity.")
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],

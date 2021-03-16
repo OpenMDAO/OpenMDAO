@@ -1,5 +1,6 @@
 """Define the base Jacobian class."""
 import weakref
+import sys
 
 import numpy as np
 from numpy.random import rand
@@ -548,3 +549,20 @@ class Jacobian(object):
         """
         self._subjacs_info = self._system()._subjacs_info
         self._colnames = None  # force recompute of internal index maps on next set_col
+
+    def _get_tot_array_size(self):
+        """
+        Return the total memory size of all value, row, and column data in this jacobian.
+
+        Returns
+        -------
+        int
+            Total size of the value and index arrays.
+        """
+        tot = 0
+        for key, meta in self._subjacs_info.items():
+            if meta['rows'] is not None:
+                tot += sys.getsizeof(np.asarray(meta['rows']))
+                tot += sys.getsizeof(np.asarray(meta['cols']))
+            tot += sys.getsizeof(meta['value'])
+        return tot
