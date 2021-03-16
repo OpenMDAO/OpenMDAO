@@ -8,6 +8,8 @@ from copy import copy
 import numpy as np
 from scipy.sparse import coo_matrix
 
+from openmdao.core.constants import INT_DTYPE
+
 
 def shape_to_len(shape):
     """
@@ -57,13 +59,13 @@ def evenly_distrib_idxs(num_divisions, arr_size):
         divisions.
     """
     base, leftover = divmod(arr_size, num_divisions)
-    sizes = np.full(num_divisions, base, dtype=int)
+    sizes = np.full(num_divisions, base, dtype=INT_DTYPE)
 
     # evenly distribute the remainder across size-leftover procs,
     # instead of giving the whole remainder to one proc
     sizes[:leftover] += 1
 
-    offsets = np.zeros(num_divisions, dtype=int)
+    offsets = np.zeros(num_divisions, dtype=INT_DTYPE)
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
@@ -205,8 +207,8 @@ def array_connection_compatible(shape1, shape2):
     bool
         True if the two shapes are compatible for connection, else False.
     """
-    ashape1 = np.asarray(shape1, dtype=int)
-    ashape2 = np.asarray(shape2, dtype=int)
+    ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
+    ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
 
     size1 = shape_to_len(ashape1)
     size2 = shape_to_len(ashape2)

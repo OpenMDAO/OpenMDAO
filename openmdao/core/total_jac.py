@@ -1908,14 +1908,13 @@ def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, 
     if jac_meta['rows'] is not None:
         if prom_in == prom_out:
             nrows, ncols = jac_meta['shape']
-            sz = 0
+            if of_idx is _full_slice or wrt_idx is _full_slice:
+                sz = nrows  # nrows = ncols since this subjac is square
+            else:
+                sz = np.max(of_idx)
+                sz = max(sz, np.max(wrt_idx)) + 1
             # take sections of the identity matrix based on of_idx and wrt_idx
-            if of_idx is not _full_slice:
-                sz = np.max(of_idx) + 1
-            if wrt_idx is not _full_slice:
-                sz = max(sz, np.max(wrt_idx) + 1)
             sz = max(sz, nrows, ncols)
-
             tot = np.eye(sz)[of_idx, wrt_idx]
         else:
             tot = np.zeros(jac_meta['shape'])

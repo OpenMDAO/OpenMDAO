@@ -917,7 +917,8 @@ class Component(System):
 
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "
-                               f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
+                               f"np.arange({offset}, {end}, dtype=INT_DTYPE).reshape({inds.shape}"
+                               ").")
 
         return added_src_inds
 
@@ -1057,7 +1058,7 @@ class Component(System):
                 # Check for repeated rows/cols indices.
                 size = len(rows)
                 if size > 0:
-                    coo = coo_matrix((np.ones(size, dtype=np.short), (rows, cols)), dtype=int)
+                    coo = coo_matrix((np.ones(size, dtype=np.short), (rows, cols)))
                     dsize = coo.data.size
                     csc = coo.tocsc()
                     # csc adds values at duplicate indices together, so result will be that data

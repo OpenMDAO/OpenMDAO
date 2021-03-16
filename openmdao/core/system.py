@@ -546,7 +546,7 @@ class System(object):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, offset, end, slice) for each 'of' var in the systems's jacobian.
+        Iterate over (name, offset, end, slice) for each 'of' (row) var in the system's jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
@@ -559,7 +559,7 @@ class System(object):
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+        Iterate over (name, offset, end, idxs) for each 'wrt' (column) var in the system's jacobian.
 
         Parameters
         ----------
@@ -1326,7 +1326,7 @@ class System(object):
             # a 'color' is assigned to each subsystem, with
             # an entry for each processor it will be given
             # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
-            color = np.empty(comm.size, dtype=int)
+            color = np.empty(comm.size, dtype=INT_DTYPE)
             for i in range(num_par_fd):
                 color[offsets[i]:offsets[i] + sizes[i]] = i
 
@@ -2269,12 +2269,12 @@ class System(object):
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
-                        csum = np.empty(vsizes.size, dtype=int)
+                        csum = np.empty(vsizes.size, dtype=INT_DTYPE)
                         csum[0] = 0
                         csum[1:] = np.cumsum(vsizes)[:-1]
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
-                        off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
+                        off_vn[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
             if self._use_derivatives:
                 offsets['nonlinear'] = offsets['linear']

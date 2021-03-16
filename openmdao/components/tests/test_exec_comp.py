@@ -1559,7 +1559,7 @@ _MASK = np.array(
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape) + 1e-5
+    sparsity = np.random.random(mask.shape) + 1e-5
     return sparsity * mask
 
 

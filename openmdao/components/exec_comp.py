@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
@@ -519,7 +520,7 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=int)
+                                inds = np.arange(oval.size, dtype=INT_DTYPE)
                             else:
                                 inds = None
                             decl_partials(of=out, wrt=inp, rows=inds, cols=inds)

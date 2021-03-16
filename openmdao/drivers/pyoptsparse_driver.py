@@ -18,6 +18,7 @@ try:
 except ImportError:
     Optimization = None
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
@@ -764,8 +765,8 @@ class pyOptSparseDriver(Driver):
                 continue
             self._res_jacs[res] = {}
             for dv, (rows, cols, shape) in resdict.items():
-                rows = np.array(rows, dtype=int)
-                cols = np.array(cols, dtype=int)
+                rows = np.array(rows, dtype=INT_DTYPE)
+                cols = np.array(cols, dtype=INT_DTYPE)
 
                 self._res_jacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],

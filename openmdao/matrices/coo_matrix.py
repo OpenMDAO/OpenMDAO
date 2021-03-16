@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix
 
 from collections import OrderedDict
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.matrices.matrix import Matrix, _compute_index_map
 
 
@@ -74,8 +75,8 @@ class COOMatrix(Matrix):
             start = end
 
         data = np.zeros(end)
-        rows = np.empty(end, dtype=int)
-        cols = np.empty(end, dtype=int)
+        rows = np.empty(end, dtype=INT_DTYPE)
+        cols = np.empty(end, dtype=INT_DTYPE)
 
         for key, (start, end, dense, jrows) in key_ranges.items():
             info, loc, src_indices, shape, factor = submats[key]
@@ -91,7 +92,7 @@ class COOMatrix(Matrix):
                 jac_type = ndarray
 
                 if src_indices is None:
-                    colrange = np.arange(shape[1], dtype=int) + col_offset
+                    colrange = np.arange(shape[1], dtype=INT_DTYPE) + col_offset
                 else:
                     colrange = src_indices
 

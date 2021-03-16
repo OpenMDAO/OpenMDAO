@@ -4,6 +4,8 @@ from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
 from collections import OrderedDict
 
+from openmdao.core.constants import INT_DTYPE
+
 # scipy sparse types allowed to be subjacs
 sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
@@ -175,7 +177,7 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
         # pull out columns that match each index
         idxarr = np.nonzero(jcols == i)[0]
         idxs.append(idxarr)
-        icols.append(np.full(idxarr.shape, idx, dtype=int))
+        icols.append(np.full(idxarr.shape, idx, dtype=INT_DTYPE))
 
     idxs = np.hstack(idxs)
     icols = np.hstack(icols) + icol

@@ -5,6 +5,7 @@ from itertools import chain
 from scipy.sparse import coo_matrix
 import numpy as np
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
@@ -157,18 +158,18 @@ class ApproximationScheme(object):
 
         if wrt_matches is not None:
             # this maps column indices into colored jac into indices into full jac
-            ccol2jcol = np.empty(coloring._shape[1], dtype=int)
+            ccol2jcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
             # colored col to out vec idx
             if is_total:
-                ccol2vcol = np.empty(coloring._shape[1], dtype=int)
+                ccol2vcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
             ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
             for abs_wrt, cstart, cend, vec, cinds in ordered_wrt_iter:
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
-                    ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=int)
+                    ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
                     if is_total and abs_wrt in out_slices:
                         slc = out_slices[abs_wrt]
                         rng = np.arange(slc.start, slc.stop)
@@ -185,7 +186,7 @@ class ApproximationScheme(object):
             approx_wrt_idxs = {}
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
-        row_map = np.empty(coloring._shape[0], dtype=int)
+        row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
@@ -199,7 +200,7 @@ class ApproximationScheme(object):
             prom = name if is_total else abs2prom[name]
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
-                row_map[colorstart:colorend] = np.arange(start, end, dtype=int)
+                row_map[colorstart:colorend] = np.arange(start, end, dtype=INT_DTYPE)
                 colorstart = colorend
             start = end
 
@@ -482,7 +483,7 @@ class ApproximationScheme(object):
         totarr : ndarray
             Array sized to fit a total jac column.
         of_iter : list
-            List of (of, start, end, inds) for each 'of' variable in the total jacobian.
+            List of (of, start, end, inds) for each 'of' (row) variable in the total jacobian.
         my_rem_out_vars : list
             List of names of local variables that are remote on other procs.
 

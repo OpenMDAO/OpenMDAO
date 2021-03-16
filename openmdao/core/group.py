@@ -1601,7 +1601,7 @@ class Group(System):
         for loc_idx, sz in zip(locality, dsizes):
             sizes[loc_idx] = sz
 
-        offsets = np.zeros(self.comm.size, dtype=int)
+        offsets = np.zeros(self.comm.size, dtype=INT_DTYPE)
         offsets[1:] = np.cumsum(sizes)[:-1]
 
         return sizes, offsets
@@ -2966,7 +2966,7 @@ class Group(System):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, start, end, idxs) for each 'of' var in the systems's jacobian.
+        Iterate over (name, start, end, idxs) for each 'of' (row) var in the systems's jacobian.
 
         idxs will usually be the var slice into the full variable in the result array,
         except in cases where _owns_approx__idx has a value for that variable, in which case it'll

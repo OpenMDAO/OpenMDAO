@@ -20,6 +20,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse.compressed import get_index_dtype
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
@@ -92,11 +93,11 @@ if LooseVersion(np.__version__) >= LooseVersion("1.12"):
 else:
     def _count_nonzeros(arr, axis=None):
         if axis == 1:  # rows
-            count = np.empty(arr.shape[0], dtype=int)
+            count = np.empty(arr.shape[0], dtype=INT_DTYPE)
             for row in range(arr.shape[0]):
                 count[row] = np.count_nonzero(arr[row])
         elif axis == 0:  # cols
-            count = np.empty(arr.shape[1], dtype=int)
+            count = np.empty(arr.shape[1], dtype=INT_DTYPE)
             for col in range(arr.shape[1]):
                 count[col] = np.count_nonzero(arr[:, col])
         else:
@@ -586,7 +587,7 @@ class Coloring(object):
         charr[self._nzrows, self._nzcols] = 'x'
 
         if self._fwd:
-            full_rows = np.arange(nrows, dtype=int)
+            full_rows = np.arange(nrows, dtype=INT_DTYPE)
             col2row = self._fwd[1]
             for grp in self._fwd[0]:
                 for c in grp:
@@ -597,7 +598,7 @@ class Coloring(object):
 
         has_overlap = False
         if self._rev:
-            full_cols = np.arange(ncols, dtype=int)
+            full_cols = np.arange(ncols, dtype=INT_DTYPE)
             row2col = self._rev[1]
             for grp in self._rev[0]:
                 for r in grp:
@@ -688,10 +689,10 @@ class Coloring(object):
 
         if self._row_vars is not None and self._col_vars is not None:
             # map row/col to corresponding var names
-            entry_xnames = np.zeros(ncols, dtype=int)
-            entry_ynames = np.zeros(nrows, dtype=int)
-            entry_xcolors = np.zeros(ncols, dtype=int)
-            entry_ycolors = np.zeros(nrows, dtype=int)
+            entry_xnames = np.zeros(ncols, dtype=INT_DTYPE)
+            entry_ynames = np.zeros(nrows, dtype=INT_DTYPE)
+            entry_xcolors = np.zeros(ncols, dtype=INT_DTYPE)
+            entry_ycolors = np.zeros(nrows, dtype=INT_DTYPE)
 
             # pick two colors for our checkerboard pattern
             sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
@@ -765,7 +766,7 @@ class Coloring(object):
             cmap = cm.get_cmap('winter')
 
             icol = 1
-            full_rows = np.arange(nrows, dtype=int)
+            full_rows = np.arange(nrows, dtype=INT_DTYPE)
             col2row = self._fwd[1]
             for i, grp in enumerate(self._fwd[0]):
                 for c in grp:
@@ -783,7 +784,7 @@ class Coloring(object):
             cmap = cm.get_cmap('autumn_r')
 
             icol = 1
-            full_cols = np.arange(ncols, dtype=int)
+            full_cols = np.arange(ncols, dtype=INT_DTYPE)
             row2col = self._rev[1]
             for i, grp in enumerate(self._rev[0]):
                 for r in grp:
@@ -979,7 +980,7 @@ def _order_by_ID(col_adj_matrix):
         Boolean array that's True where the column matches nzcols.
     """
     ncols = col_adj_matrix.shape[1]
-    colored_degrees = np.zeros(ncols, dtype=int)
+    colored_degrees = np.zeros(ncols, dtype=INT_DTYPE)
     colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
 
     for i in range(np.nonzero(colored_degrees)[0].size):
@@ -1025,8 +1026,8 @@ def _2col_adj_rows_cols(J):
         adjrows = np.hstack(adjrows)
         adjcols = np.hstack(adjcols)
     else:
-        adjrows = np.zeros(0, dtype=int)
-        adjcols = np.zeros(0, dtype=int)
+        adjrows = np.zeros(0, dtype=INT_DTYPE)
+        adjcols = np.zeros(0, dtype=INT_DTYPE)
 
     return csc_matrix((np.ones(adjrows.size, dtype=bool), (adjrows, adjcols)), shape=(ncols, ncols))
 
@@ -1090,8 +1091,8 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
         rows = np.hstack(allnzr + allnzc)
         cols = np.hstack(allnzc + allnzr)
     else:
-        rows = np.zeros(0, dtype=int)
-        cols = np.zeros(0, dtype=int)
+        rows = np.zeros(0, dtype=INT_DTYPE)
+        cols = np.zeros(0, dtype=INT_DTYPE)
 
     allnzr = allnzc = None
 
@@ -1133,7 +1134,7 @@ def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
     _, ncols = col_adj_matrix.shape
 
     # -1 indicates that a column has not been colored
-    colors = np.full(ncols, -1, dtype=int)
+    colors = np.full(ncols, -1, dtype=INT_DTYPE)
 
     for icol, colnzrows in _order_by_ID(col_adj_matrix):
         neighbor_colors = colors[colnzrows]
@@ -1212,8 +1213,8 @@ def MNCO_bidir(J):
 
     coloring = Coloring(sparsity=J)
 
-    M_col_nonzeros = np.zeros(ncols, dtype=int)
-    M_row_nonzeros = np.zeros(nrows, dtype=int)
+    M_col_nonzeros = np.zeros(ncols, dtype=INT_DTYPE)
+    M_row_nonzeros = np.zeros(nrows, dtype=INT_DTYPE)
 
     sparse = csc_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
 
@@ -1299,7 +1300,7 @@ def MNCO_bidir(J):
         for i, cols in enumerate(Jf_rows):
             if cols is not None:
                 Jfc.append(cols)
-                Jfr.append(np.full(cols.size, i, dtype=int))
+                Jfr.append(np.full(cols.size, i, dtype=INT_DTYPE))
                 nnz_Jf += len(cols)
 
         Jf_rows = None
@@ -1315,7 +1316,7 @@ def MNCO_bidir(J):
         for i, rows in enumerate(Jr_cols):
             if rows is not None:
                 Jrr.append(rows)
-                Jrc.append(np.full(rows.size, i, dtype=int))
+                Jrc.append(np.full(rows.size, i, dtype=INT_DTYPE))
                 nnz_Jr += len(rows)
 
         Jr_cols = None

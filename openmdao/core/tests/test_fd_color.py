@@ -90,8 +90,7 @@ def setup_vars(comp, ofs, wrts, sparse_partials=False, bad_sparsity=False):
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(mask.shape)
-    return sparsity * mask
+    return np.random.random(mask.shape) * mask
 
 
 def setup_indeps(isplit, ninputs, indeps_name, comp_name):

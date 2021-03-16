@@ -8,6 +8,7 @@ from numpy.random import rand
 from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse, coo_matrix
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
@@ -423,7 +424,7 @@ class Jacobian(object):
         self._colnames = list(col_var_info)   # map var id to varname
 
         ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
-        self._col2name_ind = np.empty(ncols, dtype=int)  # jac col to var id
+        self._col2name_ind = np.empty(ncols, dtype=INT_DTYPE)  # jac col to var id
         start = end = 0
         for i, (wrt, _start, _end, _, _) in enumerate(col_var_info.values()):
             end += _end - _start
