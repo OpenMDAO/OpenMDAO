@@ -1057,15 +1057,16 @@ class Component(System):
                 # Check for repeated rows/cols indices.
                 size = len(rows)
                 if size > 0:
-                    coo = coo_matrix((np.ones(size), (rows, cols)), dtype=int)
+                    coo = coo_matrix((np.ones(size, dtype=np.short), (rows, cols)), dtype=int)
+                    dsize = coo.data.size
                     csc = coo.tocsc()
                     # csc adds values at duplicate indices together, so result will be that data
                     # size is less if there are duplicates
-                    if csc.data.size < coo.data.size:
-                        coo2 = csc.tocoo()
+                    if csc.data.size < dsize:
+                        coo = csc.tocoo()
                         del csc
-                        inds = np.where(coo2.data > 1.)
-                        dups = list(zip(coo2.row[inds], coo2.col[inds]))
+                        inds = np.where(coo.data > 1.)
+                        dups = list(zip(coo.row[inds], coo.col[inds]))
                         raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
                                            "with rows and cols that specify the following duplicate"
                                            " subjacobian entries: {}.".format(self.msginfo, of, wrt,
