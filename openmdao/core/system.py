@@ -3605,9 +3605,11 @@ class System(object):
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
-        keynames = np.array(['value', 'units', 'shape', 'global_shape', 'desc', 'tags'])
-        keys = [str(n) for n in keynames[np.array([values, units, shape, global_shape, desc, tags],
-                                                  dtype=bool)]]
+        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keyflags = [values, units, shape, global_shape, desc, tags]
+
+        keys = [name for i, name in enumerate(keynames) if keyflags[i]]
+
         if bounds:
             keys.extend(('lower', 'upper'))
         if scaling:
