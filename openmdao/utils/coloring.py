@@ -1045,7 +1045,7 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
     for row in np.unique(Jrows):
         nzr = []
         nzc = []
-        row_nzcols = csr._get_submatrix(major=row).indices
+        row_nzcols = csr.getrow(row).indices
 
         if row_nzcols.size == 1:
             # if there's only 1 nonzero column in a row, include it
