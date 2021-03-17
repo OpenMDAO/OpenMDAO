@@ -1492,10 +1492,10 @@ class Group(System):
 
                 if src_indices is not None:
                     a2m = allprocs_abs2meta[abs_in]
-                    # if (a2m['shape_by_conn'] or a2m['copy_shape']):
-                    #     raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
-                    #                  f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
-                    #                  "is currently unsupported.")
+                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
+                                     f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                                     "is currently unsupported.")
 
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
@@ -1638,6 +1638,7 @@ class Group(System):
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
+            # print(f'connecting {from_var} to {to_var}', all_to_meta['size'] )
             # distrib to distrib or serial to serial
             if (from_dist and to_dist) or not (from_dist or to_dist):
                 # all copy_shapes (and some shape_by_conn) handled here
@@ -1661,14 +1662,25 @@ class Group(System):
                     else:
                         # there is not enough info to determine how the variable is split
                         # over the procs. for now we split the variable up equally
-                        rank = self.comm.rank
-                        sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
-                        size = sizes[rank]
-                        distrib_sizes[to_var] = np.array(sizes)
+                        # rank = self.comm.rank
+                        # sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
+                        # size = sizes[rank]
+                        # distrib_sizes[to_var] = np.array(sizes)
+                        # if to_meta:
+                        #     to_meta['src_indices'] = np.arange(offsets[rank],
+                        #                                     offsets[rank] + sizes[rank],
+                        #                                     dtype=INT_DTYPE)
+
+                        # Anil's way
+                        # copy the serial output to all inputs
+                        size = from_size
                         if to_meta:
-                            to_meta['src_indices'] = np.arange(offsets[rank],
-                                                            offsets[rank] + sizes[rank],
-                                                            dtype=INT_DTYPE)
+                            to_meta['src_indices'] = np.arange(0, size, dtype=INT_DTYPE)
+
+                        distrib_sizes[to_var] = np.array([from_size]*self.comm.size)
+
+
+
 
                 all_to_meta['size'] = size
                 all_to_meta['shape'] = (size,)
@@ -1681,6 +1693,19 @@ class Group(System):
                     sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
                     size = sizes[self.comm.rank]
                     distrib_sizes[to_var] = np.array(sizes)
+
+
+                    # Anil's way
+                    # copy the serial input to each output (assume the input is distubuted)
+                    # size = from_size
+
+                    # sizes = self.comm.allgather(from_size)
+                    # distrib_sizes[to_var] = np.array(sizes)
+                    # print(self.comm.rank, size, distrib_sizes[to_var])
+
+                    # all_to_meta['size'] =  np.sum(distrib_sizes[from_var])
+                    # all_to_meta['shape'] = (all_to_meta['size'],)
+
 
                 else:  # known dist input to serial output
                     if all_from_meta['has_src_indices']:
@@ -1696,10 +1721,15 @@ class Group(System):
 
                 all_to_meta['size'] = size
                 all_to_meta['shape'] = (size,)
+
                 if to_meta:
                     to_meta['size'] = size
                     to_meta['shape'] = (size,)
                     to_meta['value'] = np.full(size, to_meta['value'])
+
+
+            print(f'done connecting {from_var} to {to_var}', all_to_meta['size'] )
+
 
         all_abs2prom_in = self._var_allprocs_abs2prom['input']
         all_abs2prom_out = self._var_allprocs_abs2prom['output']
