@@ -1671,11 +1671,12 @@ class Group(System):
                         #                                     offsets[rank] + sizes[rank],
                         #                                     dtype=INT_DTYPE)
 
-                        # Anil's way
+                        # # Anil's way
                         # copy the serial output to all inputs
+                        rank = self.comm.rank
                         size = from_size
                         if to_meta:
-                            to_meta['src_indices'] = np.arange(0, size, dtype=INT_DTYPE)
+                            to_meta['src_indices'] = np.arange(rank*size, (rank+1)*size, dtype=INT_DTYPE)
 
                         distrib_sizes[to_var] = np.array([from_size]*self.comm.size)
 
@@ -1705,6 +1706,8 @@ class Group(System):
 
                     # all_to_meta['size'] =  np.sum(distrib_sizes[from_var])
                     # all_to_meta['shape'] = (all_to_meta['size'],)
+                    # if to_meta:
+                    #     to_meta['src_indices'] = np.arange(0, size, dtype=INT_DTYPE)
 
 
                 else:  # known dist input to serial output
