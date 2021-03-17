@@ -171,7 +171,7 @@ class DictionaryJacobian(Jacobian):
 
 class _CheckingJacobian(DictionaryJacobian):
     """
-    This is a special type of Jacobian that we use only inside of check_partials.
+    A special type of Jacobian that we use only inside of check_partials.
     """
 
     def __init__(self, system):
