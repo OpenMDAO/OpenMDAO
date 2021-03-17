@@ -788,11 +788,11 @@ class Ser1(om.ExplicitComponent):
         var_shape = 2 * rank
 
         # this component outputs all serial => * connections
-        self.add_output("ser_ser_fwd", shape=4, val=np.ones(4))
-        self.add_output("ser_ser_bwd", shape_by_conn=True)
+        self.add_output("ser_ser_down", shape=4, val=np.ones(4))
+        self.add_output("ser_ser_up", shape_by_conn=True)
 
-        self.add_output("ser_par_fwd", shape=4, val=np.ones(4))
-        self.add_output("ser_par_bwd", shape_by_conn=True)
+        self.add_output("ser_par_down", shape=4, val=np.ones(4))
+        self.add_output("ser_par_up", shape_by_conn=True)
 
     def compute(self, inputs, outputs):
         pass
@@ -804,12 +804,12 @@ class Par1(om.ExplicitComponent):
         self.options['distributed'] = True
 
         # this component outputs all parallel => * connections
-        self.add_output("par_ser_fwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("par_ser_down", shape=var_shape, val=np.ones(var_shape))
         # TODO does not work in setup
-        # self.add_output("par_ser_bwd", shape_by_conn=True)
+        # self.add_output("par_ser_up", shape_by_conn=True)
 
-        self.add_output("par_par_fwd", shape=var_shape, val=np.ones(var_shape))
-        self.add_output("par_par_bwd", shape_by_conn=True)
+        self.add_output("par_par_down", shape=var_shape, val=np.ones(var_shape))
+        self.add_output("par_par_up", shape_by_conn=True)
 
     def compute(self, inputs, outputs):
         pass
@@ -822,15 +822,12 @@ class Ser2(om.ExplicitComponent):
         self.add_output('foo_ser2', val=1.)
 
         # this component receives all * => serial connections
-        self.add_input("ivc_ser_fwd", shape_by_conn=True)
-        self.add_input("ivc_ser_bwd", shape=4)
+        self.add_input("ser_ser_down", shape_by_conn=True)
+        self.add_input("ser_ser_up", shape=4)
 
-        self.add_input("ser_ser_fwd", shape_by_conn=True)
-        self.add_input("ser_ser_bwd", shape=4)
-
-        self.add_input("par_ser_fwd", shape_by_conn=True)
+        self.add_input("par_ser_down", shape_by_conn=True)
         # TODO does not work in setup
-        # self.add_input("par_ser_bwd", shape=var_shape, val=np.ones(var_shape))
+        # self.add_input("par_ser_up", shape=var_shape, val=np.ones(var_shape))
 
     def compute(self, inputs, outputs):
         pass
@@ -845,14 +842,11 @@ class Par2(om.ExplicitComponent):
         self.add_output('foo_par2', val=1.)
 
         # this component receives all * => parallel connections
-        self.add_input("ivc_par_fwd", shape_by_conn=True)
-        self.add_input("ivc_par_bwd", shape=4)
+        self.add_input("ser_par_down", shape_by_conn=True)
+        self.add_input("ser_par_up", shape=4)
 
-        self.add_input("ser_par_fwd", shape_by_conn=True)
-        self.add_input("ser_par_bwd", shape=4)
-
-        self.add_input("par_par_fwd", shape_by_conn=True)
-        self.add_input("par_par_bwd", shape=var_shape, val=np.ones(var_shape))
+        self.add_input("par_par_down", shape_by_conn=True)
+        self.add_input("par_par_up", shape=var_shape, val=np.ones(var_shape))
 
     def compute(self, inputs, outputs):
         pass
@@ -861,61 +855,64 @@ class Par2(om.ExplicitComponent):
 class TestDistribDynShapeCombos(unittest.TestCase):
     """
     This will test the dynamic shaping on parallel runs with all of the possible
-    combinations of connections and dynamic shaping "directions". In words, we have
-    independent variable components, serial components, and parallel components.
+    combinations of connections and dynamic shaping directions. The "downstream"
+    or "down" direction is when an output is sized, and the input is shaped by
+    connection. The "upstream" or "up" direction is when an input is sized, and
+    the output connected to it is shaped by connection. In both of these directions,
+    we need to check all possible combinations of serial and distributed components
+    in parallel runs.
+
     Here is a list of possible connections (ser: serial, par: parallel):
 
-    ivc => ser
-    ivc => par
     ser => ser
     ser => par
     par => ser
     par => par
 
-    We can use dynamic shaping for all 6 of these connection types, and the information
-    for each connection can either be propagated "forward"/"fwd" (the upstream output
-    is explicitly size, the downstream input is shaped by conn), or "backward"/"bwd"
-    (the downstream input shape is explicitly specified, upstream output is shaped
-    by conn). With 6 connection types and 2 connection direction, this results in 12
-    dynamically sized connections to be checked. In these checks, we want to make sure
-    OpenMDAO has an "expected" behavior, where the local size of the parameters are preserved
-    on each processor regardless of connection type.
+    We can use dynamic shaping for all 4 of these connection types, and the information
+    for each connection can either be propagated down or up.  With 4 connection types
+    and 2 connection direction, this results in 8 dynamically sized connections to be
+    checked. In these checks, we want to make sure OpenMDAO has an "expected" behavior,
+    where the local size of the parameters are preserved on each processor regardless
+    of connection type.
 
-    In this test, we have a single model with 5 components in this order:
-    ivc:  Independent variable comp. This will only be connected to a parallel or serial
-    group and only has outputs by design.
-    ser1: Serial component. This will be connected to serial or parallel. Again, only outputs variables and no inputs
-    par1: Parallel component. This will be connected to serial or parallel. Again, only outputs variables and no inputs
-    ser2: Serial component to receive connections that only has inputs and no outputs (only a dummy output)
-    par2: Parallel component to receive connections that only has inputs and no outputs (only a dummy output)
+    In this test, we have a single model with 4 components in this order:
+
+    ser1:   Serial component. This will be connected to serial or parallel.
+            Only outputs variables and no inputs
+    par1:   Parallel component. This will be connected to serial or parallel.
+            Again, only outputs variables and no inputs
+
+    ser2:   Serial component to receive connections that only has inputs and no outputs
+            (only a dummy output)
+    par2:   Parallel component to receive connections that only has inputs and no outputs
+            (only a dummy output)
 
     The variable naming convention goes like type1_type2_dir:
-    type1 is the upstream component with the output
-    type2 is the downstream component with the input
-    direction is the direction of information in the dynamic sizing (see above for fwd, bwd)
+    type1 is the component with the output
+    type2 is the component with the input
+    direction is the direction of information in the dynamic sizing (see above for down and up)
 
     With all this context, here is a table that lists what variables test what i/o:
 
-    Connection:    Forward direction   Backward direction
-    ivc => ser2       ivc_ser_fwd         ivc_ser_bwd
-    ivc => par2       ivc_par_fwd         ivc_par_bwd
-    ser1 => ser2      ser_ser_fwd         ser_ser_bwd
-    ser1 => par2      ser_par_fwd         ser_par_bwd
-    par1 => ser2      par_ser_fwd         par_ser_bwd
-    par1 => par2      par_par_fwd         par_par_bwd
+    Connection:    Downstream direction   Upstream direction
+    ser1 => ser2       ser_ser_down          ser_ser_up
+    ser1 => par2       ser_par_down          ser_par_up
+    par1 => ser2       par_ser_down          par_ser_up
+    par1 => par2       par_par_down          par_par_up
 
-    The reason we have this tests is that the parallel tests above do not cover every possible combination
-    to keep things a bit simple, we do the combination tests here, and other features of the dynamic
-    sizing is tested above (chain connections, shape copies etc.). In this test, we just focus on the
-    individual dynamic shape copies in parallel runs and do not worry about dependencies.
+    The reason we have this tests is that the parallel tests above do not cover every possible combination.
+    It is important to remember that we are not just testing a serial to serial connection here.
+    We are testing all these connection types in a parallel run,
+    which is different than the serial tests above
 
-    we use 3 processors for this:
-    proc0: will have a size of 0 on all i/o. we dont really need to set different sizes
-    since each connection does its own dynamic sizing
-    proc1: will have a size of 2 on all i/o
-    proc2: will have a size of 4 on all i/o
+    In these tests, the output of the ser1 component will have the same size of 4 on all processors.
+    This is because the serial components are expected to have the "same" output duplicated on all procs.
+    The inputs to the ser2 component can have varying sizes on different processors.
 
-    So the variable sizes simply need to be rank*2
+    The outputs of the par1 component will have a size of rank*2 on each proc.
+    We use 3 processor for these tests because we want to chekc 2 procs with different non-zero sizes
+    and one proc that has a zero size for that particular output.
     """
 
     N_PROCS = 3
@@ -927,36 +924,14 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
         p = om.Problem()
 
-        # TODO also add parallel IVC?
-        # build the ivc
-        ivc = p.model.add_subsystem(
-            'ivc',
-            om.IndepVarComp(),
-            promotes_outputs=[
-                "ivc_ser_fwd",
-                "ivc_ser_bwd",
-                "ivc_par_fwd",
-                "ivc_par_bwd",
-            ],
-        )
-
-        # ivc outputs to the serial component
-        ivc.add_output('ivc_ser_fwd', shape=4, val=np.ones(4))
-        ivc.add_output('ivc_ser_bwd', shape_by_conn=True)
-
-        # ivc outputs to the parallel component
-        ivc.add_output('ivc_par_fwd', shape=4, val=np.ones(4))
-        ivc.add_output('ivc_par_bwd', shape_by_conn=True)
-
-        # add the other components
         p.model.add_subsystem(
             'ser1',
             Ser1(),
             promotes_outputs=[
-                "ser_ser_fwd",
-                "ser_ser_bwd",
-                "ser_par_fwd",
-                "ser_par_bwd",
+                "ser_ser_down",
+                "ser_ser_up",
+                "ser_par_down",
+                "ser_par_up",
             ],
         )
 
@@ -964,11 +939,11 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             'par1',
             Par1(),
             promotes_outputs=[
-                "par_ser_fwd",
+                "par_ser_down",
                 # TODO does not work in setup
-                # "par_ser_bwd",
-                "par_par_fwd",
-                "par_par_bwd",
+                # "par_ser_up",
+                "par_par_down",
+                "par_par_up",
             ]
         )
 
@@ -976,13 +951,11 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             'ser2',
             Ser2(),
             promotes_inputs=[
-                "ivc_ser_fwd",
-                "ivc_ser_bwd",
-                "ser_ser_fwd",
-                "ser_ser_bwd",
-                "par_ser_fwd",
+                "ser_ser_down",
+                "ser_ser_up",
+                "par_ser_down",
                 # TODO does not work in setup
-                # "par_ser_bwd",
+                # "par_ser_up",
             ]
         )
 
@@ -990,12 +963,10 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             'par2',
             Par2(),
             promotes_inputs=[
-                "ivc_par_fwd",
-                "ivc_par_bwd",
-                "ser_par_fwd",
-                "ser_par_bwd",
-                "par_par_fwd",
-                "par_par_bwd",
+                "ser_par_down",
+                "ser_par_up",
+                "par_par_down",
+                "par_par_up",
             ]
         )
 
@@ -1007,39 +978,29 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
         # test all of the i/o sizes set by shape_by_conn
 
-        # ivc => serial
-        self.assertEqual(p.get_val('ser2.ivc_ser_fwd').size, 4)
-        self.assertEqual(p.get_val('ivc.ivc_ser_bwd').size, 4)
-
-        # ivc => parallel
-        # TODO ivc to parallel is broken in fwd mode. openmdao distributes the vector itself instead of just copying the local sizes
-        # self.assertEqual(p.get_val('par2.ivc_par_fwd').size, 4)
-        # TODO does not work: ivc gets a size of 12 instead of the expected 4
-        # self.assertEqual(p.get_val('ivc.ivc_par_bwd').size, 4)
-
         # serial => serial
-        self.assertEqual(p.get_val('ser2.ser_ser_fwd').size, 4)
-        self.assertEqual(p.get_val('ser1.ser_ser_bwd').size, 4)
+        self.assertEqual(p.get_val('ser2.ser_ser_down').size, 4)
+        self.assertEqual(p.get_val('ser1.ser_ser_up').size, 4)
 
         # serial => parallel
-        # TODO serial to parallel is broken in fwd mode. openmdao distributes the vector itself instead of just copying the local sizes
-        # self.assertEqual(p.get_val('par2.ser_par_fwd').size, 4)
+        # TODO serial to parallel is broken in downstream mode. openmdao distributes the vector itself instead of just copying the local sizes
+        # self.assertEqual(p.get_val('par2.ser_par_down').size, 4)
         # TODO does not work: serial gets a size of 12 instead of the expected 4
-        # self.assertEqual(p.get_val('ser1.ser_par_bwd').size, 4)
+        # self.assertEqual(p.get_val('ser1.ser_par_up').size, 4)
 
         # parallel => serial
         # TODO the get_val does not work on this parallel output. need get_remote=True
-        # self.assertEqual(p.get_val('ser2.par_ser_fwd').size, var_shape)
+        # self.assertEqual(p.get_val('ser2.par_ser_down').size, var_shape)
         # so we do it with get_remote=True
-        self.assertEqual(p.get_val('ser2.par_ser_fwd', get_remote=True).size, 6)
+        self.assertEqual(p.get_val('ser2.par_ser_down', get_remote=True).size, 6)
         # TODO does not work in setup
-        # self.assertEqual(p.get_val('par1.par_ser_bwd').size, var_shape)
+        # self.assertEqual(p.get_val('par1.par_ser_up').size, var_shape)
 
         # parallel => parallel
         # TODO fails to propagate the local parallel shape.
-        # self.assertEqual(p.get_val('par2.par_par_fwd').size, var_shape)
+        # self.assertEqual(p.get_val('par2.par_par_down').size, var_shape)
         # TODO fails to propagate the local parallel shape.
-        # self.assertEqual(p.get_val('par1.par_par_bwd').size, var_shape)
+        # self.assertEqual(p.get_val('par1.par_par_up').size, var_shape)
 
 
 if __name__ == "__main__":
