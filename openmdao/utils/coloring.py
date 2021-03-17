@@ -993,7 +993,7 @@ def _2col_adj_rows_cols(J):
 
     # mark col_matrix entries as True when nonzero row entries make them dependent
     for row in np.unique(nzrows):
-        row_nzcols = csr._get_submatrix(major=row).indices
+        row_nzcols = csr.getrow(row).indices
 
         if row_nzcols.size > 0:
             for c in row_nzcols:
