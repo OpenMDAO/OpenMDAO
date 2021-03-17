@@ -178,7 +178,7 @@ class ParDerivTestCase(unittest.TestCase):
 
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (x1, x2)' in output)
-            self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+            self.assertTrue('In mode: fwd.' in output)
             self.assertTrue("('p.x3', [2])" in output)
 
     def test_fan_out_parallel_sets_rev(self):

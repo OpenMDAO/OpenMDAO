@@ -1,4 +1,4 @@
-<div id="all_pt_n2_content_div" class="non-embedded-n2">
+<div id="all_pt_n2_content_div" class="non-embedded-n2" data-openmdao-version="{{om_version}}">
     <div id="ptN2ContentDivId">
         <!-- Toolbar -->
         <div id="toolbarLoc">
@@ -9,7 +9,7 @@
                 <div id='searchbar-and-label' class='searchbar-hidden'>
                     <label id='searchCountId' for='awesompleteId'>0 matches</label>
                     <input type="text" tabindex="-1" size="80" placeholder="Search" id="awesompleteId"
-                        class="searchbar" />
+                        class="searchbar" autocomplete="off"/>
                 </div>
             </div>
             <div class="toolbar" id="true-toolbar">
@@ -67,7 +67,8 @@
                         <i class="fas icon-collapse-depth" id="depth-slider-button"></i>
                         <i class="fas icon-caret-right caret"></i>
                         <div class="toolbar-group-expandable" id="model-depth-expandable">
-                            <input type="range" min="0" max="10" value="0" class="slider" id="depth-slider" />
+                            <input type="range" min="2" max="10" value="0" class="slider" id="depth-slider" />
+                            <p id='depth-slider-label'>10</p>
                         </div>
                     </div>
                     <div class="expandable">

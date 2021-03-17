@@ -2,6 +2,7 @@
 import os
 import unittest
 import subprocess
+import re
 
 from openmdao.utils.testing_utils import use_tempdirs
 import openmdao.core.tests.test_coloring as coloring_test_mod
@@ -18,7 +19,8 @@ scriptdir = os.path.join(dname(dname(dname(os.path.abspath(__file__)))), 'test_s
 counter = 0
 
 def _test_func_name(func, num, param):
-    return func.__name__ + '_' + '_'.join(param.args[0].split()[1:-1])
+    # test name is the command with spaces, colons and backslashes replaced by underscore
+    return func.__name__ + '_' + re.sub('[ \\:\\\]', '_', param.args[0])
 
 cmd_tests = [
     'openmdao call_tree openmdao.components.exec_comp.ExecComp.setup',

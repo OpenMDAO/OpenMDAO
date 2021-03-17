@@ -1488,12 +1488,14 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                             if key == '@simul_coloring':
+                                print(f'In mode: {mode}, Solving variable(s) using simul '
+                                      'coloring:')
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
+                                print('In mode: %s.' % mode)
                                 print_key = key
                                 if key in self.ivc_print_names:
                                     print_key = self.ivc_print_names[key]
@@ -1830,6 +1832,8 @@ class _TotalJacInfo(object):
             J_dict = self.J_dict
             for of, wrt_dict in J_dict.items():
                 for wrt, J_sub in wrt_dict.items():
+                    if wrt in self.ivc_print_names:
+                        wrt = self.ivc_print_names[wrt]
                     pprint.pprint({(of, wrt): J_sub})
         else:
             J = self.J
@@ -1839,7 +1843,10 @@ class _TotalJacInfo(object):
                 out_slice = self.of_meta[of][0]
                 for j, wrt in enumerate(self.wrt):
                     if wrt not in self.remote_vois:
-                        pprint.pprint({(of, wrt): J[out_slice, self.wrt_meta[wrt][0]]})
+                        deriv = J[out_slice, self.wrt_meta[wrt][0]]
+                        if wrt in self.ivc_print_names:
+                            wrt = self.ivc_print_names[wrt]
+                        pprint.pprint({(of, wrt): deriv})
 
         print('')
         sys.stdout.flush()
