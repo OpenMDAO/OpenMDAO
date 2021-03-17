@@ -1494,8 +1494,8 @@ class Group(System):
                     a2m = allprocs_abs2meta[abs_in]
                     # if (a2m['shape_by_conn'] or a2m['copy_shape']):
                     #     raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
-                    #                      f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
-                    #                      "is currently unsupported.")
+                    #                  f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                    #                  "is currently unsupported.")
 
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
@@ -1690,7 +1690,7 @@ class Group(System):
                         local_max = np.array([mx], dtype=INT_DTYPE)
                         global_max = np.zeros(1, dtype=INT_DTYPE)
                         self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
-                        size = global_max[0] +1 # +1 becuase src_indices are 0 based
+                        size = global_max[0] + 1  # +1 becuase src_indices are 0 based
                     else:  # src_indices are not set, so just sum up the sizes
                         size = np.sum(distrib_sizes[from_var])
 
