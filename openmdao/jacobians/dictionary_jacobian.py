@@ -170,6 +170,10 @@ class DictionaryJacobian(Jacobian):
 
 
 class _CheckingJacobian(DictionaryJacobian):
+    """
+    This is a special type of Jacobian that we use only inside of check_partials.
+    """
+
     def __init__(self, system):
         super().__init__(system)
         self._subjacs_info = self._subjacs_info.copy()

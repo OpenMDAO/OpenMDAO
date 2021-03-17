@@ -11,7 +11,6 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
 from openmdao.utils.mpi import MPI
 from openmdao.jacobians.jacobian import Jacobian
-from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.vectors.vector import _full_slice
 
 
