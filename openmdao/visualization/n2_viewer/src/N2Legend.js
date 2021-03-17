@@ -243,10 +243,12 @@ class N2Help extends N2Window {
     constructor(helpInfo) {
         super();
 
+        const version = d3.select('div#all_pt_n2_content_div').attr('data-openmdao-version');
+
         this.theme('help')
             .setList({ left: '100px', top: '20px', right: '100px', height: '850px' })
             .title('Instructions')
-            .footerText('OpenMDAO Model Hierarchy and N2 diagram');
+            .footerText(`OpenMDAO Version ${version} Model Hierarchy and N2 diagram`);
 
         // Take ownership of the help div contents defined in index.html
         const newParent = this.body.node();
