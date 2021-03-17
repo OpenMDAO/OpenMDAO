@@ -805,8 +805,7 @@ class Par1(om.ExplicitComponent):
 
         # this component outputs all parallel => * connections
         self.add_output("par_ser_down", shape=var_shape, val=np.ones(var_shape))
-        # TODO does not work in setup
-        # self.add_output("par_ser_up", shape_by_conn=True)
+        self.add_output("par_ser_up", shape_by_conn=True)
 
         self.add_output("par_par_down", shape=var_shape, val=np.ones(var_shape))
         self.add_output("par_par_up", shape_by_conn=True)
@@ -816,8 +815,10 @@ class Par1(om.ExplicitComponent):
 
 class Ser2(om.ExplicitComponent):
     def setup(self):
-        rank = self.comm.rank
-        var_shape = 2 * rank
+        size = self.comm.size
+        var_size = 2 * size
+
+
         # dummy output
         self.add_output('foo_ser2', val=1.)
 
@@ -826,8 +827,7 @@ class Ser2(om.ExplicitComponent):
         self.add_input("ser_ser_up", shape=4)
 
         self.add_input("par_ser_down", shape_by_conn=True)
-        # TODO does not work in setup
-        # self.add_input("par_ser_up", shape=var_shape, val=np.ones(var_shape))
+        self.add_input("par_ser_up", shape=var_size, val=np.ones(var_size))
 
     def compute(self, inputs, outputs):
         pass
@@ -896,10 +896,10 @@ class TestDistribDynShapeCombos(unittest.TestCase):
     With all this context, here is a table that lists what variables test what i/o:
 
     Connection:    Downstream direction   Upstream direction
-    ser1 => ser2       ser_ser_down          ser_ser_up
-    ser1 => par2       ser_par_down          ser_par_up
-    par1 => ser2       par_ser_down          par_ser_up
-    par1 => par2       par_par_down          par_par_up
+    ser1 => ser2       ser_ser_down          ser_ser_up     1, 5
+    ser1 => par2       ser_par_down          ser_par_up     2, 6
+    par1 => ser2       par_ser_down          par_ser_up     3, 7
+    par1 => par2       par_par_down          par_par_up     4, 8
 
     The reason we have this tests is that the parallel tests above do not cover every possible combination.
     It is important to remember that we are not just testing a serial to serial connection here.
@@ -916,59 +916,51 @@ class TestDistribDynShapeCombos(unittest.TestCase):
     """
 
     N_PROCS = 3
+    # def setUp(self)
 
     def test_dyn_shape_combos(self):
 
-        rank = self.comm.rank
+        rank = MPI.COMM_WORLD.rank
         var_shape = 2 * rank
+        var_shape_all = MPI.COMM_WORLD.allreduce(var_shape)
+
 
         p = om.Problem()
 
         p.model.add_subsystem(
             'ser1',
             Ser1(),
-            promotes_outputs=[
-                "ser_ser_down",
-                "ser_ser_up",
-                "ser_par_down",
-                "ser_par_up",
-            ],
         )
 
         p.model.add_subsystem(
             'par1',
             Par1(),
-            promotes_outputs=[
-                "par_ser_down",
-                # TODO does not work in setup
-                # "par_ser_up",
-                "par_par_down",
-                "par_par_up",
-            ]
         )
 
         p.model.add_subsystem(
             'ser2',
             Ser2(),
-            promotes_inputs=[
-                "ser_ser_down",
-                "ser_ser_up",
-                "par_ser_down",
-                # TODO does not work in setup
-                # "par_ser_up",
-            ]
         )
 
         p.model.add_subsystem(
             'par2',
             Par2(),
-            promotes_inputs=[
-                "ser_par_down",
-                "ser_par_up",
-                "par_par_down",
-                "par_par_up",
-            ]
         )
+
+        # all down stream connections
+        p.model.connect('ser1.ser_ser_down', 'ser2.ser_ser_down') #1
+        p.model.connect('ser1.ser_par_down', 'par2.ser_par_down', src_indices=[0, 1, 2, 3]) #2
+
+        p.model.connect('par1.par_ser_down', 'ser2.par_ser_down') #3
+        p.model.connect('par1.par_par_down', 'par2.par_par_down') #4
+
+        # all up stream connections
+        p.model.connect('ser1.ser_ser_up', 'ser2.ser_ser_up') #5
+        p.model.connect('ser1.ser_par_up', 'par2.ser_par_up', src_indices=[0, 1, 2, 3]) #6
+
+        p.model.connect('par1.par_ser_up', 'ser2.par_ser_up') #7
+        p.model.connect('par1.par_par_up', 'par2.par_par_up') #8
+
 
         p.setup()
         p.run_model()
@@ -983,24 +975,20 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         self.assertEqual(p.get_val('ser1.ser_ser_up').size, 4)
 
         # serial => parallel
-        # TODO serial to parallel is broken in downstream mode. openmdao distributes the vector itself instead of just copying the local sizes
-        # self.assertEqual(p.get_val('par2.ser_par_down').size, 4)
-        # TODO does not work: serial gets a size of 12 instead of the expected 4
-        # self.assertEqual(p.get_val('ser1.ser_par_up').size, 4)
+        self.assertEqual(p.get_val('par2.ser_par_down').size, 4)
+        self.assertEqual(p.get_val('ser1.ser_par_up').size, 4)
 
         # parallel => serial
         # TODO the get_val does not work on this parallel output. need get_remote=True
         # self.assertEqual(p.get_val('ser2.par_ser_down').size, var_shape)
         # so we do it with get_remote=True
-        self.assertEqual(p.get_val('ser2.par_ser_down', get_remote=True).size, 6)
-        # TODO does not work in setup
-        # self.assertEqual(p.get_val('par1.par_ser_up').size, var_shape)
+        self.assertEqual(p.get_val('ser2.par_ser_down', get_remote=True).size,var_shape_all)
+
+        self.assertEqual(p.get_val('par1.par_ser_up').size, 2)
 
         # parallel => parallel
-        # TODO fails to propagate the local parallel shape.
-        # self.assertEqual(p.get_val('par2.par_par_down').size, var_shape)
-        # TODO fails to propagate the local parallel shape.
-        # self.assertEqual(p.get_val('par1.par_par_up').size, var_shape)
+        self.assertEqual(p.get_val('par2.par_par_down').size, var_shape)
+        self.assertEqual(p.get_val('par1.par_par_up').size, var_shape)
 
 
 if __name__ == "__main__":

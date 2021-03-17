@@ -1492,10 +1492,10 @@ class Group(System):
 
                 if src_indices is not None:
                     a2m = allprocs_abs2meta[abs_in]
-                    if (a2m['shape_by_conn'] or a2m['copy_shape']):
-                        raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
-                                         f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
-                                         "is currently unsupported.")
+                    # if (a2m['shape_by_conn'] or a2m['copy_shape']):
+                    #     raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
+                    #                      f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
+                    #                      "is currently unsupported.")
 
                     if abs_in in abs2meta:
                         meta = abs2meta[abs_in]
@@ -1655,16 +1655,21 @@ class Group(System):
                 if from_dist and not to_dist:  # known dist output to serial input
                     size = np.sum(distrib_sizes[from_var])
                 else:  # known serial output to dist input
-                    # there is not enough info to determine how the variable is split
-                    # over the procs. for now we split the variable up equally
-                    rank = self.comm.rank
-                    sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
-                    size = sizes[rank]
-                    distrib_sizes[to_var] = np.array(sizes)
-                    if to_meta:
-                        to_meta['src_indices'] = np.arange(offsets[rank],
-                                                           offsets[rank] + sizes[rank],
-                                                           dtype=INT_DTYPE)
+
+                    if all_to_meta['has_src_indices']:
+                        size = len(to_meta['src_indices'])
+                    else:
+                        # there is not enough info to determine how the variable is split
+                        # over the procs. for now we split the variable up equally
+                        rank = self.comm.rank
+                        sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
+                        size = sizes[rank]
+                        distrib_sizes[to_var] = np.array(sizes)
+                        if to_meta:
+                            to_meta['src_indices'] = np.arange(offsets[rank],
+                                                            offsets[rank] + sizes[rank],
+                                                            dtype=INT_DTYPE)
+
                 all_to_meta['size'] = size
                 all_to_meta['shape'] = (size,)
                 if to_meta:
@@ -1685,7 +1690,7 @@ class Group(System):
                         local_max = np.array([mx], dtype=INT_DTYPE)
                         global_max = np.zeros(1, dtype=INT_DTYPE)
                         self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
-                        size = global_max[0]
+                        size = global_max[0] +1 # +1 becuase src_indices are 0 based
                     else:  # src_indices are not set, so just sum up the sizes
                         size = np.sum(distrib_sizes[from_var])
 
