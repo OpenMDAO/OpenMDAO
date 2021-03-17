@@ -422,9 +422,9 @@ class Component(System):
                         rows, cols = tup[:2]
                         if not np.all(meta['rows'] == rows) or not np.all(meta['cols'] == cols):
                             raise RuntimeError(f"{self.msginfo}: User sparsity pattern "
-                                               f"(rows={rows}, cols={cols}) for sub-jacobian "
-                                               f"{abs_key} does not match the computed sparsity "
-                                               f"(rows={meta['rows']}, cols={meta['cols']}).")
+                                               f"(rows={meta['rows']}, cols={meta['cols']}) for "
+                                               f"sub-jacobian {abs_key} does not match the "
+                                               f"computed sparsity (rows={rows}, cols={cols}).")
                     # add sparsity info to existing partial info
                     meta['sparsity'] = tup
 
@@ -1116,8 +1116,7 @@ class Component(System):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         ignore_approx_sparsity=True):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1153,14 +1152,11 @@ class Component(System):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
-        ignore_approx_sparsity : bool
-            If True (the default) compute the sparsity instead of using any user-specified
-            rows/cols in their declared partials.
         """
         super().declare_coloring(wrt, method, form, step, per_instance,
                                  num_full_jacs,
                                  tol, orders, perturb_size, min_improve_pct,
-                                 show_summary, show_sparsity, ignore_approx_sparsity)
+                                 show_summary, show_sparsity)
 
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)

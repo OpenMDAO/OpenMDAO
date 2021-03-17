@@ -35,10 +35,6 @@ class Jacobian(object):
         Pointer to the system that is currently operating on this Jacobian.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
-    _override_checks : bool
-        If we are approximating a jacobian at the top level and we have specified indices on the
-        functions or designvars, then we need to disable the size checking temporarily so that we
-        can assign a jacobian with less rows or columns than the variable sizes.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : defaultdict
@@ -67,7 +63,6 @@ class Jacobian(object):
         """
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
-        self._override_checks = False
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
@@ -171,12 +166,6 @@ class Jacobian(object):
                 subjac = np.atleast_1d(subjac)
                 safe_dtype = np.promote_types(subjac.dtype, float)
                 subjac = subjac.astype(safe_dtype, copy=False)
-
-                # Bail here so that we allow top level jacobians to be of reduced size when indices
-                # are specified on driver vars.
-                if self._override_checks:
-                    subjacs_info['value'] = subjac
-                    return
 
                 rows = subjacs_info['rows']
 

@@ -66,7 +66,6 @@ _DEFAULT_COLORING_META = {
     'dynamic': False,        # True if dynamic coloring is being used
     'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
                              # if use_fixed_coloring was called
-    'ignore_approx_sparsity': True,  # Perform coloring while ignoring subjac rows/cols if True
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -909,8 +908,7 @@ class System(object):
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
                          min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
-                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity'],
-                         ignore_approx_sparsity=True):
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -946,9 +944,6 @@ class System(object):
             If True, display summary information after generating coloring.
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
-        ignore_approx_sparsity : bool
-            If True (the default) compute the sparsity instead of using any user-specified
-            rows/cols in their declared partials.
         """
         if method not in ('fd', 'cs'):
             raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.msginfo))
@@ -977,7 +972,6 @@ class System(object):
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
         options['coloring'] = self._coloring_info['coloring']
-        options['ignore_approx_sparsity'] = ignore_approx_sparsity
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1095,7 +1089,8 @@ class System(object):
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
 
-        if info['ignore_approx_sparsity']:
+        # TODO: add some flag to allow user to toggle this behavior
+        if True:
             # update jacobian subjac metadata to get rid of rows/cols
             self._jacobian._remove_approx_sparsity()
 
