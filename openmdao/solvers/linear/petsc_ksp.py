@@ -201,7 +201,7 @@ class PETScKrylov(LinearSolver):
         super().__init__(**kwargs)
 
         if PETSc is None:
-            raise RuntimeError(f"{self.msginfo}: PETSc is not available."
+            raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_REQUIRE_MPI=1 to detect earlier.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
