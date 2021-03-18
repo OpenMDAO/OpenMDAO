@@ -70,7 +70,7 @@ def setup_vars(comp, ofs, wrts, sparse_partials=False, bad_sparsity=False):
         start = end
 
     if sparse_partials:
-        flipped = 0
+        nbad = 0
         for i in range(len(osizes)):
             of = f"y{i}"
             for j in range(len(isizes)):
@@ -78,10 +78,12 @@ def setup_vars(comp, ofs, wrts, sparse_partials=False, bad_sparsity=False):
                 subjac = comp.sparsity[slices[of], slices[wrt]]
                 if np.any(subjac):
                     rows, cols = np.nonzero(subjac)
-                    if bad_sparsity and rows.size > 1 and flipped < 5:
-                        rows[0], rows[-1] = rows[-1], rows[0]
-                        cols[0], cols[-1] = cols[-1], cols[0]
-                        flipped += 1
+                    if bad_sparsity and rows.size > 1 and nbad < 5:
+                        rows[rows.size // 2] = -1  # remove one row/col pair
+                        mask = rows != -1
+                        rows = rows[mask]
+                        cols = cols[mask]
+                        nbad += 1
                     comp.declare_partials(of=of, wrt=wrt, rows=rows, cols=cols, method=comp.method)
                 else:
                     comp.declare_partials(of=of, wrt=wrt, method=comp.method, dependent=False)
@@ -302,7 +304,7 @@ class TestColoringExplicit(unittest.TestCase):
         for conn in conns:
             model.connect(*conn)
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -313,69 +315,6 @@ class TestColoringExplicit(unittest.TestCase):
         self.assertEqual(comp._nruns - start_nruns, 10)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
-
-    # TODO: put this test back after we finalize user flag to toggle ignoring user sparsity
-    # def test_partials_sparse_explicit(self):
-    #     method = 'cs'
-    #     isplit = 7
-    #     osplit = 11
-    #     sparsity = rand_sparsity((100, 100), .01).toarray()
-
-    #     totsizes = []
-    #     for sparse in [True, False]:
-    #         prob = Problem(coloring_dir=self.tempdir)
-    #         model = prob.model
-    #         indeps, conns = setup_indeps(isplit, sparsity.shape[1], 'indeps', 'comp')
-    #         model.add_subsystem('indeps', indeps)
-    #         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-    #                                                               isplit=isplit, osplit=osplit,
-    #                                                               sparse_partials=sparse))
-    #         comp.declare_coloring('x*', method=method)
-
-    #         for conn in conns:
-    #             model.connect(*conn)
-
-    #         prob.setup(check=False, mode='fwd')
-    #         prob.set_solver_print(level=0)
-    #         prob.run_model()
-
-    #         comp.run_linearize()
-    #         prob.run_model()
-    #         comp.run_linearize()
-    #         jac = comp._jacobian._subjacs_info
-    #         _check_partial_matrix(comp, jac, sparsity, method)
-    #         totsizes.append(comp._jacobian._get_tot_array_size())
-
-    #     # sparse memory usage in this case should be less than 1/2 that of dense
-    #     self.assertLess(totsizes[0] * 2, totsizes[1])
-
-    def test_partials_bad_sparse_explicit(self):
-        method = 'cs'
-        isplit = 7
-        osplit = 11
-        sparsity = rand_sparsity((100, 100), .01).toarray()
-
-        prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model
-        indeps, conns = setup_indeps(isplit, sparsity.shape[1], 'indeps', 'comp')
-        model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                              isplit=isplit, osplit=osplit,
-                                                              sparse_partials=True, bad_sparsity=True))
-        comp.declare_coloring('x*', method=method)
-
-        for conn in conns:
-            model.connect(*conn)
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        with self.assertRaises(RuntimeError) as cm:
-            comp.run_linearize()
-
-        self.assertTrue("User sparsity pattern" in str(cm.exception) and "does not match the computed sparsity" in str(cm.exception),
-                        msg="Missing expected exception about incorrect user sparsity.")
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],

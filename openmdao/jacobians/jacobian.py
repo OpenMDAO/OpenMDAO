@@ -501,10 +501,9 @@ class Jacobian(object):
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
-                # TODO: support other sparse subjac types
-                if subjac['cols'] is None:
+                if subjac['cols'] is None:  # dense
                     subjac['value'][:, loc_idx] = column[start:end]
-                else:
+                else:  # our COO format
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]

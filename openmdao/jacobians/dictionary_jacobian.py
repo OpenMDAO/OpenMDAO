@@ -2,6 +2,7 @@
 import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
+from openmdao.core.constants import INT_DTYPE
 
 
 class DictionaryJacobian(Jacobian):
@@ -224,3 +225,54 @@ class _CheckingJacobian(DictionaryJacobian):
                 elif directional and self._subjacs_info[key]['value'].shape[1] != 1:
                     self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
                     meta['value'] = np.atleast_2d(meta['value'][:, 0]).T
+
+    def set_col(self, system, icol, column):
+        """
+        Set a column of the jacobian.
+
+        The column is assumed to be the same size as a column of the jacobian.
+
+        If the column has any nonzero values that are outside of specified sparsity patterns for
+        any of the subjacs, an exception will be raised.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        icol : int
+            Column index.
+        column : ndarray
+            Column value.
+
+        """
+        if self._colnames is None:
+            self._setup_index_maps(system)
+
+        wrt = self._colnames[self._col2name_ind[icol]]
+        _, offset, _, _, _ = self._col_var_info[wrt]
+        loc_idx = icol - offset  # local col index into subjacs
+
+        scratch = np.zeros(column.shape)
+
+        for of, start, end, _ in system._jac_of_iter():
+            key = (of, wrt)
+            if key in self._subjacs_info:
+                subjac = self._subjacs_info[key]
+                if subjac['cols'] is None:
+                    subjac['value'][:, loc_idx] = column[start:end]
+                else:
+                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
+                    if match_inds.size > 0:
+                        row_inds = subjac['rows'][match_inds]
+                        subjac['value'][match_inds] = column[start:end][row_inds]
+                    else:
+                        row_inds = np.zeros(0, dtype=INT_DTYPE)
+                    arr = scratch[start:end]
+                    arr[:] = column[start:end]
+                    arr[row_inds] = 0.
+                    nzs = np.nonzero(arr)
+                    if nzs[0].size > 0:
+                        raise ValueError(f"{system.msginfo}: User specified sparsity (rows/cols) "
+                                         f"for subjac '{of}' wrt '{wrt}' is incorrect. There are "
+                                         f"non-covered nonzeros in column {loc_idx} at "
+                                         f"row(s) {nzs[0]}.")
