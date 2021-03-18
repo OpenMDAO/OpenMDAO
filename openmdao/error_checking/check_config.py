@@ -178,7 +178,7 @@ def _get_used_before_calc_subs(group, input_srcs):
                     src_sys == tgt_sys and
                     not hierarchy_check):
                 msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
-                      f"to {src_sys} when connecting components inside parallel groups"
+                      f"to '{src_sys}' when connecting components inside parallel groups"
                 issue_warning(msg, category=SetupWarning)
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in allsubs and tgt_sys in allsubs and
@@ -368,6 +368,8 @@ def _check_auto_ivc_warnings(problem, logger):
     ----------
     problem : <Problem>
         The problem being checked.
+    logger
+        The logger to which the auto_ivc_warnings are to be sent.
     """
     if hasattr(problem.model, "_auto_ivc_warnings"):
         for i in problem.model._auto_ivc_warnings:

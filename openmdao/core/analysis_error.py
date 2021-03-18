@@ -1,8 +1,6 @@
 """
 OpenMDAO custom error: AnalysisError.
 """
-import inspect
-from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.general_utils import _warn_simple_format, reset_warning_registry
 import warnings
 

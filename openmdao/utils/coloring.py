@@ -21,7 +21,7 @@ from scipy.sparse.compressed import get_index_dtype
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
-from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
+from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI

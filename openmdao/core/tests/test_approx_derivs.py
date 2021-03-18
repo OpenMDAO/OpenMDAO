@@ -1844,10 +1844,10 @@ class TestGroupComplexStep(unittest.TestCase):
         of = ['obj']
 
         expected_warnings = [(om.DerivativesWarning,
-                              ' [d1]: Nested complex step detected. '
+                              'd1: Nested complex step detected. '
                               'Finite difference will be used.'),
                              (om.DerivativesWarning,
-                              ' [d1]: Nested complex step detected. '
+                              'd2: Nested complex step detected. '
                               'Finite difference will be used.')]
 
         with assert_warnings(expected_warnings):

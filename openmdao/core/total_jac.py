@@ -12,10 +12,11 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_src_dict
+from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 # Attempt to import petsc4py.
 # If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
@@ -121,6 +122,12 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+            If False, only retrieve the value if it is on the current process, or only the part
+            of the value that's on the current process for a distributed variable.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -255,7 +262,7 @@ class _TotalJacInfo(object):
                            "be turned off.\ncoloring design vars: %s, current design vars: "
                            "%s\ncoloring responses: %s, current responses: %s." %
                            (driver_wrt, wrt, driver_of, of))
-                    simple_warning(msg)
+                    issue_warning(msg, category=DerivativesWarning)
                     self.simul_coloring = None
 
             if not isinstance(self.simul_coloring, Coloring):
@@ -1716,7 +1723,7 @@ class _TotalJacInfo(object):
             if raise_error:
                 raise RuntimeError(msg)
             else:
-                simple_warning(msg)
+                issue_warning(msg, category=DerivativesWarning)
 
         # Check for zero cols, which correspond to design vars that don't affect anything.
         for j in np.arange(ncols):
@@ -1735,7 +1742,7 @@ class _TotalJacInfo(object):
             if raise_error:
                 raise RuntimeError(msg)
             else:
-                simple_warning(msg)
+                issue_warning(msg, category=DerivativesWarning)
 
     def _restore_linear_solution(self, vec_names, key, mode):
         """

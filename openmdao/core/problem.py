@@ -30,7 +30,7 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
+from openmdao.utils.general_utils import ContainsAll, pad_name, warn_deprecation, \
     _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
@@ -44,6 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -966,10 +967,10 @@ class Problem(object):
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
-            simple_warning("Inefficient choice of derivative mode.  You chose '%s' for a "
-                           "problem with %d design variables and %d response variables "
-                           "(objectives and nonlinear constraints)." %
-                           (mode, desvar_size, response_size), RuntimeWarning)
+            issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
+                          f"problem with {desvar_size} design variables and {response_size} "
+                          "response variables (objectives and nonlinear constraints).",
+                          category=DerivativesWarning)
 
         if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
                 hasattr(self.model, '_order_set') and self.model._order_set:
@@ -1412,7 +1413,7 @@ class Problem(object):
             msg += str(list(comps_could_not_cs))
             msg += "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
                    "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-            simple_warning(msg)
+            issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
@@ -1985,7 +1986,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if sys_name not in derivative_data:
             msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
-            simple_warning(msg)
+            issue_warning(msg, category=DerivativesWarning)
             continue
 
         derivatives = derivative_data[sys_name]

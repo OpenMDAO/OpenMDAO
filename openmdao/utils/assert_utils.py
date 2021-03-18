@@ -43,9 +43,11 @@ def assert_warning(category, msg):
         if (issubclass(warn.category, category) and str(warn.message) == msg):
             break
     else:
-        msg = f"Did not see expected {category.__name__}: {msg}"
+        msg = f"Did not see expected {category.__name__}:\n{msg}"
         if w:
-            msg += f": Did see warnings {[str(ww.message) for ww in w]}"
+            ws = '\n'.join([str(ww.message) for ww in w])
+            categories = '\n'.join([str(ww.category.__name__) for ww in w])
+            msg += f"\nDid see warnings [{categories}]:\n{ws}"
         raise AssertionError(msg)
 
 

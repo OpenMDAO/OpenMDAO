@@ -1,3 +1,7 @@
+"""
+A module for OpenMDAO-specific warnings and associated functions.
+"""
+
 import inspect
 import sys
 import io
@@ -17,6 +21,7 @@ class OpenMDAOWarning(UserWarning):
     """
     Base class for all OpenMDAO warnings.
     """
+
     name = 'warn_openmdao'
     filter = 'always'
 
@@ -25,6 +30,7 @@ class AllowableSetupError(UserWarning):
     """
     A class of setup errors that are treated as warnings to allow the N2 to be built.
     """
+
     name = '_warn_allowable_setup_error'
     filter = 'error'
 
@@ -33,6 +39,7 @@ class SetupWarning(OpenMDAOWarning):
     """
     Warning class for warnings that occur during setup.
     """
+
     name = 'warn_setup'
     filter = 'always'
 
@@ -45,13 +52,16 @@ class PromotionWarning(SetupWarning):
     """
     Warning dealing with the promotion of an input or output.
     """
+
     name = 'warn_promotion'
     filter = 'always'
 
+
 class UnitsWarning(OpenMDAOWarning):
     """
-    Warning which is issued when a unitless output is connected to an input with units, or vice versa.
+    Warning which is issued when unitless variable is connected to a variable with units.
     """
+
     name = 'warn_units'
     filter = 'always'
 
@@ -60,6 +70,7 @@ class DerivativesWarning(OpenMDAOWarning):
     """
     Warning issued when the approximated partials or coloring cannot be evaluated as expected.
     """
+
     name = 'warn_derivatives'
     filter = 'always'
 
@@ -68,6 +79,7 @@ class MPIWarning(SetupWarning):
     """
     Warning dealing with the availability of MPI.
     """
+
     name = 'warn_mpi'
     filter = 'always'
 
@@ -76,6 +88,7 @@ class DistributedComponentWarning(OpenMDAOWarning):
     """
     Warning specific to a distributed component.
     """
+
     name = 'warn_distributed_component'
     filter = 'always'
 
@@ -88,6 +101,7 @@ class SolverWarning(OpenMDAOWarning):
     """
     Warning base class for solver-related warnings.
     """
+
     name = 'warn_solver'
     filter = 'always'
 
@@ -96,6 +110,7 @@ class DriverWarning(OpenMDAOWarning):
     """
     Warning which is issued during the execution of a driver.
     """
+
     name = 'warn_driver'
     filter = 'always'
 
@@ -104,6 +119,7 @@ class UnusedOptionWarning(OpenMDAOWarning):
     """
     Warning dealing with an unnecessary option or argument being provided.
     """
+
     name = 'warn_unused_option'
     filter = 'always'
 
@@ -112,6 +128,7 @@ class CaseRecorderWarning(OpenMDAOWarning):
     """
     Warning pertaining to case recording and reading.
     """
+
     name = 'warn_case_recorder'
     filter = 'always'
 
@@ -120,6 +137,7 @@ class CacheWarning(OpenMDAOWarning):
     """
     Warning which is issued when the a cache is invalid and needs to be rebuilt.
     """
+
     name = 'warn_cache'
     filter = 'always'
 
@@ -128,20 +146,24 @@ class OMDeprecationWarning(OpenMDAOWarning):
     """
     An OpenMDAO-specific deprecation warning that is noisy by default, unlike the Python one.
     """
+
     name = 'warn_deprecation'
     filter = 'always'
 
 
 _warnings = {_class.name: _class for _, _class in
-             inspect.getmembers(sys.modules[__name__], inspect.isclass) if issubclass(_class, Warning)}
+             inspect.getmembers(sys.modules[__name__], inspect.isclass)
+             if issubclass(_class, Warning)}
 
 
 def get_warning_defaults():
     """
     Return a dictionary of the default action of each warning type.
+
     Returns
     -------
-
+    dict
+        A dictionary mapping a warning name with its default filter aciton.
     """
     defaults = {c.name: c.action for _, c in
                 inspect.getmembers(sys.modules[__name__], inspect.isclass)
@@ -184,6 +206,17 @@ def register_warning(*args):
         filter_warnings(kwg)
 
 
+def reset_warnings():
+    """
+    Apply the default warning filter actions for the OpenMDAO-specific warnings.
+
+    This is necessary when testing the filters, because Python resets the default filters
+    before running each test.
+    """
+    for w_name, w_class in _warnings.items():
+        warnings.filterwarnings(w_class.filter, category=w_class)
+
+
 def filter_warnings(reset_to_defaults=False, **kwargs):
     """
     Apply the warning filters as given by warning_options.
@@ -219,22 +252,23 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
 
     Parameters
     ----------
+    msg : str
+        The warning message.
     prefix : str
         An optional prefix to be prepended to the warning message (usually the system path).
     stacklevel : int
         Number of levels up the stack to identify as the warning location.
-    **kwargs
-        Keyword argument pairs where the keyword is the OpenMDAO warning class name and the
-        associated value is the warning message.
+    category : class
+        The class of warning to be issued.
 
     Examples
     --------
-    om.issue_warning(prefix=self.pathname, warn_setup='some warning message')
+    om.issue_warning('some warning message', prefix=self.pathname, category=om.SetupWarning)
 
     """
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
-    _msg = f' [{prefix}]: {msg}' if prefix else f' {msg}'
+    _msg = f'{prefix}: {msg}' if prefix else f'{msg}'
     try:
         warnings.warn(_msg, category=category, stacklevel=stacklevel)
     finally:
@@ -253,7 +287,7 @@ def _make_table():
     s = io.StringIO()
     max_name_len = max([len(name) for name in _warnings])
     max_desc_len = max([len(' '.join(c.__doc__.split())) for c in _warnings.values()])
-    
+
     name_header = "Option Name"
     desc_header = "Description"
     print(f'| {name_header:<{max_name_len}} | {desc_header:<{max_desc_len}} |', file=s)
@@ -270,5 +304,7 @@ filter_warnings(reset_to_defaults=True)
 
 
 if __name__ == '__main__':
-    issue_warning('foo', prefix='my.comp', category=OMDeprecationWarning)
-    print(list(_warnings.keys()))
+    issue_warning('foo', prefix='my.comp', category=AllowableSetupError)
+    # print(list(_warnings.keys()))
+    for f in warnings.filters:
+        print(f)

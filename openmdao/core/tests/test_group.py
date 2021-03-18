@@ -1975,10 +1975,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup())
 
-        with assert_warning(UserWarning,
-                            "<model> <class SimpleGroup>: src_indices have been specified with promotes 'any'. "
-                            "Note that src_indices only apply to matching inputs."):
-            p.setup()
+        p.setup()
 
         p.run_model()
 

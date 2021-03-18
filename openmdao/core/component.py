@@ -17,9 +17,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, simple_warning, make_set, _is_slicer_op, warn_deprecation, convert_src_inds, \
+    find_matches, make_set, _is_slicer_op, warn_deprecation, convert_src_inds, \
     _slice_indices
 import openmdao.utils.coloring as coloring_mod
+from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
+    DerivativesWarning, UnusedOptionWarning
 
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
@@ -148,9 +150,9 @@ class Component(System):
             if comm.size > 1:
                 comm = self._setup_par_fd_procs(comm)
             elif not MPI:
-                msg = ("%s: MPI is not active but num_par_fd = %d. No parallel finite difference "
-                       "will be performed." % (self.msginfo, self._num_par_fd))
-                simple_warning(msg)
+                issue_warning(f"MPI is not active but num_par_fd = {self._num_par_fd}. No parallel "
+                              "finite difference will be performed.",
+                              prefix=self.msginfo, category=MPIWarning)
 
         self.comm = comm
 
@@ -183,10 +185,11 @@ class Component(System):
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
-                simple_warning("The 'distributed' option is set to True for Component %s, "
-                               "but there is no distributed vector implementation (MPI/PETSc) "
-                               "available. The default non-distributed vectors will be used."
-                               % self.pathname)
+                issue_warning("The 'distributed' option is set to True for Component %s, "
+                              "but there is no distributed vector implementation (MPI/PETSc) "
+                              "available. The default non-distributed vectors will be used.",
+                              prefix=self.msginfo, category=DistributedComponentWarning)
+
                 self._vector_class = self._problem_meta['local_vector_class']
         else:
             self._vector_class = self._problem_meta['local_vector_class']
@@ -204,9 +207,10 @@ class Component(System):
                     break
             else:
                 method = self._coloring_info['method']
-                simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
-                               " partials were declared.  Declaring all partials as approximated "
-                               "using default metadata and method='%s'." % (self.msginfo, method))
+                issue_warning("declare_coloring or use_fixed_coloring was called but no approx"
+                              " partials were declared.  Declaring all partials as approximated "
+                              f"using default metadata and method='{method}'.", prefix=self.msginfo,
+                              category=DerivativesWarning)
                 self.declare_partials('*', '*', method=method)
 
         super()._configure_check()
@@ -353,9 +357,10 @@ class Component(System):
             self._declare_partials(of, wrt, dct)
 
         if self.matrix_free and self._subjacs_info:
-            simple_warning(f"{self.msginfo}: matrix free component has declared the following "
-                           f"partials: {sorted(self._subjacs_info)}, which will allocate "
-                           "(possibly unnecessary) memory for each of those sub-jacobians.")
+            issue_warning("matrix free component has declared the following "
+                          f"partials: {sorted(self._subjacs_info)}, which will allocate "
+                          "(possibly unnecessary) memory for each of those sub-jacobians.",
+                          prefix=self.msginfo, category=DerivativesWarning)
 
     def setup_partials(self):
         """
@@ -499,8 +504,9 @@ class Component(System):
                 if _is_slicer_op(src_indices):
                     src_slice = src_indices
                     if flat_src_indices is not None:
-                        simple_warning(f"{self.msginfo}: Input '{name}' was added with slice "
-                                       "src_indices, so flat_src_indices is ignored.")
+                        issue_warning(f"Input '{name}' was added with slice "
+                                      "src_indices, so flat_src_indices is ignored.",
+                                      prefix=self.msginfo, category=UnusedOptionWarning)
                 else:
                     src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
 
@@ -902,9 +908,10 @@ class Component(System):
                 all_abs2meta_in[iname]['has_src_indices'] = True
                 added_src_inds.add(iname)
 
-                simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
-                               "added without src_indices. Setting src_indices to "
-                               f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
+                issue_warning(f"Component is distributed but input '{iname}' was "
+                              "added without src_indices. Setting src_indices to "
+                              f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).",
+                              prefix=self.msginfo, category=DistributedComponentWarning)
 
         return added_src_inds
 
