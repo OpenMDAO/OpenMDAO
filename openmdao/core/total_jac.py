@@ -17,15 +17,18 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 
-# Attempt to import petsc4py. If OPENMDAO_REQUIRE_MPI is set to a recognized
-# positive value, raise exception on failure.
-try:
-    from petsc4py import PETSc
-except ImportError:
-    PETSc = None
-    if 'OPENMDAO_REQUIRE_MPI' in os.environ and \
-            os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+# Attempt to import petsc4py.
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ and \
+    os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+
+    try:
+        from petsc4py import PETSc
+    except ImportError:
         raise ImportError("Unable to import petsc4py, but OPENMDAO_REQUIRE_MPI set.\n")
+else:
+    PETSc = None
 
 _contains_all = ContainsAll()
 

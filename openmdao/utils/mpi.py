@@ -53,15 +53,18 @@ def use_proc_files():
         _redirect_streams(ofile.fileno())
 
 
-# Attempt to import mpi4py. If OPENMDAO_REQUIRE_MPI is set to a recognized positive value,
-# raise exception on failure.
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
-    if 'OPENMDAO_REQUIRE_MPI' in os.environ and \
-            os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+# Attempt to import mpi4py.
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ and \
+    os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+
+    try:
+        from mpi4py import MPI
+    except ImportError:
         raise ImportError("Unable to import mpi4py, but OPENMDAO_REQUIRE_MPI set.")
+else:
+    MPI = None
 
 if MPI:
     def debug(*msg):  # pragma: no cover
