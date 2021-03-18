@@ -1,3 +1,4 @@
+[![GitHub Actions Test Badge][17]][18]
 [![TravisCI Badge][9]][10]
 [![AppVeyor Badge][11]][12]
 [![Coveralls Badge][13]][14]
@@ -166,3 +167,7 @@ browser.
 [15]: https://en.wikipedia.org/wiki/Software_release_life_cycle#Beta "Wikipedia Beta"
 
 [16]: https://setuptools.readthedocs.io/en/latest/setuptools.html#development-mode "Pip Editable Mode"
+
+[17]: https://github.com/OpenMDAO/OpenMDAO/actions/workflows/openmdao_test_workflow.yml/badge.svg "Github Actions Badge"
+[18]: https://github.com/OpenMDAO/OpenMDAO/actions "Github Actions"
+
