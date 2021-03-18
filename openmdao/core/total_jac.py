@@ -24,7 +24,7 @@ if 'OPENMDAO_REQUIRE_MPI' in os.environ:
     if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
         try:
             from petsc4py import PETSc
-            
+
         except ImportError:
             raise ImportError("Importing petsc4py failed and OPENMDAO_REQUIRE_MPI is true.")
     else:

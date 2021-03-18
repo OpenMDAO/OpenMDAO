@@ -73,7 +73,7 @@ else:
         # run was intended, don't use MPI
         if MPI.COMM_WORLD.size == 1:
             MPI = None
-            
+
     except ImportError:
         MPI = None
 

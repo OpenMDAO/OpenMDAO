@@ -14,7 +14,7 @@ if 'OPENMDAO_REQUIRE_MPI' in os.environ:
         try:
             import petsc4py
             from petsc4py import PETSc
-            
+
         except ImportError:
             raise ImportError("Importing petsc4py failed and OPENMDAO_REQUIRE_MPI is true.")
     else:
@@ -201,8 +201,8 @@ class PETScKrylov(LinearSolver):
         super().__init__(**kwargs)
 
         if PETSc is None:
-            raise RuntimeError(f"{self.msginfo}: PETSc is not available." \
-                "Set shell variable OPENMDAO_REQUIRE_MPI=1 to detect earlier.")
+            raise RuntimeError(f"{self.msginfo}: PETSc is not available."
+                               "Set shell variable OPENMDAO_REQUIRE_MPI=1 to detect earlier.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
