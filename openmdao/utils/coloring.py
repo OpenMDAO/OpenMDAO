@@ -1200,7 +1200,7 @@ def MNCO_bidir(J):
         M_col_nonzeros[c] = sparse._get_submatrix(major=c).indices.size
     sparse = sparse.tocsr()
     for r in range(nrows):
-        M_row_nonzeros[r] = sparse._get_submatrix(major=r).indices.size
+        M_row_nonzeros[r] = sparse.getrow(r).indices.size
 
     sparse = None
 
