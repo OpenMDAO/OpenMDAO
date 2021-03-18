@@ -6,24 +6,28 @@ import sys
 
 from openmdao.solvers.solver import LinearSolver
 
-# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
-# and raise exception on failure. If set to anything else, no import is attempted.
+
 if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
-        import petsc4py
-        from petsc4py import PETSc
+    # If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, import
+    # petsc4py and raise ImportError on failure.
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
+        try:
+            import petsc4py
+            from petsc4py import PETSc
+            
+        except ImportError:
+            raise ImportError("Importing petsc4py failed and OPENMDAO_REQUIRE_MPI is true.")
     else:
+        # OPENMDAO_REQUIRE_MPI is set to something else, so no import is attempted.
         PETSc = None
-# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
-# with a notification.
 else:
+    # If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but fail silently.
     try:
         import petsc4py
         from petsc4py import PETSc
+
     except ImportError:
         PETSc = None
-        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
-        sys.stdout.flush()
 
 
 KSP_TYPES = [
