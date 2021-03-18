@@ -189,7 +189,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
     tree_dict['expressions'] = None
-    tree_dict['om_version'] = openmdao_version
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
