@@ -418,13 +418,6 @@ class Component(System):
                 abs_key = (of_abs, wrt_abs)
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
-                    if meta['rows'] is not None:
-                        rows, cols = tup[:2]
-                        if not np.all(meta['rows'] == rows) or not np.all(meta['cols'] == cols):
-                            raise RuntimeError(f"{self.msginfo}: User sparsity pattern "
-                                               f"(rows={meta['rows']}, cols={meta['cols']}) for "
-                                               f"sub-jacobian {abs_key} does not match the "
-                                               f"computed sparsity (rows={rows}, cols={cols}).")
                     # add sparsity info to existing partial info
                     meta['sparsity'] = tup
 

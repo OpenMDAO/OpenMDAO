@@ -963,7 +963,7 @@ def _order_by_ID(col_adj_matrix):
 
     for i in range(np.nonzero(colored_degrees)[0].size):
         col = colored_degrees.argmax()
-        colnzrows = col_adj_matrix._get_submatrix(major=col).indices
+        colnzrows = col_adj_matrix.getcol(col).indices
         colored_degrees[colnzrows] += 1
         colored_degrees[col] = -ncols  # ensure that this col will never have max degree again
         yield col, colnzrows
@@ -1163,7 +1163,7 @@ def _color_partition(Jprows, Jpcols, shape):
     csc = csc_matrix((np.ones(Jprows.size), (Jprows, Jpcols)), shape=shape)
     col2row = [None] * ncols
     for col in np.unique(Jpcols):
-        col2row[col] = csc._get_submatrix(major=col).indices
+        col2row[col] = csc.getcol(col).indices
 
     return [col_groups, col2row]
 
@@ -1197,10 +1197,10 @@ def MNCO_bidir(J):
     sparse = csc_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
 
     for c in range(ncols):
-        M_col_nonzeros[c] = sparse._get_submatrix(major=c).indices.size
+        M_col_nonzeros[c] = sparse.getcol(c).indices.size
     sparse = sparse.tocsr()
     for r in range(nrows):
-        M_row_nonzeros[r] = sparse._get_submatrix(major=r).indices.size
+        M_row_nonzeros[r] = sparse.getrow(r).indices.size
 
     sparse = None
 

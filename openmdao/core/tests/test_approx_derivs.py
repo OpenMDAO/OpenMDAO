@@ -2061,6 +2061,63 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
 
+    def test_partials_bad_sparse_explicit(self):
+        class BadSparsityComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.sparsity = np.array(
+                    [[1, 0, 1, 0, 0, 1, 1],
+                     [0, 1, 0, 1, 0, 1, 0],
+                     [0, 0, 1, 0, 0, 0, 1],
+                     [1, 0, 0, 1, 0, 1, 0],
+                     [0, 1, 0, 1, 1, 0, 1]], dtype=int)
+
+                self.add_input('x0', val=np.ones(4))
+                self.add_input('x1', val=np.ones(2))
+                self.add_input('x2', val=np.ones(1))
+
+                self.add_output('y0', val=np.zeros(2))
+                self.add_output('y1', val=np.zeros(3))
+
+                rows, cols = np.nonzero(self.sparsity[0:2, 0:4])
+                self.declare_partials(of='y0', wrt='x0', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[0:2, 4:6])
+                self.declare_partials(of='y0', wrt='x1', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[0:2, 6:7])
+                self.declare_partials(of='y0', wrt='x2', rows=rows, cols=cols, method='cs')
+                # corrupt the rows/cols
+                bad_sparsity = self.sparsity[2:5, 0:4].copy()
+                bad_sparsity[1, 3] = 0  # missing nz at col x0[3] row y1[1]
+                rows, cols = np.nonzero(bad_sparsity)
+                self.declare_partials(of='y1', wrt='x0', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[2:5, 4:6])
+                self.declare_partials(of='y1', wrt='x1', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[2:5, 6:7])
+                self.declare_partials(of='y1', wrt='x2', rows=rows, cols=cols, method='cs')
+
+            def compute(self, inputs, outputs):
+                prod = self.sparsity.dot(inputs.asarray())
+                start = end = 0
+                for i in range(2):
+                    outname = 'y%d' % i
+                    end += outputs[outname].size
+                    outputs[outname] = prod[start:end]
+                    start = end
+
+        prob = om.Problem()
+        model = prob.model
+        comp = model.add_subsystem('comp', BadSparsityComp())
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(Exception) as cm:
+            prob.check_partials(includes=['comp'])
+
+        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
+
+
 
 class ApproxTotalsFeature(unittest.TestCase):
 
