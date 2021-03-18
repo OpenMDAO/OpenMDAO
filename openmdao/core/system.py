@@ -36,9 +36,10 @@ from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
+from openmdao.warnings import issue_warning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
+    make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -825,8 +826,10 @@ class System(object):
 
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
-                simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
-                               "coloring was set, so recurse was ignored." % self.pathname)
+                issue_warning(prefix=self.pathname,
+                              warn_unused_option='recurse was passed to use_fixed_coloring '
+                                                 'but a specific coloring was set, so recurse '
+                                                 'was ignored.')
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
@@ -973,9 +976,9 @@ class System(object):
                 if 'method' in meta and meta['method']:
                     break
             else:  # no approx derivs found
-                simple_warning("%s: No approx partials found but coloring was requested.  "
-                               "Declaring ALL partials as dense and approx (method='%s')" %
-                               (self.msginfo, self._coloring_info['method']))
+                msg = f"No approx partials found but coloring was requested.  Declaring ALL " \
+                      f"partials as dense and approx (method='{self._coloring_info['method']}')"
+                issue_warning(prefix=self.msginfo, warn_derivatives=msg)
                 try:
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
@@ -1079,8 +1082,9 @@ class System(object):
         pct = coloring._solves_info()[-1]
         if info['min_improve_pct'] > pct:
             info['coloring'] = info['static'] = None
-            simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
-                           "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
+            msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less than min " \
+                  f"allowed ({info['min_improve_pct']:.1f}%)."
+            issue_warning(prefix=self.msginfo, warn_derivatives=msg)
             if not info['per_instance']:
                 coloring_mod._CLASS_COLORINGS[coloring_fname] = None
             return [None]
@@ -1927,8 +1931,9 @@ class System(object):
                                        f"'{old_key}'.")
 
             if old_key != '*':
-                simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                               f"{new_using}, was already promoted using {old_using}.")
+                msg = f"{io} variable '{name}', promoted using {new_using}, " \
+                      f"was already promoted using {old_using}."
+                issue_warning(prefix=self.msginfo, warn_promotion=msg)
 
             return match_type == _MatchType.PATTERN
 

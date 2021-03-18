@@ -18,7 +18,7 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 import time
@@ -1843,7 +1843,15 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        expected_warnings = [(om.DerivativesWarning,
+                              ' [d1]: Nested complex step detected. '
+                              'Finite difference will be used.'),
+                             (om.DerivativesWarning,
+                              ' [d1]: Nested complex step detected. '
+                              'Finite difference will be used.')]
+
+        with assert_warnings(expected_warnings):
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)

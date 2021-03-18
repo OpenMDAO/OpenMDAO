@@ -185,7 +185,7 @@ def filter_warnings(reset_to_defaults=False, **kwargs):
     """
     if reset_to_defaults:
         for w_name, w_class in _warnings.items():
-            warnings.filterwarnings(w_class.action, category=w_class)
+            warnings.filterwarnings(w_class.filter, category=w_class)
 
     for w_name, action in kwargs.items():
         _action = 'error' if action == 'raise' else action
