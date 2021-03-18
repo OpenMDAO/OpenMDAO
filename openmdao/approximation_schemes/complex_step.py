@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results, _get_wrt_subjacs, _full_slice
-from openmdao.warnings import issue_warning
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 
 class ComplexStep(ApproximationScheme):
@@ -105,8 +105,8 @@ class ComplexStep(ApproximationScheme):
             if not self._fd:
                 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
-                msg = "Nested complex step detected. Finite difference will be used."
-                issue_warning(warn_derivatives=msg, prefix=system.pathname)
+                issue_warning("Nested complex step detected. Finite difference will be used.",
+                              prefix=system.pathname, category=DerivativesWarning)
 
                 fd = self._fd = FiniteDifference()
                 empty = {}

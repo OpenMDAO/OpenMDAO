@@ -26,7 +26,7 @@ from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.warnings import issue_warning
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 
 CITATIONS = """
@@ -1854,7 +1854,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     problem = driver._problem()
     if not problem.model._use_derivatives:
         msg = "Derivatives have been turned off. Skipping dynamic simul coloring."
-        issue_warning(warn_derivatives=msg)
+        issue_warning(msg, category=DerivativesWarning)
         return
 
     driver._total_jac = None

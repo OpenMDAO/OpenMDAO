@@ -30,7 +30,7 @@ def notebook_mode():
     if ipy and tabulate is None:
         msg = "Tabulate is not installed run `pip install openmdao[notebooks]` to " \
               "install required dependencies. Using ASCII for outputs."
-        issue_warning(warn_all=msg)
+        issue_warning(msg)
     return ipy
 
 

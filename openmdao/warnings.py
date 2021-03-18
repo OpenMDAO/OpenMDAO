@@ -17,7 +17,7 @@ class OpenMDAOWarning(UserWarning):
     """
     Base class for all OpenMDAO warnings.
     """
-    name = 'warn_all'
+    name = 'warn_openmdao'
     filter = 'always'
 
 
@@ -124,6 +124,14 @@ class CacheWarning(OpenMDAOWarning):
     filter = 'always'
 
 
+class OMDeprecationWarning(OpenMDAOWarning):
+    """
+    An OpenMDAO-specific deprecation warning that is noisy by default, unlike the Python one.
+    """
+    name = 'warn_deprecation'
+    filter = 'always'
+
+
 _warnings = {_class.name: _class for _, _class in
              inspect.getmembers(sys.modules[__name__], inspect.isclass) if issubclass(_class, Warning)}
 
@@ -205,7 +213,7 @@ def _warn_simple_format(message, category, filename, lineno, file=None, line=Non
     return f'{filename}:{lineno}: {category.__name__}:{message}\n'
 
 
-def issue_warning(prefix='', stacklevel=2, **kwargs):
+def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     """
     Display an OpenMDAO-specific warning with the desired stack level and optional prefix.
 
@@ -226,14 +234,11 @@ def issue_warning(prefix='', stacklevel=2, **kwargs):
     """
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
-    for warn_type, msg in kwargs.items():
-        if warn_type not in _warnings:
-            raise ValueError(f'{warn_type} is not a valid OpenMDAO warning class.')
-        _msg = f' [{prefix}]: {msg}' if prefix else f' {msg}'
-        try:
-            warnings.warn(_msg, category=_warnings[warn_type], stacklevel=stacklevel)
-        finally:
-            warnings.formatwarning = old_format
+    _msg = f' [{prefix}]: {msg}' if prefix else f' {msg}'
+    try:
+        warnings.warn(_msg, category=category, stacklevel=stacklevel)
+    finally:
+        warnings.formatwarning = old_format
 
 
 def _make_table():
@@ -265,4 +270,5 @@ filter_warnings(reset_to_defaults=True)
 
 
 if __name__ == '__main__':
-    issue_warning(prefix='my.comp', warn_derivatives='some message')
+    issue_warning('foo', prefix='my.comp', category=OMDeprecationWarning)
+    print(list(_warnings.keys()))

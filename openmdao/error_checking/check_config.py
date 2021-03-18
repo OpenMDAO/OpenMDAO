@@ -17,7 +17,7 @@ from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions, ignore_errors
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.warnings import issue_warning
+from openmdao.warnings import issue_warning, SetupWarning
 
 
 _UNSET = object()
@@ -179,7 +179,7 @@ def _get_used_before_calc_subs(group, input_srcs):
                     not hierarchy_check):
                 msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
                       f"to {src_sys} when connecting components inside parallel groups"
-                issue_warning(warn_setup=msg)
+                issue_warning(msg, category=SetupWarning)
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in allsubs and tgt_sys in allsubs and
                     (allsubs[src_sys].index > allsubs[tgt_sys].index)):
