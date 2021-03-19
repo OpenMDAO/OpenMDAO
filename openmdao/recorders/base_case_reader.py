@@ -14,6 +14,8 @@ class BaseCaseReader(object):
     ----------
     _format_version : int
         The version of the format assumed when loading the file.
+    _openmdao_version : str
+        The version of OpenMDAO used to generate the case recorder file.
     problem_metadata : dict
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict

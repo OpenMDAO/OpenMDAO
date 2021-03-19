@@ -203,7 +203,7 @@ class SqliteRecorder(CaseRecorder):
                           "conns TEXT)")
                 c.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
                           " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                       None, None))
+                                                         None, None))
 
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
