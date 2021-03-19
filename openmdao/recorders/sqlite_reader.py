@@ -101,6 +101,7 @@ class SqliteCaseReader(BaseCaseReader):
 
             # collect data from the metadata table. this includes:
             #   format_version
+            #   openmdao_version
             #   VOI metadata, which is added to problem_metadata
             #   var name maps and metadata for all vars, which are saved as private attributes
             self._collect_metadata(cur)
@@ -163,8 +164,10 @@ class SqliteCaseReader(BaseCaseReader):
 
         row = cur.fetchone()
 
-        # get format_version
         self._format_version = version = row['format_version']
+
+        if version >= 13:
+            self._openmdao_version = row['openmdao_version']
 
         if version not in range(1, format_version + 1):
             raise ValueError('SqliteCaseReader encountered an unhandled '
