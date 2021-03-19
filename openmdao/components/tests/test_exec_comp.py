@@ -1235,6 +1235,82 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue("balance" in text)
         self.assertTrue("x_1" in text)
 
+    def test_add_expr(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp('y=x',
+                             x={'value' : 3.0, 'units' : 'mm'},
+                             y={'shape' : (1, ), 'units' : 'cm'})
+
+        excomp.add_expr('z = 2.9*x',
+                        z={'shape' : (1, ), 'units' : 's'})
+
+        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
+    def test_add_expr_bare(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp()
+
+        excomp.add_expr('z = 2.9*x',
+                        x={'value' : 3.0, 'units' : 'mm'},
+                        z={'shape' : (1, ), 'units' : 's'})
+
+        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+
+    def test_add_expr_errors(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp('y=x',
+                             x={'value' : 3.0, 'units' : 'mm'},
+                             y={'shape' : (1, ), 'units' : 'cm'})
+
+        with self.assertRaises(NameError) as cm:
+            excomp.add_expr('z = 2.9*x',
+                            x={'value' : 3.0, 'units' : 'cm'},
+                            z={'shape' : (1, ), 'units' : 's'})
+
+        self.assertEquals(cm.exception.args[0],
+                          "Defaults for 'x' have already been defined in a previous "
+                          "expression.")
+
+        with self.assertRaises(TypeError) as cm:
+            excomp.add_expr(p)
+
+        self.assertEquals(cm.exception.args[0],
+                          "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
+
+    def test_feature_add_expr(self):
+        import numpy as np
+        import openmdao.api as om
+
+        p = om.Problem()
+
+        excomp = om.ExecComp()
+
+        excomp.add_expr('z = 2.9*x',
+                        x={'value' : 3.0, 'units' : 'mm'},
+                        z={'shape' : (1, ), 'units' : 's'})
+
+        excomp.add_expr('y = 3.7*x',
+                        y={'value' : 9.0, 'units' : 'km'})
+
+        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 11.1, 1e-8)
+
 
 class TestFunctionRegistration(unittest.TestCase):
 

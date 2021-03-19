@@ -235,6 +235,35 @@ class ExecComp(ExplicitComponent):
                              desc='If True, shape all inputs and outputs based on their '
                                   'connection. Default is False.')
 
+    def add_expr(self, expr, **kwargs):
+        """
+        Add an expression to the ExecComp.
+
+        Parameters
+        ----------
+        expr : str
+            An assignment statement that expresses how the outputs are calculated based on the
+            inputs. In addition to standard Python operators, a subset of numpy and scipy
+            functions is supported.
+        **kwargs : dict of named args
+            Initial values of variables can be set by setting a named arg with the var name.  If
+            the value is a dict it is assumed to contain metadata.  To set the initial value in
+            addition to other metadata, assign the initial value to the 'value' entry of the dict.
+            Do not include for inputs that have been declared on previous expressions.
+        """
+        if not isinstance(expr, str):
+            typ = type(expr).__name__
+            msg = f"Argument 'expr' must be of type 'str', but type '{typ}' was found."
+            raise TypeError(msg)
+
+        self._exprs.append(expr)
+        for name in kwargs:
+            if name in self._kwargs:
+                raise NameError(f"Defaults for '{name}' have already been defined in a previous "
+                                "expression.")
+
+        self._kwargs.update(kwargs)
+
     @classmethod
     def register(cls, name, callable_obj, complex_safe):
         """

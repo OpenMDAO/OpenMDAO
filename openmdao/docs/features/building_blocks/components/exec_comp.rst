@@ -179,5 +179,14 @@ that `fd` should be used for a given derivative is to call :code:`declare_partia
     openmdao.components.tests.test_exec_comp.TestFunctionRegistration.featuretest_register_simple_unsafe
     :layout: interleave
 
+ExecComp Example: Adding Expressions
+------------------------------------
+
+You can add additional expressions to an `ExecComp` with the "add_expr" method.
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_add_expr
+    :layout: interleave
+
 
 .. tags:: ExecComp, Component, Examples
