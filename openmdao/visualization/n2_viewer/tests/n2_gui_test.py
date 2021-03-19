@@ -561,7 +561,11 @@ class n2_gui_test_case(unittest.TestCase):
                 'width': 1600,
                 'height': 900
             },
-            'args': ['--start-fullscreen'],
+            'args': [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--start-fullscreen'
+            ],
             'headless': True
         })
         userAgentStr = await self.browser.userAgent()
