@@ -607,14 +607,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         # Without waitUntil: 'networkidle0', processing will begin before
         # the page is fully rendered
-
-        # The DOMContentLoaded event fires when the initial HTML document has
-        # been completely loaded and parsed, without waiting for stylesheets,
-        # images, and subframes to finish loading.
-
-        # When running on the Github platform via GitHub Actions, the
-        # 'networkidle0' was unreliable, so we are using 'domcontentloaded'
-        await self.page.goto(url, waitUntil='domcontentloaded')
+        await self.page.goto(url, waitUntil='networkidle0')
 
         # Milliseconds to allow for the last transition animation to finish.
         # Obtain value defined in N2 code.
