@@ -96,10 +96,10 @@ from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 from openmdao.utils.units import convert_units, unit_conversion
 
 # Warning Options
-from openmdao.warnings import register_warning, filter_warnings, issue_warning, OpenMDAOWarning, \
-    AllowableSetupError, SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
+from openmdao.warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
+    SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
-    MPIWarning, UnitsWarning, SolverWarning
+    MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning
 
 
 # set up tracing or memory profiling if env vars are set.

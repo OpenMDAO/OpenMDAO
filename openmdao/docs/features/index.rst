@@ -17,4 +17,5 @@ has been thoroughly tested, and should be considered fully functional.
    model_visualization/index.rst
    debugging/index.rst
    units.rst
+   warnings.rst
    experimental/index.rst
