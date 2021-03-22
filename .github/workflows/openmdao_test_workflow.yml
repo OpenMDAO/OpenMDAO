@@ -1,0 +1,240 @@
+# Run Tests
+
+name: OpenMDAO Test
+
+on:
+  # Trigger on push or pull request events for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  test_ubuntu:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 90
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # baseline versions
+          - PY: 3.8
+            NUMPY: 1.18
+            SCIPY: 1.4
+            PETSc: 3.12
+            PYOPTSPARSE: 'v2.1.5'
+            SNOPT: 7.7
+
+          # try latest versions
+          - PY: 3
+            NUMPY: 1
+            SCIPY: 1
+            # PETSc: 3
+            PYOPTSPARSE: 'v2.1.5'
+            SNOPT: 7.7
+
+          # oldest supported versions
+          - PY: 3.6
+            NUMPY: 1.16
+            SCIPY: 1.2
+            PETSc: 3.10.2
+            PYOPTSPARSE: 'v1.2'
+            SNOPT: 7.2
+
+    steps:
+      - name: Create SSH key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+          SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          sudo chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - run: |
+          git fetch --prune --unshallow --tags
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version:  ${{ matrix.PY }}
+
+      - name: Install & test
+        run: |
+          echo "=============================================================";
+          echo "Run #${GITHUB_RUN_NUMBER}";
+          echo "Testing: ${GITHUB_REPOSITORY}";
+          echo "Triggered by: ${GITHUB_EVENT_NAME}";
+          echo "Initiated by: ${GITHUB_ACTOR}";
+          echo "=============================================================";
+
+          echo "=============================================================";
+          echo "Create conda environment";
+          echo "=============================================================";
+          source $CONDA/etc/profile.d/conda.sh;
+          echo $CONDA/bin >> $GITHUB_PATH;
+          conda create -n OpenMDAO python=${{ matrix.PY }} numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y;
+          conda activate OpenMDAO
+
+          if [ "${{ matrix.PETSc }}" ]; then
+            echo "=============================================================";
+            echo "Installing PETSc";
+            echo "=============================================================";
+            conda install -c anaconda mpi4py -q -y;
+            conda install -c conda-forge petsc=${{ matrix.PETSc }} petsc4py -q -y;
+          fi
+
+          if [ "${{ matrix.PYOPTSPARSE }}" ]; then
+            echo "=============================================================";
+            echo "Installing pyoptsparse";
+            echo "=============================================================";
+
+            git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
+
+            cd build_pyoptsparse;
+            chmod 755 ./build_pyoptsparse.sh;
+
+            if [ "${{ matrix.PETSc }}" ] && [ "${{ matrix.PYOPTSPARSE }}" == "v1.2"]; then
+              PAROPT=-a;
+            fi
+
+            if [ "${{ matrix.SNOPT }}" == "7.7" ] && [ "${{ secrets.SNOPT_LOCATION_77 }}" ]; then
+              echo "  > Secure copying SNOPT 7.7 over SSH";
+              mkdir SNOPT;
+              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT;
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src;
+
+            elif [ "${{ matrix.SNOPT }}" == "7.2" ] && [ "${{ secrets.SNOPT_LOCATION_72 }}" ]; then
+              echo "  > Secure copying SNOPT 7.2 over SSH";
+              mkdir SNOPT;
+              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT;
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source;
+
+            else
+              if [ "${{ matrix.SNOPT }}" ]; then
+                echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available";
+              fi
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}";
+            fi
+
+            cd ..
+
+            export LD_LIBRARY_PATH=$HOME/ipopt/lib;
+          fi
+
+          echo "=============================================================";
+          echo "Installing OpenMDAO";
+          echo "=============================================================";
+          pip install .[all];
+
+          echo "=============================================================";
+          echo "Installing optional packages for testing/coverage";
+          echo "=============================================================";
+          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
+          pyppeteer-install;
+
+          echo "=============================================================";
+          echo "Test environment";
+          echo "=============================================================";
+          conda list;
+
+          echo "=============================================================";
+          echo "Run tests";
+          echo "=============================================================";
+          cd openmdao/docs;
+
+          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
+          
+          if [ "${{ matrix.PETSc }}" ]; then
+            echo "=============================================================";
+            echo "Make docs";
+            echo "=============================================================";
+            make travis;
+          fi
+
+      - uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+        if: always()
+
+  test_windows:
+    runs-on: windows-latest
+
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # baseline versions
+          - PY: 3
+            NUMPY: 1.18
+            SCIPY: 1.4
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - run: |
+          git fetch --prune --unshallow --tags
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version:  ${{ matrix.PY }}
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: ${{ matrix.PY }}
+
+      - name: Install & test
+        run: |
+          echo "=============================================================";
+          echo "Run #$env:GITHUB_RUN_NUMBER";
+          echo "Testing: $env:GITHUB_REPOSITORY";
+          echo "Triggered by: $env:GITHUB_EVENT_NAME";
+          echo "Initiated by: $env:GITHUB_ACTOR";
+          echo "=============================================================";
+
+          echo "=============================================================";
+          echo "Create conda environment";
+          echo "=============================================================";
+          conda create -n OpenMDAO python=${{ matrix.PY }} numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y;
+          conda activate OpenMDAO
+
+          echo "=============================================================";
+          echo "Installing OpenMDAO";
+          echo "=============================================================";
+          pip install .[all];
+
+          echo "=============================================================";
+          echo "Installing optional packages for testing/coverage";
+          echo "=============================================================";
+          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
+          pyppeteer-install;
+
+          echo "=============================================================";
+          echo "Test environment";
+          echo "=============================================================";
+          conda list;
+
+          echo "=============================================================";
+          echo "Run tests";
+          echo "=============================================================";
+          cd \;
+          testflo -n 1 openmdao --timeout=120 --show_skipped;
+
+      - uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+        if: always()
