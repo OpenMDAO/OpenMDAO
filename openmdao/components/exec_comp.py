@@ -441,7 +441,8 @@ class ExecComp(ExplicitComponent):
             Initial values of variables can be set by setting a named arg with the var name.  If
             the value is a dict it is assumed to contain metadata.  To set the initial value in
             addition to other metadata, assign the initial value to the 'value' entry of the dict.
-            Do not include for inputs that have been declared on previous expressions.
+            Do not include for inputs whose default kwargs have been declared on previous
+            expressions.
         """
         if not isinstance(expr, str):
             typ = type(expr).__name__
