@@ -1033,7 +1033,7 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # unittest.main()
-    myclass = TestDistribDynShapeCombos()
-    myclass.test_dyn_shape_combos()
+    unittest.main()
+    # myclass = TestDistribDynShapeCombos()
+    # myclass.test_dyn_shape_combos()
 
