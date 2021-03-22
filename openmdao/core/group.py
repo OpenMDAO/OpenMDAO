@@ -1654,7 +1654,28 @@ class Group(System):
             elif from_io == 'output':
                 # from_var is an output.  assume to_var is an input
                 if from_dist and not to_dist:  # known dist output to serial input
-                    size = np.sum(distrib_sizes[from_var])
+                    # original
+                    # size = np.sum(distrib_sizes[from_var])
+
+                    # Anil's way
+                    rank = self.comm.rank
+                    # gets the local size
+                    size = distrib_sizes[from_var][rank]
+                    # gets the cumulative sum
+                    cumsum = np.cumsum(distrib_sizes[from_var])
+
+                    # AY: I dont know why we check to_meta here
+                    # but Josh's modification below checks it so I also checked it
+                    if to_meta:
+                        to_meta['src_indices'] = np.arange(
+                            cumsum[rank] - size,
+                            cumsum[rank],
+                            dtype=INT_DTYPE
+                        )
+
+                    # AY: do we need to set distrib_sizes here?
+                    distrib_sizes[to_var] = cumsum[-1]
+
                 else:  # known serial output to dist input
 
                     if all_to_meta['has_src_indices']:
@@ -1671,12 +1692,15 @@ class Group(System):
                         #                                     offsets[rank] + sizes[rank],
                         #                                     dtype=INT_DTYPE)
 
-                        # # Anil's way
+                        # Anil's way
                         # copy the serial output to all inputs
                         rank = self.comm.rank
                         size = from_size
                         if to_meta:
-                            to_meta['src_indices'] = np.arange(rank*size, (rank+1)*size, dtype=INT_DTYPE)
+                            to_meta['src_indices'] = np.arange(
+                                rank * size,
+                                (rank + 1) * size,
+                                dtype=INT_DTYPE)
 
                         distrib_sizes[to_var] = np.array([from_size]*self.comm.size)
 
@@ -1731,7 +1755,7 @@ class Group(System):
                     to_meta['value'] = np.full(size, to_meta['value'])
 
 
-            print(f'done connecting {from_var} to {to_var}', all_to_meta['size'] )
+            # print(f'done connecting {from_var} to {to_var}', all_to_meta['size'] )
 
 
         all_abs2prom_in = self._var_allprocs_abs2prom['input']
