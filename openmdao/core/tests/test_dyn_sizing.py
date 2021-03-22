@@ -784,18 +784,25 @@ class TestDynShapeFeature(unittest.TestCase):
 # following 4 classes are used in TestDistribDynShapeCombos
 class Ser1(om.ExplicitComponent):
     def setup(self):
-        rank = self.comm.rank
-        var_shape = 2 * rank
+        # serial components' outputs must be the same size on all procs.
+        # this is a serial output, so the same output is duplicated on all procs
 
         # this component outputs all serial => * connections
-        self.add_output("ser_ser_down", shape=4, val=np.ones(4))
-        self.add_output("ser_ser_up", shape_by_conn=True)
 
-        self.add_output("ser_par_down", shape=4, val=np.ones(4))
-        self.add_output("ser_par_up", shape_by_conn=True)
+        # downstream
+        self.add_output("ser_ser_down", shape=4, val=np.ones(4))  # (1)
+        self.add_output("ser_par_down", shape=4, val=np.ones(4))  # (2)
+
+        # upstream
+        self.add_output("ser_ser_up", shape_by_conn=True)  # (5), size should be 4
+        self.add_output("ser_par_up", shape_by_conn=True)  # (6), size should be 4
 
     def compute(self, inputs, outputs):
-        pass
+        # check the 2 upstream connections to this component
+        np.testing.assert_equal(outputs["ser_ser_up"].size, 4)  # (5)
+        np.testing.assert_equal(outputs["ser_par_up"].size, 4)  # (6)
+
+        return
 
 class Par1(om.ExplicitComponent):
     def setup(self):
@@ -803,41 +810,55 @@ class Par1(om.ExplicitComponent):
         var_shape = 2 * rank
         self.options['distributed'] = True
 
+        # parallel components' outputs are distributed, so for a general case,
+        # they will have different sizes on different processors.
+
         # this component outputs all parallel => * connections
-        self.add_output("par_ser_down", shape=var_shape, val=np.ones(var_shape))
-        self.add_output("par_ser_up", shape_by_conn=True)
 
-        # uncomment to test with different sized input variables in Ser2 without shape_by_conn
-        # self.add_output("par_ser_up", shape=var_shape, val=np.ones(var_shape))
+        # downstream
+        self.add_output("par_ser_down", shape=var_shape, val=np.ones(var_shape))  # (3)
+        self.add_output("par_par_down", shape=var_shape, val=np.ones(var_shape))  # (4)
 
-
-        self.add_output("par_par_down", shape=var_shape, val=np.ones(var_shape))
-        self.add_output("par_par_up", shape_by_conn=True)
+        # upstream
+        self.add_output("par_ser_up", shape_by_conn=True)  # (7), size should be 2*rank
+        self.add_output("par_par_up", shape_by_conn=True)  # (8), size should be 2*rank
 
     def compute(self, inputs, outputs):
-        pass
+        # check the 2 upstream connections to this component
+        np.testing.assert_equal(outputs["par_ser_up"].size, self.comm.rank * 2)  # (7)
+        np.testing.assert_equal(outputs["par_par_up"].size, self.comm.rank * 2)  # (8)
+
+        return
 
 class Ser2(om.ExplicitComponent):
     def setup(self):
         rank = self.comm.size
-
-        # uncomment to test with different sized input variables
-        # rank = self.comm.rank  # this leads to differnt sized input variables
         var_shape = 2 * rank
 
-
-        # dummy output
-        self.add_output('foo_ser2', val=1.)
+        # serial components' inputs can be coming from another serial component,
+        # and in that case, they are duplicated across procs and have the same size
+        # OR serial components' inputs can also be coming from a parallel component,
+        # and in that case, the vector is distributed and can have varying size on each proc
 
         # this component receives all * => serial connections
-        self.add_input("ser_ser_down", shape_by_conn=True)
-        self.add_input("ser_ser_up", shape=4)
 
-        self.add_input("par_ser_down", shape_by_conn=True)
-        self.add_input("par_ser_up", shape=var_shape, val=np.ones(var_shape))
+        # downstream
+        self.add_input("ser_ser_down", shape_by_conn=True)  # (1), size should be 4
+        self.add_input("par_ser_down", shape_by_conn=True)  # (3), size should be 2*rank
+
+        # upstream
+        self.add_input("ser_ser_up", shape=4)  # (5)
+        self.add_input("par_ser_up", shape=var_shape, val=np.ones(var_shape))  # (7)
+
+        # dummy output so the component runs
+        self.add_output('foo_ser2', val=1.)
 
     def compute(self, inputs, outputs):
-        pass
+        # check the 2 downstream connections to this component
+        np.testing.assert_equal(outputs["ser_ser_down"].size, 4)  # (1)
+        np.testing.assert_equal(outputs["par_ser_down"].size, self.comm.rank * 2)  # (3)
+
+        return
 
 class Par2(om.ExplicitComponent):
     def setup(self):
@@ -845,18 +866,30 @@ class Par2(om.ExplicitComponent):
         var_shape = 2 * rank
         self.options['distributed'] = True
 
+        # parallel components' inputs can be coming from another serial component,
+        # and in that case, they are duplicated across procs and have the same size
+        # OR parallel components' inputs can also be coming from a parallel component,
+        # and in that case, the vector is distributed and can have varying size on each proc
+
+        # this component receives all * => parallel connections
+
+        # downstream
+        self.add_input("ser_par_down", shape_by_conn=True)  # (2), size should be 4
+        self.add_input("par_par_down", shape_by_conn=True)  # (4), size should be 2*rank
+
+        # upstream
+        self.add_input("ser_par_up", shape=4)
+        self.add_input("par_par_up", shape=var_shape, val=np.ones(var_shape))
+
         # dummy output
         self.add_output('foo_par2', val=1.)
 
-        # this component receives all * => parallel connections
-        self.add_input("ser_par_down", shape_by_conn=True)
-        self.add_input("ser_par_up", shape=4, src_indices=[0, 1, 2, 3])
-
-        self.add_input("par_par_down", shape_by_conn=True)
-        self.add_input("par_par_up", shape=var_shape, val=np.ones(var_shape))
-
     def compute(self, inputs, outputs):
-        pass
+        # check the 2 downstream connections to this component
+        np.testing.assert_equal(outputs["ser_par_down"].size, 4)  # (2)
+        np.testing.assert_equal(outputs["par_par_down"].size, self.comm.rank * 2)  # (4)
+
+        return
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDynShapeCombos(unittest.TestCase):
@@ -902,11 +935,13 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
     With all this context, here is a table that lists what variables test what i/o:
 
-    Connection:    Downstream direction   Upstream direction
-    ser1 => ser2       ser_ser_down          ser_ser_up     1, 5
-    ser1 => par2       ser_par_down          ser_par_up     2, 6
-    par1 => ser2       par_ser_down          par_ser_up     3, 7
-    par1 => par2       par_par_down          par_par_up     4, 8
+    Connection:      Downstream direction    Upstream direction
+    ser1 => ser2       ser_ser_down (1)        ser_ser_up (5)
+    ser1 => par2       ser_par_down (2)        ser_par_up (6)
+    par1 => ser2       par_ser_down (3)        par_ser_up (7)
+    par1 => par2       par_par_down (4)        par_par_up (8)
+
+    The parentheses after the connection name shows where we make that connection below
 
     The reason we have this tests is that the parallel tests above do not cover every possible combination.
     It is important to remember that we are not just testing a serial to serial connection here.
@@ -929,72 +964,68 @@ class TestDistribDynShapeCombos(unittest.TestCase):
 
         rank = MPI.COMM_WORLD.rank
         var_shape = 2 * rank
-        var_shape_all = MPI.COMM_WORLD.allreduce(var_shape)
-
 
         p = om.Problem()
 
-        p.model.add_subsystem(
-            'ser1',
-            Ser1(),
-        )
+        # components with outputs
+        p.model.add_subsystem('ser1', Ser1())
+        p.model.add_subsystem('par1', Par1())
 
-        p.model.add_subsystem(
-            'par1',
-            Par1(),
-        )
+        # components with inputs
+        p.model.add_subsystem('ser2', Ser2())
+        p.model.add_subsystem('par2', Par2())
 
-        p.model.add_subsystem(
-            'ser2',
-            Ser2(),
-        )
+        # all downstream connections
+        p.model.connect('ser1.ser_ser_down', 'ser2.ser_ser_down')  # (1)
+        p.model.connect('ser1.ser_par_down', 'par2.ser_par_down')  # (2)
+        p.model.connect('par1.par_ser_down', 'ser2.par_ser_down')  # (3)
+        p.model.connect('par1.par_par_down', 'par2.par_par_down')  # (4)
 
-        p.model.add_subsystem(
-            'par2',
-            Par2(),
-        )
-
-        # all down stream connections
-        p.model.connect('ser1.ser_ser_down', 'ser2.ser_ser_down') #1
-        p.model.connect('ser1.ser_par_down', 'par2.ser_par_down') #2
-
-        p.model.connect('par1.par_ser_down', 'ser2.par_ser_down') #3
-        p.model.connect('par1.par_par_down', 'par2.par_par_down') #4
-
-        # all up stream connections
-        p.model.connect('ser1.ser_ser_up', 'ser2.ser_ser_up') #5
-        p.model.connect('ser1.ser_par_up', 'par2.ser_par_up') #6
-
-        p.model.connect('par1.par_ser_up', 'ser2.par_ser_up') #7
-        p.model.connect('par1.par_par_up', 'par2.par_par_up') #8
-
+        # all upstream connections
+        p.model.connect('ser1.ser_ser_up', 'ser2.ser_ser_up')  # (5)
+        p.model.connect('ser1.ser_par_up', 'par2.ser_par_up')  # (6)
+        p.model.connect('par1.par_ser_up', 'ser2.par_ser_up')  # (7)
+        p.model.connect('par1.par_par_up', 'par2.par_par_up')  # (8)
 
         p.setup()
+
+        # we check the variable sizes in each component here
         p.run_model()
 
+        # also check the i/o sizes here
         p.model.list_inputs(shape=True, all_procs=True, global_shape=False)
         p.model.list_outputs(shape=True, all_procs=True, global_shape=False)
 
         # test all of the i/o sizes set by shape_by_conn
 
-        # serial => serial
+        # all downstream:
+
+        # serial => serial (1)
         self.assertEqual(p.get_val('ser2.ser_ser_down').size, 4)
+
+        # serial => parallel (2)
+        self.assertEqual(p.get_val('par2.ser_par_down').size, 4)
+
+        # parallel => serial (3)
+        # TODO the get_val does not work on this parallel output. need get_remote=True
+        self.assertEqual(p.get_val('ser2.par_ser_down').size, var_shape)
+
+        # parallel => parallel (4)
+        self.assertEqual(p.get_val('par2.par_par_down').size, var_shape)
+
+
+        # all upstream:
+
+        # serial => serial (5)
         self.assertEqual(p.get_val('ser1.ser_ser_up').size, 4)
 
-        # serial => parallel
-        # self.assertEqual(p.get_val('par2.ser_par_down').size, 4)
+        # serial => parallel (6)
         self.assertEqual(p.get_val('ser1.ser_par_up').size, 4)
 
-        # parallel => serial
-        # TODO the get_val does not work on this parallel output. need get_remote=True
-        # self.assertEqual(p.get_val('ser2.par_ser_down').size, var_shape)
-        # so we do it with get_remote=True
-        self.assertEqual(p.get_val('ser2.par_ser_down', get_remote=True).size,var_shape_all)
-
+        # parallel => serial (7)
         self.assertEqual(p.get_val('par1.par_ser_up').size, 2)
 
-        # parallel => parallel
-        self.assertEqual(p.get_val('par2.par_par_down').size, var_shape)
+        # parallel => parallel (8)
         self.assertEqual(p.get_val('par1.par_par_up').size, var_shape)
 
 
