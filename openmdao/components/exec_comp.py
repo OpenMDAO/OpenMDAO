@@ -403,11 +403,6 @@ class ExecComp(ExplicitComponent):
             if var in var_rel2meta:
                 # Input/Output already exists, but we may be setting defaults for the first time.
                 # Note that there is only one submitted dictionary of defaults.
-                if var in outs:
-                    # Can't add two equations with the same output.
-                    raise RuntimeError(f"{self.msginfo}: The outout '{var}' has already been "
-                                       "defined by an expression.")
-
                 current_meta = var_rel2meta[var]
 
                 for kname, kvalue in meta.items():
@@ -463,7 +458,18 @@ class ExecComp(ExplicitComponent):
 
     def _compile_exprs(self, exprs):
         compiled = []
+        outputs = []
         for i, expr in enumerate(exprs):
+
+            # Quick dupe check.
+            lhs_name = expr.split('=', 1)[0].strip()
+            if lhs_name in outputs:
+                # Can't add two equations with the same output.
+                raise RuntimeError(f"{self.msginfo}: The output '{lhs_name}' has already been "
+                                   "defined by an expression.")
+            else:
+                outputs.append(lhs_name)
+
             try:
                 compiled.append(compile(expr, expr, 'exec'))
             except Exception:

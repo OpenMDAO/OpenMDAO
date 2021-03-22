@@ -1335,6 +1335,14 @@ class TestExecComp(unittest.TestCase):
         self.assertEquals(cm.exception.args[0],
                           "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
 
+        excomp.add_expr('y = 2.9*x')
+        p.model.add_subsystem('zzz', excomp)
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEquals(cm.exception.args[0],
+                          "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
+
     def test_feature_add_expr(self):
         import numpy as np
         import openmdao.api as om
