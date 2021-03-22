@@ -1267,6 +1267,52 @@ class TestExecComp(unittest.TestCase):
 
         assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
 
+    def test_add_expr_configure(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     z={'shape' : (1, ), 'units' : 's'})
+
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
+    def test_add_expr_configure_delay_defaults(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     z={'shape' : (1, ), 'units' : 's'})
+
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
     def test_add_expr_errors(self):
         p = om.Problem()
 
