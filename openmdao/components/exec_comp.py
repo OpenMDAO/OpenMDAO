@@ -280,6 +280,9 @@ class ExecComp(ExplicitComponent):
 
     def _setup_expressions(self):
         """
+        Set up the expressions.
+
+        This is called during setup_procs and after each call to "add_expr" from configure.
         """
         global _not_complex_safe
 
