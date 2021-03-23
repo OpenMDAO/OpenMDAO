@@ -964,7 +964,7 @@ class System(object):
         options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
-        options['repeat'] = num_full_jacs
+        options['num_full_jacs'] = num_full_jacs
         options['tol'] = tol
         options['orders'] = orders
         options['perturb_size'] = perturb_size

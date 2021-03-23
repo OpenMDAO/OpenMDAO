@@ -284,32 +284,176 @@ class ApproximationScheme(object):
                 self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
                                             meta['vector']))
 
-    def _compute_approximations(self, system, jac, total, under_cs):
-        from openmdao.core.component import Component
+    # def _compute_approximations(self, system, jac, total, under_cs):
+    #     from openmdao.core.component import Component
 
-        # Set system flag that we're under approximation to true
-        system._set_approx_mode(True)
+    #     # Set system flag that we're under approximation to true
+    #     system._set_approx_mode(True)
 
-        # Clean vector for results (copy of the outputs or resids)
-        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
+    #     # Clean vector for results (copy of the outputs or resids)
+    #     results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
 
-        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
-                                                      system._full_comm.size > 1)
-        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
-        num_par_fd = system._num_par_fd if use_parallel_fd else 1
-        is_parallel = use_parallel_fd or system.comm.size > 1
-        if isinstance(system, Component):
-            is_distributed = system.options['distributed']
-        else:
-            is_distributed = system._has_distrib_vars and not use_parallel_fd
+    #     use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+    #                                                   system._full_comm.size > 1)
+    #     par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
+    #     num_par_fd = system._num_par_fd if use_parallel_fd else 1
+    #     is_parallel = use_parallel_fd or system.comm.size > 1
+    #     if isinstance(system, Component):
+    #         is_distributed = system.options['distributed']
+    #     else:
+    #         is_distributed = system._has_distrib_vars and not use_parallel_fd
 
-        mycomm = system._full_comm if use_parallel_fd else system.comm
-        jacobian = jac if isinstance(jac, Jacobian) else None
+    #     mycomm = system._full_comm if use_parallel_fd else system.comm
+    #     jacobian = jac if isinstance(jac, Jacobian) else None
 
-        fd_count = 0
+    #     fd_count = 0
 
-        out_slices = system._outputs.get_slice_dict()
+    #     out_slices = system._outputs.get_slice_dict()
 
+    #     if total:
+    #         # if we have any remote vars, find the list of vars from this proc that need to be
+    #         # transferred to other procs
+    #         if system.comm.size > 1:
+    #             my_rem_out_vars = [n for n in system._outputs._abs_iter()
+    #                                if n in system._vars_to_gather and
+    #                                system._vars_to_gather[n] == system.comm.rank]
+    #         else:
+    #             my_rem_out_vars = ()
+    #         ordered_of_iter = list(system._jac_of_iter())
+    #         tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+    #         scratch = tot_result.copy()
+    #     else:
+    #         scratch = np.empty(len(system._outputs))
+
+    #     # This will either generate new approx groups or use cached ones
+    #     approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+
+    #     coloring = system._coloring_info['coloring']
+
+    #     # do colored solves first
+    #     if isinstance(coloring, coloring_mod.Coloring):
+
+    #         nruns = len(colored_approx_groups)
+    #         tosend = None
+
+    #         for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
+    #             mult = self._get_multiplier(data)
+
+    #             if fd_count % num_par_fd == system._par_fd_id:
+    #                 # run the finite difference
+    #                 result = self._run_point(system, vec_ind_list, data, results_array, total)
+
+    #                 if par_fd_w_serial_model or not is_parallel:
+    #                     result = self._transform_result(result)
+
+    #                     if mult != 1.0:
+    #                         result *= mult
+
+    #                     if total:
+    #                         result = self._get_semitotal_result(system, result, tot_result,
+    #                                                             ordered_of_iter, my_rem_out_vars)
+
+    #                     tosend = (fd_count, result)
+
+    #                 else:  # parallel model (some vars are remote)
+    #                     raise NotImplementedError("simul approx coloring with parallel FD/CS is "
+    #                                               "only supported currently when using "
+    #                                               "a serial model, i.e., when "
+    #                                               "num_par_fd == number of MPI procs.")
+
+    #             fd_count += 1
+
+    #             # check if it's time to collect parallel FD columns
+    #             if use_parallel_fd and ((nruns < num_par_fd and fd_count == nruns) or
+    #                                     fd_count % num_par_fd == 0 or fd_count == nruns):
+    #                 allres = mycomm.allgather(tosend)
+    #                 tosend = None
+    #             else:
+    #                 allres = [tosend]
+
+    #             for tup in allres:
+    #                 if tup is None:
+    #                     continue
+
+    #                 i, res = tup
+
+    #                 _, jcols, _, nzrows = colored_approx_groups[i]
+
+    #                 for i, col in enumerate(jcols):
+    #                     scratch[:] = 0.0
+    #                     scratch[nzrows[i]] = res[nzrows[i]]
+    #                     jac.set_col(system, col, scratch)
+
+    #     nruns = self._nruns_uncolored
+    #     tosend = None
+
+    #     # now do uncolored solves
+    #     for group_i, tup in enumerate(approx_groups):
+    #         wrt, data, jcol_idxs, vec, vec_idxs, directional, direction = tup
+    #         if self._progress_out:
+    #             start_time = time.time()
+
+    #         if direction is not None:
+    #             app_data = self.apply_directional(data, direction)
+    #         else:
+    #             app_data = data
+
+    #         mult = self._get_multiplier(data)
+
+    #         for i_count, (idxs, vecidxs) in enumerate(zip(jcol_idxs, vec_idxs)):
+    #             if fd_count % num_par_fd == system._par_fd_id:
+    #                 # run the finite difference
+    #                 result = self._run_point(system, [(vec, vecidxs)],
+    #                                          app_data, results_array, total)
+
+    #                 result = self._transform_result(result)
+
+    #                 if direction is not None or mult != 1.0:
+    #                     result *= mult
+
+    #                 if total:
+    #                     result = self._get_semitotal_result(system, result, tot_result,
+    #                                                         ordered_of_iter, my_rem_out_vars)
+
+    #                 tosend = (group_i, i_count, result)
+
+    #                 if self._progress_out:
+    #                     end_time = time.time()
+    #                     prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out,
+    #                                                                wrt)
+    #                     self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
+    #                                              f"derivatives with respect to: "
+    #                                              f"'{prom_name} [{vecidxs}]' ... "
+    #                                              f"{round(end_time-start_time, 4)} seconds\n")
+
+    #             fd_count += 1
+
+    #             # check if it's time to collect parallel FD columns
+    #             if use_parallel_fd:
+    #                 if fd_count == nruns or fd_count % num_par_fd == 0:
+    #                     allres = mycomm.allgather(tosend)
+    #                     tosend = None
+    #                 else:
+    #                     continue
+    #             else:
+    #                 allres = [tosend]
+
+    #             for tup in allres:
+    #                 if tup is None:
+    #                     continue
+    #                 gi, icount, res = tup
+    #                 # approx_groups[gi] gives tuple (wrt, data, jcol_idxs, vec, vec_idxs, direction)
+    #                 # [2] gives jcol_idxs, and [icount] gives actual indices used for the fd run.
+    #                 jinds = approx_groups[gi][2][icount]
+    #                 if directional:
+    #                     jac.set_col(system, jinds[0], res)
+    #                 else:
+    #                     jac.set_col(system, jinds, res)
+
+    #     # Set system flag that we're under approximation to false
+    #     system._set_approx_mode(False)
+
+    def _colored_column_iter(self, system, colored_approx_groups, total):
         if total:
             # if we have any remote vars, find the list of vars from this proc that need to be
             # transferred to other procs
@@ -325,67 +469,95 @@ class ApproximationScheme(object):
         else:
             scratch = np.empty(len(system._outputs))
 
-        # This will either generate new approx groups or use cached ones
-        approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+        # Clean vector for results (copy of the outputs or resids)
+        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
 
-        coloring = system._coloring_info['coloring']
+        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+                                                      system._full_comm.size > 1)
+        num_par_fd = system._num_par_fd if use_parallel_fd else 1
+        is_parallel = use_parallel_fd or system.comm.size > 1
+        par_fd_w_serial_model = use_parallel_fd and system._num_par_fd == system._full_comm.size
+        fd_count = 0
+        mycomm = system._full_comm if use_parallel_fd else system.comm
 
-        # do colored solves first
-        if isinstance(coloring, coloring_mod.Coloring):
+        nruns = len(colored_approx_groups)
+        tosend = None
 
-            nruns = len(colored_approx_groups)
-            tosend = None
+        for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
+            mult = self._get_multiplier(data)
 
-            for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
-                mult = self._get_multiplier(data)
+            if fd_count % num_par_fd == system._par_fd_id:
+                # run the finite difference
+                result = self._run_point(system, vec_ind_list, data, results_array, total)
 
-                if fd_count % num_par_fd == system._par_fd_id:
-                    # run the finite difference
-                    result = self._run_point(system, vec_ind_list, data, results_array, total)
+                if par_fd_w_serial_model or not is_parallel:
+                    result = self._transform_result(result)
 
-                    if par_fd_w_serial_model or not is_parallel:
-                        result = self._transform_result(result)
+                    if mult != 1.0:
+                        result *= mult
 
-                        if mult != 1.0:
-                            result *= mult
+                    if total:
+                        result = self._get_semitotal_result(system, result, tot_result,
+                                                            ordered_of_iter, my_rem_out_vars)
 
-                        if total:
-                            result = self._get_semitotal_result(system, result, tot_result,
-                                                                ordered_of_iter, my_rem_out_vars)
+                    tosend = (fd_count, result)
 
-                        tosend = (fd_count, result)
+                else:  # parallel model (some vars are remote)
+                    raise NotImplementedError("simul approx coloring with parallel FD/CS is "
+                                                "only supported currently when using "
+                                                "a serial model, i.e., when "
+                                                "num_par_fd == number of MPI procs.")
 
-                    else:  # parallel model (some vars are remote)
-                        raise NotImplementedError("simul approx coloring with parallel FD/CS is "
-                                                  "only supported currently when using "
-                                                  "a serial model, i.e., when "
-                                                  "num_par_fd == number of MPI procs.")
+            fd_count += 1
 
-                fd_count += 1
+            # check if it's time to collect parallel FD columns
+            if use_parallel_fd and (nruns < num_par_fd or fd_count % num_par_fd == 0 or
+                                    fd_count == nruns):
+                allres = mycomm.allgather(tosend)
+                tosend = None
+            else:
+                allres = [tosend]
 
-                # check if it's time to collect parallel FD columns
-                if use_parallel_fd and ((nruns < num_par_fd and fd_count == nruns) or
-                                        fd_count % num_par_fd == 0 or fd_count == nruns):
-                    allres = mycomm.allgather(tosend)
-                    tosend = None
-                else:
-                    allres = [tosend]
+            for tup in allres:
+                if tup is None:
+                    continue
 
-                for tup in allres:
-                    if tup is None:
-                        continue
+                i, res = tup
 
-                    i, res = tup
+                _, jcols, _, nzrows = colored_approx_groups[i]
 
-                    _, jcols, _, nzrows = colored_approx_groups[i]
+                for i, col in enumerate(jcols):
+                    scratch[:] = 0.0
+                    scratch[nzrows[i]] = res[nzrows[i]]
+                    yield col, scratch
 
-                    for i, col in enumerate(jcols):
-                        scratch[:] = 0.0
-                        scratch[nzrows[i]] = res[nzrows[i]]
-                        jac.set_col(system, col, scratch)
+    def _uncolored_column_iter(self, system, approx_groups, total, nrepeats=1):
+        ordered_of_iter = list(system._jac_of_iter())
+        if total:
+            # if we have any remote vars, find the list of vars from this proc that need to be
+            # transferred to other procs
+            if system.comm.size > 1:
+                my_rem_out_vars = [n for n in system._outputs._abs_iter()
+                                   if n in system._vars_to_gather and
+                                   system._vars_to_gather[n] == system.comm.rank]
+            else:
+                my_rem_out_vars = ()
+            scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            tot_result = scratch.copy()
+        else:
+            scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+
+        # Clean vector for results (copy of the outputs or resids)
+        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
+        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
+                                                      system._full_comm.size > 1)
+        is_parallel = use_parallel_fd or system.comm.size > 1
+        num_par_fd = system._num_par_fd if use_parallel_fd else 1
 
         nruns = self._nruns_uncolored
         tosend = None
+        fd_count = 0
+        mycomm = system._full_comm if use_parallel_fd else system.comm
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
@@ -401,56 +573,85 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             for i_count, (idxs, vecidxs) in enumerate(zip(jcol_idxs, vec_idxs)):
-                if fd_count % num_par_fd == system._par_fd_id:
-                    # run the finite difference
-                    result = self._run_point(system, [(vec, vecidxs)],
-                                             app_data, results_array, total)
+                for rep in range(nrepeats):
+                    if fd_count % num_par_fd == system._par_fd_id:
+                        # run the finite difference
+                        result = self._run_point(system, [(vec, vecidxs)],
+                                                app_data, results_array, total) # , rep=rep)
 
-                    result = self._transform_result(result)
+                        result = self._transform_result(result)
 
-                    if direction is not None or mult != 1.0:
-                        result *= mult
+                        if direction is not None or mult != 1.0:
+                            result *= mult
 
-                    if total:
-                        result = self._get_semitotal_result(system, result, tot_result,
-                                                            ordered_of_iter, my_rem_out_vars)
+                        if total:
+                            result = self._get_semitotal_result(system, result, tot_result,
+                                                                ordered_of_iter, my_rem_out_vars)
 
-                    tosend = (group_i, i_count, result)
+                        tosend = (group_i, i_count, result)
 
-                    if self._progress_out:
-                        end_time = time.time()
-                        prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out,
-                                                                   wrt)
-                        self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
-                                                 f"derivatives with respect to: "
-                                                 f"'{prom_name} [{vecidxs}]' ... "
-                                                 f"{round(end_time-start_time, 4)} seconds\n")
+                        if self._progress_out:
+                            end_time = time.time()
+                            prom_name = _convert_auto_ivc_to_conn_name(system._conn_global_abs_in2out,
+                                                                    wrt)
+                            self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
+                                                    f"derivatives with respect to: "
+                                                    f"'{prom_name} [{vecidxs}]' ... "
+                                                    f"{round(end_time-start_time, 4)} seconds\n")
 
-                fd_count += 1
+                    if rep == nrepeats:
+                        fd_count += 1
 
-                # check if it's time to collect parallel FD columns
-                if use_parallel_fd:
-                    if fd_count == nruns or fd_count % num_par_fd == 0:
-                        allres = mycomm.allgather(tosend)
-                        tosend = None
+                    # check if it's time to collect parallel FD columns
+                    if use_parallel_fd:
+                        if fd_count == nruns or fd_count % num_par_fd == 0:
+                            allres = mycomm.allgather(tosend)
+                            tosend = None
+                        else:
+                            continue
                     else:
-                        continue
-                else:
-                    allres = [tosend]
+                        allres = [tosend]
 
-                for tup in allres:
-                    if tup is None:
-                        continue
-                    gi, icount, res = tup
-                    # approx_groups[gi] gives tuple (wrt, data, jcol_idxs, vec, vec_idxs, direction)
-                    # [2] gives jcol_idxs, and [icount] gives actual indices used for the fd run.
-                    jinds = approx_groups[gi][2][icount]
-                    if directional:
-                        jac.set_col(system, jinds[0], res)
-                    else:
-                        jac.set_col(system, jinds, res)
+                    for tup in allres:
+                        if tup is None:
+                            continue
+                        gi, icount, res = tup
+                        # approx_groups[gi] gives tuple (wrt, data, jcol_idxs, vec, vec_idxs, direction)
+                        # [2] gives jcol_idxs, and [icount] gives actual indices used for the fd run.
+                        jinds = approx_groups[gi][2][icount]
+                        if directional:
+                            yield jinds[0], res
+                        else:
+                            yield jinds, res
 
-        # Set system flag that we're under approximation to false
+    def _compute_approximations(self, system, jac, total, under_cs):
+        system._set_approx_mode(True)
+
+        # either generate new approx groups or use cached ones
+        approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+
+        # do colored solves first
+        if colored_approx_groups:
+            for icol, column in self._colored_column_iter(system, colored_approx_groups, total):
+                jac.set_col(system, icol, column)
+
+        # do uncolored solves
+        for icol, column in self._uncolored_column_iter(system, approx_groups, total):
+            jac.set_col(system, icol, column)
+
+        system._set_approx_mode(False)
+
+    def _compute_approx_column_iter(self, system, total, under_cs, nrepeats=1):
+        system._set_approx_mode(True)
+
+        # This will either generate new approx groups or use cached ones
+        approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+
+        if colored_approx_groups:
+            yield from self._colored_column_iter(system, colored_approx_groups, total)
+
+        yield from self._uncolored_column_iter(system, approx_groups, total, nrepeats)
+
         system._set_approx_mode(False)
 
     def _get_semitotal_result(self, system, outarr, totarr, of_iter, my_rem_out_vars):

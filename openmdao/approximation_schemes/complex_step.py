@@ -88,7 +88,7 @@ class ComplexStep(ApproximationScheme):
         step *= 1j
         return step
 
-    def compute_approximations(self, system, jac, total=False):
+    def compute_approximations(self, system, jac=None, total=False, nrepeats=1):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -100,6 +100,8 @@ class ComplexStep(ApproximationScheme):
             Approximations are stored in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
+        nrepeats : int
+            Number of times each column calculation will be repeated.
         """
         if not self._wrt_meta:
             return
@@ -118,7 +120,7 @@ class ComplexStep(ApproximationScheme):
                 for wrt in self._wrt_meta:
                     fd.add_approximation(wrt, system, empty)
 
-            self._fd.compute_approximations(system, jac, total=total)
+            self._fd.compute_approximations(system, total=total, nrepeats=nrepeats)
             return
 
         saved_inputs = system._inputs._get_data().copy()
@@ -132,7 +134,65 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            self._compute_approximations(system, jac, total, under_cs=True)
+            self._compute_approximations(system, jac, total, under_cs=True) # , nrepeats=nrepeats)
+        finally:
+            # Turn off complex step.
+            system._set_complex_step_mode(False)
+
+        system._inputs.set_val(saved_inputs)
+        system._outputs.set_val(saved_outputs)
+        system._residuals.set_val(saved_resids)
+
+
+    def compute_approx_column_iter(self, system, total=False, nrepeats=1):
+        """
+        Execute the system to compute the approximate sub-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System on which the execution is run.
+        jac : dict-like
+            Approximations are stored in the given dict-like object.
+        total : bool
+            If True total derivatives are being approximated, else partials.
+        nrepeats : int
+            Number of times each column calculation will be repeated.
+        """
+        if not self._wrt_meta:
+            return
+
+        raise RuntimeError("FOO")
+        if system.under_complex_step:
+
+            # If we are nested under another complex step, then warn and swap to FD.
+            if not self._fd:
+                from openmdao.approximation_schemes.finite_difference import FiniteDifference
+
+                msg = "Nested complex step detected. Finite difference will be used for '%s'."
+                simple_warning(msg % system.pathname)
+
+                fd = self._fd = FiniteDifference()
+                empty = {}
+                for wrt in self._wrt_meta:
+                    fd.add_approximation(wrt, system, empty)
+
+            yield from self._fd.compute_approx_column_iter(system, total=total, nrepeats=nrepeats)
+            return
+
+        saved_inputs = system._inputs._get_data().copy()
+        system._inputs._data.imag[:] = 0.0
+        saved_outputs = system._outputs.asarray(copy=True)
+        system._outputs._data.imag[:] = 0.0
+        saved_resids = system._residuals.asarray(copy=True)
+        system._residuals._data.imag[:] = 0.0
+
+        # Turn on complex step.
+        system._set_complex_step_mode(True)
+
+        try:
+            yield from self._compute_approx_column_iter(system, total, under_cs=True,
+                                                        nrepeats=nrepeats)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)
