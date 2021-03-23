@@ -155,7 +155,12 @@ jobs:
             echo "=============================================================";
             echo "Make docs";
             echo "=============================================================";
-            make travis;
+            if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+              make all;
+            else:
+              make travis;
+            fi
+
           fi
 
       - uses: act10ns/slack@v1
