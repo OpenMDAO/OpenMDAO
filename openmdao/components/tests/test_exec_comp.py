@@ -1347,23 +1347,25 @@ class TestExecComp(unittest.TestCase):
         import numpy as np
         import openmdao.api as om
 
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     z={'shape' : (1, ), 'units' : 's'})
+
         p = om.Problem()
-
-        excomp = om.ExecComp()
-
-        excomp.add_expr('z = 2.9*x',
-                        x={'value' : 3.0, 'units' : 'mm'},
-                        z={'shape' : (1, ), 'units' : 's'})
-
-        excomp.add_expr('y = 3.7*x',
-                        y={'value' : 9.0, 'units' : 'km'})
-
-        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
         p.setup()
         p.run_model()
 
         assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
-        assert_almost_equal(p.get_val('y'), 11.1, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
 
 
 class TestFunctionRegistration(unittest.TestCase):
