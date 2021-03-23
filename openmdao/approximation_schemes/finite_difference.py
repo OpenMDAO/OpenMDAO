@@ -172,7 +172,7 @@ class FiniteDifference(ApproximationScheme):
 
         return deltas, coeffs, current_coeff
 
-    def compute_approximations(self, system, jac=None, total=False, nrepeats=1):
+    def compute_approx_col_iter(self, system, total=False, under_cs=False, nrepeats=1):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -180,19 +180,15 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
+        under_cs : bool
+            True if we're currently under complex step at a higher level.
         nrepeats : int
             Number of times each column calculation will be repeated.
         """
         if not self._wrt_meta:
             return
-
-        if jac is None:
-            jac = system._jacobian
 
         self._starting_outs = system._outputs.asarray(copy=True)
         self._starting_resids = system._residuals.asarray(copy=True)
@@ -202,45 +198,8 @@ class FiniteDifference(ApproximationScheme):
         else:
             self._results_tmp = self._starting_resids.copy()
 
-        self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
-
-        # reclaim some memory
-        self._starting_ins = None
-        self._starting_outs = None
-        self._starting_resids = None
-        self._results_tmp = None
-
-    def compute_approx_column_iter(self, system, total=False, nrepeats=1):
-        """
-        Execute the system to compute the approximate sub-Jacobians.
-
-        Parameters
-        ----------
-        system : System
-            System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
-        total : bool
-            If True total derivatives are being approximated, else partials.
-        nrepeats : int
-            Number of times each column calculation will be repeated.
-        """
-        if not self._wrt_meta:
-            return
-
-        if jac is None:
-            jac = system._jacobian
-
-        self._starting_outs = system._outputs.asarray(copy=True)
-        self._starting_resids = system._residuals.asarray(copy=True)
-        self._starting_ins = system._inputs.asarray(copy=True)
-        if total:
-            self._results_tmp = self._starting_outs.copy()
-        else:
-            self._results_tmp = self._starting_resids.copy()
-
-        self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
+        yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs,
+                                                 nrepeats=nrepeats)
 
         # reclaim some memory
         self._starting_ins = None
