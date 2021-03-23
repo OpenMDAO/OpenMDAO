@@ -157,7 +157,7 @@ jobs:
             echo "=============================================================";
             if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
               make all;
-            else:
+            else
               make travis;
             fi
 
