@@ -37,7 +37,7 @@ single: touch buildone
 all html: make_srcdocs n2html redbaron matplotlib tagg buildall post_remove
 
 # build it all on CI machines; all warnings are raised as errors.
-travis: make_srcdocs n2html redbaron matplotlib tagg buildalltravis post_remove
+strict: make_srcdocs n2html redbaron matplotlib tagg buildallstrict post_remove
 
 clean:
 	rm -rf $(BUILDDIR)/*
@@ -75,7 +75,7 @@ buildall:
 	$(SPHINXBUILD) -a -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-buildalltravis:
+buildallstrict:
 	mkdir -p _n2html
 	$(SPHINXBUILD) -a -W -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
