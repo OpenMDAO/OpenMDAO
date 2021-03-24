@@ -5,30 +5,19 @@ import os
 import sys
 
 from openmdao.solvers.solver import LinearSolver
+from openmdao.utils.mpi import check_mpi_env
 
-
-if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    # If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, import
-    # petsc4py and raise ImportError on failure.
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
-        try:
-            import petsc4py
-            from petsc4py import PETSc
-
-        except ImportError:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_REQUIRE_MPI is true.")
-    else:
-        # OPENMDAO_REQUIRE_MPI is set to something else, so no import is attempted.
-        PETSc = None
-else:
-    # If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but fail silently.
+use_mpi = check_mpi_env()
+if use_mpi is not False:
     try:
         import petsc4py
         from petsc4py import PETSc
-
     except ImportError:
         PETSc = None
-
+        if use_mpi is True:
+            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+else:
+    PETSc = None
 
 KSP_TYPES = [
     "richardson",
