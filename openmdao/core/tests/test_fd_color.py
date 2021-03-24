@@ -450,6 +450,9 @@ class TestColoringImplicit(unittest.TestCase):
         start_nruns = comp._nruns
         comp.run_linearize()
         self.assertEqual(comp._nruns - start_nruns, 10 + sparsity.shape[0])
+        
+        # do another linearize() after sparsity computation is done in order to populate _subjacs_info
+        comp.run_linearize()
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
 

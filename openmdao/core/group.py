@@ -3061,6 +3061,8 @@ class Group(System):
         if wrt_color_patterns:
             abs2prom = self._var_allprocs_abs2prom
             for _, wrt in self._get_approx_subjac_keys():
+                if wrt in wrt_colors_matched:
+                    continue
                 if wrt in abs2prom['output']:
                     wrtprom = abs2prom['output'][wrt]
                 else:

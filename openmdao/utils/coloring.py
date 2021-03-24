@@ -2264,3 +2264,93 @@ def _get_coloring_meta(coloring=None):
         return dct
 
     return coloring._meta.copy()
+
+
+class ColSparsityJac(object):
+    """
+    A class to manage the assembly of a sparsity matrix by columns without allocating a dense jac.
+    """
+    def __init__(self, system, color_info):
+        self._color_info = color_info
+
+        nrows = sum([end - start for _, start, end, _ in system._jac_of_iter()])
+        # get full column size of the jacobian (including cols not being colored)
+        colored = set()
+        matches = None if color_info['wrt_matches'] is None else set(color_info['wrt_matches'])
+        ordered_wrt_info = list(system._jac_wrt_iter())
+        for wrt, start, end, _, _ in ordered_wrt_info:
+            if matches is None or wrt in matches:
+                colored.add(wrt)
+        ncols = end
+        mask = np.zeros(ncols, dtype=bool)
+        for wrt, start, end, _, _ in ordered_wrt_info:
+            if wrt in colored:
+                mask[start:end] = True
+        self._colored_cols = mask
+        self._col_list = [None] * ncols
+        self._ncols = ncols
+        self._nrows = nrows
+
+    def set_col(self, system, i, column):
+        if not self._colored_cols[i]:
+            return
+        nzs = np.nonzero(column)[0]
+        if self._col_list[i] is None:
+            self._col_list[i] = [nzs, np.abs(column[nzs])]
+        else:
+            oldnzs, olddata = self._col_list[i]
+            if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
+                olddata += np.abs(column[nzs])
+            else:  # nonzeros don't match
+                scratch = np.zeros(column.size, dtype=int)
+                scratch[oldnzs] = olddata
+                scratch[nzs] += np.abs(column[nzs])
+                newnzs = np.nonzero(scratch)[0]
+                self._col_list[i] = [newnzs, scratch[newnzs]]
+
+    def __setitem__(self, key, value):
+        # ignore any setting of subjacs based on analytic derivs
+        pass
+
+    def get_sparsity(self):
+        rows = []
+        cols = []
+        data = []
+        color_info = self._color_info
+        for icol, tup in enumerate(self._col_list):
+            if tup is None:
+                continue
+            rowinds, d = tup
+            if rowinds.size > 0:
+                rows.append(rowinds)
+                cols.append(np.full(rowinds.size, icol))
+                data.append(d)
+        if rows:
+            rows = np.hstack(rows)
+            cols = np.hstack(cols)
+            data = np.hstack(data)
+
+            # scale the data
+            data *= (1./np.max(data))
+
+            info = _tol_sweep(data, color_info['tol'], color_info['orders'])
+            data = data > info['good_tol']  # data is now a bool
+            rows = rows[data]
+            cols = cols[data]
+            data = data[data]
+        else:
+            rows = np.zeros(0, dtype=int)
+            cols = np.zeros(0, dtype=int)
+            data = np.zeros(0, dtype=bool)
+            info = {
+                'tol': color_info['tol'],
+                'orders': color_info['orders'],
+                'good_tol': color_info['tol'],
+                'nz_matches': 0,
+                'n_tested': 0,
+                'zero_entries': 0,
+                'J_size': 0,
+            }
+
+        return coo_matrix((data, (rows, cols)), shape=(self._nrows, self._ncols)), info
+

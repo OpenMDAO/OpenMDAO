@@ -357,10 +357,10 @@ class ApproximationScheme(object):
                                    system._vars_to_gather[n] == system.comm.rank]
             else:
                 my_rem_out_vars = ()
-            scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
-            tot_result = scratch.copy()
-        else:
-            scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+        #     tot_result = scratch.copy()
+        # else:
+        #     scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
 
         # Clean vector for results (copy of the outputs or resids)
         results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
