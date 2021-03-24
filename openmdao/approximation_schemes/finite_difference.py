@@ -122,9 +122,9 @@ class FiniteDifference(ApproximationScheme):
         options['vector'] = vector
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
-            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
-                           f"'{wrt}.")
-        self._wrt_meta[wrt] = options
+            self._wrt_meta[wrt].update(options)
+        else:
+            self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, wrt, meta):
