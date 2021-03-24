@@ -14,6 +14,7 @@ import numpy as np
 from io import StringIO
 
 import openmdao.api as om
+from openmdao import __version__ as openmdao_version
 import openmdao
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -3268,6 +3269,22 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
+    def test_get_openmdao_version(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+        prob.model.d1.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        print(cr.openmdao_version)
+        self.assertEqual(openmdao_version, cr.openmdao_version)
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
@@ -4036,6 +4053,9 @@ def _assert_model_matches_case(case, system):
 class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
     legacy_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'legacy_sql')
+
+    # the change from v12 to v13 is just adding the openmdao version.
+    # the tests below should already be able to test the ability to read a file without that
 
     def test_options_v12(self):
 

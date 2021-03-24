@@ -415,6 +415,15 @@
     cursor: pointer;
 }
 
+#depth-slider-label {
+    min-width: 30px;
+    text-align: center;
+    font-size: 18px;
+    border-radius: 50%;
+    border: 1px solid white;
+    color: white;
+}
+
 #model-slider-label {
     min-width: 30px;
     text-align: center;

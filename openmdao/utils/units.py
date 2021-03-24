@@ -869,6 +869,11 @@ def _find_unit(unit, error=False):
         The actual unit object
     """
     if isinstance(unit, str):
+
+        # Deal with 'as' for attoseconds
+        reg1 = re.compile(r'\bas\b')
+        unit = re.sub(reg1, 'as_', unit)
+
         name = unit.strip()
         try:
             unit = _UNIT_CACHE[name]
@@ -886,17 +891,22 @@ def _find_unit(unit, error=False):
                 regex = re.compile('[A-Z,a-z]{1}[A-Z,a-z,0-9]*')
 
                 for item in regex.findall(name):
+                    item = re.sub(reg1, 'as_', item)
+
                     # check if this was a compound unit, so each
                     # substring might be a unit
                     try:
                         eval(item, {'__builtins__': None},
                              _UNIT_LIB.unit_table)
+
                     except Exception:  # maybe is a prefixed unit then
+                        base_unit = item[1:].rstrip('_')
+
                         # check for single letter prefix before unit
                         if(item[0] in _UNIT_LIB.prefixes and
-                           item[1:] in _UNIT_LIB.unit_table):
+                           base_unit in _UNIT_LIB.unit_table):
                             add_unit(item, _UNIT_LIB.prefixes[item[0]] *
-                                     _UNIT_LIB.unit_table[item[1:]])
+                                     _UNIT_LIB.unit_table[base_unit])
 
                         # check for double letter prefix before unit
                         elif(item[0:2] in _UNIT_LIB.prefixes and
@@ -1127,6 +1137,10 @@ def simplify_unit(old_unit_str, msginfo=''):
         # Special Case. Unity always becomes None.
         new_str = None
 
+    # Restore units 'as' (attoseconds).
+    if new_str:
+        reg1 = re.compile(r'\bas_\b')
+        new_str = reg1.sub('as', new_str)
     return new_str
 
 
