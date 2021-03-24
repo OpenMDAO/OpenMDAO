@@ -3149,6 +3149,7 @@ class Group(System):
             wrtset = set([k[1] for k in approx_keys])
             self._owns_approx_of = list(abs_outs)
             self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+            self._owns_approx_jac = True
 
     def _setup_approx_coloring(self):
         """

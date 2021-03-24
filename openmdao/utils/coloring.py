@@ -2266,34 +2266,25 @@ def _get_coloring_meta(coloring=None):
     return coloring._meta.copy()
 
 
-class ColSparsityJac(object):
+class _ColSparsityJac(object):
     """
     A class to manage the assembly of a sparsity matrix by columns without allocating a dense jac.
     """
+
     def __init__(self, system, color_info):
         self._color_info = color_info
 
         nrows = sum([end - start for _, start, end, _ in system._jac_of_iter()])
-        # get full column size of the jacobian (including cols not being colored)
-        colored = set()
-        matches = None if color_info['wrt_matches'] is None else set(color_info['wrt_matches'])
-        ordered_wrt_info = list(system._jac_wrt_iter())
-        for wrt, start, end, _, _ in ordered_wrt_info:
-            if matches is None or wrt in matches:
-                colored.add(wrt)
-        ncols = end
-        mask = np.zeros(ncols, dtype=bool)
-        for wrt, start, end, _, _ in ordered_wrt_info:
-            if wrt in colored:
-                mask[start:end] = True
-        self._colored_cols = mask
+        ordered_wrt_info = list(system._jac_wrt_iter(color_info['wrt_matches']))
+
+        ncols = ordered_wrt_info[-1][2]
         self._col_list = [None] * ncols
         self._ncols = ncols
         self._nrows = nrows
 
     def set_col(self, system, i, column):
-        if not self._colored_cols[i]:
-            return
+        # record only the nonzero part of the column.
+        # Depending on user specified tolerance, the number of nonzeros may be further reduced later
         nzs = np.nonzero(column)[0]
         if self._col_list[i] is None:
             self._col_list[i] = [nzs, np.abs(column[nzs])]
@@ -2302,7 +2293,7 @@ class ColSparsityJac(object):
             if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
                 olddata += np.abs(column[nzs])
             else:  # nonzeros don't match
-                scratch = np.zeros(column.size, dtype=int)
+                scratch = np.zeros(column.size)
                 scratch[oldnzs] = olddata
                 scratch[nzs] += np.abs(column[nzs])
                 newnzs = np.nonzero(scratch)[0]
@@ -2313,6 +2304,16 @@ class ColSparsityJac(object):
         pass
 
     def get_sparsity(self):
+        """
+        Assemble the sparsity matrix based on data collected earlier via set_col.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        dict
+            Metadata describing the sparsity computation.
+        """
         rows = []
         cols = []
         data = []
@@ -2331,7 +2332,7 @@ class ColSparsityJac(object):
             data = np.hstack(data)
 
             # scale the data
-            data *= (1./np.max(data))
+            data *= (1. / np.max(data))
 
             info = _tol_sweep(data, color_info['tol'], color_info['orders'])
             data = data > info['good_tol']  # data is now a bool
@@ -2353,4 +2354,3 @@ class ColSparsityJac(object):
             }
 
         return coo_matrix((data, (rows, cols)), shape=(self._nrows, self._ncols)), info
-

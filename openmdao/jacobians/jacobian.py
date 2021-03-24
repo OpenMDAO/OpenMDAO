@@ -41,9 +41,6 @@ class Jacobian(object):
         A cache dict for key to absolute key.
     _randomize : bool
         If True, sparsity is being computed for simultaneous derivative coloring.
-    _jac_summ : dict or None
-        A dict containing a summation of some number of instantaneous absolute values of this
-        jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
     _col_var_info : dict
         Maps column name to start, end, and slice/indices into the result array.
     _colnames : list
@@ -66,7 +63,6 @@ class Jacobian(object):
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
-        self._jac_summ = None
         self._col_var_info = None
         self._colnames = None
         self._col2name_ind = None
@@ -291,101 +287,6 @@ class Jacobian(object):
             r = rand(*subjac.shape)
             r += 1.0
         return r
-
-    def _save_sparsity(self, system):
-        """
-        Add the current jacobian to a running absolute summation.
-
-        Parameters
-        ----------
-        system : System
-            System owning this jacobian.
-        """
-        if self._jac_summ is None:
-            fdtypes = ('cs', 'fd')
-            # create _jac_summ structure
-            self._jac_summ = summ = {}
-            if system.pathname == '':  # totals
-                for of in system._owns_approx_of:
-                    for wrt in system._owns_approx_wrt:
-                        key = (of, wrt)
-                        summ[key] = np.abs(self._subjacs_info[key]['value'])
-            else:
-                for key, meta in self._subjacs_info.items():
-                    if 'method' in meta and meta['method'] in fdtypes:
-                        summ[key] = np.abs(meta['value'])
-        else:
-            subjacs = self._subjacs_info
-            for key, summ in self._jac_summ.items():
-                summ += np.abs(subjacs[key]['value'])
-
-    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, tol, orders):
-        """
-        Compute a dense sparsity matrix for this jacobian using saved absolute summations.
-
-        The sparsity matrix will contain only those columns that match the wrt variables in
-        wrt_matches, but will contain rows for all outputs in the given system.
-
-        Parameters
-        ----------
-        ordered_of_info : list of (name, offset, end, idxs)
-            Name, offset, etc. of row variables in the order that they appear in the jacobian.
-        ordered_wrt_info : list of (name, offset, end, idxs)
-            Name, offset, etc. of column variables in the order that they appear in the jacobian.
-        tol : float
-            Tolerance used to determine if an array entry is zero or nonzero.
-        orders : int
-            Number of orders +/- for the tolerance sweep.
-
-        Returns
-        -------
-        coo_matrix
-            Boolean sparsity matrix.
-        """
-        from openmdao.utils.coloring import _tol_sweep
-
-        subjacs = self._subjacs_info
-        summ = self._jac_summ
-
-        Jrows = []
-        Jcols = []
-        Jdata = []
-
-        for of, roffset, rend, _ in ordered_of_info:
-            for wrt, coffset, cend, _, _ in ordered_wrt_info:
-                key = (of, wrt)
-                if key in summ:
-                    subsum = summ[key]
-                    meta = subjacs[key]
-                    if meta['rows'] is not None:
-                        Jrows.append(meta['rows'] + roffset)
-                        Jcols.append(meta['cols'] + coffset)
-                        Jdata.append(subsum)
-                    elif issparse(subsum):
-                        raise NotImplementedError("{}: scipy sparse arrays are not "
-                                                  "supported yet.".format(self.msginfo))
-                    else:  # dense
-                        for i, r in enumerate(range(roffset, rend)):
-                            Jrows.append([r] * (cend - coffset))
-                            Jcols.append(np.arange(coffset, cend))
-                            Jdata.append(subsum[i, :])
-
-        summ = self._jac_summ = None  # free up some memory
-
-        Jrows = np.hstack(Jrows)
-        Jcols = np.hstack(Jcols)
-        Jdata = np.hstack([d.flat for d in Jdata])
-        shape = (rend, cend)
-
-        Jdata *= (1.0 / np.max(Jdata))
-
-        tol_info = _tol_sweep(Jdata, tol, orders)
-
-        mask = Jdata > tol_info['good_tol']
-        size = np.count_nonzero(mask)
-
-        boolJ = coo_matrix((np.ones(size, dtype=bool), (Jrows[mask], Jcols[mask])), shape=shape)
-        return boolJ, tol_info
 
     def set_complex_step_mode(self, active):
         """

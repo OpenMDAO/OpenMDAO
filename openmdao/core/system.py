@@ -34,7 +34,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, ColSparsityJac
+    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
@@ -1089,22 +1089,21 @@ class System(object):
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
 
-        # # TODO: add some flag to allow user to toggle this behavior
-        # if True:
-        #     # update jacobian subjac metadata to get rid of rows/cols
-        #     self._jacobian._remove_approx_sparsity()
-
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
 
-        save_jac = self._jacobian
+        # tell approx scheme to limit itself to only colored columns
+        approx_scheme._reset()
+        approx_scheme._during_sparsity_comp = True
 
         self._update_wrt_matches(info)
 
-        ordered_of_info = list(self._jac_of_iter())
+        save_jac = self._jacobian
 
-        self._jacobian = ColSparsityJac(self, info)
+        # use special sparse jacobian to collect sparsity info
+        self._jacobian = _ColSparsityJac(self, info)
+
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -1119,32 +1118,27 @@ class System(object):
 
                 for scheme in self._approx_schemes.values():
                     scheme._reset()  # force a re-initialization of approx
+                    approx_scheme._during_sparsity_comp = True
 
             self.run_linearize()
-            # self._jacobian._save_sparsity(self)
 
         sparsity, sp_info = self._jacobian.get_sparsity()
-        print("New")
-        print(np.asarray(sparsity.toarray(), dtype=int))
 
         self._jacobian = save_jac
 
+        # revert uncolored approx back to normal
+        approx_scheme._reset()
+
         sparsity_time = time.time() - sparsity_start_time
 
-        self._update_wrt_matches(info)
-
         ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
-        # ordered_of_info = list(self._jac_of_iter())
-        # Jsparsity, Jsp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
-        #                                                      tol=info['tol'],
-        #                                                      orders=info['orders'])
+        ordered_of_info = list(self._jac_of_iter())
 
         sp_info['sparsity_time'] = sparsity_time
         sp_info['pathname'] = self.pathname
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        self._jacobian._jac_summ = None  # reclaim the memory
         if self.pathname:
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)

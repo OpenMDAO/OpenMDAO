@@ -31,6 +31,9 @@ class ApproximationScheme(object):
         A dict that maps wrt name to its fd/cs metadata.
     _progress_out : None or file-like object
         Attribute to output the progress of check_totals
+    _during_sparsity_comp : bool
+        If True, we're doing a sparsity computation and uncolored approxs need to be restricted
+        to only colored columns.
     """
 
     def __init__(self):
@@ -42,6 +45,7 @@ class ApproximationScheme(object):
         self._approx_groups_cached_under_cs = False
         self._wrt_meta = {}
         self._progress_out = None
+        self._during_sparsity_comp = False
 
     def __repr__(self):
         """
@@ -52,7 +56,7 @@ class ApproximationScheme(object):
         str
             String containing class name and added approximation keys.
         """
-        return f"{self.__class__.__name__}: {list(self._wrt_meta.keys())}"
+        return f"at {id(self)}, {self.__class__.__name__}: {list(self._wrt_meta.keys())}"
 
     def _reset(self):
         """
@@ -60,6 +64,7 @@ class ApproximationScheme(object):
         """
         self._colored_approx_groups = None
         self._approx_groups = None
+        self._during_sparsity_comp = False
 
     def _get_approx_groups(self, system, under_cs=False):
         """
@@ -218,7 +223,12 @@ class ApproximationScheme(object):
         self._approx_groups = []
         self._nruns_uncolored = 0
 
-        for wrt, start, end, vec, cinds in system._jac_wrt_iter():
+        if self._during_sparsity_comp:
+            wrt_matches = system._coloring_info['wrt_matches']
+        else:
+            wrt_matches = None
+
+        for wrt, start, end, vec, cinds in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
