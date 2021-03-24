@@ -53,16 +53,22 @@ The following script generates an OpenMDAO model which will generate UnitsWarnin
 
 In the following code, the UnitsWarning will be displayed as expected:
 
-[example 1]
+.. embed-code::
+    openmdao.test_suite.tests.test_warnings.TestWarnings.test_doc_with_units_warning
+    :layout: code, output
 
 The warnings can be completely turned off by filtering them using Python's `filterwarnings` function:
 
-[example 2]
+.. embed-code::
+    openmdao.test_suite.tests.test_warnings.TestWarnings.test_doc_ignore_units_warning
+    :layout: code, output
 
 If you want to clean your code and remove warnings, it can be useful to promote them to errors so that they cannot be ignored.
 The following code filters **all** OpenMDAO associated warnings to Errors:
 
-[example 3]
+.. embed-code::
+    openmdao.test_suite.tests.test_warnings.TestWarnings.test_doc_error_on_openmdao_warning
+    :layout: code, output
 
 
 Notes for Developers

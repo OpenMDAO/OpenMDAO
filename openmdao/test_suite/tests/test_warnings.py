@@ -1,7 +1,7 @@
 import unittest
 import openmdao.api as om
 
-class TestWarnings(unittest.TestCase):
+class c(unittest.TestCase):
 
     def setUp(self):
         """

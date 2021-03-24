@@ -11,7 +11,7 @@ import warnings
 __all__ = ['issue_warning', 'reset_warnings', 'OpenMDAOWarning',
            'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
            'CacheWarning', 'PromotionWarning', 'UnusedOptionWarning', 'DerivativesWarning',
-           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning']
+           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning']
 
 _valid_actions = ['warn', 'error', 'raise', 'ignore', 'once', 'always', 'module', 'default']
 

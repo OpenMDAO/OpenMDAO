@@ -49,8 +49,6 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
 from openmdao.utils.general_utils import ignore_errors, warn_deprecation
-from openmdao.warnings import AllowableSetupError
-from warnings import filterwarnings
 
 
 def _n2_setup_parser(parser):
@@ -92,7 +90,7 @@ def _n2_cmd(options, user_args):
     if filename.endswith('.py'):
         # the file is a python script, run as a post_setup hook
         def _noraise(prob):
-            filterwarnings('always', category=AllowableSetupError)
+            prob.model._raise_connection_errors = False
 
         if options.use_declare_partial_info:
             warn_deprecation("'--use_declare_partial_info' is now the"

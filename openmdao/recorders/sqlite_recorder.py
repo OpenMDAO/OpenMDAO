@@ -20,11 +20,12 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.general_utils import simple_warning, make_serializable, default_noraise
+from openmdao.utils.general_utils import make_serializable, default_noraise
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
 from openmdao.solvers.solver import Solver
+from openmdao.warnings import issue_warning, CaseRecorderWarning
 
 
 """
@@ -662,9 +663,10 @@ class SqliteRecorder(CaseRecorder):
                         pickle.dumps(values, self._pickle_version)
                 except Exception:
                     pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
-                    simple_warning("Trying to record option '%s' which cannot be pickled on system "
-                                   "%s. Set 'recordable' to False. Skipping recording options for "
-                                   "this system." % (key, system.msginfo))
+                    msg = f"Trying to record option '{key}' which cannot be pickled on this " \
+                          "system. Set option 'recordable' to False. Skipping recording options " \
+                          "for this system."
+                    issue_warning(msg, prefix=system.msginfo, category=CaseRecorderWarning)
 
             path = system.pathname
             if not path:

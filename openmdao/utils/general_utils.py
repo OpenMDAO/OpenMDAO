@@ -18,12 +18,12 @@ except ImportError:
 
 import numbers
 import json
-import importlib
 
 import numpy as np
 import openmdao
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.warnings import issue_warning, OMDeprecationWarning
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -117,12 +117,9 @@ def warn_deprecation(msg):
     msg : str
         Message that will be printed to stdout.
     """
-    # Deprecation warnings need to be printed regardless of debug level
-    warnings.simplefilter('always', DeprecationWarning)
 
     # note, stack level 3 should take us back to original caller.
-    simple_warning(msg, DeprecationWarning, stacklevel=3)
-    warnings.simplefilter('ignore', DeprecationWarning)
+    issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
 
 
 def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
