@@ -173,6 +173,9 @@ class DictionaryJacobian(Jacobian):
 class _CheckingJacobian(DictionaryJacobian):
     """
     A special type of Jacobian that we use only inside of check_partials.
+
+    It checks during set_col to make sure that any user specified rows/cols don't mask any
+    nonzero values found in the column being set.
     """
 
     def __init__(self, system):
