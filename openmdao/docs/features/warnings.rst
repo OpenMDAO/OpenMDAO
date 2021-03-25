@@ -41,7 +41,6 @@ Using a filter to silence SetupWarning will silence **all** of the following.
 | DistributedComponentWarning | Warning specific to a distributed component.                                               |
 | MPIWarning                  | Warning dealing with the availability of MPI.                                              |
 | PromotionWarning            | Warning dealing with the promotion of an input or output.                                  |
-| SetupWarning                | Warning class for warnings that occur during setup.                                        |
 | UnitsWarning                | Warning which is issued when unitless variable is connected to a variable with units.      |
 +-----------------------------+--------------------------------------------------------------------------------------------+
 

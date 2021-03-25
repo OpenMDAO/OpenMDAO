@@ -50,7 +50,7 @@ class UnitsWarning(SetupWarning):
     filter = 'always'
 
 
-class DerivativesWarning(SetupWarning):
+class DerivativesWarning(OpenMDAOWarning):
     """
     Warning issued when the approximated partials or coloring cannot be evaluated as expected.
     """
