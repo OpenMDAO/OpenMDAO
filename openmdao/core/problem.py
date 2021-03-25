@@ -1381,7 +1381,6 @@ class Problem(object):
                     added_wrts.add(abs_key[1])
 
             approx_jac = _CheckingJacobian(comp)
-            # approx_jac = {}
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
