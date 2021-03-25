@@ -2305,7 +2305,7 @@ class _ColSparsityJac(object):
 
     def get_sparsity(self):
         """
-        Assemble the sparsity matrix based on data collected earlier via set_col.
+        Assemble the sparsity matrix (COO) based on data collected earlier via set_col.
 
         Returns
         -------
