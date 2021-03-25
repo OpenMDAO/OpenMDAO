@@ -147,10 +147,6 @@ def reset_warnings():
         warnings.filterwarnings(w_class.filter, category=w_class)
 
 
-def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
-    return f'{filename}:{lineno}: {category.__name__}:{message}\n'
-
-
 def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     """
     Display a warning with the desired stack level and optional prefix.
@@ -171,6 +167,9 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     om.issue_warning('some warning message', prefix=self.pathname, category=om.SetupWarning)
 
     """
+    def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
+        return f'{filename}:{lineno}: {category.__name__}:{message}\n'
+
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
     _msg = f'{prefix}: {msg}' if prefix else f'{msg}'

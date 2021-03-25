@@ -3,7 +3,6 @@ from contextlib import contextmanager
 import os
 import re
 import sys
-import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
@@ -85,7 +84,7 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning):
         This category is the class of warning to be issued.
     """
     if ignore_errors():
-        simple_warning(msg, category=category)
+        issue_warning(msg, category=category)
     else:
         raise exc(msg)
 
@@ -117,7 +116,6 @@ def warn_deprecation(msg):
     msg : str
         Message that will be printed to stdout.
     """
-
     # note, stack level 3 should take us back to original caller.
     issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
 
