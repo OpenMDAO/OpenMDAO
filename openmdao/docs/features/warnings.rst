@@ -36,7 +36,7 @@ For finer control over which warnings are displayed during setup, the following 
 Using a filter to silence SetupWarning will silence **all** of the following.
 
 +-----------------------------+--------------------------------------------------------------------------------------------+
-| Option Name                 | Description                                                                                |
+| Warning Class               | Description                                                                                |
 +=============================+=====================+======================================================================+
 | DistributedComponentWarning | Warning specific to a distributed component.                                               |
 | MPIWarning                  | Warning dealing with the availability of MPI.                                              |
