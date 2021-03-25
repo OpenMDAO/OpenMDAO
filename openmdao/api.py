@@ -95,6 +95,9 @@ from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 # Units
 from openmdao.utils.units import convert_units, unit_conversion
 
+# Docs Util
+from openmdao.docs.display_source import show_source_code
+
 # set up tracing or memory profiling if env vars are set.
 import os
 if os.environ.get('OPENMDAO_TRACE'):
