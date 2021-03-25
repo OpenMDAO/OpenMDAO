@@ -16,9 +16,9 @@ Class **OpenMDAOWarning** serves as the base-class for all OpenMDAO-specific war
 All OpenMDAO-specific warnings default to a filter of 'always'.
 The following table shows all OpenMDAOWarning-derived classes.
 
-+-----------------------------+---------------------+----------------------+-----------------------------------------------+
-| Warning Class               | String Name         | Default Behavior     | Description                                   |
-+=============================+=====================+======================+===============================================+
++-----------------------------+--------------------------------------------------------------------------------------------+
+| Warning Class               | Description                                                                                |
++=============================+============================================+===============================================+
 | CacheWarning                | A cache is invalid and must be discarded.                                                  |
 | CaseRecorderWarning         | Warning encountered by a case recorder or case reader.                                     |
 | DerivativesWarning          | Warning issued when the approximated partials or coloring cannot be evaluated as expected. |
@@ -27,7 +27,7 @@ The following table shows all OpenMDAOWarning-derived classes.
 | SetupWarning                | General errors encountered during setup.                                                   |
 | SolverWarning               | Warning encountered during solver execution.                                               |
 | UnusedOptionWarning         | A given option or argument has no effect.                                                  |
-+-----------------------------+---------------------+----------------------+-----------------------------------------------+
++-----------------------------+--------------------------------------------------------------------------------------------+
 
 Note that the OpenMDAO-Specific **OMDeprecationWarning** behaves a bit differently than the default Python DeprecationWarning.
 **OMDeprecationWarning** is is always displayed by default, but can be silenced by the user.
