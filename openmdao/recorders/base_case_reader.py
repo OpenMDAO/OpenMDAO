@@ -14,6 +14,8 @@ class BaseCaseReader(object):
     ----------
     _format_version : int
         The version of the format assumed when loading the file.
+    _openmdao_version : str
+        The version of OpenMDAO used to generate the case recorder file.
     problem_metadata : dict
         Metadata about the problem, including the system hierachy and connections.
     solver_metadata : dict
@@ -34,6 +36,7 @@ class BaseCaseReader(object):
             If True, load all the data into memory during initialization.
         """
         self._format_version = None
+        self._openmdao_version = None
         self.problem_metadata = {}
         self.solver_metadata = {}
         self._system_options = {}
@@ -65,6 +68,18 @@ class BaseCaseReader(object):
         warn_deprecation("The BaseCaseReader.system_metadata attribute is deprecated. "
                          "Use `list_model_options` instead.")
         return self._system_options
+
+    @property
+    def openmdao_version(self):
+        """
+        Provide the version of OpenMDAO that was used to record this file.
+
+        Returns
+        -------
+        str
+            version of OpenMDAO that was used to record this file.
+        """
+        return self._openmdao_version
 
     def get_cases(self, source, recurse=True, flat=False):
         """

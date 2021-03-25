@@ -1666,6 +1666,7 @@ class Problem(object):
     def list_problem_vars(self,
                           show_promoted_name=True,
                           print_arrays=False,
+                          driver_scaling=True,
                           desvar_opts=[],
                           cons_opts=[],
                           objs_opts=[],
@@ -1683,6 +1684,10 @@ class Problem(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        driver_scaling : bool, optional
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         desvar_opts : list of str
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
@@ -1705,7 +1710,7 @@ class Problem(object):
 
         # Design vars
         desvars = self.driver._designvars
-        vals = self.driver.get_design_var_values(get_remote=True)
+        vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         header = "Design Variables"
         col_names = default_col_names + desvar_opts
         self._write_var_info_table(header, col_names, desvars, vals,
@@ -1715,7 +1720,7 @@ class Problem(object):
 
         # Constraints
         cons = self.driver._cons
-        vals = self.driver.get_constraint_values()
+        vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         header = "Constraints"
         col_names = default_col_names + cons_opts
         self._write_var_info_table(header, col_names, cons, vals,
@@ -1724,7 +1729,7 @@ class Problem(object):
                                    col_spacing=2)
 
         objs = self.driver._objs
-        vals = self.driver.get_objective_values()
+        vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
         header = "Objectives"
         col_names = default_col_names + objs_opts
         self._write_var_info_table(header, col_names, objs, vals,
