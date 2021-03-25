@@ -17,7 +17,7 @@ def get_object_from_reference(reference):
             module = getattr(module, entry)
     return module
 
-def show_source_code(reference):
+def display_source(reference):
 
     obj = inspect.getsource(get_object_from_reference(reference))
 
