@@ -13,8 +13,6 @@ __all__ = ['issue_warning', 'reset_warnings', 'OpenMDAOWarning',
            'CacheWarning', 'PromotionWarning', 'UnusedOptionWarning', 'DerivativesWarning',
            'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning']
 
-_valid_actions = ['warn', 'error', 'raise', 'ignore', 'once', 'always', 'module', 'default']
-
 
 class OpenMDAOWarning(UserWarning):
     """
@@ -33,10 +31,6 @@ class SetupWarning(OpenMDAOWarning):
     name = 'warn_setup'
     filter = 'always'
 
-
-#
-# Subclasses of SetupWarning
-#
 
 class PromotionWarning(SetupWarning):
     """
@@ -81,10 +75,6 @@ class DistributedComponentWarning(SetupWarning):
 
     name = 'warn_distributed_component'
     filter = 'always'
-
-#
-# End SetupWarning subclasses
-#
 
 
 class SolverWarning(OpenMDAOWarning):
@@ -138,62 +128,12 @@ class OMDeprecationWarning(OpenMDAOWarning):
     """
 
     name = 'warn_deprecation'
-    filter = 'always'
+    filter = 'once'
 
 
 _warnings = [_class for _, _class in
              inspect.getmembers(sys.modules[__name__], inspect.isclass)
              if issubclass(_class, Warning)]
-
-#
-# def get_warning_defaults():
-#     """
-#     Return a dictionary of the default action of each warning type.
-#
-#     Returns
-#     -------
-#     dict
-#         A dictionary mapping a warning name with its default filter aciton.
-#     """
-#     defaults = {c.name: c.action for _, c in
-#                 inspect.getmembers(sys.modules[__name__], inspect.isclass)
-#                 if issubclass(c, Warning) and not c.name.startswith('_')}
-#     return defaults
-
-
-# def register_warning(*args):
-#     """
-#     Register th new warning class within the OpenMDAO warning ecosystem.
-#
-#     Parameters
-#     ----------
-#     *args : class
-#         One or more classes derived from Warning.  Each must have class "name" and "filter"
-#         attributes that provide the name and default filter action of the warning.
-#     """
-#     for c in args:
-#         if not issubclass(c, Warning):
-#             raise TypeError(f'Only subclasses of Warning may be registered using '
-#                             f'register_warning. {c} is not a subclass of Warning.')
-#
-#         if not hasattr(c, 'name') or not isinstance(c.name, str):
-#             raise AttributeError(f'class {c} is required to have a class attribute "name" of '
-#                                  f'type str.')
-#
-#         if not hasattr(c, 'filter') or not isinstance(c.name, str):
-#             raise AttributeError(f'class {c} is required to have a class attribute "filter" of '
-#                                  f'type str.')
-#
-#         if c.name in _warnings:
-#             raise ValueError(f'Class name {c.name} is already registered.')
-#
-#         if c.filter not in _valid_actions:
-#             raise ValueError(f'Class {c} has an invalid filter setting: {c.filter}. Valid values '
-#                              f'for filter are {_valid_actions}')
-#
-#         _warnings[c.name] = c
-#         kwg = {c.name: c.filter}
-#         filter_warnings(kwg)
 
 
 def reset_warnings():
@@ -205,31 +145,6 @@ def reset_warnings():
     """
     for w_class in _warnings:
         warnings.filterwarnings(w_class.filter, category=w_class)
-
-
-# def filter_warnings(reset_to_defaults=False, **kwargs):
-#     """
-#     Apply the warning filters as given by warning_options.
-#
-#     This is necessary when testing the filters, because Python resets the default filters
-#     before running each test.
-#     """
-#     if reset_to_defaults:
-#         for w_name, w_class in _warnings.items():
-#             warnings.filterwarnings(w_class.filter, category=w_class)
-#
-#     for w_name, action in kwargs.items():
-#         _action = 'error' if action == 'raise' else action
-#         if w_name not in _warnings:
-#             valid = [key for key in _warnings.keys() if not key.startswith('_')]
-#             msg = f"The warning '{w_name}' is not a valid OpenMDAO warning. \n" \
-#                   f"Valid values are {valid}."
-#             raise ValueError("\n".join(textwrap.wrap(msg, width=80)))
-#         if action not in _valid_actions:
-#             msg = f"The action '{action}' for warning '{w_name}' is not a valid action. \n" \
-#                   f"Must be one of {_valid_actions}.  See Python warning documentation for " \
-#                   f"more details."
-#             raise ValueError(msg)
 
 
 def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
@@ -292,9 +207,3 @@ def _make_table(superclass=OpenMDAOWarning):
 
 # When we import OpenMDAO and load this module, set the default filters on these warnings.
 reset_warnings()
-
-
-if __name__ == '__main__':
-    issue_warning('foo', prefix='my.comp', category=OpenMDAOWarning)
-
-    print(_make_table(SetupWarning))
