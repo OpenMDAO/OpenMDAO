@@ -765,6 +765,12 @@ class System(object):
         # this runs after the variable sizes are known
         self._setup_global_shapes()
 
+    def _setup_check(self):
+        """
+        Do any error checking on user's setup, before any other recursion happens.
+        """
+        pass
+
     def _configure_check(self):
         """
         Do any error checking on i/o and connections.

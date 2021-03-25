@@ -544,6 +544,7 @@ class Group(System):
 
         # Call setup function for this group.
         self.setup()
+        self._setup_check()
 
         # need to save these because _setup_var_data can be called multiple times
         # during the config process and we don't want to wipe out any group_inputs

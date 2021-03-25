@@ -203,9 +203,12 @@ class EmbedCodeDirective(Directive):
             # an environment where mpi or pyoptsparse are missing.
             raise self.directive_error(2, run_outputs)
         elif skipped:
-            # issue a warning unless it's about missing SNOPT when building a Travis pull request
-            PR = os.environ.get("TRAVIS_PULL_REQUEST")
-            if not (PR and PR != "false" and "pyoptsparse is not providing SNOPT" in run_outputs):
+            # When building docs for a pull request, we do not want the build to fail due to not
+            # having SNOPT (since PRs will not have access to SNOPT).  We want all other warnings.
+            TRAVIS_PR = os.environ.get("TRAVIS_PULL_REQUEST")
+            GITHUB_EV = os.environ.get("GITHUB_EVENT_NAME")
+            PR = (TRAVIS_PR and TRAVIS_PR != "false") or (GITHUB_EV and GITHUB_EV == "pull_request")
+            if not (PR and "pyoptsparse is not providing SNOPT" in run_outputs):
                 self.state_machine.reporter.warning(run_outputs)
 
             io_nodes = [get_skip_output_node(run_outputs)]

@@ -5,14 +5,12 @@ Controlling MPI Detection
 *************************
 
 By default, OpenMDAO will attempt to import the mpi4py module. If that fails,
-or if :code:`MPI.COMM_WORLD.size` is :code:`1`, a warning is printed and
-execution continues normally without MPI support:
-
-  ``Unable to import mpi4py. Parallel processing unavailable.``
+or if :code:`MPI.COMM_WORLD.size` is :code:`1`, execution continues normally
+without MPI support.
 
 Continuing can be problematic if MPI processing was intended, so this behavior
 can be modified by setting the environment variable
-:code:`OPENMDAO_REQUIRE_MPI`:
+:code:`OPENMDAO_USE_MPI`:
 
 - A value of :code:`True` (or :code:`Yes`, :code:`1`, or
   :code:`Always`; case-insensitive) will raise an exception if mpi4py fails to
