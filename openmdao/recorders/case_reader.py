@@ -4,7 +4,7 @@ CaseReader factory function.
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 
-def CaseReader(filename, pre_load=True):
+def CaseReader(filename, metadata_filename=None, pre_load=True):
     """
     Return a CaseReader for the given file.
 
@@ -21,4 +21,4 @@ def CaseReader(filename, pre_load=True):
     reader : BaseCaseReader
         An instance of a CaseReader.
     """
-    return SqliteCaseReader(filename, pre_load)
+    return SqliteCaseReader(filename, metadata_filename, pre_load)
