@@ -655,7 +655,7 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         if not colab:
             display(IFrame(src=outfile, width=1000, height=1000))
         else:
-            display(HTML(outfile))
+            display(IFrame(src=outfile, width=100, height=100))
     elif show_browser:
         # open it up in the browser
         from openmdao.utils.webview import webview
