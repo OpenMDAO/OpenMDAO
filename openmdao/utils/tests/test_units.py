@@ -289,6 +289,23 @@ class TestPhysicalUnit(unittest.TestCase):
             simplified_str = simplify_unit(test_str)
             self.assertEqual(simplified_str, correct_str)
 
+    def test_atto_seconds(self):
+        # The unit 'as' was bugged because it is a python keyword.
+
+        fact = unit_conversion('s', 'as')
+        assert_near_equal(fact[0], 1e18)
+
+        # Make sure regex for 'as' doesn't pick up partial words.
+        fact = unit_conversion('aslug*as*as', 'aslug*zs*zs')
+        assert_near_equal(fact[0], 1e6)
+
+        # Make sure simplification works.
+        simple = simplify_unit('m*as/as')
+        self.assertEqual(simple, 'm')
+
+        simple = simplify_unit('as**6/as**4')
+        self.assertEqual(simple, 'as**2')
+
 
 class TestModuleFunctions(unittest.TestCase):
     def test_add_unit(self):
