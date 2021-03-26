@@ -10,7 +10,7 @@ without MPI support.
 
 Continuing can be problematic if MPI processing was intended, so this behavior
 can be modified by setting the environment variable
-:code:`OPENMDAO_REQUIRE_MPI`:
+:code:`OPENMDAO_USE_MPI`:
 
 - A value of :code:`True` (or :code:`Yes`, :code:`1`, or
   :code:`Always`; case-insensitive) will raise an exception if mpi4py fails to

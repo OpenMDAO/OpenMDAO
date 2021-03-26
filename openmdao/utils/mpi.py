@@ -9,6 +9,7 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def _redirect_streams(to_fd):
@@ -53,19 +54,43 @@ def use_proc_files():
         _redirect_streams(ofile.fileno())
 
 
-if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    # If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, import
-    # MPI and raise ImportError on failure.
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
-        try:
-            from mpi4py import MPI
-        except ImportError:
-            raise ImportError("Importing MPI failed and OPENMDAO_REQUIRE_MPI is true.")
-    else:
-        # OPENMDAO_REQUIRE_MPI is set to something else, so no import is attempted.
-        MPI = None
+def check_mpi_env():
+    """
+    Determine if the environment variable governing MPI usage is set.
+
+    Returns
+    -------
+    bool
+        True if MPI is required, False if it's to be skipped, None if not set.
+    """
+    if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+        warn_deprecation("Set OPENMDAO_USE_MPI instead of OPENMDAO_REQUIRE_MPI.")
+
+    mpi_selection = os.environ.get('OPENMDAO_USE_MPI',
+                                   os.environ.get('OPENMDAO_REQUIRE_MPI', None))
+
+    # If OPENMDAO_USE_MPI is set to a postive value, the run will fail
+    # immediately if the import fails
+    if str(mpi_selection).lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
+        return True
+
+    # If set to something else, no import is attempted.
+    if mpi_selection is not None:
+        return False
+
+    # If unset, the import will be attempted but give no warning if it fails.
+    return None
+
+
+use_mpi = check_mpi_env()
+if use_mpi is True:
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        raise ImportError("Importing MPI failed and OPENMDAO_USE_MPI is true.")
+elif use_mpi is False:
+    MPI = None
 else:
-    # If OPENMDAO_REQUIRE_MPI is unset, attempt to import MPI, but fail silently.
     try:
         from mpi4py import MPI
 

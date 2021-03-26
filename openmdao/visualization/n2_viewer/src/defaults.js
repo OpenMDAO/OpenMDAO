@@ -37,7 +37,7 @@ let N2TransitionDefaults = {
     'startDelay': 100,
     'duration': 0,
     'durationFast': 1000,
-    'durationSlow': 1500,
+    'durationSlow': 3000,
     'maxNodes': 150
 }
 
