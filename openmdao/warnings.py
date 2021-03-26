@@ -216,6 +216,30 @@ def warn_deprecation(msg):
 
 
 def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
+    """
+    Provide a warning format for OpenMDAO warnings.
+
+    Parameters
+    ----------
+    message : str
+        The warning message
+    category : class
+        The warning class being issued.
+    filename : str
+        The filename from which the warning is issued.
+    lineno : int
+        The line number from which the warning is issued.
+    file : str
+        Ignored in this implementation.
+    line : str
+        The line of code causing the warning (ignored in this implementation)
+
+    Returns
+    -------
+    str
+        A formatted warning message.
+
+    """
     return f'{filename}:{lineno}: {category.__name__}:{message}\n'
 
 
