@@ -22,7 +22,7 @@ import numpy as np
 import openmdao
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.warnings import issue_warning, _warn_simple_format
+from openmdao.warnings import issue_warning, _warn_simple_format, warn_deprecation
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -120,6 +120,7 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
     stacklevel : int
         Number of levels up the stack to identify as the warning location.
     """
+    warn_deprecation('simple_warning is deprecated.  Use openmdao.warnings.issue_warning instead.')
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
     try:
