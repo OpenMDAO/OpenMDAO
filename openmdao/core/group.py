@@ -971,7 +971,7 @@ class Group(System):
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             if isinstance(subsys, Component):
-                self._has_distrib_vars |= subsys.options['distributed']
+                self._has_distrib_vars |= (MPI is not None and subsys.options['distributed'])
             else:
                 self._has_distrib_vars |= subsys._has_distrib_vars
 

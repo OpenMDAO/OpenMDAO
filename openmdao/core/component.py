@@ -180,7 +180,7 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if self.options['distributed']:
+        if MPI is not None and self.options['distributed']:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
@@ -527,7 +527,7 @@ class Component(System):
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': self.options['distributed'],
+            'distributed': False if MPI is None else self.options['distributed'],
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
@@ -749,7 +749,7 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': self.options['distributed'],
+            'distributed': False if MPI is None else self.options['distributed'],
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
@@ -864,7 +864,7 @@ class Component(System):
         set
             Names of inputs where src_indices were added.
         """
-        if not self.options['distributed'] or self.comm.size == 1:
+        if MPI is None or not self.options['distributed']:
             return set()
 
         iproc = self.comm.rank
