@@ -31,8 +31,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-from openmdao.utils.general_utils import warn_deprecation
-from openmdao.warnings import issue_warning
+from openmdao.warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
 

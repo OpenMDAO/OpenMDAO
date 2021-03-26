@@ -13,8 +13,8 @@ from functools import wraps
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import pad_name, reset_warning_registry
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import pad_name
+from openmdao.warnings import warn_deprecation, reset_warning_registry
 
 
 @contextmanager

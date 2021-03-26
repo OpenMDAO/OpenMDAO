@@ -8,9 +8,8 @@ from numpy import ndarray, imag, complex as npcomplex
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils import cs_safe
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')

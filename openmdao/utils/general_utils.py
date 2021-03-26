@@ -22,7 +22,7 @@ import numpy as np
 import openmdao
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.warnings import issue_warning, OMDeprecationWarning
+from openmdao.warnings import issue_warning, _warn_simple_format
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -107,23 +107,6 @@ def ignore_errors_context(flag=True):
         ignore_errors(save)
 
 
-def warn_deprecation(msg):
-    """
-    Raise a warning and prints a deprecation message to stdout.
-
-    Parameters
-    ----------
-    msg : str
-        Message that will be printed to stdout.
-    """
-    # note, stack level 3 should take us back to original caller.
-    issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
-
-
-def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
-    return '%s:%s: %s:%s\n' % (filename, lineno, category.__name__, message)
-
-
 def simple_warning(msg, category=UserWarning, stacklevel=2):
     """
     Display a simple warning message without the annoying extra line showing the warning call.
@@ -143,93 +126,6 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
         warnings.warn(msg, category, stacklevel)
     finally:
         warnings.formatwarning = old_format
-
-
-class reset_warning_registry(object):
-    """
-    Context manager which archives & clears warning registry for duration of context.
-
-    From https://bugs.python.org/file40031/reset_warning_registry.py
-
-    Attributes
-    ----------
-    _pattern : regex pattern
-        Causes manager to only reset modules whose names match this pattern. defaults to ``".*"``.
-    """
-
-    #: regexp for filtering which modules are reset
-    _pattern = None
-
-    #: dict mapping module name -> old registry contents
-    _backup = None
-
-    def __init__(self, pattern=None):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        pattern : regex pattern
-            Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
-        """
-        self._pattern = re.compile(pattern or ".*")
-
-    def __enter__(self):
-        """
-        Enter the runtime context related to this object.
-
-        Returns
-        -------
-        reset_warning_registry
-            This context manager.
-
-        """
-        # archive and clear the __warningregistry__ key for all modules
-        # that match the 'reset' pattern.
-        pattern = self._pattern
-        backup = self._backup = {}
-        for name, mod in list(sys.modules.items()):
-            if pattern.match(name):
-                reg = getattr(mod, "__warningregistry__", None)
-                if reg:
-                    backup[name] = reg.copy()
-                    reg.clear()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Exit the runtime context related to this object.
-
-        Parameters
-        ----------
-        exc_type : Exception class
-            The type of the exception.
-        exc_value : Exception instance
-            The exception instance raised.
-        traceback : regex pattern
-            Traceback object.
-        """
-        # restore warning registry from backup
-        modules = sys.modules
-        backup = self._backup
-        for name, content in backup.items():
-            mod = modules.get(name)
-            if mod is None:
-                continue
-            reg = getattr(mod, "__warningregistry__", None)
-            if reg is None:
-                setattr(mod, "__warningregistry__", content)
-            else:
-                reg.clear()
-                reg.update(content)
-
-        # clear all registry entries that we didn't archive
-        pattern = self._pattern
-        for name, mod in list(modules.items()):
-            if pattern.match(name) and name not in backup:
-                reg = getattr(mod, "__warningregistry__", None)
-                if reg:
-                    reg.clear()
 
 
 def ensure_compatible(name, value, shape=None, indices=None):

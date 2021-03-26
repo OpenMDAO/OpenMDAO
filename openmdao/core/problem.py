@@ -30,8 +30,7 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, warn_deprecation, \
-    _is_slicer_op, _slice_indices
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import name2abs_names
@@ -44,7 +43,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

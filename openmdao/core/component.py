@@ -17,12 +17,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, _is_slicer_op, warn_deprecation, convert_src_inds, \
+    find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
 import openmdao.utils.coloring as coloring_mod
 from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, UnusedOptionWarning
-
+    DerivativesWarning, UnusedOptionWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = set([' ', '\t', '\r', '\n'])

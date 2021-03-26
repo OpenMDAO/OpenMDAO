@@ -12,14 +12,14 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import warn_deprecation, _prom2ivc_src_dict, \
+from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 
 def _check_debug_print_opts_valid(name, opts):

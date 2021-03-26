@@ -9,7 +9,7 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import warn_deprecation
 
 
 def _redirect_streams(to_fd):

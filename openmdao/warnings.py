@@ -3,13 +3,14 @@ A module for OpenMDAO-specific warnings and associated functions.
 """
 
 import inspect
+import re
 import sys
 import io
 import warnings
 
 
-__all__ = ['issue_warning', 'reset_warnings', 'OpenMDAOWarning',
-           'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
+__all__ = ['issue_warning', 'reset_warnings', 'reset_warning_registry', '_warn_simple_format',
+           'OpenMDAOWarning', 'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
            'CacheWarning', 'PromotionWarning', 'UnusedOptionWarning', 'DerivativesWarning',
            'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning']
 
@@ -167,9 +168,6 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     om.issue_warning('some warning message', prefix=self.pathname, category=om.SetupWarning)
 
     """
-    def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
-        return f'{filename}:{lineno}: {category.__name__}:{message}\n'
-
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
     _msg = f'{prefix}: {msg}' if prefix else f'{msg}'
@@ -202,6 +200,110 @@ def _make_table(superclass=OpenMDAOWarning):
             desc = ' '.join(_class.__doc__.split())
             print(f'| {_class.__name__:<{max_name_len}} | {desc:<{max_desc_len}} |', file=s)
     return s.getvalue()
+
+
+def warn_deprecation(msg):
+    """
+    Raise a warning and prints a deprecation message to stdout.
+
+    Parameters
+    ----------
+    msg : str
+        Message that will be printed to stdout.
+    """
+    # note, stack level 3 should take us back to original caller.
+    issue_warning(msg, stacklevel=3, category=OMDeprecationWarning)
+
+
+def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
+    return f'{filename}:{lineno}: {category.__name__}:{message}\n'
+
+
+class reset_warning_registry(object):
+    """
+    Context manager which archives & clears warning registry for duration of context.
+
+    From https://bugs.python.org/file40031/reset_warning_registry.py
+
+    Attributes
+    ----------
+    _pattern : regex pattern
+        Causes manager to only reset modules whose names match this pattern. defaults to ``".*"``.
+    """
+
+    #: regexp for filtering which modules are reset
+    _pattern = None
+
+    #: dict mapping module name -> old registry contents
+    _backup = None
+
+    def __init__(self, pattern=None):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        pattern : regex pattern
+            Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
+        """
+        self._pattern = re.compile(pattern or ".*")
+
+    def __enter__(self):
+        """
+        Enter the runtime context related to this object.
+
+        Returns
+        -------
+        reset_warning_registry
+            This context manager.
+
+        """
+        # archive and clear the __warningregistry__ key for all modules
+        # that match the 'reset' pattern.
+        pattern = self._pattern
+        backup = self._backup = {}
+        for name, mod in list(sys.modules.items()):
+            if pattern.match(name):
+                reg = getattr(mod, "__warningregistry__", None)
+                if reg:
+                    backup[name] = reg.copy()
+                    reg.clear()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Exit the runtime context related to this object.
+
+        Parameters
+        ----------
+        exc_type : Exception class
+            The type of the exception.
+        exc_value : Exception instance
+            The exception instance raised.
+        traceback : regex pattern
+            Traceback object.
+        """
+        # restore warning registry from backup
+        modules = sys.modules
+        backup = self._backup
+        for name, content in backup.items():
+            mod = modules.get(name)
+            if mod is None:
+                continue
+            reg = getattr(mod, "__warningregistry__", None)
+            if reg is None:
+                setattr(mod, "__warningregistry__", content)
+            else:
+                reg.clear()
+                reg.update(content)
+
+        # clear all registry entries that we didn't archive
+        pattern = self._pattern
+        for name, mod in list(modules.items()):
+            if pattern.match(name) and name not in backup:
+                reg = getattr(mod, "__warningregistry__", None)
+                if reg:
+                    reg.clear()
 
 
 # When we import OpenMDAO and load this module, set the default filters on these warnings.

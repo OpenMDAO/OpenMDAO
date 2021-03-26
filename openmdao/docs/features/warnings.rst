@@ -7,7 +7,7 @@ Warning Control
 OpenMDAO has several classes of warnings that may be raised during operation.
 In general, these warnings are useful and the user should pay attention to them.
 Sometimes these warnings can be unnecessarily noisy.
-Filtering out noisy "low-priority" warning can make other more important ones more obvious.
+Filtering out noisy "low-priority" warnings can make other more important ones more obvious.
 
 OpenMDAO-Specific Warning Categories
 ------------------------------------
@@ -19,14 +19,14 @@ The following table shows all OpenMDAOWarning-derived classes.
 +-----------------------------+--------------------------------------------------------------------------------------------+
 | Warning Class               | Description                                                                                |
 +=============================+============================================+===============================================+
-| CacheWarning                | A cache is invalid and must be discarded.                                                  |
-| CaseRecorderWarning         | Warning encountered by a case recorder or case reader.                                     |
-| DerivativesWarning          | Warning issued when the approximated partials or coloring cannot be evaluated as expected. |
-| DriverWarning               | Warning encountered during driver execution.                                               |
-| OMDeprecationWarning        | Warning of the use of deprecated OpenMDAO features.                                        |
-| SetupWarning                | General errors encountered during setup.                                                   |
-| SolverWarning               | Warning encountered during solver execution.                                               |
-| UnusedOptionWarning         | A given option or argument has no effect.                                                  |
+| CacheWarning                | Issued when cache is invalid and must be discarded.                                        |
+| CaseRecorderWarning         | Issued when a problem is encountered by a case recorder or case reader.                    |
+| DerivativesWarning          | Issued when the approximated partials or coloring cannot be evaluated as expected.         |
+| DriverWarning               | Issued when a problem is encountered during driver execution.                              |
+| OMDeprecationWarning        | Issued when a deprecated OpenMDAO feature is used.                                         |
+| SetupWarning                | Issued when a problem is encountered during setup.                                         |
+| SolverWarning               | Issued when a problem is encountered during solver execution.                              |
+| UnusedOptionWarning         | Issued when a given option or argument has no effect.                                      |
 +-----------------------------+--------------------------------------------------------------------------------------------+
 
 Note that the OpenMDAO-Specific **OMDeprecationWarning** behaves a bit differently than the default Python DeprecationWarning.
@@ -38,16 +38,16 @@ Using a filter to silence SetupWarning will silence **all** of the following.
 +-----------------------------+--------------------------------------------------------------------------------------------+
 | Warning Class               | Description                                                                                |
 +=============================+=====================+======================================================================+
-| DistributedComponentWarning | Warning specific to a distributed component.                                               |
-| MPIWarning                  | Warning dealing with the availability of MPI.                                              |
-| PromotionWarning            | Warning dealing with the promotion of an input or output.                                  |
-| UnitsWarning                | Warning which is issued when unitless variable is connected to a variable with units.      |
+| DistributedComponentWarning | Issued when problems arise with a distributed component.                                   |
+| MPIWarning                  | Issued when MPI is not available or cannot be used.                                        |
+| PromotionWarning            | Issued when there is ambiguity due to variable promotion.                                  |
+| UnitsWarning                | Issued when unitless variable is connected to a variable with units.                       |
 +-----------------------------+--------------------------------------------------------------------------------------------+
 
 Filtering Warnings
 ------------------
 
-Python's built-in warning filtering system can be used to control which warning are displayed when using OpenMDAO.
+Python's built-in warning filtering system can be used to control which warnings are displayed when using OpenMDAO.
 The following script generates an OpenMDAO model which will generate UnitsWarning due to connecting unitless outputs to inputs with units.
 
 In the following code, the UnitsWarning will be displayed as expected:
