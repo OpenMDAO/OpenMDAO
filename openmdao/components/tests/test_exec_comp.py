@@ -20,7 +20,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.utils import cs_safe
+from openmdao.warnings import OMDeprecationWarning
 
 _ufunc_test_data = {
     'min': {
@@ -293,7 +293,7 @@ else:
         'check_func': scipy.special.factorial,
         'args': {'f': {'value': np.zeros(6)},
                  'x': {'value': np.random.random(6)}},
-        'warning': (DeprecationWarning,
+        'warning': (OMDeprecationWarning,
                     "The 'factorial' function is deprecated. "
                     "It is no longer supported for SciPy versions >= 1.5.")
     }
