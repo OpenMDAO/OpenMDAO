@@ -7,6 +7,7 @@ class TestWarnings(unittest.TestCase):
         """
         Ensure that OpenMDAO warnings are using their default filter action.
         """
+        import openmdao.api as om
         om.reset_warnings()
 
     def test_doc_with_units_warning(self):
