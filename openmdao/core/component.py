@@ -1552,7 +1552,7 @@ class Component(System):
                         src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
                                                   parent_src_shape)
                     except IndexError as err:
-                        raise IndexError(f"In component {self.msginfo}: \nError '{err}'\n  in "
+                        raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
                                          f"resolving source indices in connection "
                                          f"between source='{oldprom}' "
                                          f"and target='{tgt}'\n  with src_indices='{src_inds}'")

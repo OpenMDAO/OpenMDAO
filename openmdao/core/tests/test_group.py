@@ -2516,11 +2516,16 @@ class TestSrcIndices(unittest.TestCase):
         # the 4 should be a 3
         p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
 
-        with self.assertRaises(IndexError) as e:
+        with self.assertRaises(IndexError) as err:
             p.setup()
 
-        self.assertTrue(str(e.exception).startswith("In component 'row4_comp'"))
-        self.assertTrue(str(e.exception).endswith("with src_indices='(4, Ellipsis)'"))
+        expected_error_msg = ( "'row4_comp' <class SlicerComp>:\n"
+                               "Error 'index 4 is out of bounds for axis 0 with size 4'\n"
+                               "  in resolving source indices in connection between"
+                               " source='indep.x' and target='row4_comp.x'\n"
+                               "  with src_indices='(4, Ellipsis)'" )
+        self.assertEqual(str(err.exception), expected_error_msg)
+
 
 class TestGroupAddInput(unittest.TestCase):
 
