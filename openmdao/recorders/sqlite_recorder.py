@@ -147,7 +147,7 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record on this processor when running in parallel.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=2, record_viewer_data=True):
+    def __init__(self, filepath, append=False, pickle_version=4, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
 
@@ -253,14 +253,13 @@ class SqliteRecorder(CaseRecorder):
                               "conns BLOB)")
                     m.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
                               " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                         None, None))
+                                                             None, None))
                     m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
                               "model_viewer_data TEXT)")
                     m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
                               "scaling_factors BLOB, component_metadata BLOB)")
                     m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                               "solver_options BLOB, solver_class TEXT)")
-
 
         self._database_initialized = True
 
@@ -413,7 +412,8 @@ class SqliteRecorder(CaseRecorder):
             abs2prom = zlib.compress(json.dumps(self._abs2prom).encode('ascii'))
             prom2abs = zlib.compress(json.dumps(self._prom2abs).encode('ascii'))
             abs2meta = zlib.compress(json.dumps(self._abs2meta).encode('ascii'))
-            conns = zlib.compress(json.dumps(system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
+            conns = zlib.compress(json.dumps(
+                system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
 
             var_settings = {}
             var_settings.update(desvars)
@@ -421,7 +421,8 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
             var_settings['execution_order'] = var_order
-            var_settings_json = zlib.compress(json.dumps(var_settings, default=default_noraise).encode('ascii'))
+            var_settings_json = zlib.compress(
+                json.dumps(var_settings, default=default_noraise).encode('ascii'))
 
             if self._record_metadata:
                 with self.metadata_connection as m:

@@ -60,7 +60,8 @@ def _n2_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file[,metadata]', nargs=1, help='Python script or recording containing the model. '
+    parser.add_argument('file', nargs=1,
+                        help='Python script or recording containing the model. '
                         'For separate recording metadata from a parallel run, specify both '
                         'filenames delimited with a comma.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',

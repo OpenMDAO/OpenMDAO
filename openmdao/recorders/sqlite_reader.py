@@ -24,6 +24,7 @@ except ImportError:
 
 import pickle
 import zlib
+import re
 from json import loads as json_loads
 from io import TextIOBase
 
@@ -90,8 +91,6 @@ class SqliteCaseReader(BaseCaseReader):
 
         if metadata_filename:
             check_valid_sqlite3_db(metadata_filename)
-        else:
-            metadata_filename = filename
 
         # initialize private attributes
         self._filename = filename
@@ -101,6 +100,28 @@ class SqliteCaseReader(BaseCaseReader):
         self._conns = None
         self._auto_ivc_map = {}
         self._global_iterations = None
+
+        with sqlite3.connect(filename) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # get the global iterations table, and save it as an attribute
+            self._global_iterations = self._get_global_iterations(cur)
+
+            # If separate metadata not specified, check the current db
+            # to make sure it's there
+            if metadata_filename is None:
+                cur.execute("SELECT count(name) FROM sqlite_master "
+                            "WHERE type='table' AND name='metadata'")
+
+                # If not, take a guess at the filename:
+                if cur.fetchone()[0] == 0:
+                    metadata_filename = re.sub(r'^(.*)_(\d+)', r'\1_meta', filename)
+                    check_valid_sqlite3_db(metadata_filename)
+                else:
+                    metadata_filename = filename
+
+        con.close()
 
         # collect metadata from database
         with sqlite3.connect(metadata_filename) as con:
@@ -126,15 +147,6 @@ class SqliteCaseReader(BaseCaseReader):
             # collect data from the solver_metadata table. this includes:
             #   solver class and options for each solver, which is saved as an attribute
             self._collect_solver_metadata(cur)
-            
-        con.close()
-
-        with sqlite3.connect(filename) as con:
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-
-            # get the global iterations table, and save it as an attribute
-            self._global_iterations = self._get_global_iterations(cur)
 
         con.close()
 
@@ -298,8 +310,10 @@ class SqliteCaseReader(BaseCaseReader):
             self._system_options[id] = {}
 
             if self._format_version >= 14:
-                self._system_options[id]['scaling_factors'] = pickle.loads(zlib.decompress(row[1]))
-                self._system_options[id]['component_options'] = pickle.loads(zlib.decompress(row[2]))
+                self._system_options[id]['scaling_factors'] = \
+                    pickle.loads(zlib.decompress(row[1]))
+                self._system_options[id]['component_options'] = \
+                    pickle.loads(zlib.decompress(row[2]))
             else:
                 self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
                 self._system_options[id]['component_options'] = pickle.loads(row[2])
