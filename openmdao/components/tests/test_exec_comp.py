@@ -1469,8 +1469,10 @@ class TestFunctionRegistration(unittest.TestCase):
             p = om.Problem()
             comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
                                                               'out2 = safe(y) + z'], shape=size))
-            comp.declare_partials('out1', ['x', 'z'], method='fd')
-            comp.declare_partials('out2', ['y', 'z'], method='cs')
+            rows = cols = np.arange(size)
+            comp.declare_partials('out1', ['x', 'z'], rows=rows, cols=cols, method='fd')
+            comp.declare_partials('out2', ['y'], rows=rows, cols=cols, method='cs')
+            comp.declare_partials('out2', ['z'], rows=rows, cols=cols, method='fd')
             p.setup()
             xx = np.arange(1, size + 1, dtype=float)
             p['comp.x'] = x = xx * 3.
@@ -1486,7 +1488,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out1', 'comp.z'], np.eye(size) * x**2, 1e-6)
             assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-11)
             assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-11)
-            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-11)
+            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
@@ -1693,7 +1695,7 @@ _MASK = np.array(
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape) + 1e-5
+    sparsity = np.random.random(mask.shape) + 1e-5
     return sparsity * mask
 
 
