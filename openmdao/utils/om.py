@@ -62,8 +62,8 @@ def _n2_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1,
                         help='Python script or recording containing the model. '
-                        'For separate recording metadata from a parallel run, specify both '
-                        'filenames delimited with a comma.')
+                        'If metadata from a parallel run was recorded in a separate file, '
+                        'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
