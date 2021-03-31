@@ -2506,6 +2506,22 @@ class TestSrcIndices(unittest.TestCase):
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
 
+    def test_om_slice_with_ellipsis_error_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        # the 4 should be a 3
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
+
+        with self.assertRaises(IndexError) as e:
+            p.setup()
+
+        self.assertTrue(str(e.exception).startswith("In component 'row4_comp'"))
+        self.assertTrue(str(e.exception).endswith("with src_indices='(4, Ellipsis)'"))
+
 class TestGroupAddInput(unittest.TestCase):
 
     def _make_tree_model(self, diff_units=False, diff_vals=False):
