@@ -72,7 +72,7 @@ class SqliteCaseReader(BaseCaseReader):
         List of iteration cases and the table and row in which they are found.
     """
 
-    def __init__(self, filename, metadata_filename=None, pre_load=False):
+    def __init__(self, filename, pre_load=False, metadata_filename=None):
         """
         Initialize.
 
@@ -80,10 +80,10 @@ class SqliteCaseReader(BaseCaseReader):
         ----------
         filename : str
             The path to the filename containing the recorded data.
-        metadata_filename : str
-            The path to the filename containing the recorded metadata, if separate.
         pre_load : bool
             If True, load all the data into memory during initialization.
+        metadata_filename : str
+            The path to the filename containing the recorded metadata, if separate.
         """
         super().__init__(filename, pre_load)
 
