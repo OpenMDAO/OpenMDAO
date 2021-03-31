@@ -577,7 +577,7 @@ class TemplateWriter(object):
         outfile : str
             Path name for file to write to.
         """
-        with open(outfile, 'w') as f:  # write output file
+        with open(outfile, 'w', encoding='utf-8') as f:  # write output file
             f.write(self.template)
 
 
