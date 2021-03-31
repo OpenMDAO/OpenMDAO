@@ -4,10 +4,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results, _get_wrt_subjacs, _full_slice
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
 from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.array_utils import sub2full_indices
 from openmdao.utils.coloring import Coloring
 
 
@@ -61,11 +59,14 @@ class ComplexStep(ApproximationScheme):
         options.update(kwargs)
         options['vector'] = vector
 
-        key = (abs_key[1], options['step'], options['directional'])
-        self._exec_dict[key].append((abs_key, options))
+        wrt = abs_key[1]
+        if wrt in self._wrt_meta:
+            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
+                           f"'{wrt}.")
+        self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
-    def _get_approx_data(self, system, data):
+    def _get_approx_data(self, system, wrt, meta):
         """
         Given approximation metadata, compute necessary delta for complex step.
 
@@ -73,17 +74,19 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System whose derivatives are being approximated.
-        data : tuple
-            Tuple of the form (wrt, delta, directional)
+        wrt : str
+            Name of wrt variable.
+        meta : dict
+            Metadata dict.
 
         Returns
         -------
         float
             Delta needed for complex step perturbation.
         """
-        _, delta, _ = data
-        delta *= 1j
-        return delta
+        step = meta['step']
+        step *= 1j
+        return step
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -98,7 +101,7 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if not self._exec_dict:
+        if not self._wrt_meta:
             return
 
         if system.under_complex_step:
@@ -112,9 +115,8 @@ class ComplexStep(ApproximationScheme):
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
-                for lst in self._exec_dict.values():
-                    for apprx in lst:
-                        fd.add_approximation(apprx[0], system, empty)
+                for wrt in self._wrt_meta:
+                    fd.add_approximation(wrt, system, empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return
@@ -129,10 +131,11 @@ class ComplexStep(ApproximationScheme):
         # Turn on complex step.
         system._set_complex_step_mode(True)
 
-        self._compute_approximations(system, jac, total, under_cs=True)
-
-        # Turn off complex step.
-        system._set_complex_step_mode(False)
+        try:
+            self._compute_approximations(system, jac, total, under_cs=True)
+        finally:
+            # Turn off complex step.
+            system._set_complex_step_mode(False)
 
         system._inputs.set_val(saved_inputs)
         system._outputs.set_val(saved_outputs)
@@ -189,8 +192,8 @@ class ComplexStep(ApproximationScheme):
 
         Returns
         -------
-        Vector
-            Copy of the results from running the perturbed system.
+        ndarray
+            Copy of the outputs or residuals array after running the perturbed system.
         """
         for vec, idxs in idx_info:
             if vec is not None:
@@ -198,10 +201,10 @@ class ComplexStep(ApproximationScheme):
 
         if total:
             system.run_solve_nonlinear()
-            result_array[:] = system._outputs._data
+            result_array[:] = system._outputs.asarray()
         else:
             system.run_apply_nonlinear()
-            result_array[:] = system._residuals._data
+            result_array[:] = system._residuals.asarray()
 
         for vec, idxs in idx_info:
             if vec is not None:

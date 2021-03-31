@@ -158,8 +158,8 @@ perform the total derivative computation *5* times.
 
 
 Note that when multiple total jacobian computations are performed, we take the absolute values
-of each jacobian and add them together, then divide by number of jacobians computed, resulting
-in the average of absolute values of each entry.
+of each jacobian and add them together, then divide by the maximum value, resulting
+in values between 0 and 1 for each entry.
 
 If repeating the total derivative computation multiple times doesn't work, try changing the
 tolerance using the *-t* option as follows:

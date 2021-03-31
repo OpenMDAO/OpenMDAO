@@ -547,21 +547,22 @@ class Vector(object):
         if self._icol is not None:
             idxs = (idxs, self._icol)
 
-        value = np.asarray(val)
-
-        try:
-            if flat:
-                self._views_flat[abs_name][idxs] = value.flat
+        if flat:
+            if isinstance(val, float):
+                self._views_flat[abs_name][idxs] = val
             else:
-                self._views[abs_name][idxs] = value
-
-        except Exception as err:
+                self._views_flat[abs_name][idxs] = np.asarray(val).flat
+        else:
+            value = np.asarray(val)
             try:
-                value = value.reshape(self._views[abs_name][idxs].shape)
-            except Exception:
-                raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                                 f"'{name}': {str(err)}.")
-            self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs] = value
+            except Exception as err:
+                try:
+                    value = value.reshape(self._views[abs_name][idxs].shape)
+                except Exception:
+                    raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                                     f"'{name}': {str(err)}.")
+                self._views[abs_name][idxs] = value
 
     def dot(self, vec):
         """

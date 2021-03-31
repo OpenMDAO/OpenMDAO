@@ -41,6 +41,8 @@ try:
             String prepended to each reported memory usage.
         out : file-like
             Output will be sent to this stream.
+        resident : bool
+            If True, report resident memory usage, else virtual.
 
         Returns
         -------
