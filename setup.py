@@ -152,6 +152,7 @@ setup(
     },
     python_requires=">=3.6",
     install_requires=[
+        'decorator<5',
         'networkx>=2.0',
         'numpy',
         'pyDOE2',
