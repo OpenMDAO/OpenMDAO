@@ -186,10 +186,9 @@ class Component(System):
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
-                issue_warning("'C2' <class DistribInputComp>: The 'distributed' option is set to "
-                              "True for this component, but there is no distributed vector "
-                              "implementation (MPI/PETSc) available. The default non-distributed "
-                              "vectors will be used.",
+                issue_warning("The 'distributed' option is set to True for this component, "
+                              "but there is no distributed vector implementation (MPI/PETSc) "
+                              "available. The default non-distributed vectors will be used.",
                               prefix=self.msginfo, category=DistributedComponentWarning)
 
                 self._vector_class = self._problem_meta['local_vector_class']

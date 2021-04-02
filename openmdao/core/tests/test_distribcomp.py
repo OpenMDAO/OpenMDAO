@@ -8,6 +8,7 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.warnings import DistributedComponentWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -325,8 +326,8 @@ class NOMPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        msg = "The 'distributed' option is set to True for this component, " \
-              "but there is no distributed vector implementation (MPI/PETSc) " \
+        msg = "'C2' <class DistribInputComp>: The 'distributed' option is set to True for " \
+              "this component, but there is no distributed vector implementation (MPI/PETSc) " \
               "available. The default non-distributed vectors will be used."
 
         with assert_warning(DistributedComponentWarning, msg):
