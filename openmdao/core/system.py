@@ -1046,7 +1046,7 @@ class System(object):
                     issue_warning("No approx partials found but coloring was requested.  "
                                   "Declaring ALL partials as dense and approx "
                                   "(method='{}')".format(info['method']),
-                    prefix=self.msginfo, category=DerivativesWarning)
+                                  prefix=self.msginfo, category=DerivativesWarning)
                     try:
                         self.declare_partials('*', '*', method=info['method'])
                     except AttributeError:  # this system must be a group

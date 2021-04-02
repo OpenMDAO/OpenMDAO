@@ -1,5 +1,5 @@
 import unittest
-import openmdao.api as om
+
 
 class TestWarnings(unittest.TestCase):
 
