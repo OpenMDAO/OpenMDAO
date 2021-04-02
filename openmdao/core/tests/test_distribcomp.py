@@ -325,11 +325,11 @@ class NOMPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        msg = "The 'distributed' option is set to True for Component C2, " \
+        msg = "The 'distributed' option is set to True for this component, " \
               "but there is no distributed vector implementation (MPI/PETSc) " \
               "available. The default non-distributed vectors will be used."
 
-        with assert_warning(UserWarning, msg):
+        with assert_warning(DistributedComponentWarning, msg):
             p.setup()
 
         # Conclude setup but don't run model.

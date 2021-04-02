@@ -171,7 +171,6 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
-    p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
     if use_vois:
@@ -330,7 +329,6 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
         # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
         # - (total_solves - 2) / (solves_per_iter) should be equal to
@@ -475,11 +473,14 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
@@ -490,7 +491,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
@@ -916,8 +917,6 @@ class BidirectionalTestCase(unittest.TestCase):
             builder = TotJacBuilder.eisenstat(n)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
-            if tot_colors == n // 2 + 3:
-                raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
             self.assertLessEqual(tot_colors, n // 2 + 2,
                                  "Eisenstat's example of size %d required %d colors but shouldn't "
                                  "need more than %d." % (n, tot_colors, n // 2 + 2))
@@ -944,7 +943,7 @@ class BidirectionalTestCase(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
         [('n4c6-b15', 3), ('can_715', 21), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 28), ('Harvard500', 26), ('illc1033', 5)],
+         ('D_6', 27), ('Harvard500', 26), ('illc1033', 5)],
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")
@@ -957,8 +956,8 @@ class BidirectionalTestCase(unittest.TestCase):
         if not os.path.exists(matfile):
             raise unittest.SkipTest("Matrix test file were not included.")
 
-        mat = load_npz(matfile).toarray()
-        mat = np.asarray(mat, dtype=bool)
+        mat = load_npz(matfile).tocoo()
+        mat.data = np.asarray(mat.data, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
         mat = None
 

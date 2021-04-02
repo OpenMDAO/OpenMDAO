@@ -1,13 +1,16 @@
 """Define the base Jacobian class."""
 import weakref
+import sys
 
 import numpy as np
 from numpy.random import rand
 
 from collections import OrderedDict, defaultdict
-from scipy.sparse import issparse
+from scipy.sparse import issparse, coo_matrix
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
+from openmdao.utils.array_utils import sparse_subinds
 from openmdao.matrices.matrix import sparse_types
 from openmdao.vectors.vector import _full_slice
 
@@ -32,10 +35,6 @@ class Jacobian(object):
         Pointer to the system that is currently operating on this Jacobian.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
-    _override_checks : bool
-        If we are approximating a jacobian at the top level and we have specified indices on the
-        functions or designvars, then we need to disable the size checking temporarily so that we
-        can assign a jacobian with less rows or columns than the variable sizes.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : defaultdict
@@ -45,6 +44,12 @@ class Jacobian(object):
     _jac_summ : dict or None
         A dict containing a summation of some number of instantaneous absolute values of this
         jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
+    _col_var_info : dict
+        Maps column name to start, end, and slice/indices into the result array.
+    _colnames : list
+        List of column var names.
+    _col2name_ind : ndarray
+        Array that maps jac col index to index of column name.
     """
 
     def __init__(self, system):
@@ -58,11 +63,13 @@ class Jacobian(object):
         """
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
-        self._override_checks = False
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
         self._jac_summ = None
+        self._col_var_info = None
+        self._colnames = None
+        self._col2name_ind = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -160,12 +167,6 @@ class Jacobian(object):
                 safe_dtype = np.promote_types(subjac.dtype, float)
                 subjac = subjac.astype(safe_dtype, copy=False)
 
-                # Bail here so that we allow top level jacobians to be of reduced size when indices
-                # are specified on driver vars.
-                if self._override_checks:
-                    subjacs_info['value'] = subjac
-                    return
-
                 rows = subjacs_info['rows']
 
                 if rows is None:
@@ -191,15 +192,20 @@ class Jacobian(object):
         """
         Yield next name pair of sub-Jacobian.
         """
-        for key in self._subjacs_info.keys():
-            yield key
+        yield from self._subjacs_info.keys()
+
+    def keys(self):
+        """
+        Yield next name pair of sub-Jacobian.
+        """
+        yield from self._subjacs_info.keys()
 
     def items(self):
         """
         Yield name pair and value of sub-Jacobian.
         """
-        for key, val in self._subjacs_info.items():
-            yield key, val['value']
+        for key, meta in self._subjacs_info.items():
+            yield key, meta['value']
 
     @property
     def msginfo(self):
@@ -295,18 +301,25 @@ class Jacobian(object):
         system : System
             System owning this jacobian.
         """
-        subjacs = self._subjacs_info
         if self._jac_summ is None:
+            fdtypes = ('cs', 'fd')
             # create _jac_summ structure
             self._jac_summ = summ = {}
-            for key in subjacs:
-                summ[key] = np.abs(subjacs[key]['value'])
+            if system.pathname == '':  # totals
+                for of in system._owns_approx_of:
+                    for wrt in system._owns_approx_wrt:
+                        key = (of, wrt)
+                        summ[key] = np.abs(self._subjacs_info[key]['value'])
+            else:
+                for key, meta in self._subjacs_info.items():
+                    if 'method' in meta and meta['method'] in fdtypes:
+                        summ[key] = np.abs(meta['value'])
         else:
-            summ = self._jac_summ
-            for key in subjacs:
-                summ[key] += np.abs(subjacs[key]['value'])
+            subjacs = self._subjacs_info
+            for key, summ in self._jac_summ.items():
+                summ += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, num_full_jacs, tol, orders):
+    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, tol, orders):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
@@ -319,8 +332,6 @@ class Jacobian(object):
             Name, offset, etc. of row variables in the order that they appear in the jacobian.
         ordered_wrt_info : list of (name, offset, end, idxs)
             Name, offset, etc. of column variables in the order that they appear in the jacobian.
-        num_full_jacs : int
-            Number of times to compute partial jacobian when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero.
         orders : int
@@ -328,7 +339,7 @@ class Jacobian(object):
 
         Returns
         -------
-        ndarray
+        coo_matrix
             Boolean sparsity matrix.
         """
         from openmdao.utils.coloring import _tol_sweep
@@ -336,32 +347,44 @@ class Jacobian(object):
         subjacs = self._subjacs_info
         summ = self._jac_summ
 
-        rend = ordered_of_info[-1][2]
-        cend = ordered_wrt_info[-1][2]
-        J = np.zeros((rend, cend))
+        Jrows = []
+        Jcols = []
+        Jdata = []
 
         for of, roffset, rend, _ in ordered_of_info:
-            for wrt, coffset, cend, _ in ordered_wrt_info:
+            for wrt, coffset, cend, _, _ in ordered_wrt_info:
                 key = (of, wrt)
-                if key in subjacs:
+                if key in summ:
+                    subsum = summ[key]
                     meta = subjacs[key]
                     if meta['rows'] is not None:
-                        rows = meta['rows'] + roffset
-                        cols = meta['cols'] + coffset
-                        J[rows, cols] = summ[key]
-                    elif issparse(summ[key]):
+                        Jrows.append(meta['rows'] + roffset)
+                        Jcols.append(meta['cols'] + coffset)
+                        Jdata.append(subsum)
+                    elif issparse(subsum):
                         raise NotImplementedError("{}: scipy sparse arrays are not "
                                                   "supported yet.".format(self.msginfo))
-                    else:
-                        J[roffset:rend, coffset:cend] = summ[key]
+                    else:  # dense
+                        for i, r in enumerate(range(roffset, rend)):
+                            Jrows.append([r] * (cend - coffset))
+                            Jcols.append(np.arange(coffset, cend))
+                            Jdata.append(subsum[i, :])
 
-        J *= (1.0 / np.max(J))
+        summ = self._jac_summ = None  # free up some memory
 
-        tol_info = _tol_sweep(J, tol, orders)
+        Jrows = np.hstack(Jrows)
+        Jcols = np.hstack(Jcols)
+        Jdata = np.hstack([d.flat for d in Jdata])
+        shape = (rend, cend)
 
-        boolJ = np.zeros(J.shape, dtype=bool)
-        boolJ[J > tol_info['good_tol']] = True
+        Jdata *= (1.0 / np.max(Jdata))
 
+        tol_info = _tol_sweep(Jdata, tol, orders)
+
+        mask = Jdata > tol_info['good_tol']
+        size = np.count_nonzero(mask)
+
+        boolJ = coo_matrix((np.ones(size, dtype=bool), (Jrows[mask], Jcols[mask])), shape=shape)
         return boolJ, tol_info
 
     def set_complex_step_mode(self, active):
@@ -383,3 +406,151 @@ class Jacobian(object):
                 meta['value'] = meta['value'].real
 
         self._under_complex_step = active
+
+    def _setup_index_maps(self, system):
+        self._col_var_info = col_var_info = {t[0]: t for t in system._jac_wrt_iter()}
+        self._colnames = list(col_var_info)   # map var id to varname
+
+        ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
+        self._col2name_ind = np.empty(ncols, dtype=INT_DTYPE)  # jac col to var id
+        start = end = 0
+        for i, (wrt, _start, _end, _, _) in enumerate(col_var_info.values()):
+            end += _end - _start
+            self._col2name_ind[start:end] = i
+            start = end
+
+        # for total derivs, we can have sub-indices making some subjacs smaller
+        if system.pathname == '':
+            for key, meta in system._subjacs_info.items():
+                nrows, ncols = meta['shape']
+                if key[0] in system._owns_approx_of_idx:
+                    ridxs = system._owns_approx_of_idx[key[0]]
+                    if len(ridxs) == nrows:
+                        ridxs = _full_slice  # value was already changed
+                else:
+                    ridxs = _full_slice
+                if key[1] in system._owns_approx_wrt_idx:
+                    cidxs = system._owns_approx_wrt_idx[key[1]]
+                    if len(cidxs) == ncols:
+                        cidxs = _full_slice  # value was already changed
+                else:
+                    cidxs = _full_slice
+
+                if ridxs is not _full_slice or cidxs is not _full_slice:
+                    # replace our local subjac with a smaller one but don't
+                    # change the subjac belonging to the system (which has values
+                    # shared with subsystems)
+                    if self._subjacs_info is system._subjacs_info:
+                        self._subjacs_info = system._subjacs_info.copy()
+                    meta = self._subjacs_info[key] = meta.copy()
+                    val = meta['value']
+
+                    if ridxs is not _full_slice:
+                        nrows = len(ridxs)
+                    if cidxs is not _full_slice:
+                        ncols = len(cidxs)
+
+                    if meta['rows'] is None:  # dense
+                        val = val[ridxs, :]
+                        val = val[:, cidxs]
+                        meta['value'] = val
+                    else:  # sparse
+                        sprows = meta['rows']
+                        spcols = meta['cols']
+                        if ridxs is not _full_slice:
+                            sprows, mask = sparse_subinds(sprows, ridxs)
+                            spcols = spcols[mask]
+                            val = val[mask]
+                        if cidxs is not _full_slice:
+                            spcols, mask = sparse_subinds(spcols, cidxs)
+                            sprows = sprows[mask]
+                            val = val[mask]
+                        meta['rows'] = sprows
+                        meta['cols'] = spcols
+                        meta['value'] = val
+
+                    meta['shape'] = (nrows, ncols)
+
+    def set_col(self, system, icol, column):
+        """
+        Set a column of the jacobian.
+
+        The column is assumed to be the same size as a column of the jacobian.
+
+        This also assumes that the column does not attempt to set any nonzero values that are
+        outside of specified sparsity patterns for any of the subjacs.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        icol : int
+            Column index.
+        column : ndarray
+            Column value.
+
+        """
+        if self._colnames is None:
+            self._setup_index_maps(system)
+
+        wrt = self._colnames[self._col2name_ind[icol]]
+        _, offset, _, _, _ = self._col_var_info[wrt]
+        loc_idx = icol - offset  # local col index into subjacs
+
+        for of, start, end, _ in system._jac_of_iter():
+            key = (of, wrt)
+            if key in self._subjacs_info:
+                subjac = self._subjacs_info[key]
+                if subjac['cols'] is None:  # dense
+                    subjac['value'][:, loc_idx] = column[start:end]
+                else:  # our COO format
+                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
+                    if match_inds.size > 0:
+                        subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+
+    def _remove_approx_sparsity(self):
+        """
+        Turn all subjacs into dense ones for purposes of computing the coloring.
+        """
+        system = self._system()
+        abs2meta_out = system._var_allprocs_abs2meta['output']
+        abs2meta_in = system._var_allprocs_abs2meta['input']
+        fd_types = ('cs', 'fd')
+        self._subjacs_info = system._subjacs_info.copy()
+        for key, meta in self._subjacs_info.items():
+            if meta['rows'] is not None and 'method' in meta and meta['method'] in fd_types:
+                of, wrt = key
+                nrows, ncols = meta['shape']
+                self._subjacs_info[key] = m = meta.copy()
+                val = meta['value']
+                rows = meta['rows']
+                cols = meta['cols']
+                # create dense subjac
+                m['value'] = np.zeros(meta['shape'])
+                m['value'][rows, cols] = val
+                m['rows'] = None
+                m['cols'] = None
+
+    def _restore_approx_sparsity(self):
+        """
+        Revert all subjacs back to the way they were as declared by the user.
+        """
+        self._subjacs_info = self._system()._subjacs_info
+        self._colnames = None  # force recompute of internal index maps on next set_col
+
+    def _get_tot_array_size(self):
+        """
+        Return the total memory size of all value, row, and column data in this jacobian.
+
+        Returns
+        -------
+        int
+            Total size of the value and index arrays.
+        """
+        tot = 0
+        for key, meta in self._subjacs_info.items():
+            if meta['rows'] is not None:
+                tot += sys.getsizeof(np.asarray(meta['rows']))
+                tot += sys.getsizeof(np.asarray(meta['cols']))
+            tot += sys.getsizeof(meta['value'])
+        return tot

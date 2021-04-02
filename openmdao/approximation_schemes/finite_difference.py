@@ -3,10 +3,8 @@ from collections import namedtuple, defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results, _full_slice
-from openmdao.utils.array_utils import sub2full_indices
-from openmdao.utils.coloring import Coloring
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -121,13 +119,14 @@ class FiniteDifference(ApproximationScheme):
                                                     list(DEFAULT_ORDER.keys())))
 
         options['vector'] = vector
-
-        key = (abs_key[1], options['form'], options['order'], options['step'],
-               options['step_calc'], options['directional'])
-        self._exec_dict[key].append((abs_key, options))
+        wrt = abs_key[1]
+        if wrt in self._wrt_meta:
+            issue_warning(f"overriding previous approximation defined for '{wrt}'.",
+                          prefix=system.msginfo, category=DerivativesWarning)
+        self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
-    def _get_approx_data(self, system, data):
+    def _get_approx_data(self, system, wrt, meta):
         """
         Given approximation metadata, compute necessary deltas and coefficients.
 
@@ -135,15 +134,20 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System whose derivatives are being approximated.
-        data : tuple
-            Tuple of the form (wrt, form, order, step, step_calc, directional)
+        wrt : str
+            Name of wrt variable.
+        meta : dict
+            Metadata dict.
 
         Returns
         -------
         tuple
             Tuple of the form (deltas, coeffs, current_coeff)
         """
-        wrt, form, order, step, step_calc, _ = data
+        form = meta['form']
+        order = meta['order']
+        step = meta['step']
+        step_calc = meta['step_calc']
 
         # FD forms are written as a collection of changes to inputs (deltas) and the associated
         # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -181,15 +185,15 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if not self._exec_dict:
+        if not self._wrt_meta:
             return
 
         if jac is None:
             jac = system._jacobian
 
-        self._starting_outs = system._outputs.asarray(True)
-        self._starting_resids = system._residuals.asarray(True)
-        self._starting_ins = system._inputs.asarray(True)
+        self._starting_outs = system._outputs.asarray(copy=True)
+        self._starting_resids = system._residuals.asarray(copy=True)
+        self._starting_ins = system._inputs.asarray(copy=True)
         if total:
             self._results_tmp = self._starting_outs.copy()
         else:
@@ -198,7 +202,10 @@ class FiniteDifference(ApproximationScheme):
         self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
         # reclaim some memory
-        self._starting_ins = self._starting_outs = self._results_tmp = None
+        self._starting_ins = None
+        self._starting_outs = None
+        self._starting_resids = None
+        self._results_tmp = None
 
     def _get_multiplier(self, data):
         """
@@ -254,7 +261,7 @@ class FiniteDifference(ApproximationScheme):
         Returns
         -------
         ndarray
-            The results from running the perturbed system.
+            Copy of the outputs or residuals array after running the perturbed system.
         """
         deltas, coeffs, current_coeff = data
 
@@ -292,7 +299,7 @@ class FiniteDifference(ApproximationScheme):
         Returns
         -------
         ndarray
-            The results from running the perturbed system.
+            Copy of the outputs or residuals array after running the perturbed system.
         """
         for vec, idxs in idx_info:
             if vec is not None:
