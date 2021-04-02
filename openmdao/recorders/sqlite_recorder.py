@@ -7,6 +7,7 @@ from io import BytesIO
 from collections import OrderedDict
 
 import os
+import gc
 import sqlite3
 from itertools import chain
 
@@ -769,8 +770,18 @@ class SqliteRecorder(CaseRecorder):
         Shut down the recorder.
         """
         # close database connection
+        if self._record_metadata and self.metadata_connection and \
+                self.metadata_connection != self.connection:
+            self.metadata_connection.close()
+
         if self.connection:
             self.connection.close()
+
+        # sqlite close() does not always write until garbage collection occurs.
+        # If collection is not forced like this and a reader is immediately opened on
+        # the same file, it may find a 0-length or malformed db.
+        # See https://www.sqlite.org/c3ref/close.html for more info
+        gc.collect()
 
     def delete_recordings(self):
         """
