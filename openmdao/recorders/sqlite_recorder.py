@@ -15,6 +15,7 @@ import numpy as np
 
 import pickle
 
+from openmdao import __version__ as openmdao_version
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
@@ -29,6 +30,8 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+13-- OpenMDAO 3.8.1
+     Added OpenMDAO version number to recorder file
 12-- OpenMDAO 3.6.1
      Change key for system metadata to use non-ambiguous separator
 11-- OpenMDAO 3.2
@@ -56,7 +59,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 12
+format_version = 13
 
 # separator, cannot be a legal char for names
 META_KEY_SEP = '!'
@@ -195,11 +198,12 @@ class SqliteRecorder(CaseRecorder):
 
             self.connection = sqlite3.connect(filepath)
             with self.connection as c:
-                c.execute("CREATE TABLE metadata(format_version INT, "
+                c.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
                           "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT,"
                           "conns TEXT)")
-                c.execute("INSERT INTO metadata(format_version, abs2prom, prom2abs) "
-                          "VALUES(?,?,?)", (format_version, None, None))
+                c.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
+                          " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
+                                                         None, None))
 
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "

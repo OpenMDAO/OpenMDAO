@@ -25,6 +25,8 @@ env:
 git:
   depth: 99999
 
+dist: bionic
+
 addons:
   apt:
     update: true
@@ -155,7 +157,7 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make travis;
+    make strict;
   fi
 
 # run the tests from down here to see if it can work without being at top level

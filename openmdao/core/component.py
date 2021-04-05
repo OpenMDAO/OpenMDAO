@@ -173,7 +173,9 @@ class Component(System):
         self._var_rel2meta.update(self._static_var_rel2meta)
         for io in ['input', 'output']:
             self._var_rel_names[io].extend(self._static_var_rel_names[io])
+
         self.setup()
+        self._setup_check()
 
         self._set_vector_class()
 
@@ -195,9 +197,9 @@ class Component(System):
         """
         Do any error checking on i/o configuration.
         """
-        # check here if declare_coloring was called during setup but declare_partials
-        # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
-        # have something to color.
+        # Check here if declare_coloring was called during setup but declare_partials wasn't.
+        # If declare partials wasn't called, call it with of='*' and wrt='*' so we'll have
+        # something to color.
         if self._coloring_info['coloring'] is not None:
             for key, meta in self._declared_partials.items():
                 if 'method' in meta and meta['method'] is not None:
@@ -1546,7 +1548,14 @@ class Component(System):
                                                 meta['src_indices'], src_shape)
                 elif _is_slicer_op(src_inds):
                     meta['src_slice'] = src_inds
-                    src_inds = _slice_indices(src_inds, np.prod(parent_src_shape), parent_src_shape)
+                    try:
+                        src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
+                                                  parent_src_shape)
+                    except IndexError as err:
+                        raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
+                                         f"resolving source indices in connection "
+                                         f"between source='{oldprom}' "
+                                         f"and target='{tgt}'\n  with src_indices='{src_inds}'")
                     meta['flat_src_indices'] = True
                 elif src_inds.ndim == 1:
                     meta['flat_src_indices'] = True
