@@ -3,7 +3,20 @@ import inspect
 from IPython.display import display, HTML, Code
 
 
-def get_object_from_reference(reference):
+def _get_object_from_reference(reference):
+    """
+    Return object of given reference path.
+
+    Parameters
+    ----------
+    reference : str
+        Dot path of desired class.
+
+    Returns
+    -------
+    str
+        Object of the given class.
+    """
     split = reference.split('.')
     right = []
     module = None
@@ -32,7 +45,7 @@ def display_source(reference, hide_doc_string=False):
     str
         Source code of the given class or function.
     """
-    obj = inspect.getsource(get_object_from_reference(reference))
+    obj = inspect.getsource(_get_object_from_reference(reference))
 
     if hide_doc_string:
         obj = obj.split('"""')
@@ -55,7 +68,7 @@ def show_options_table(reference):
     IPython.display.Code
         Options table of the given class or function.
     """
-    obj = get_object_from_reference(reference)()
+    obj = _get_object_from_reference(reference)()
 
     return display(HTML(obj.options.to_table(fmt='html')))
 
@@ -68,7 +81,7 @@ def cite(reference):
     reference : str
         Dot path of desired class or function.
     """
-    obj = get_object_from_reference(reference)()
+    obj = _get_object_from_reference(reference)()
 
     print(obj.cite)
 
