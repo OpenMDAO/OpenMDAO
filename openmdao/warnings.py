@@ -190,7 +190,7 @@ def _make_table(superclass=OpenMDAOWarning):
     max_name_len = max([len(_class.__name__) for _class in _warnings])
     max_desc_len = max([len(' '.join(c.__doc__.split())) for c in _warnings])
 
-    name_header = "Option Name"
+    name_header = "Warning Class"
     desc_header = "Description"
     print(f'| {name_header:<{max_name_len}} | {desc_header:<{max_desc_len}} |', file=s)
     print(f'| {max_name_len*"-"} | {max_desc_len*"-"} |', file=s)
