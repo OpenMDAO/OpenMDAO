@@ -1160,7 +1160,18 @@ def _slice_indices(slicer, arr_size, arr_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
+    if isinstance(slicer, slice):
+        # for a simple slice we can use less memory
+        start, stop, step = slicer.start, slicer.stop, slicer.step
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = arr_size
+        if step is None:
+            step = 1
+        return np.arange(start, stop, step, dtype=INT_DTYPE).reshape(arr_shape)
+    else:
+        return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
 def _prom2ivc_src_name_iter(prom_dict):
@@ -1354,7 +1365,7 @@ def shape2tuple(shape):
 
 def get_connection_owner(system, tgt):
     """
-    Return (owner, promoted_src, promoted_tgt) for the given connected source and target.
+    Return (owner, promoted_src, promoted_tgt) for the given connected target.
 
     Note: this is not speedy.  It's intended for use only in error messages.
 

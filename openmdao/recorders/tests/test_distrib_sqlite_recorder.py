@@ -11,7 +11,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
-    Group, ParallelGroup, IndepVarComp, SqliteRecorder, ScipyOptimizeDriver
+    Group, ParallelGroup, IndepVarComp, SqliteRecorder, ScipyOptimizeDriver, slicer
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
@@ -142,7 +142,8 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('summer', Summer(size), promotes_outputs=['sum'])
+        prob.model.promotes('summer', inputs=['y'], src_indices=slicer[:])
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True

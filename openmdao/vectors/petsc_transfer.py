@@ -135,15 +135,11 @@ class PETScTransfer(DefaultTransfer):
                     if src_indices is None:
                         if meta_out['distributed']:
                             # input in this case is non-distributed (else src_indices would be
-                            # defined by now).  The input size must match the full
-                            # distributed size of the output.
-                            for rank, sz in enumerate(sizes_out[:, idx_out]):
-                                if sz > 0:
-                                    out_offset = offsets_out[rank, idx_out]
-                                    break
-                            output_inds = np.arange(out_offset,
-                                                    out_offset + meta_out['global_size'],
-                                                    dtype=INT_DTYPE)
+                            # defined by now).  dist output to serial input conns w/o src_indices
+                            # are not allowed.
+                            raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
+                                               f"'{abs_out}' to serial input '{abs_in}' without "
+                                               "declaring src_indices.")
                         else:
                             rank = myproc if abs_out in abs2meta_out else owner
                             offset = offsets_out[rank, idx_out]

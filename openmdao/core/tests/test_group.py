@@ -1813,7 +1813,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "<model> <class SimpleGroup>: The src_indices argument should be an int, list, "
-            "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
+            "tuple, ndarray, slice or Iterable, but src_indices for promotes from 'comp2' are "
             "<class 'float'>.")
 
     def test_promotes_src_indices_bad_dtype(self):
@@ -3123,6 +3123,7 @@ class Test3Deep(unittest.TestCase):
         p = self.build_model()
         p.model.cfg.add_var_output('sub.C3.ovar0', 3.0, units='ft')
         p.model.add_var_output('cfg.sub.C3.ovar1', 4.0, units='inch')
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)

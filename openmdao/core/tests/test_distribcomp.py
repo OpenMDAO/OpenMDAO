@@ -426,7 +426,7 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
         model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
-        model.connect('Cdist.outvec', 'Cserial.invec')
+        model.connect('Cdist.outvec', 'Cserial.invec', src_indices=om.slicer[:])
         p.setup()
         p.run_model()
         msg = "<model> <class Group>: Non-distributed variable 'Cserial.invec' has a distributed source, 'Cdist.outvec', so you must retrieve its value using 'get_remote=True'."
@@ -700,7 +700,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
                                                  y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
-        top.connect('C2.outvec', 'C3.x')
+        top.connect('C2.outvec', 'C3.x', src_indices=om.slicer[:])
         p.setup()
 
         # Conclude setup but don't run model.
@@ -817,7 +817,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
-        top.connect('C2.outvec', 'C3.invec')
+        top.connect('C2.outvec', 'C3.invec', om.slicer[:])
         p.setup()
 
         # Conclude setup but don't run model.
@@ -1048,7 +1048,9 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        # to copy the full distributed output C2.outvec into C3.invec on all procs, we need
+        # to specify src_indices=om.slicer[:]
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()

@@ -864,7 +864,7 @@ class Component(System):
         set
             Names of inputs where src_indices were added.
         """
-        if MPI is None or not self.options['distributed']:
+        if MPI is None:  # or not self.options['distributed']:
             return set()
 
         iproc = self.comm.rank
@@ -874,11 +874,15 @@ class Component(System):
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
-        added_src_inds = set()
+        added_src_inds = {}
+        # loop over continuous inputs (all procs)
         for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
-            if iname in abs2meta_in and abs2meta_in[iname]['src_indices'] is None:
-                meta_in = abs2meta_in[iname]
-                src = abs_in2out[iname]
+            if iname not in abs2meta_in:
+                continue
+            meta_in = abs2meta_in[iname]
+            src = abs_in2out[iname]
+            if meta_in['src_indices'] is None and (
+                    meta_in['distributed'] or all_abs2meta_out[src]['distributed']):
                 out_i = all_abs2idx[src]
                 nzs = np.nonzero(sizes_out[:, out_i])[0]
                 if (all_abs2meta_out[src]['global_size'] ==
@@ -902,7 +906,7 @@ class Component(System):
                 meta_in['src_indices'] = inds
                 meta_in['flat_src_indices'] = True
                 all_abs2meta_in[iname]['has_src_indices'] = True
-                added_src_inds.add(iname)
+                added_src_inds[iname] = (offset, end)
 
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "

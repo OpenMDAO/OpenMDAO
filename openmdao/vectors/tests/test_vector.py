@@ -140,7 +140,7 @@ class TestPETScVector2Proc(unittest.TestCase):
 
         # Connect variables between components
         top_group.connect('serial_linear.x', 'distributed_quad.x')
-        top_group.connect('distributed_quad.y', 'serial_linear.y')
+        top_group.connect('distributed_quad.y', 'serial_linear.y', src_indices=om.slicer[:])
 
         # Need a nonlinear solver since the model is coupled
         top_group.nonlinear_solver = om.NonlinearBlockGS(iprint=0, maxiter=20)
@@ -172,7 +172,7 @@ class TestPETScVector3Proc(unittest.TestCase):
 
         # Connect variables between components
         top_group.connect('serial_linear.x', 'distributed_quad.x')
-        top_group.connect('distributed_quad.y', 'serial_linear.y')
+        top_group.connect('distributed_quad.y', 'serial_linear.y', src_indices=om.slicer[:])
 
         # Need a nonlinear solver since the model is coupled
         top_group.nonlinear_solver = om.NonlinearBlockGS(iprint=0, maxiter=20)

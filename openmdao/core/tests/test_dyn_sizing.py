@@ -204,7 +204,7 @@ class TestPassSizeDistributed(unittest.TestCase):
     N_PROCS = 3
 
     def test_serial_start(self):
-        """the size information starts in the serial comonent C"""
+        """the size information starts in the serial component C"""
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -216,7 +216,7 @@ class TestPassSizeDistributed(unittest.TestCase):
         prob.model.connect('A.out', ['B.in'])
 
         prob.model.add_subsystem('C', C())
-        prob.model.connect('B.out', ['C.in'])
+        prob.model.connect('B.out', ['C.in'], src_indices=om.slicer[:])
 
         prob.model.add_subsystem('D', D_distrib())
         prob.model.connect('C.out', ['D.in'])
@@ -224,42 +224,11 @@ class TestPassSizeDistributed(unittest.TestCase):
         prob.model.add_subsystem('E', E())
         prob.model.connect('D.out', ['E.in'])
 
-        prob.setup()
-        prob.run_model()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
 
-        # # check all global sizes
-        self.assertEqual(prob.get_val('A.out', get_remote=True).size, 4)
-        self.assertEqual(prob.get_val('B.in', get_remote=True).size, 4)
-        self.assertEqual(prob.get_val('B.out', get_remote=True).size, 4)
-
-        self.assertEqual(prob.get_val('D.in', get_remote=True).size, 9)
-        self.assertEqual(prob.get_val('D.out', get_remote=True).size, 9)
-        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 9)
-
-        # #check all local sizes
-        nprocs = MPI.COMM_WORLD.size
-        rank = MPI.COMM_WORLD.rank
-
-        # evenly distribute the variable over the procs
-        ave, res = divmod(4, nprocs)
-        sizes_up = [ave + 1 if p < res else ave for p in range(nprocs)]
-        size_up = sizes_up[rank]
-
-        ave, res = divmod(9, nprocs)
-        sizes_down = [ave + 1 if p < res else ave for p in range(nprocs)]
-        size_down = sizes_down[rank]
-
-        self.assertEqual(prob.get_val('A.out').size, 4)
-        self.assertEqual(prob.get_val('B.in').size, size_up)
-        self.assertEqual(prob.get_val('B.out').size, sizes_up[rank])
-
-        self.assertEqual(prob.get_val('D.in').size, size_down)
-        self.assertEqual(prob.get_val('D.out').size, sizes_down[rank])
-        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 3*self.N_PROCS)
-        self.assertEqual(prob.get_val('E.out').size, 9)
-
-        # test the output from running model
-        self.assertEqual(np.sum(prob.get_val('E.out')), np.sum(np.arange(9)))
+        msg = "<model> <class Group>: dynamic sizing of serial input 'E.in' from distributed output 'D.out' is not supported."
+        self.assertEquals(str(cm.exception), msg)
 
     def test_distributed_start(self):
         """the size information starts in the distributed comonent C"""
@@ -282,42 +251,11 @@ class TestPassSizeDistributed(unittest.TestCase):
         prob.model.add_subsystem('E', E())
         prob.model.connect('D.out', ['E.in'])
 
-        prob.setup()
-        prob.run_model()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
 
-        # # check all global sizes
-        self.assertEqual(prob.get_val('A.out', get_remote=True).size, 3)
-        self.assertEqual(prob.get_val('B.in', get_remote=True).size, 3)
-        self.assertEqual(prob.get_val('B.out', get_remote=True).size, 3)
-
-        self.assertEqual(prob.get_val('D.in', get_remote=True).size, 3*self.N_PROCS)
-        self.assertEqual(prob.get_val('D.out', get_remote=True).size, 3*self.N_PROCS)
-        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 3*self.N_PROCS)
-
-        # #check all local sizes
-        rank = MPI.COMM_WORLD.rank
-        if rank == 0:
-            size_up = 1
-        elif rank == 1:
-            size_up = 2
-        else:
-            size_up = 0
-
-        size_down = 3
-
-        self.assertEqual(prob.get_val('A.out').size, 3)
-        self.assertEqual(prob.get_val('B.in').size, size_up)
-        self.assertEqual(prob.get_val('B.out').size, size_up)
-
-        self.assertEqual(prob.get_val('D.in').size, size_down)
-        self.assertEqual(prob.get_val('D.out').size, size_down)
-        self.assertEqual(prob.get_val('E.in', get_remote=True).size, 3*self.N_PROCS)
-        self.assertEqual(prob.get_val('E.out').size, 3*self.N_PROCS)
-
-        # test the output from running model
-        n = self.N_PROCS - 1
-        np.testing.assert_allclose(prob.get_val('E.out'), np.array([1., 1., 1., 4., 4., 4., 0., 0., 0.]))
-
+        msg = "<model> <class Group>: dynamic sizing of serial output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
+        self.assertEquals(str(cm.exception), msg)
 
 class ResizableComp(om.ExplicitComponent):
     # this is just a component that allows us to resize between setups
@@ -694,14 +632,18 @@ class TestDistribDynShapes(unittest.TestCase):
         G1 = par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
         G2 = par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
 
-        p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(5,)))
+        # 'sink' has a defined shape and dyn shapes propagate in reverse from there.
+        p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(8,)))
         p.model.connect('indep.x1', ['par.G1.C1.x1', 'par.G2.C1.x1'])
-        p.model.connect('par.G1.C2.y1', 'sink.x1')
-        p.model.connect('par.G2.C2.y1', 'sink.x2')
+        p.model.connect('par.G1.C2.y1', 'sink.x1', src_indices=om.slicer[:])
+        p.model.connect('par.G2.C2.y1', 'sink.x2', src_indices=om.slicer[:])
 
-        p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p['sink.y1'], np.ones(5)*8.)
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        cname = 'G1' if p.model.comm.rank <= 1 else 'G2'
+        msg = f"'par.{cname}.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.{cname}.C1.x1'. They must be supplied manually."
+        self.assertEqual(str(cm.exception), msg)
 
 
 class DynPartialsComp(om.ExplicitComponent):

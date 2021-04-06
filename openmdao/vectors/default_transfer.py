@@ -84,15 +84,13 @@ class DefaultTransfer(Transfer):
                 if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
-                # Only continue if the input exists on this processor
+                # This weeds out discrete vars (all vars are local if using this Transfer)
                 if abs_in in abs2meta['input']:
 
                     indices = None
                     # Get meta
                     meta_in = abs2meta['input'][abs_in]
                     meta_out = allprocs_abs2meta_out[abs_out]
-
-                    assert not meta_out['distributed']
 
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]

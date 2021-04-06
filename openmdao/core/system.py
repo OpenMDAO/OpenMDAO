@@ -4451,7 +4451,12 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            src_indices = None  # FIXME: remote var could have src_indices
+            if 'src_slice' in vmeta:
+                smeta = self._var_allprocs_abs2meta['output'][src]
+                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
+                                             smeta['shape'])
+            else:
+                src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
@@ -4477,7 +4482,14 @@ class System(object):
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
                     vshape = shp
-        else:
+
+        if self.comm.size > 1 and get_remote:
+            if self.comm.rank == self._owning_rank[abs_name]:
+                self.comm.bcast(has_src_indices, root=self.comm.rank)
+            else:
+                has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
+
+        if name not in scope_sys._var_prom2inds:
             is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
             src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
