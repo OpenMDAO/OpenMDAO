@@ -168,19 +168,6 @@ script:
     testflo -n 1 openmdao --timeout=120 --show_skipped;
   fi
 
-after_success:
-# again, only run coverage operations on the upload machine after success.
-# strip the site-package path so that links works on coveralls.io
-- if [ "$UPLOAD_DOCS" ]; then
-    echo " >> Installing forked version of coveralls";
-    pip install git+https://github.com/swryan/coveralls-python@work;
-
-    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
-    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
-    coveralls --upload=coveralls-upd.json;
-  fi
-
 deploy:
   provider: script
   skip_cleanup: true
