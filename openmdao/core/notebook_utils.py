@@ -43,6 +43,7 @@ def _get_object_from_reference(reference):
             module = getattr(module, entry)
     return module
 
+
 def display_source(reference, hide_doc_string=False):
     """
     Return the source code of the given reference path.
@@ -66,6 +67,7 @@ def display_source(reference, hide_doc_string=False):
 
     return display(Code(obj, language='python'))
 
+
 def show_options_table(reference):
     """
     Return the options table of the given reference path.
@@ -83,6 +85,7 @@ def show_options_table(reference):
     obj = _get_object_from_reference(reference)()
 
     return display(HTML(obj.options.to_table(fmt='html')))
+
 
 def cite(reference):
     """
