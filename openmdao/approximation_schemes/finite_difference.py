@@ -172,7 +172,7 @@ class FiniteDifference(ApproximationScheme):
 
         return deltas, coeffs, current_coeff
 
-    def compute_approx_col_iter(self, system, total=False, under_cs=False, nrepeats=1):
+    def compute_approx_col_iter(self, system, total=False, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -184,8 +184,6 @@ class FiniteDifference(ApproximationScheme):
             If True total derivatives are being approximated, else partials.
         under_cs : bool
             True if we're currently under complex step at a higher level.
-        nrepeats : int
-            Number of times each column calculation will be repeated.
         """
         if not self._wrt_meta:
             return
@@ -198,8 +196,7 @@ class FiniteDifference(ApproximationScheme):
         else:
             self._results_tmp = self._starting_resids.copy()
 
-        yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs,
-                                                 nrepeats=nrepeats)
+        yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs)
 
         # reclaim some memory
         self._starting_ins = None

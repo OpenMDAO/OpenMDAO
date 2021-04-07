@@ -272,6 +272,29 @@ class ApproximationScheme(object):
                                             meta['vector']))
 
     def _colored_column_iter(self, system, colored_approx_groups, total):
+        """
+        Perform colored approximations and yields (column_index, column) for each jac column.
+
+        Parameters
+        ----------
+        system : System
+            System where this approximation is occurring.
+        colored_approx_groups : list of tuples of the form (data, jaccols, vec_ind_list, nzrows)
+            data -> metadata needed to perform cs or fd
+            jaccols -> jacobian columns corresponding to a colored solve
+            vec_ind_list -> list of tuples of the form (Vector, ndarray of int)
+                Tuple of wrt indices and corresponding data vector to perturb.
+            nzrows -> rows containing nonzero values for each column in jaccols
+        total : bool
+            If True total derivatives are being approximated, else partials.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
+        """
         if total:
             # if we have any remote vars, find the list of vars from this proc that need to be
             # transferred to other procs
@@ -349,7 +372,34 @@ class ApproximationScheme(object):
                     scratch[nzrows[i]] = res[nzrows[i]]
                     yield col, scratch
 
-    def _uncolored_column_iter(self, system, approx_groups, total, nrepeats=1):
+    def _uncolored_column_iter(self, system, approx_groups, total):
+        """
+        Perform approximations and yields (column_index, column) for each jac column.
+
+        Parameters
+        ----------
+        system : System
+            System where this approximation is occurring.
+        approx_groups : list of tuples of the form (wrt, data, jaccols, vec, vec_idx, directional,
+                                                    dir_vector)
+            wrt -> name of the 'with respect to' variable
+            data -> metadata needed to perform cs or fd
+            jaccols -> jacobian columns corresponding to all solves for the 'wrt' variable
+            vec -> Vector being perturbed
+            vec_idx -> indices where the vector will be perturbed (one per approximation)
+            directional -> if True we're computing a directional derivative (one approx for the
+                           whole wrt variable instead of 1 per entry in the variable)
+            dir_vector -> if directional is True, this may contain the direction vector
+        total : bool
+            If True total derivatives are being approximated, else partials.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
+        """
         ordered_of_iter = list(system._jac_of_iter())
         if total:
             # if we have any remote vars, find the list of vars from this proc that need to be
@@ -388,56 +438,54 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             for i_count, (idxs, vecidxs) in enumerate(zip(jcol_idxs, vec_idxs)):
-                for rep in range(nrepeats):
-                    if fd_count % num_par_fd == system._par_fd_id:
-                        # run the finite difference
-                        result = self._run_point(system, [(vec, vecidxs)],
-                                                 app_data, results_array, total)
+                if fd_count % num_par_fd == system._par_fd_id:
+                    # run the finite difference
+                    result = self._run_point(system, [(vec, vecidxs)],
+                                             app_data, results_array, total)
 
-                        result = self._transform_result(result)
+                    result = self._transform_result(result)
 
-                        if direction is not None or mult != 1.0:
-                            result *= mult
+                    if direction is not None or mult != 1.0:
+                        result *= mult
 
-                        if total:
-                            result = self._get_semitotal_result(system, result, tot_result,
-                                                                ordered_of_iter, my_rem_out_vars)
+                    if total:
+                        result = self._get_semitotal_result(system, result, tot_result,
+                                                            ordered_of_iter, my_rem_out_vars)
 
-                        tosend = (group_i, i_count, result)
+                    tosend = (group_i, i_count, result)
 
-                        if rep == 0 and self._progress_out:
-                            end_time = time.time()
-                            prom_name = _convert_auto_ivc_to_conn_name(
-                                system._conn_global_abs_in2out, wrt)
-                            self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
-                                                     f"derivatives with respect to: "
-                                                     f"'{prom_name} [{vecidxs}]' ... "
-                                                     f"{round(end_time-start_time, 4)} seconds\n")
+                    if self._progress_out:
+                        end_time = time.time()
+                        prom_name = _convert_auto_ivc_to_conn_name(
+                            system._conn_global_abs_in2out, wrt)
+                        self._progress_out.write(f"{fd_count+1}/{len(result)}: Checking "
+                                                 f"derivatives with respect to: "
+                                                 f"'{prom_name} [{vecidxs}]' ... "
+                                                 f"{round(end_time-start_time, 4)} seconds\n")
 
-                    if rep == (nrepeats - 1):
-                        fd_count += 1
+                fd_count += 1
 
-                    # check if it's time to collect parallel FD columns
-                    if use_parallel_fd:
-                        if fd_count == nruns or fd_count % num_par_fd == 0:
-                            allres = mycomm.allgather(tosend)
-                            tosend = None
-                        else:
-                            continue
+                # check if it's time to collect parallel FD columns
+                if use_parallel_fd:
+                    if fd_count == nruns or fd_count % num_par_fd == 0:
+                        allres = mycomm.allgather(tosend)
+                        tosend = None
                     else:
-                        allres = [tosend]
+                        continue
+                else:
+                    allres = [tosend]
 
-                    for tup in allres:
-                        if tup is None:
-                            continue
-                        gi, icount, res = tup
-                        # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
-                        # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
-                        jinds = approx_groups[gi][2][icount]
-                        if directional:
-                            yield jinds[0], res
-                        else:
-                            yield jinds, res
+                for tup in allres:
+                    if tup is None:
+                        continue
+                    gi, icount, res = tup
+                    # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
+                    # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
+                    jinds = approx_groups[gi][2][icount]
+                    if directional:
+                        yield jinds[0], res
+                    else:
+                        yield jinds, res
 
     def compute_approximations(self, system, jac=None, total=False):
         """
@@ -463,7 +511,7 @@ class ApproximationScheme(object):
                                                     under_cs=system._outputs._under_complex_step):
             jac.set_col(system, ic, col)
 
-    def _compute_approx_col_iter(self, system, total, under_cs, nrepeats=1):
+    def _compute_approx_col_iter(self, system, total, under_cs):
         system._set_approx_mode(True)
 
         # This will either generate new approx groups or use cached ones
@@ -472,7 +520,7 @@ class ApproximationScheme(object):
         if colored_approx_groups:
             yield from self._colored_column_iter(system, colored_approx_groups, total)
 
-        yield from self._uncolored_column_iter(system, approx_groups, total, nrepeats)
+        yield from self._uncolored_column_iter(system, approx_groups, total)
 
         system._set_approx_mode(False)
 
