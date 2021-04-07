@@ -157,13 +157,6 @@ class ApproximationScheme(object):
                         ccol2vcol[colored_start:colored_end] = rng
                     colored_start = colored_end
 
-        approx_of_idxs = system._owns_approx_of_idx
-        if approx_of_idxs is None:
-            approx_of_idxs = {}
-        approx_wrt_idxs = system._owns_approx_wrt_idx
-        if approx_wrt_idxs is None:
-            approx_wrt_idxs = {}
-
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
         abs2prom = system._var_allprocs_abs2prom['output']
@@ -368,9 +361,6 @@ class ApproximationScheme(object):
             else:
                 my_rem_out_vars = ()
             tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
-        #     tot_result = scratch.copy()
-        # else:
-        #     scratch = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
 
         # Clean vector for results (copy of the outputs or resids)
         results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)

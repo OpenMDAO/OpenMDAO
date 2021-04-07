@@ -444,18 +444,6 @@ class Vector(object):
         raise NotImplementedError('add_scale_vec not defined for vector type %s' %
                                   type(self).__name__)
 
-    def scale(self, scale_to):
-        """
-        Scale this vector to normalized or physical form.
-
-        Parameters
-        ----------
-        scale_to : str
-            Values are "phys" or "norm" to scale to physical or normalized.
-        """
-        raise NotImplementedError('scale not defined for vector type %s' %
-                                  type(self).__name__)
-
     def asarray(self, copy=False):
         """
         Return a flat array representation of this vector.
