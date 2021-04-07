@@ -52,6 +52,8 @@ def display_source(reference, hide_doc_string=False):
     ----------
     reference : str
         Dot path of desired class or function.
+    hide_doc_string : bool
+        Option to hide the docstring.
 
     Returns
     -------
