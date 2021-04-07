@@ -823,10 +823,10 @@ class Group(System):
         abs2meta_in = self._var_abs2meta['input']
         tdict = {}
         for tgt, src in self._conn_global_abs_in2out.items():
-            # skip remote vars, discretes and auto_ivcs
-            if tgt not in abs2meta_in or src.startswith('_auto_ivc.'):
+            # skip remote vars, discretes and non-distributed auto_ivcs
+            if tgt not in abs2meta_in or src not in all_abs2meta_out:
                 continue
-            if src not in all_abs2meta_out:
+            if src.startswith('_auto_ivc.') and not all_abs2meta_out[src]['distributed']:
                 continue
 
             src_inds = flat_src_inds = None
@@ -1831,6 +1831,51 @@ class Group(System):
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
+        if path_len == 0 and self.comm.size > 1:  # top level group
+            for abs_in, abs_out in sorted(global_abs_in2out.items()):
+                if abs_out not in allprocs_abs2meta_out or abs_in not in allprocs_abs2meta_in:
+                    continue  # discrete var
+                all_meta_out = allprocs_abs2meta_out[abs_out]
+                all_meta_in = allprocs_abs2meta_in[abs_in]
+
+                # check that src_indices match for dist->serial connection
+                # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
+                # memory issues if src_indices are large.  Maybe try something like computing a hash
+                # in each rank and comparing those?
+                if all_meta_out['distributed'] and not all_meta_in['distributed']:
+                    # all serial inputs must have src_indices if they connect to a distributed
+                    # output
+                    owner = self._owning_rank[abs_in]
+                    if abs_in in abs2meta_in:  # input is local
+                        src_inds = abs2meta_in[abs_in]['src_indices']
+                    else:
+                        src_inds = None
+                    if self.comm.rank == owner:
+                        baseline = None
+                        err = 0
+                        for sinds in self.comm.gather(src_inds, root=owner):
+                            if sinds is not None:
+                                if baseline is None:
+                                    baseline = sinds
+                                else:
+                                    if not np.all(sinds == baseline):
+                                        err = 1
+                                        break
+                        if baseline is None:  # no src_indices were set
+                            err = -1
+                        self.comm.bcast(err, root=owner)
+                    else:
+                        self.comm.gather(src_inds, root=owner)
+                        err = self.comm.bcast(None, root=owner)
+                    if err == 1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' because "
+                                           "src_indices differ on different ranks.")
+                    elif err == -1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' without "
+                                           "specifying src_indices.")
+
         for abs_in, abs_out in global_abs_in2out.items():
             if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
                 continue
@@ -1921,40 +1966,6 @@ class Group(System):
         for abs_in, abs_out in abs_in2out.items():
             all_meta_out = allprocs_abs2meta_out[abs_out]
             all_meta_in = allprocs_abs2meta_in[abs_in]
-
-            # check that src_indices match for dist->serial connection
-            # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
-            # memory issues if src_indices are large.  Maybe try something like computing a hash
-            # in each rank and comparing those?
-            if all_meta_out['distributed'] and not all_meta_in['distributed']:
-                if all_meta_in['has_src_indices']:
-                    if abs_in in abs2meta_in:  # input is local
-                        src_inds = abs2meta_in[abs_in]['src_indices']
-                    else:
-                        src_inds = None
-                    if self.comm.rank == 0:
-                        baseline = None
-                        err = False
-                        for sinds in self.comm.gather(src_inds, root=0):
-                            if sinds is not None:
-                                if baseline is None:
-                                    baseline = sinds
-                                else:
-                                    if not np.all(sinds == baseline):
-                                        err = True
-                                        break
-                        self.comm.bcast(err, root=0)
-                    else:
-                        self.comm.gather(src_inds, root=0)
-                        err = self.comm.bcast(None)
-                    if err:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to serial input '{abs_in}' because "
-                                           "src_indices differ on different ranks.")
-                else:
-                    raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                       f"'{abs_out}' to serial input '{abs_in}' without "
-                                       "specifying src_indices.")
 
             # check unit compatibility
             out_units = all_meta_out['units']
@@ -2089,7 +2100,7 @@ class Group(System):
                         else:
                             meta_in['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape and flat_array_slice_check:
+                        if src_indices.size != shape_to_len(in_shape) and flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."
