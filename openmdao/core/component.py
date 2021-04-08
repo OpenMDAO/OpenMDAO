@@ -109,7 +109,10 @@ class Component(System):
 
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if ALL variables in this component are distributed '
-                                  'across multiple processes.')
+                                  'across multiple processes.',
+                             deprecation="The 'distributed' option has been deprecated. Individual "
+                                         "inputs and outputs should be set as distributed instead,"
+                                         " using calls to add_input() or add_output().")
         self.options.declare('run_root_only', types=bool, default=False,
                              desc='If True, call compute/compute_partials/linearize/apply_linear/'
                                   'apply_nonlinear/compute_jacvec_product only on '
