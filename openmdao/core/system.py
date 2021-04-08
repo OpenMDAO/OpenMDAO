@@ -303,6 +303,10 @@ class System(object):
         True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
+    _has_distrib_vars : bool
+        If True, this System contains at least one distributed variable. Used to determine if a
+        parallel group or distributed component is below a DirectSolver so that we can raise an
+        exception.
     _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
@@ -474,9 +478,10 @@ class System(object):
         self._has_input_scaling = False
         self._has_input_adder = False
         self._has_bounds = False
+        self._has_distrib_vars = False
+        self._has_approx = False
 
         self._vector_class = None
-        self._has_approx = False
 
         self._assembled_jac = None
 

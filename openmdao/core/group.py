@@ -165,9 +165,6 @@ class Group(System):
         List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
-    _has_distrib_vars : bool
-        If True, this Group contains distributed variables. Only used to determine if a parallel
-        group or distributed component is below a DirectSolver so that we can raise an exception.
     _contains_parallel_group : bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
@@ -210,7 +207,6 @@ class Group(System):
         self._discrete_transfers = {}
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
-        self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
@@ -973,10 +969,7 @@ class Group(System):
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
-            if isinstance(subsys, Component):
-                self._has_distrib_vars |= (MPI is not None and subsys.options['distributed'])
-            else:
-                self._has_distrib_vars |= subsys._has_distrib_vars
+            self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps()
             promotes_src_indices = {}

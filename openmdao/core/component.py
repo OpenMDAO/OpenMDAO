@@ -108,8 +108,12 @@ class Component(System):
         super()._declare_options()
 
         self.options.declare('distributed', types=bool, default=False,
-                             desc='True if the component has variables that are distributed '
+                             desc='True if ALL variables in this component are distributed '
                                   'across multiple processes.')
+        self.options.declare('run_root_only', types=bool, default=False,
+                             desc='If True, call compute/compute_partials/linearize/apply_linear/'
+                                  'apply_nonlinear/compute_jacvec_product only on '
+                                  'rank 0 and broadcast the results to the other ranks.')
 
     def setup(self):
         """
@@ -153,14 +157,20 @@ class Component(System):
                 simple_warning(msg)
 
         self.comm = comm
+        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
+        if comm.size == 1:
+            self._has_distrib_vars = False
 
-        # reset shape if any dynamic shape parameters are set in case this is a resetup
-        # NOTE: this is necessary because we allow variables to be added in __init__.
         for meta in self._static_var_rel2meta.values():
+            if nprocs == 1 and 'distributed' in meta and meta['distributed']:
+                meta['distributed'] = False
+
+            # reset shape if any dynamic shape parameters are set in case this is a resetup
+            # NOTE: this is necessary because we allow variables to be added in __init__.
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
@@ -180,7 +190,7 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if MPI is not None and self.options['distributed']:
+        if MPI is not None and self._has_distrib_vars:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
@@ -418,7 +428,8 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
+                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
+                  distributed=False):
         """
         Add an input variable to the component.
 
@@ -454,6 +465,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this input to match that of
             the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
 
         Returns
         -------
@@ -527,11 +541,13 @@ class Component(System):
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': False if MPI is None else self.options['distributed'],
+            'distributed': distributed or self.options['distributed'],
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
         }
+
+        self._has_distrib_vars |= metadata['distributed']
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -607,7 +623,7 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+                   shape_by_conn=False, copy_shape=None, distributed=False):
         """
         Add an output variable to the component.
 
@@ -655,6 +671,9 @@ class Component(System):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
 
         Returns
         -------
@@ -749,7 +768,7 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': False if MPI is None else self.options['distributed'],
+            'distributed': distributed or self.options['distributed'],
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
@@ -759,6 +778,8 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape
         }
+
+        self._has_distrib_vars |= metadata['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
