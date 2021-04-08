@@ -539,6 +539,33 @@ def all_ancestors(pathname, delim='.'):
         yield delim.join(parts[:i])
 
 
+def common_path(path1, path2, delim='.'):
+    """
+    Given two pathnames, return whatever path is common between the two.
+
+    Parameters
+    ----------
+    path1 : str
+        First pathname.
+    path2 : str
+        Second pathname.
+    delim : str
+        Delimiter. Defaults to '.'.
+
+    Returns
+    -------
+    str
+        The common path, or '' if there is no common path.
+    """
+    common = []
+    for n1, n2 in zip(path1.split(delim), path2.split(delim)):
+        if n1 == n2:
+            common.append(n1)
+        else:
+            break
+    return delim.join(common)
+
+
 def find_matches(pattern, var_list):
     """
     Return list of variable names that match given pattern.

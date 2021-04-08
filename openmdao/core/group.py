@@ -150,7 +150,7 @@ class Group(System):
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned
+        Dictionary containing all explicit & implicit continuous var connections owned
         by this system only. The data is the same across all processors.
     _conn_discrete_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit discrete var connections owned
@@ -1148,7 +1148,7 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-        self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
+        self._vars_to_gather = self._find_remote_var_owners()
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -1239,22 +1239,17 @@ class Group(System):
 
     def _find_remote_var_owners(self):
         """
-        Return a mapping of var pathname to owning rank and distrib var name locality.
+        Return a mapping of var pathname to owning rank.
 
-        The first mapping will contain ONLY systems that are remote on at least one proc.
+        The mapping will contain ONLY systems that are remote on at least one proc.
         Distributed systems are not included.
-
-        The second will contain only distrib vars keyed to an array of local ranks.
 
         Returns
         -------
         dict
             The mapping of variable pathname to owning rank.
-        dict
-            The mapping of distrib var name to local ranks.
         """
         remote_vars = {}
-        dists = {}
 
         if self.comm.size > 1:
             myproc = self.comm.rank
@@ -1277,11 +1272,11 @@ class Group(System):
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
                     if name in abs2meta and abs2meta[name]['distributed']:
-                        dists[name] = nzs
+                        pass
                     elif 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
-        return remote_vars, dists
+        return remote_vars
 
     def _setup_var_sizes(self):
         """
@@ -1610,35 +1605,6 @@ class Group(System):
 
         for inp in src_ind_inputs:
             allprocs_abs2meta[inp]['has_src_indices'] = True
-
-    def _evenly_distribute_sizes_to_locals(self, var, arr_size):
-        """
-        Evenly distribute entries for the given array size, but only where the given var is local.
-
-        Parameters
-        ----------
-        var : str
-            Absolute name of the variable.
-        arr_size : int
-            Size to be distributed among procs where var is local.
-
-        Returns
-        -------
-        ndarray
-            Array of sizes, one entry for each proc in this group's comm.
-        ndarray
-            Array of offsets.
-        """
-        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        locality = self._dist_var_locality[var]
-        dsizes, offsets = evenly_distrib_idxs(locality.size, arr_size)
-        for loc_idx, sz in zip(locality, dsizes):
-            sizes[loc_idx] = sz
-
-        offsets = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        offsets[1:] = np.cumsum(sizes)[:-1]
-
-        return sizes, offsets
 
     def _setup_dynamic_shapes(self):
         """

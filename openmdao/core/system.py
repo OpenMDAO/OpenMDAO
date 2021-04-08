@@ -215,11 +215,9 @@ class System(object):
         across multiple processes.
     _vars_to_gather : dict
         Contains names of non-distributed variables that are remote on at least one proc in the comm
-    _dist_var_locality : dict
-        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned by this system
-        or any descendant system. The data is the same across all processors.
+        Dictionary containing all explicit & implicit connections (continuous and discrete)
+        owned by this system or any descendant system. The data is the same across all processors.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs : <Vector>
@@ -402,7 +400,6 @@ class System(object):
         self._subsystems_allprocs = {}
         self._subsystems_myproc = []
         self._vars_to_gather = {}
-        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
