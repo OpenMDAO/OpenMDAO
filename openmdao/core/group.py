@@ -783,6 +783,54 @@ class Group(System):
 
         self._resolve_src_indices()
 
+        if self.comm.size > 1:
+            allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+            allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+            abs2meta_in = self._var_abs2meta['input']
+            for abs_in, abs_out in sorted(conns.items()):
+                if abs_out not in allprocs_abs2meta_out:
+                    continue  # discrete var
+                all_meta_out = allprocs_abs2meta_out[abs_out]
+                all_meta_in = allprocs_abs2meta_in[abs_in]
+
+                # check that src_indices match for dist->serial connection
+                # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
+                # memory issues if src_indices are large.  Maybe try something like computing a hash
+                # in each rank and comparing those?
+                if all_meta_out['distributed'] and not all_meta_in['distributed']:
+                    # all serial inputs must have src_indices if they connect to a distributed
+                    # output
+                    owner = self._owning_rank[abs_in]
+                    if abs_in in abs2meta_in:  # input is local
+                        src_inds = abs2meta_in[abs_in]['src_indices']
+                    else:
+                        src_inds = None
+                    if self.comm.rank == owner:
+                        baseline = None
+                        err = 0
+                        for sinds in self.comm.gather(src_inds, root=owner):
+                            if sinds is not None:
+                                if baseline is None:
+                                    baseline = sinds
+                                else:
+                                    if not np.all(sinds == baseline):
+                                        err = 1
+                                        break
+                        if baseline is None:  # no src_indices were set
+                            err = -1
+                        self.comm.bcast(err, root=owner)
+                    else:
+                        self.comm.gather(src_inds, root=owner)
+                        err = self.comm.bcast(None, root=owner)
+                    if err == 1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' because "
+                                           "src_indices differ on different ranks.")
+                    elif err == -1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' without "
+                                           "specifying src_indices.")
+
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
             meta = self._group_inputs[prom_in][0]
@@ -1809,51 +1857,6 @@ class Group(System):
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
         # ref or ref0 are defined for the output.
-        if path_len == 0 and self.comm.size > 1:  # top level group
-            for abs_in, abs_out in sorted(global_abs_in2out.items()):
-                if abs_out not in allprocs_abs2meta_out or abs_in not in allprocs_abs2meta_in:
-                    continue  # discrete var
-                all_meta_out = allprocs_abs2meta_out[abs_out]
-                all_meta_in = allprocs_abs2meta_in[abs_in]
-
-                # check that src_indices match for dist->serial connection
-                # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
-                # memory issues if src_indices are large.  Maybe try something like computing a hash
-                # in each rank and comparing those?
-                if all_meta_out['distributed'] and not all_meta_in['distributed']:
-                    # all serial inputs must have src_indices if they connect to a distributed
-                    # output
-                    owner = self._owning_rank[abs_in]
-                    if abs_in in abs2meta_in:  # input is local
-                        src_inds = abs2meta_in[abs_in]['src_indices']
-                    else:
-                        src_inds = None
-                    if self.comm.rank == owner:
-                        baseline = None
-                        err = 0
-                        for sinds in self.comm.gather(src_inds, root=owner):
-                            if sinds is not None:
-                                if baseline is None:
-                                    baseline = sinds
-                                else:
-                                    if not np.all(sinds == baseline):
-                                        err = 1
-                                        break
-                        if baseline is None:  # no src_indices were set
-                            err = -1
-                        self.comm.bcast(err, root=owner)
-                    else:
-                        self.comm.gather(src_inds, root=owner)
-                        err = self.comm.bcast(None, root=owner)
-                    if err == 1:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to serial input '{abs_in}' because "
-                                           "src_indices differ on different ranks.")
-                    elif err == -1:
-                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
-                                           f"'{abs_out}' to serial input '{abs_in}' without "
-                                           "specifying src_indices.")
-
         for abs_in, abs_out in global_abs_in2out.items():
             if abs_in[:path_len] != path_dot or abs_out[:path_len] != path_dot:
                 continue

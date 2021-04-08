@@ -237,7 +237,7 @@ class ExplicitComponent(Component):
 
             with self._call_user_function('compute'):
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.compute(self._inputs, self._outputs, self._discrete_inputs,
+                    self.compute(self._inputs, outputs, self._discrete_inputs,
                                  self._discrete_outputs)
                 else:
                     self.compute(self._inputs, self._outputs)
