@@ -2506,6 +2506,27 @@ class TestSrcIndices(unittest.TestCase):
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
 
+    def test_om_slice_with_ellipsis_error_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        # the 4 should be a 3
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
+
+        with self.assertRaises(IndexError) as err:
+            p.setup()
+
+        expected_error_msg = ( "'row4_comp' <class SlicerComp>:\n"
+                               "Error 'index 4 is out of bounds for axis 0 with size 4'\n"
+                               "  in resolving source indices in connection between"
+                               " source='indep.x' and target='row4_comp.x'\n"
+                               "  with src_indices='(4, Ellipsis)'" )
+        self.assertEqual(str(err.exception), expected_error_msg)
+
+
 class TestGroupAddInput(unittest.TestCase):
 
     def _make_tree_model(self, diff_units=False, diff_vals=False):

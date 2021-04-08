@@ -17,6 +17,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
@@ -1306,7 +1307,6 @@ class Problem(object):
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
-        jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
@@ -1318,6 +1318,7 @@ class Problem(object):
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
+            added_wrts = set()
 
             of, wrt = comp._get_partials_varlists()
 
@@ -1372,17 +1373,21 @@ class Problem(object):
                 else:
                     vector = None
 
-                approximations[fd_options['method']].add_approximation(abs_key, self.model,
-                                                                       fd_options, vector=vector)
+                # prevent adding multiple approxs with same wrt (and confusing users with warnings)
+                if abs_key[1] not in added_wrts:
+                    approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                           fd_options,
+                                                                           vector=vector)
+                    added_wrts.add(abs_key[1])
 
-            approx_jac = {}
+            approx_jac = _CheckingJacobian(comp)
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
-                partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key]['J_fd'] = partial
 
                 # If this is a directional derivative, convert the analytic to a directional one.
                 wrt = rel_key[1]
@@ -2000,13 +2005,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(derivatives.keys())
+        num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
         if not suppress_output:
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
             out_buffer = StringIO()
-            num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
                 out_buffer.write(header_str)
@@ -2077,7 +2082,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info = derivatives[of, wrt]
             # TODO total derivs may have been computed in rev mode, not fwd
             forward = derivative_info['J_fwd']
-            fd = derivative_info['J_fd']
+            try:
+                fd = derivative_info['J_fd']
+            except KeyError:
+                # this can happen when a partial is not declared, which means it should be zero
+                fd = np.zeros(forward.shape)
+
             if do_rev:
                 reverse = derivative_info.get('J_rev')
 

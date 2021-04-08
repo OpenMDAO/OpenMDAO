@@ -2001,7 +2001,10 @@ class TestParallelDOEFeature(unittest.TestCase):
         filename = "cases.sql_%d" % rank
         self.assertEqual(filename, "cases.sql_%d" % rank)
 
-        cr = om.CaseReader(filename)
+        # SqliteCaseReader will automatically look for cases.sql_meta if
+        # metadata_filename is not specified, but test by explicitly
+        # using it here.
+        cr = om.CaseReader(filename, metadata_filename = 'cases.sql_meta')
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -2012,6 +2015,17 @@ class TestParallelDOEFeature(unittest.TestCase):
 
         self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expect_text)
+
+        del cr
+
+        # Test for missing metadata db file error
+        try:
+            cr_test = om.CaseReader(filename, metadata_filename = 'nonexistant_filename')
+            found_metadata = True
+        except IOError:
+            found_metadata = False
+
+        self.assertFalse(found_metadata, "No error from SqliteCaseReader for missing metadata file.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

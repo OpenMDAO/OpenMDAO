@@ -6,7 +6,7 @@ from itertools import product
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
-from scipy.sparse import issparse
+from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names
@@ -390,17 +390,22 @@ class Component(System):
         """
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
-        matches_prom = set()
+        if '*' in wrt_patterns:
+            info['wrt_matches_rel'] = None
+            info['wrt_matches'] = None
+            return
+
+        matches_rel = set()
         for w in wrt_patterns:
-            matches_prom.update(find_matches(w, allwrt))
+            matches_rel.update(find_matches(w, allwrt))
 
         # error if nothing matched
-        if not matches_prom:
+        if not matches_rel:
             raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
                              "options: {}.".format(self.msginfo, wrt_patterns))
 
-        info['wrt_matches_prom'] = matches_prom
-        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_prom]
+        info['wrt_matches_rel'] = matches_rel
+        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_rel]
 
     def _update_subjac_sparsity(self, sparsity):
         """
@@ -424,8 +429,9 @@ class Component(System):
                 wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
                 abs_key = (of_abs, wrt_abs)
                 if abs_key in self._subjacs_info:
+                    meta = self._subjacs_info[abs_key]
                     # add sparsity info to existing partial info
-                    self._subjacs_info[abs_key]['sparsity'] = tup
+                    meta['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
@@ -931,7 +937,8 @@ class Component(System):
 
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "
-                               f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).")
+                               f"np.arange({offset}, {end}, dtype=INT_DTYPE).reshape({inds.shape}"
+                               ").")
 
         return added_src_inds
 
@@ -1047,10 +1054,10 @@ class Component(System):
         if dependent:
             meta['value'] = val
             if rows is not None:
-                meta['rows'] = rows
-                meta['cols'] = cols
+                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
+                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
-                # First, check the length of rows and cols to catch this easy mistake and give a
+                # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
                 if len(cols) != len(rows):
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
@@ -1058,14 +1065,33 @@ class Component(System):
                                        " but rows is length {} while cols is length "
                                        "{}.".format(self.msginfo, of, wrt, len(rows), len(cols)))
 
+                if rows.size > 0 and rows.min() < 0:
+                    msg = '{}: d({})/d({}): row indices must be non-negative'
+                    raise ValueError(msg.format(self.msginfo, of, wrt))
+                if cols.size > 0 and cols.min() < 0:
+                    msg = '{}: d({})/d({}): col indices must be non-negative'
+                    raise ValueError(msg.format(self.msginfo, of, wrt))
+
+                meta['rows'] = rows
+                meta['cols'] = cols
+
                 # Check for repeated rows/cols indices.
-                idxset = set(zip(rows, cols))
-                if len(rows) - len(idxset) > 0:
-                    dups = [n for n, val in Counter(zip(rows, cols)).items() if val > 1]
-                    raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
-                                       "with rows and cols that specify the following duplicate "
-                                       "subjacobian entries: {}.".format(self.msginfo, of, wrt,
-                                                                         sorted(dups)))
+                size = len(rows)
+                if size > 0:
+                    coo = coo_matrix((np.ones(size, dtype=np.short), (rows, cols)))
+                    dsize = coo.data.size
+                    csc = coo.tocsc()
+                    # csc adds values at duplicate indices together, so result will be that data
+                    # size is less if there are duplicates
+                    if csc.data.size < dsize:
+                        coo = csc.tocoo()
+                        del csc
+                        inds = np.where(coo.data > 1.)
+                        dups = list(zip(coo.row[inds], coo.col[inds]))
+                        raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
+                                           "with rows and cols that specify the following duplicate"
+                                           " subjacobian entries: {}.".format(self.msginfo, of, wrt,
+                                                                              sorted(dups)))
 
         if method_func is not None:
             # we're doing approximations
@@ -1074,11 +1100,6 @@ class Component(System):
             self._get_approx_scheme(method)
 
             default_opts = method_func.DEFAULT_OPTIONS
-
-            # If rows/cols is specified
-            if rows is not None or cols is not None:
-                raise ValueError("{}: d({})/d({}): Sparse FD specification not supported "
-                                 "yet.".format(self.msginfo, of, wrt))
         else:
             default_opts = ()
 
@@ -1313,14 +1334,6 @@ class Component(System):
                 rows = dct['rows']
                 cols = dct['cols']
 
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
-
-                if rows.shape != cols.shape:
-                    raise ValueError('{}: d({})/d({}): rows and cols must have the same shape,'
-                                     ' rows: {}, cols: {}'.format(self.msginfo, of, wrt,
-                                                                  rows.shape, cols.shape))
-
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
                     is_scalar = False
@@ -1340,12 +1353,6 @@ class Component(System):
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
-                    if rows.min() < 0:
-                        msg = '{}: d({})/d({}): row indices must be non-negative'
-                        raise ValueError(msg.format(self.msginfo, of, wrt))
-                    if cols.min() < 0:
-                        msg = '{}: d({})/d({}): col indices must be non-negative'
-                        raise ValueError(msg.format(self.msginfo, of, wrt))
                     rows_max = rows.max()
                     cols_max = cols.max()
                 else:
@@ -1505,9 +1512,16 @@ class Component(System):
         """
         self._get_static_wrt_matches()
         subjacs = self._subjacs_info
-        for key in self._approx_subjac_keys_iter():
-            meta = subjacs[key]
-            self._approx_schemes[meta['method']].add_approximation(key, self, meta)
+        wrtset = set()
+        subjac_keys = self._get_approx_subjac_keys()
+        # go through subjac keys in reverse and only add approx for the last of each wrt
+        # (this prevents warnings that could confuse users)
+        for i in range(len(subjac_keys) - 1, -1, -1):
+            key = subjac_keys[i]
+            if key[1] not in wrtset:
+                wrtset.add(key[1])
+                meta = subjacs[key]
+                self._approx_schemes[meta['method']].add_approximation(key, self, meta)
 
     def _guess_nonlinear(self):
         """
@@ -1534,6 +1548,7 @@ class Component(System):
                     if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+                self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self, my_tdict, top):
         abs2meta_in = self._var_abs2meta['input']
@@ -1558,7 +1573,14 @@ class Component(System):
                                                 meta['src_indices'], src_shape)
                 elif _is_slicer_op(src_inds):
                     meta['src_slice'] = src_inds
-                    src_inds = _slice_indices(src_inds, np.prod(parent_src_shape), parent_src_shape)
+                    try:
+                        src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
+                                                  parent_src_shape)
+                    except IndexError as err:
+                        raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
+                                         f"resolving source indices in connection "
+                                         f"between source='{oldprom}' "
+                                         f"and target='{tgt}'\n  with src_indices='{src_inds}'")
                     meta['flat_src_indices'] = True
                 elif src_inds.ndim == 1:
                     meta['flat_src_indices'] = True

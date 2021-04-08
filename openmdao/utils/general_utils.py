@@ -1199,6 +1199,8 @@ def _prom2ivc_src_item_iter(prom_dict):
     """
     Yield items from prom_dict with promoted input names converted to ivc source names.
 
+    The result is that all names are absolute.
+
     Parameters
     ----------
     prom_dict : dict
