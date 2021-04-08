@@ -166,6 +166,7 @@ class Component(System):
             self._has_distrib_vars = False
 
         for meta in self._static_var_rel2meta.values():
+            # variable isn't distributed if we're only running on 1 proc
             if nprocs == 1 and 'distributed' in meta and meta['distributed']:
                 meta['distributed'] = False
 
@@ -190,12 +191,12 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if MPI is not None and self._has_distrib_vars:
+        if self._has_distrib_vars:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
-                simple_warning("The 'distributed' option is set to True for Component %s, "
+                simple_warning("Component %s contains distributed variables, "
                                "but there is no distributed vector implementation (MPI/PETSc) "
                                "available. The default non-distributed vectors will be used."
                                % self.pathname)
@@ -553,6 +554,7 @@ class Component(System):
             'copy_shape': copy_shape,
         }
 
+        # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
 
         if self._static_mode:
@@ -785,6 +787,7 @@ class Component(System):
             'copy_shape': copy_shape
         }
 
+        # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
@@ -888,12 +891,9 @@ class Component(System):
 
         Returns
         -------
-        set
+        list
             Names of inputs where src_indices were added.
         """
-        if MPI is None:  # or not self.options['distributed']:
-            return set()
-
         iproc = self.comm.rank
         abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_in = all_abs2meta['input']
@@ -901,17 +901,13 @@ class Component(System):
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
-        added_src_inds = {}
+        added_src_inds = []
         # loop over continuous inputs (all procs)
-        for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
-            if iname not in abs2meta_in:
-                continue
-            meta_in = abs2meta_in[iname]
+        for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
             src = abs_in2out[iname]
             if meta_in['src_indices'] is None and (
                     meta_in['distributed'] or all_abs2meta_out[src]['distributed']):
-                out_i = all_abs2idx[src]
-                nzs = np.nonzero(sizes_out[:, out_i])[0]
+                nzs = np.nonzero(sizes_out[:, all_abs2idx[src]])[0]
                 if (all_abs2meta_out[src]['global_size'] ==
                         all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
@@ -920,7 +916,7 @@ class Component(System):
                 else:  # distributed output (may have some zero size entries)
                     if nzs.size == 1:
                         offset = 0
-                        end = sizes_out[nzs[0], out_i]
+                        end = sizes_out[nzs[0], all_abs2idx[src]]
                     else:
                         # total sizes differ and output is distributed, so can't determine mapping
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
@@ -932,8 +928,7 @@ class Component(System):
                     inds = inds.reshape(meta_in['shape'])
                 meta_in['src_indices'] = inds
                 meta_in['flat_src_indices'] = True
-                all_abs2meta_in[iname]['has_src_indices'] = True
-                added_src_inds[iname] = (offset, end)
+                added_src_inds.append(iname)
 
                 simple_warning(f"{self.msginfo}: Component is distributed but input '{iname}' was "
                                "added without src_indices. Setting src_indices to "
@@ -1405,12 +1400,12 @@ class Component(System):
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if not abs2meta_out[of]['distributed']:
-                            # non-distributed components are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, of))
-                        else:
+                        if abs2meta_out[of]['distributed']:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
+                        else:
+                            # non-distributed components are not allowed to have zero size inputs
+                            raise ValueError(msg.format(self.msginfo, of))
                     if shape[1] == 0:
                         if wrt in abs2meta_in:
                             distrib = abs2meta_in[wrt]['distributed']

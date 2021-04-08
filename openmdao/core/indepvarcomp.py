@@ -267,11 +267,11 @@ class _AutoIndepVarComp(IndepVarComp):
                 all_remotes.update(remotes)
 
             if all_remotes:
-                self.options['distributed'] = True
+                self._has_distrib_vars = True
 
-            self._remotes = all_remotes
-            for name in all_remotes:
-                self._static_var_rel2meta[name]['distributed'] = True
+                self._remotes = all_remotes
+                for name in all_remotes:
+                    self._static_var_rel2meta[name]['distributed'] = True
 
         super()._set_vector_class()
 

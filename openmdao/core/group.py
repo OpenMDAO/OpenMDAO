@@ -756,33 +756,30 @@ class Group(System):
         if self.comm.size > 1:
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             all_abs2meta = self._var_allprocs_abs2meta
-            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_in = all_abs2meta['input']
             conns = self._conn_global_abs_in2out
 
             # the code below is to handle the case where src_indices were not specified
             # for a distributed input or an input connected to a distributed auto_ivc
             # output. This update can't happen until sizes are known.
-            dist_ins = [n for n, m in all_abs2meta_in.items() if m['distributed'] or
+            dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
                         (conns[n].startswith('_auto_ivc.') and
-                         all_abs2meta_out[conns[n]]['distributed'])]
+                         all_abs2meta_out[conns[n]]['distributed']))
             dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
             if dcomp_names:
-                added_src_inds = {}
+                added_src_inds = []
                 for comp in self.system_iter(recurse=True, typ=Component):
                     if comp.pathname in dcomp_names:
-                        added_src_inds.update(
+                        added_src_inds.extend(
                             comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
                                                           self._var_sizes))
-                all_added = {}
-                for a in self.comm.allgather(added_src_inds):
-                    all_added.update(a)
 
-                for a, rng in all_added.items():
+                updated = set()
+                for alist in self.comm.allgather(added_src_inds):
+                    updated.update(alist)
+
+                for a in updated:
                     all_abs2meta_in[a]['has_src_indices'] = True
-                    if a in conns:
-                        src = conns[a]
-                        if src.startswith('_auto_ivc.'):
-                            all_abs2meta_out[src]['distributed'] = True
 
         self._resolve_src_indices()
 
@@ -1015,7 +1012,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
-                       self._has_resid_scaling, self._group_inputs)
+                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -1024,7 +1021,8 @@ class Group(System):
                     False,
                     False,
                     False,
-                    {}
+                    {},
+                    False,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -1038,10 +1036,11 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, oadd, rscale, ginputs) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs, has_dist_vars) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
+                self._has_distrib_vars |= has_dist_vars
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
@@ -1051,10 +1050,6 @@ class Group(System):
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
-                    for n, m in proc_abs2meta[io].items():
-                        if m['distributed']:
-                            self._has_distrib_vars = True
-
                     allprocs_discrete[io].update(proc_discrete[io])
 
                     for prom_name, abs_names_list in proc_prom2abs_list[io].items():
