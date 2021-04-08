@@ -551,7 +551,8 @@ class Component(System):
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': distributed or self.options['distributed'],
+            # using ._dict below to avoid tons of deprecation warnings
+            'distributed': distributed or self.options._dict['distributed']['value'],
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
@@ -779,7 +780,8 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': distributed or self.options['distributed'],
+            # using ._dict below to avoid tons of deprecation warnings
+            'distributed': distributed or self.options._dict['distributed']['value'],
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),

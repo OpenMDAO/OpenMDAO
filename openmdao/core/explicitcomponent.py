@@ -145,7 +145,7 @@ class ExplicitComponent(Component):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+                   shape_by_conn=False, copy_shape=None, distributed=False):
         """
         Add an output variable to the component.
 
@@ -196,6 +196,9 @@ class ExplicitComponent(Component):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
 
         Returns
         -------
