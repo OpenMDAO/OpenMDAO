@@ -40,18 +40,18 @@ def _get_object_from_reference(reference):
             right.append(split.pop())
     if module:
         for entry in reversed(right):
-            module = getattr(module, entry)
-    return module
+            obj = getattr(module, entry)
+    return obj
 
 
 def display_source(reference, hide_doc_string=False):
     """
-    Return the source code of the given reference path.
+    Return the source code of the given reference path to a function.
 
     Parameters
     ----------
     reference : str
-        Dot path of desired class or function.
+        Dot path of desired function.
     hide_doc_string : bool
         Option to hide the docstring.
 
@@ -122,7 +122,7 @@ def notebook_mode():
         pass
 
     if ipy and tabulate is None:
-        simple_warning("Tabulate is not installed run `pip install openmdao[notebooks]` to "
+        simple_warning("Tabulate is not installed. Run `pip install openmdao[notebooks]` to "
                        "install required dependencies. Using ASCII for outputs.")
     return ipy
 
