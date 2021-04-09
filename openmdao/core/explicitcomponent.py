@@ -223,6 +223,28 @@ class ExplicitComponent(Component):
                 if (method is not None and method in self._approx_schemes):
                     yield abs_key
 
+    def _compute_wrapper(self):
+        """
+        Call compute based on the value of the "run_root_only" option.
+        """
+        with self._call_user_function('compute'):
+            args = [self._inputs, self._outputs]
+            if self._discrete_inputs or self._discrete_outputs:
+                args += [self._discrete_inputs, self._discrete_outputs]
+
+            if self.options['run_root_only']:
+                if self.comm.rank == 0:
+                    self.compute(*args)
+                    self.comm.bcast([self._outputs.asarray(), self._discrete_outputs], root=0)
+                else:
+                    new_outs, new_disc_outs = self.comm.bcast(None, root=0)
+                    self._outputs.set_val(new_outs)
+                    if new_disc_outs:
+                        for name, val in new_disc_outs.items():
+                            self._discrete_outputs[name] = val
+            else:
+                self.compute(*args)
+
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.
@@ -234,14 +256,7 @@ class ExplicitComponent(Component):
 
             # Sign of the residual is minus the sign of the output vector.
             residuals *= -1.0
-
-            with self._call_user_function('compute'):
-                if self._discrete_inputs or self._discrete_outputs:
-                    self.compute(self._inputs, outputs, self._discrete_inputs,
-                                 self._discrete_outputs)
-                else:
-                    self.compute(self._inputs, self._outputs)
-
+            self._compute_wrapper()
             residuals += outputs
             outputs -= residuals
 
@@ -254,14 +269,35 @@ class ExplicitComponent(Component):
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 self._residuals.set_val(0.0)
-                with self._call_user_function('compute'):
-                    if self._discrete_inputs or self._discrete_outputs:
-                        self.compute(self._inputs, self._outputs, self._discrete_inputs,
-                                     self._discrete_outputs)
-                    else:
-                        self.compute(self._inputs, self._outputs)
+                self._compute_wrapper()
 
             # Iteration counter is incremented in the Recording context manager at exit.
+
+    def _compute_jacvec_product_wrapper(self, *args):
+        """
+        Call compute_jacvec_product based on the value of the "run_root_only" option.
+
+        Parameters
+        ----------
+        *args : list
+            List of positional arguments.
+        """
+        if self.options['run_root_only']:
+            _, d_inputs, d_resids, mode = args[:4]
+            if self.comm.rank == 0:
+                self.compute_jacvec_product(*args)
+                if mode == 'fwd':
+                    self.comm.bcast(d_resids.asarray(), root=0)
+                else:  # rev
+                    self.comm.bcast(d_inputs.asarray(), root=0)
+            else:
+                new_vals = self.comm.bcast(None, root=0)
+                if mode == 'fwd':
+                    d_resids.set_val(new_vals)
+                else:  # rev
+                    d_inputs.set_val(new_vals)
+        else:
+            self.compute_jacvec_product(*args)
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -348,12 +384,12 @@ class ExplicitComponent(Component):
                                     d_inputs._icol = i
                                     d_residuals._icol = i
                                     with self._call_user_function('compute_jacvec_product'):
-                                        self.compute_jacvec_product(*args)
+                                        self._compute_jacvec_product_wrapper(*args)
                                 d_inputs._icol = None
                                 d_residuals._icol = None
                         else:
                             with self._call_user_function('compute_jacvec_product'):
-                                self.compute_jacvec_product(*args)
+                                self._compute_jacvec_product_wrapper(*args)
                     finally:
                         d_inputs.read_only = d_residuals.read_only = False
 
@@ -398,6 +434,25 @@ class ExplicitComponent(Component):
                     # ExplicitComponent jacobian defined with -1 on diagonal.
                     d_residuals *= -1.0
 
+    def _compute_partials_wrapper(self):
+        """
+        Call compute_partials based on the value of the "run_root_only" option.
+        """
+        with self._call_user_function('compute_partials'):
+            args = [self._inputs, self._jacobian]
+            if self._discrete_inputs:
+                args += [self._discrete_inputs]
+
+            if self.options['run_root_only']:
+                if self.comm.rank == 0:
+                    self.compute_partials(*args)
+                    self.comm.bcast(list(self._jacobian.items()), root=0)
+                else:
+                    for key, val in self.comm.bcast(None, root=0):
+                        self._jacobian[key] = val
+            else:
+                self.compute_partials(*args)
+
     def _linearize(self, jac=None, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -421,17 +476,8 @@ class ExplicitComponent(Component):
                 approximation.compute_approximations(self, jac=self._jacobian)
 
             if self._has_compute_partials:
-                # We don't need to set the _system attribute on jac here because jac (if not None)
-                # shares the _subjacs_info metadata with our _jacobian, and our _jacobian knows
-                # how to properly convert relative names (used by the component in compute_partials)
-                # to absolute names (used by all jacobians internally).
-
                 # We used to negate the jacobian here, and then re-negate after the hook.
-                with self._call_user_function('compute_partials'):
-                    if self._discrete_inputs:
-                        self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
-                    else:
-                        self.compute_partials(self._inputs, self._jacobian)
+                self._compute_partials_wrapper()
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

@@ -3,6 +3,7 @@
 from collections import OrderedDict, Counter, defaultdict
 from collections.abc import Iterable
 from itertools import product
+from contextlib import contextmanager
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -158,6 +159,7 @@ class Component(System):
                 msg = ("%s: MPI is not active but num_par_fd = %d. No parallel finite difference "
                        "will be performed." % (self.msginfo, self._num_par_fd))
                 simple_warning(msg)
+                self._num_par_fd = 1
 
         self.comm = comm
         nprocs = comm.size
@@ -1613,5 +1615,5 @@ class _DictValues(object):
         return [(key, self._dict[key]['value']) for key in self._dict]
 
     def iteritems(self):
-        for key, val in self._dict.iteritems():
+        for key, val in self._dict.items():
             yield key, val['value']
