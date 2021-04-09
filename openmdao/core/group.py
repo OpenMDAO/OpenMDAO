@@ -2423,12 +2423,20 @@ class Group(System):
 
         prominfo = None
 
+        # Note, the declared order in any of these promotes arguments shouldn't matter. However,
+        # the order does matter when using system.promotes during configure. There, you are
+        # permitted to promote '*' then promote_to an alias afterwards, but not in the reverse.
+        # To make this work, we sort the promotes lists for this subsystem to put the wild card
+        # entries at the beginning.
         if promotes:
-            subsys._var_promotes['any'] = [(p, prominfo) for p in promotes]
+            subsys._var_promotes['any'] = [(p, prominfo) for p in
+                                           sorted(promotes, key=lambda x: '*' not in x)]
         if promotes_inputs:
-            subsys._var_promotes['input'] = [(p, prominfo) for p in promotes_inputs]
+            subsys._var_promotes['input'] = [(p, prominfo) for p in
+                                             sorted(promotes_inputs, key=lambda x: '*' not in x)]
         if promotes_outputs:
-            subsys._var_promotes['output'] = [(p, prominfo) for p in promotes_outputs]
+            subsys._var_promotes['output'] = [(p, prominfo) for p in
+                                              sorted(promotes_outputs, key=lambda x: '*' not in x)]
 
         if self._static_mode:
             subsystems_allprocs = self._static_subsystems_allprocs
