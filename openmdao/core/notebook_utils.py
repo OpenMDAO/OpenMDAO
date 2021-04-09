@@ -31,16 +31,16 @@ def _get_object_from_reference(reference):
     """
     split = reference.split('.')
     right = []
-    module = None
+    obj = None
     while split:
         try:
-            module = importlib.import_module('.'.join(split))
+            obj = importlib.import_module('.'.join(split))
             break
         except ModuleNotFoundError:
             right.append(split.pop())
-    if module:
+    if obj:
         for entry in reversed(right):
-            obj = getattr(module, entry)
+            obj = getattr(obj, entry)
     return obj
 
 
