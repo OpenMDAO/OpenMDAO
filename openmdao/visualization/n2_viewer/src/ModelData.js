@@ -47,13 +47,14 @@ class ModelData {
 
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
-        const jsonStr = window.pako.inflate(compressedData, { to: 'string' })
-            .replace(/([^'"])nan([^'"])/ig, '$1"nan"$2'); // Catch any remaining bare NaNs
+        const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
             
         /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
             console.log(pos, jsonStr.substring(pos, pos+99));
         } */
-        return JSON.parse(jsonStr);
+
+        // JSON5 can handle Inf and NaN
+        return JSON5.parse(jsonStr); 
     }
 
     /**

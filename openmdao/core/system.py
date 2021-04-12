@@ -1927,8 +1927,6 @@ class System(object):
 
             Parameters
             ----------
-            io : str
-                Variable type ('input' or 'output')
             matches : dict {'input': ..., 'output': ...}
                 Dict of promoted names and associated info.
             match_type : IntEnum

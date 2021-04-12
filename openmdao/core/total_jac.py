@@ -118,11 +118,7 @@ class _TotalJacInfo(object):
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
         get_remote : bool
-            If True, retrieve the value even if it is on a remote process.  Note that if the
-            variable is remote on ANY process, this function must be called on EVERY process
-            in the Problem's MPI communicator.
-            If False, only retrieve the value if it is on the current process, or only the part
-            of the value that's on the current process for a distributed variable.
+            Whether to get remote variables if using MPI.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']

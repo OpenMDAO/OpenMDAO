@@ -368,8 +368,8 @@ def _check_auto_ivc_warnings(problem, logger):
     ----------
     problem : <Problem>
         The problem being checked.
-    logger
-        The logger to which the auto_ivc_warnings are to be sent.
+    logger : object
+        The object that manages logging output.
     """
     if hasattr(problem.model, "_auto_ivc_warnings"):
         for i in problem.model._auto_ivc_warnings:
