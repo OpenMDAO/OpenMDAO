@@ -8,7 +8,7 @@ import numpy as np
 from scipy import __version__ as scipy_version
 
 import openmdao.api as om
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
@@ -620,6 +620,68 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        obj = prob['o']
+        assert_near_equal(obj, 41.5, 1e-6)
+
+    def test_simple_array_comp2D_sparse_eq_con(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArraySparse(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        obj = prob['o']
+        assert_near_equal(obj, 41.5, 1e-6)
+
+    def test_simple_array_comp2D_jacvec_eq_con(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayJacVec(), promotes=['*'])
         model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 

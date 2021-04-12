@@ -21,7 +21,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
 
 
 def check_option(option, value):

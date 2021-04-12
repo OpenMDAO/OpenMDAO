@@ -37,31 +37,35 @@ class TestExplCompArrayDense(TestExplCompArray):
         partials['total_volume', 'widths'] = inputs['lengths'].flatten() * thk
 
 
-class TestExplCompArraySpmtx(TestExplCompArray):
-
-    def compute_partials(self, inputs, partials):
-        thk = self.options['thickness']
-
-        inds = np.arange(4)
-        partials['areas', 'lengths'] = scipy.sparse.csr_matrix(
-            (inputs['widths'].flatten(), (inds, inds)))
-        partials['areas', 'widths'] = scipy.sparse.csr_matrix(
-            (inputs['lengths'].flatten(), (inds, inds)))
-        partials['total_volume', 'lengths'] = scipy.sparse.csr_matrix(
-            (inputs['widths'].flatten() * thk, ([0], inds)))
-        partials['total_volume', 'widths'] = scipy.sparse.csr_matrix(
-            (inputs['lengths'].flatten() * thk, ([0], inds)))
-
-
 class TestExplCompArraySparse(TestExplCompArray):
 
+    def setup_partials(self):
+        self.declare_partials('areas', ['lengths', 'widths'], rows=np.arange(4), cols=np.arange(4))
+        self.declare_partials('total_volume', ['lengths', 'widths'])
+
     def compute_partials(self, inputs, partials):
         thk = self.options['thickness']
 
-        inds = np.arange(4)
-        partials['areas', 'lengths'] = (inputs['widths'].flatten(), inds, inds)
-        partials['areas', 'widths'] = (inputs['lengths'].flatten(), inds, inds)
-        partials['total_volume', 'lengths'] = (
-            inputs['widths'].flatten() * thk, [0], inds)
-        partials['total_volume', 'widths'] = (
-            inputs['lengths'].flatten() * thk, [0], inds)
+        partials['areas', 'lengths'] = inputs['widths'].flatten()
+        partials['areas', 'widths'] = inputs['lengths'].flatten()
+        partials['total_volume', 'lengths'] = inputs['widths'].flatten() * thk
+        partials['total_volume', 'widths'] = inputs['lengths'].flatten() * thk
+
+
+class TestExplCompArrayJacVec(TestExplCompArray):
+
+    def setup_partials(self):
+        pass  # prevent declared partials from base class
+
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+
+        if mode == 'fwd':
+            if 'widths' in d_inputs:
+                d_outputs['areas'] += d_inputs['widths']*inputs['lengths']
+            if 'lengths' in d_inputs:
+                d_outputs['areas'] += d_inputs['lengths']*inputs['widths']
+        else:
+            if 'widths' in d_inputs:
+                d_inputs['widths'] += d_outputs['areas']*inputs['lengths']
+            if 'lengths' in d_inputs:
+                d_inputs['lengths'] += d_outputs['areas']*inputs['widths']
