@@ -3,7 +3,12 @@ import sys
 import importlib
 import inspect
 
-from IPython.display import display, HTML, Code
+from IPython.display import display, HTML
+
+try:
+    from IPython.display import Code
+except ImportError:
+    ipy_code = None
 
 from openmdao.utils.general_utils import simple_warning
 
@@ -67,7 +72,11 @@ def display_source(reference, hide_doc_string=False):
         del obj[1]
         obj = ''.join(obj)
 
-    return display(Code(obj, language='python'))
+    if ipy_code is not None:
+        return display(Code(obj, language='python'))
+    else:
+        simple_warning("Latest IPython is not installed. Run `pip install openmdao[notebooks]` or "
+                       "`pip install openmdao[docs]` to upgrade.")
 
 
 def show_options_table(reference):

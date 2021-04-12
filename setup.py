@@ -13,11 +13,13 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'redbaron',
         'sphinx>=1.8.5',
-        'tabulate'
+        'tabulate',
+        'IPython>=7.22'
     ],
     'notebooks': [
         'notebook',
-        'tabulate'
+        'tabulate',
+        'IPython>=7.22'
     ],
     'visualization': [
         'bokeh>=1.3.4',
