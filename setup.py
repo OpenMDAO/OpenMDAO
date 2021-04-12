@@ -14,12 +14,12 @@ optional_dependencies = {
         'redbaron',
         'sphinx>=1.8.5',
         'tabulate',
-        'IPython>=7.22.0'
+        'ipython>=7.22.0'
     ],
     'notebooks': [
         'notebook',
         'tabulate',
-        'IPython>=7.22.0'
+        'ipython>=7.22.0'
     ],
     'visualization': [
         'bokeh>=1.3.4',
