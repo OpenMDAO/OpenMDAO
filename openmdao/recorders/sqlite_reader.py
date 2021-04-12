@@ -23,6 +23,8 @@ except ImportError:
     display = HTML = None
 
 import pickle
+import zlib
+import re
 from json import loads as json_loads
 from io import TextIOBase
 
@@ -70,7 +72,7 @@ class SqliteCaseReader(BaseCaseReader):
         List of iteration cases and the table and row in which they are found.
     """
 
-    def __init__(self, filename, pre_load=False):
+    def __init__(self, filename, pre_load=False, metadata_filename=None):
         """
         Initialize.
 
@@ -80,10 +82,15 @@ class SqliteCaseReader(BaseCaseReader):
             The path to the filename containing the recorded data.
         pre_load : bool
             If True, load all the data into memory during initialization.
+        metadata_filename : str
+            The path to the filename containing the recorded metadata, if separate.
         """
         super().__init__(filename, pre_load)
 
         check_valid_sqlite3_db(filename)
+
+        if metadata_filename:
+            check_valid_sqlite3_db(metadata_filename)
 
         # initialize private attributes
         self._filename = filename
@@ -94,13 +101,36 @@ class SqliteCaseReader(BaseCaseReader):
         self._auto_ivc_map = {}
         self._global_iterations = None
 
-        # collect metadata from database
         with sqlite3.connect(filename) as con:
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+
+            # get the global iterations table, and save it as an attribute
+            self._global_iterations = self._get_global_iterations(cur)
+
+            # If separate metadata not specified, check the current db
+            # to make sure it's there
+            if metadata_filename is None:
+                cur.execute("SELECT count(name) FROM sqlite_master "
+                            "WHERE type='table' AND name='metadata'")
+
+                # If not, take a guess at the filename:
+                if cur.fetchone()[0] == 0:
+                    metadata_filename = re.sub(r'^(.*)_(\d+)', r'\1_meta', filename)
+                    check_valid_sqlite3_db(metadata_filename)
+                else:
+                    metadata_filename = filename
+
+        con.close()
+
+        # collect metadata from database
+        with sqlite3.connect(metadata_filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
 
             # collect data from the metadata table. this includes:
             #   format_version
+            #   openmdao_version
             #   VOI metadata, which is added to problem_metadata
             #   var name maps and metadata for all vars, which are saved as private attributes
             self._collect_metadata(cur)
@@ -117,9 +147,6 @@ class SqliteCaseReader(BaseCaseReader):
             # collect data from the solver_metadata table. this includes:
             #   solver class and options for each solver, which is saved as an attribute
             self._collect_solver_metadata(cur)
-
-            # get the global iterations table, and save it as an attribute
-            self._global_iterations = self._get_global_iterations(cur)
 
         con.close()
 
@@ -163,8 +190,10 @@ class SqliteCaseReader(BaseCaseReader):
 
         row = cur.fetchone()
 
-        # get format_version
         self._format_version = version = row['format_version']
+
+        if version >= 13:
+            self._openmdao_version = row['openmdao_version']
 
         if version not in range(1, format_version + 1):
             raise ValueError('SqliteCaseReader encountered an unhandled '
@@ -172,19 +201,31 @@ class SqliteCaseReader(BaseCaseReader):
 
         if version >= 11:
             # Auto-IVC
-            self._conns = json_loads(row['conns'])
+            if version >= 14:
+                self._conns = json_loads(zlib.decompress(row['conns']).decode('ascii'))
+            else:
+                self._conns = json_loads(row['conns'])
 
         # add metadata for VOIs (des vars, objective, constraints) to problem metadata
         if version >= 4:
-            self.problem_metadata['variables'] = json_loads(row['var_settings'])
+            if version >= 14:
+                self.problem_metadata['variables'] = \
+                    json_loads(zlib.decompress(row['var_settings']).decode('ascii'))
+            else:
+                self.problem_metadata['variables'] = json_loads(row['var_settings'])
         else:
             self.problem_metadata['variables'] = None
 
         # get variable name maps and metadata for all variables
         if version >= 3:
-            self._abs2prom = json_loads(row['abs2prom'])
-            self._prom2abs = json_loads(row['prom2abs'])
-            self._abs2meta = json_loads(row['abs2meta'])
+            if version >= 14:
+                self._abs2prom = json_loads(zlib.decompress(row['abs2prom']).decode('ascii'))
+                self._prom2abs = json_loads(zlib.decompress(row['prom2abs']).decode('ascii'))
+                self._abs2meta = json_loads(zlib.decompress(row['abs2meta']).decode('ascii'))
+            else:
+                self._abs2prom = json_loads(row['abs2prom'])
+                self._prom2abs = json_loads(row['prom2abs'])
+                self._abs2meta = json_loads(row['abs2meta'])
 
             # need to convert bounds to numpy arrays
             for name, meta in self._abs2meta.items():
@@ -268,8 +309,14 @@ class SqliteCaseReader(BaseCaseReader):
             id = row[0]
             self._system_options[id] = {}
 
-            self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
-            self._system_options[id]['component_options'] = pickle.loads(row[2])
+            if self._format_version >= 14:
+                self._system_options[id]['scaling_factors'] = \
+                    pickle.loads(zlib.decompress(row[1]))
+                self._system_options[id]['component_options'] = \
+                    pickle.loads(zlib.decompress(row[2]))
+            else:
+                self._system_options[id]['scaling_factors'] = pickle.loads(row[1])
+                self._system_options[id]['component_options'] = pickle.loads(row[2])
 
     def _collect_solver_metadata(self, cur):
         """
@@ -285,7 +332,10 @@ class SqliteCaseReader(BaseCaseReader):
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
         for row in cur:
             id = row[0]
-            solver_options = pickle.loads(row[1])
+            if self._format_version >= 14:
+                solver_options = pickle.loads(zlib.decompress(row[1]))
+            else:
+                solver_options = pickle.loads(row[1])
             solver_class = row[2]
             self.solver_metadata[id] = {
                 'solver_options': solver_options,

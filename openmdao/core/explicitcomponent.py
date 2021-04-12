@@ -77,21 +77,7 @@ class ExplicitComponent(Component):
 
         return of, wrt
 
-    def _get_partials_var_sizes(self):
-        """
-        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
-
-        Returns
-        -------
-        tuple(ndarray, ndarray)
-            'of' and 'wrt' variable sizes.
-        """
-        iproc = self.comm.rank
-        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
-        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
-        return out_sizes, in_sizes
-
-    def _partial_jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -102,13 +88,13 @@ class ExplicitComponent(Component):
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
         """
-        if wrt_matches is None:
-            wrt_matches = ContainsAll()
         offset = end = 0
-        for wrt, meta in self._var_allprocs_abs2meta['input'].items():
-            if wrt in wrt_matches:
+        local_ins = self._var_abs2meta['input']
+        for wrt, meta in self._var_abs2meta['input'].items():
+            if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                yield wrt, offset, end, _full_slice
+                vec = self._inputs if wrt in local_ins else None
+                yield wrt, offset, end, vec, _full_slice
                 offset = end
 
     def _setup_partials(self):
@@ -329,6 +315,9 @@ class ExplicitComponent(Component):
                             oflat = self._vectors['output'][vec_name]._abs_get_val
                             d_out_names = self._vectors['output'][vec_name]._names
                             vnames = self._var_relevant_names[vec_name]['output']
+
+                            # 'val' in the code below is a reference to the part of the
+                            # output or residual array corresponding to the variable 'v'
                             if mode == 'fwd':
                                 for v in vnames:
                                     if v in d_out_names and (v, v) not in self._subjacs_info:

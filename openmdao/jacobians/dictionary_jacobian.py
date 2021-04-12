@@ -2,6 +2,7 @@
 import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
+from openmdao.core.constants import INT_DTYPE
 
 
 class DictionaryJacobian(Jacobian):
@@ -12,7 +13,6 @@ class DictionaryJacobian(Jacobian):
     ----------
     _iter_keys : list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
-
     """
 
     def __init__(self, system, **kwargs):
@@ -168,3 +168,114 @@ class DictionaryJacobian(Jacobian):
                             subjac = subjac.transpose()
 
                         left_vec += subjac.dot(right_vec)
+
+
+class _CheckingJacobian(DictionaryJacobian):
+    """
+    A special type of Jacobian that we use only inside of check_partials.
+
+    It checks during set_col to make sure that any user specified rows/cols don't mask any
+    nonzero values found in the column being set.
+    """
+
+    def __init__(self, system):
+        super().__init__(system)
+        self._subjacs_info = self._subjacs_info.copy()
+
+    def __iter__(self):
+        for key, _ in self.items():
+            yield key
+
+    def items(self):
+        from openmdao.core.explicitcomponent import ExplicitComponent
+        explicit = isinstance(self._system(), ExplicitComponent)
+
+        for key, meta in self._subjacs_info.items():
+            if explicit and key[0] == key[1]:
+                continue
+            rows = meta['rows']
+            if rows is None:
+                yield key, meta['value']
+            else:
+                dense = np.zeros(meta['shape'])
+                dense[rows, meta['cols']] = meta['value']
+                yield key, dense
+
+    def _setup_index_maps(self, system):
+        super()._setup_index_maps(system)
+        from openmdao.core.component import Component
+
+        if isinstance(system, Component):
+            local_opts = system._get_check_partial_options()
+        else:
+            local_opts = None
+
+        for of, start, end, _ in system._jac_of_iter():
+            nrows = end - start
+            for wrt, wstart, wend, _, _ in system._jac_wrt_iter():
+                ncols = wend - wstart
+                loc_wrt = wrt.rsplit('.', 1)[-1]
+                directional = (local_opts is not None and loc_wrt in local_opts and
+                               local_opts[loc_wrt]['directional'])
+                key = (of, wrt)
+                if key not in self._subjacs_info:
+                    # create subjacs_info objects for matrix_free systems that don't have them
+                    self._subjacs_info[key] = {
+                        'rows': None,
+                        'cols': None,
+                        'value': np.zeros((nrows, 1 if directional else ncols)),
+                    }
+                elif directional and self._subjacs_info[key]['value'].shape[1] != 1:
+                    self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
+                    meta['value'] = np.atleast_2d(meta['value'][:, 0]).T
+
+    def set_col(self, system, icol, column):
+        """
+        Set a column of the jacobian.
+
+        The column is assumed to be the same size as a column of the jacobian.
+
+        If the column has any nonzero values that are outside of specified sparsity patterns for
+        any of the subjacs, an exception will be raised.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        icol : int
+            Column index.
+        column : ndarray
+            Column value.
+
+        """
+        if self._colnames is None:
+            self._setup_index_maps(system)
+
+        wrt = self._colnames[self._col2name_ind[icol]]
+        _, offset, _, _, _ = self._col_var_info[wrt]
+        loc_idx = icol - offset  # local col index into subjacs
+
+        scratch = np.zeros(column.shape)
+
+        for of, start, end, _ in system._jac_of_iter():
+            key = (of, wrt)
+            if key in self._subjacs_info:
+                subjac = self._subjacs_info[key]
+                if subjac['cols'] is None:
+                    subjac['value'][:, loc_idx] = column[start:end]
+                else:
+                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
+                    if match_inds.size > 0:
+                        row_inds = subjac['rows'][match_inds]
+                        subjac['value'][match_inds] = column[start:end][row_inds]
+                    else:
+                        row_inds = np.zeros(0, dtype=INT_DTYPE)
+                    arr = scratch[start:end]
+                    arr[:] = column[start:end]
+                    arr[row_inds] = 0.
+                    nzs = np.nonzero(arr)
+                    if nzs[0].size > 0:
+                        raise ValueError(f"{system.msginfo}: User specified sparsity (rows/cols) "
+                                         f"for subjac '{of}' wrt '{wrt}' is incorrect. There are "
+                                         f"non-covered nonzeros in column {loc_idx} at "
+                                         f"row(s) {nzs[0]}.")

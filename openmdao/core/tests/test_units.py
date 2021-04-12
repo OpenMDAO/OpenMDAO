@@ -929,6 +929,25 @@ class TestUnitConversion(unittest.TestCase):
         msg = ("<class Group>: The units 'in**2' are invalid.")
         self.assertEqual(cm.exception.args[0], msg)
 
+    def test_attoseconds(self):
+        # Attoseconds (as) didn't originally work because of collision with the python keyword.
+        p = om.Problem()
+
+        p.model.add_subsystem("C1", om.ExecComp("y = 2*x",
+                                                y={'value': 1.0, 'units': 'as'}),
+                              promotes=['x', 'y'])
+        p.model.add_subsystem("C2", om.ExecComp("z = 3*y",
+                                                y={'value': 1.0, 'units': 'zs'},
+                                                z={'value': 1.0, 'units': 'zs'}),
+                              promotes=['z', 'y'])
+
+        p.setup()
+        p.set_val('x', 25.0)
+        p.run_model()
+
+        assert_near_equal(p.get_val('z'), 150000.0)
+        assert_near_equal(p.get_val('z', units='as'), 150.0)
+
 
 if __name__ == "__main__":
     unittest.main()

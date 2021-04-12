@@ -33,6 +33,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
+from openmdao import __version__ as openmdao_version
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -344,7 +345,9 @@ def _get_viewer_data(data_source, case_id=None):
     Parameters
     ----------
     data_source : <Problem> or <Group> or str
-        A Problem or Group or case recorder file name containing the model or model data.
+        A Problem or Group or case recorder filename containing the model or model data.
+        If the case recorder file from a parallel run has separate metadata, the
+        filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
 
     case_id : int or str or None
         Case name or index of case in SQL file.
@@ -386,7 +389,11 @@ def _get_viewer_data(data_source, case_id=None):
             return {}
 
     elif isinstance(data_source, str):
-        cr = CaseReader(data_source)
+        if ',' in data_source:
+            filenames = data_source.split(',')
+            cr = CaseReader(filenames[0], metadata_filename=filenames[1])
+        else:
+            cr = CaseReader(data_source)
 
         data_dict = cr.problem_metadata
 
@@ -570,7 +577,8 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         'd3': 'd3.v5.min',
         'awesomplete': 'awesomplete',
         'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min'
+        'pako_inflate': 'pako_inflate.min',
+        'json5': 'json5_2.2.0.min'
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
@@ -637,6 +645,7 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
     h.insert('{{n2toolbar_png}}', n2toolbar_png)
+    h.insert('{{om_version}}', openmdao_version)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))

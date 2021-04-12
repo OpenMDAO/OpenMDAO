@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import numpy as np
 from numpy import ndarray, imag, complex as npcomplex
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
@@ -273,11 +274,19 @@ class ExecComp(ExplicitComponent):
         """
         Set up variable name and metadata lists.
         """
-        global _not_complex_safe
-
         if not self._exprs:
             raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
                                % (self.msginfo, self._exprs))
+        self._setup_expressions()
+
+    def _setup_expressions(self):
+        """
+        Set up the expressions.
+
+        This is called during setup_procs and after each call to "add_expr" from configure.
+        """
+        global _not_complex_safe
+
         exprs = self._exprs
         kwargs = self._kwargs
 
@@ -378,6 +387,11 @@ class ExecComp(ExplicitComponent):
             else:
                 init_vals[arg] = val
 
+        if self._static_mode:
+            var_rel2meta = self._static_var_rel2meta
+        else:
+            var_rel2meta = self._var_rel2meta
+
         for var in sorted(allvars):
             meta = kwargs2.get(var, {
                 'units': units,
@@ -390,19 +404,77 @@ class ExecComp(ExplicitComponent):
             else:
                 val = 1.0
 
-            if var in outs:
-                dct = self.add_output(var, val, **meta)
+            if var in var_rel2meta:
+                # Input/Output already exists, but we may be setting defaults for the first time.
+                # Note that there is only one submitted dictionary of defaults.
+                current_meta = var_rel2meta[var]
+
+                for kname, kvalue in meta.items():
+                    if kvalue is not None:
+                        current_meta[kname] = kvalue
+
+                new_val = kwargs[var].get('value')
+                if new_val is not None:
+                    current_meta['value'] = new_val
             else:
-                dct = self.add_input(var, val, **meta)
+                # new input and/or output.
+                if var in outs:
+                    dct = self.add_output(var, val, **meta)
+                else:
+                    dct = self.add_input(var, val, **meta)
 
             if var not in init_vals:
                 init_vals[var] = dct['value']
 
         self._codes = self._compile_exprs(self._exprs)
 
+    def add_expr(self, expr, **kwargs):
+        """
+        Add an expression to the ExecComp.
+
+        Parameters
+        ----------
+        expr : str
+            An assignment statement that expresses how the outputs are calculated based on the
+            inputs. In addition to standard Python operators, a subset of numpy and scipy
+            functions is supported.
+        **kwargs : dict of named args
+            Initial values of variables can be set by setting a named arg with the var name.  If
+            the value is a dict it is assumed to contain metadata.  To set the initial value in
+            addition to other metadata, assign the initial value to the 'value' entry of the dict.
+            Do not include for inputs whose default kwargs have been declared on previous
+            expressions.
+        """
+        if not isinstance(expr, str):
+            typ = type(expr).__name__
+            msg = f"Argument 'expr' must be of type 'str', but type '{typ}' was found."
+            raise TypeError(msg)
+
+        self._exprs.append(expr)
+        for name in kwargs:
+            if name in self._kwargs:
+                raise NameError(f"Defaults for '{name}' have already been defined in a previous "
+                                "expression.")
+
+        self._kwargs.update(kwargs)
+
+        if not self._static_mode:
+            self._setup_expressions()
+
     def _compile_exprs(self, exprs):
         compiled = []
+        outputs = []
         for i, expr in enumerate(exprs):
+
+            # Quick dupe check.
+            lhs_name = expr.split('=', 1)[0].strip()
+            if lhs_name in outputs:
+                # Can't add two equations with the same output.
+                raise RuntimeError(f"{self.msginfo}: The output '{lhs_name}' has already been "
+                                   "defined by an expression.")
+            else:
+                outputs.append(lhs_name)
+
             try:
                 compiled.append(compile(expr, expr, 'exec'))
             except Exception:
@@ -519,7 +591,7 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=int)
+                                inds = np.arange(oval.size, dtype=INT_DTYPE)
                             else:
                                 inds = None
                             decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
@@ -577,7 +649,7 @@ class ExecComp(ExplicitComponent):
         """
         if self._requires_fd:
             if 'fd' in self._approx_schemes:
-                fdins = {tup[0].rsplit('.', 1)[1] for tup in self._approx_schemes['fd']._exec_dict}
+                fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
             else:
                 fdins = set()
 

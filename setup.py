@@ -23,7 +23,7 @@ optional_dependencies = {
     ],
     'visualization': [
         'bokeh>=1.3.4',
-        'colorama',
+        'colorama'
     ],
     'test': [
         'parameterized',

@@ -1441,7 +1441,7 @@ class TestSqliteRecorder(unittest.TestCase):
             try:
                 ln = nl.linear_solver = solver()
             except RuntimeError as err:
-                if str(err).endswith('PETSc is not available.'):
+                if str(err).count('PETSc is not available.') > 0:
                     continue
                 else:
                     raise err

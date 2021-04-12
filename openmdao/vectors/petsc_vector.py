@@ -125,9 +125,9 @@ class PETScVector(DefaultVector):
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
                         dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
-                self._dup_inds = np.array(dup_inds, dtype=int)
+                self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
             else:
-                self._dup_inds = np.array([], dtype=int)
+                self._dup_inds = np.array([], dtype=INT_DTYPE)
 
         return self._dup_inds
 

@@ -1338,7 +1338,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1370,7 +1370,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p1.x', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 

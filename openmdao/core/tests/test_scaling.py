@@ -12,7 +12,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
 from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.general_utils import all_ancestors
+from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompF
 
 
 class PassThroughLength(om.ExplicitComponent):
@@ -252,6 +252,9 @@ class TestScaling(unittest.TestCase):
         prob.run_model()
         assert_near_equal(prob['sys2.new_length'], 3.e-1)
         assert_near_equal(prob.model._outputs['sys2.new_length'], 3.e-1)
+
+        # Make sure we don't allocate an adder for the inputs vector.
+        self.assertTrue(prob.model._inputs._scaling[0] is None)
 
     def test_speed(self):
         comp = om.IndepVarComp()
@@ -986,6 +989,22 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val[0], 2.0)
             assert_near_equal(val[1], 6.0)
 
+    def test_deep_input_adder(self):
+        p = om.Problem()
+        sub1 = p.model.add_subsystem('sub1', om.Group())
+        sub2 = sub1.add_subsystem('sub2', om.Group())
+        sub2.add_subsystem('src', SrcComp())
+        sub3 = sub2.add_subsystem('sub3', om.Group())
+        sub3.add_subsystem('tgt', TgtCompF())
+        sub2.connect('src.x2', 'sub3.tgt.x2')
+
+        p.setup()
+        p.set_val('sub1.sub2.src.x1', 25.0)
+        p.run_model()
+
+        assert_near_equal(p.get_val('sub1.sub2.sub3.tgt.x3'), 77.0)
+        assert_near_equal(p.model.sub1.sub2._inputs._scaling[0],
+                          np.array([0, 32]), tolerance=1e-12)
 
 class MyComp(om.ExplicitComponent):
 

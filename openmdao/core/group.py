@@ -161,8 +161,6 @@ class Group(System):
         or subname can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
-    _approx_subjac_keys : list
-        List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
     _has_distrib_vars : bool
@@ -208,7 +206,6 @@ class Group(System):
         self._conn_discrete_in2out = {}
         self._transfers = {}
         self._discrete_transfers = {}
-        self._approx_subjac_keys = None
         self._setup_procs_finished = False
         self._has_distrib_vars = False
         self._contains_parallel_group = False
@@ -382,8 +379,12 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
+        # The output and residual vectors are handled in system.py.
         scale_factors = super()._compute_root_scale_factors()
 
+        # Input scaling for connected inputs is added here.
+        # This is a combined scale factor that includes the scaling of the connected source
+        # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
             abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
@@ -442,9 +443,12 @@ class Group(System):
                     a1 = (ref - ref0) * factor
 
                 scale_factors[abs_in] = {
-                    ('input', 'phys'): (a0, a1),
-                    ('input', 'norm'): (-a0 / a1, 1.0 / a1)
+                    'input': (a0, a1),
                 }
+
+                # Check whether we need to allocate an adder for the input vector.
+                if np.any(np.asarray(a0)):
+                    self._has_input_adder = True
 
         return scale_factors
 
@@ -521,8 +525,6 @@ class Group(System):
 
         self.comm = comm
 
-        self._approx_subjac_keys = None
-
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
         self._group_inputs = self._static_group_inputs.copy()
@@ -533,6 +535,7 @@ class Group(System):
 
         # Call setup function for this group.
         self.setup()
+        self._setup_check()
 
         # need to save these because _setup_var_data can be called multiple times
         # during the config process and we don't want to wipe out any group_inputs
@@ -790,11 +793,6 @@ class Group(System):
             if meta_name in meta:
                 return meta[meta_name]
 
-    def _set_group_input_meta(self, prom_in, meta_name, value):
-        if prom_in not in self._group_inputs:
-            self._group_inputs[prom_in] = [{'path': self.pathname, 'prom': prom_in, 'auto': True}]
-        meta = self._group_inputs[prom_in][0][meta_name] = value
-
     def _get_promotes_call_info(self, abs_in):
         prefix_len = len(self.pathname) + 1 if self.pathname else 0
         subname = abs_in[prefix_len:].split('.', 1)[0]
@@ -960,6 +958,7 @@ class Group(System):
 
         for subsys in self._subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
+            self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
             if isinstance(subsys, Component):
                 self._has_distrib_vars |= subsys.options['distributed']
@@ -1019,12 +1018,14 @@ class Group(System):
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
-                       self._has_output_scaling, self._has_resid_scaling, self._group_inputs)
+                       self._has_output_scaling, self._has_output_adder,
+                       self._has_resid_scaling, self._group_inputs)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
+                    False,
                     False,
                     False,
                     {}
@@ -1041,8 +1042,9 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, rscale, ginputs) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs) in enumerate(gathered):
                 self._has_output_scaling |= oscale
+                self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
 
                 if rank != myrank:
@@ -1595,7 +1597,7 @@ class Group(System):
         for loc_idx, sz in zip(locality, dsizes):
             sizes[loc_idx] = sz
 
-        offsets = np.zeros(self.comm.size, dtype=int)
+        offsets = np.zeros(self.comm.size, dtype=INT_DTYPE)
         offsets[1:] = np.cumsum(sizes)[:-1]
 
         return sizes, offsets
@@ -2164,9 +2166,9 @@ class Group(System):
         if mode == 'fwd':
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale('norm')
+                    vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale('phys')
+                    vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
@@ -2175,9 +2177,9 @@ class Group(System):
         else:  # rev
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale('phys')
+                    vec_inputs.scale_to_phys()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale('norm')
+                    vec_inputs.scale_to_norm()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
@@ -2847,7 +2849,7 @@ class Group(System):
                     coloring._check_config_partial(self)
                 self._setup_approx_coloring()
             # TODO: for top level FD, call below is unnecessary, but we need this
-            # for some tests that just call run_linearize directily without calling
+            # for some tests that just call run_linearize directly without calling
             # compute_totals.
             elif self._approx_schemes:
                 self._setup_approx_partials()
@@ -2901,7 +2903,7 @@ class Group(System):
             info.update(subsys._subjacs_info)
 
         if self._has_distrib_vars and self._owns_approx_jac:
-            # We current cannot approximate across a group with a distributed component if the
+            # We currently cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             for iname, meta in self._var_allprocs_abs2meta['input'].items():
                 if meta['has_src_indices'] and \
@@ -2910,20 +2912,6 @@ class Group(System):
                     msg = "{} : Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
-
-    def _get_approx_subjac_keys(self):
-        """
-        Return a list of (of, wrt) keys needed for approx derivs for this group.
-
-        Returns
-        -------
-        list
-            List of approx derivative subjacobian keys.
-        """
-        if self._approx_subjac_keys is None:
-            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
-
-        return self._approx_subjac_keys
 
     def _approx_subjac_keys_iter(self):
         pro2abs = self._var_allprocs_prom2abs_list
@@ -2972,79 +2960,88 @@ class Group(System):
 
             yield key
 
-    def _partial_jac_of_iter(self):
+    def _jac_of_iter(self):
         """
-        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        Iterate over (name, start, end, idxs) for each 'of' (row) var in the systems's jacobian.
 
-        idxs will usually be a full slice, except in cases where _owns_approx__idx has
-        a value for that variable.
+        idxs will usually be the var slice into the full variable in the result array,
+        except in cases where _owns_approx__idx has a value for that variable, in which case it'll
+        be indices into the variable.
 
         Yields
         ------
-        of_name, start, end, intra_variable_slice_or_idxs
+        of_name, start, end, result_variable_slice_or_idxs
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
 
         if self._owns_approx_of:
-            # we're computing totals/semi-totals
-            offset = end = 0
+            # we're computing totals/semi-totals (vars may not be local)
+            start = end = 0
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, offset, end, approx_of_idx[of]
+                    yield of, start, end, np.atleast_1d(approx_of_idx[of])
                 else:
                     end += abs2meta[of]['size']
-                    yield of, offset, end, _full_slice
+                    yield of, start, end, _full_slice
 
-                offset = end
+                start = end
         else:
-            yield from super()._partial_jac_of_iter()
+            yield from super()._jac_of_iter()
 
-    def _partial_jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
-
-        idxs will usually be a full slice, except in cases where _owns_approx_wrt_idx has
-        a value for that variable.
+        Iterate over (name, start, end, vec, locinds) for each column var in the systems's jacobian.
 
         Parameters
         ----------
         wrt_matches : set or None
-            Only include row vars that are contained in this set.  This will determine what
+            Only include vars in each row that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
 
         Yields
         ------
-        wrt_name, start, end, intra_variable_slice_or_idxs
+        wrt_name, start, end, vec, locinds
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
+            local_ins = self._var_abs2meta['input']
+            local_outs = self._var_abs2meta['output']
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, sub_of_idx in self._partial_jac_of_iter():
+                for of, _offset, _end, _ in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
-                        yield of, offset, end, sub_of_idx
+                        vec = self._outputs if of in local_outs else None
+                        yield of, offset, end, vec, _full_slice
                         offset = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
-                    if wrt in approx_wrt_idx:
-                        end += len(approx_wrt_idx[wrt])
-                        yield wrt, offset, end, approx_wrt_idx[wrt]
+                    if wrt in local_ins:
+                        vec = self._inputs
+                    elif wrt in local_outs:
+                        vec = self._outputs
                     else:
+                        vec = None
+                    if wrt in approx_wrt_idx:
+                        sub_wrt_idx = approx_wrt_idx[wrt]
+                        size = len(sub_wrt_idx)
+                    else:
+                        sub_wrt_idx = _full_slice
                         if wrt in abs2meta['input']:
-                            end += abs2meta['input'][wrt]['size']
+                            size = abs2meta['input'][wrt]['size']
                         else:
-                            end += abs2meta['output'][wrt]['size']
-                        yield wrt, offset, end, _full_slice
+                            size = abs2meta['output'][wrt]['size']
+                    end += size
+                    yield wrt, offset, end, vec, sub_wrt_idx
                     offset = end
         else:
-            yield from super()._partial_jac_wrt_iter(wrt_matches)
+            yield from super()._jac_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """
@@ -3058,26 +3055,25 @@ class Group(System):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        abs2prom = self._var_allprocs_abs2prom
+        wrt_color_patterns = info['wrt_patterns']
 
         info['wrt_matches'] = wrt_colors_matched = set()
 
-        wrt_color_patterns = info['wrt_patterns']
-
-        for key in self._get_approx_subjac_keys():
-            if wrt_color_patterns:
-                if key[1] in abs2prom['output']:
-                    wrtprom = abs2prom['output'][key[1]]
+        if wrt_color_patterns:
+            abs2prom = self._var_allprocs_abs2prom
+            for _, wrt in self._get_approx_subjac_keys():
+                if wrt in abs2prom['output']:
+                    wrtprom = abs2prom['output'][wrt]
                 else:
-                    wrtprom = abs2prom['input'][key[1]]
+                    wrtprom = abs2prom['input'][wrt]
 
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
-                        wrt_colors_matched.add(key[1])
+                        wrt_colors_matched.add(wrt)
                         break
 
         baselen = len(self.pathname) + 1 if self.pathname else 0
-        info['wrt_matches_prom'] = [n[baselen:] for n in wrt_colors_matched]
+        info['wrt_matches_rel'] = [n[baselen:] for n in wrt_colors_matched]
 
         if info.get('dynamic') and info['coloring'] is None and self._owns_approx_of:
             if not wrt_colors_matched:
@@ -3104,7 +3100,7 @@ class Group(System):
 
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
-        approx._exec_dict = defaultdict(list)
+        approx._wrt_meta = {}
         approx._reset()
 
         approx_keys = self._get_approx_subjac_keys()
@@ -3125,7 +3121,7 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if key[1] in wrt_matches:
+            if wrt_matches is None or key[1] in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
             if meta['value'] is None:
@@ -3135,7 +3131,10 @@ class Group(System):
                     sz = abs2meta['output'][key[1]]['size']
                 shape = (abs2meta['output'][key[0]]['size'], sz)
                 meta['shape'] = shape
-                meta['value'] = np.zeros(shape)
+                if meta['rows'] is not None:  # subjac is sparse
+                    meta['value'] = np.zeros(len(meta['rows']))
+                else:
+                    meta['value'] = np.zeros(shape)
 
             approx.add_approximation(key, self, meta)
 

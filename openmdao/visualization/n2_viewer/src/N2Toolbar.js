@@ -274,6 +274,20 @@ class N2Toolbar {
         return btn;
     }
 
+    /** Get a snapshot of the search term and match count. */
+    getSearchState() {
+        return {
+                'term': this.searchBar.property('value'),
+                'matches': this.searchCount.html()
+        }
+    }
+
+    /** Restore a snapshot of the search term and match count. */
+    setSearchState(searchInfo) {
+        this.searchBar.property('value', searchInfo.term);
+        this.searchCount.html(searchInfo.matches);
+    }
+
     /**
      * Associate all of the buttons on the toolbar with a method in N2UserInterface.
      * @param {N2UserInterface} n2ui A reference to the UI object
@@ -285,9 +299,10 @@ class N2Toolbar {
         this._addButton(new N2ToolbarButtonClick('#searchButtonId', tooltipBox,
             "Collapse model to only variables that match search term",
             e => {
-                self.searchCount.html('0 matches');
+                if (self.searchBar.node().value == '') {
+                    self.searchCount.html('0 matches');
+                }
 
-                self.searchBar.node().value = '';
                 d3.select('#searchbar-and-label').attr('class', 'searchbar-visible');
 
                 // This is necessary rather than just calling focus() due to the

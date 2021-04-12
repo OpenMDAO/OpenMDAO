@@ -9,7 +9,7 @@
     flex-direction: row;
     margin-left: 12px;
     margin-bottom: 20px;
-    z-index: 31;
+    z-index: 50;
     overflow: visible;
     height: 40px;
 }
@@ -413,6 +413,15 @@
     border-radius: 50%;
     background: #98daba;
     cursor: pointer;
+}
+
+#depth-slider-label {
+    min-width: 30px;
+    text-align: center;
+    font-size: 18px;
+    border-radius: 50%;
+    border: 1px solid white;
+    color: white;
 }
 
 #model-slider-label {

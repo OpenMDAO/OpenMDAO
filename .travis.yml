@@ -25,6 +25,8 @@ env:
 git:
   depth: 99999
 
+dist: bionic
+
 addons:
   apt:
     update: true
@@ -155,7 +157,7 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make travis;
+    make strict;
   fi
 
 # run the tests from down here to see if it can work without being at top level
@@ -164,19 +166,6 @@ script:
     testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
     testflo -n 1 openmdao --timeout=120 --show_skipped;
-  fi
-
-after_success:
-# again, only run coverage operations on the upload machine after success.
-# strip the site-package path so that links works on coveralls.io
-- if [ "$UPLOAD_DOCS" ]; then
-    echo " >> Installing forked version of coveralls";
-    pip install git+https://github.com/swryan/coveralls-python@work;
-
-    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
-    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
-    coveralls --upload=coveralls-upd.json;
   fi
 
 deploy:

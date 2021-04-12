@@ -14,26 +14,21 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_src_dict
 
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, check_mpi_env, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
+from openmdao.vectors.vector import _full_slice
 
-# Attempt to import petsc4py.
-# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
-# and raise exception on failure. If set to anything else, no import is attempted.
-if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
-        from petsc4py import PETSc
-    else:
-        PETSc = None
-# If OPENMDAO_REQUIRE_MPI is unset, attempt to import petsc4py, but continue on failure
-# with a notification.
-else:
+
+use_mpi = check_mpi_env()
+if use_mpi is not False:
     try:
         from petsc4py import PETSc
     except ImportError:
         PETSc = None
-        sys.stdout.write("Unable to import petsc4py. Parallel processing unavailable.\n")
-        sys.stdout.flush()
+        if use_mpi is True:
+            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+elif use_mpi is False:
+    PETSc = None
 
 _contains_all = ContainsAll()
 
@@ -121,6 +116,8 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
+        get_remote : bool
+            Whether to get remote variables if using MPI.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
@@ -1488,12 +1485,14 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('In mode: %s, Solving variable(s) using simul coloring:' % mode)
                             if key == '@simul_coloring':
+                                print(f'In mode: {mode}, Solving variable(s) using simul '
+                                      'coloring:')
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
                                     print("   {}".format(local_ind))
                             else:
+                                print('In mode: %s.' % mode)
                                 print_key = key
                                 if key in self.ivc_print_names:
                                     print_key = self.ivc_print_names[key]
@@ -1619,12 +1618,14 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
-                    ofidx = of_idx[output_name] if output_name in of_idx else None
-                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else None
+                    ofidx = of_idx[output_name] if output_name in of_idx else _full_slice
+                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else _full_slice
 
-                    totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                               prom_out, prom_in, ofidx, wrtidx,
-                                                               dist_resp, comm)
+                    approxJ = approx_jac[output_name, input_name]
+
+                    totals[prom_out, prom_in][:] = _get_approx_subjac(approxJ,
+                                                                      prom_out, prom_in, ofidx,
+                                                                      wrtidx, dist_resp, comm)
 
         elif return_format in ('dict', 'array'):
             for prom_out, output_name in zip(self.prom_of, of):
@@ -1643,18 +1644,18 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
-                    ofidx = of_idx[output_name] if output_name in of_idx else None
-                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else None
+                    ofidx = of_idx[output_name] if output_name in of_idx else _full_slice
+                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else _full_slice
 
                     if prom_out == prom_in and isinstance(tot[prom_in], dict):
                         rows, cols, data = tot[prom_in]['coo']
-                        data[:] = _get_subjac(approx_jac[output_name, input_name],
-                                              prom_out, prom_in, ofidx, wrtidx,
-                                              dist_resp, comm)[rows, cols]
+                        data[:] = _get_approx_subjac(approx_jac[output_name, input_name],
+                                                     prom_out, prom_in, ofidx, wrtidx,
+                                                     dist_resp, comm)[rows, cols]
                     else:
-                        tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                      prom_out, prom_in, ofidx, wrtidx,
-                                                      dist_resp, comm)
+                        tot[prom_in][:] = _get_approx_subjac(approx_jac[output_name, input_name],
+                                                             prom_out, prom_in, ofidx, wrtidx,
+                                                             dist_resp, comm)
 
         else:
             msg = "Unsupported return format '%s." % return_format
@@ -1830,6 +1831,8 @@ class _TotalJacInfo(object):
             J_dict = self.J_dict
             for of, wrt_dict in J_dict.items():
                 for wrt, J_sub in wrt_dict.items():
+                    if wrt in self.ivc_print_names:
+                        wrt = self.ivc_print_names[wrt]
                     pprint.pprint({(of, wrt): J_sub})
         else:
             J = self.J
@@ -1839,7 +1842,10 @@ class _TotalJacInfo(object):
                 out_slice = self.of_meta[of][0]
                 for j, wrt in enumerate(self.wrt):
                     if wrt not in self.remote_vois:
-                        pprint.pprint({(of, wrt): J[out_slice, self.wrt_meta[wrt][0]]})
+                        deriv = J[out_slice, self.wrt_meta[wrt][0]]
+                        if wrt in self.ivc_print_names:
+                            wrt = self.ivc_print_names[wrt]
+                        pprint.pprint({(of, wrt): deriv})
 
         print('')
         sys.stdout.flush()
@@ -1866,7 +1872,7 @@ class _TotalJacInfo(object):
             self.model._recording_iter.pop()
 
 
-def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
+def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     """
     Return proper subjacobian based on input/output names and indices.
 
@@ -1878,9 +1884,9 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
         Promoted output name.
     prom_in : str
         Promoted input name.
-    of_idx : ndarray or None
+    of_idx : ndarray or slice
         Output indices, if any.
-    wrt_idx : ndarray or None
+    wrt_idx : ndarray or slice
         Input indices, if any.
     dist_resp : None or tuple
         Tuple containing indices and sizes if this response is distributed.
@@ -1892,13 +1898,23 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     ndarray
         The desired subjacobian.
     """
-    if jac_meta['rows'] is not None:  # sparse list format
-        # This is a design variable that was declared as an obj/con.
-        tot = np.eye(len(jac_meta['value']))
-        if of_idx is not None:
-            tot = tot[of_idx, :]
-        if wrt_idx is not None:
-            tot = tot[:, wrt_idx]
+    # of_idx and wrt_idx are relative to the full sized of and wrt vars, but
+    # 'rows' and 'cols' are relative to the subjac after compression based on of_idx
+    # and wrt_idx.
+    if jac_meta['rows'] is not None:
+        if prom_in == prom_out:
+            nrows, ncols = jac_meta['shape']
+            if of_idx is _full_slice or wrt_idx is _full_slice:
+                sz = nrows  # nrows = ncols since this subjac is square
+            else:
+                sz = np.max(of_idx)
+                sz = max(sz, np.max(wrt_idx)) + 1
+            # take sections of the identity matrix based on of_idx and wrt_idx
+            sz = max(sz, nrows, ncols)
+            tot = np.eye(sz)[of_idx, wrt_idx]
+        else:
+            tot = np.zeros(jac_meta['shape'])
+            tot[jac_meta['rows'], jac_meta['cols']] = jac_meta['value']
     else:
         tot = jac_meta['value']
 
