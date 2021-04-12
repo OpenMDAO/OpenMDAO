@@ -4376,7 +4376,10 @@ class System(object):
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
         simp_units = simplify_unit(units)
 
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        if from_src:
+            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        else:
+            conns = []
         if from_src and abs_names[0] in conns:  # pull input from source
             src = conns[abs_names[0]]
             if src in self._var_allprocs_abs2prom['output']:
@@ -4825,8 +4828,12 @@ class System(object):
             The value stored under key in the metadata dictionary for the named variable.
         """
         if self._problem_meta is not None:
-            meta_all = self._problem_meta['model_ref']()._var_allprocs_abs2meta
-            meta_loc = self._problem_meta['model_ref']()._var_abs2meta
+            if self._problem_meta['model_ref']() is not None:
+                meta_all = self._problem_meta['model_ref']()._var_allprocs_abs2meta
+                meta_loc = self._problem_meta['model_ref']()._var_abs2meta
+            else:
+                meta_all = self._var_allprocs_abs2meta
+                meta_loc = self._var_abs2meta
         else:
             meta_all = self._var_allprocs_abs2meta
             meta_loc = self._var_abs2meta
