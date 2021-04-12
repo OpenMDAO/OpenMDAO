@@ -9,7 +9,7 @@ from io import TextIOBase
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
-from openmdao.core.notebook_mode import notebook, tabulate
+from openmdao.core.notebook_utils import notebook, tabulate
 try:
     from IPython.display import display, HTML
 except ImportError:

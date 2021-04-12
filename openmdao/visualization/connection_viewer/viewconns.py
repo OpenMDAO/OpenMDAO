@@ -15,7 +15,7 @@ except ImportError:
 
 import openmdao
 from openmdao.core.problem import Problem
-from openmdao.core.notebook_mode import notebook, colab
+from openmdao.core.notebook_utils import notebook, colab
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview

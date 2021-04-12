@@ -19,7 +19,7 @@ import numpy as np
 import networkx as nx
 
 import openmdao
-from openmdao.core.notebook_mode import notebook, tabulate
+from openmdao.core.notebook_utils import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
