@@ -5,6 +5,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArraySparse, TestExplCompArrayJacVec
+from openmdao.test_suite.components.impl_comp_array import TestImplCompArraySparse, TestImplCompArrayMatVec
 
 try:
     from parameterized import parameterized
@@ -43,15 +44,46 @@ class ExplCompArrayJacVecCounted(TestExplCompArrayJacVec):
         self.ncomputes += 1
 
     def compute_jacvec_product(self, inputs, dinputs, result, mode):
-        super().compute_jacvec_product(inputs, outputs)
+        super().compute_jacvec_product(inputs, dinputs, result, mode)
         self.njacvec_products += 1
+
+
+class ImplCompArraySparseCounted(TestImplCompArraySparse):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.nsolve_nonlinears = 0
+        self.nlinearizes = 0
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        super().apply_nonlinear(inputs, outputs, residuals)
+        self.napply_nonlinears += 1
+
+    def solve_nonlinear(self, inputs, outputs):
+        super().solve_nonlinear(inputs, outputs)
+        self.nsolve_nonlinears += 1
+
+    def linearize(self, inputs, outputs, jacobian):
+        super().linearize(inputs, outputs, jacobian)
+        self.nlinearizes += 1
+
+
+class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.napply_linears = 0
+
+    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
+                     mode):
+        super().apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
+        self.napply_linears += 1
 
 
 @unittest.skipUnless(MPI is not None and PETScVector is not None, "MPI and PETSc are required.")
 class TestSimpleSerialReplication(unittest.TestCase):
     N_PROCS = 3
 
-    def test_serial_replication_False(self):
+    def test_serial_replication_ex_False(self):
         # run_root_only is False
         p = om.Problem()
         p.model.add_subsystem('C1', ExplCompArraySparseCounted(), promotes_outputs=['areas', 'total_volume'])
@@ -79,7 +111,7 @@ class TestSimpleSerialReplication(unittest.TestCase):
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
 
 
-    def test_serial_replication_True(self):
+    def test_serial_replication_ex_True(self):
         # run_root_only is True
         p = om.Problem()
         p.model.add_subsystem('C1', ExplCompArraySparseCounted(run_root_only=True),
@@ -113,3 +145,39 @@ class TestSimpleSerialReplication(unittest.TestCase):
         np.testing.assert_allclose(J['C2.y', 'C1.widths'], [np.ones(4) * 2.5])
         np.testing.assert_allclose(J['C3.y', 'C1.lengths'], np.eye(4) * 4.5)
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
+
+    def test_serial_replication_ex_jacvec_True(self):
+        # run_root_only is True
+        p = om.Problem()
+
+        p.model.add_subsystem('C1', ExplCompArrayJacVecCounted(run_root_only=True),
+                              promotes_outputs=['areas', 'total_volume'])
+        p.model.add_subsystem('C2', om.ExecComp('y = total_volume * 2.5'), promotes_inputs=['total_volume'])
+        p.model.add_subsystem('C3', om.ExecComp('y = areas * 1.5', areas=np.zeros((2,2)), y=np.zeros((2,2))),
+                              promotes_inputs=['areas'])
+
+        p.setup()
+
+        p.set_val('C1.widths', np.ones(4) * 3.)
+
+        p.run_model()
+
+        if p.comm.rank == 0:
+            self.assertEqual(p.model.C1.ncomputes, 1)
+        else:
+            self.assertEqual(p.model.C1.ncomputes, 0)
+
+        np.testing.assert_allclose(p.get_val('C2.y'), 30.)
+        np.testing.assert_allclose(p.get_val('C3.y'), np.ones((2,2)) * 4.5)
+
+        J = p.compute_totals(of=['C2.y', 'C3.y'], wrt=['C1.lengths', 'C1.widths'])
+
+        if p.comm.rank == 0:
+            self.assertEqual(p.model.C1.njacvec_products, 8)
+        else:
+            self.assertEqual(p.model.C1.njacvec_products, 0)
+
+        np.testing.assert_allclose(J['C3.y', 'C1.lengths'], np.eye(4) * 4.5)
+        np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
+        np.testing.assert_allclose(J['C2.y', 'C1.lengths'], [np.ones(4) * 7.5])
+        np.testing.assert_allclose(J['C2.y', 'C1.widths'], [np.ones(4) * 2.5])

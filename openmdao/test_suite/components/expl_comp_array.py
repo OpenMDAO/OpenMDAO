@@ -60,12 +60,20 @@ class TestExplCompArrayJacVec(TestExplCompArray):
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
 
         if mode == 'fwd':
-            if 'widths' in d_inputs:
-                d_outputs['areas'] += d_inputs['widths']*inputs['lengths']
-            if 'lengths' in d_inputs:
-                d_outputs['areas'] += d_inputs['lengths']*inputs['widths']
+            if 'areas' in d_outputs:
+                if 'widths' in d_inputs:
+                    d_outputs['areas'] += d_inputs['widths']*inputs['lengths']
+                if 'lengths' in d_inputs:
+                    d_outputs['areas'] += d_inputs['lengths']*inputs['widths']
+            if 'total_volume' in d_outputs:
+                if 'widths' in d_inputs:
+                    d_outputs['total_volume'] += np.sum(d_inputs['widths']*inputs['lengths'])
+                if 'lengths' in d_inputs:
+                    d_outputs['total_volume'] += np.sum(d_inputs['lengths']*inputs['widths'])
         else:
             if 'widths' in d_inputs:
                 d_inputs['widths'] += d_outputs['areas']*inputs['lengths']
+                d_inputs['widths'] += d_outputs['total_volume']*inputs['lengths']
             if 'lengths' in d_inputs:
                 d_inputs['lengths'] += d_outputs['areas']*inputs['widths']
+                d_inputs['lengths'] += d_outputs['total_volume']*inputs['widths']
