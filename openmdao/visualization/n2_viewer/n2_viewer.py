@@ -16,7 +16,7 @@ except ImportError:
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.notebook_mode import notebook, colab
+from openmdao.core.notebook_utils import notebook, colab
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -661,8 +661,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
 
     if notebook:
         # display in Jupyter Notebook
+        outfile = os.path.relpath(outfile)
         if not colab:
-            display(IFrame(src=outfile, width=1000, height=1000))
+            display(IFrame(src=outfile, width="100%", height=700))
         else:
             display(HTML(outfile))
     elif show_browser:
