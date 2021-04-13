@@ -19,7 +19,7 @@ import numpy as np
 import networkx as nx
 
 import openmdao
-from openmdao.core.notebook_mode import notebook, tabulate
+from openmdao.core.notebook_utils import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -3049,9 +3049,15 @@ class System(object):
                 meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
                 if src_name in abs2idx:
+                    indices = meta['indices']
                     meta = abs2meta_out[src_name]
                     out[name]['distributed'] = meta['distributed']
-                    out[name]['global_size'] = meta['global_size']
+                    if indices is not None:
+                        # Index defined in this response.
+                        out[name]['global_size'] = len(indices) if meta['distributed'] \
+                            else meta['global_size']
+                    else:
+                        out[name]['global_size'] = meta['global_size']
                 else:
                     out[name]['global_size'] = 0  # discrete var
 
