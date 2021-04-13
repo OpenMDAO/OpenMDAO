@@ -7,6 +7,7 @@ from io import BytesIO
 from collections import OrderedDict
 
 import os
+import gc
 import sqlite3
 from itertools import chain
 
@@ -14,6 +15,7 @@ import json
 import numpy as np
 
 import pickle
+import zlib
 
 from openmdao import __version__ as openmdao_version
 from openmdao.recorders.case_recorder import CaseRecorder
@@ -30,6 +32,9 @@ from openmdao.solvers.solver import Solver
 """
 SQL case database version history.
 ----------------------------------
+14-- OpenMDAO 3.8.1
+     Metadata pickle and JSON blobs are compressed.
+     Save metadata separately for parallel runs.
 13-- OpenMDAO 3.8.1
      Added OpenMDAO version number to recorder file
 12-- OpenMDAO 3.6.1
@@ -59,7 +64,7 @@ SQL case database version history.
 1 -- Through OpenMDAO 2.3
      Original implementation.
 """
-format_version = 13
+format_version = 14
 
 # separator, cannot be a legal char for names
 META_KEY_SEP = '!'
@@ -122,6 +127,10 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record data needed to generate N2 diagram.
     connection : sqlite connection object
         Connection to the sqlite3 database.
+    metadata_connection : sqlite connection object
+        Connection to the sqlite3 database, if metadata is recorded separately.
+    _record_metadata : Whether this process is recording metadata. Always True
+        for serial runs, only True for rank 0 of parallel runs.
     _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
     _prom2abs : {'input': dict, 'output': dict}
@@ -139,7 +148,7 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record on this processor when running in parallel.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=2, record_viewer_data=True):
+    def __init__(self, filepath, append=False, pickle_version=4, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
 
@@ -158,6 +167,8 @@ class SqliteRecorder(CaseRecorder):
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")
 
         self.connection = None
+        self.metadata_connection = None
+        self._record_metadata = True
         self._record_viewer_data = record_viewer_data
 
         self._abs2prom = {'input': {}, 'output': {}}
@@ -183,6 +194,12 @@ class SqliteRecorder(CaseRecorder):
                 print("Note: SqliteRecorder is running on multiple processors. "
                       "Cases from rank %d are being written to %s." %
                       (rank, filepath))
+                if rank == 0:
+                    metadata_filepath = f'{self._filepath}_meta'
+                    print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
+                    self.metadata_connection = sqlite3.connect(metadata_filepath)
+                else:
+                    self._record_metadata = False
             elif rank == 0:
                 filepath = self._filepath
             else:
@@ -197,14 +214,10 @@ class SqliteRecorder(CaseRecorder):
                 pass
 
             self.connection = sqlite3.connect(filepath)
-            with self.connection as c:
-                c.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
-                          "abs2prom TEXT, prom2abs TEXT, abs2meta TEXT, var_settings TEXT,"
-                          "conns TEXT)")
-                c.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
-                          " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
-                                                         None, None))
+            if self._record_metadata and self.metadata_connection is None:
+                self.metadata_connection = self.connection
 
+            with self.connection as c:
                 # used to keep track of the order of the case records across all case tables
                 c.execute("CREATE TABLE global_iterations(id INTEGER PRIMARY KEY, "
                           "record_type TEXT, rowid INT, source TEXT)")
@@ -234,12 +247,20 @@ class SqliteRecorder(CaseRecorder):
                           "solver_inputs TEXT, solver_output TEXT, solver_residuals TEXT)")
                 c.execute("CREATE INDEX solv_iter_ind on solver_iterations(iteration_coordinate)")
 
-                c.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
-                          "model_viewer_data TEXT)")
-                c.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
-                          "scaling_factors BLOB, component_metadata BLOB)")
-                c.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
-                          "solver_options BLOB, solver_class TEXT)")
+            if self._record_metadata:
+                with self.metadata_connection as m:
+                    m.execute("CREATE TABLE metadata(format_version INT, openmdao_version TEXT, "
+                              "abs2prom BLOB, prom2abs BLOB, abs2meta BLOB, var_settings BLOB,"
+                              "conns BLOB)")
+                    m.execute("INSERT INTO metadata(format_version, openmdao_version, abs2prom,"
+                              " prom2abs) VALUES(?,?,?,?)", (format_version, openmdao_version,
+                                                             None, None))
+                    m.execute("CREATE TABLE driver_metadata(id TEXT PRIMARY KEY, "
+                              "model_viewer_data TEXT)")
+                    m.execute("CREATE TABLE system_metadata(id TEXT PRIMARY KEY, "
+                              "scaling_factors BLOB, component_metadata BLOB)")
+                    m.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
+                              "solver_options BLOB, solver_class TEXT)")
 
         self._database_initialized = True
 
@@ -389,10 +410,11 @@ class SqliteRecorder(CaseRecorder):
             self._cleanup_abs2meta()
 
             # store the updated abs2prom and prom2abs
-            abs2prom = json.dumps(self._abs2prom)
-            prom2abs = json.dumps(self._prom2abs)
-            abs2meta = json.dumps(self._abs2meta)
-            conns = json.dumps(system._problem_meta['model_ref']()._conn_global_abs_in2out)
+            abs2prom = zlib.compress(json.dumps(self._abs2prom).encode('ascii'))
+            prom2abs = zlib.compress(json.dumps(self._prom2abs).encode('ascii'))
+            abs2meta = zlib.compress(json.dumps(self._abs2meta).encode('ascii'))
+            conns = zlib.compress(json.dumps(
+                system._problem_meta['model_ref']()._conn_global_abs_in2out).encode('ascii'))
 
             var_settings = {}
             var_settings.update(desvars)
@@ -400,12 +422,14 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
             var_settings['execution_order'] = var_order
-            var_settings_json = json.dumps(var_settings, default=default_noraise)
+            var_settings_json = zlib.compress(
+                json.dumps(var_settings, default=default_noraise).encode('ascii'))
 
-            with self.connection as c:
-                c.execute("UPDATE metadata SET " +
-                          "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
-                          (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
+            if self._record_metadata:
+                with self.metadata_connection as m:
+                    m.execute("UPDATE metadata SET " +
+                              "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
+                              (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 
     def record_iteration_driver(self, driver, data, metadata):
         """
@@ -621,13 +645,13 @@ class SqliteRecorder(CaseRecorder):
         key : str, optional
             The unique ID to use for this data in the table.
         """
-        if self.connection:
+        if self._record_metadata and self.metadata_connection:
             json_data = json.dumps(model_viewer_data, default=default_noraise)
 
             # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:
-                with self.connection as c:
-                    c.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
+                with self.metadata_connection as m:
+                    m.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
                               (key, json_data))
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
@@ -644,7 +668,7 @@ class SqliteRecorder(CaseRecorder):
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
-        if self.connection:
+        if self._record_metadata and self.metadata_connection:
 
             scaling_vecs, user_options = self._get_metadata_system(system)
 
@@ -670,16 +694,16 @@ class SqliteRecorder(CaseRecorder):
             if not path:
                 path = 'root'
 
-            scaling_factors = sqlite3.Binary(scaling_factors)
-            pickled_metadata = sqlite3.Binary(pickled_metadata)
+            scaling_factors = sqlite3.Binary(zlib.compress(scaling_factors))
+            pickled_metadata = sqlite3.Binary(zlib.compress(pickled_metadata))
 
             if run_number is None:
                 name = path
             else:
                 name = META_KEY_SEP.join([path, str(run_number)])
 
-            with self.connection as c:
-                c.execute("INSERT INTO system_metadata"
+            with self.metadata_connection as m:
+                m.execute("INSERT INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (name, scaling_factors,
                                             pickled_metadata))
@@ -696,7 +720,7 @@ class SqliteRecorder(CaseRecorder):
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
-        if self.connection:
+        if self._record_metadata and self.metadata_connection:
             path = solver._system().pathname
             solver_class = type(solver).__name__
 
@@ -708,10 +732,10 @@ class SqliteRecorder(CaseRecorder):
             if run_number is not None:
                 id = META_KEY_SEP.join([id, str(run_number)])
 
-            solver_options = pickle.dumps(solver.options, self._pickle_version)
+            solver_options = zlib.compress(pickle.dumps(solver.options, self._pickle_version))
 
-            with self.connection as c:
-                c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class)"
+            with self.metadata_connection as m:
+                m.execute("INSERT INTO solver_metadata(id, solver_options, solver_class)"
                           " VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
 
     def record_derivatives_driver(self, recording_requester, data, metadata):
@@ -746,8 +770,18 @@ class SqliteRecorder(CaseRecorder):
         Shut down the recorder.
         """
         # close database connection
+        if self._record_metadata and self.metadata_connection and \
+                self.metadata_connection != self.connection:
+            self.metadata_connection.close()
+
         if self.connection:
             self.connection.close()
+
+        # sqlite close() does not always write until garbage collection occurs.
+        # If collection is not forced like this and a reader is immediately opened on
+        # the same file, it may find a 0-length or malformed db.
+        # See https://www.sqlite.org/c3ref/close.html for more info
+        gc.collect()
 
     def delete_recordings(self):
         """

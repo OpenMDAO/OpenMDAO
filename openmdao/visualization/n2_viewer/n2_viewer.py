@@ -16,7 +16,7 @@ except ImportError:
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.notebook_mode import notebook, colab
+from openmdao.core.notebook_utils import notebook, colab
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -345,7 +345,9 @@ def _get_viewer_data(data_source, case_id=None):
     Parameters
     ----------
     data_source : <Problem> or <Group> or str
-        A Problem or Group or case recorder file name containing the model or model data.
+        A Problem or Group or case recorder filename containing the model or model data.
+        If the case recorder file from a parallel run has separate metadata, the
+        filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
 
     case_id : int or str or None
         Case name or index of case in SQL file.
@@ -387,7 +389,11 @@ def _get_viewer_data(data_source, case_id=None):
             return {}
 
     elif isinstance(data_source, str):
-        cr = CaseReader(data_source)
+        if ',' in data_source:
+            filenames = data_source.split(',')
+            cr = CaseReader(filenames[0], metadata_filename=filenames[1])
+        else:
+            cr = CaseReader(data_source)
 
         data_dict = cr.problem_metadata
 
@@ -571,7 +577,8 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
         'd3': 'd3.v5.min',
         'awesomplete': 'awesomplete',
         'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min'
+        'pako_inflate': 'pako_inflate.min',
+        'json5': 'json5_2.2.0.min'
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
