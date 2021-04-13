@@ -116,6 +116,8 @@ class _TotalJacInfo(object):
         driver_scaling : bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
+        get_remote : bool
+            Whether to get remote variables if using MPI.
         """
         driver = problem.driver
         prom2abs = problem.model._var_allprocs_prom2abs_list['output']
