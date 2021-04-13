@@ -9,6 +9,7 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.notebook_utils import notebook
 from openmdao.utils.general_utils import warn_deprecation
 
 
@@ -307,4 +308,5 @@ else:
 
 
 if os.environ.get('USE_PROC_FILES') or os.environ.get('PROC_FILES_DIR'):
-    use_proc_files()
+    if not notebook:
+        use_proc_files()
