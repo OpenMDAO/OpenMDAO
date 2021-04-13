@@ -52,6 +52,7 @@ class ImplCompArraySparseCounted(TestImplCompArraySparse):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.nsolve_nonlinears = 0
+        self.napply_nonlinears = 0
         self.nlinearizes = 0
 
     def apply_nonlinear(self, inputs, outputs, residuals):
@@ -72,6 +73,16 @@ class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.napply_linears = 0
+        self.nsolve_nonlinears = 0
+        self.napply_nonlinears = 0
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        super().apply_nonlinear(inputs, outputs, residuals)
+        self.napply_nonlinears += 1
+
+    def solve_nonlinear(self, inputs, outputs):
+        super().solve_nonlinear(inputs, outputs)
+        self.nsolve_nonlinears += 1
 
     def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals,
                      mode):
@@ -83,7 +94,10 @@ class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
 class TestSimpleSerialReplication(unittest.TestCase):
     N_PROCS = 3
 
-    def test_serial_replication_ex_False(self):
+    # these tests just take a serial model and replicate it in 3 procs, verifying that
+    # compute/etc. run only on rank 0
+
+    def test_serial_replication_ex(self):
         # run_root_only is False
         p = om.Problem()
         p.model.add_subsystem('C1', ExplCompArraySparseCounted(), promotes_outputs=['areas', 'total_volume'])
@@ -110,9 +124,7 @@ class TestSimpleSerialReplication(unittest.TestCase):
         np.testing.assert_allclose(J['C3.y', 'C1.lengths'], np.eye(4) * 4.5)
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
 
-
-    def test_serial_replication_ex_True(self):
-        # run_root_only is True
+    def test_serial_replication_ex_root_only(self):
         p = om.Problem()
         p.model.add_subsystem('C1', ExplCompArraySparseCounted(run_root_only=True),
                               promotes_outputs=['areas', 'total_volume'])
@@ -146,8 +158,7 @@ class TestSimpleSerialReplication(unittest.TestCase):
         np.testing.assert_allclose(J['C3.y', 'C1.lengths'], np.eye(4) * 4.5)
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
 
-    def test_serial_replication_ex_jacvec_True(self):
-        # run_root_only is True
+    def test_serial_replication_ex_jacvec_root_only(self):
         p = om.Problem()
 
         p.model.add_subsystem('C1', ExplCompArrayJacVecCounted(run_root_only=True),
@@ -181,3 +192,112 @@ class TestSimpleSerialReplication(unittest.TestCase):
         np.testing.assert_allclose(J['C3.y', 'C1.widths'], np.eye(4) * 1.5)
         np.testing.assert_allclose(J['C2.y', 'C1.lengths'], [np.ones(4) * 7.5])
         np.testing.assert_allclose(J['C2.y', 'C1.widths'], [np.ones(4) * 2.5])
+
+    def test_serial_replication_impl(self):
+        # run_root_only is False
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(2)))
+        comp = model.add_subsystem('comp', ImplCompArraySparseCounted())
+        model.connect('indeps.x', 'comp.rhs')
+
+        prob.setup()
+        prob.run_model()
+
+        self.assertEqual(comp.nsolve_nonlinears, 1)
+
+        np.testing.assert_allclose(prob['comp.rhs'], np.ones(2))
+        np.testing.assert_allclose(prob['comp.x'], np.ones(2))
+
+        model.run_linearize()
+
+        np.testing.assert_allclose(comp._jacobian['comp.x', 'comp.x'], comp.mtx)
+        np.testing.assert_allclose(comp._jacobian['comp.x', 'comp.rhs'], -np.ones(2))
+
+    def test_serial_replication_impl_root_only(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(2)))
+        comp = model.add_subsystem('comp', ImplCompArraySparseCounted(run_root_only=True))
+        model.connect('indeps.x', 'comp.rhs')
+
+        prob.setup()
+        prob.run_model()
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.nsolve_nonlinears, 1)
+        else:
+            self.assertEqual(comp.nsolve_nonlinears, 0)
+
+        np.testing.assert_allclose(prob['comp.rhs'], np.ones(2))
+        np.testing.assert_allclose(prob['comp.x'], np.ones(2))
+
+        model.run_linearize()
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.nlinearizes, 1)
+        else:
+            self.assertEqual(comp.nlinearizes, 0)
+
+        np.testing.assert_allclose(comp._jacobian['comp.x', 'comp.x'], comp.mtx)
+        np.testing.assert_allclose(comp._jacobian['comp.x', 'comp.rhs'], -np.ones(2))
+
+        comp._outputs['x'] = np.array([1.5, 2.5])
+        comp._inputs['rhs'] = np.array([2., 3.])
+
+        comp.run_apply_nonlinear()
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.napply_nonlinears, 1)
+        else:
+            self.assertEqual(comp.napply_nonlinears, 0)
+
+        np.testing.assert_allclose(comp._residuals['x'],
+                                   comp.mtx.dot(np.array([1.5, 2.5]))-np.array([2., 3.]))
+
+        J = prob.compute_totals(of='comp.x', wrt='indeps.x')
+
+        np.testing.assert_allclose(J['comp.x', 'indeps.x'], np.eye(2))
+
+    def test_serial_replication_impl_apply_linear_root_only(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(2)))
+        comp = model.add_subsystem('comp', ImplCompArrayMatVecCounted(run_root_only=True))
+        model.connect('indeps.x', 'comp.rhs')
+
+        prob.setup()
+        prob.run_model()
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.nsolve_nonlinears, 1)
+        else:
+            self.assertEqual(comp.nsolve_nonlinears, 0)
+
+        np.testing.assert_allclose(prob['comp.rhs'], np.ones(2))
+        np.testing.assert_allclose(prob['comp.x'], np.ones(2))
+
+        comp._outputs['x'] = np.array([1.5, 2.5])
+        comp._inputs['rhs'] = np.array([2., 3.])
+
+        comp.run_apply_nonlinear()
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.napply_nonlinears, 1)
+        else:
+            self.assertEqual(comp.napply_nonlinears, 0)
+
+        np.testing.assert_allclose(comp._residuals['x'],
+                                   comp.mtx.dot(np.array([1.5, 2.5]))-np.array([2., 3.]))
+
+        J = prob.compute_totals(of='comp.x', wrt='indeps.x')
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.napply_linears, 2)
+        else:
+            self.assertEqual(comp.napply_linears, 0)
+
+        np.testing.assert_allclose(J['comp.x', 'indeps.x'], np.eye(2))

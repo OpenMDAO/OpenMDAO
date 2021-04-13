@@ -38,13 +38,11 @@ class TestImplCompArrayDense(TestImplCompArray):
 class TestImplCompArraySparse(TestImplCompArray):
 
     def setup_partials(self):
-        # dx/dx actually isn't sparse, but we'll declare it sparse anyway...
-        self.declare_partials(of='x', wrt='x', rows=np.arange(4), cols=np.arange(4))
-
+        self.declare_partials(of='x', wrt='x')
         self.declare_partials(of='x', wrt='rhs', rows=np.arange(2), cols=np.arange(2))
 
     def linearize(self, inputs, outputs, jacobian):
-        jacobian['x', 'x'] = self.mtx.flatten()
+        jacobian['x', 'x'] = self.mtx
         jacobian['x', 'rhs'] = -np.ones(2)
 
 
@@ -60,8 +58,14 @@ class TestImplCompArrayMatVec(TestImplCompArray):
                      mode):
 
         if mode == 'fwd':
-            d_residuals['x'] += self.mtx.dot(d_outputs['x'])
-            d_residuals['x'] += -d_inputs['rhs']
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_residuals['x'] += self.mtx.dot(d_outputs['x'])
+                if 'rhs' in d_inputs:
+                    d_residuals['x'] += -d_inputs['rhs']
         else:
-            d_outputs['x'] += self.mtx.dot(d_residuals['x'])
-            d_inputs['rhs'] += -d_residuals['x']
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_outputs['x'] += self.mtx.dot(d_residuals['x'])
+                if 'rhs' in d_inputs:
+                    d_inputs['rhs'] += -d_residuals['x']
