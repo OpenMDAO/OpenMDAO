@@ -661,8 +661,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
 
     if notebook:
         # display in Jupyter Notebook
+        outfile = os.path.relpath(outfile)
         if not colab:
-            display(IFrame(src=outfile, width=850, height=850))
+            display(IFrame(src=outfile, width="100%", height=700))
         else:
             display(HTML(outfile))
     elif show_browser:
