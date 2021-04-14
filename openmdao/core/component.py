@@ -385,6 +385,29 @@ class Component(System):
         """
         pass
 
+    def _run_root_only(self):
+        """
+        Return the value of the run_root_only option and check for possible errors.
+
+        Returns
+        -------
+        bool
+            True if run_root_only is active.
+        """
+        if self.options['run_root_only']:
+            if self.comm.size > 1 or (self._full_comm is not None and self._full_comm.size > 1):
+                if self._has_distrib_vars:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "a component has distributed variables.")
+                if self._num_par_fd > 1:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "using parallel FD.")
+                if len(self._vec_names) > 2:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "using parallel_deriv_color.")
+                return True
+        return False
+
     def _update_wrt_matches(self, info):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.

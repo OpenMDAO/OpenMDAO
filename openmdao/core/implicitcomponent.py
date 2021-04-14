@@ -71,7 +71,7 @@ class ImplicitComponent(Component):
                 if self._discrete_inputs or self._discrete_outputs:
                     args += [self._discrete_inputs, self._discrete_outputs]
 
-                if self.options['run_root_only']:
+                if self._run_root_only():
                     if self.comm.rank == 0:
                         self.apply_nonlinear(*args)
                         self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
@@ -100,7 +100,7 @@ class ImplicitComponent(Component):
                         args = [self._inputs, self._outputs]
                         if self._discrete_inputs or self._discrete_outputs:
                             args += [self._discrete_inputs, self._discrete_outputs]
-                        if self.options['run_root_only']:
+                        if self._run_root_only():
                             if self.comm.rank == 0:
                                 self.solve_nonlinear(*args)
                                 self.comm.bcast([self._outputs.asarray(), self._discrete_outputs],
@@ -153,7 +153,7 @@ class ImplicitComponent(Component):
             List of positional arguments.
         """
         inputs, outputs, d_inputs, d_outputs, d_residuals, mode = args
-        if self.options['run_root_only']:
+        if self._run_root_only():
             if self.comm.rank == 0:
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
                 if mode == 'fwd':
@@ -318,7 +318,7 @@ class ImplicitComponent(Component):
             if self._discrete_inputs or self._discrete_outputs:
                 args += [self._discrete_inputs, self._discrete_outputs]
 
-            if self.options['run_root_only']:
+            if self._run_root_only():
                 if self.comm.rank == 0:
                     self.linearize(*args)
                     self.comm.bcast(list(self._jacobian.items()), root=0)

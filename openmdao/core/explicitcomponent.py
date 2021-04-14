@@ -213,7 +213,7 @@ class ExplicitComponent(Component):
                                   lower=lower, upper=upper,
                                   ref=ref, ref0=ref0, res_ref=res_ref,
                                   tags=tags, shape_by_conn=shape_by_conn,
-                                  copy_shape=copy_shape)
+                                  copy_shape=copy_shape, distributed=distributed)
 
     def _approx_subjac_keys_iter(self):
         is_output = self._outputs._contains_abs
@@ -232,7 +232,7 @@ class ExplicitComponent(Component):
             if self._discrete_inputs or self._discrete_outputs:
                 args += [self._discrete_inputs, self._discrete_outputs]
 
-            if self.options['run_root_only']:
+            if self._run_root_only():
                 if self.comm.rank == 0:
                     self.compute(*args)
                     self.comm.bcast([self._outputs.asarray(), self._discrete_outputs], root=0)
@@ -282,7 +282,7 @@ class ExplicitComponent(Component):
         *args : list
             List of positional arguments.
         """
-        if self.options['run_root_only']:
+        if self._run_root_only():
             _, d_inputs, d_resids, mode = args[:4]
             if self.comm.rank == 0:
                 self.compute_jacvec_product(*args)
@@ -443,7 +443,7 @@ class ExplicitComponent(Component):
             if self._discrete_inputs:
                 args += [self._discrete_inputs]
 
-            if self.options['run_root_only']:
+            if self._run_root_only():
                 if self.comm.rank == 0:
                     self.compute_partials(*args)
                     self.comm.bcast(list(self._jacobian.items()), root=0)

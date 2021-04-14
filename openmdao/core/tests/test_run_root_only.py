@@ -91,7 +91,7 @@ class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
 
 
 @unittest.skipUnless(MPI is not None and PETScVector is not None, "MPI and PETSc are required.")
-class TestSimpleSerialReplication(unittest.TestCase):
+class TestRunRootOnly(unittest.TestCase):
     N_PROCS = 3
 
     # these tests just take a serial model and replicate it in 3 procs, verifying that
@@ -301,3 +301,68 @@ class TestSimpleSerialReplication(unittest.TestCase):
             self.assertEqual(comp.napply_linears, 0)
 
         np.testing.assert_allclose(J['comp.x', 'indeps.x'], np.eye(2))
+
+
+@unittest.skipUnless(MPI is not None and PETScVector is not None, "MPI and PETSc are required.")
+class TestRunRootOnlyErrors(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_not_serial_err(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', val=np.ones(2), distributed=True)
+
+            def compute(self, inputs, outputs):
+                pass
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', MyComp(run_root_only=True))
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
+        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when a component has distributed variables.")
+
+    def test_parallel_fd_err(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', val=np.ones(2))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x', method='fd')
+
+            def compute(self, inputs, outputs):
+                pass
+
+        p = om.Problem()
+
+        p.model.add_subsystem('comp', MyComp(num_par_fd=2, run_root_only=True))
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
+        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel FD.")
+
+    def test_parallel_deriv_color(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x')
+                self.add_output('y', val=np.ones(2))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x',)
+
+            def compute(self, inputs, outputs):
+                pass
+
+        p = om.Problem()
+
+        p.model.add_subsystem('comp', MyComp(run_root_only=True))
+        p.model.add_constraint('comp.y', lower=0., upper=10., parallel_deriv_color='foobar')
+
+        p.setup(mode='rev')
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
+        self.assertEqual(cm.exception.args[0], f"'comp' <class MyComp>: Can't set 'run_root_only' option when using parallel_deriv_color.")
+
+
