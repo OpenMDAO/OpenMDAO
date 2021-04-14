@@ -27,6 +27,7 @@ jobs:
             PETSc: 3.12
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
+            OPTIONAL: '[all]'
 
           # try latest versions
           - PY: 3
@@ -35,6 +36,7 @@ jobs:
             # PETSc: 3
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
+            OPTIONAL: '[test]'
 
           # oldest supported versions
           - PY: 3.6
@@ -43,6 +45,7 @@ jobs:
             PETSc: 3.10.2
             PYOPTSPARSE: 'v1.2'
             SNOPT: 7.2
+            OPTIONAL: '[all]'
 
     steps:
       - name: Create SSH key
@@ -136,13 +139,15 @@ jobs:
           echo "=============================================================";
           echo "Install OpenMDAO";
           echo "=============================================================";
-          pip install .[all];
+          pip install .${{ matrix.OPTIONAL }};
 
           echo "=============================================================";
           echo "Install optional packages for testing/coverage";
           echo "=============================================================";
-          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
-          pyppeteer-install;
+          if [ "${{ matrix.OPTIONAL }}" == "[all]" ]; then
+            pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
+            pyppeteer-install;
+          fi
 
           echo "=============================================================";
           echo "List installed packages/versions";
@@ -156,7 +161,7 @@ jobs:
           cp ../../.coveragerc .
           testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao;
           
-          if [ "${{ matrix.PETSc }}" ]; then
+          if [ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]; then
             echo "=============================================================";
             echo "Make docs";
             echo "=============================================================";

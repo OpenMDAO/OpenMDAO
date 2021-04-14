@@ -39,9 +39,12 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-# do not show matplotlib plots
-import matplotlib
-matplotlib.use('Agg')
+try:
+    # do not show matplotlib plots
+    import matplotlib.pyplot as plt
+    plt.switch_backend('Agg')
+except ImportError:
+    plt = None
 
 
 class Cycle(om.Group):
@@ -3324,6 +3327,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)
 
+    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_solver_recorder(self):
         import numpy as np
         import matplotlib.pyplot as plt
@@ -3408,6 +3412,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(case.get_constraints(), {'con1': 0., 'con2': -20.2447}, tolerance=1e-4)
         assert_near_equal(case.get_objectives(), {'obj': 3.18339395}, tolerance=1e-4)
 
+    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_plot_des_vars(self):
         import matplotlib.pyplot as plt
         import numpy as np
