@@ -33,6 +33,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_sc
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -2164,10 +2165,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        msg = ("Trying to record option 'options value to fail' which cannot be pickled on system "
-               "'subs' <class IndepVarComp>. Set 'recordable' to False. Skipping recording options for "
-               "this system.")
-        with assert_warning(UserWarning, msg):
+        msg = ("'subs' <class IndepVarComp>: Trying to record option 'options value to fail' which "
+               "cannot be pickled on this system. Set option 'recordable' to False. Skipping "
+               "recording options for this system.")
+        with assert_warning(om.CaseRecorderWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -3021,7 +3022,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
         "Use `list_model_options` instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             options = cr.system_metadata
 
     def test_system_options_attribute_deprecated(self):
@@ -3034,7 +3035,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
         msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):

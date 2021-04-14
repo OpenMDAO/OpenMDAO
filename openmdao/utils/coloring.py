@@ -22,11 +22,12 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
-from openmdao.utils.general_utils import simple_warning, _prom2ivc_src_dict, \
+from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter, _prom2ivc_src_item_iter
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
+from openmdao.warnings import issue_warning, DerivativesWarning
 from openmdao.devtools.memory import mem_usage
 
 
@@ -1872,7 +1873,8 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     """
     problem = driver._problem()
     if not problem.model._use_derivatives:
-        simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
+        msg = "Derivatives have been turned off. Skipping dynamic simul coloring."
+        issue_warning(msg, category=DerivativesWarning)
         return
 
     driver._total_jac = None

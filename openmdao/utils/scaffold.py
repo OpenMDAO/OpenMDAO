@@ -2,11 +2,8 @@
 Support functions for the 'openmdao scaffold' command.
 """
 
-import sys
 import os
 from pprint import pformat
-
-from openmdao.utils.general_utils import simple_warning
 
 
 _common_bases = {
