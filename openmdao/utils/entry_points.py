@@ -404,7 +404,6 @@ def find_plugins(types=None):
         if not items:
             print(f"Query returned no items for topic '{_github_topics[type_]}'.")
         else:
-            items = resdict['items']
             for item in items:
                 url = item['html_url']
                 name = item['name']
