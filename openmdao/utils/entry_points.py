@@ -400,7 +400,8 @@ def find_plugins(types=None):
 
         resdict = response.json()
 
-        if 'items' not in resdict:
+        items = resdict.get('items', None)
+        if not items:
             print(f"Query returned no items for topic '{_github_topics[type_]}'.")
         else:
             items = resdict['items']
@@ -414,17 +415,18 @@ def find_plugins(types=None):
                     wid2 = len(url)
                 pkgs[url] = (name, topics)
 
+        incomplete = resdict.get('incomplete_results', None)
+        if incomplete:
+            print("\nResults are incomplete.\n")
+
     template = '{:<{wid1}}  {:<{wid2}}  {}'
     if pkgs:
         print(template.format('Pkg Name', 'URL', 'Topics', wid1=wid1, wid2=wid2))
-        print(template.format('--------', '___', '______', wid1=wid1, wid2=wid2))
+        print(template.format('--------', '---', '------', wid1=wid1, wid2=wid2))
         for url, (name, topics) in sorted(pkgs.items(), key=lambda x: x[1][0]):
             print(template.format(name, url, topics, wid1=wid1, wid2=wid2))
     else:
         print("No matching packages found.")
-
-    if resdict['incomplete_results']:
-        print("\nResults are incomplete.\n")
 
     return pkgs
 
