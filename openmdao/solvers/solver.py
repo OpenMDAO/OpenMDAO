@@ -15,7 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, SolverWarning
 from openmdao.core.component import Component
 
 _emptyset = set()
@@ -623,7 +623,7 @@ class NonlinearSolver(Solver):
                            f"here: \n{pathname}nonlinear_solver.linesearch.options"
                            f"['print_bound_enforce']=True. "
                            f"\nThe bound(s) being violated now are:\n")
-                    simple_warning(msg)
+                    issue_warning(msg, category=SolverWarning)
 
                     self._single_iteration()
                     self.linesearch.options['print_bound_enforce'] = False

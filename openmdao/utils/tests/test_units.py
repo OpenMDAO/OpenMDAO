@@ -4,11 +4,11 @@ import os
 import unittest
 import warnings
 
-# from openmdao.utils.assert_utils import assert_near_equal
 import openmdao.api as om
 from openmdao.utils.units import NumberDict, PhysicalUnit, _find_unit, import_library, \
     add_unit, add_offset_unit, unit_conversion, get_conversion, simplify_unit
 from openmdao.utils.assert_utils import assert_warning, assert_near_equal
+from openmdao.warnings import OMDeprecationWarning
 
 
 class TestNumberDict(unittest.TestCase):
@@ -260,7 +260,7 @@ class TestPhysicalUnit(unittest.TestCase):
 
     def test_get_conversion(self):
         msg = "'get_conversion' has been deprecated. Use 'unit_conversion' instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             get_conversion('km', 'm'), (1000., 0.)
 
         self.assertEqual(get_conversion('km', 'm'), (1000., 0.))

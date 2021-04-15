@@ -3,8 +3,11 @@ import unittest
 
 import numpy as np
 
-import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
+try:
+    import matplotlib.pyplot as plt
+    plt.switch_backend('Agg')
+except ImportError:
+    plt = None
 
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
@@ -293,6 +296,7 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         assert_near_equal(prob.get_val('ks.KS'), [[-12.0]])
 
+    @unittest.skipIf(not plt, "requires matplotlib")
     def test_add_constraint(self):
         import numpy as np
         import openmdao.api as om

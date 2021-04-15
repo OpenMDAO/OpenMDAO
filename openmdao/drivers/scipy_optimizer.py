@@ -14,9 +14,9 @@ from scipy.optimize import minimize
 import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -445,9 +445,9 @@ class ScipyOptimizeDriver(Driver):
                     pct = info['coloring']._solves_info()[-1]
                     if info['min_improve_pct'] > pct:
                         info['coloring'] = info['static'] = None
-                        simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was "
-                                       "less than min allowed (%.1f%%)." %
-                                       (self.msginfo, pct, info['min_improve_pct']))
+                        msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                              f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                        issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
         # optimize
         try:

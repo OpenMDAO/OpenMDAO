@@ -17,6 +17,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -2678,7 +2679,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['optimizer'] = "SNOPT"
 
         msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.driver.options['user_teriminate_signal'] = None
 
 

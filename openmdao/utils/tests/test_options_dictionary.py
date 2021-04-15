@@ -3,6 +3,7 @@ from openmdao.api import OptionsDictionary
 import unittest
 
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
+from openmdao.warnings import OMDeprecationWarning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 
@@ -301,20 +302,20 @@ class TestOptionsDict(unittest.TestCase):
         self.dict.declare('test1', deprecation=msg)
 
         # test double set
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             self.dict['test1'] = None
         # Should only generate warning first time
-        with assert_no_warning(DeprecationWarning, msg):
+        with assert_no_warning(OMDeprecationWarning, msg):
             self.dict['test1'] = None
 
         # Also test set and then get
         msg = 'Option "test2" is deprecated.'
         self.dict.declare('test2', deprecation=msg)
 
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             self.dict['test2'] = None
         # Should only generate warning first time
-        with assert_no_warning(DeprecationWarning, msg):
+        with assert_no_warning(OMDeprecationWarning, msg):
             option = self.dict['test2']
 
 

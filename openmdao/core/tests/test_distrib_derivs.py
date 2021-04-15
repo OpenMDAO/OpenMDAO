@@ -1379,6 +1379,40 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
 
 
+class TestBugs(unittest.TestCase):
+
+    def test_distributed_ivc_as_desvar(self):
+        # Covers a case where a distributed IVC output is used as a desvar with indices.
+
+        class DVS(om.IndepVarComp):
+            def initialize(self):
+                self.options['distributed'] = True
+            def setup(self):
+                self.add_output('state', np.ones(4))
+
+        class SolverComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+            def setup(self):
+                self.add_input('state',shape_by_conn=True)
+                self.add_output('func')
+                self.declare_partials('func','state',method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['func'] += np.sum(inputs['state'])
+
+        prob = om.Problem()
+        dvs = prob.model.add_subsystem('dvs',DVS())
+        prob.model.add_subsystem('solver', SolverComp())
+        prob.model.connect('dvs.state','solver.state')
+        prob.model.add_design_var('dvs.state', indices=[0,2])
+        prob.model.add_objective('solver.func')
+
+        prob.setup()
+        prob.run_model()
+        totals = prob.check_totals(wrt='dvs.state')
+        assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

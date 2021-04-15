@@ -18,6 +18,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.general_utils import simple_warning
 from openmdao.core.constants import _SetupStatus
+from openmdao.warnings import issue_warning, MPIWarning
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -425,7 +426,7 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
         If True, flush print buffer after every print call.
     """
     if MPI is None:
-        simple_warning("MPI is not active.  Trace aborted.")
+        issue_warning("MPI is not active.  Trace aborted.", category=MPIWarning)
         return
     if sys.getprofile() is not None:
         raise RuntimeError("another profile function is already active.")
