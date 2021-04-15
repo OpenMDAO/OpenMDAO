@@ -481,7 +481,7 @@ class TestMultiConns(unittest.TestCase):
 
         prob.model._raise_connection_errors = False
 
-        with assert_warning(UserWarning, expected):
+        with assert_warning(om.SetupWarning, expected):
             prob.setup()
 
     def test_mixed_conns_same_level(self):

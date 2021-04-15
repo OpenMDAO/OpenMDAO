@@ -8,7 +8,8 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.notebook_mode import notebook_mode
+from openmdao.core.notebook_utils import notebook_mode, display_source, show_options_table, cite
+
 
 # Components
 from openmdao.components.add_subtract_comp import AddSubtractComp
@@ -94,6 +95,13 @@ from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 
 # Units
 from openmdao.utils.units import convert_units, unit_conversion
+
+# Warning Options
+from openmdao.warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
+    SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
+    DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
+    MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning
+
 
 # set up tracing or memory profiling if env vars are set.
 import os

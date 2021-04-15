@@ -4,7 +4,8 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import make_set, warn_deprecation, ensure_compatible
+from openmdao.utils.general_utils import make_set, ensure_compatible
+from openmdao.warnings import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):

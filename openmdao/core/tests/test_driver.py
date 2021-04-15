@@ -17,6 +17,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
+from openmdao.warnings import OMDeprecationWarning
 
 from openmdao.utils.mpi import MPI
 
@@ -155,7 +156,7 @@ class TestDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        with assert_warning(DeprecationWarning, "'global_names' is deprecated in calls to _compute_totals. Use 'use_abs_names' instead."):
+        with assert_warning(OMDeprecationWarning, "'global_names' is deprecated in calls to _compute_totals. Use 'use_abs_names' instead."):
             derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'], global_names=True,
                                                  return_format='dict')
 
@@ -483,7 +484,7 @@ class TestDriver(unittest.TestCase):
         prob = om.Problem()
         msg = "The recording option, record_model_metadata, on Driver is deprecated. " \
               "Recording of model metadata will always be done"
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.driver.recording_options['record_model_metadata'] = True
 
     def test_units_basic(self):

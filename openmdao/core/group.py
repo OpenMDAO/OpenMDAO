@@ -24,7 +24,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len
-from openmdao.utils.general_utils import ContainsAll, simple_warning, common_subpath, \
+from openmdao.utils.general_utils import common_subpath, \
     conditional_error, _is_slicer_op, _slice_indices, convert_src_inds, \
     shape_from_idx, shape2tuple, get_connection_owner
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
@@ -32,6 +32,8 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
+    SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
 
 # regex to check for valid names.
@@ -285,8 +287,9 @@ class Group(System):
         else:
             meta['value'] = val
             if src_shape is not None:
-                simple_warning(f"{self.msginfo}: value was set in set_input_defaults, so ignoring "
-                               f"value {src_shape} of src_shape.")
+                issue_warning("value was set in set_input_defaults, so ignoring "
+                              f"value {src_shape} of src_shape.", prefix=self.msginfo,
+                              category=PromotionWarning)
             if isinstance(val, np.ndarray):
                 src_shape = val.shape
             elif isinstance(val, Number):
@@ -308,8 +311,9 @@ class Group(System):
             old = dct[name][0]
             overlap = sorted(set(old).intersection(meta))
             if overlap:
-                simple_warning(f"{self.msginfo}: Setting input defaults for input '{name}' which "
-                               f"override previously set defaults for {overlap}.")
+                issue_warning(f"Setting input defaults for input '{name}' which "
+                              f"override previously set defaults for {overlap}.",
+                              prefix=self.msginfo, condition=PromotionWarning)
             old.update(meta)
         else:
             dct[name] = [meta]
@@ -519,9 +523,9 @@ class Group(System):
                                                                          self._num_par_fd)
                     raise RuntimeError(msg)
             elif not MPI:
-                msg = ("%s: MPI is not active but num_par_fd = %d. No parallel finite difference "
-                       "will be performed." % (self.msginfo, self._num_par_fd))
-                simple_warning(msg)
+                msg = f"MPI is not active but num_par_fd = {self._num_par_fd}. No parallel " \
+                      f"finite difference will be performed."
+                issue_warning(msg, prefix=self.msginfo, category=MPIWarning)
 
         self.comm = comm
 
@@ -1131,7 +1135,7 @@ class Group(System):
                 top_origin = paths[0][1]
                 top_prom = metalist[paths[0][0]]['prom']
             except KeyError:
-                simple_warning("No auto IVCs found")
+                issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
             allmeta = set()
             for meta in metalist:
                 allmeta.update(meta)
@@ -1151,7 +1155,7 @@ class Group(System):
                                        f"'{key}' for input '{top_prom}', so the value of "
                                        f"({val}) from group '{origin}' will be used.")
                                 if show_warnings:
-                                    simple_warning(msg)
+                                    issue_warning(msg, category=PromotionWarning)
                                 else:
                                     self._auto_ivc_warnings.append(msg)
 
@@ -1168,7 +1172,7 @@ class Group(System):
                                            f"The value ({val}) from '{origin}' will be "
                                            "used.")
                                     if show_warnings:
-                                        simple_warning(msg)
+                                        issue_warning(msg, category=PromotionWarning)
                                     else:
                                         self._auto_ivc_warnings.append(msg)
                                 else:  # origin is not an ancestor, so we have an ambiguity
@@ -1432,7 +1436,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
@@ -1440,7 +1444,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
 
             if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
@@ -1451,7 +1455,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
@@ -1459,7 +1463,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise NameError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
 
             # Throw an exception if output and input are in the same system
@@ -1478,7 +1482,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
 
                 if src_indices is not None:
@@ -1497,7 +1501,7 @@ class Group(System):
                             if self._raise_connection_errors:
                                 raise RuntimeError(msg)
                             else:
-                                simple_warning(msg)
+                                issue_warning(msg, category=SetupWarning)
                                 continue
                         meta['src_indices'] = src_indices
                         if _is_slicer_op(src_indices):
@@ -1513,7 +1517,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                         continue
 
                 abs_in2out[abs_in] = abs_out
@@ -1554,7 +1558,7 @@ class Group(System):
                 if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
-                    simple_warning(msg)
+                    issue_warning(msg, category=SetupWarning)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -1867,7 +1871,7 @@ class Group(System):
                     if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
                 else:
                     abs_in2out[abs_in] = abs_out
 
@@ -1925,14 +1929,14 @@ class Group(System):
                 if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
-                    simple_warning(msg)
+                    issue_warning(msg, category=SetupWarning)
             if not issubclass(in_type, out_type):
                 msg = f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is " + \
                       f"incompatible with type '{in_type.__name__}' of input '{abs_in}'."
                 if self._raise_connection_errors:
                     raise RuntimeError(msg)
                 else:
-                    simple_warning(msg)
+                    issue_warning(msg, category=SetupWarning)
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1948,21 +1952,21 @@ class Group(System):
             if out_units:
                 if not in_units:
                     if not _is_unitless(out_units):
-                        msg = f"{self.msginfo}: Output '{abs_out}' with units of '{out_units}' " + \
+                        msg = f"Output '{abs_out}' with units of '{out_units}' " + \
                             f"is connected to input '{abs_in}' which has no units."
-                        simple_warning(msg)
+                        issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
                 elif not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
                     if self._raise_connection_errors:
                         raise RuntimeError(msg)
                     else:
-                        simple_warning(msg)
+                        issue_warning(msg, category=SetupWarning)
             elif in_units is not None:
                 if not _is_unitless(in_units):
-                    msg = f"{self.msginfo}: Input '{abs_in}' with units of '{in_units}' is " + \
+                    msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
                         f"connected to output '{abs_out}' which has no units."
-                    simple_warning(msg)
+                    issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
 
             fail = False
 
@@ -1997,7 +2001,7 @@ class Group(System):
                         if self._raise_connection_errors:
                             raise ValueError(msg)
                         else:
-                            simple_warning(msg)
+                            issue_warning(msg, category=SetupWarning)
                             fail = True
 
                 elif src_indices is not None:
@@ -2022,7 +2026,7 @@ class Group(System):
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
-                                    simple_warning(msg)
+                                    issue_warning(msg, category=SetupWarning)
                                     fail = True
                                     continue
 
@@ -2039,7 +2043,7 @@ class Group(System):
                             if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
-                                simple_warning(msg)
+                                issue_warning(msg, category=SetupWarning)
                                 fail = True
                                 continue
                     else:
@@ -2068,7 +2072,7 @@ class Group(System):
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
-                                    simple_warning(msg)
+                                    issue_warning(msg, category=SetupWarning)
                                     fail = True
                         if src_indices.ndim > 1:
                             meta_in['src_indices'] = src_indices.ravel()
@@ -2082,7 +2086,7 @@ class Group(System):
                             if self._raise_connection_errors:
                                 raise ValueError(msg)
                             else:
-                                simple_warning(msg)
+                                issue_warning(msg, category=SetupWarning)
                                 fail = True
                     else:
                         for d in range(source_dimensions):
@@ -2104,7 +2108,7 @@ class Group(System):
                                         if self._raise_connection_errors:
                                             raise ValueError(msg)
                                         else:
-                                            simple_warning(msg)
+                                            issue_warning(msg, category=SetupWarning)
                                             fail = True
 
                         if not fail:
@@ -2299,8 +2303,10 @@ class Group(System):
         if src_indices is None:
             prominfo = None
             if flat_src_indices is not None or src_shape is not None:
-                simple_warning(f"{self.msginfo}: ignored flat_src_indices and/or src_shape because"
-                               " src_indices was not specified.")
+                issue_warning(f"ignored flat_src_indices and/or src_shape because"
+                              " src_indices was not specified.", prefix=self.msginfo,
+                              category=UnusedOptionWarning)
+
         else:
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2314,17 +2320,14 @@ class Group(System):
                 raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
                                 f"list, tuple, ndarray or Iterable, but src_indices for "
                                 f"promotes from '{subsys_name}' are {type(src_indices)}.")
-            else:
-                if any:
-                    simple_warning(f"{self.msginfo}: src_indices have been specified with promotes"
-                                   " 'any'. Note that src_indices only apply to matching inputs.")
 
             prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
 
             if flat_src_indices and _is_slicer_op(src_indices):
                 promoted = inputs if inputs else any
-                simple_warning(f"{self.msginfo}: When promoting {promoted}, slice src_indices were "
-                               "specified, so flat_src_indices is ignored.")
+                issue_warning(f"When promoting {promoted}, slice src_indices were "
+                              "specified, so flat_src_indices is ignored.", prefix=self.msginfo,
+                              category=UnusedOptionWarning)
 
         subsys = getattr(self, subsys_name)
         if any:
@@ -2509,9 +2512,10 @@ class Group(System):
                                                                       src_name, tgt_name))
 
         if flat_src_indices and _is_slicer_op(src_indices):
-            simple_warning(f"{self.msginfo}: Connection from '{src_name}' to "
-                           f"'{tgt_name}' was added with slice src_indices, so "
-                           "flat_src_indices is ignored.")
+            issue_warning(f"Connection from '{src_name}' to "
+                          f"'{tgt_name}' was added with slice src_indices, so "
+                          "flat_src_indices is ignored.", prefix=self.msginfo,
+                          category=UnusedOptionWarning)
 
         if self._static_mode:
             manual_connections = self._static_manual_connections

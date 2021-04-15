@@ -4,6 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
+from openmdao.warnings import OMDeprecationWarning
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -223,28 +224,28 @@ class TestIndepVarComp(unittest.TestCase):
         indep = prob.model.add_subsystem('p1', om.IndepVarComp())
 
         # ref, ref0
-        with assert_warnings([(DeprecationWarning, msg.format('ref', 'a')),
-                              (DeprecationWarning, msg.format('ref0', 'a'))]):
+        with assert_warnings([(OMDeprecationWarning, msg.format('ref', 'a')),
+                              (OMDeprecationWarning, msg.format('ref0', 'a'))]):
             indep.add_output('a', 12., ref=0.0, ref0=1.)
 
         # res_units
-        with assert_warning(DeprecationWarning, msg.format('res_units', 'b')):
+        with assert_warning(OMDeprecationWarning, msg.format('res_units', 'b')):
             indep.add_output('b', 12., res_units='m')
 
         # upper
-        with assert_warning(DeprecationWarning, msg.format('upper', 'c')):
+        with assert_warning(OMDeprecationWarning, msg.format('upper', 'c')):
             indep.add_output('c', 12., upper=1.)
 
         # lower
-        with assert_warning(DeprecationWarning, msg.format('lower', 'd')):
+        with assert_warning(OMDeprecationWarning, msg.format('lower', 'd')):
             indep.add_output('d', 12., lower=1.)
 
         # res_ref
-        with assert_warning(DeprecationWarning, msg.format('res_ref', 'e')):
+        with assert_warning(OMDeprecationWarning, msg.format('res_ref', 'e')):
             indep.add_output('e', 12., res_ref=1.)
 
         # res_ref
-        with assert_warning(DeprecationWarning, msg.format('ref', 'f')):
+        with assert_warning(OMDeprecationWarning, msg.format('ref', 'f')):
             indep.add_output('f', 12., ref=2.)
 
 

@@ -4,9 +4,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
-from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.coloring import Coloring
+from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
 
 class ComplexStep(ApproximationScheme):
@@ -110,8 +109,8 @@ class ComplexStep(ApproximationScheme):
             if not self._fd:
                 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
-                msg = "Nested complex step detected. Finite difference will be used for '%s'."
-                simple_warning(msg % system.pathname)
+                issue_warning("Nested complex step detected. Finite difference will be used.",
+                              prefix=system.pathname, category=DerivativesWarning)
 
                 fd = self._fd = FiniteDifference()
                 empty = {}

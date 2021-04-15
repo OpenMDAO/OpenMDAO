@@ -2,13 +2,14 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
+from openmdao.api import Problem, ExplicitComponent, IndepVarComp
 from openmdao.core.component import Component
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.warnings import OMDeprecationWarning
 
 class TestExplicitComponent(unittest.TestCase):
 
@@ -360,7 +361,7 @@ class TestRangePartials(unittest.TestCase):
 
         prob = Problem(model=comp)
 
-        with assert_warning(DeprecationWarning,
+        with assert_warning(OMDeprecationWarning,
                             f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input` is"
                             "deprecated and will become an error in a future release.  Add "
                             "`src_indices` to a `promotes` or `connect` call instead."):
