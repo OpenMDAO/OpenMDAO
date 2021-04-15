@@ -1300,6 +1300,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob['indep.x'] = np.ones(size)

@@ -4547,7 +4547,7 @@ class System(object):
                     end = start + sizes[self.comm.rank]
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
-                            src_indices = src_indices - np.min(src_indices)
+                            src_indices = src_indices - start
                         val = val.ravel()[src_indices]
                         fail = 0
                     else:

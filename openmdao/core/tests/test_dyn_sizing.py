@@ -723,7 +723,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
 
 
-# following 4 classes are used in TestDistribDynShapeCombos
 class Ser1(om.ExplicitComponent):
     def setup(self):
         # serial components' outputs must be the same size on all procs.
@@ -835,6 +834,27 @@ class Dist2(om.ExplicitComponent):
         return
 
 
+class DistCompDiffSizeKnownInput(om.ExplicitComponent):
+    def setup(self):
+        size = (self.comm.rank + 1) * 3
+        self.add_input('x', val=np.ones(size), distributed=True)
+
+class DistCompKnownInput(om.ExplicitComponent):
+    def setup(self):
+        size = 3
+        self.add_input('x', val=np.ones(size), distributed=True)
+
+    def compute(self, inputs, outputs):
+        pass
+
+class DistCompUnknownInput(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True, distributed=True)
+
+    def compute(self, inputs, outputs):
+        pass
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDistribDynShapeCombos(unittest.TestCase):
     """
@@ -846,134 +866,91 @@ class TestDistribDynShapeCombos(unittest.TestCase):
     we need to check all possible combinations of serial and distributed components
     in parallel runs.
 
-    Here is a list of possible connections (ser: serial, dist: distributed):
+    Here is a list of possible connections:
 
-    ser => ser
-    ser => dist
-    dist => ser
-    dist => dist
+    serial => serial
+    serial => distributed
+    distributed => serial
+    distributed => distributed
 
-    We can use dynamic shaping for all 4 of these connection types, and the information
+    We'll use dynamic shaping for all 4 of these connection types, and the information
     for each connection can either be propagated down or up.  With 4 connection types
-    and 2 connection direction, this results in 8 dynamically sized connections to be
-    checked. In these checks, we want to make sure OpenMDAO has an "expected" behavior,
-    where the local size of the parameters are preserved on each processor regardless
-    of connection type.
-
-    In this test, we have a single model with 4 components in this order:
-
-    ser1:   Serial component. This will be connected to serial or distributed.
-            Only outputs variables and no inputs
-    dist1:  Distributed component. This will be connected to serial or distributed.
-            Again, only outputs variables and no inputs
-
-    ser2:   Serial component to receive connections that only has inputs and no outputs
-            (only a dummy output)
-    dist2:  Distributed component to receive connections that only has inputs and no outputs
-            (only a dummy output)
-
-    The variable naming convention goes like type1_type2_dir:
-    type1 is the component with the output
-    type2 is the component with the input
-    direction is the direction of information in the dynamic sizing (see above for down and up)
-
-    With all this context, here is a table that lists what variables test what i/o:
-
-    Connection:      Downstream direction    Upstream direction
-    ser1 => ser2       ser_ser_down (1)        ser_ser_up (5)
-    ser1 => dist2       ser_dist_down (2)        ser_dist_up (6)
-    dist1 => ser2       par_ser_down (3)        par_ser_up (7)
-    dist1 => dist2       par_dist_down (4)        par_dist_up (8)
-
-    The parentheses after the connection name shows where we make that connection below
-
-    The reason we have this tests is that the parallel tests above do not cover every possible combination.
-    It is important to remember that we are not just testing a serial to serial connection here.
-    We are testing all these connection types in a parallel run,
-    which is different than the serial tests above
-
-    In these tests, the output of the ser1 component will have the same size of 4 on all processors.
-    This is because the serial components are expected to have the "same" output duplicated on all procs.
-    The inputs to the ser2 component can have varying sizes on different processors.
-
-    The outputs of the dist1 component will have a size of rank*2 on each proc.
-    We use 3 processor for these tests because we want to chekc 2 procs with different non-zero sizes
-    and one proc that has a zero size for that particular output.
+    and 2 connection directions, this results in 8 dynamically sized connections to be
+    checked. In these checks, we want to make sure OpenMDAO has an "expected" behavior.
     """
 
     N_PROCS = 3
 
-    def test_dyn_shape_combos(self):
-
-        rank = MPI.COMM_WORLD.rank
-        var_shape = 2 * rank
-
+    def test_ser_known_ser_unknown(self):
         p = om.Problem()
-
-        # components with outputs
-        p.model.add_subsystem('ser1', Ser1())
-        p.model.add_subsystem('dist1', Dist1())
-
-        # components with inputs
-        p.model.add_subsystem('ser2', Ser2())
-        p.model.add_subsystem('dist2', Dist2())
-
-        # all downstream connections
-        p.model.connect('ser1.ser_ser_down', 'ser2.ser_ser_down')  # (1)
-        p.model.connect('ser1.ser_dist_down', 'dist2.ser_dist_down')  # (2)
-        p.model.connect('dist1.par_ser_down', 'ser2.par_ser_down')  # (3)
-        p.model.connect('dist1.par_dist_down', 'dist2.par_dist_down')  # (4)
-
-        # all upstream connections
-        p.model.connect('ser1.ser_ser_up', 'ser2.ser_ser_up')  # (5)
-        p.model.connect('ser1.ser_dist_up', 'dist2.ser_dist_up')  # (6)
-        p.model.connect('dist1.par_ser_up', 'ser2.par_ser_up')  # (7)
-        p.model.connect('dist1.par_dist_up', 'dist2.par_dist_up')  # (8)
-
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        val = np.ones(2)
+        indeps.add_output('x', val=val)
+        p.model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                  x={'shape_by_conn': True},
+                                                  y=np.zeros(2)))
+        p.model.connect('indeps.x', 'comp.x')
         p.setup()
-
-        # we check the variable sizes in each component here
         p.run_model()
+        self.assertEqual(p.get_val('comp.x').shape, val.shape)
 
-        # also check the i/o sizes here
-        p.model.list_inputs(shape=True, all_procs=True, global_shape=False)
-        p.model.list_outputs(shape=True, all_procs=True, global_shape=False)
+    def test_ser_unknown_ser_known(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        val = np.ones(2)
+        indeps.add_output('x', shape_by_conn=True)
+        p.model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                  x=val,
+                                                  y=np.zeros(2)))
+        p.model.connect('indeps.x', 'comp.x')
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('indeps.x').shape, val.shape)
 
-        # test all of the i/o sizes set by shape_by_conn
+    def test_ser_known_dist_unknown(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        val = np.ones(2)
 
-        # all downstream:
+        indeps.add_output('x', val=val)
+        p.model.add_subsystem('comp', DistCompUnknownInput())
+        p.model.connect('indeps.x', 'comp.x')
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('comp.x', get_remote=False).size, 2)
 
-        # serial => serial (1)
-        # AY: this works both in compute above, and here
-        self.assertEqual(p.get_val('ser2.ser_ser_down').size, 4)
+    def test_ser_unknown_dist_known_err(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', shape_by_conn=True)
+        p.model.add_subsystem('comp', DistCompDiffSizeKnownInput())
+        p.model.connect('indeps.x', 'comp.x')
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+        self.assertEquals(cm.exception.args[0],
+                          "<model> <class Group>: dynamic sizing of serial output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9]).")
 
-        # serial => distributed (2)
-        # TODO AY: this variable passes the tests above in compute, but get_val fails when this is uncommented
-        # self.assertEqual(p.get_val('dist2.ser_dist_down').size, 4)
+    def test_ser_unknown_dist_known(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', shape_by_conn=True)
+        p.model.add_subsystem('comp', DistCompKnownInput())
+        p.model.connect('indeps.x', 'comp.x')
+        p.setup()
+        p.run_model()
+        self.assertEqual(p.get_val('indeps.x').size, 3)
 
-        # distributed => serial (3)
-        # TODO AY: passes the tests above in compute. the get_val does not work on this distributed output. need get_remote=True
-        # self.assertEqual(p.get_val('ser2.par_ser_down').size, var_shape)
+    def test_dist_known_ser_unknown(self):
+        pass
 
-        # distributed => distributed (4)
-        # AY: this works both in compute above, and here
-        self.assertEqual(p.get_val('dist2.par_dist_down').size, var_shape)
+    def test_dist_unknown_ser_known(self):
+        pass
 
+    def test_dist_known_dist_unknown(self):
+        pass
 
-        # all upstream:
-
-        # # serial => serial (5)
-        # self.assertEqual(p.get_val('ser1.ser_ser_up').size, 4)
-
-        # # serial => distributed (6)
-        # self.assertEqual(p.get_val('ser1.ser_dist_up').size, 4)
-
-        # # distributed => serial (7)
-        # self.assertEqual(p.get_val('dist1.par_ser_up').size, 2)
-
-        # # distributed => distributed (8)
-        # self.assertEqual(p.get_val('dist1.par_dist_up').size, var_shape)
-
+    def test_dist_unknown_dist_known(self):
+        pass
 
 if __name__ == "__main__":
     unittest.main()
