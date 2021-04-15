@@ -60,9 +60,9 @@ class ComplexStep(ApproximationScheme):
 
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
-            issue_warning(f"overriding previous approximation defined for '{wrt}'.",
-                          prefix=system.msginfo, category=DerivativesWarning)
-        self._wrt_meta[wrt] = options
+            self._wrt_meta[wrt].update(options)
+        else:
+            self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, wrt, meta):
@@ -87,7 +87,7 @@ class ComplexStep(ApproximationScheme):
         step *= 1j
         return step
 
-    def compute_approximations(self, system, jac, total=False):
+    def compute_approx_col_iter(self, system, total=False, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -95,10 +95,10 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : dict-like
-            Approximations are stored in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
+        under_cs : bool
+            True if we're currently under complex step at a higher level.
         """
         if not self._wrt_meta:
             return
@@ -117,7 +117,7 @@ class ComplexStep(ApproximationScheme):
                 for wrt in self._wrt_meta:
                     fd.add_approximation(wrt, system, empty)
 
-            self._fd.compute_approximations(system, jac, total=total)
+            yield from self._fd.compute_approx_col_iter(system, total=total)
             return
 
         saved_inputs = system._inputs._get_data().copy()
@@ -131,7 +131,7 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            self._compute_approximations(system, jac, total, under_cs=True)
+            yield from self._compute_approx_col_iter(system, total, under_cs=True)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)

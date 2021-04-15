@@ -3074,6 +3074,8 @@ class Group(System):
         if wrt_color_patterns:
             abs2prom = self._var_allprocs_abs2prom
             for _, wrt in self._get_approx_subjac_keys():
+                if wrt in wrt_colors_matched:
+                    continue
                 if wrt in abs2prom['output']:
                     wrtprom = abs2prom['output'][wrt]
                 else:
@@ -3160,6 +3162,7 @@ class Group(System):
             wrtset = set([k[1] for k in approx_keys])
             self._owns_approx_of = list(abs_outs)
             self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+            self._owns_approx_jac = True
 
     def _setup_approx_coloring(self):
         """
