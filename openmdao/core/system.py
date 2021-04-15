@@ -4489,6 +4489,7 @@ class System(object):
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
+        vdynshape = vmeta['shape_by_conn']
         has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
                               for n in abs_ins)
 
@@ -4526,6 +4527,7 @@ class System(object):
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
+        dynshape = vdynshape or smeta['shape_by_conn']
         slocal = src in model_ref._var_abs2meta['output']
 
         if self.comm.size > 1:
@@ -4550,7 +4552,7 @@ class System(object):
                 if is_slice:
                     val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
-                elif distrib and (sdistrib or not slocal) and not get_remote:
+                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes[vec_name]['output'][:, var_idx]

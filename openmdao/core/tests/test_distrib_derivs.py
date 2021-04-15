@@ -1217,6 +1217,7 @@ class MPIFeatureTests(unittest.TestCase):
         model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob.set_val('indep.x', np.ones(size))
