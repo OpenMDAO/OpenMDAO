@@ -1326,7 +1326,7 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dct, quick_declare=False):
+    def _declare_partials(self, of, wrt, dct):
         """
         Store subjacobian metadata for later use.
 
@@ -1341,20 +1341,7 @@ class Component(System):
             May also contain glob patterns.
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
-        quick_declare : bool
-            This is set to True when declaring the jacobian diagonal terms for explicit
-            components. The checks and conversions are all skipped to improve performance for
-            cases with large numbers of explicit components or indepvarcomps.
         """
-        if quick_declare:
-            self._subjacs_info[rel_key2abs_key(self, (of, wrt))] = {
-                'rows': np.array(dct['rows'], dtype=INT_DTYPE, copy=False),
-                'cols': np.array(dct['cols'], dtype=INT_DTYPE, copy=False),
-                'shape': (len(dct['rows']), len(dct['cols'])),
-                'value': dct['value'],
-            }
-            return
-
         val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
@@ -1477,16 +1464,16 @@ class Component(System):
 
                 self._subjacs_info[abs_key] = meta
 
-    def _find_partial_matches(self, of, wrt):
+    def _find_partial_matches(self, of_pattern, wrt_pattern):
         """
         Find all partial derivative matches from of and wrt.
 
         Parameters
         ----------
-        of : str or list of str
+        of_pattern : str or list of str
             The relative name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt_pattern : str or list of str
             The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
@@ -1498,12 +1485,12 @@ class Component(System):
             where of_matches is a list of tuples (pattern, matches) and wrt_matches is a list of
             tuples (pattern, output_matches, input_matches).
         """
-        of_list = [of] if isinstance(of, str) else of
-        wrt_list = [wrt] if isinstance(wrt, str) else wrt
-        of, wrt = self._get_partials_varlists()
+        of_list = [of_pattern] if isinstance(of_pattern, str) else of_pattern
+        wrt_list = [wrt_pattern] if isinstance(wrt_pattern, str) else wrt_pattern
+        ofs, wrts = self._get_partials_varlists()
 
-        of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]
+        of_pattern_matches = [(pattern, find_matches(pattern, ofs)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, wrts)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, val, shape):

@@ -9,6 +9,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.core.constants import INT_DTYPE
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
 
@@ -119,17 +120,15 @@ class ExplicitComponent(Component):
 
             # ExplicitComponent jacobians have -1 on the diagonal.
             if size > 0 and not self.matrix_free:
-                out_name = abs2prom_out[out_abs]
-                arange = np.arange(size)
+                arange = np.arange(size, dtype=INT_DTYPE)
 
-                dct = {
+                self._subjacs_info[abs_key] = {
                     'rows': arange,
                     'cols': arange,
+                    'shape': (size, size),
                     'value': np.full(size, -1.),
                     'dependent': True,
                 }
-
-                self._declare_partials(out_name, out_name, dct, quick_declare=True)
 
     def _setup_jacobians(self, recurse=True):
         """
