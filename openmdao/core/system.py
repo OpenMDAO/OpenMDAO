@@ -4830,6 +4830,8 @@ class System(object):
         
         if self._problem_meta is not None:
             model_ref = self._problem_meta['model_ref']()
+        else:
+            model_ref = None
 
 
         if model_ref is not None:
