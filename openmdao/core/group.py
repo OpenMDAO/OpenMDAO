@@ -797,12 +797,14 @@ class Group(System):
                     continue  # discrete var
                 all_meta_out = allprocs_abs2meta_out[abs_out]
                 all_meta_in = allprocs_abs2meta_in[abs_in]
+                in_dist = all_meta_in['distributed']
+                out_dist = all_meta_out['distributed']
 
                 # check that src_indices match for dist->serial connection
                 # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
                 # memory issues if src_indices are large.  Maybe try something like computing a hash
                 # in each rank and comparing those?
-                if all_meta_out['distributed'] and not all_meta_in['distributed']:
+                if out_dist and not in_dist:
                     # all serial inputs must have src_indices if they connect to a distributed
                     # output
                     owner = self._owning_rank[abs_in]
@@ -835,6 +837,11 @@ class Group(System):
                         raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
                                            f"'{abs_out}' to serial input '{abs_in}' without "
                                            "specifying src_indices.")
+                elif in_dist and not out_dist:
+                    warn_deprecation(f"Connection between serial output '{abs_out}' and distributed"
+                                     f" input '{abs_in}' is deprecated and will become an error "
+                                     "in a future release.")
+
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
@@ -1608,15 +1615,6 @@ class Group(System):
                     global_abs_in2out.update(myproc_global_abs_in2out)
                     all_src_ind_ins.update(src_ind_ins)
                 src_ind_inputs = all_src_ind_ins
-
-            if self.pathname == '':
-                allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-                for tgt, src in global_abs_in2out.items():
-                    tdist = allprocs_abs2meta_in[tgt]['distributed']
-                    if tdist and not allprocs_abs2meta_out[src]['distributed']:
-                        warn_deprecation(f"Connection between serial output '{src}' and distributed"
-                                         f" input '{tgt}' is deprecated and will become an error "
-                                         "in a future release.")
 
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
