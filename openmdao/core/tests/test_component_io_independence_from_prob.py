@@ -1,7 +1,6 @@
 import unittest
 import numpy as np
 import openmdao.api as om 
-
 import gc
 
 class TestComponentIOIndependenceFromProb(unittest.TestCase):
@@ -22,7 +21,7 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
             self.add_input('x', units='mm')
             self.add_input('a', units='mm')
             self.add_output('y', units='mm')
-        
+
         def compute(self, inputs, outputs):
             x = inputs['x']
             a = inputs['a']
@@ -85,7 +84,6 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
             prob.setup()
             prob.run_driver()
 
-    
     def test_parabola(self):
         # Runs the Optimization
         p = TestComponentIOIndependenceFromProb.Parabola()
@@ -116,8 +114,6 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
         y = ps.p.get_val('y', units='mm', from_src=False)[0]
         self.assertAlmostEqual(y, 4)
 
-        
-    
 if __name__ == '__main__':
 
     unittest.main()
