@@ -2039,6 +2039,34 @@ class TestGroupPromotes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
             "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
 
+    def test_promotes_list_order(self):
+        # This test verifies that the order we promote in the arguments to add_subsystem doesn't
+        # trigger any of our exceptions when we have wildcards with promote_as.
+        class AllPatterns(om.Group):
+            def setup(self):
+                comp = om.ExecComp(['a1=b1+c1', 'g1=b1-c1'])
+                self.add_subsystem('comp1', comp,
+                                   promotes_inputs=['*',('c1','ialias1')],
+                                   promotes_outputs=['*',('g1','oalias1')])
+
+                comp = om.ExecComp(['a2=b2+c2', 'g2=b2-c2'])
+                self.add_subsystem('comp2', comp,
+                                   promotes_inputs=[('c2','ialias2'), '*'],
+                                   promotes_outputs=[('g2','oalias2'), '*'])
+
+                comp = om.ExecComp(['a3=b3+c3', 'g3=b3-c3'])
+                self.add_subsystem('comp3', comp,
+                                   promotes=[('c3','ialias3'), ('g3','oalias3'), '*'])
+
+                comp = om.ExecComp(['a4=b4+c4', 'g4=b4-c4'])
+                self.add_subsystem('comp4', comp,
+                                   promotes=['*', ('c4','ialias4'), ('g4','oalias4')])
+
+        p = om.Problem(model=AllPatterns())
+        p.setup()
+        p.run_model()
+        # If working correctly, no exception raised.
+
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):

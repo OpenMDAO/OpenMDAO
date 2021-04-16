@@ -2426,12 +2426,20 @@ class Group(System):
 
         prominfo = None
 
+        # Note, the declared order in any of these promotes arguments shouldn't matter. However,
+        # the order does matter when using system.promotes during configure. There, you are
+        # permitted to promote '*' then promote_to an alias afterwards, but not in the reverse.
+        # To make this work, we sort the promotes lists for this subsystem to put the wild card
+        # entries at the beginning.
         if promotes:
-            subsys._var_promotes['any'] = [(p, prominfo) for p in promotes]
+            subsys._var_promotes['any'] = [(p, prominfo) for p in
+                                           sorted(promotes, key=lambda x: '*' not in x)]
         if promotes_inputs:
-            subsys._var_promotes['input'] = [(p, prominfo) for p in promotes_inputs]
+            subsys._var_promotes['input'] = [(p, prominfo) for p in
+                                             sorted(promotes_inputs, key=lambda x: '*' not in x)]
         if promotes_outputs:
-            subsys._var_promotes['output'] = [(p, prominfo) for p in promotes_outputs]
+            subsys._var_promotes['output'] = [(p, prominfo) for p in
+                                              sorted(promotes_outputs, key=lambda x: '*' not in x)]
 
         if self._static_mode:
             subsystems_allprocs = self._static_subsystems_allprocs
@@ -3066,6 +3074,8 @@ class Group(System):
         if wrt_color_patterns:
             abs2prom = self._var_allprocs_abs2prom
             for _, wrt in self._get_approx_subjac_keys():
+                if wrt in wrt_colors_matched:
+                    continue
                 if wrt in abs2prom['output']:
                     wrtprom = abs2prom['output'][wrt]
                 else:
@@ -3152,6 +3162,7 @@ class Group(System):
             wrtset = set([k[1] for k in approx_keys])
             self._owns_approx_of = list(abs_outs)
             self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+            self._owns_approx_jac = True
 
     def _setup_approx_coloring(self):
         """

@@ -86,7 +86,6 @@ class PETScTransfer(DefaultTransfer):
             relvars, _ = group._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices
-            nsub_allprocs = len(allsubs)
             xfer_in = []
             xfer_out = []
             fwd_xfer_in = defaultdict(list)
