@@ -3,7 +3,12 @@ import sys
 import importlib
 import inspect
 
-from IPython.display import display, HTML, Code
+try:
+    from IPython.display import display, HTML, Code
+    from IPython import get_ipython
+    ipy = get_ipython() is not None
+except ImportError:
+    ipy = None
 
 from openmdao.utils.general_utils import simple_warning
 
@@ -67,7 +72,11 @@ def display_source(reference, hide_doc_string=False):
         del obj[1]
         obj = ''.join(obj)
 
-    return display(Code(obj, language='python'))
+    if ipy:
+        return display(Code(obj, language='python'))
+    else:
+        simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
+                       "`pip install openmdao[docs]` to upgrade.")
 
 
 def show_options_table(reference):
@@ -86,7 +95,11 @@ def show_options_table(reference):
     """
     obj = _get_object_from_reference(reference)()
 
-    return display(HTML(obj.options.to_table(fmt='html')))
+    if ipy:
+        return display(HTML(obj.options.to_table(fmt='html')))
+    else:
+        simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
+                       "`pip install openmdao[docs]` to upgrade.")
 
 
 def cite(reference):
@@ -114,13 +127,6 @@ def notebook_mode():
     bool
         True if the environment is an interactive notebook.
     """
-    ipy = False
-    try:
-        from IPython import get_ipython
-        ipy = get_ipython() is not None
-    except ImportError:
-        pass
-
     if ipy and tabulate is None:
         simple_warning("Tabulate is not installed. Run `pip install openmdao[notebooks]` to "
                        "install required dependencies. Using ASCII for outputs.")

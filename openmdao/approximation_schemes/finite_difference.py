@@ -3,9 +3,8 @@ from collections import namedtuple, defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
-from openmdao.utils.coloring import Coloring
-from openmdao.utils.general_utils import simple_warning
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -122,8 +121,8 @@ class FiniteDifference(ApproximationScheme):
         options['vector'] = vector
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
-            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
-                           f"'{wrt}.")
+            issue_warning(f"overriding previous approximation defined for '{wrt}'.",
+                          prefix=system.msginfo, category=DerivativesWarning)
         self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 

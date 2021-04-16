@@ -6,7 +6,7 @@ from hashlib import md5
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, CacheWarning
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 
@@ -144,7 +144,7 @@ class KrigingSurrogate(SurrogateModel):
                 except KeyError as e:
                     msg = ("An error occurred while loading KrigingSurrogate Cache: %s. "
                            "Ignoring and training from scratch.")
-                    simple_warning(msg % str(e))
+                    issue_warning(msg % str(e), category=CacheWarning)
 
             # if the loaded data passes the hash check with the current training data, we exit
             if cache_hash == training_data_hash:

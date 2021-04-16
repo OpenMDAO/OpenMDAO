@@ -18,7 +18,8 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
+from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.warnings import reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -1975,10 +1976,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup())
 
-        with assert_warning(UserWarning,
-                            "<model> <class SimpleGroup>: src_indices have been specified with promotes 'any'. "
-                            "Note that src_indices only apply to matching inputs."):
-            p.setup()
+        p.setup()
 
         p.run_model()
 

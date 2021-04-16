@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
-from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.warnings import OMDeprecationWarning
 
 
 class TestSystem(unittest.TestCase):
@@ -261,12 +261,12 @@ class TestSystem(unittest.TestCase):
         prob = Problem()
         msg = "The recording option, record_model_metadata, on System is deprecated. " \
               "Recording of model metadata will always be done"
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.model.recording_options['record_model_metadata'] = True
 
         msg = "The recording option, record_metadata, on System is deprecated. " \
               "Recording of metadata will always be done"
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.model.recording_options['record_metadata'] = True
 
     def test_setup_check_group(self):

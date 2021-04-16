@@ -28,10 +28,10 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, default_noraise
+from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
 
@@ -361,7 +361,7 @@ def _get_viewer_data(data_source, case_id=None):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning("The model is not a Group, viewer data is unavailable.")
+            issue_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
@@ -385,7 +385,7 @@ def _get_viewer_data(data_source, case_id=None):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
-            simple_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
+            issue_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
             return {}
 
     elif isinstance(data_source, str):
@@ -661,8 +661,9 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
 
     if notebook:
         # display in Jupyter Notebook
+        outfile = os.path.relpath(outfile)
         if not colab:
-            display(IFrame(src=outfile, width=850, height=850))
+            display(IFrame(src=outfile, width="100%", height=700))
         else:
             display(HTML(outfile))
     elif show_browser:
