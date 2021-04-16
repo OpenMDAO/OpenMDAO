@@ -4827,7 +4827,6 @@ class System(object):
         object
             The value stored under key in the metadata dictionary for the named variable.
         """
-
         if self._problem_meta is not None:
             model_ref = self._problem_meta['model_ref']()
         else:
