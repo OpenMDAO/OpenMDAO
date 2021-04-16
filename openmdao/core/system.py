@@ -4827,13 +4827,16 @@ class System(object):
         object
             The value stored under key in the metadata dictionary for the named variable.
         """
+        
         if self._problem_meta is not None:
             if self._problem_meta['model_ref']() is not None:
-                meta_all = self._problem_meta['model_ref']()._var_allprocs_abs2meta
-                meta_loc = self._problem_meta['model_ref']()._var_abs2meta
+                model_ref = self._problem_meta['model_ref']()
             else:
-                meta_all = self._var_allprocs_abs2meta
-                meta_loc = self._var_abs2meta
+                model_ref = None
+
+        if model_ref is not None:
+            meta_all = model_ref._var_allprocs_abs2meta
+            meta_loc = model_ref._var_abs2meta
         else:
             meta_all = self._var_allprocs_abs2meta
             meta_loc = self._var_abs2meta
@@ -5114,3 +5117,4 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
