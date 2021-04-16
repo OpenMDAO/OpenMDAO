@@ -35,6 +35,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
+from openmdao.warnings import warn_deprecation
 
 # regex to check for valid names.
 import re
