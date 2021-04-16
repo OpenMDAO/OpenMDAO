@@ -1454,7 +1454,7 @@ class Group(System):
 
         src_ind_inputs = set()
         abs2meta = self._var_abs2meta['input']
-        allprocs_abs2meta = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
@@ -1519,7 +1519,7 @@ class Group(System):
                         continue
 
                 if src_indices is not None:
-                    a2m = allprocs_abs2meta[abs_in]
+                    a2m = allprocs_abs2meta_in[abs_in]
                     if (a2m['shape_by_conn'] or a2m['copy_shape']):
                         raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
                                          f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
@@ -1593,22 +1593,32 @@ class Group(System):
                 else:
                     issue_warning(msg, category=SetupWarning)
 
-        # If running in parallel, allgather
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                raw = (global_abs_in2out, src_ind_inputs)
-            else:
-                raw = ({}, ())
-            gathered = self.comm.allgather(raw)
+        if self.comm.size > 1:
+            if self._mpi_proc_allocator.parallel:
+                # If running in parallel, allgather
+                if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+                    raw = (global_abs_in2out, src_ind_inputs)
+                else:
+                    raw = ({}, ())
+                gathered = self.comm.allgather(raw)
 
-            all_src_ind_ins = set()
-            for myproc_global_abs_in2out, src_ind_ins in gathered:
-                global_abs_in2out.update(myproc_global_abs_in2out)
-                all_src_ind_ins.update(src_ind_ins)
-            src_ind_inputs = all_src_ind_ins
+                all_src_ind_ins = set()
+                for myproc_global_abs_in2out, src_ind_ins in gathered:
+                    global_abs_in2out.update(myproc_global_abs_in2out)
+                    all_src_ind_ins.update(src_ind_ins)
+                src_ind_inputs = all_src_ind_ins
+
+            if self.pathname == '':
+                allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+                for tgt, src in global_abs_in2out.items():
+                    tdist = allprocs_abs2meta_in[tgt]['distributed']
+                    if tdist and not allprocs_abs2meta_out[src]['distributed']:
+                        warn_deprecation(f"Connection between serial output '{src}' and distributed"
+                                         f" input '{tgt}' is deprecated and will become an error "
+                                         "in a future release.")
 
         for inp in src_ind_inputs:
-            allprocs_abs2meta[inp]['has_src_indices'] = True
+            allprocs_abs2meta_in[inp]['has_src_indices'] = True
 
     def _setup_dynamic_shapes(self):
         """
