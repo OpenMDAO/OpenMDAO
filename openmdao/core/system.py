@@ -4829,10 +4829,8 @@ class System(object):
         """
         
         if self._problem_meta is not None:
-            if self._problem_meta['model_ref']() is not None:
-                model_ref = self._problem_meta['model_ref']()
-            else:
-                model_ref = None
+            model_ref = self._problem_meta['model_ref']()
+
 
         if model_ref is not None:
             meta_all = model_ref._var_allprocs_abs2meta
@@ -5117,4 +5115,5 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
 
