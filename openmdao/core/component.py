@@ -3,7 +3,6 @@
 from collections import OrderedDict, Counter, defaultdict
 from collections.abc import Iterable
 from itertools import product
-from contextlib import contextmanager
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types

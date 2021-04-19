@@ -1601,20 +1601,19 @@ class Group(System):
                 else:
                     issue_warning(msg, category=SetupWarning)
 
-        if self.comm.size > 1:
-            if self._mpi_proc_allocator.parallel:
-                # If running in parallel, allgather
-                if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
-                    raw = (global_abs_in2out, src_ind_inputs)
-                else:
-                    raw = ({}, ())
-                gathered = self.comm.allgather(raw)
+        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            # If running in parallel, allgather
+            if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
+                raw = (global_abs_in2out, src_ind_inputs)
+            else:
+                raw = ({}, ())
+            gathered = self.comm.allgather(raw)
 
-                all_src_ind_ins = set()
-                for myproc_global_abs_in2out, src_ind_ins in gathered:
-                    global_abs_in2out.update(myproc_global_abs_in2out)
-                    all_src_ind_ins.update(src_ind_ins)
-                src_ind_inputs = all_src_ind_ins
+            all_src_ind_ins = set()
+            for myproc_global_abs_in2out, src_ind_ins in gathered:
+                global_abs_in2out.update(myproc_global_abs_in2out)
+                all_src_ind_ins.update(src_ind_ins)
+            src_ind_inputs = all_src_ind_ins
 
         for inp in src_ind_inputs:
             allprocs_abs2meta_in[inp]['has_src_indices'] = True
