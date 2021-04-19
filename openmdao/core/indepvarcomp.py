@@ -110,7 +110,7 @@ class IndepVarComp(ExplicitComponent):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=False):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an independent variable to this component.
 

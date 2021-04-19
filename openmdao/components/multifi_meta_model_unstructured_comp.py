@@ -190,7 +190,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
                    desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=False):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
 

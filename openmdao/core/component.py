@@ -467,7 +467,7 @@ class Component(System):
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
-                  distributed=False):
+                  distributed=None):
         """
         Add an input variable to the component.
 
@@ -570,6 +570,15 @@ class Component(System):
                              "deprecated and will become an error in a future release.  Add "
                              "`src_indices` to a `promotes` or `connect` call instead.")
 
+        # until we get rid of component level distributed option, handle the case where
+        # component distributed has been set to True but variable distributed has been set
+        # to False by the caller.
+        if distributed is not False:
+            if distributed is None:
+                distributed = False
+            # using ._dict below to avoid tons of deprecation warnings
+            distributed = distributed or self.options._dict['distributed']['value']
+
         metadata = {
             'value': val,
             'shape': shape,
@@ -580,8 +589,7 @@ class Component(System):
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            # using ._dict below to avoid tons of deprecation warnings
-            'distributed': distributed or self.options._dict['distributed']['value'],
+            'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
@@ -664,7 +672,7 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=False):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -802,6 +810,15 @@ class Component(System):
         else:
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
+        # until we get rid of component level distributed option, handle the case where
+        # component distributed has been set to True but variable distributed has been set
+        # to False by the caller.
+        if distributed is not False:
+            if distributed is None:
+                distributed = False
+            # using ._dict below to avoid tons of deprecation warnings
+            distributed = distributed or self.options._dict['distributed']['value']
+
         metadata = {
             'value': val,
             'shape': shape,
@@ -809,8 +826,7 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            # using ._dict below to avoid tons of deprecation warnings
-            'distributed': distributed or self.options._dict['distributed']['value'],
+            'distributed': distributed,
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
