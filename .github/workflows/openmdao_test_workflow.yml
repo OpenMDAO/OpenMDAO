@@ -149,7 +149,7 @@ jobs:
           echo "=============================================================";
           echo "Install optional packages for testing/coverage";
           echo "=============================================================";
-          if [ "${{ matrix.OPTIONAL }}" == "[all]" ]; then
+          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
             pyppeteer-install;
           fi
@@ -166,7 +166,7 @@ jobs:
           cp ../../.coveragerc .
           testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao;
           
-          if [ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]; then
+          if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             echo "=============================================================";
             echo "Make docs";
             echo "=============================================================";
