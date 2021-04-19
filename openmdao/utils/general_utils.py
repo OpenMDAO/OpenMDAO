@@ -16,7 +16,6 @@ except ImportError:
     from collections import Iterable
 
 import numbers
-import json
 
 import numpy as np
 import openmdao
@@ -606,84 +605,6 @@ def do_nothing_context():
         yield None
 
     return contextmanager(nothing)()
-
-
-def _byteify(data, ignore_dicts=False):
-    """
-    Convert any unicode items in a data structure to bytes (object_hook for json load/loads).
-
-    Credit: Mirec Miskuf
-    stackoverflow.com/questions/956867/how-to-get-string-objects-instead-of-unicode-from-json
-
-    Parameters
-    ----------
-    data : any data item or structure
-        the data to be converted
-    ignore_dicts : bool
-        a flag to prevent recursion on dicts that have already been byteified.
-        False when object_hook passes a new dict to byteify, True at all other times.
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    # if this is a unicode string, return its string representation
-    if isinstance(data, unicode):
-        return data.encode('utf-8')
-
-    # if this is a list of values, return list of byteified values
-    if isinstance(data, list):
-        return [_byteify(item, ignore_dicts=True) for item in data]
-
-    # if this is a dictionary, return dictionary of byteified keys and values
-    # but only if we haven't already byteified it
-    if isinstance(data, dict) and not ignore_dicts:
-        return {
-            _byteify(key, ignore_dicts=True): _byteify(value, ignore_dicts=True)
-            for key, value in data.iteritems()
-        }
-
-    # if it's anything else, return it in its original form
-    return data
-
-
-def json_load_byteified(file_handle):
-    """
-    Load data from a JSON file, converting unicode to bytes if Python version is 2.x.
-
-    Intended for use only with Python 2.x, behaves the same as json.load() under Python 3.x.
-
-    Parameters
-    ----------
-    file_handle : file
-        file containing the data to be converted
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    return json.load(file_handle)
-
-
-def json_loads_byteified(json_str):
-    """
-    Load data from a JSON string, converting unicode to bytes if Python version is 2.x.
-
-    Intended for use only with Python 2.x, behaves the same as json.loads() under Python 3.x.
-
-    Parameters
-    ----------
-    json_str : str
-        text string containing json encoded data
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    return json.loads(json_str)
 
 
 def remove_whitespace(s, right=False, left=False):

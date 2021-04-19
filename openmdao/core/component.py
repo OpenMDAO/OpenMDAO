@@ -1627,7 +1627,3 @@ class _DictValues(object):
 
     def items(self):
         return [(key, self._dict[key]['value']) for key in self._dict]
-
-    def iteritems(self):
-        for key, val in self._dict.items():
-            yield key, val['value']
