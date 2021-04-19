@@ -842,7 +842,6 @@ class Group(System):
                                      f" input '{abs_in}' is deprecated and will become an error "
                                      "in a future release.")
 
-
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
             meta = self._group_inputs[prom_in][0]
