@@ -2778,7 +2778,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader(self.filename)
-        case = cr.get_cases()[-1]
+        case = cr.get_case(cr.list_cases()[-1])
 
         norm =  nl._iter_get_norm()
         norm0 = nl._norm0
