@@ -48,6 +48,11 @@ jobs:
             OPTIONAL: '[all]'
 
     steps:
+      # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
+      - name: Add the current IP address, long hostname and short hostname record to /etc/hosts file
+        run: |
+          echo -e "$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)\t$(hostname -f) $(hostname -s)" | sudo tee -a /etc/hosts
+
       - name: Create SSH key
         shell: bash
         env:
@@ -144,7 +149,7 @@ jobs:
           echo "=============================================================";
           echo "Install optional packages for testing/coverage";
           echo "=============================================================";
-          if [ "${{ matrix.OPTIONAL }}" == "[all]" ]; then
+          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
             pyppeteer-install;
           fi
@@ -161,7 +166,7 @@ jobs:
           cp ../../.coveragerc .
           testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao;
           
-          if [ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]; then
+          if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
             echo "=============================================================";
             echo "Make docs";
             echo "=============================================================";
