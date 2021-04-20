@@ -2758,6 +2758,33 @@ class TestSqliteCaseReader(unittest.TestCase):
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
 
+    def test_abs_rel_error(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', ImplCompTwoStates())
+
+        # mda solver
+        nl = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        nl.options['maxiter'] = 2
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_val('comp.y', 8.0)
+        prob.set_val('comp.z', 5.0)
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(cr.list_cases()[-1])
+
+        norm =  nl._iter_get_norm()
+        norm0 = nl._norm0
+        self.assertEqual(case.abs_err, norm)
+        self.assertEqual(case.rel_err, norm/norm0)
+
     def test_linesearch(self):
         prob = om.Problem()
 
