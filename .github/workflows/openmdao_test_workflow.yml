@@ -38,7 +38,6 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[test]'
-            UPLOAD_DOCS: False
 
           # oldest supported versions
           - PY: 3.6
@@ -48,7 +47,6 @@ jobs:
             PYOPTSPARSE: 'v1.2'
             SNOPT: 7.2
             OPTIONAL: '[all]'
-            UPLOAD_DOCS: False
 
     steps:
       # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
