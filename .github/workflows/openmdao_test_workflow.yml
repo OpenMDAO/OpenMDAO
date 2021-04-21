@@ -179,7 +179,7 @@ jobs:
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`;
           coveralls --base_dir $SITE_DIR;
           
-          if [[ "${GITHUB_EVENT_NAME} == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
             echo "=============================================================";
             echo "Upload docs";
             echo "=============================================================";
