@@ -1,3 +1,4 @@
+import sys
 import subprocess
 import pipes
 import os
@@ -61,12 +62,16 @@ def get_doc_version():
         return current_commit, 0
 
 
-def upload_doc_version():
+def upload_doc_version(destination):
     """
-    Perform operations, then upload properly-named docs to WebFaction
+    Upload properly-named docs.
+
+    Parameters
+    ----------
+    destination : str
+        The destination for the documentation, [USER@]HOST:DIRECTORY
     """
     name, rel = get_doc_version()
-    destination = "openmdao@web543.webfaction.com:/home/openmdao/webapps/twodocversions/"
 
     # if release, send to version-numbered dir
     if rel:
@@ -78,7 +83,7 @@ def upload_doc_version():
     # execute the rsync to upload docs
     cmd = "rsync -r --delete-after -v _build/html/* " + destination
     status = subprocess.call(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, shell=True)
+                                  stderr=subprocess.PIPE, shell=True)
 
     if status == 0:
         return True
@@ -87,4 +92,7 @@ def upload_doc_version():
 
 
 if __name__ == "__main__":
-    upload_doc_version()
+    if len(sys.argv) != 2:
+        print("Destination required, [USER@]HOST:DIRECTORY")
+    else:
+        upload_doc_version(sys.argv[1])

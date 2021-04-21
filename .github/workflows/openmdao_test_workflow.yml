@@ -28,6 +28,7 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
+            UPLOAD_DOCS: True
 
           # try latest versions
           - PY: 3
@@ -37,6 +38,7 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[test]'
+            UPLOAD_DOCS: False
 
           # oldest supported versions
           - PY: 3.6
@@ -46,6 +48,7 @@ jobs:
             PYOPTSPARSE: 'v1.2'
             SNOPT: 7.2
             OPTIONAL: '[all]'
+            UPLOAD_DOCS: False
 
     steps:
       # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
@@ -56,8 +59,8 @@ jobs:
       - name: Create SSH key
         shell: bash
         env:
-          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
-          SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
@@ -175,6 +178,13 @@ jobs:
           pip install git+https://github.com/swryan/coveralls-python;
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`;
           coveralls --base_dir $SITE_DIR;
+          
+          if [[ "${GITHUB_EVENT_NAME} == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
+            echo "=============================================================";
+            echo "Upload docs";
+            echo "=============================================================";
+            python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }};
+          fi
 
       - uses: act10ns/slack@v1
         env:
