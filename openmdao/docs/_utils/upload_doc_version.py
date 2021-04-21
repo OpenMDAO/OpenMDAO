@@ -86,6 +86,7 @@ def upload_doc_version(destination):
                                   stderr=subprocess.PIPE, shell=True)
 
     if status == 0:
+        print("Uploaded documentation for", name if rel else "latest")
         return True
     else:
         raise Exception('Doc transfer failed.')
