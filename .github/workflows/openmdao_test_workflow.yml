@@ -114,7 +114,7 @@ jobs:
               PAROPT=-a
             fi
 
-            if [ "${{ matrix.SNOPT }}" == "7.7" ] && [ "${{ secrets.SNOPT_LOCATION_77 }}" ] then
+            if [ "${{ matrix.SNOPT }}" == "7.7" ] && [ "${{ secrets.SNOPT_LOCATION_77 }}" ]; then
               echo "  > Secure copying SNOPT 7.7 over SSH"
               mkdir SNOPT
               scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
