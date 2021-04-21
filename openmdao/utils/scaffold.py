@@ -131,8 +131,8 @@ def _scaffold_exec(options, user_args):
 
                 setup_dict = {
                     'name': dist_name,
-                    'version': '???',
-                    'description': '???',
+                    'version': '0.0.1',
+                    'description': '',
                     'keywords': keywords,
                     'license': '???',
                     'packages': [pkg_name, pkg_name + '.' + 'test'],
