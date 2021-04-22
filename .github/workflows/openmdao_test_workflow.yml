@@ -178,7 +178,7 @@ jobs:
           coveralls --base_dir $SITE_DIR
           
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
-            if [[ ${{ secrets.DOCS_LOCATION }} ]]; then
+            if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
               echo "============================================================="
               echo "Upload docs"
               echo "============================================================="
