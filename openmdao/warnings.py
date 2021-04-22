@@ -154,13 +154,13 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
 
     Parameters
     ----------
-    msg : str
+    msg: str
         The warning message.
-    prefix : str
+    prefix: str
         An optional prefix to be prepended to the warning message (usually the system path).
-    stacklevel : int
+    stacklevel: int
         Number of levels up the stack to identify as the warning location.
-    category : class
+    category: class
         The class of warning to be issued.
 
     Examples
@@ -208,7 +208,7 @@ def warn_deprecation(msg):
 
     Parameters
     ----------
-    msg : str
+    msg: str
         Message that will be printed to stdout.
     """
     # note, stack level 3 should take us back to original caller.
@@ -221,17 +221,17 @@ def _warn_simple_format(message, category, filename, lineno, file=None, line=Non
 
     Parameters
     ----------
-    message : str
+    message: str
         The warning message
-    category : class
+    category: class
         The warning class being issued.
-    filename : str
+    filename: str
         The filename from which the warning is issued.
-    lineno : int
+    lineno: int
         The line number from which the warning is issued.
-    file : str
+    file: str
         Ignored in this implementation.
-    line : str
+    line: str
         The line of code causing the warning (ignored in this implementation)
 
     Returns
@@ -251,7 +251,7 @@ class reset_warning_registry(object):
 
     Attributes
     ----------
-    _pattern : regex pattern
+    _pattern: regex pattern
         Causes manager to only reset modules whose names match this pattern. defaults to ``".*"``.
     """
 
@@ -267,7 +267,7 @@ class reset_warning_registry(object):
 
         Parameters
         ----------
-        pattern : regex pattern
+        pattern: regex pattern
             Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
         """
         self._pattern = re.compile(pattern or ".*")
@@ -300,11 +300,11 @@ class reset_warning_registry(object):
 
         Parameters
         ----------
-        exc_type : Exception class
+        exc_type: Exception class
             The type of the exception.
-        exc_value : Exception instance
+        exc_value: Exception instance
             The exception instance raised.
-        traceback : regex pattern
+        traceback: regex pattern
             Traceback object.
         """
         # restore warning registry from backup

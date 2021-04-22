@@ -15,13 +15,13 @@ class CSRMatrix(COOMatrix):
 
         Parameters
         ----------
-        num_rows : int
+        num_rows: int
             number of rows in the matrix.
-        num_cols : int
+        num_cols: int
             number of cols in the matrix.
-        in_ranges : dict
+        in_ranges: dict
             Maps input var name to column range.
-        out_ranges : dict
+        out_ranges: dict
             Maps output var name to row range.
         """
         super()._build(num_rows, num_cols, in_ranges, out_ranges)

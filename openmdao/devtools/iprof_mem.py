@@ -72,7 +72,7 @@ def setup(**kwargs):
 
     Parameters
     ----------
-    kwargs : dict
+    kwargs: dict
         Keyword options.
     """
     _setup(_Options(**kwargs))
@@ -188,7 +188,7 @@ def memtrace(**kwargs):
 
     Parameters
     ----------
-    kwargs : dict
+    kwargs: dict
         Named options to pass to setup.
     """
     options = _Options(**kwargs)

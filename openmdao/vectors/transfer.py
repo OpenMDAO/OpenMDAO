@@ -7,11 +7,11 @@ class Transfer(object):
 
     Attributes
     ----------
-    _in_inds : int ndarray
+    _in_inds: int ndarray
         input indices for the transfer.
-    _out_inds : int ndarray
+    _out_inds: int ndarray
         output indices for the transfer.
-    _comm : MPI.Comm or FakeComm
+    _comm: MPI.Comm or FakeComm
         communicator of the system that owns this transfer.
     """
 
@@ -21,15 +21,15 @@ class Transfer(object):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        in_inds : int ndarray
+        in_inds: int ndarray
             input indices for the transfer.
-        out_inds : int ndarray
+        out_inds: int ndarray
             output indices for the transfer.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
         self._in_inds = in_inds
@@ -58,11 +58,11 @@ class Transfer(object):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         pass

@@ -47,7 +47,7 @@ def count_keys(d):
 
     Parameters
     ----------
-    d : nested OrderedDict
+    d: nested OrderedDict
         The dictionary of cases to be counted.
     """
     count = 0
@@ -4061,9 +4061,9 @@ def _assert_model_matches_case(case, system):
 
     Parameters
     ----------
-    case : Case object
+    case: Case object
         Case to be used for the comparison.
-    system : System object
+    system: System object
         System to be used for the comparison.
     """
     case_inputs = case.inputs
@@ -4114,42 +4114,42 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         expected = [
             "Run Number: 1",
             "    Subsystem: root",
-            "        assembled_jac_type : dense",
+            "        assembled_jac_type: dense",
             "    Subsystem: p1",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
+            "        distributed: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
             "    Subsystem: p2",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
+            "        distributed: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
             "    Subsystem: comp",
-            "        distributed : False",
+            "        distributed: False",
             "    Subsystem: con",
-            "        distributed : False",
-            "        has_diag_partials : False",
-            "        units : None",
-            "        shape : None",
+            "        distributed: False",
+            "        has_diag_partials: False",
+            "        units: None",
+            "        shape: None",
             ""
         ]
 

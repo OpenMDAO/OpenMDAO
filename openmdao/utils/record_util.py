@@ -14,12 +14,12 @@ def create_local_meta(name):
 
     Parameters
     ----------
-    name : str
+    name: str
         String to describe the current level of execution.
 
     Returns
     -------
-    local_meta : dict
+    local_meta: dict
         Dictionary containing the metadata
     """
     local_meta = {
@@ -38,10 +38,10 @@ def format_iteration_coordinate(coord, prefix=None):
 
     Parameters
     ----------
-    coord : list
+    coord: list
         List containing the iteration coordinate.
 
-    prefix : str or None
+    prefix: str or None
         Prefix to prepend to iteration coordinates.
 
     Returns
@@ -81,7 +81,7 @@ def get_source_system(iteration_coordinate):
 
     Parameters
     ----------
-    iteration_coordinate : str
+    iteration_coordinate: str
         The full unique identifier for this iteration.
 
     Returns
@@ -108,7 +108,7 @@ def check_valid_sqlite3_db(filename):
 
     Parameters
     ----------
-    filename : str
+    filename: str
         The path to the file to be tested
 
     Raises
@@ -138,13 +138,13 @@ def check_path(path, includes, excludes, include_all_path=False):
 
     Parameters
     ----------
-    path : str
+    path: str
         path proposed to be recorded
-    includes : list
+    includes: list
         list of things to be included in recording list.
-    excludes : list
+    excludes: list
         list of things to be excluded from recording list.
-    include_all_path : bool
+    include_all_path: bool
         If set to True, will return True unless it is in excludes
 
     Returns
@@ -173,14 +173,14 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
 
     Parameters
     ----------
-    json_data : string
+    json_data: string
         JSON encoded data
-    abs2meta : dict
+    abs2meta: dict
         Dictionary mapping absolute variable names to variable metadata
-    prom2abs : dict
+    prom2abs: dict
         Dictionary mapping promoted input names to absolute. Needed to resolve auto_ivc outputs
         that are recorded with their promoted input name.
-    conns : dict
+    conns: dict
         Dictionary of all model connections.
 
     Returns
@@ -219,7 +219,7 @@ def dict_to_structured_array(values):
 
     Parameters
     ----------
-    values : dict
+    values: dict
         dict of variable names and values
 
     Returns

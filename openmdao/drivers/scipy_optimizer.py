@@ -84,31 +84,31 @@ class ScipyOptimizeDriver(Driver):
 
     Attributes
     ----------
-    fail : bool
+    fail: bool
         Flag that indicates failure of most recent optimization.
-    iter_count : int
+    iter_count: int
         Counter for function evaluations.
-    result : OptimizeResult
+    result: OptimizeResult
         Result returned from scipy.optimize call.
-    opt_settings : dict
+    opt_settings: dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
-    _check_jac : bool
+    _check_jac: bool
         Used internally to control when to perform singular checks on computed total derivs.
-    _con_cache : dict
+    _con_cache: dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
-    _con_idx : dict
+    _con_idx: dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
-    _grad_cache : OrderedDict
+    _grad_cache: OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _exc_info : 3 item tuple
+    _exc_info: 3 item tuple
         Storage for exception and traceback information.
-    _obj_and_nlcons : list
+    _obj_and_nlcons: list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
-    _dvlist : list
+    _dvlist: list
         Copy of _designvars.
-    _lincongrad_cache : np.ndarray
+    _lincongrad_cache: np.ndarray
         Pre-calculated gradients of linear constraints.
     """
 
@@ -118,7 +118,7 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
@@ -196,7 +196,7 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        problem : <Problem>
+        problem: <Problem>
             Pointer
         """
         super()._setup_driver(problem)
@@ -570,7 +570,7 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        x_new : ndarray
+        x_new: ndarray
             Array containing input values at new design point.
 
         Returns
@@ -621,13 +621,13 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        x_new : ndarray
+        x_new: ndarray
             Array containing input values at new design point.
-        name : string
+        name: string
             Name of the constraint to be evaluated.
-        dbl : bool
+        dbl: bool
             True if double sided constraint.
-        idx : float
+        idx: float
             Contains index into the constraint array.
 
         Returns
@@ -646,13 +646,13 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        x_new : ndarray
+        x_new: ndarray
             Array containing input values at new design point.
-        name : string
+        name: string
             Name of the constraint to be evaluated.
-        dbl : bool
+        dbl: bool
             True if double sided constraint.
-        idx : float
+        idx: float
             Contains index into the constraint array.
 
         Returns
@@ -696,7 +696,7 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        x_new : ndarray
+        x_new: ndarray
             Array containing input values at new design point.
 
         Returns
@@ -735,13 +735,13 @@ class ScipyOptimizeDriver(Driver):
 
         Parameters
         ----------
-        x_new : ndarray
+        x_new: ndarray
             Array containing input values at new design point.
-        name : string
+        name: string
             Name of the constraint to be evaluated.
-        dbl : bool
+        dbl: bool
             Denotes if a constraint is double-sided or not.
-        idx : float
+        idx: float
             Contains index into the constraint array.
 
         Returns
@@ -800,9 +800,9 @@ def signature_extender(fcn, extra_args):
 
     Parameters
     ----------
-    fcn : callable
+    fcn: callable
         Function, which takes the design vector as the first argument.
-    extra_args : tuple or list
+    extra_args: tuple or list
         Extra arguments for the function
 
     Returns

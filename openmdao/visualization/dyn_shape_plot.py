@@ -18,7 +18,7 @@ def _view_dyn_shapes_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -36,9 +36,9 @@ def _view_dyn_shapes_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     def _view_shape_graph(model):
@@ -70,16 +70,16 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
 
     Parameters
     ----------
-    root : system or Problem
+    root: System or Problem
         The top level system or Problem.
 
-    outfile : str, optional
+    outfile: str, optional
         The name of the plot file.  Defaults to 'shape_dep_graph.png'.
 
-    show : bool, optional
+    show: bool, optional
         If True, display the plot. Defaults to True.
 
-    title : str, optional
+    title: str, optional
         Sets the title of the plot.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:

@@ -15,7 +15,7 @@ class ImplicitComponent(Component):
 
     Attributes
     ----------
-    _inst_functs : dict
+    _inst_functs: dict
         Dictionary of names mapped to bound methods.
     """
 
@@ -25,7 +25,7 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -127,18 +127,18 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        scope_out : set or None
+        scope_out: set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in: set or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
@@ -204,11 +204,11 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         """
         if self._linear_solver is not None:
@@ -264,9 +264,9 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln: boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         self._check_first_linearize()
@@ -296,15 +296,15 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
-        discrete_inputs : dict or None
+        discrete_inputs: dict or None
             If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
+        discrete_outputs: dict or None
             If not None, dict containing discrete output values.
         """
         pass
@@ -315,9 +315,9 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         pass
@@ -331,15 +331,15 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
-        discrete_inputs : dict or None
+        discrete_inputs: dict or None
             If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
+        discrete_outputs: dict or None
             If not None, dict containing discrete output values.
         """
         pass
@@ -355,17 +355,17 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        d_inputs : Vector
+        d_inputs: Vector
             see inputs; product must be computed only if var_name in d_inputs
-        d_outputs : Vector
+        d_outputs: Vector
             see outputs; product must be computed only if var_name in d_outputs
-        d_residuals : Vector
+        d_residuals: Vector
             see outputs
-        mode : str
+        mode: str
             either 'fwd' or 'rev'
         """
         pass
@@ -386,11 +386,11 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        d_outputs : Vector
+        d_outputs: Vector
             unscaled, dimensional quantities read via d_outputs[key]
-        d_residuals : Vector
+        d_residuals: Vector
             unscaled, dimensional quantities read via d_residuals[key]
-        mode : str
+        mode: str
             either 'fwd' or 'rev'
         """
         if mode == 'fwd':
@@ -406,15 +406,15 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
+        jacobian: Jacobian
             sub-jac components written to jacobian[output_name, input_name]
-        discrete_inputs : dict or None
+        discrete_inputs: dict or None
             If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
+        discrete_outputs: dict or None
             If not None, dict containing discrete output values.
         """
         pass

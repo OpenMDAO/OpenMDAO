@@ -12,33 +12,33 @@ class NNBase(object):
 
     Attributes
     ----------
-    _tpm : ndarray
+    _tpm: ndarray
         ndarray of shape (1 x independent dims) containing the minimum in each dimension of
          the training input locations.
-    _tpr : ndarray
+    _tpr: ndarray
         ndarray of shape (1x independent dims) containing the range of each dimension of
         the training input locations.
-    _tvm : ndarray
+    _tvm: ndarray
         ndarray of shape (1 x independent dims) containing the minimum in each dimension of
         the training output values.
-    _tvr : ndarray
+    _tvr: ndarray
         ndarray of shape (1x independent dims) containing the range of each dimension of
         the training output values.
-    _tp : ndarray
+    _tp: ndarray
         ndarray of shape (num_points x independent dims) containing normalized training
         input locations.
-    _tv : ndarray
+    _tv: ndarray
         ndarray of shape (num_points x independent dims) containing normalized training
         output values.
-    _indep_dims : int
+    _indep_dims: int
         Number of independent dims
-    _dep_dims : int
+    _dep_dims: int
         Number of dependent dims
-    _ntpts : int
+    _ntpts: int
         Number of training points
-    _KData : scipy.spatial.cKDTree
+    _KData: scipy.spatial.cKDTree
         KDTree used for finding the nearest neighbors.
-    _pt_cache : tuple(ndarray, ndarray, ndarray)
+    _pt_cache: tuple(ndarray, ndarray, ndarray)
         Internal cache of the last found neighbors.
     """
 
@@ -48,11 +48,11 @@ class NNBase(object):
 
         Parameters
         ----------
-        training_points : ndarray
+        training_points: ndarray
             ndarray of shape (num_points x independent dims) containing training input locations.
-        training_values : ndarray
+        training_values: ndarray
             ndarray of shape (num_points x dependent dims) containing training output values.
-        num_leaves : int
+        num_leaves: int
             How many leaves the tree should have.
         """
         # training_points and training_values are the known points and their

@@ -115,7 +115,7 @@ setup(
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
-        'openmdao.visualization' : [
+        'openmdao.visualization': [
             'common/libs/*.js',
             'common/style/*.css'
         ],

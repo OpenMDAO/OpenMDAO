@@ -39,16 +39,16 @@ class SimpleGADriver(Driver):
 
     Attributes
     ----------
-    _concurrent_pop_size : int
+    _concurrent_pop_size: int
         Number of points to run concurrently when model is a parallel one.
-    _concurrent_color : int
+    _concurrent_color: int
         Color of current rank when running a parallel model.
-    _desvar_idx : dict
+    _desvar_idx: dict
         Keeps track of the indices for each desvar, since GeneticAlgorithm sees an array of
         design variables.
-    _ga : <GeneticAlgorithm>
+    _ga: <GeneticAlgorithm>
         Main genetic algorithm lies here.
-    _randomstate : np.random.RandomState, int
+    _randomstate: np.random.RandomState, int
          Random state (or seed-number) which controls the seed and random draws.
     """
 
@@ -58,7 +58,7 @@ class SimpleGADriver(Driver):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
@@ -146,7 +146,7 @@ class SimpleGADriver(Driver):
 
         Parameters
         ----------
-        problem : <Problem>
+        problem: <Problem>
             Pointer to the containing problem.
         """
         super()._setup_driver(problem)
@@ -168,7 +168,7 @@ class SimpleGADriver(Driver):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
+        comm: MPI.Comm or <FakeComm> or None
             The communicator for the Problem.
 
         Returns
@@ -385,9 +385,9 @@ class SimpleGADriver(Driver):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             Value of design variables.
-        icase : int
+        icase: int
             Case number, used for identification when run in parallel.
 
         Returns
@@ -505,26 +505,26 @@ class GeneticAlgorithm(object):
 
     Attributes
     ----------
-    comm : MPI communicator or None
+    comm: MPI communicator or None
         The MPI communicator that will be used objective evaluation for each generation.
-    elite : bool
+    elite: bool
         Elitism flag.
-    gray_code : bool
+    gray_code: bool
         Gray code binary representation flag.
-    cross_bits : bool
+    cross_bits: bool
         Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation,
         so when used Pc should be increased and Pm reduced.
-    lchrom : int
+    lchrom: int
         Chromosome length.
-    model_mpi : None or tuple
+    model_mpi: None or tuple
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
         to evaluate on this rank.
-    nobj : int
+    nobj: int
         Number of objectives.
-    npop : int
+    npop: int
         Population size.
-    objfun : function
+    objfun: function
         Objective function callback.
     """
 
@@ -534,11 +534,11 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        objfun : function
+        objfun: function
             Objective callback function.
-        comm : MPI communicator or None
+        comm: MPI communicator or None
             The MPI communicator that will be used objective evaluation for each generation.
-        model_mpi : None or tuple
+        model_mpi: None or tuple
             If the model in objfun is also parallel, then this will contain a tuple with the the
             total number of population points to evaluate concurrently, and the color of the point
             to evaluate on this rank.
@@ -560,26 +560,26 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        x0 : ndarray
+        x0: ndarray
             Initial design values
-        vlb : ndarray
+        vlb: ndarray
             Lower bounds array.
-        vub : ndarray
+        vub: ndarray
             Upper bounds array. This includes over-allocation so that every point falls on an
             integer value.
-        vob : ndarray
+        vob: ndarray
             Outer bounds array. This is purely for bounds check.
-        bits : ndarray
+        bits: ndarray
             Number of bits to encode the design space for each element of the design vector.
-        pop_size : int
+        pop_size: int
             Number of points in the population.
-        max_gen : int
+        max_gen: int
             Number of generations to run the GA.
-        random_state : np.random.RandomState, int
+        random_state: np.random.RandomState, int
             Random state (or seed-number) which controls the seed and random draws.
-        Pm : float or None
+        Pm: float or None
             Mutation rate
-        Pc : float
+        Pc: float
             Crossover rate
 
         Returns
@@ -724,13 +724,13 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             Design points from new generation.
-        obj : ndarray
+        obj: ndarray
             Objective values from new generation.
-        x_nd : ndarray
+        x_nd: ndarray
             Non dominated design points from previous pareto evaluation.
-        obj_nd : ndarray
+        obj_nd: ndarray
             Non dominated objective values from previous pareto evaluation.
 
         Returns
@@ -767,9 +767,9 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        old_gen : ndarray
+        old_gen: ndarray
             Points in current generation
-        fitness : ndarray
+        fitness: ndarray
             Objective value of each point.
 
         Returns
@@ -799,9 +799,9 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        old_gen : ndarray
+        old_gen: ndarray
             Points in current generation
-        obj_val : ndarray
+        obj_val: ndarray
             Objective value of each point.
 
         Returns
@@ -839,10 +839,10 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        old_gen : ndarray
+        old_gen: ndarray
             Points in current generation
 
-        Pc : float
+        Pc: float
             Probability of crossover.
 
         Returns
@@ -873,10 +873,10 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        current_gen : ndarray
+        current_gen: ndarray
             Points in current generation
 
-        Pm : float
+        Pm: float
             Probability of mutation.
 
         Returns
@@ -897,7 +897,7 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        old_gen : ndarray
+        old_gen: ndarray
             Old population.
 
         Returns
@@ -917,13 +917,13 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        gen : ndarray
+        gen: ndarray
             Population of points, encoded.
-        vlb : ndarray
+        vlb: ndarray
             Lower bound array.
-        vub : ndarray
+        vub: ndarray
             Upper bound array.
-        bits : ndarray(dtype=np.int)
+        bits: ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -956,13 +956,13 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             Design variable values.
-        vlb : ndarray
+        vlb: ndarray
             Lower bound array.
-        vub : ndarray
+        vub: ndarray
             Upper bound array.
-        bits : ndarray(dtype=np.int)
+        bits: ndarray(dtype=np.int)
             Number of bits for decoding.
 
         Returns
@@ -987,7 +987,7 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        g : binary array
+        g: binary array
              Normal binary array, e.g. np.array([0, 0, 1, 0]).
 
         Returns
@@ -1010,7 +1010,7 @@ class GeneticAlgorithm(object):
 
         Parameters
         ----------
-        g : binary array
+        g: binary array
             Gray coded binary array, e.g. np.array([0, 0, 1, 1]).
 
         Returns

@@ -18,9 +18,9 @@ class RecordingManager(object):
 
     Attributes
     ----------
-    _recorders : list of CaseRecorder
+    _recorders: list of CaseRecorder
         All of the recorders attached to the current object.
-    rank : int
+    rank: int
         Rank of the iteration coordinate.
     _has_serial_recorders: bool
         True if any of the recorders managed by this object are serial recorders.
@@ -44,12 +44,12 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        index : int
+        index: int
             an index into _recorders.
 
         Returns
         -------
-        recorder : CaseRecorder
+        recorder: CaseRecorder
             a recorder from _recorders
         """
         return self._recorders[index]
@@ -60,7 +60,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        iter : CaseRecorder
+        iter: CaseRecorder
             a recorder from _recorders.
         """
         return iter(self._recorders)
@@ -71,7 +71,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recorder : CaseRecorder
+        recorder: CaseRecorder
            Recorder instance to be added to the manager.
         """
         self._recorders.append(recorder)
@@ -82,7 +82,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             The object that needs an iteration of itself recorded.
         """
         # Will only add parallel code for Drivers. Use the old method for System and Solver
@@ -123,11 +123,11 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             The object that needs an iteration of itself recorded.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
-        metadata : dict
+        metadata: dict
             Metadata for iteration coordinate.
         """
         if not self._recorders:
@@ -146,7 +146,7 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             The object that needs its metadata recorded.
 
         """
@@ -159,11 +159,11 @@ class RecordingManager(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             The object that needs an iteration of itself recorded.
-        data : dict
+        data: dict
             Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
-        metadata : dict
+        metadata: dict
             Metadata for iteration coordinate.
         """
         if not self._recorders:
@@ -182,7 +182,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        True/False : bool
+        True/False: bool
             True if RecordingManager is managing at least one recorder
         """
         return True if self._recorders else False
@@ -233,7 +233,7 @@ def record_viewer_data(problem):
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The problem for which model viewer data is to be recorded.
     """
     # get all recorders that need to record the viewer data
@@ -255,7 +255,7 @@ def record_system_options(problem):
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The problem for which all its systems' options are to be recorded.
     """
     warn_deprecation("The 'record_system_options' function is deprecated. "
@@ -269,9 +269,9 @@ def record_model_options(problem, run_number):
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The problem for which all its system and solver options are to be recorded.
-    run_number : int or None
+    run_number: int or None
         Number indicating which run the metadata is associated with.
         Zero or None for the first run, 1 for the second, etc.
     """

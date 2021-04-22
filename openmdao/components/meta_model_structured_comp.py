@@ -27,15 +27,15 @@ class MetaModelStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    grad_shape : tuple
+    grad_shape: tuple
         Cached shape of the gradient of the outputs wrt the training inputs.
-    interps : dict
+    interps: dict
         Dictionary of interpolations for each output.
-    inputs : list
+    inputs: list
         List containing training data for each input.
-    pnames : list
+    pnames: list
         Cached list of input names.
-    training_outputs : dict
+    training_outputs: dict
         Dictionary of training data each output.
     """
 
@@ -45,7 +45,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -79,13 +79,13 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the input.
-        val : float or ndarray
+        val: float or ndarray
             Initial value for the input.
-        training_data : ndarray
+        training_data: ndarray
             training data sample points for this input variable.
-        **kwargs : dict
+        **kwargs: dict
             Additional agruments for add_input.
         """
         n = self.options['vec_size']
@@ -108,13 +108,13 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the output.
-        val : float or ndarray
+        val: float or ndarray
             Initial value for the output.
-        training_data : ndarray
+        training_data: ndarray
             training data sample points for this output variable.
-        **kwargs : dict
+        **kwargs: dict
             Additional agruments for add_output.
         """
         n = self.options['vec_size']
@@ -182,9 +182,9 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
@@ -220,9 +220,9 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T

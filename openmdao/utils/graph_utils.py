@@ -10,7 +10,7 @@ def get_sccs_topo(graph):
 
     Parameters
     ----------
-    graph : networkx.DiGraph
+    graph: networkx.DiGraph
         Directed graph of Systems.
 
     Returns
@@ -31,9 +31,9 @@ def all_connected_nodes(graph, start):
 
     Parameters
     ----------
-    graph : network.DiGraph
+    graph: network.DiGraph
         Graph being traversed.
-    start : hashable object
+    start: hashable object
         Identifier of the starting node.
 
     Yields

@@ -12,15 +12,15 @@ class BaseCaseReader(object):
 
     Attributes
     ----------
-    _format_version : int
+    _format_version: int
         The version of the format assumed when loading the file.
-    _openmdao_version : str
+    _openmdao_version: str
         The version of OpenMDAO used to generate the case recorder file.
-    problem_metadata : dict
+    problem_metadata: dict
         Metadata about the problem, including the system hierachy and connections.
-    solver_metadata : dict
+    solver_metadata: dict
         The solver options for each solver in the recorded model.
-    _system_options : dict
+    _system_options: dict
         Metadata about each system in the recorded model, including options and scaling factors.
     """
 
@@ -30,9 +30,9 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        filename : str
+        filename: str
             The path to the file containing the recorded data.
-        pre_load : bool
+        pre_load: bool
             If True, load all the data into memory during initialization.
         """
         self._format_version = None
@@ -87,12 +87,12 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+        source: {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
             case name}
             Identifies which cases to return.
-        recurse : bool, optional
+        recurse: bool, optional
             If True, will enable iterating over all successors in case hierarchy
-        flat : bool, optional
+        flat: bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
 
@@ -109,9 +109,9 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        case_id : str or int
+        case_id: str or int
             The unique identifier of the case to return or an index into all cases.
-        recurse : bool, optional
+        recurse: bool, optional
             If True, will return all successors to the case as well.
 
         Returns
@@ -127,7 +127,7 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -145,9 +145,9 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
+        source: {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -164,15 +164,15 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+        source: {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
             case name}
             If not None, only cases originating from the specified source or case are returned.
-        recurse : bool, optional
+        recurse: bool, optional
             If True, will enable iterating over all successors in case hierarchy.
-        flat : bool, optional
+        flat: bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -189,11 +189,11 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        run_number : int
+        run_number: int
             Run_driver or run_model iteration to inspect
-        system : str or None
+        system: str or None
             Pathname of system (None for all systems)
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -210,11 +210,11 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        run_number : int
+        run_number: int
             Run_driver or run_model iteration to inspect
-        solver : str or None
+        solver: str or None
             Pathname of solver (None for all solvers)
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 

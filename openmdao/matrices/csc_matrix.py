@@ -17,11 +17,11 @@ class CSCMatrix(COOMatrix):
 
         Parameters
         ----------
-        num_rows : int
+        num_rows: int
             number of rows in the matrix.
-        num_cols : int
+        num_cols: int
             number of cols in the matrix.
-        system : <System>
+        system: <System>
             owning system.
         """
         super()._build(num_rows, num_cols, system)
@@ -50,7 +50,7 @@ class CSCMatrix(COOMatrix):
 
         Parameters
         ----------
-        mask : ndarray
+        mask: ndarray
             The mask of indices to zero out.
 
         Returns
@@ -71,7 +71,7 @@ class CSCMatrix(COOMatrix):
 
         Parameters
         ----------
-        active : bool
+        active: bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:

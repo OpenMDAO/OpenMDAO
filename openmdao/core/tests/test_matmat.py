@@ -166,15 +166,15 @@ def lgl(n, tol=np.finfo(float).eps):
 
     Parameters
     ----------
-    n : int
+    n: int
         The number of LGL nodes requested.  The order of the polynomial is n-1.
 
     Returns
     -------
-    x : numpy.array
+    x: numpy.array
         An array of the LGL nodes for a polynomial of the given order.
 
-    w : numpy.array
+    w: numpy.array
         An array of the corresponding LGL weights at the nodes in x.
 
     """
@@ -220,20 +220,20 @@ def lagrange_matrices(x_disc, x_interp):
 
     Parameters
     ----------
-    x_disc : np.array
+    x_disc: np.array
         The cardinal nodes at which values of the variable are specified.
-    x_interp : np.array
+    x_interp: np.array
         The interior nodes at which interpolated values of the variable or its derivative
         are desired.
 
     Returns
     -------
-    Li : np.array
+    Li: np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
         at the cardinal nodes, yields the interpolated values at the interior
         nodes.
 
-    Di : np.array
+    Di: np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
         at the cardinal nodes, yields the interpolated derivatives at the interior
         nodes.

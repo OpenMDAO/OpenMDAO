@@ -12,10 +12,10 @@ class NonlinearBlockGS(NonlinearSolver):
 
     Attributes
     ----------
-    _delta_outputs_n_1 : ndarray
+    _delta_outputs_n_1: ndarray
         Cached change in the full output vector for the previous iteration. Only used if the aitken
         acceleration option is turned on.
-    _theta_n_1 : float
+    _theta_n_1: float
         Cached relaxation factor from previous iteration. Only used if the aitken acceleration
         option is turned on.
     """
@@ -28,7 +28,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         super().__init__(**kwargs)
@@ -42,9 +42,9 @@ class NonlinearBlockGS(NonlinearSolver):
 
         Parameters
         ----------
-        system : <System>
+        system: <System>
             pointer to the owning system.
-        depth : int
+        depth: int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)

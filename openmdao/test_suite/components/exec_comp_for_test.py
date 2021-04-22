@@ -24,7 +24,7 @@ class ExecComp4Test(ExecComp):
     rec_procs : tuple of the form (minprocs, maxprocs)
         Minimum and maximun MPI processes usable by this component.
 
-    fail_rank : int or collection of int (0)
+    fail_rank: int or collection of int (0)
         Rank (if running under MPI) or worker number (if running under
         multiprocessing) where failures will be initiated.
 

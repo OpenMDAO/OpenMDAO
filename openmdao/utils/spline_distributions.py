@@ -9,11 +9,11 @@ def cell_centered(num_cells, start=0.0, end=1.0):
 
     Parameters
     ----------
-    num_cells : int
+    num_cells: int
         Number of cells.
-    start : int or float
+    start: int or float
         Minimum value to interpolate at.
-    end : int or float
+    end: int or float
         Maximum value to interpolate at.
 
     Returns
@@ -32,13 +32,13 @@ def sine_distribution(num_points, start=0.0, end=1.0, phase=np.pi):
 
     Parameters
     ----------
-    num_points : int
+    num_points: int
         Number of points to predict at.
-    start : int or float
+    start: int or float
         Minimum value to interpolate at.
-    end : int or float
+    end: int or float
         Maximum value to interpolate at.
-    phase : float
+    phase: float
         Phase of the sine wave
 
     Returns
@@ -57,11 +57,11 @@ def node_centered(num_points, start=0.0, end=1.0):
 
     Parameters
     ----------
-    num_points : int
+    num_points: int
         Number of points to predict.
-    start : int or float
+    start: int or float
         Minimum value to interpolate at.
-    end : int or float
+    end: int or float
         Maximum value to interpolate at.
 
     Returns

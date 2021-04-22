@@ -24,9 +24,9 @@ class NearestNeighbor(SurrogateModel):
 
     Attributes
     ----------
-    interpolant : object
+    interpolant: object
         Interpolator object
-    interpolant_init_args : dict
+    interpolant_init_args: dict
         Input keyword arguments for the interpolator.
     """
 
@@ -36,7 +36,7 @@ class NearestNeighbor(SurrogateModel):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         super().__init__()
@@ -62,9 +62,9 @@ class NearestNeighbor(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Training input locations
-        y : array-like
+        y: array-like
             Model responses at given inputs.
         """
         super().train(x, y)
@@ -77,9 +77,9 @@ class NearestNeighbor(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point(s) at which the surrogate is evaluated.
-        **kwargs : dict
+        **kwargs: dict
             Additional keyword arguments passed to the interpolant.
 
         Returns
@@ -96,9 +96,9 @@ class NearestNeighbor(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate Jacobian is evaluated.
-        **kwargs : dict
+        **kwargs: dict
             Additional keyword arguments passed to the interpolant.
 
         Returns

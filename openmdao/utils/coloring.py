@@ -92,31 +92,31 @@ class Coloring(object):
 
     Attributes
     ----------
-    _shape : tuple of int (nrows, ncols)
+    _shape: tuple of int (nrows, ncols)
         Tuple describing the shape of the sparsity matrix.
-    _nzrows : ndarray of int
+    _nzrows: ndarray of int
         Row indices of nonzero entries in the full jac sparsity matrix.
-    _nzcols : ndarray of int
+    _nzcols: ndarray of int
         Column indices of nonzero entries in the full jac sparsity matrix.
-    _pct_nonzero : float
+    _pct_nonzero: float
         If known, percentage of nonzero vs total array entries.
-    _fwd : tuple (col_lists, row_maps) or None
+    _fwd: tuple (col_lists, row_maps) or None
         Contains lists of grouped columns and nonzero rows for each column for forward coloring.
-    _rev : tuple (col_lists, row_maps) or None
+    _rev: tuple (col_lists, row_maps) or None
         Contains lists of grouped columns and nonzero rows for each column for reverse coloring.
-    _col_vars : list of str or None
+    _col_vars: list of str or None
         Names of variables corresponding to columns.
-    _col_var_sizes : ndarray or None
+    _col_var_sizes: ndarray or None
         Sizes of column variables.
-    _row_vars : list of str or None
+    _row_vars: list of str or None
         Names of variables corresponding to rows.
-    _row_var_sizes : ndarray or None
+    _row_var_sizes: ndarray or None
         Sizes of row variables.
-    _meta : dict
+    _meta: dict
         Dictionary of metadata used to create the coloring.
-    _names_array : ndarray or None:
+    _names_array: ndarray or None:
         Names of total jacobian rows or columns.
-    _local_array : ndarray or None:
+    _local_array: ndarray or None:
         Indices of total jacobian rows or columns.
     """
 
@@ -127,15 +127,15 @@ class Coloring(object):
 
         Parameters
         ----------
-        sparsity : ndarray
+        sparsity: ndarray
             Full jacobian sparsity matrix (dense bool form).
-        row_vars : list of str or None
+        row_vars: list of str or None
             Names of variables corresponding to rows.
-        row_var_sizes : ndarray or None
+        row_var_sizes: ndarray or None
             Sizes of row variables.
-        col_vars : list of str or None
+        col_vars: list of str or None
             Names of variables corresponding to columns.
-        col_var_sizes : ndarray or None
+        col_var_sizes: ndarray or None
             Sizes of column variables.
         """
         self._shape = sparsity.shape
@@ -169,7 +169,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        direction : str
+        direction: str
             Derivative direction ('fwd' or 'rev').
 
         Yields
@@ -192,7 +192,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        direction : str
+        direction: str
             Indicates which coloring subdict ('fwd' or 'rev') to use.
 
         Yields
@@ -211,7 +211,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        direction : str
+        direction: str
             Indicator of forward mode ('fwd') or reverse mode ('rev').
 
         Returns
@@ -305,9 +305,9 @@ class Coloring(object):
 
         Parameters
         ----------
-        do_fwd : bool
+        do_fwd: bool
             If True, add fwd colors to total.
-        do_rev : bool
+        do_rev: bool
             If True, add rev colors to total.
 
         Returns
@@ -331,7 +331,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        fname : str
+        fname: str
             Name of file to read from.
 
         Returns
@@ -362,7 +362,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        fname : str
+        fname: str
             File to save to.
         """
         if isinstance(fname, str):
@@ -381,7 +381,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        driver : Driver
+        driver: Driver
             Current driver object.
         """
         of_names, of_sizes = _get_response_info(driver)
@@ -395,7 +395,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        system : System
+        system: System
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
@@ -501,7 +501,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        stream : file-like
+        stream: file-like
             Where the output will go.
         """
         nrows = self._shape[0] if self._shape else -1
@@ -856,7 +856,7 @@ class Coloring(object):
 
         Parameters
         ----------
-        varname : str
+        varname: str
             Name of the row variable.
 
         Returns
@@ -948,7 +948,7 @@ def _order_by_ID(col_adj_matrix):
 
     Parameters
     ----------
-    col_adj_matrix : csc matrix
+    col_adj_matrix: csc matrix
         CSC column adjacency matrix.
 
     Yields
@@ -976,7 +976,7 @@ def _2col_adj_rows_cols(J):
 
     Parameters
     ----------
-    J : coo_matrix
+    J: coo_matrix
         Sparse matrix to be colored.
 
     Returns
@@ -1022,11 +1022,11 @@ def _Jc2col_matrix_direct(Jrows, Jcols, shape):
 
     Parameters
     ----------
-    Jrows : ndarray
+    Jrows: ndarray
         Nonzero rows of a partition of the matrix being colored.
-    Jcols : ndarray
+    Jcols: ndarray
         Nonzero columns of a partition of the matrix being colored.
-    shape : tuple
+    shape: tuple
         Shape of the partition of the matrix being colored.
 
     Returns
@@ -1084,7 +1084,7 @@ def _get_full_disjoint_cols(J):
 
     Parameters
     ----------
-    J : coo_matrix
+    J: coo_matrix
         Sparse matrix to be colored.
 
     Returns
@@ -1101,7 +1101,7 @@ def _get_full_disjoint_col_matrix_cols(col_adj_matrix):
 
     Parameters
     ----------
-    col_adj_matrix : csc_matrix
+    col_adj_matrix: csc_matrix
         Sparse column adjacency matrix.
 
     Returns
@@ -1137,11 +1137,11 @@ def _color_partition(Jprows, Jpcols, shape):
 
     Parameters
     ----------
-    Jprows : ndarray
+    Jprows: ndarray
         Nonzero rows of a partition of the matrix being colored.
-    Jpcols : ndarray
+    Jpcols: ndarray
         Nonzero columns of a partition of the matrix being colored.
-    shape : tuple
+    shape: tuple
         Shape of a partition of the matrix being colored.
 
     Returns
@@ -1179,7 +1179,7 @@ def MNCO_bidir(J):
 
     Parameters
     ----------
-    J : coo_matrix
+    J: coo_matrix
         Jacobian sparsity matrix (boolean)
 
     Returns
@@ -1322,11 +1322,11 @@ def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSIT
 
     Parameters
     ----------
-    arr : ndarray
+    arr: ndarray
         The array requiring computation of nonzero values.
-    tol : float
+    tol: float
         Tolerance.  We'll sweep above and below this by 'orders' of magnitude.
-    orders : int
+    orders: int
         Number of orders of magnitude for one direction of our sweep.
 
     Returns
@@ -1393,7 +1393,7 @@ def _compute_total_coloring_context(top):
 
     Parameters
     ----------
-    top : System
+    top: System
         Top of the system hierarchy where coloring will be done.
     """
     np.random.seed(41)  # set seed for consistency
@@ -1436,25 +1436,25 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
 
     Parameters
     ----------
-    prob : Problem
+    prob: Problem
         The Problem being analyzed.
-    num_full_jacs : int
+    num_full_jacs: int
         Number of times to repeat total jacobian computation.
-    tol : float
+    tol: float
         Starting tolerance on values in jacobian.  Actual tolerance is computed based on
         consistent numbers of zero entries over a sweep of tolerances.  Anything smaller in
         magnitude than the computed tolerance will be set to 0.0.
-    orders : int
+    orders: int
         Number of orders of magnitude for up and down tolerance sweep (default is 5).
-    setup : bool
+    setup: bool
         If True, run setup before calling compute_totals.
-    run_model : bool
+    run_model: bool
         If True, run run_model before calling compute_totals.
-    of : iter of str or None
+    of: iter of str or None
         Names of response variables.
-    wrt : iter of str or None
+    wrt: iter of str or None
         Names of design variables.
-    use_abs_names : bool
+    use_abs_names: bool
         Set to True when passing in absolute names to skip some translation steps.
 
     Returns
@@ -1527,17 +1527,17 @@ def _jac2subjac_sparsity(nzrows, nzcols, ofs, wrts, of_sizes, wrt_sizes):
 
     Parameters
     ----------
-    nzrows : ndarray
+    nzrows: ndarray
         Nonzero row indices.
-    nzcols : ndarray
+    nzcols: ndarray
         Nonzero column indices.
-    ofs : list of str
+    ofs: list of str
         List of variables corresponding to rows.
-    wrts : list of str
+    wrts: list of str
         List of variables corresponding to columns.
-    of_sizes : ndarray of int
+    of_sizes: ndarray of int
         Sizes of ofs variables.
-    wrt_sizes : ndarray of int
+    wrt_sizes: ndarray of int
         Sizes of wrts variables.
 
     Returns
@@ -1634,17 +1634,17 @@ def get_tot_jac_sparsity(problem, mode='fwd',
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The Problem being analyzed.
-    mode : str
+    mode: str
         Derivative direction.
-    num_full_jacs : int
+    num_full_jacs: int
         Number of times to repeat total jacobian computation.
-    tol : float
+    tol: float
         Tolerance used to determine if an array entry is nonzero.
-    setup : bool
+    setup: bool
         If True, run setup before calling compute_totals.
-    run_model : bool
+    run_model: bool
         If True, run run_model before calling compute_totals.
 
     Returns
@@ -1676,9 +1676,9 @@ def _compute_coloring(J, mode):
 
     Parameters
     ----------
-    J : ndarray or coo_matrix
+    J: ndarray or coo_matrix
         The boolean total jacobian.
-    mode : str
+    mode: str
         The direction for solving for total derivatives.  Must be 'fwd', 'rev' or 'auto'.
         If 'auto', use bidirectional coloring.
 
@@ -1766,27 +1766,27 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The Problem being analyzed.
-    mode : str or None
+    mode: str or None
         The direction for computing derivatives.  If None, use problem._mode.
-    of : iter of str or None
+    of: iter of str or None
         Names of the 'response' variables.
-    wrt : iter of str or None
+    wrt: iter of str or None
         Names of the 'design' variables.
-    num_full_jacs : int
+    num_full_jacs: int
         Number of times to repeat total jacobian computation.
-    tol : float
+    tol: float
         Tolerance used to determine if an array entry is nonzero.
-    orders : int
+    orders: int
         Number of orders above and below the tolerance to check during the tolerance sweep.
-    setup : bool
+    setup: bool
         If True, run setup before calling compute_totals.
-    run_model : bool
+    run_model: bool
         If True, run run_model before calling compute_totals.
-    fname : filename or None
+    fname: filename or None
         File where output coloring info will be written. If None, no info will be written.
-    use_abs_names : bool
+    use_abs_names: bool
         If True, use absolute naming for of and wrt variables.
 
     Returns
@@ -1859,11 +1859,11 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     Parameters
     ----------
-    driver : <Driver>
+    driver: <Driver>
         The driver performing the optimization.
-    run_model : bool
+    run_model: bool
         If True, call run_model before computing coloring.
-    fname : str or None
+    fname: str or None
         Name of file where coloring will be saved.
 
     Returns
@@ -1909,7 +1909,7 @@ def _total_coloring_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -1936,9 +1936,9 @@ def _total_coloring_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     from openmdao.core.problem import Problem
@@ -1994,7 +1994,7 @@ def _partial_coloring_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -2062,9 +2062,9 @@ def _partial_coloring_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
 
     """
@@ -2166,7 +2166,7 @@ def _view_coloring_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='coloring file.')
@@ -2189,9 +2189,9 @@ def _view_coloring_exec(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Command line options after '--' (if any).  Passed to user script.
     """
     coloring = Coloring.load(options.file[0])
