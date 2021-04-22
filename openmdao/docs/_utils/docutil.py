@@ -92,7 +92,7 @@ def remove_docstrings(source):
 
     Parameters
     ----------
-    source : str
+    source: str
         Original source code.
 
     Returns
@@ -181,7 +181,7 @@ def replace_asserts_with_prints(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         String containing source lines.
 
     Returns
@@ -262,7 +262,7 @@ def get_source_code(path):
 
     Parameters
     ----------
-    path : str
+    path: str
         Path to a file, module, function, class, or class method.
 
     Returns
@@ -343,7 +343,7 @@ def remove_leading_trailing_whitespace_lines(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         Input code.
 
     Returns
@@ -369,7 +369,7 @@ def is_output_node(node):
 
     Parameters
     ----------
-    node : <Node>
+    node: <Node>
         a RedBaron Node.
 
     Returns
@@ -408,7 +408,7 @@ def split_source_into_input_blocks(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         Input code.
 
     Returns
@@ -442,7 +442,7 @@ def insert_output_start_stop_indicators(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         String containing input and output lines.
 
     Returns
@@ -559,7 +559,7 @@ def extract_output_blocks(run_output):
 
     Parameters
     ----------
-    run_output : str or list of str
+    run_output: str or list of str
         Source code with outputs.
 
     Returns
@@ -598,7 +598,7 @@ def strip_decorators(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         Source code
 
     Returns
@@ -650,7 +650,7 @@ def strip_header(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         source code
     """
     lines = src.split('\n')
@@ -675,7 +675,7 @@ def dedent(src):
 
     Parameters
     ----------
-    src : str
+    src: str
         source code
     """
 
@@ -695,7 +695,7 @@ def sync_multi_output_blocks(run_output):
 
     Parameters
     ----------
-    run_output : list of dict
+    run_output: list of dict
         List of outputs from individual procs.
 
     Returns
@@ -875,10 +875,10 @@ def get_interleaved_io_nodes(input_blocks, output_blocks):
     """
     Parameters
     ----------
-    input_blocks : list of tuple
+    input_blocks: list of tuple
         Each tuple is a block of code and the tag marking it's output.
 
-    output_blocks : dict
+    output_blocks: dict
         Output blocks keyed on tag.
     """
     nodelist = []

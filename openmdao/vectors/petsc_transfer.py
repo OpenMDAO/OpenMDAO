@@ -20,9 +20,9 @@ class PETScTransfer(DefaultTransfer):
 
     Attributes
     ----------
-    _scatter : method
+    _scatter: method
         Method that performs a PETSc scatter.
-    _transfer : method
+    _transfer: method
         Method that performs either a normal transfer or a multi-transfer.
     """
 
@@ -32,15 +32,15 @@ class PETScTransfer(DefaultTransfer):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        in_inds : int ndarray
+        in_inds: int ndarray
             input indices for the transfer.
-        out_inds : int ndarray
+        out_inds: int ndarray
             output indices for the transfer.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             communicator of the system that owns this transfer.
         """
         super().__init__(in_vec, out_vec, in_inds, out_inds, comm)
@@ -60,7 +60,7 @@ class PETScTransfer(DefaultTransfer):
 
         Parameters
         ----------
-        group : <Group>
+        group: <Group>
             Parent group.
         """
         rev = group._mode != 'fwd'
@@ -243,11 +243,11 @@ class PETScTransfer(DefaultTransfer):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         flag = False
@@ -299,11 +299,11 @@ class PETScTransfer(DefaultTransfer):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         if mode == 'fwd':

@@ -11,11 +11,11 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
 
     Parameters
     ----------
-    of : string
+    of: string
         Variable whose derivatives will be computed.
-    wrt : string
+    wrt: string
         Variable with respect to which the derivatives will be computed.
-    check_partials_data : dict of dicts of dicts
+    check_partials_data: dict of dicts of dicts
         First key:
             is the component name;
         Second key:
@@ -26,16 +26,16 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
             forward - fd, adjoint - fd, forward - adjoint.
         For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
             Jacobian for the three different methods of computation.
-    title : string (Optional)
+    title: string (Optional)
         Title for the plot
         If None, use the values of the arguments "of" and "wrt"
-    jac_method : string (Optional)
+    jac_method: string (Optional)
         Method of computating Jacobian
         Is one of ['J_fwd', 'J_rev']. Optional, default is 'J_fwd'.
-    tol : float (Optional)
+    tol: float (Optional)
         The tolerance, below which the two numbers are considered the same for
         plotting purposes.
-    binary : bool (Optional)
+    binary: bool (Optional)
         If true, the plot will only show the presence of a non-zero derivative, not the value.
         Otherwise, plot the value. Default is true.
 

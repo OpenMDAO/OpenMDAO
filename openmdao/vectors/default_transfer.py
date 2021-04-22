@@ -33,7 +33,7 @@ class DefaultTransfer(Transfer):
 
         Parameters
         ----------
-        group : <Group>
+        group: <Group>
             Parent group.
         """
         iproc = group.comm.rank
@@ -179,7 +179,7 @@ class DefaultTransfer(Transfer):
 
         Parameters
         ----------
-        group : <Group>
+        group: <Group>
             Parent group.
         """
         group._discrete_transfers = transfers = defaultdict(list)
@@ -257,11 +257,11 @@ class DefaultTransfer(Transfer):
 
         Parameters
         ----------
-        in_vec : <Vector>
+        in_vec: <Vector>
             pointer to the input vector.
-        out_vec : <Vector>
+        out_vec: <Vector>
             pointer to the output vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
 
         """

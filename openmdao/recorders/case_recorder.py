@@ -16,23 +16,23 @@ class CaseRecorder(object):
 
     Attributes
     ----------
-    _record_viewer_data : bool
+    _record_viewer_data: bool
         Flag indicating whether to record data needed to generate N2 diagram.
-    _counter : int
+    _counter: int
         A global counter for execution order, used in iteration coordinate.
-    _inputs : dict
+    _inputs: dict
         System inputs values, post-filtering, to be used by a derived recorder.
-    _outputs : dict
+    _outputs: dict
         System or Solver output values, post-filtering, to be used by a derived recorder.
-    _resids : dict
+    _resids: dict
         System or Solver residual values, post-filtering, to be used by a derived recorder.
-    _abs_error : float
+    _abs_error: float
         Solver abs_error value, to be used by a derived recorder.
-    _rel_error : float
+    _rel_error: float
         Solver abs_error value, to be used by a derived recorder.
-    _iteration_coordinate : str
+    _iteration_coordinate: str
         The unique iteration coordinate of where an iteration originates.
-    _parallel : bool
+    _parallel: bool
         Designates if the current recorder is parallel-recording-capable.
     """
 
@@ -42,7 +42,7 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        record_viewer_data : bool, optional
+        record_viewer_data: bool, optional
             If True, record data needed for visualization.
         """
         self._record_viewer_data = record_viewer_data
@@ -72,7 +72,7 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             Object to which this recorder is attached.
         """
         self._counter = 0
@@ -83,7 +83,7 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             The object that would like to record its metadata.
         """
         warn_deprecation("The 'record_metadata' function is deprecated. "
@@ -123,9 +123,9 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        system : System
+        system: System
             The System for which to record metadata.
-        run_number : int or None
+        run_number: int or None
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
@@ -137,9 +137,9 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        solver : Solver
+        solver: Solver
             The Solver for which to record metadata.
-        run_number : int or None
+        run_number: int or None
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
@@ -151,13 +151,13 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             System, Solver, Driver in need of recording.
-        metadata : dict, optional
+        metadata: dict, optional
             Dictionary containing execution metadata.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
-        **kwargs : keyword args
+        **kwargs: keyword args
             Some implementations of record_iteration need additional args.
         """
         if not self._parallel:
@@ -186,11 +186,11 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : Driver
+        recording_requester: Driver
             Driver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_driver has not been overridden")
@@ -201,11 +201,11 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : System
+        recording_requester: System
             System in need of recording.
-        data : dict
+        data: dict
             Dictionary containing inputs, outputs, and residuals.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_system has not been overridden")
@@ -216,11 +216,11 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : Solver
+        recording_requester: Solver
             Solver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing outputs, residuals, and errors.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_solver has not been overridden")
@@ -231,11 +231,11 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : Problem
+        recording_requester: Problem
             Problem in need of recording.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, constraints.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_iteration_problem has not been overridden")
@@ -246,13 +246,13 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             System, Solver, Driver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
-        **kwargs : keyword args
+        **kwargs: keyword args
             Some implementations of record_derivatives need additional args.
         """
         if not self._parallel:
@@ -270,11 +270,11 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        recording_requester : Driver
+        recording_requester: Driver
             Driver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         raise NotImplementedError("record_derivatives_driver has not been overridden")
@@ -285,7 +285,7 @@ class CaseRecorder(object):
 
         Parameters
         ----------
-        model_viewer_data : dict
+        model_viewer_data: dict
             Data required to visualize the model.
         """
         raise NotImplementedError("record_viewer_data has not been overridden")

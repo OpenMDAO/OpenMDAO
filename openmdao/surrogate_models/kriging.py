@@ -20,29 +20,29 @@ class KrigingSurrogate(SurrogateModel):
 
     Attributes
     ----------
-    alpha : ndarray
+    alpha: ndarray
         Reduced likelihood parameter: alpha
-    L : ndarray
+    L: ndarray
         Reduced likelihood parameter: L
-    n_dims : int
+    n_dims: int
         Number of independents in the surrogate
-    n_samples : int
+    n_samples: int
         Number of training points.
-    sigma2 : ndarray
+    sigma2: ndarray
         Reduced likelihood parameter: sigma squared
-    thetas : ndarray
+    thetas: ndarray
         Kriging hyperparameters.
-    X : ndarray
+    X: ndarray
         Training input values, normalized.
-    X_mean : ndarray
+    X_mean: ndarray
         Mean of training input values, normalized.
-    X_std : ndarray
+    X_std: ndarray
         Standard deviation of training input values, normalized.
-    Y : ndarray
+    Y: ndarray
         Training model response values, normalized.
-    Y_mean : ndarray
+    Y_mean: ndarray
         Mean of training model response values, normalized.
-    Y_std : ndarray
+    Y_std: ndarray
         Standard deviation of training model response values, normalized.
     """
 
@@ -52,7 +52,7 @@ class KrigingSurrogate(SurrogateModel):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         super().__init__(**kwargs)
@@ -105,9 +105,9 @@ class KrigingSurrogate(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Training input locations
-        y : array-like
+        y: array-like
             Model responses at given inputs.
         """
         super().train(x, y)
@@ -232,7 +232,7 @@ class KrigingSurrogate(SurrogateModel):
 
         Parameters
         ----------
-        thetas : ndarray, optional
+        thetas: ndarray, optional
             Given input correlation coefficients. If none given, uses self.thetas
             from training.
 
@@ -289,7 +289,7 @@ class KrigingSurrogate(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate is evaluated.
 
         Returns
@@ -336,7 +336,7 @@ class KrigingSurrogate(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate Jacobian is evaluated.
 
         Returns

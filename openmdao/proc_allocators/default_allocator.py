@@ -18,18 +18,18 @@ class DefaultAllocator(ProcAllocator):
 
         Parameters
         ----------
-        proc_info : list of (min_procs, max_procs, weight)
+        proc_info: list of (min_procs, max_procs, weight)
             Information used to determine MPI process allocation to subsystems.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             communicator of the owning System.
 
         Returns
         -------
-        isubs : [int, ...]
+        isubs: [int, ...]
             indices of the owned local subsystems.
-        sub_comm : MPI.Comm or <FakeComm>
+        sub_comm: MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
-        sub_proc_range : (int, int)
+        sub_proc_range: (int, int)
             The range of processors that the subcomm owns, among those of comm.
         """
         iproc = comm.rank

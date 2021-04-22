@@ -19,11 +19,11 @@ class AnalysisError(Exception):
 
         Parameters
         ----------
-        error : str
+        error: str
             Error message.
-        location : None or inspect.currentframe()
+        location: None or inspect.currentframe()
             inspect.currentframe of error being raised.
-        msginfo : str
+        msginfo: str
             Name of component that raise the AnalysisError.
         """
         super().__init__(error)

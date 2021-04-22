@@ -104,11 +104,11 @@ class _MatchType(IntEnum):
 
     Attributes
     ----------
-    NAME : int
+    NAME: int
         Literal name match.
-    RENAME : int
+    RENAME: int
         Rename match.
-    PATTERN : int
+    PATTERN: int
         Glob pattern match.
     """
 
@@ -125,211 +125,211 @@ class System(object):
     All subclasses have their attributes defined here.
 
     In attribute names:
-        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
-        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
-        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
-        idx : global variable index among variables on all procs (I/O indices separate).
-        my_idx : index among variables in this system, on this processor (I/O indices separate).
-        io : indicates explicitly that input and output variables are combined in the same dict.
+        abs / abs_name: absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name: relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name: relative, promoted variable name, seen from current system (non-unique).
+        idx: global variable index among variables on all procs (I/O indices separate).
+        my_idx: index among variables in this system, on this processor (I/O indices separate).
+        io: indicates explicitly that input and output variables are combined in the same dict.
 
     Attributes
     ----------
-    name : str
+    name: str
         Name of the system, must be different from siblings.
-    pathname : str
+    pathname: str
         Global name of the system, including the path.
-    comm : MPI.Comm or <FakeComm>
+    comm: MPI.Comm or <FakeComm>
         MPI communicator object.
-    options : OptionsDictionary
+    options: OptionsDictionary
         options dictionary
-    recording_options : OptionsDictionary
+    recording_options: OptionsDictionary
         Recording options dictionary
-    _problem_meta : dict
+    _problem_meta: dict
         Problem level metadata.
-    under_complex_step : bool
+    under_complex_step: bool
         When True, this system is undergoing complex step.
-    under_approx : bool
+    under_approx: bool
         When True, this system is undergoing approximation.
-    iter_count : int
+    iter_count: int
         Counts the number of times this system has called _solve_nonlinear. This also
         corresponds to the number of times that the system's outputs are recorded if a recorder
         is present.
-    iter_count_apply : int
+    iter_count_apply: int
         Counts the number of times the system has called _apply_nonlinear. For ExplicitComponent,
         calls to apply_nonlinear also call compute, so number of executions can be found by adding
         this and iter_count together. Recorders do no record calls to apply_nonlinear.
-    iter_count_without_approx : int
+    iter_count_without_approx: int
         Counts the number of times the system has iterated but excludes any that occur during
         approximation of derivatives.
-    cite : str
+    cite: str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
-    _full_comm : MPI.Comm or None
+    _full_comm: MPI.Comm or None
         MPI communicator object used when System's comm is split for parallel FD.
-    _solver_print_cache : list
+    _solver_print_cache: list
         Allows solver iprints to be set to requested values after setup calls.
-    _subsystems_allprocs : OrderedDict
+    _subsystems_allprocs: OrderedDict
         Dict mapping subsystem name to SysInfo(system, index) for children of this system.
-    _subsystems_myproc : [<System>, ...]
+    _subsystems_myproc: [<System>, ...]
         List of local subsystems that exist on this proc.
-    _var_promotes : { 'any': [], 'input': [], 'output': [] }
+    _var_promotes: { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_prom2inds : dict
+    _var_prom2inds: dict
         Maps promoted name to src_indices in scope of system.
-    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
+    _var_allprocs_prom2abs_list: {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
-    _var_abs2prom : {'input': dict, 'output': dict}
+    _var_abs2prom: {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
-    _var_allprocs_abs2prom : {'input': dict, 'output': dict}
+    _var_allprocs_abs2prom: {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on all procs.
-    _var_allprocs_abs2meta : dict
+    _var_allprocs_abs2meta: dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
         ('units', 'shape', 'size') for inputs and
         ('units', 'shape', 'size', 'ref', 'ref0', 'res_ref', 'distributed') for outputs.
-    _var_abs2meta : dict
+    _var_abs2meta: dict
         Dictionary mapping absolute names to metadata dictionaries for myproc variables.
-    _var_discrete : dict
+    _var_discrete: dict
         Dictionary of discrete var metadata and values local to this process.
-    _var_allprocs_discrete : dict
+    _var_allprocs_discrete: dict
         Dictionary of discrete var metadata and values for all processes.
-    _discrete_inputs : dict-like or None
+    _discrete_inputs: dict-like or None
         Storage for discrete input values.
-    _discrete_outputs : dict-like or None
+    _discrete_outputs: dict-like or None
         Storage for discrete output values.
-    _var_allprocs_abs2idx : dict
+    _var_allprocs_abs2idx: dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_sizes : {<vecname>: {'input': ndarray, 'output': ndarray}, ...}
+    _var_sizes: {<vecname>: {'input': ndarray, 'output': ndarray}, ...}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _owned_sizes : ndarray
+    _owned_sizes: ndarray
         Array of local sizes for 'owned' or distributed vars only.
-    _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
+    _var_offsets: {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this System's communicator and num_var is the number of allprocs variables
         in the given system.  This is only defined in a Group that owns one or more interprocess
         connections or a top level Group or System that is used to compute total derivatives
         across multiple processes.
-    _vars_to_gather : dict
+    _vars_to_gather: dict
         Contains names of non-distributed variables that are remote on at least one proc in the comm
-    _dist_var_locality : dict
+    _dist_var_locality: dict
         Contains names of distrib vars mapped to the ranks in the comm where they are local.
-    _conn_global_abs_in2out : {'abs_in': 'abs_out'}
+    _conn_global_abs_in2out: {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned by this system
         or any descendant system. The data is the same across all processors.
-    _vectors : {'input': dict, 'output': dict, 'residual': dict}
+    _vectors: {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
-    _inputs : <Vector>
+    _inputs: <Vector>
         The inputs vector; points to _vectors['input']['nonlinear'].
-    _outputs : <Vector>
+    _outputs: <Vector>
         The outputs vector; points to _vectors['output']['nonlinear'].
-    _residuals : <Vector>
+    _residuals: <Vector>
         The residuals vector; points to _vectors['residual']['nonlinear'].
-    _nonlinear_solver : <NonlinearSolver>
+    _nonlinear_solver: <NonlinearSolver>
         Nonlinear solver to be used for solve_nonlinear.
-    _linear_solver : <LinearSolver>
+    _linear_solver: <LinearSolver>
         Linear solver to be used for solve_linear; not the Newton system.
-    _approx_schemes : OrderedDict
+    _approx_schemes: OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
-    _jacobian : <Jacobian>
+    _jacobian: <Jacobian>
         <Jacobian> object to be used in apply_linear.
-    _owns_approx_jac : bool
+    _owns_approx_jac: bool
         If True, this system approximated its Jacobian
-    _owns_approx_jac_meta : dict
+    _owns_approx_jac_meta: dict
         Stores approximation metadata (e.g., step_size) from calls to approx_totals
-    _owns_approx_of : list or None
+    _owns_approx_of: list or None
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that
         we only take derivatives of variables that the driver needs.
-    _owns_approx_of_idx : dict
+    _owns_approx_of_idx: dict
         Index for override 'of' approximations if declared. When the user calls  `add_objective`
         or `add_constraint`, they may optionally specify an "indices" argument. This argument must
         also be communicated to the approximations when they are set up so that 1) the Jacobian is
         the correct size, and 2) we don't perform any extra unnecessary calculations.
-    _owns_approx_wrt : list or None
+    _owns_approx_wrt: list or None
         Overrides aproximation inputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's input quantities to the approximation objects so that
         we only take derivatives with respect to variables that the driver needs.
-    _owns_approx_wrt_idx : dict
+    _owns_approx_wrt_idx: dict
         Index for override 'wrt' approximations if declared. When the user calls  `add_designvar`
         they may optionally specify an "indices" argument. This argument must also be communicated
         to the approximations when they are set up so that 1) the Jacobian is the correct size, and
         2) we don't perform any extra unnecessary calculations.
-    _subjacs_info : dict of dict
+    _subjacs_info: dict of dict
         Sub-jacobian metadata for each (output, input) pair added using
         declare_partials. Members of each pair may be glob patterns.
-    _approx_subjac_keys : list
+    _approx_subjac_keys: list
         List of subjacobian keys used for approximated derivatives.
-    _design_vars : dict of dict
+    _design_vars: dict of dict
         dict of all driver design vars added to the system.
-    _responses : dict of dict
+    _responses: dict of dict
         dict of all driver responses added to the system.
-    _rec_mgr : <RecordingManager>
+    _rec_mgr: <RecordingManager>
         object that manages all recorders added to this system.
-    _static_subsystems_allprocs : OrderedDict
+    _static_subsystems_allprocs: OrderedDict
         Dict of SysInfo(subsys, index) that stores all subsystems added outside of setup.
-    _static_design_vars : dict of dict
+    _static_design_vars: dict of dict
         Driver design variables added outside of setup.
-    _static_responses : dict of dict
+    _static_responses: dict of dict
         Driver responses added outside of setup.
-    supports_multivecs : bool
+    supports_multivecs: bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
-    matrix_free : Bool
+    matrix_free: bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian or any of its subsystems do.
-    _relevant : dict
+    _relevant: dict
         Mapping of a VOI to a tuple containing dependent inputs, dependent outputs,
         and dependent systems.
-    _vois : dict
+    _vois: dict
         Either design vars or responses metadata, depending on the direction of
         derivatives.
-    _mode : str
+    _mode: str
         Indicates derivative direction for the model, either 'fwd' or 'rev'.
-    _scope_cache : dict
+    _scope_cache: dict
         Cache for variables in the scope of various mat-vec products.
-    _has_guess : bool
+    _has_guess: bool
         True if this system has or contains a system with a `guess_nonlinear` method defined.
-    _has_output_scaling : bool
+    _has_output_scaling: bool
         True if this system has output scaling.
-    _has_output_adder : bool
+    _has_output_adder: bool
         True if this system has scaling that includes an adder term.
-    _has_resid_scaling : bool
+    _has_resid_scaling: bool
         True if this system has resid scaling.
-    _has_input_scaling : bool
+    _has_input_scaling: bool
         True if this system has input scaling.
-    _has_input_adder : bool
+    _has_input_adder: bool
         True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
-    _owning_rank : dict
+    _owning_rank: dict
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
-    _vector_class : class
+    _vector_class: class
         Class to use for data vectors.  After setup will contain the value of either
         _problem_meta['distributed_vector_class'] or _problem_meta['local_vector_class'].
-    _assembled_jac : AssembledJacobian or None
+    _assembled_jac: AssembledJacobian or None
         If not None, this is the AssembledJacobian owned by this system's linear_solver.
-    _num_par_fd : int
+    _num_par_fd: int
         If FD is active, and the value is > 1, turns on parallel FD and specifies the number of
         concurrent FD solves.
-    _par_fd_id : int
+    _par_fd_id: int
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
-    _has_approx : bool
+    _has_approx: bool
         If True, this system or its descendent has declared approximated partial or semi-total
         derivatives.
-    _coloring_info : tuple
+    _coloring_info: tuple
         Metadata that defines how to perform coloring of this System's approx jacobian. Not
         used if this System does no partial or semi-total coloring.
-    _first_call_to_linearize : bool
+    _first_call_to_linearize: bool
         If True, this is the first call to _linearize.
-    _is_local : bool
+    _is_local: bool
         If True, this system is local to this mpi process.
     """
 
@@ -339,9 +339,9 @@ class System(object):
 
         Parameters
         ----------
-        num_par_fd : int
+        num_par_fd: int
             If FD is active, number of concurrent FD solves.
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
@@ -522,13 +522,13 @@ class System(object):
 
         Parameters
         ----------
-        iotype : str
+        iotype: str
             Either 'input' or 'output'.
-        local : bool
+        local: bool
             If True, include only names of local variables. Default is True.
-        cont : bool
+        cont: bool
             If True, include names of continuous variables.  Default is True.
-        discrete : bool
+        discrete: bool
             If True, include names of discrete variables.  Default is False.
         """
         if cont:
@@ -564,7 +564,7 @@ class System(object):
 
         Parameters
         ----------
-        wrt_matches : set or None
+        wrt_matches: set or None
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
@@ -683,7 +683,7 @@ class System(object):
 
         Parameters
         ----------
-        method : str
+        method: str
             Name of the type of approxmation scheme.
 
         Returns
@@ -712,7 +712,7 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Absolute or promoted name of the variable.
 
         Returns
@@ -742,11 +742,11 @@ class System(object):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
+        comm: MPI.Comm or <FakeComm> or None
             The global communicator.
-        mode : str
+        mode: str
             Derivative direction, either 'fwd', or 'rev', or 'auto'
-        prob_meta : dict
+        prob_meta: dict
             Problem level metadata dictionary.
         """
         # save a ref to the problem level options.
@@ -833,7 +833,7 @@ class System(object):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
+        comm: MPI.Comm or <FakeComm> or None
             The global communicator.
         """
         if self._use_derivatives:
@@ -876,10 +876,10 @@ class System(object):
 
         Parameters
         ----------
-        coloring : str
+        coloring: str
             A coloring filename.  If no arg is passed, filename will be determined
             automatically.
-        recurse : bool
+        recurse: bool
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
@@ -924,35 +924,35 @@ class System(object):
 
         Parameters
         ----------
-        wrt : str or list of str
+        wrt: str or list of str
             The name or names of the variables that derivatives are taken with respect to.
             This can contain input names, output names, or glob patterns.
-        method : str
+        method: str
             Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
+        form: str
             Finite difference form, can be "forward", "central", or "backward". Leave
             undeclared to keep unchanged from previous or default value.
-        step : float
+        step: float
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
-        per_instance : bool
+        per_instance: bool
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
-        num_full_jacs : int
+        num_full_jacs: int
             Number of times to repeat partial jacobian computation when computing sparsity.
-        tol : float
+        tol: float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
-        orders : int
+        orders: int
             Number of orders above and below the tolerance to check during the tolerance sweep.
-        perturb_size : float
+        perturb_size: float
             Size of input/output perturbation during generation of sparsity.
-        min_improve_pct : float
+        min_improve_pct: float
             If coloring does not improve (decrease) the number of solves more than the given
             percentage, coloring will not be used.
-        show_summary : bool
+        show_summary: bool
             If True, display summary information after generating coloring.
-        show_sparsity : bool
+        show_sparsity: bool
             If True, display sparsity with coloring info after generating coloring.
         """
         if method not in ('fd', 'cs'):
@@ -998,12 +998,12 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
+        recurse: bool
             If True, recurse from this system down the system hierarchy.  Whenever a group
             is encountered that has specified its coloring metadata, we don't recurse below
             that group unless that group has a subsystem that has a nonlinear solver that uses
             gradients.
-        **overrides : dict
+        **overrides: dict
             Any args that will override either default coloring settings or coloring settings
             resulting from an earlier call to declare_coloring.
 
@@ -1214,7 +1214,7 @@ class System(object):
 
         Parameters
         ----------
-        system : System
+        system: System
             The System having its coloring saved or loaded.
 
         Returns
@@ -1243,7 +1243,7 @@ class System(object):
 
         Parameters
         ----------
-        coloring : Coloring
+        coloring: Coloring
             See Coloring class docstring.
         """
         # under MPI, only save on proc 0
@@ -1319,7 +1319,7 @@ class System(object):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
 
         Returns
@@ -1403,14 +1403,14 @@ class System(object):
 
         Parameters
         ----------
-        pathname : str
+        pathname: str
             Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode: string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
+        prob_meta: dict
             Problem level options.
         """
         self.pathname = pathname
@@ -1453,7 +1453,7 @@ class System(object):
 
         Parameters
         ----------
-        vec_name : str
+        vec_name: str
             Name of vector.
         """
         abs2idx = self._var_allprocs_abs2idx[vec_name] = {}
@@ -1511,7 +1511,7 @@ class System(object):
 
         Parameters
         ----------
-        conns : dict
+        conns: dict
             Dictionary of connections passed down from parent group.
         """
         pass
@@ -1524,7 +1524,7 @@ class System(object):
 
         Parameters
         ----------
-        mode : str
+        mode: str
             Derivative direction, either 'fwd' or 'rev'.
         """
         vois = set()
@@ -1556,7 +1556,7 @@ class System(object):
 
         Parameters
         ----------
-        mode : str
+        mode: str
             Derivative direction, either 'fwd' or 'rev'.
         """
         vois = self._design_vars if mode == 'fwd' else self._responses
@@ -1580,7 +1580,7 @@ class System(object):
 
         Parameters
         ----------
-        mode : str
+        mode: str
             Derivative direction, either 'fwd' or 'rev'.
 
         Returns
@@ -1694,9 +1694,9 @@ class System(object):
 
         Parameters
         ----------
-        mode : str
+        mode: str
             Derivative direction, either 'fwd' or 'rev'.
-        relevant : dict or None
+        relevant: dict or None
             Dictionary mapping VOI name to all variables necessary for computing
             derivatives between the VOI and all other VOIs.
         """
@@ -1735,7 +1735,7 @@ class System(object):
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
+        root_vectors: dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         self._vectors = vectors = {'input': OrderedDict(),
@@ -1835,7 +1835,7 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
+        recurse: bool
             If True, setup jacobians in all descendants.
         """
         asm_jac_solvers = set()
@@ -1902,7 +1902,7 @@ class System(object):
 
             Parameters
             ----------
-            lst : list
+            lst: list
                 List of names, patterns and/or tuples specifying promotes.
 
             Yields
@@ -1934,13 +1934,13 @@ class System(object):
 
             Parameters
             ----------
-            matches : dict {'input': ..., 'output': ...}
+            matches: dict {'input': ..., 'output': ...}
                 Dict of promoted names and associated info.
-            match_type : IntEnum
+            match_type: intEnum
                 Indicates whether match is an explicit name, rename, or pattern match.
-            name : str
+            name: str
                 Name of promoted variable that is specified multiple times.
-            tup : tuple (?, _PromotesInfo)
+            tup: tuple (?, _PromotesInfo)
                 First entry can be name, rename, or pattern depending on the match type.
 
             Returns
@@ -2076,9 +2076,9 @@ class System(object):
 
         Parameters
         ----------
-        outputs : list of output <Vector> objects
+        outputs: list of output <Vector> objects
             List of output vectors to apply the unit and scaling conversions.
-        residuals : list of residual <Vector> objects
+        residuals: list of residual <Vector> objects
             List of residual vectors to apply the unit and scaling conversions.
         """
         if self._has_output_scaling:
@@ -2138,24 +2138,24 @@ class System(object):
 
         Parameters
         ----------
-        vec_name : str
+        vec_name: str
             Name of the vector to use.
-        scope_out : frozenset or None
+        scope_out: frozenset or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : frozenset or None
+        scope_in: frozenset or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
-        mode : str
+        mode: str
             Key for specifying derivative direction. Values are 'fwd'
             or 'rev'.
-        clear : bool(True)
+        clear: bool(True)
             If True, zero out residuals (in fwd mode) or inputs and outputs
             (in rev mode).
 
         Yields
         ------
-        (d_inputs, d_outputs, d_residuals) : tuple of Vectors
+        (d_inputs, d_outputs, d_residuals): tuple of Vectors
             Yields the three Vectors configured internally to deal only
             with variables relevant to the current matrix vector product.
 
@@ -2200,13 +2200,13 @@ class System(object):
 
         Parameters
         ----------
-        fname : str
+        fname: str
             Name of the user defined function.
-        protect_inputs : bool
+        protect_inputs: bool
             If True, then set the inputs vector to be read only
-        protect_outputs : bool
+        protect_outputs: bool
             If True, then set the outputs vector to be read only
-        protect_residuals : bool
+        protect_residuals: bool
             If True, then set the residuals vector to be read only
         """
         self._inputs.read_only = protect_inputs
@@ -2232,7 +2232,7 @@ class System(object):
 
         Returns
         -------
-        (inputs, outputs, residuals) : tuple of <Vector> instances
+        (inputs, outputs, residuals): tuple of <Vector> instances
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
@@ -2247,12 +2247,12 @@ class System(object):
 
         Parameters
         ----------
-        vec_name : str
+        vec_name: str
             Name of the linear right-hand-side vector. The default is 'linear'.
 
         Returns
         -------
-        (inputs, outputs, residuals) : tuple of <Vector> instances
+        (inputs, outputs, residuals): tuple of <Vector> instances
             Yields the inputs, outputs, and residuals linear vectors for vec_name.
         """
         if self._inputs is None:
@@ -2373,15 +2373,15 @@ class System(object):
 
         Parameters
         ----------
-        level : int
+        level: int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        depth : int
+        depth: int
             How deep to recurse. For example, you can set this to 0 if you only want
             to print the top level linear and nonlinear solver messages. Default
             prints everything.
-        type_ : str
+        type_: str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         if self._linear_solver is not None and type_ != 'NL':
@@ -2408,7 +2408,7 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
+        recurse: bool
             Whether to call this method in subsystems.
         """
         for level, depth, type_ in self._solver_print_cache:
@@ -2424,15 +2424,15 @@ class System(object):
 
         Parameters
         ----------
-        level : int
+        level: int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        depth : int
+        depth: int
             How deep to recurse. For example, you can set this to 0 if you only want
             to print the top level linear and nonlinear solver messages. Default
             prints everything.
-        type_ : str
+        type_: str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         if (level, depth, type_) not in self._solver_print_cache:
@@ -2470,11 +2470,11 @@ class System(object):
 
         Parameters
         ----------
-        include_self : bool
+        include_self: bool
             If True, include this system in the iteration.
-        recurse : bool
+        recurse: bool
             If True, iterate over the whole tree under this system.
-        typ : type
+        typ: type
             If not None, only yield Systems that match that are instances of the
             given type.
         """
@@ -2497,36 +2497,36 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the design variable in the system.
-        lower : float or ndarray, optional
+        lower: float or ndarray, optional
             Lower boundary for the input
-        upper : upper or ndarray, optional
+        upper: upper or ndarray, optional
             Upper boundary for the input
-        ref : float or ndarray, optional
+        ref: float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
-        ref0 : float or ndarray, optional
+        ref0: float or ndarray, optional
             Value of design var that scales to 0.0 in the driver.
-        indices : iter of int, optional
+        indices: iter of int, optional
             If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
-        units : str, optional
+        units: str, optional
             Units to convert to before applying scaling.
-        adder : float or ndarray, optional
+        adder: float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
-        scaler : float or ndarray, optional
+        scaler: float or ndarray, optional
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color: string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
+        vectorize_derivs: bool
             If True, vectorize derivative calculations.
-        cache_linear_solution : bool
+        cache_linear_solution: bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
@@ -2651,44 +2651,44 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the response variable in the system.
-        type_ : string
+        type_: string
             The type of response. Supported values are 'con' and 'obj'
-        lower : float or ndarray, optional
+        lower: float or ndarray, optional
             Lower boundary for the variable
-        upper : upper or ndarray, optional
+        upper: upper or ndarray, optional
             Upper boundary for the variable
-        equals : equals or ndarray, optional
+        equals: equals or ndarray, optional
             Equality constraint value for the variable
-        ref : float or ndarray, optional
+        ref: float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-        ref0 : upper or ndarray, optional
+        ref0: upper or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-        indices : sequence of int, optional
+        indices: sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.
-        index : int, optional
+        index: int, optional
             If variable is an array, this indicates which entry is of
             interest for this particular response.
-        units : str, optional
+        units: str, optional
             Units to convert to before applying scaling.
-        adder : float or ndarray, optional
+        adder: float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
-        scaler : float or ndarray, optional
+        scaler: float or ndarray, optional
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        linear : bool
+        linear: bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color: string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
+        vectorize_derivs: bool
             If True, vectorize derivative calculations.
-        cache_linear_solution : bool
+        cache_linear_solution: bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
@@ -2851,40 +2851,40 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the response variable in the system.
-        lower : float or ndarray, optional
+        lower: float or ndarray, optional
             Lower boundary for the variable
-        upper : float or ndarray, optional
+        upper: float or ndarray, optional
             Upper boundary for the variable
-        equals : float or ndarray, optional
+        equals: float or ndarray, optional
             Equality constraint value for the variable
-        ref : float or ndarray, optional
+        ref: float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-        ref0 : float or ndarray, optional
+        ref0: float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-        adder : float or ndarray, optional
+        adder: float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
-        scaler : float or ndarray, optional
+        scaler: float or ndarray, optional
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        units : str, optional
+        units: str, optional
             Units to convert to before applying scaling.
-        indices : sequence of int, optional
+        indices: sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.  These may be positive or
             negative integers.
-        linear : bool
+        linear: bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color: string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
+        vectorize_derivs: bool
             If True, vectorize derivative calculations.
-        cache_linear_solution : bool
+        cache_linear_solution: bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
@@ -2912,32 +2912,32 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the response variable in the system.
-        ref : float or ndarray, optional
+        ref: float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
-        ref0 : float or ndarray, optional
+        ref0: float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
-        index : int, optional
+        index: int, optional
             If variable is an array, this indicates which entry is of
             interest for this particular response. This may be a positive
             or negative integer.
-        units : str, optional
+        units: str, optional
             Units to convert to before applying scaling.
-        adder : float or ndarray, optional
+        adder: float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
-        scaler : float or ndarray, optional
+        scaler: float or ndarray, optional
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color: string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
+        vectorize_derivs: bool
             If True, vectorize derivative calculations.
-        cache_linear_solution : bool
+        cache_linear_solution: bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
@@ -2985,12 +2985,12 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool
+        recurse: bool
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
-        get_sizes : bool, optional
+        get_sizes: bool, optional
             If True, compute the size of each design variable.
-        use_prom_ivc : bool
+        use_prom_ivc: bool
             Translate auto_ivc_names to their promoted input names.
 
         Returns
@@ -3113,12 +3113,12 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool, optional
+        recurse: bool, optional
             If True, recurse through the subsystems and return the path of
             all responses relative to the this system.
-        get_sizes : bool, optional
+        get_sizes: bool, optional
             If True, compute the size of each response.
-        use_prom_ivc : bool
+        use_prom_ivc: bool
             Translate auto_ivc_names to their promoted input names.
 
         Returns
@@ -3223,7 +3223,7 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool, optional
+        recurse: bool, optional
             If True, recurse through the subsystems and return the path of
             all constraints relative to the this system.
 
@@ -3246,7 +3246,7 @@ class System(object):
 
         Parameters
         ----------
-        recurse : bool, optional
+        recurse: bool, optional
             If True, recurse through the subsystems and return the path of
             all objective relative to the this system.
 
@@ -3277,29 +3277,29 @@ class System(object):
 
         Parameters
         ----------
-        iotypes : str or iter of str
+        iotypes: str or iter of str
             Will contain either 'input', 'output', or both.  Defaults to both.
-        metadata_keys : iter of str or None
+        metadata_keys: iter of str or None
             Names of metadata entries to be retrieved or None, meaning retrieve all
             available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
             their keys must be provided explicitly since they are not found in the 'allprocs'
             metadata and must be retrieved from local metadata located in each process.
-        includes : str, iter of str or None
+        includes: str, iter of str or None
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all variables.
-        excludes : str, iter of str or None
+        excludes: str, iter of str or None
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
-        tags : str or iter of strs
+        tags: str or iter of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        get_remote : bool
+        get_remote: bool
             If True, retrieve variables from other MPI processes as well.
-        rank : int or None
+        rank: int or None
             If None, and get_remote is True, retrieve values from all MPI process to all other
             MPI processes.  Otherwise, if get_remote is True, retrieve values from all MPI
             processes only to the specified rank.
-        return_rel_names : bool
+        return_rel_names: bool
             If True, the names returned will be relative to the scope of this System. Otherwise
             they will be absolute names.
 
@@ -3459,40 +3459,40 @@ class System(object):
 
         Parameters
         ----------
-        values : bool, optional
+        values: bool, optional
             When True, display/return input values. Default is True.
-        prom_name : bool, optional
+        prom_name: bool, optional
             When True, display/return the promoted name of the variable.
             Default is False.
-        units : bool, optional
+        units: bool, optional
             When True, display/return units. Default is False.
-        shape : bool, optional
+        shape: bool, optional
             When True, display/return the shape of the value. Default is False.
-        global_shape : bool, optional
+        global_shape: bool, optional
             When True, display/return the global shape of the value. Default is False.
-        desc : bool, optional
+        desc: bool, optional
             When True, display/return description. Default is False.
-        hierarchical : bool, optional
+        hierarchical: bool, optional
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
+        print_arrays: bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes: None or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
-        excludes : None or iter of str
+        excludes: None or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
-        all_procs : bool, optional
+        all_procs: bool, optional
             When True, display output on all ranks. Default is False, which will display
             output only from rank 0.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -3569,55 +3569,55 @@ class System(object):
 
         Parameters
         ----------
-        explicit : bool, optional
+        explicit: bool, optional
             include outputs from explicit components. Default is True.
-        implicit : bool, optional
+        implicit: bool, optional
             include outputs from implicit components. Default is True.
-        values : bool, optional
+        values: bool, optional
             When True, display output values. Default is True.
-        prom_name : bool, optional
+        prom_name: bool, optional
             When True, display the promoted name of the variable.
             Default is False.
-        residuals : bool, optional
+        residuals: bool, optional
             When True, display residual values. Default is False.
-        residuals_tol : float, optional
+        residuals_tol: float, optional
             If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
-        units : bool, optional
+        units: bool, optional
             When True, display units. Default is False.
-        shape : bool, optional
+        shape: bool, optional
             When True, display/return the shape of the value. Default is False.
-        global_shape : bool, optional
+        global_shape: bool, optional
             When True, display/return the global shape of the value. Default is False.
-        bounds : bool, optional
+        bounds: bool, optional
             When True, display/return bounds (lower and upper). Default is False.
-        scaling : bool, optional
+        scaling: bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-        desc : bool, optional
+        desc: bool, optional
             When True, display/return description. Default is False.
-        hierarchical : bool, optional
+        hierarchical: bool, optional
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
+        print_arrays: bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes: None or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
-        excludes : None or iter of str
+        excludes: None or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
-        all_procs : bool, optional
+        all_procs: bool, optional
             When True, display output on all processors. Default is False.
-        list_autoivcs : bool
+        list_autoivcs: bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
-        out_stream : file-like
+        out_stream: file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -3732,21 +3732,21 @@ class System(object):
 
         Parameters
         ----------
-        var_type : 'input', 'explicit' or 'implicit'
+        var_type: 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        var_data : dict
+        var_data: dict
             dict of name and metadata.
-        hierarchical : bool
+        hierarchical: bool
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool
+        print_arrays: bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        all_procs : bool, optional
+        all_procs: bool, optional
             When True, display output on all processors.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output.
             Set to None to suppress.
         """
@@ -3772,11 +3772,11 @@ class System(object):
 
         Parameters
         ----------
-        outputs : bool, optional
+        outputs: bool, optional
             Get names of output variables. Default is False.
-        inputs : bool, optional
+        inputs: bool, optional
             Get names of input variables. Default is False.
-        variables : Collection (list or dict)
+        variables: Collection (list or dict)
             Absolute path names of the subset of variables to include.
             If None then all variables will be included. Default is None.
 
@@ -3831,14 +3831,14 @@ class System(object):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        scope_out : set or None
+        scope_out: set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in: set or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
@@ -3853,9 +3853,9 @@ class System(object):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
@@ -3869,7 +3869,7 @@ class System(object):
 
         Parameters
         ----------
-        sub_do_ln : boolean
+        sub_do_ln: boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
@@ -3890,7 +3890,7 @@ class System(object):
 
         Parameters
         ----------
-        logger : object
+        logger: object
             The object that manages logging output.
         """
         pass
@@ -3901,18 +3901,18 @@ class System(object):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        scope_out : set or None
+        scope_out: set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in: set or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
@@ -3924,11 +3924,11 @@ class System(object):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         """
         pass
@@ -3939,9 +3939,9 @@ class System(object):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln: boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         pass
@@ -3974,9 +3974,9 @@ class System(object):
 
         Parameters
         ----------
-        recorder : <CaseRecorder>
+        recorder: <CaseRecorder>
            A recorder instance.
-        recurse : boolean
+        recurse: boolean
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
@@ -4080,7 +4080,7 @@ class System(object):
 
         Parameters
         ----------
-        active : bool
+        active: bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         for sub in self.system_iter(include_self=True, recurse=True):
@@ -4114,7 +4114,7 @@ class System(object):
 
         Parameters
         ----------
-        active : bool
+        active: bool
             Approx mode flag; set to True prior to commencing approximation.
         """
         for sub in self.system_iter(include_self=True, recurse=True):
@@ -4172,7 +4172,7 @@ class System(object):
 
         Parameters
         ----------
-        var_info : list of (name, offset, end, idxs)
+        var_info: list of (name, offset, end, idxs)
             The list that uses absolute names.
 
         Returns
@@ -4199,26 +4199,26 @@ class System(object):
 
         Parameters
         ----------
-        abs_name : str
+        abs_name: str
             The absolute name of the variable.
-        get_remote : bool or None
+        get_remote: bool or None
             If True, return the value even if the variable is remote. NOTE: This function must be
             called in all procs in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
-        rank : int or None
+        rank: int or None
             If not None, specifies that the value is to be gathered to the given rank only.
             Otherwise, if get_remote is specified, the value will be broadcast to all procs
             in the MPI communicator.
-        vec_name : str
+        vec_name: str
             Name of the vector to use.
-        kind : str or None
+        kind: str or None
             Kind of variable ('input', 'output', or 'residual').  If None, returned value
             will be either an input or output.
-        flat : bool
+        flat: bool
             If True, return the flattened version of the value.
-        from_root : bool
+        from_root: bool
             If True, resolve variables from top level scope.
 
         Returns
@@ -4359,29 +4359,29 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted or relative variable name in the root system's namespace.
-        units : str, optional
+        units: str, optional
             Units to convert to before return.
-        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+        indices: int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
-        get_remote : bool or None
+        get_remote: bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
-        rank : int or None
+        rank: int or None
             If not None, only gather the value to this rank.
-        vec_name : str
+        vec_name: str
             Name of the vector to use.   Defaults to 'nonlinear'.
-        kind : str or None
+        kind: str or None
             Kind of variable ('input', 'output', or 'residual').  If None, returned value
             will be either an input or output.
-        flat : bool
+        flat: bool
             If True, return the flattened version of the value.
-        from_src : bool
+        from_src: bool
             If True, retrieve value of an input variable from its connected source.
 
         Returns
@@ -4427,30 +4427,30 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted or relative variable name in the root system's namespace.
-        abs_ins : list of str
+        abs_ins: list of str
             List of absolute input names.
-        conns : dict
+        conns: dict
             Mapping of absolute names of each input to its connected output across the whole model.
-        units : str, optional
+        units: str, optional
             Units to convert to before return.
-        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+        indices: int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
-        get_remote : bool
+        get_remote: bool
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
-        rank : int or None
+        rank: int or None
             If not None, only gather the value to this rank.
-        vec_name : str
+        vec_name: str
             Name of the vector to use.   Defaults to 'nonlinear'.
-        flat : bool
+        flat: bool
             If True, return the flattened version of the value.
-        scope_sys : <System> or None
+        scope_sys: <System> or None
             If not None, the System where the original get_val was called.  This situation
             happens when get_val is called on an input, and the source connected to that input
             resides in a different scope.
@@ -4617,7 +4617,7 @@ class System(object):
 
         Parameters
         ----------
-        varname : str
+        varname: str
             Absolute name of the input variable.
 
         Returns
@@ -4652,13 +4652,13 @@ class System(object):
 
         Parameters
         ----------
-        filtered_vars : dict
+        filtered_vars: dict
             Dictionary containing entries for 'input', 'output', and/or 'residual'.
-        kind : str
+        kind: str
             Either 'input', 'output', or 'residual'.
-        vec_name : str
+        vec_name: str
             Either 'nonlinear' or 'linear'.
-        parallel : bool
+        parallel: bool
             If True, recorders are parallel, so only local values should be saved in each proc.
 
         Returns
@@ -4742,11 +4742,11 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the variable.
-        val : float or ndarray of float
+        val: float or ndarray of float
             The value of the variable.
-        units : str
+        units: str
             The units to convert to.
 
         Returns
@@ -4773,11 +4773,11 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the variable.
-        val : float or ndarray of float
+        val: float or ndarray of float
             The value of the variable.
-        units : str
+        units: str
             The units to convert to.
 
         Returns
@@ -4804,13 +4804,13 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the variable.
-        val : float or ndarray of float
+        val: float or ndarray of float
             The value of the variable.
-        units_from : str
+        units_from: str
             The units to convert from.
-        units_to : str
+        units_to: str
             The units to convert to.
 
         Returns
@@ -4835,9 +4835,9 @@ class System(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Variable name (promoted, relative, or absolute) in the root system's namespace.
-        key : str
+        key: str
             Key into the metadata dict for the given variable.
 
         Returns
@@ -4934,11 +4934,11 @@ class System(object):
 
         Parameters
         ----------
-        desvars : list of str
+        desvars: list of str
             Names of design variables.
-        responses : list of str
+        responses: list of str
             Names of response variables.
-        mode : str
+        mode: str
             Direction of derivatives, either 'fwd' or 'rev'.
 
         Returns

@@ -58,7 +58,7 @@ def _n2_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1,
@@ -84,9 +84,9 @@ def _n2_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Command line options after '--' (if any).  Passed to user script.
     """
     filename = _to_filename(options.file[0])
@@ -122,7 +122,7 @@ def _view_connections_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -143,9 +143,9 @@ def _view_connections_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     def _viewconns(prob):
@@ -174,7 +174,7 @@ def _meta_model_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -195,9 +195,9 @@ def _meta_model_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     def _view_metamodel(prob):
@@ -258,7 +258,7 @@ def _config_summary_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -270,9 +270,9 @@ def _config_summary_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     def summary(prob):
@@ -291,7 +291,7 @@ def _tree_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -322,9 +322,9 @@ def _get_tree_filter(attrs, vecvars):
 
     Parameters
     ----------
-    attrs : list of str
+    attrs: list of str
         Names of attributes (may contain dots).
-    vecvars : list of str
+    vecvars: list of str
         Names of variables contained in the input or output vectors.  Use component relative
         names.
 
@@ -364,9 +364,9 @@ def _tree_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     if options.outfile is None:
@@ -402,7 +402,7 @@ def _cite_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -418,9 +418,9 @@ def _cite_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     if options.outfile is None:

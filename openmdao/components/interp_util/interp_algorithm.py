@@ -10,25 +10,25 @@ class InterpAlgorithm(object):
 
     Attributes
     ----------
-    grid : tuple(ndarray)
+    grid: tuple(ndarray)
         Tuple containing x grid locations for this dimension.
-    k : int
+    k: int
         Minimum number of points required for this algorithm.
-    last_index : integer
+    last_index: integer
         Index of previous evaluation, used to start search for current index.
-    options : <OptionsDictionary>
+    options: <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    subtable : <InterpAlgorithm>
+    subtable: <InterpAlgorithm>
         Table interpolation that handles child dimensions.
-    values : ndarray
+    values: ndarray
         Array containing the table values for all dimensions.
-    _compute_d_dvalues : bool
+    _compute_d_dvalues: bool
         When set to True, compute gradients with respect to the grid values.
-    _compute_d_dx : bool
+    _compute_d_dx: bool
         When set to True, compute gradients with respect to the interpolated point location.
-    _full_slice : tuple of <Slice>
+    _full_slice: tuple of <Slice>
         Used to cache the full slice if training derivatives are computed.
-    _name : str
+    _name: str
         Algorithm name for error messages.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
@@ -40,13 +40,13 @@ class InterpAlgorithm(object):
 
         Parameters
         ----------
-        grid : tuple(ndarray)
+        grid: tuple(ndarray)
             Tuple containing ndarray of x grid locations for each table dimension.
-        values : ndarray
+        values: ndarray
             Array containing the values at all points in grid.
-        interp : class
+        interp: class
             Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
+        **kwargs: dict
             Interpolator-specific options to pass onward.
         """
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -105,7 +105,7 @@ class InterpAlgorithm(object):
 
         Parameters
         ----------
-        x : float
+        x: float
             Value of new independent to interpolate.
 
         Returns
@@ -168,10 +168,10 @@ class InterpAlgorithm(object):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        slice_idx : List of <slice>
+        slice_idx: list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 
@@ -210,12 +210,12 @@ class InterpAlgorithm(object):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx: integer
             Interval index for x.
-        slice_idx : List of <slice>
+        slice_idx: list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 

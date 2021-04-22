@@ -42,7 +42,7 @@ def _setup_hooks(obj):
 
     Parameters
     ----------
-    obj : object
+    obj: object
         The object whose methods may be wrapped.
     """
     # _setup_hooks should be called after 'obj' can return a valid name from _get_inst_id().
@@ -86,11 +86,11 @@ def _hook_decorator(f, inst, hookmeta):
 
     Parameters
     ----------
-    f : method
+    f: method
         The method being wrapped.
-    inst : object
+    inst: object
         The instance that owns the method.
-    hookmeta : dict
+    hookmeta: dict
         A dict with information about the hooks.
     """
     def check_hooks(*args, **kwargs):
@@ -115,17 +115,17 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None):
 
     Parameters
     ----------
-    hookfunc : function
+    hookfunc: function
         A function to execute in the designated hook location.
-    fname : str
+    fname: str
         The name of the function where the pre and/or post hook will be applied.
-    class_name : str
+    class_name: str
         The name of the class owning the method where the hook will be applied.
-    inst_id : str, optional
+    inst_id: str, optional
         The name of the instance owning the method where the hook will be applied.
-    pre : function (None)
+    pre: function (None)
         If not None, this hook will run before the named function runs.
-    post : function (None)
+    post: function (None)
         If not None, this hook will run after the named function runs.
     """
     if pre is None and post is None:
@@ -147,15 +147,15 @@ def _unregister_hook(fname, class_name, inst_id=None, pre=True, post=True):
 
     Parameters
     ----------
-    fname : str
+    fname: str
         The name of the function where the pre and/or post hook will be removed.
-    class_name : str
+    class_name: str
         The name of the class owning the method where the hook will be removed.
-    inst_id : str, optional
+    inst_id: str, optional
         The name of the instance owning the method where the hook will be removed.
-    pre : bool (True)
+    pre: bool (True)
         If True, the hook that runs before the named function runs will be removed.
-    post : bool, (True)
+    post: bool, (True)
         If True, the hook that runs after the named function runs will be removed.
     """
     hookdict = _hooks[class_name][inst_id]

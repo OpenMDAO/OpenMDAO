@@ -82,7 +82,7 @@ def array_to_blob(array):
 
     Parameters
     ----------
-    array : array
+    array: array
         The array that will be converted to a blob.
 
     Returns
@@ -105,7 +105,7 @@ def blob_to_array(blob):
 
     Parameters
     ----------
-    blob : blob
+    blob: blob
         The blob that will be converted to an array.
 
     Returns
@@ -124,28 +124,28 @@ class SqliteRecorder(CaseRecorder):
 
     Attributes
     ----------
-    _record_viewer_data : bool
+    _record_viewer_data: bool
         Flag indicating whether to record data needed to generate N2 diagram.
-    connection : sqlite connection object
+    connection: sqlite connection object
         Connection to the sqlite3 database.
-    metadata_connection : sqlite connection object
+    metadata_connection: sqlite connection object
         Connection to the sqlite3 database, if metadata is recorded separately.
-    _record_metadata : Whether this process is recording metadata. Always True
+    _record_metadata: Whether this process is recording metadata. Always True
         for serial runs, only True for rank 0 of parallel runs.
-    _abs2prom : {'input': dict, 'output': dict}
+    _abs2prom: {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
-    _prom2abs : {'input': dict, 'output': dict}
+    _prom2abs: {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _abs2meta : {'name': {}}
+    _abs2meta: {'name': {}}
         Dictionary mapping absolute variable names to their metadata including units,
         bounds, and scaling.
-    _pickle_version : int
+    _pickle_version: int
         The pickle protocol version to use when pickling metadata.
-    _filepath : str
+    _filepath: str
         Path to the recorder file.
-    _database_initialized : bool
+    _database_initialized: bool
         Flag indicating whether or not the database has been initialized.
-    _record_on_proc : bool
+    _record_on_proc: bool
         Flag indicating whether to record on this processor when running in parallel.
     """
 
@@ -155,13 +155,13 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        filepath : str
+        filepath: str
             Path to the recorder file.
-        append : bool, optional
+        append: bool, optional
             Optional. If True, append to an existing case recorder file.
-        pickle_version : int, optional
+        pickle_version: int, optional
             The pickle protocol version to use when pickling metadata.
-        record_viewer_data : bool, optional
+        record_viewer_data: bool, optional
             If True, record data needed for visualization.
         """
         if append:
@@ -279,12 +279,12 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        var_settings : dict
+        var_settings: dict
             Dictionary mapping absolute variable names to variable settings.
 
         Returns
         -------
-        var_settings : dict
+        var_settings: dict
             Dictionary mapping absolute variable names to var settings that are JSON compatible.
         """
         # otherwise we trample on values that are used elsewhere
@@ -300,7 +300,7 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             Object to which this recorder is attached.
         """
         super().startup(recording_requester)
@@ -438,11 +438,11 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        driver : Driver
+        driver: Driver
             Driver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         if self.connection:
@@ -480,11 +480,11 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        problem : Problem
+        problem: Problem
             Problem in need of recording.
-        data : dict
+        data: dict
             Dictionary containing desvars, objectives, and constraints.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         if self.connection:
@@ -536,11 +536,11 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        system : System
+        system: System
             System in need of recording.
-        data : dict
+        data: dict
             Dictionary containing inputs, outputs, and residuals.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         if self.connection:
@@ -581,11 +581,11 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        solver : Solver
+        solver: Solver
             Solver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing outputs, residuals, and errors.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         if self.connection:
@@ -641,9 +641,9 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        model_viewer_data : dict
+        model_viewer_data: dict
             Data required to visualize the model.
-        key : str, optional
+        key: str, optional
             The unique ID to use for this data in the table.
         """
         if self._record_metadata and self.metadata_connection:
@@ -663,9 +663,9 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        system : System
+        system: System
             The System for which to record metadata.
-        run_number : int or None
+        run_number: int or None
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
@@ -716,9 +716,9 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        solver : Solver
+        solver: Solver
             The Solver for which to record metadata.
-        run_number : int or None
+        run_number: int or None
             Number indicating which run the metadata is associated with.
             None for the first run, 1 for the second, etc.
         """
@@ -746,11 +746,11 @@ class SqliteRecorder(CaseRecorder):
 
         Parameters
         ----------
-        recording_requester : object
+        recording_requester: object
             Driver in need of recording.
-        data : dict
+        data: dict
             Dictionary containing derivatives keyed by 'of,wrt' to be recorded.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         if self.connection:

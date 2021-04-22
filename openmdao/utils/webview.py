@@ -10,7 +10,7 @@ def webview(outfile):
 
     Parameters
     ----------
-    outfile : str
+    outfile: str
         Path to the HTML file to open.
 
     """

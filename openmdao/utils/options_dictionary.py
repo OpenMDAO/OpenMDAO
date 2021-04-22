@@ -13,9 +13,9 @@ def check_valid(name, value):
 
     Parameters
     ----------
-    name : str
+    name: str
         name of the option
-    value : any
+    value: any
         value for the option
 
     Raises
@@ -37,16 +37,16 @@ class OptionsDictionary(object):
 
     Attributes
     ----------
-    _dict : dict of dict
+    _dict: dict of dict
         Dictionary of entries. Each entry is a dictionary consisting of value, values,
         types, desc, lower, and upper.
-    _parent_name : str or None
+    _parent_name: str or None
         If defined, prepend this name to beginning of all exceptions.
-    _read_only : bool
+    _read_only: bool
         If True, no options can be set after declaration.
-    _all_recordable : bool
+    _all_recordable: bool
         Flag to determine if all options in UserOptions are recordable.
-    _deprecation_warning_issued : list
+    _deprecation_warning_issued: list
         Option names that are deprecated and a warning has been issued for their use.
     """
 
@@ -56,9 +56,9 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        parent_name : str
+        parent_name: str
             Name or class name of System that owns this OptionsDictionary
-        read_only : bool
+        read_only: bool
             If True, setting (via __setitem__ or update) is not permitted.
         """
         self._dict = {}
@@ -114,11 +114,11 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        fmt : str
+        fmt: str
             The formatting of the requested table.  Options are the same as those available
             to the tabulate package.  See tabulate.tabulate_formats for a complete list.
             Default value of 'github' produces a table in GitHub-flavored markdown.
-        missingval : str
+        missingval: str
             The value to be displayed in place of None.
 
         Returns
@@ -167,7 +167,7 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        width : int
+        width: int
             The maximum width of the text.
 
         Returns
@@ -204,9 +204,9 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        msg : str
+        msg: str
             The error message.
-        exc_type : class
+        exc_type: class
             The type of the exception to be raised.
         """
         if self._parent_name is None:
@@ -225,9 +225,9 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             The key for the declared option.
-        value : object
+        value: object
             The default or user-set value to check for value, type, lower, and upper.
         """
         meta = self._dict[name]
@@ -292,28 +292,28 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the option.
-        default : object or Null
+        default: object or Null
             Optional default value that must be valid under the above 3 conditions.
-        values : set or list or tuple or None
+        values: set or list or tuple or None
             Optional list of acceptable option values.
-        types : type or tuple of types or None
+        types: type or tuple of types or None
             Optional type or list of acceptable option types.
-        desc : str
+        desc: str
             Optional description of the option.
-        upper : float or None
+        upper: float or None
             Maximum allowable value.
-        lower : float or None
+        lower: float or None
             Minimum allowable value.
-        check_valid : function or None
+        check_valid: function or None
             User-supplied function with arguments (name, value) that raises an exception
             if the value is not valid.
-        allow_none : bool
+        allow_none: bool
             If True, allow None as a value regardless of values or types.
-        recordable : bool
+        recordable: bool
             If True, add to recorder
-        deprecation : str or None
+        deprecation: str or None
             If None, it is not deprecated. If a str, use as a DeprecationWarning
             during __setitem__ and __getitem__
         """
@@ -364,7 +364,7 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             The name of a key, the entry of which will be removed from the internal dictionary.
 
         """
@@ -377,7 +377,7 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        in_dict : dict
+        in_dict: dict
             The incoming dictionary to add to the internal one.
         """
         for name in in_dict:
@@ -400,7 +400,7 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        key : str
+        key: str
             name of the option.
 
         Returns
@@ -416,9 +416,9 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the option.
-        value : -
+        value: -
             value of the option to be value- and type-checked if declared.
         """
         try:
@@ -446,12 +446,12 @@ class OptionsDictionary(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the option.
 
         Returns
         -------
-        value : -
+        value: -
             value of the option.
         """
         # If the option has been set in this system, return the set value

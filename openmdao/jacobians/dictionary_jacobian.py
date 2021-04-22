@@ -11,7 +11,7 @@ class DictionaryJacobian(Jacobian):
 
     Attributes
     ----------
-    _iter_keys : list of (vname, vname) tuples
+    _iter_keys: list of (vname, vname) tuples
         List of tuples of variable names that match subjacs in the this Jacobian.
     """
 
@@ -21,9 +21,9 @@ class DictionaryJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         super().__init__(system, **kwargs)
@@ -37,9 +37,9 @@ class DictionaryJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             System that is updating this jacobian.
-        vec_name : str
+        vec_name: str
             The name of the current RHS vector.
 
         Returns
@@ -69,15 +69,15 @@ class DictionaryJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             System that is updating this jacobian.
-        d_inputs : Vector
+        d_inputs: Vector
             inputs linear vector.
-        d_outputs : Vector
+        d_outputs: Vector
             outputs linear vector.
-        d_residuals : Vector
+        d_residuals: Vector
             residuals linear vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         # avoid circular import
@@ -240,11 +240,11 @@ class _CheckingJacobian(DictionaryJacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             The system that owns this jacobian.
-        icol : int
+        icol: int
             Column index.
-        column : ndarray
+        column: ndarray
             Column value.
 
         """

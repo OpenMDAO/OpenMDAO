@@ -47,7 +47,7 @@ class LintAttributesTestCase(unittest.TestCase):
         # Regex to grab a variable name from the attributes documentation section from the class.
         # Start at the beginning of a line that does not start with whitespace, grab everything
         # up to the first space or colon. Example: grab _system from:
-        # _system : System
+        # _system: System
         classdoc_varnames_re = re.compile('^([^\\s].*?[^\\s\\:]*)', re.MULTILINE)
 
         # Regex to grab a variable name from the __init__ section of every self.___=.
@@ -127,17 +127,17 @@ class LintAttributesTestCase(unittest.TestCase):
 
                             # there are 'self.*=' statements in __init__ but there is no Attributes section
                             if(len(all_member_vars) > 0 and len(classdoc_matches) == 0):
-                                print('%s/%s : Class `%s`... Attributes section missing but found %d member vars.. will check parent classes'
+                                print('%s/%s: Class `%s`... Attributes section missing but found %d member vars.. will check parent classes'
                                                 % (dir_name, file_name, class_name, len(all_member_vars)))
 
                             for v in classdoc_varnames_matches:
                                 if v not in all_member_vars:
-                                    print('%s/%s : Class `%s`, Member `%s` documented in Attributes section of docstring but not used'
+                                    print('%s/%s: Class `%s`, Member `%s` documented in Attributes section of docstring but not used'
                                                 % (dir_name, file_name, class_name, v))
 
                             for v in all_member_vars:
                                 if v not in classdoc_varnames_matches:
-                                    print('%s/%s : Class `%s`, Member `%s` not documented in Attributes section of docstring.. checking parent classes'
+                                    print('%s/%s: Class `%s`, Member `%s` not documented in Attributes section of docstring.. checking parent classes'
                                                 % (dir_name, file_name, class_name, v))
                                     found_in_pc = False
                                     for pc in parent_classes:

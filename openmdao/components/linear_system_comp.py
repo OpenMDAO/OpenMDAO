@@ -16,7 +16,7 @@ class LinearSystemComp(ImplicitComponent):
 
     Attributes
     ----------
-    _lup : None or list(object)
+    _lup: None or list(object)
         matrix factorizations returned from scipy.linag.lu_factor for each A matrix
     """
 
@@ -26,7 +26,7 @@ class LinearSystemComp(ImplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -98,11 +98,11 @@ class LinearSystemComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
         if self.options['vec_size'] > 1:
@@ -120,9 +120,9 @@ class LinearSystemComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         vec_size = self.options['vec_size']
@@ -148,11 +148,11 @@ class LinearSystemComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        J : Jacobian
+        J: Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
         x = outputs['x']
@@ -176,11 +176,11 @@ class LinearSystemComp(ImplicitComponent):
 
         Parameters
         ----------
-        d_outputs : Vector
+        d_outputs: Vector
             unscaled, dimensional quantities read via d_outputs[key]
-        d_residuals : Vector
+        d_residuals: Vector
             unscaled, dimensional quantities read via d_residuals[key]
-        mode : str
+        mode: str
             either 'fwd' or 'rev'
         """
         vec_size = self.options['vec_size']

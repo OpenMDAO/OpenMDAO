@@ -26,9 +26,9 @@ def check_option(option, value):
 
     Parameters
     ----------
-    option : str
+    option: str
         The name of the option
-    value : any
+    value: any
         The value of the option
 
     Raises
@@ -54,9 +54,9 @@ class KSfunction(object):
 
         Parameters
         ----------
-        g : ndarray
+        g: ndarray
             Array of constraint values, where negative means satisfied and positive means violated.
-        rho : float
+        rho: float
             Constraint Aggregation Factor.
 
         Returns
@@ -77,9 +77,9 @@ class KSfunction(object):
 
         Parameters
         ----------
-        g : ndarray
+        g: ndarray
             Array of constraint values, where negative means satisfied and positive means violated.
-        rho : float
+        rho: float
             Constraint Aggregation Factor.
 
         Returns
@@ -100,9 +100,9 @@ class KSfunction(object):
 
         Parameters
         ----------
-        g : ndarray
+        g: ndarray
             Array of constraint values, where negative means satisfied and positive means violated.
-        rho : float
+        rho: float
             Constraint Aggregation Factor.
 
         Returns
@@ -132,7 +132,7 @@ class KSComp(ExplicitComponent):
 
     Attributes
     ----------
-    cite : str
+    cite: str
         Listing of relevant citations that should be referenced when publishing
         work that uses this class.
     """
@@ -143,7 +143,7 @@ class KSComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -219,9 +219,9 @@ class KSComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : `Vector`
+        inputs: `Vector`
             `Vector` containing inputs.
-        outputs : `Vector`
+        outputs: `Vector`
             `Vector` containing outputs.
         """
         opt = self.options
@@ -238,9 +238,9 @@ class KSComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         opt = self.options

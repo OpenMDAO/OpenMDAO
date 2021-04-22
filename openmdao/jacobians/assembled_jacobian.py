@@ -20,23 +20,23 @@ class AssembledJacobian(Jacobian):
 
     Attributes
     ----------
-    _view_ranges : dict
+    _view_ranges: dict
         Maps system pathnames to jacobian sub-view ranges
-    _int_mtx : <Matrix>
+    _int_mtx: <Matrix>
         Global internal Jacobian.
-    _ext_mtx : {str: <Matrix>, ...}
+    _ext_mtx: {str: <Matrix>, ...}
         External Jacobian for each viewing subsystem.
-    _mask_caches : dict
+    _mask_caches: dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
-    _matrix_class : type
+    _matrix_class: type
         Class used to create Matrix objects.
-    _subjac_iters : dict
+    _subjac_iters: dict
         Mapping of system pathname to tuple of lists of absolute key tuples used to index into
         the jacobian.
-    _in_ranges : dict
+    _in_ranges: dict
         Column ranges for inputs.
-    _out_ranges : dict
+    _out_ranges: dict
         Row ranges for outputs.
     """
 
@@ -46,9 +46,9 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        matrix_class : type
+        matrix_class: type
             Class to use to create internal matrices.
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         global Component
@@ -71,9 +71,9 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             System owning this jacobian.
-        vtype : str
+        vtype: str
             Type of variable, must be one of ('input', 'output').
 
         Returns
@@ -95,7 +95,7 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         # var_indices are the *global* indices for variables on this proc
@@ -210,7 +210,7 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        system : <System>
+        system: <System>
             The system being solved using a sub-view of the jacobian.
         """
         abs2meta = system._var_abs2meta['output']
@@ -318,7 +318,7 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             System that is updating this jacobian.
         """
         # _initialize has been delayed until the first _update call
@@ -368,15 +368,15 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             System that is updating this jacobian.
-        d_inputs : Vector
+        d_inputs: Vector
             inputs linear vector.
-        d_outputs : Vector
+        d_outputs: Vector
             outputs linear vector.
-        d_residuals : Vector
+        d_residuals: Vector
             residuals linear vector.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
         """
         int_mtx = self._int_mtx
@@ -417,7 +417,7 @@ class AssembledJacobian(Jacobian):
 
         Parameters
         ----------
-        active : bool
+        active: bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         super().set_complex_step_mode(active)
@@ -440,7 +440,7 @@ class DenseJacobian(AssembledJacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         super().__init__(DenseMatrix, system=system)
@@ -457,7 +457,7 @@ class COOJacobian(AssembledJacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         super().__init__(COOMatrix, system=system)
@@ -474,7 +474,7 @@ class CSRJacobian(AssembledJacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         super().__init__(CSRMatrix, system=system)
@@ -491,7 +491,7 @@ class CSCJacobian(AssembledJacobian):
 
         Parameters
         ----------
-        system : System
+        system: System
             Parent system to this jacobian.
         """
         super().__init__(CSCMatrix, system=system)

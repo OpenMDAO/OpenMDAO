@@ -31,31 +31,31 @@ class BroydenSolver(NonlinearSolver):
 
     Attributes
     ----------
-    delta_fxm : ndarray
+    delta_fxm: ndarray
         Most recent change in residual vector.
-    delta_xm : ndarray
+    delta_xm: ndarray
         Most recent change in state vector.
-    fxm : ndarray
+    fxm: ndarray
         Most recent residual.
-    Gm : ndarray
+    Gm: ndarray
         Most recent Jacobian matrix.
-    linear_solver : LinearSolver
+    linear_solver: LinearSolver
         Linear solver to use for calculating inverse Jacobian.
-    linesearch : NonlinearSolver
+    linesearch: NonlinearSolver
         Line search algorithm. Default is None for no line search.
-    size : int
+    size: int
         Total length of the states being solved.
-    xm : ndarray
+    xm: ndarray
         Most recent state.
-    _idx : dict
+    _idx: dict
         Cache of vector indices for each state name.
-    _computed_jacobians : int
+    _computed_jacobians: int
         Number of computed jacobians.
-    _converge_failures : int
+    _converge_failures: int
         Number of consecutive iterations that failed to converge to the tol definied in options.
-    _full_inverse : bool
+    _full_inverse: bool
         When True, Broyden considers the whole vector rather than a list of states.
-    _recompute_jacobian : bool
+    _recompute_jacobian: bool
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
     """
 
@@ -67,7 +67,7 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         super().__init__(**kwargs)
@@ -144,9 +144,9 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system : <System>
+        system: <System>
             Pointer to the owning system.
-        depth : int
+        depth: int
             Depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -254,11 +254,11 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        level : int
+        level: int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        type_ : str
+        type_: str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         super()._set_solver_print(level=level, type_=type_)
@@ -359,7 +359,7 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        vec : ndarray
+        vec: ndarray
             Array of real or complex values. For MPI on rank 0, should be full dimension of the
             openmdao vector with duplicate indices removed.
 
@@ -481,7 +481,7 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        vec : <Vector>
+        vec: <Vector>
             Vector from which to extract state values.
 
         Returns
@@ -506,7 +506,7 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        new_val : ndarray
+        new_val: ndarray
             New values for states.
         """
         outputs = self._system()._outputs
@@ -525,7 +525,7 @@ class BroydenSolver(NonlinearSolver):
 
         Parameters
         ----------
-        dx : ndarray
+        dx: ndarray
             Full step in the states for this iteration.
         """
         linear = self._system()._vectors['output']['linear']
@@ -547,9 +547,9 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             New inverse Jacobian.
         """
-        # TODO : Consider promoting this capability out into OpenMDAO so other solvers can use the
+        # TODO: Consider promoting this capability out into OpenMDAO so other solvers can use the
         # same code.
-        # TODO : Can do each state in parallel if procs are available.
+        # TODO: Can do each state in parallel if procs are available.
         system = self._system()
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']

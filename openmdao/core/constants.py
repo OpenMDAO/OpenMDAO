@@ -19,13 +19,13 @@ class _SetupStatus(IntEnum):
 
     Attributes
     ----------
-    PRE_SETUP : int
+    PRE_SETUP: int
         Newly initialized problem or newly added model.
-    POST_CONFIGURE : int
+    POST_CONFIGURE: int
         Configure has been called.
-    POST_SETUP : int
+    POST_SETUP: int
         The `setup` method has been called, but vectors not initialized.
-    POST_FINAL_SETUP : int
+    POST_FINAL_SETUP: int
         The `final_setup` has been run, everything ready to run.
     """
 
@@ -50,7 +50,7 @@ class _ReprClass(object):
 
         Parameters
         ----------
-        repr_string : str
+        repr_string: str
             The string to be returned by __repr__
         """
         self._repr_string = repr_string

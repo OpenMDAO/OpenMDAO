@@ -135,51 +135,51 @@ class Group(System):
 
     Attributes
     ----------
-    _mpi_proc_allocator : ProcAllocator
+    _mpi_proc_allocator: ProcAllocator
         Object used to allocate MPI processes to subsystems.
-    _proc_info : dict of subsys_name: (min_procs, max_procs, weight)
+    _proc_info: dict of subsys_name: (min_procs, max_procs, weight)
         Information used to determine MPI process allocation to subsystems.
-    _subgroups_myproc : list
+    _subgroups_myproc: list
         List of local subgroups.
-    _manual_connections : dict
+    _manual_connections: dict
         Dictionary of input_name: (output_name, src_indices) connections.
-    _group_inputs : dict
+    _group_inputs: dict
         Mapping of promoted names to certain metadata (src_indices, units).
-    _static_group_inputs : dict
+    _static_group_inputs: dict
         Group inputs added outside of setup/configure.
-    _pre_config_group_inputs : dict
+    _pre_config_group_inputs: dict
         Group inputs added inside of setup but before configure.
-    _static_manual_connections : dict
+    _static_manual_connections: dict
         Dictionary that stores all explicit connections added outside of setup.
-    _conn_abs_in2out : {'abs_in': 'abs_out'}
+    _conn_abs_in2out: {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections owned
         by this system only. The data is the same across all processors.
-    _conn_discrete_in2out : {'abs_in': 'abs_out'}
+    _conn_discrete_in2out: {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit discrete var connections owned
         by this system only. The data is the same across all processors.
-    _transfers : dict of dict of dict of Transfers
+    _transfers: dict of dict of dict of Transfers
         First key is the vec_name, second key is mode, third is subname where
         mode is 'fwd' or 'rev' and subname is the subsystem name
         or subname can be None for the full, simultaneous transfer.
-    _discrete_transfers : dict of discrete transfer metadata
+    _discrete_transfers: dict of discrete transfer metadata
         Key is system pathname or None for the full, simultaneous transfer.
-    _setup_procs_finished : bool
+    _setup_procs_finished: bool
         Flag to check if setup_procs is complete
-    _has_distrib_vars : bool
+    _has_distrib_vars: bool
         If True, this Group contains distributed variables. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
-    _contains_parallel_group : bool
+    _contains_parallel_group: bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
-    _raise_connection_errors : bool
+    _raise_connection_errors: bool
         Flag indicating whether connection errors are raised as an Exception.
-    _order_set : bool
+    _order_set: bool
         Flag to check if set_order has been called.
-    _auto_ivc_warnings : list
+    _auto_ivc_warnings: list
         List of Auto IVC warnings to be raised later with simple_warnings.
-    _shapes_graph : nx.OrderedGraph
+    _shapes_graph: nx.OrderedGraph
         Dynamic shape dependency graph, or None.
-    _shape_knowns : set
+    _shape_knowns: set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
     """
 
@@ -189,7 +189,7 @@ class Group(System):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             dict of arguments available here and in all descendants of this
             Group.
         """
@@ -272,13 +272,13 @@ class Group(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted input name.
-        val : object
+        val: object
             Value to assume for the promoted input.
-        units : str or None
+        units: str or None
             Units to assume for the promoted input.
-        src_shape : int or tuple
+        src_shape: int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
         meta = {'prom': name, 'auto': False}
@@ -324,7 +324,7 @@ class Group(System):
 
         Parameters
         ----------
-        excl_sub : <System>
+        excl_sub: <System>
             A subsystem whose variables should be excluded from the matvec product.
 
         Returns
@@ -497,14 +497,14 @@ class Group(System):
 
         Parameters
         ----------
-        pathname : str
+        pathname: str
             Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode: string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
+        prob_meta: dict
             Problem level metadata.
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
@@ -1121,7 +1121,7 @@ class Group(System):
 
         Parameters
         ----------
-        show_warnings : bool
+        show_warnings: bool
             Bool to show or hide the auto_ivc warnings.
         """
         skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
@@ -1367,7 +1367,7 @@ class Group(System):
 
         Parameters
         ----------
-        conns : dict
+        conns: dict
             Dictionary of connections passed down from parent group.
         """
         if not self._raise_connection_errors:
@@ -1583,9 +1583,9 @@ class Group(System):
 
         Parameters
         ----------
-        var : str
+        var: str
             Absolute name of the variable.
-        arr_size : int
+        arr_size: int
             Size to be distributed among procs where var is local.
 
         Returns
@@ -2134,7 +2134,7 @@ class Group(System):
 
         Parameters
         ----------
-        val : bool
+        val: bool
             If True, connection errors will raise an Exception. If False, connection errors
             will issue a warning and the offending connection will be ignored.
         """
@@ -2149,11 +2149,11 @@ class Group(System):
 
         Parameters
         ----------
-        vec_name : str
+        vec_name: str
             Name of the vector RHS on which to perform a transfer.
-        mode : str
+        mode: str
             Either 'fwd' or 'rev'
-        sub : None or str
+        sub: None or str
             If None, perform a full transfer.
             If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
@@ -2193,7 +2193,7 @@ class Group(System):
 
         Parameters
         ----------
-        sub : None or str
+        sub: None or str
             If None, perform a full transfer.
             If not, perform a partial transfer for linear Gauss--Seidel.
         """
@@ -2261,31 +2261,31 @@ class Group(System):
 
         Parameters
         ----------
-        subsys_name : str
+        subsys_name: str
             The name of the child subsystem whose inputs/outputs are being promoted.
-        any : Sequence of str or tuple
+        any: Sequence of str or tuple
             A Sequence of variable names (or tuples) to be promoted, regardless
             of if they are inputs or outputs. This is equivalent to the items
             passed via the `promotes=` argument to add_subsystem.  If given as a
             tuple, we use the "promote as" standard of ('real name', 'promoted name')*[]:
-        inputs : Sequence of str or tuple
+        inputs: Sequence of str or tuple
             A Sequence of input names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
-        outputs : Sequence of str or tuple
+        outputs: Sequence of str or tuple
             A Sequence of output names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+        src_indices: int or list of ints or tuple of ints or int ndarray or Iterable or None
             This argument applies only to promoted inputs.
             The global indices of the source variable to transfer data from.
             A value of None implies this input depends on all entries of source.
             Default is None. The shapes of the target and src_indices must match,
             and form of the entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
+        flat_src_indices: bool
             This argument applies only to promoted inputs.
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
-        src_shape : int or tuple
+        src_shape: int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
         if isinstance(any, str):
@@ -2361,31 +2361,31 @@ class Group(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the subsystem being added
-        subsys : <System>
+        subsys: <System>
             An instantiated, but not-yet-set up system object.
-        promotes : iter of (str or tuple), optional
+        promotes: iter of (str or tuple), optional
             A list of variable names specifying which subsystem variables
             to 'promote' up to this group. If an entry is a tuple of the
             form (old_name, new_name), this will rename the variable in
             the parent group.
-        promotes_inputs : iter of (str or tuple), optional
+        promotes_inputs: iter of (str or tuple), optional
             A list of input variable names specifying which subsystem input
             variables to 'promote' up to this group. If an entry is a tuple of
             the form (old_name, new_name), this will rename the variable in
             the parent group.
-        promotes_outputs : iter of (str or tuple), optional
+        promotes_outputs: iter of (str or tuple), optional
             A list of output variable names specifying which subsystem output
             variables to 'promote' up to this group. If an entry is a tuple of
             the form (old_name, new_name), this will rename the variable in
             the parent group.
-        min_procs : int
+        min_procs: int
             Minimum number of MPI processes usable by the subsystem. Defaults to 1.
-        max_procs : int or None
+        max_procs: int or None
             Maximum number of MPI processes usable by the subsystem.  A value
             of None (the default) indicates there is no maximum limit.
-        proc_weight : float
+        proc_weight: float
             Weight given to the subsystem when allocating available MPI processes
             to all subsystems.  Default is 1.0.
 
@@ -2470,15 +2470,15 @@ class Group(System):
 
         Parameters
         ----------
-        src_name : str
+        src_name: str
             name of the source variable to connect
-        tgt_name : str or [str, ... ] or (str, ...)
+        tgt_name: str or [str, ... ] or (str, ...)
             name of the target variable(s) to connect
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+        src_indices: int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
             The shapes of the target and src_indices must match, and form of the
             entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
+        flat_src_indices: bool
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise it must be a tuple or list of size equal
             to the number of dimensions of the source.
@@ -2538,7 +2538,7 @@ class Group(System):
 
         Parameters
         ----------
-        new_order : list of str
+        new_order: list of str
             List of system names in desired new execution order.
         """
         if self._problem_meta is not None and \
@@ -2597,7 +2597,7 @@ class Group(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the desired system in the current namespace.
 
         Returns
@@ -2683,15 +2683,15 @@ class Group(System):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
-        discrete_inputs : dict or None
+        discrete_inputs: dict or None
             If not None, dict containing discrete input values.
-        discrete_outputs : dict or None
+        discrete_outputs: dict or None
             If not None, dict containing discrete output values.
         """
         pass
@@ -2702,18 +2702,18 @@ class Group(System):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        scope_out : set or None
+        scope_out: set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in : set or None
+        scope_in: set or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
@@ -2761,11 +2761,11 @@ class Group(System):
 
         Parameters
         ----------
-        vec_names : [str, ...]
+        vec_names: [str, ...]
             list of names of the right-hand-side vectors.
-        mode : str
+        mode: str
             'fwd' or 'rev'.
-        rel_systems : set of str
+        rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         """
         if self._owns_approx_jac:
@@ -2808,9 +2808,9 @@ class Group(System):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln: boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self._jacobian is None:
@@ -2872,16 +2872,16 @@ class Group(System):
 
         Parameters
         ----------
-        method : str
+        method: str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step
-        step : float
+        step: float
             Step size for approximation. Defaults to None, in which case, the approximation
             method provides its default value.
-        form : string
+        form: string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
             None, in which case, the approximation method provides its default value.
-        step_calc : string
+        step_calc: string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case, the approximation method
             provides its default value.
@@ -2921,7 +2921,7 @@ class Group(System):
                 if meta['has_src_indices'] and \
                    meta['distributed'] and \
                    iname not in self._conn_abs_in2out:
-                    msg = "{} : Approx_totals is not supported on a group with a distributed "
+                    msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
 
@@ -3008,7 +3008,7 @@ class Group(System):
 
         Parameters
         ----------
-        wrt_matches : set or None
+        wrt_matches: set or None
             Only include vars in each row that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
@@ -3061,7 +3061,7 @@ class Group(System):
 
         Parameters
         ----------
-        info : dict
+        info: dict
             Coloring metadata dict.
         """
         if not (self._owns_approx_of or self.pathname):
@@ -3179,7 +3179,7 @@ class Group(System):
 
         Parameters
         ----------
-        meta : dict
+        meta: dict
             Metadata for a subjac.
         """
         info = self._coloring_info
@@ -3197,7 +3197,7 @@ class Group(System):
 
         Parameters
         ----------
-        comps_only : bool (False)
+        comps_only: bool (False)
             If True, return a graph of all components within this group
             or any of its descendants. No sub-groups will be included. Otherwise,
             a graph containing only direct children (both Components and Groups)

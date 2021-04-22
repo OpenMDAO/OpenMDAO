@@ -20,15 +20,15 @@ def concurrent_eval_lb(func, cases, comm, broadcast=False):
 
     Parameters
     ----------
-    func : function
+    func: function
         The function to execute in workers.
-    cases : collection of function args
+    cases: collection of function args
         Entries are assumed to be of the form (args, kwargs) where
         kwargs are allowed to be None and args should be a list or tuple.
-    comm : MPI communicator or None
+    comm: MPI communicator or None
         The MPI communicator that is shared between the master and workers.
         If None, the function will be executed serially.
-    broadcast : bool(False)
+    broadcast: bool(False)
         If True, the results will be broadcast out to the worker procs so
         that the return value of concurrent_eval_lb will be the full result
         list in every process.
@@ -82,10 +82,10 @@ def _concurrent_eval_lb_master(cases, comm):
 
     Parameters
     ----------
-    cases : collection of function args
+    cases: collection of function args
         Entries are assumed to be of the form (args, kwargs) where
         kwargs are allowed to be None and args should be a list or tuple.
-    comm : MPI communicator or None
+    comm: MPI communicator or None
         The MPI communicator that is shared between the master and workers.
         If None, the function will be executed serially.
 
@@ -183,18 +183,18 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
 
     Parameters
     ----------
-    func : function
+    func: function
         The function to execute in workers.
-    cases : iter of function args
+    cases: iter of function args
         Entries are assumed to be of the form (args, kwargs) where
         kwargs are allowed to be None and args should be a list or tuple.
-    comm : MPI communicator or None
+    comm: MPI communicator or None
         The MPI communicator that is shared between the master and workers.
         If None, the function will be executed serially.
-    allgather : bool(False)
+    allgather: bool(False)
         If True, the results will be allgathered to all procs in the comm.
         Otherwise, results will be gathered to rank 0 only.
-    model_mpi : None or tuple
+    model_mpi: None or tuple
         If the function in func runs in parallel, then this will be a tuple containing the total
         number of cases to evaluate concurrently, and the color of the cases to evaluate on this
         rank.

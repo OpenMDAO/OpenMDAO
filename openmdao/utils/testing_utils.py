@@ -60,7 +60,7 @@ def use_tempdirs(cls):
 
     Parameters
     ----------
-    cls : TestCase
+    cls: TestCase
         TestCase being decorated to use a tempdir for each test.
 
     Returns

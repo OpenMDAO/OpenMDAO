@@ -17,9 +17,9 @@ def abs_smooth_complex(x, delta_x):
 
     Parameters
     ----------
-    x : ndarray
+    x: ndarray
         Input array.
-    delta_x : float
+    delta_x: float
         Half width of the rounded section.
 
     Returns
@@ -41,11 +41,11 @@ def dv_abs_smooth_complex(x, x_deriv, delta_x):
 
     Parameters
     ----------
-    x : ndarray
+    x: ndarray
         Input array, used for determining which elements to negate.
-    x_deriv : ndarray
+    x_deriv: ndarray
         Incoming partial derivative array, may have one additional dimension.
-    delta_x : float
+    delta_x: float
         Half width of the rounded section.
 
     Returns
@@ -86,13 +86,13 @@ class InterpAkima(InterpAlgorithm):
 
         Parameters
         ----------
-        grid : tuple(ndarray)
+        grid: tuple(ndarray)
             Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
+        values: ndarray
             Array containing the table values for all dimensions.
-        interp : class
+        interp: class
             Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
+        **kwargs: dict
             Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, **kwargs)
@@ -118,12 +118,12 @@ class InterpAkima(InterpAlgorithm):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx: integer
             Interval index for x.
-        slice_idx : List of <slice>
+        slice_idx: list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 

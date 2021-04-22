@@ -28,9 +28,9 @@ def _check_debug_print_opts_valid(name, opts):
 
     Parameters
     ----------
-    name : str
+    name: str
         The name of the option.
-    opts : list
+    opts: list
         The value of the debug_print option set by the user.
     """
     if not isinstance(opts, list):
@@ -49,52 +49,52 @@ class Driver(object):
 
     Attributes
     ----------
-    fail : bool
+    fail: bool
         Reports whether the driver ran successfully.
-    iter_count : int
+    iter_count: int
         Keep track of iterations for case recording.
-    options : <OptionsDictionary>
+    options: <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    recording_options : <OptionsDictionary>
+    recording_options: <OptionsDictionary>
         Dictionary with driver recording options.
-    cite : str
+    cite: str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
-    _problem : weakref to <Problem>
+    _problem: weakref to <Problem>
         Pointer to the containing problem.
-    supports : <OptionsDictionary>
+    supports: <OptionsDictionary>
         Provides a consistent way for drivers to declare what features they support.
-    _designvars : dict
+    _designvars: dict
         Contains all design variable info.
-    _designvars_discrete : list
+    _designvars_discrete: list
         List of design variables that are discrete.
-    _dist_driver_vars : dict
+    _dist_driver_vars: dict
         Dict of constraints that are distributed outputs. Key is abs variable name, values are
         (local indices, local sizes).
-    _cons : dict
+    _cons: dict
         Contains all constraint info.
-    _objs : dict
+    _objs: dict
         Contains all objective info.
-    _responses : dict
+    _responses: dict
         Contains all response info.
-    _remote_dvs : dict
+    _remote_dvs: dict
         Dict of design variables that are remote on at least one proc. Values are
         (owning rank, size).
-    _remote_cons : dict
+    _remote_cons: dict
         Dict of constraints that are remote on at least one proc. Values are
         (owning rank, size).
-    _remote_objs : dict
+    _remote_objs: dict
         Dict of objectives that are remote on at least one proc. Values are
         (owning rank, size).
-    _rec_mgr : <RecordingManager>
+    _rec_mgr: <RecordingManager>
         Object that manages all recorders added to this driver.
-    _coloring_info : dict
+    _coloring_info: dict
         Metadata pertaining to total coloring.
-    _total_jac_sparsity : dict, str, or None
+    _total_jac_sparsity: dict, str, or None
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
-    _res_jacs : dict
+    _res_jacs: dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
-    _total_jac : _TotalJacInfo or None
+    _total_jac: _TotalJacInfo or None
         Cached total jacobian handling object.
     """
 
@@ -104,7 +104,7 @@ class Driver(object):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
@@ -220,7 +220,7 @@ class Driver(object):
 
         Parameters
         ----------
-        recorder : CaseRecorder
+        recorder: CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -246,7 +246,7 @@ class Driver(object):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
+        comm: MPI.Comm or <FakeComm> or None
             The communicator for the Problem.
 
         Returns
@@ -264,7 +264,7 @@ class Driver(object):
 
         Parameters
         ----------
-        problem : <Problem>
+        problem: <Problem>
             Pointer to the containing problem.
         """
         self._problem = weakref.ref(problem)
@@ -419,7 +419,7 @@ class Driver(object):
 
         Parameters
         ----------
-        recording_options : <OptionsDictionary>
+        recording_options: <OptionsDictionary>
             Dictionary with recording options.
 
         Returns
@@ -501,24 +501,24 @@ class Driver(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the variable of interest.
-        meta : dict
+        meta: dict
             Metadata for the variable of interest.
-        remote_vois : dict
+        remote_vois: dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
-        driver_scaling : bool
+        driver_scaling: bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        get_remote : bool or None
+        get_remote: bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
-        rank : int or None
+        rank: int or None
             If not None, gather value to this rank only.
 
         Returns
@@ -617,13 +617,13 @@ class Driver(object):
 
         Parameters
         ----------
-        get_remote : bool or None
+        get_remote: bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
-        driver_scaling : bool
+        driver_scaling: bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
@@ -643,11 +643,11 @@ class Driver(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Global pathname of the design variable.
-        value : float or ndarray
+        value: float or ndarray
             Value for the design variable.
-        set_remote : bool
+        set_remote: bool
             If True, set the global value of the variable (value must be of the global size).
             If False, set the local value of the variable (value must be of the local size).
         """
@@ -712,7 +712,7 @@ class Driver(object):
 
         Parameters
         ----------
-        driver_scaling : bool
+        driver_scaling: bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
@@ -732,13 +732,13 @@ class Driver(object):
 
         Parameters
         ----------
-        ctype : string
+        ctype: string
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-        lintype : string
+        lintype: string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
-        driver_scaling : bool
+        driver_scaling: bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
@@ -790,7 +790,7 @@ class Driver(object):
 
         Parameters
         ----------
-        model : System
+        model: System
             The System that represents the entire model.
 
         Returns
@@ -851,24 +851,24 @@ class Driver(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of: list of variable name strings or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt: list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format : string
+        return_format: string
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        global_names : bool
+        global_names: bool
             Deprecated.  Use 'use_abs_names' instead.
-        use_abs_names : bool
+        use_abs_names: bool
             Set to True when passing in absolute names to skip some translation steps.
 
         Returns
         -------
-        derivs : object
+        derivs: object
             Derivatives in form requested by 'return_format'.
         """
         problem = self._problem()
@@ -938,7 +938,7 @@ class Driver(object):
 
         Parameters
         ----------
-        case_name : str
+        case_name: str
             Name of current case.
 
         Returns
@@ -971,20 +971,20 @@ class Driver(object):
 
         Parameters
         ----------
-        num_full_jacs : int
+        num_full_jacs: int
             Number of times to repeat partial jacobian computation when computing sparsity.
-        tol : float
+        tol: float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
-        orders : int
+        orders: int
             Number of orders above and below the tolerance to check during the tolerance sweep.
-        perturb_size : float
+        perturb_size: float
             Size of input/output perturbation during generation of sparsity.
-        min_improve_pct : float
+        min_improve_pct: float
             If coloring does not improve (decrease) the number of solves more than the given
             percentage, coloring will not be used.
-        show_summary : bool
+        show_summary: bool
             If True, display summary information after generating coloring.
-        show_sparsity : bool
+        show_sparsity: bool
             If True, display sparsity with coloring info after generating coloring.
         """
         self._coloring_info['num_full_jacs'] = num_full_jacs
@@ -1006,7 +1006,7 @@ class Driver(object):
 
         Parameters
         ----------
-        coloring : str
+        coloring: str
             A coloring filename.  If no arg is passed, filename will be determined
             automatically.
 
@@ -1033,7 +1033,7 @@ class Driver(object):
 
         Parameters
         ----------
-        coloring : Coloring or None
+        coloring: Coloring or None
             Current coloring.
         """
         pass
@@ -1112,13 +1112,13 @@ class Driver(object):
 
         Parameters
         ----------
-        outfile : str, optional
+        outfile: str, optional
             The name of the output html file.  Defaults to 'driver_scaling_report.html'.
-        title : str, optional
+        title: str, optional
             Sets the title of the web page.
-        show_browser : bool, optional
+        show_browser: bool, optional
             If True, pop up a browser to view the generated html file. Defaults to True.
-        jac : bool
+        jac: bool
             If True, show jacobian information.
 
         Returns
@@ -1211,7 +1211,7 @@ class RecordingDebugging(Recording):
 
         Returns
         -------
-        self : object
+        self: object
             self
         """
         super().__enter__()
@@ -1224,7 +1224,7 @@ class RecordingDebugging(Recording):
 
         Parameters
         ----------
-        *args : array
+        *args: array
             Solver recording requires extra args.
         """
         self.recording_requester()._post_run_model_debug_print()
@@ -1237,11 +1237,11 @@ def record_iteration(requester, prob, case_name):
 
     Parameters
     ----------
-    requester : Problem or Driver
+    requester: Problem or Driver
         The recording requester.
-    prob : Problem
+    prob: Problem
         The Problem.
-    case_name : str
+    case_name: str
         The name of this case.
     """
     rec_mgr = requester._rec_mgr
