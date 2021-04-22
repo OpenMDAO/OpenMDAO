@@ -5,6 +5,8 @@ Design-of-Experiments Driver.
 import traceback
 import inspect
 
+import numpy as np
+
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
@@ -187,7 +189,10 @@ class DOEDriver(Driver):
         for dv_name, dv_val in case:
             try:
                 msg = None
-                self.set_design_var(dv_name, dv_val)
+                if isinstance(dv_val, np.ndarray):
+                    self.set_design_var(dv_name, dv_val.flatten())
+                else:
+                    self.set_design_var(dv_name, dv_val)
             except ValueError as err:
                 msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
             finally:
