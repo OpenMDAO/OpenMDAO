@@ -226,7 +226,6 @@ def _check_dup_comp_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
-<<<<<<< HEAD
 def _trim_str(obj, size):
     """
     Truncate given string if it's longer than the given size.
@@ -301,8 +300,6 @@ def _list_has_val_mismatch(discretes, names, units, vals):
     return False
 
 
-=======
->>>>>>> c97c82b63605dac987fe6733d672d73b363e90d1
 def _check_hanging_inputs(problem, logger):
     """
     Issue a logger warning if any model inputs are not connected.
