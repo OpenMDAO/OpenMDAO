@@ -178,10 +178,12 @@ jobs:
           coveralls --base_dir $SITE_DIR
           
           if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
-            echo "============================================================="
-            echo "Upload docs"
-            echo "============================================================="
-            python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
+            if [[ ${{ secrets.DOCS_LOCATION }} ]]; then
+              echo "============================================================="
+              echo "Upload docs"
+              echo "============================================================="
+              python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
+            fi
           fi
 
       - uses: act10ns/slack@v1
