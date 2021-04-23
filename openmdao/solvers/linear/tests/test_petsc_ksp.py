@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 

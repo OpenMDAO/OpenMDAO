@@ -491,12 +491,11 @@ class TestUnderMPI(unittest.TestCase):
 
         class myComp(om.ExplicitComponent):
             def initialize(self):
-                self.options['distributed'] = True
                 self.options.declare('foo', recordable=False)
 
             def setup(self):
-                self.add_input('x2')
-                self.add_output('x3')
+                self.add_input('x2', distributed=True)
+                self.add_output('x3', distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['x3'] = inputs['x2'] + 1

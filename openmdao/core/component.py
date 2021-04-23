@@ -109,8 +109,15 @@ class Component(System):
         super()._declare_options()
 
         self.options.declare('distributed', types=bool, default=False,
-                             desc='True if the component has variables that are distributed '
-                                  'across multiple processes.')
+                             desc='True if ALL variables in this component are distributed '
+                                  'across multiple processes.',
+                             deprecation="The 'distributed' option has been deprecated. Individual "
+                                         "inputs and outputs should be set as distributed instead,"
+                                         " using calls to add_input() or add_output().")
+        self.options.declare('run_root_only', types=bool, default=False,
+                             desc='If True, call compute/compute_partials/linearize/apply_linear/'
+                                  'apply_nonlinear/compute_jacvec_product only on '
+                                  'rank 0 and broadcast the results to the other ranks.')
 
     def setup(self):
         """
@@ -152,16 +159,24 @@ class Component(System):
                 issue_warning(f"MPI is not active but num_par_fd = {self._num_par_fd}. No parallel "
                               "finite difference will be performed.",
                               prefix=self.msginfo, category=MPIWarning)
+                self._num_par_fd = 1
 
         self.comm = comm
+        nprocs = comm.size
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
+        if comm.size == 1:
+            self._has_distrib_vars = False
 
-        # reset shape if any dynamic shape parameters are set in case this is a resetup
-        # NOTE: this is necessary because we allow variables to be added in __init__.
         for meta in self._static_var_rel2meta.values():
+            # variable isn't distributed if we're only running on 1 proc
+            if nprocs == 1 and 'distributed' in meta and meta['distributed']:
+                meta['distributed'] = False
+
+            # reset shape if any dynamic shape parameters are set in case this is a resetup
+            # NOTE: this is necessary because we allow variables to be added in __init__.
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
@@ -181,12 +196,12 @@ class Component(System):
         self._set_vector_class()
 
     def _set_vector_class(self):
-        if self.options['distributed']:
+        if self._has_distrib_vars:
             dist_vec_class = self._problem_meta['distributed_vector_class']
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
-                issue_warning("The 'distributed' option is set to True for this component, "
+                issue_warning("Component contains distributed variables, "
                               "but there is no distributed vector implementation (MPI/PETSc) "
                               "available. The default non-distributed vectors will be used.",
                               prefix=self.msginfo, category=DistributedComponentWarning)
@@ -373,6 +388,29 @@ class Component(System):
         """
         pass
 
+    def _run_root_only(self):
+        """
+        Return the value of the run_root_only option and check for possible errors.
+
+        Returns
+        -------
+        bool
+            True if run_root_only is active.
+        """
+        if self.options['run_root_only']:
+            if self.comm.size > 1 or (self._full_comm is not None and self._full_comm.size > 1):
+                if self._has_distrib_vars:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "a component has distributed variables.")
+                if self._num_par_fd > 1:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "using parallel FD.")
+                if len(self._vec_names) > 2:
+                    raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
+                                       "using parallel_deriv_color.")
+                return True
+        return False
+
     def _update_wrt_matches(self, info):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
@@ -428,7 +466,8 @@ class Component(System):
                     meta['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None):
+                  units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
+                  distributed=None):
         """
         Add an input variable to the component.
 
@@ -464,6 +503,9 @@ class Component(System):
         copy_shape: str or None
             If a str, that str is the name of a variable. Shape this input to match that of
             the named variable.
+        distributed: bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
 
         Returns
         -------
@@ -528,6 +570,15 @@ class Component(System):
                              "deprecated and will become an error in a future release.  Add "
                              "`src_indices` to a `promotes` or `connect` call instead.")
 
+        # until we get rid of component level distributed option, handle the case where
+        # component distributed has been set to True but variable distributed has been set
+        # to False by the caller.
+        if distributed is not False:
+            if distributed is None:
+                distributed = False
+            # using ._dict below to avoid tons of deprecation warnings
+            distributed = distributed or self.options._dict['distributed']['value']
+
         metadata = {
             'value': val,
             'shape': shape,
@@ -538,11 +589,14 @@ class Component(System):
             'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
-            'distributed': self.options['distributed'],
+            'distributed': distributed,
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
         }
+
+        # this will get reset later if comm size is 1
+        self._has_distrib_vars |= metadata['distributed']
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -618,7 +672,7 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -666,6 +720,9 @@ class Component(System):
         copy_shape: str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        distributed: bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
 
         Returns
         -------
@@ -753,6 +810,15 @@ class Component(System):
         else:
             self._has_resid_scaling |= np.any(res_ref != 1.0)
 
+        # until we get rid of component level distributed option, handle the case where
+        # component distributed has been set to True but variable distributed has been set
+        # to False by the caller.
+        if distributed is not False:
+            if distributed is None:
+                distributed = False
+            # using ._dict below to avoid tons of deprecation warnings
+            distributed = distributed or self.options._dict['distributed']['value']
+
         metadata = {
             'value': val,
             'shape': shape,
@@ -760,7 +826,7 @@ class Component(System):
             'units': units,
             'res_units': res_units,
             'desc': desc,
-            'distributed': self.options['distributed'],
+            'distributed': distributed,
             'tags': make_set(tags),
             'ref': format_as_float_or_array('ref', ref, flatten=True),
             'ref0': format_as_float_or_array('ref0', ref0, flatten=True),
@@ -770,6 +836,9 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape
         }
+
+        # this will get reset later if comm size is 1
+        self._has_distrib_vars |= metadata['distributed']
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -872,12 +941,9 @@ class Component(System):
 
         Returns
         -------
-        set
+        list
             Names of inputs where src_indices were added.
         """
-        if not self.options['distributed'] or self.comm.size == 1:
-            return set()
-
         iproc = self.comm.rank
         abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_in = all_abs2meta['input']
@@ -885,13 +951,13 @@ class Component(System):
 
         sizes_in = self._var_sizes['nonlinear']['input']
         sizes_out = all_sizes['nonlinear']['output']
-        added_src_inds = set()
-        for i, iname in enumerate(self._var_allprocs_abs2meta['input']):
-            if iname in abs2meta_in and abs2meta_in[iname]['src_indices'] is None:
-                meta_in = abs2meta_in[iname]
-                src = abs_in2out[iname]
-                out_i = all_abs2idx[src]
-                nzs = np.nonzero(sizes_out[:, out_i])[0]
+        added_src_inds = []
+        # loop over continuous inputs (all procs)
+        for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
+            src = abs_in2out[iname]
+            if meta_in['src_indices'] is None and (
+                    meta_in['distributed'] or all_abs2meta_out[src]['distributed']):
+                nzs = np.nonzero(sizes_out[:, all_abs2idx[src]])[0]
                 if (all_abs2meta_out[src]['global_size'] ==
                         all_abs2meta_in[iname]['global_size'] or nzs.size == self.comm.size):
                     # This offset assumes a 'full' distributed output
@@ -900,7 +966,7 @@ class Component(System):
                 else:  # distributed output (may have some zero size entries)
                     if nzs.size == 1:
                         offset = 0
-                        end = sizes_out[nzs[0], out_i]
+                        end = sizes_out[nzs[0], all_abs2idx[src]]
                     else:
                         # total sizes differ and output is distributed, so can't determine mapping
                         raise RuntimeError(f"{self.msginfo}: Can't determine src_indices "
@@ -912,8 +978,7 @@ class Component(System):
                     inds = inds.reshape(meta_in['shape'])
                 meta_in['src_indices'] = inds
                 meta_in['flat_src_indices'] = True
-                all_abs2meta_in[iname]['has_src_indices'] = True
-                added_src_inds.add(iname)
+                added_src_inds.append(iname)
 
                 issue_warning(f"Component is distributed but input '{iname}' was "
                               "added without src_indices. Setting src_indices to "
@@ -1372,12 +1437,12 @@ class Component(System):
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if not abs2meta_out[of]['distributed']:
-                            # non-distributed components are not allowed to have zero size inputs
-                            raise ValueError(msg.format(self.msginfo, of))
-                        else:
+                        if abs2meta_out[of]['distributed']:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
+                        else:
+                            # non-distributed components are not allowed to have zero size inputs
+                            raise ValueError(msg.format(self.msginfo, of))
                     if shape[1] == 0:
                         if wrt in abs2meta_in:
                             distrib = abs2meta_in[wrt]['distributed']
@@ -1578,7 +1643,3 @@ class _DictValues(object):
 
     def items(self):
         return [(key, self._dict[key]['value']) for key in self._dict]
-
-    def iteritems(self):
-        for key, val in self._dict.iteritems():
-            yield key, val['value']

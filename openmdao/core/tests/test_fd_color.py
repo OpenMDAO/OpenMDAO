@@ -19,8 +19,6 @@ from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring, Coloring
 
-from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
-
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
 try:

@@ -802,7 +802,7 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices and name not in self.remote_vois:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if MPI and meta['distributed'] and model.comm.size > 1 and self.get_remote:
+                    if MPI and meta['distributed'] and self.get_remote:
                         if indices is not None:
                             local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 

@@ -217,11 +217,9 @@ class System(object):
         across multiple processes.
     _vars_to_gather: dict
         Contains names of non-distributed variables that are remote on at least one proc in the comm
-    _dist_var_locality: dict
-        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out: {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned by this system
-        or any descendant system. The data is the same across all processors.
+        Dictionary containing all explicit & implicit connections (continuous and discrete)
+        owned by this system or any descendant system. The data is the same across all processors.
     _vectors: {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs: <Vector>
@@ -307,7 +305,11 @@ class System(object):
         True if this system has scaling that includes an adder term.
     _has_bounds: bool
         True if this system has upper or lower bounds on outputs.
-    _owning_rank: dict
+    _has_distrib_vars: bool
+        If True, this System contains at least one distributed variable. Used to determine if a
+        parallel group or distributed component is below a DirectSolver so that we can raise an
+        exception.
+    _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
         Dict of list of var names to record
@@ -400,7 +402,6 @@ class System(object):
         self._subsystems_allprocs = {}
         self._subsystems_myproc = []
         self._vars_to_gather = {}
-        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
@@ -479,9 +480,10 @@ class System(object):
         self._has_input_scaling = False
         self._has_input_adder = False
         self._has_bounds = False
+        self._has_distrib_vars = False
+        self._has_approx = False
 
         self._vector_class = None
-        self._has_approx = False
 
         self._assembled_jac = None
 
@@ -4488,10 +4490,16 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            src_indices = None  # FIXME: remote var could have src_indices
+            if 'src_slice' in vmeta:
+                smeta = self._var_allprocs_abs2meta['output'][src]
+                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
+                                             smeta['shape'])
+            else:
+                src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
+        vdynshape = vmeta['shape_by_conn']
         has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
                               for n in abs_ins)
 
@@ -4514,7 +4522,14 @@ class System(object):
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
                     vshape = shp
-        else:
+
+        if self.comm.size > 1 and get_remote:
+            if self.comm.rank == self._owning_rank[abs_name]:
+                self.comm.bcast(has_src_indices, root=self.comm.rank)
+            else:
+                has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
+
+        if name not in scope_sys._var_prom2inds:
             is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
             src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
@@ -4522,6 +4537,7 @@ class System(object):
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
+        dynshape = vdynshape or smeta['shape_by_conn']
         slocal = src in model_ref._var_abs2meta['output']
 
         if self.comm.size > 1:
@@ -4546,7 +4562,7 @@ class System(object):
                 if is_slice:
                     val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
-                elif distrib and (sdistrib or not slocal) and not get_remote:
+                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes[vec_name]['output'][:, var_idx]
@@ -4554,7 +4570,7 @@ class System(object):
                     end = start + sizes[self.comm.rank]
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
-                            src_indices = src_indices - np.min(src_indices)
+                            src_indices = src_indices - start
                         val = val.ravel()[src_indices]
                         fail = 0
                     else:

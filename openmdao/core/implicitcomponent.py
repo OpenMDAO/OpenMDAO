@@ -67,11 +67,22 @@ class ImplicitComponent(Component):
         """
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
+                args = [self._inputs, self._outputs, self._residuals]
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals,
-                                         self._discrete_inputs, self._discrete_outputs)
+                    args += [self._discrete_inputs, self._discrete_outputs]
+
+                if self._run_root_only():
+                    if self.comm.rank == 0:
+                        self.apply_nonlinear(*args)
+                        self.comm.bcast([self._residuals.asarray(), self._discrete_outputs], root=0)
+                    else:
+                        new_res, new_disc_outs = self.comm.bcast(None, root=0)
+                        self._residuals.set_val(new_res)
+                        if new_disc_outs:
+                            for name, val in new_disc_outs.items():
+                                self._discrete_outputs[name] = val
                 else:
-                    self.apply_nonlinear(self._inputs, self._outputs, self._residuals)
+                    self.apply_nonlinear(*args)
 
         self.iter_count_apply += 1
 
@@ -86,11 +97,22 @@ class ImplicitComponent(Component):
             with self._unscaled_context(outputs=[self._outputs]):
                 with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
                     with self._call_user_function('solve_nonlinear'):
+                        args = [self._inputs, self._outputs]
                         if self._discrete_inputs or self._discrete_outputs:
-                            self.solve_nonlinear(self._inputs, self._outputs,
-                                                 self._discrete_inputs, self._discrete_outputs)
+                            args += [self._discrete_inputs, self._discrete_outputs]
+                        if self._run_root_only():
+                            if self.comm.rank == 0:
+                                self.solve_nonlinear(*args)
+                                self.comm.bcast([self._outputs.asarray(), self._discrete_outputs],
+                                                root=0)
+                            else:
+                                new_res, new_disc_outs = self.comm.bcast(None, root=0)
+                                self._outputs.set_val(new_res)
+                                if new_disc_outs:
+                                    for name, val in new_disc_outs.items():
+                                        self._discrete_outputs[name] = val
                         else:
-                            self.solve_nonlinear(self._inputs, self._outputs)
+                            self.solve_nonlinear(*args)
 
         # Iteration counter is incremented in the Recording context manager at exit.
 
@@ -120,6 +142,34 @@ class ImplicitComponent(Component):
                     self._inputs.set_complex_step_mode(True)
                     self._outputs.set_complex_step_mode(True)
                     self._residuals.set_complex_step_mode(True)
+
+    def _apply_linear_wrapper(self, *args):
+        """
+        Call apply_linear based on the value of the "run_root_only" option.
+
+        Parameters
+        ----------
+        *args: list
+            List of positional arguments.
+        """
+        inputs, outputs, d_inputs, d_outputs, d_residuals, mode = args
+        if self._run_root_only():
+            if self.comm.rank == 0:
+                self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
+                if mode == 'fwd':
+                    self.comm.bcast(d_residuals.asarray(), root=0)
+                else:  # rev
+                    self.comm.bcast((d_inputs.asarray(), d_outputs.asarray()), root=0)
+            else:
+                if mode == 'fwd':
+                    new_res = self.comm.bcast(None, root=0)
+                    d_residuals.set_val(new_res)
+                else:  # rev
+                    new_ins, new_outs = self.comm.bcast(None, root=0)
+                    d_inputs.set_val(new_ins)
+                    d_outputs.set_val(new_outs)
+        else:
+            self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
         """
@@ -186,15 +236,16 @@ class ImplicitComponent(Component):
                                         d_inputs._icol = i
                                         d_outputs._icol = i
                                         d_residuals._icol = i
-                                        self.apply_linear(self._inputs, self._outputs,
-                                                          d_inputs, d_outputs, d_residuals, mode)
+                                        self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                                   d_inputs, d_outputs, d_residuals,
+                                                                   mode)
                                 d_inputs._icol = None
                                 d_outputs._icol = None
                                 d_residuals._icol = None
                         else:
                             with self._call_user_function('apply_linear', protect_outputs=True):
-                                self.apply_linear(self._inputs, self._outputs,
-                                                  d_inputs, d_outputs, d_residuals, mode)
+                                self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                           d_inputs, d_outputs, d_residuals, mode)
                     finally:
                         d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
@@ -258,6 +309,25 @@ class ImplicitComponent(Component):
                 if method is not None and method in self._approx_schemes:
                     yield abs_key
 
+    def _linearize_wrapper(self):
+        """
+        Call linearize based on the value of the "run_root_only" option.
+        """
+        with self._call_user_function('linearize', protect_outputs=True):
+            args = [self._inputs, self._outputs, self._jacobian]
+            if self._discrete_inputs or self._discrete_outputs:
+                args += [self._discrete_inputs, self._discrete_outputs]
+
+            if self._run_root_only():
+                if self.comm.rank == 0:
+                    self.linearize(*args)
+                    self.comm.bcast(list(self._jacobian.items()), root=0)
+                else:
+                    for key, val in self.comm.bcast(None, root=0):
+                        self._jacobian[key] = val
+            else:
+                self.linearize(*args)
+
     def _linearize(self, jac=None, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -277,12 +347,7 @@ class ImplicitComponent(Component):
             for approximation in self._approx_schemes.values():
                 approximation.compute_approximations(self, jac=self._jacobian)
 
-            with self._call_user_function('linearize', protect_outputs=True):
-                if self._discrete_inputs or self._discrete_outputs:
-                    self.linearize(self._inputs, self._outputs, self._jacobian,
-                                   self._discrete_inputs, self._discrete_outputs)
-                else:
-                    self.linearize(self._inputs, self._outputs, self._jacobian)
+            self._linearize_wrapper()
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)

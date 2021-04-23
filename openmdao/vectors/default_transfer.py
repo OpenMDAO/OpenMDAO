@@ -70,16 +70,20 @@ class DefaultTransfer(Transfer):
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
-            sizes_out = group._var_sizes[vec_name]['output']
             offsets_in = offsets[vec_name]['input']
+            if sizes_in.size > 0:
+                sizes_in = sizes_in[iproc]
+                offsets_in = offsets_in[iproc]
             offsets_out = offsets[vec_name]['output']
+            if offsets_out.size > 0:
+                offsets_out = offsets_out[iproc]
 
             # Loop through all connections owned by this group
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
-                # Only continue if the input exists on this processor
+                # This weeds out discrete vars (all vars are local if using this Transfer)
                 if abs_in in abs2meta['input']:
 
                     indices = None
@@ -97,16 +101,15 @@ class DefaultTransfer(Transfer):
                             src_indices = convert_neg(src_indices, meta_out['global_size'])
 
                     # 1. Compute the output indices
-                    offset = offsets_out[iproc, idx_out]
+                    offset = offsets_out[idx_out]
                     if src_indices is None:
                         output_inds = np.arange(offset, offset + meta_in['size'], dtype=INT_DTYPE)
                     else:
                         output_inds = src_indices + offset
 
                     # 2. Compute the input indices
-                    input_inds = np.arange(offsets_in[iproc, idx_in],
-                                           offsets_in[iproc, idx_in] +
-                                           sizes_in[iproc, idx_in], dtype=INT_DTYPE)
+                    input_inds = np.arange(offsets_in[idx_in],
+                                           offsets_in[idx_in] + sizes_in[idx_in], dtype=INT_DTYPE)
                     if indices is not None:
                         input_inds = input_inds.reshape(indices.shape)
 

@@ -35,6 +35,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
+from openmdao.warnings import warn_deprecation
 
 # regex to check for valid names.
 import re
@@ -152,7 +153,7 @@ class Group(System):
     _static_manual_connections: dict
         Dictionary that stores all explicit connections added outside of setup.
     _conn_abs_in2out: {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned
+        Dictionary containing all explicit & implicit continuous var connections owned
         by this system only. The data is the same across all processors.
     _conn_discrete_in2out: {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit discrete var connections owned
@@ -165,9 +166,6 @@ class Group(System):
         Key is system pathname or None for the full, simultaneous transfer.
     _setup_procs_finished: bool
         Flag to check if setup_procs is complete
-    _has_distrib_vars: bool
-        If True, this Group contains distributed variables. Only used to determine if a parallel
-        group or distributed component is below a DirectSolver so that we can raise an exception.
     _contains_parallel_group: bool
         If True, this Group contains a ParallelGroup. Only used to determine if a parallel
         group or distributed component is below a DirectSolver so that we can raise an exception.
@@ -209,7 +207,6 @@ class Group(System):
         self._transfers = {}
         self._discrete_transfers = {}
         self._setup_procs_finished = False
-        self._has_distrib_vars = False
         self._contains_parallel_group = False
         self._raise_connection_errors = True
         self._order_set = False
@@ -764,32 +761,86 @@ class Group(System):
         if self.comm.size > 1:
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             all_abs2meta = self._var_allprocs_abs2meta
-            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_in = all_abs2meta['input']
             conns = self._conn_global_abs_in2out
 
             # the code below is to handle the case where src_indices were not specified
-            # for a distributed input. This update can't happen until sizes are known.
-            dist_ins = [n for n, m in all_abs2meta_in.items() if m['distributed']]
+            # for a distributed input or an input connected to a distributed auto_ivc
+            # output. This update can't happen until sizes are known.
+            dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
+                        (conns[n].startswith('_auto_ivc.') and
+                         all_abs2meta_out[conns[n]]['distributed']))
             dcomp_names = set(d.rsplit('.', 1)[0] for d in dist_ins)
             if dcomp_names:
-                added_src_inds = set()
+                added_src_inds = []
                 for comp in self.system_iter(recurse=True, typ=Component):
                     if comp.pathname in dcomp_names:
-                        added_src_inds.update(
+                        added_src_inds.extend(
                             comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
                                                           self._var_sizes))
-                all_added = set()
-                for a in self.comm.allgather(added_src_inds):
-                    all_added.update(a)
 
-                for a in all_added:
+                updated = set()
+                for alist in self.comm.allgather(added_src_inds):
+                    updated.update(alist)
+
+                for a in updated:
                     all_abs2meta_in[a]['has_src_indices'] = True
-                    if a in conns:
-                        src = conns[a]
-                        if src.startswith('_auto_ivc.'):
-                            all_abs2meta_out[src]['distributed'] = True
 
         self._resolve_src_indices()
+
+        if self.comm.size > 1:
+            allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+            allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+            abs2meta_in = self._var_abs2meta['input']
+            for abs_in, abs_out in sorted(conns.items()):
+                if abs_out not in allprocs_abs2meta_out:
+                    continue  # discrete var
+                all_meta_out = allprocs_abs2meta_out[abs_out]
+                all_meta_in = allprocs_abs2meta_in[abs_in]
+                in_dist = all_meta_in['distributed']
+                out_dist = all_meta_out['distributed']
+
+                # check that src_indices match for dist->serial connection
+                # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
+                # memory issues if src_indices are large.  Maybe try something like computing a hash
+                # in each rank and comparing those?
+                if out_dist and not in_dist:
+                    # all serial inputs must have src_indices if they connect to a distributed
+                    # output
+                    owner = self._owning_rank[abs_in]
+                    if abs_in in abs2meta_in:  # input is local
+                        src_inds = abs2meta_in[abs_in]['src_indices']
+                    else:
+                        src_inds = None
+                    if self.comm.rank == owner:
+                        baseline = None
+                        err = 0
+                        for sinds in self.comm.gather(src_inds, root=owner):
+                            if sinds is not None:
+                                if baseline is None:
+                                    baseline = sinds
+                                else:
+                                    if not np.all(sinds == baseline):
+                                        err = 1
+                                        break
+                        if baseline is None:  # no src_indices were set
+                            err = -1
+                        self.comm.bcast(err, root=owner)
+                    else:
+                        self.comm.gather(src_inds, root=owner)
+                        err = self.comm.bcast(None, root=owner)
+                    if err == 1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' because "
+                                           "src_indices differ on different ranks.")
+                    elif err == -1:
+                        raise RuntimeError(f"{self.msginfo}: Can't connect distributed output "
+                                           f"'{abs_out}' to serial input '{abs_in}' without "
+                                           "specifying src_indices.")
+                elif in_dist and not out_dist:
+                    warn_deprecation(f"Connection between serial output '{abs_out}' and distributed"
+                                     f" input '{abs_in}' is deprecated and will become an error "
+                                     "in a future release.")
 
     def _get_group_input_meta(self, prom_in, meta_name):
         if prom_in in self._group_inputs:
@@ -814,10 +865,10 @@ class Group(System):
         abs2meta_in = self._var_abs2meta['input']
         tdict = {}
         for tgt, src in self._conn_global_abs_in2out.items():
-            # skip remote vars, discretes and auto_ivcs
-            if tgt not in abs2meta_in or src.startswith('_auto_ivc.'):
+            # skip remote vars, discretes and non-distributed auto_ivcs
+            if tgt not in abs2meta_in or src not in all_abs2meta_out:
                 continue
-            if src not in all_abs2meta_out:
+            if src.startswith('_auto_ivc.') and not all_abs2meta_out[src]['distributed']:
                 continue
 
             src_inds = flat_src_inds = None
@@ -872,7 +923,7 @@ class Group(System):
                         pinfo = pinfo.convert_from(oldinfo)
                     except Exception as err:
                         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-                        parinput = tprom if oldinfo.parent is None else oldinfo.prom_path()
+                        parinput = prom if oldinfo.parent is None else oldinfo.prom_path()
                         if tgt in conns:
                             src = conns[tgt]
                             owner, sprom, tprom = get_connection_owner(self, tgt)
@@ -964,10 +1015,7 @@ class Group(System):
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
-            if isinstance(subsys, Component):
-                self._has_distrib_vars |= subsys.options['distributed']
-            else:
-                self._has_distrib_vars |= subsys._has_distrib_vars
+            self._has_distrib_vars |= subsys._has_distrib_vars
 
             var_maps = subsys._get_promotion_maps()
             promotes_src_indices = {}
@@ -1023,7 +1071,7 @@ class Group(System):
                                                     mysub._full_comm.rank == 0)):
                 raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
-                       self._has_resid_scaling, self._group_inputs)
+                       self._has_resid_scaling, self._group_inputs, self._has_distrib_vars)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
@@ -1032,7 +1080,8 @@ class Group(System):
                     False,
                     False,
                     False,
-                    {}
+                    {},
+                    False,
                 )
 
             gathered = self.comm.allgather(raw)
@@ -1046,10 +1095,11 @@ class Group(System):
 
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
-                       oscale, oadd, rscale, ginputs) in enumerate(gathered):
+                       oscale, oadd, rscale, ginputs, has_dist_vars) in enumerate(gathered):
                 self._has_output_scaling |= oscale
                 self._has_output_adder |= oadd
                 self._has_resid_scaling |= rscale
+                self._has_distrib_vars |= has_dist_vars
 
                 if rank != myrank:
                     for p, mlist in ginputs.items():
@@ -1059,10 +1109,6 @@ class Group(System):
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
-                    for n, m in proc_abs2meta[io].items():
-                        if m['distributed']:
-                            self._has_distrib_vars = True
-
                     allprocs_discrete[io].update(proc_discrete[io])
 
                     for prom_name, abs_names_list in proc_prom2abs_list[io].items():
@@ -1113,7 +1159,7 @@ class Group(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
-        self._vars_to_gather, self._dist_var_locality = self._find_remote_var_owners()
+        self._vars_to_gather = self._find_remote_var_owners()
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -1204,34 +1250,28 @@ class Group(System):
 
     def _find_remote_var_owners(self):
         """
-        Return a mapping of var pathname to owning rank and distrib var name locality.
+        Return a mapping of var pathname to owning rank.
 
-        The first mapping will contain ONLY systems that are remote on at least one proc.
+        The mapping will contain ONLY systems that are remote on at least one proc.
         Distributed systems are not included.
-
-        The second will contain only distrib vars keyed to an array of local ranks.
 
         Returns
         -------
         dict
             The mapping of variable pathname to owning rank.
-        dict
-            The mapping of distrib var name to local ranks.
         """
         remote_vars = {}
-        dists = {}
 
         if self.comm.size > 1:
             myproc = self.comm.rank
             nprocs = self.comm.size
 
             for io in ('input', 'output'):
-                all_abs2prom = self._var_allprocs_abs2prom[io]
                 abs2prom = self._var_abs2prom[io]
                 abs2meta = self._var_allprocs_abs2meta[io]
 
                 # var order must be same on all procs
-                sorted_names = sorted(all_abs2prom)
+                sorted_names = sorted(self._var_allprocs_abs2prom[io])
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
                     if name in abs2prom:
@@ -1243,11 +1283,11 @@ class Group(System):
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
                     if name in abs2meta and abs2meta[name]['distributed']:
-                        dists[name] = nzs
+                        pass
                     elif 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
-        return remote_vars, dists
+        return remote_vars
 
     def _setup_var_sizes(self):
         """
@@ -1421,7 +1461,7 @@ class Group(System):
 
         src_ind_inputs = set()
         abs2meta = self._var_abs2meta['input']
-        allprocs_abs2meta = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
         # Add explicit connections (only ones declared by this group)
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
@@ -1486,7 +1526,7 @@ class Group(System):
                         continue
 
                 if src_indices is not None:
-                    a2m = allprocs_abs2meta[abs_in]
+                    a2m = allprocs_abs2meta_in[abs_in]
                     if (a2m['shape_by_conn'] or a2m['copy_shape']):
                         raise ValueError(f"{self.msginfo}: Setting of 'src_indices' along with "
                                          f"'shape_by_conn' or 'copy_shape' for variable '{abs_in}' "
@@ -1560,8 +1600,8 @@ class Group(System):
                 else:
                     issue_warning(msg, category=SetupWarning)
 
-        # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            # If running in parallel, allgather
             if self._subsystems_myproc and self._subsystems_myproc[0].comm.rank == 0:
                 raw = (global_abs_in2out, src_ind_inputs)
             else:
@@ -1575,36 +1615,7 @@ class Group(System):
             src_ind_inputs = all_src_ind_ins
 
         for inp in src_ind_inputs:
-            allprocs_abs2meta[inp]['has_src_indices'] = True
-
-    def _evenly_distribute_sizes_to_locals(self, var, arr_size):
-        """
-        Evenly distribute entries for the given array size, but only where the given var is local.
-
-        Parameters
-        ----------
-        var: str
-            Absolute name of the variable.
-        arr_size: int
-            Size to be distributed among procs where var is local.
-
-        Returns
-        -------
-        ndarray
-            Array of sizes, one entry for each proc in this group's comm.
-        ndarray
-            Array of offsets.
-        """
-        sizes = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        locality = self._dist_var_locality[var]
-        dsizes, offsets = evenly_distrib_idxs(locality.size, arr_size)
-        for loc_idx, sz in zip(locality, dsizes):
-            sizes[loc_idx] = sz
-
-        offsets = np.zeros(self.comm.size, dtype=INT_DTYPE)
-        offsets[1:] = np.cumsum(sizes)[:-1]
-
-        return sizes, offsets
+            allprocs_abs2meta_in[inp]['has_src_indices'] = True
 
     def _setup_dynamic_shapes(self):
         """
@@ -1612,12 +1623,14 @@ class Group(System):
         """
         self._shapes_graph = graph = nx.OrderedGraph()  # ordered graph for consistency across procs
         self._shape_knowns = knowns = set()
+        all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        all_abs2meta_in = self._var_allprocs_abs2meta['input']
 
         def copy_var_meta(from_var, to_var, distrib_sizes):
             # copy size/shape info from from_var's metadata to to_var's metadata
 
-            from_io = 'output' if from_var in self._var_allprocs_abs2meta['output'] else 'input'
-            to_io = 'output' if to_var in self._var_allprocs_abs2meta['output'] else 'input'
+            from_io = 'output' if from_var in all_abs2meta_out else 'input'
+            to_io = 'output' if to_var in all_abs2meta_out else 'input'
 
             # transfer shape/size info from from_var to to_var
             all_from_meta = self._var_allprocs_abs2meta[from_io][from_var]
@@ -1633,63 +1646,31 @@ class Group(System):
 
             to_dist = nprocs > 1 and all_to_meta['distributed']
 
-            # distrib to distrib or serial to serial
-            if (from_dist and to_dist) or not (from_dist or to_dist):
-                # all copy_shapes (and some shape_by_conn) handled here
-                all_to_meta['shape'] = from_shape
-                all_to_meta['size'] = from_size
-                if to_meta:
-                    to_meta['shape'] = from_shape
-                    to_meta['size'] = from_size
-                    to_meta['value'] = np.full(from_shape, to_meta['value'])
-                if to_dist and from_dist:
-                    distrib_sizes[to_var] = distrib_sizes[from_var]
-                # src_indices will be computed later for dist inputs that don't specify them
-            elif from_io == 'output':
-                # from_var is an output.  assume to_var is an input
-                if from_dist and not to_dist:  # known dist output to serial input
-                    size = np.sum(distrib_sizes[from_var])
-                else:  # known serial output to dist input
-                    # there is not enough info to determine how the variable is split
-                    # over the procs. for now we split the variable up equally
-                    rank = self.comm.rank
-                    sizes, offsets = self._evenly_distribute_sizes_to_locals(to_var, from_size)
-                    size = sizes[rank]
-                    distrib_sizes[to_var] = np.array(sizes)
-                    if to_meta:
-                        to_meta['src_indices'] = np.arange(offsets[rank],
-                                                           offsets[rank] + sizes[rank],
-                                                           dtype=INT_DTYPE)
-                all_to_meta['size'] = size
-                all_to_meta['shape'] = (size,)
-                if to_meta:
-                    to_meta['size'] = size
-                    to_meta['shape'] = (size,)
-                    to_meta['value'] = np.full(size, to_meta['value'])
-            else:  # from_var is an input
-                if not from_dist and to_dist:   # known serial input to dist output
-                    sizes, _ = self._evenly_distribute_sizes_to_locals(to_var, from_size)
-                    size = sizes[self.comm.rank]
-                    distrib_sizes[to_var] = np.array(sizes)
+            # known dist output to/from serial input.  We don't allow this case because serial
+            # variables must have the same value on all procs and the only way this is possible is
+            # if the src_indices on each proc are identical, but that's not possible if we assume
+            # 'always local' transfer (see POEM 46).
+            if from_dist and not to_dist:
+                if from_io == 'output':
+                    raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
+                                       f"'{to_var}' from distributed {from_io} '{from_var}' is not "
+                                       "supported.")
+                else:  # serial_out <- dist_in
+                    # all input rank sizes must be the same
+                    if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
+                        raise RuntimeError(f"{self.msginfo}: dynamic sizing of serial {to_io} "
+                                           f"'{to_var}' from distributed {from_io} '{from_var}' is "
+                                           f"not supported because not all {from_var} ranks are "
+                                           f"the same size (sizes={distrib_sizes[from_var]}).")
 
-                else:  # known dist input to serial output
-                    if all_from_meta['has_src_indices']:
-                        # in this case we have to set the size of the serial output based on
-                        # the largest entry in src_indices across all procs.
-                        mx = np.max(from_meta['src_indices']) if 'src_indices' in from_meta else 0
-                        local_max = np.array([mx], dtype=INT_DTYPE)
-                        global_max = np.zeros(1, dtype=INT_DTYPE)
-                        self.comm.Allreduce(local_max, global_max, op=MPI.MAX)
-                        size = global_max[0]
-                    else:  # src_indices are not set, so just sum up the sizes
-                        size = np.sum(distrib_sizes[from_var])
-
-                all_to_meta['size'] = size
-                all_to_meta['shape'] = (size,)
-                if to_meta:
-                    to_meta['size'] = size
-                    to_meta['shape'] = (size,)
-                    to_meta['value'] = np.full(size, to_meta['value'])
+            all_to_meta['shape'] = from_shape
+            all_to_meta['size'] = from_size
+            if to_meta:
+                to_meta['shape'] = from_shape
+                to_meta['size'] = from_size
+                to_meta['value'] = np.full(from_shape, to_meta['value'])
+            if from_var in distrib_sizes:
+                distrib_sizes[to_var] = distrib_sizes[from_var]
 
         all_abs2prom_in = self._var_allprocs_abs2prom['input']
         all_abs2prom_out = self._var_allprocs_abs2prom['output']
@@ -1710,8 +1691,6 @@ class Group(System):
         graph = nx.OrderedGraph()  # ordered graph for consistency across procs
         dist_sz = {}  # local distrib sizes
         knowns = set()  # variable nodes in the graph with known shapes
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
 
@@ -1752,7 +1731,7 @@ class Group(System):
                                            f"'{abs_from}'. Variable doesn't exist.")
 
                 # store known distributed size info needed for computing shapes
-                if nprocs > 1 and meta['distributed']:
+                if nprocs > 1:
                     my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
                     if name in my_abs2meta:
                         sz = my_abs2meta[name]['size']
@@ -1943,11 +1922,12 @@ class Group(System):
         # This way, we don't repeat the error checking in multiple groups.
 
         for abs_in, abs_out in abs_in2out.items():
-            all_abs_out = allprocs_abs2meta_out[abs_out]
+            all_meta_out = allprocs_abs2meta_out[abs_out]
+            all_meta_in = allprocs_abs2meta_in[abs_in]
 
             # check unit compatibility
-            out_units = all_abs_out['units']
-            in_units = allprocs_abs2meta_in[abs_in]['units']
+            out_units = all_meta_out['units']
+            in_units = all_meta_in['units']
 
             if out_units:
                 if not in_units:
@@ -1973,7 +1953,6 @@ class Group(System):
             # check shape compatibility
             if abs_in in abs2meta_in and abs_out in abs2meta_out:
                 meta_in = abs2meta_in[abs_in]
-                all_meta_out = allprocs_abs2meta_out[abs_out]
 
                 # get output shape from allprocs meta dict, since it may
                 # be distributed (we want global shape)
@@ -2079,7 +2058,7 @@ class Group(System):
                         else:
                             meta_in['src_indices'] = src_indices
 
-                        if src_indices.shape != in_shape and flat_array_slice_check:
+                        if src_indices.size != shape_to_len(in_shape) and flat_array_slice_check:
                             msg = f"{self.msginfo}: src_indices shape " + \
                                   f"{src_indices.shape} does not match {abs_in} shape " + \
                                   f"{in_shape}."
@@ -2090,8 +2069,7 @@ class Group(System):
                                 fail = True
                     else:
                         for d in range(source_dimensions):
-                            if all_abs_out['distributed'] or \
-                               allprocs_abs2meta_in[abs_in]['distributed']:
+                            if all_meta_out['distributed'] or all_meta_in['distributed']:
                                 d_size = out_shape[d] * self.comm.size
                             else:
                                 d_size = out_shape[d]
@@ -2115,8 +2093,8 @@ class Group(System):
                             # now convert src_indices into a flat array
                             meta_in['src_indices'] = \
                                 _flatten_src_indices(src_indices, in_shape,
-                                                     all_abs_out['global_shape'],
-                                                     all_abs_out['global_size'])
+                                                     all_meta_out['global_shape'],
+                                                     all_meta_out['global_size'])
 
             elif abs_in in abs2meta_in:
                 # Source is not local, but target is. We need to flatten the src_indices here too.
@@ -2125,8 +2103,8 @@ class Group(System):
                 if src_indices is not None:
                     meta_in['src_indices'] = \
                         _flatten_src_indices(src_indices, meta_in['shape'],
-                                             all_abs_out['global_shape'],
-                                             all_abs_out['global_size'])
+                                             all_meta_out['global_shape'],
+                                             all_meta_out['global_size'])
 
     def _set_subsys_connection_errors(self, val=True):
         """
@@ -2316,9 +2294,9 @@ class Group(System):
                     raise TypeError(f"{self.msginfo}: src_indices must contain integers, but "
                                     f"src_indices for promotes from '{subsys_name}' are type "
                                     f"{src_indices.dtype.type}.")
-            elif not isinstance(src_indices, (int, list, tuple, Iterable)):
+            elif not isinstance(src_indices, (int, list, tuple, slice, Iterable)):
                 raise TypeError(f"{self.msginfo}: The src_indices argument should be an int, "
-                                f"list, tuple, ndarray or Iterable, but src_indices for "
+                                f"list, tuple, ndarray, slice or Iterable, but src_indices for "
                                 f"promotes from '{subsys_name}' are {type(src_indices)}.")
 
             prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)

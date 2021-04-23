@@ -501,8 +501,7 @@ class Solver(object):
             return
 
         from openmdao.core.group import Group
-        if (isinstance(s, Group) and (s._has_distrib_vars or s._contains_parallel_group)) or \
-           (isinstance(s, Component) and s.options['distributed']):
+        if s._has_distrib_vars or (isinstance(s, Group) and s._contains_parallel_group):
             msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
                 "distributed component."
             raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
