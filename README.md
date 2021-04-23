@@ -1,5 +1,4 @@
 [![GitHub Actions Test Badge][17]][18]
-[![TravisCI Badge][9]][10]
 [![Coveralls Badge][13]][14]
 
 # [OpenMDAO][0]
@@ -156,8 +155,6 @@ browser.
 
 [8]: https://help.github.com/articles/changing-a-remote-s-url/ "Update Git Remote URL"
 
-[9]: https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master "TravisCI Badge"
-[10]: https://travis-ci.org/OpenMDAO/OpenMDAO "OpenMDAO @TravisCI"
 [13]: https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master "Coverage Badge"
 [14]: https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master "OpenMDAO @Coveralls"
 
