@@ -15,7 +15,7 @@ class BalanceComp(ImplicitComponent):
 
     Attributes
     ----------
-    _state_vars : dict
+    _state_vars: dict
         Cache the data provided during `add_balance`
         so everything can be saved until setup is called.
     """
@@ -100,35 +100,35 @@ class BalanceComp(ImplicitComponent):
 
         Parameters
         ----------
-        name : str
+        name: str
             The name of the state variable to be created.
-        eq_units : str or None
+        eq_units: str or None
             Units for the left-hand-side and right-hand-side of the equation to be balanced.
-        lhs_name : str or None
+        lhs_name: str or None
             Optional name for the LHS variable associated with the implicit state variable.  If
             None, the default will be used:  'lhs:{name}'.
-        rhs_name : str or None
+        rhs_name: str or None
             Optional name for the RHS variable associated with the implicit state variable.  If
             None, the default will be used:  'rhs:{name}'.
-        rhs_val : int, float, or np.array
+        rhs_val: int, float, or np.array
             Default value for the RHS of the given state.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
-        use_mult : bool
+        use_mult: bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
             input `mult_name` is created, with the default value given by `mult_val`, that
             multiplies lhs.  Default is False.
-        mult_name : str or None
+        mult_name: str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
-        mult_val : int, float, or np.array
+        mult_val: int, float, or np.array
             Default value for the LHS multiplier of the given state.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
-        normalize : bool
+        normalize: bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
             function of the RHS.
-        val : float, int, or np.ndarray
+        val: float, int, or np.ndarray
             Set initial value for the state.
-        **kwargs : dict
+        **kwargs: dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """
@@ -152,11 +152,11 @@ class BalanceComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
         if inputs._under_complex_step:
@@ -191,11 +191,11 @@ class BalanceComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        jacobian : Jacobian
+        jacobian: Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
         if inputs._under_complex_step:
@@ -251,11 +251,11 @@ class BalanceComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
         if self.options['guess_func'] is not None:
@@ -273,35 +273,35 @@ class BalanceComp(ImplicitComponent):
 
         Parameters
         ----------
-        name : str
+        name: str
             The name of the state variable to be created.
-        eq_units : str or None
+        eq_units: str or None
             Units for the left-hand-side and right-hand-side of the equation to be balanced.
-        lhs_name : str or None
+        lhs_name: str or None
             Optional name for the LHS variable associated with the implicit state variable.  If
             None, the default will be used:  'lhs:{name}'.
-        rhs_name : str or None
+        rhs_name: str or None
             Optional name for the RHS variable associated with the implicit state variable.  If
             None, the default will be used:  'rhs:{name}'.
-        rhs_val : int, float, or np.array
+        rhs_val: int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
-        use_mult : bool
+        use_mult: bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
             input `mult_name` is created, with the default value given by `mult_val`, that
             multiplies lhs.  Default is False.
-        mult_name : str or None
+        mult_name: str or None
             Optional name for the LHS multiplier variable associated with the implicit state
             variable. If None, the default will be used: 'mult:{name}'.
-        mult_val : int, float, or np.array
+        mult_val: int, float, or np.array
             Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
-        normalize : bool
+        normalize: bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
             function of the RHS.
-        val : float, int, or np.ndarray
+        val: float, int, or np.ndarray
             Set initial value for the state.
-        **kwargs : dict
+        **kwargs: dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """

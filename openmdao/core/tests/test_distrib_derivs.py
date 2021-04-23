@@ -643,7 +643,7 @@ class MPITests2(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.run_model()
 
-        msg = "'sub' <class Group> : Approx_totals is not supported on a group with a distributed "
+        msg = "'sub' <class Group>: Approx_totals is not supported on a group with a distributed "
         msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
         self.assertEqual(str(context.exception), msg)
 

@@ -32,14 +32,14 @@ class InterpScipy(InterpAlgorithm):
 
     Attributes
     ----------
-    _d_dx : ndarray
+    _d_dx: ndarray
         Cache of computed gradients with respect to evaluation point.
-    _interp_config : dict
+    _interp_config: dict
         Configuration object that stores the number of points required for each interpolation
         method.
-    _ki : list
+    _ki: list
         Interpolation order to be used in each dimension.
-    _xi : ndarray
+    _xi: ndarray
         Cache of current evaluation point.
     """
 
@@ -49,13 +49,13 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        grid : tuple(ndarray)
+        grid: tuple(ndarray)
             Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
+        values: ndarray
             Array containing the table values for all dimensions.
-        interp : class
+        interp: class
             Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
+        **kwargs: dict
             Interpolator-specific options to pass onward.
         """
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -104,7 +104,7 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
 
@@ -131,12 +131,12 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx: integer
             Interval index for x.
-        slice_idx : List of <slice>
+        slice_idx: list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 
@@ -164,13 +164,13 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        data_values : array_like
+        data_values: array_like
             The data on the regular grid in n dimensions.
-        xi : ndarray
+        xi: ndarray
             The coordinates to sample the gridded data at
-        ki : list
+        ki: list
             List of spline interpolation orders.
-        compute_gradients : bool, optional
+        compute_gradients: bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
 
@@ -267,15 +267,15 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        x : array_like, shape (n,)
+        x: array_like, shape (n,)
             Abscissas.
-        y : array_like, shape (n, ...)
+        y: array_like, shape (n, ...)
             Ordinates.
-        pt : array_like
+        pt: array_like
             Points to evaluate the spline at.
-        k : float
+        k: float
             Spline interpolation order.
-        compute_gradients : bool
+        compute_gradients: bool
             If a spline interpolation method is chosen, this determines whether gradient
             calculations should be made and cached.
 
@@ -299,7 +299,7 @@ class InterpScipy(InterpAlgorithm):
 
         Parameters
         ----------
-        pt : ndarray
+        pt: ndarray
             Training point values.
 
         Returns

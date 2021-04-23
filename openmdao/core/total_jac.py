@@ -40,54 +40,54 @@ class _TotalJacInfo(object):
 
     Attributes
     ----------
-    comm : MPI.Comm or <FakeComm>
+    comm: MPI.Comm or <FakeComm>
         The global communicator.
-    debug_print : bool
+    debug_print: bool
         When True, print out debug and timing information for each derivative solved.
-    has_lin_cons : bool
+    has_lin_cons: bool
         If True, this total jacobian contains linear constraints.
-    idx_iter_dict : dict
+    idx_iter_dict: dict
         A dict containing an entry for each outer iteration of the total jacobian computation.
-    J : ndarray
+    J: ndarray
         The dense array form of the total jacobian.
-    J_dict : dict
+    J_dict: dict
         Nested or flat dict with views of the jacobian.
-    J_final : ndarray or dict
+    J_final: ndarray or dict
         If return_format is 'array', Jfinal is J.  Otherwise it's either a nested dict (if
         return_format is 'dict') or a flat dict (return_format 'flat_dict') with views into
         the array jacobian.
-    lin_sol_cache : dict
+    lin_sol_cache: dict
         Dict of indices keyed to solution vectors.
-    mode : str
+    mode: str
         If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
-    model : <System>
+    model: <System>
         The top level System of the System tree.
-    of_meta : dict
+    of_meta: dict
         Map of absolute output 'of' var name to tuples of the form
         (row/column slice, indices, distrib).
-    wrt_meta : dict
+    wrt_meta: dict
         Map of absolute output 'wrt' var name to tuples of the form
         (row/column slice, indices, distrib).
     ivc_print_names :dict
         Dictionary that maps auto_ivc names back to their promoted input names.
-    output_list : list of str
+    output_list: list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
-    output_vec : Dict of vectors keyed by vec_name.
+    output_vec: dict of vectors keyed by vec_name.
         Designated output vectors based on value of fwd.
-    owning_ranks : dict
+    owning_ranks: dict
         Map of absolute var name to the MPI process that owns it.
-    par_deriv : dict
+    par_deriv: dict
         Cache containing names of desvars or responses for each parallel derivative color.
-    par_deriv_printnames : dict
+    par_deriv_printnames: dict
         Companion to par_deriv cache with auto_ivc names mapped to their promoted inputs.
         This is used for debug printing.
-    return_format : str
+    return_format: str
         Indicates the desired return format of the total jacobian. Can have value of
         'array', 'dict', or 'flat_dict'.
-    simul_coloring : Coloring or None
+    simul_coloring: Coloring or None
         Contains all data necessary to simultaneously solve for groups of total derivatives.
-    _dist_driver_vars : dict
+    _dist_driver_vars: dict
         Dict of constraints that are distributed outputs. Key is abs variable name, values are
         (local indices, local sizes).
     """
@@ -99,25 +99,25 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        problem : <Problem>
+        problem: <Problem>
             Reference to that Problem object that contains this _TotalJacInfo.
-        of : iter of str
+        of: iter of str
             Response names.
-        wrt : iter of str
+        wrt: iter of str
             Design variable names.
-        use_abs_names : bool
+        use_abs_names: bool
             If True, names in of and wrt are absolute names.
-        return_format : str
+        return_format: str
             Indicates the desired return format of the total jacobian. Can have value of
             'array', 'dict', or 'flat_dict'.
-        approx : bool
+        approx: bool
             If True, the object will compute approx total jacobians.
-        debug_print : bool
+        debug_print: bool
             Set to True to print out debug and timing information for each derivative solved.
-        driver_scaling : bool
+        driver_scaling: bool
             If True (default), scale derivative values by the quantities specified when the desvars
             and responses were added. If False, leave them unscaled.
-        get_remote : bool
+        get_remote: bool
             Whether to get remote variables if using MPI.
         """
         driver = problem.driver
@@ -462,22 +462,22 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        J : ndarray
+        J: ndarray
             Array jacobian.
-        wrt : iter of str
+        wrt: iter of str
             Absolute names of 'with respect to' vars.
-        prom_wrt : iter of str
+        prom_wrt: iter of str
             Promoted names of 'with respect to' vars.
-        of : iter of str
+        of: iter of str
             Absolute names of output vars.
-        prom_of : iter of str
+        prom_of: iter of str
             Promoted names of output vars.
-        wrt_meta : dict
+        wrt_meta: dict
             Dict mapping absolute 'with respect to' name to array jacobian slice, indices,
             and distrib.
-        of_meta : dict
+        of_meta: dict
             Dict mapping absolute output name to array jacobian slice, indices, and distrib.
-        return_format : str
+        return_format: str
             Indicates the desired form of the returned jacobian.
 
         Returns
@@ -525,7 +525,7 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        mode : str
+        mode: str
             Derivative solution direction.
         """
         iproc = self.comm.rank
@@ -753,13 +753,13 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        names : iter of str
+        names: iter of str
             Names of the variables making up the rows or columns of the jacobian.
-        vois : dict
+        vois: dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        allprocs_abs2meta_out : dict
+        allprocs_abs2meta_out: dict
             Mapping of absolute output name to metadata for that var across all procs.
-        mode : str
+        mode: str
             Derivative solution direction.
 
         Returns
@@ -854,11 +854,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        names : iter of str
+        names: iter of str
             Names of the variables making up the rows or columns of the jacobian.
-        vois : dict
+        vois: dict
             Mapping of variable of interest (desvar or response) name to its metadata.
-        abs2meta_out : dict
+        abs2meta_out: dict
             Mapping of absolute output var name to metadata for that var.
 
         Returns
@@ -904,9 +904,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Yields
@@ -927,9 +927,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Yields
@@ -958,9 +958,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Yields
@@ -982,9 +982,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Yields
@@ -1005,9 +1005,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Yields
@@ -1043,11 +1043,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        idx : int
+        idx: int
             Total jacobian row or column index.
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Returns
@@ -1078,11 +1078,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : list of int
+        inds: list of int
             Total jacobian row or column indices.
-        itermeta : dict
+        itermeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Returns
@@ -1112,11 +1112,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : tuple of int
+        inds: tuple of int
             Total jacobian row or column indices.
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Returns
@@ -1148,11 +1148,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : ndarray of int
+        inds: ndarray of int
             Total jacobian row or column indices.
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Returns
@@ -1192,11 +1192,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : list of ndarray of int
+        inds: list of ndarray of int
             Total jacobian row or column indices.
-        imeta : dict
+        imeta: dict
             Dictionary of iteration metadata.
-        mode : str
+        mode: str
             Direction of derivative solution.
 
         Returns
@@ -1250,9 +1250,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        i : int
+        i: int
             Total jacobian row or column index.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         vecname, _, _ = self.in_idx_map[mode][i]
@@ -1276,9 +1276,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        i : int
+        i: int
             Total jacobian row or column index.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         if (self.get_remote and mode == 'fwd') or (not self.get_remote and mode == 'rev'):
@@ -1315,9 +1315,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        i : int
+        i: int
             Total jacobian row or column index.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         self.simple_single_jac_scatter(i, mode)
@@ -1330,9 +1330,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : tuple of int
+        inds: tuple of int
             Total jacobian row or column indices.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         dist = self.comm.size > 1
@@ -1347,9 +1347,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : list of int
+        inds: list of int
             Total jacobian row or column indices.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         row_col_map = self.simul_coloring.get_row_col_map(mode)
@@ -1387,9 +1387,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : ndarray of int
+        inds: ndarray of int
             Total jacobian row or column indices.
-        mode : str
+        mode: str
             Direction of derivative solution. (ignored)
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
@@ -1428,9 +1428,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        inds : list of ndarray of int
+        inds: list of ndarray of int
             Total jacobian row or column indices.
-        mode : str
+        mode: str
             Direction of derivative solution. (ignored)
         """
         for matmat_idxs in inds:
@@ -1442,7 +1442,7 @@ class _TotalJacInfo(object):
 
         Returns
         -------
-        derivs : object
+        derivs: object
             Derivatives in form requested by 'return_format'.
         """
         debug_print = self.debug_print
@@ -1541,15 +1541,15 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        initialize : bool
+        initialize: bool
             Set to True to re-initialize the FD in model. This is only needed when manually
             calling compute_totals on the problem.
-        progress_out_stream : None or file-like object
+        progress_out_stream: None or file-like object
             Where to send human readable output. None by default which suppresses the output.
 
         Returns
         -------
-        derivs : object
+        derivs: object
             Derivatives in form requested by 'return_format'.
         """
         of = self.of
@@ -1688,9 +1688,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        tol : double
+        tol: double
             Tolerance for the check.
-        raise_error : bool
+        raise_error: bool
             If True, raise an exception if a zero row or column is found.
         """
         J = np.abs(self.J)
@@ -1743,11 +1743,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        vec_names : list of str
+        vec_names: list of str
             Names of output vectors to restore.
-        key : hashable object
+        key: hashable object
             Key to lookup linear solution.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         lin_sol_cache = self.lin_sol_cache
@@ -1768,11 +1768,11 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        vec_names : list of str
+        vec_names: list of str
             Names of output vectors to restore.
-        key : hashable object
+        key: hashable object
             Key to lookup linear solution.
-        mode : str
+        mode: str
             Direction of derivative solution.
         """
         lin_sol = self.lin_sol_cache[key]
@@ -1785,7 +1785,7 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        J : dict
+        J: dict
             Jacobian to be scaled.
         """
         # use promoted names for design vars and responses
@@ -1857,9 +1857,9 @@ class _TotalJacInfo(object):
 
         Parameters
         ----------
-        requester : <Driver>
+        requester: <Driver>
             Object requesting derivatives.
-        metadata : dict
+        metadata: dict
             Dictionary containing execution metadata.
         """
         self.model._recording_iter.push((requester._get_name(), requester.iter_count))
@@ -1879,19 +1879,19 @@ def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, 
 
     Parameters
     ----------
-    jac_meta : dict
+    jac_meta: dict
         Partial subjacobian metadata coming from approx_jac.
-    prom_out : str
+    prom_out: str
         Promoted output name.
-    prom_in : str
+    prom_in: str
         Promoted input name.
-    of_idx : ndarray or slice
+    of_idx: ndarray or slice
         Output indices, if any.
-    wrt_idx : ndarray or slice
+    wrt_idx: ndarray or slice
         Input indices, if any.
-    dist_resp : None or tuple
+    dist_resp: None or tuple
         Tuple containing indices and sizes if this response is distributed.
-    comm : MPI.Comm or <FakeComm>
+    comm: MPI.Comm or <FakeComm>
         MPI communicator object.
 
     Returns
@@ -1946,13 +1946,13 @@ def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):
 
     Parameters
     ----------
-    name : str
+    name: str
         Name of the variable.
-    parallel_deriv_color : str
+    parallel_deriv_color: str
         Color of parallel deriv grouping.
-    matmat : bool
+    matmat: bool
         If True, vectorize derivatives for this variable.
-    simul_coloring : ndarray
+    simul_coloring: ndarray
         Array of colors. Each entry corresponds to a column or row of the total jacobian.
     """
     if simul_coloring:
@@ -1970,7 +1970,7 @@ def _fix_pdc_lengths(idx_iter_dict):
 
     Parameters
     ----------
-    idx_iter_dict : dict
+    idx_iter_dict: dict
         Dict of a name/color mapped to indexing information.
     """
     for imeta, _ in idx_iter_dict.values():
@@ -2003,9 +2003,9 @@ def _update_rel_systems(all_rel_systems, rel_systems):
 
     Parameters
     ----------
-    all_rel_systems : set
+    all_rel_systems: set
         Current set of all relevant system names.
-    rel_systems : set
+    rel_systems: set
         Set of relevant system names for the latest iteration.
     """
     if all_rel_systems is _contains_all or rel_systems is _contains_all:

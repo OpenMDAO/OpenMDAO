@@ -28,7 +28,7 @@ class PETScVector(DefaultVector):
 
     Attributes
     ----------
-    _dup_inds : ndarray of int
+    _dup_inds: ndarray of int
         Array of indices of variables that aren't locally owned, meaning that they duplicate
         variables that are 'owned' by a different process. Used by certain distributed
         calculations, e.g., get_norm(), where including duplicate values would result in
@@ -44,17 +44,17 @@ class PETScVector(DefaultVector):
 
         Parameters
         ----------
-        name : str
+        name: str
             The name of the vector: 'nonlinear', 'linear', or right-hand side name.
-        kind : str
+        kind: str
             The kind of vector, 'input', 'output', or 'residual'.
-        system : <System>
+        system: <System>
             Pointer to the owning system.
-        root_vector : <Vector>
+        root_vector: <Vector>
             Pointer to the vector owned by the root system.
-        alloc_complex : bool
+        alloc_complex: bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
-        ncol : int
+        ncol: int
             Number of columns for multi-vectors.
         """
         super().__init__(name, kind, system, root_vector=root_vector,
@@ -68,7 +68,7 @@ class PETScVector(DefaultVector):
 
         Parameters
         ----------
-        root_vector : Vector or None
+        root_vector: Vector or None
             the root's vector instance or None, if we are at the root.
         """
         super()._initialize_data(root_vector)
@@ -202,7 +202,7 @@ class PETScVector(DefaultVector):
 
         Parameters
         ----------
-        vec : <Vector>
+        vec: <Vector>
             The incoming vector being dotted with self.
 
         Returns

@@ -24,23 +24,23 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    train : bool
+    train: bool
         If True, training will occur on the next execution.
-    _input_size : int
+    _input_size: int
         Keeps track of the cumulative size of all inputs.
-    _surrogate_input_names : [str, ..]
+    _surrogate_input_names: [str, ..]
         List of inputs that are not the training vars.
-    _surrogate_output_names : [str, ..]
+    _surrogate_output_names: [str, ..]
         List of outputs that are not the training vars.
-    _static_input_size : int
+    _static_input_size: int
         Keeps track of the cumulative size of all inputs added outside of setup.
-    _static_surrogate_input_names : [str, ..]
+    _static_surrogate_input_names: [str, ..]
         List of inputs that are not the training vars and are added outside of setup.
-    _static_surrogate_output_names : [str, ..]
+    _static_surrogate_output_names: [str, ..]
         List of outputs that are not the training vars and are added outside of setup.
-    _training_input : dict
+    _training_input: dict
         Training data for inputs.
-    _training_output : dict
+    _training_output: dict
         Training data for outputs.
     """
 
@@ -50,7 +50,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -80,14 +80,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        pathname : str
+        pathname: str
             Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
+        mode: str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint).
-        prob_meta : dict
+        prob_meta: dict
             Problem level options.
         """
         self._surrogate_input_names = []
@@ -116,13 +116,13 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the input.
-        val : float or ndarray
+        val: float or ndarray
             Initial value for the input.
-        training_data : float or ndarray
+        training_data: float or ndarray
             training data for this variable. Optional, can be set by the problem later.
-        **kwargs : dict
+        **kwargs: dict
             Additional agruments for add_input.
 
         Returns
@@ -162,16 +162,16 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name: string
             Name of the variable output.
-        val : float or ndarray
+        val: float or ndarray
             Initial value for the output. While the value is overwritten during execution, it is
             useful for inferring size.
-        training_data : float or ndarray
+        training_data: float or ndarray
             Training data for this variable. Optional, can be set by the problem later.
-        surrogate : <SurrogateModel>, optional
+        surrogate: <SurrogateModel>, optional
             Surrogate model to use for this output; if None, use default surrogate.
-        **kwargs : dict
+        **kwargs: dict
             Additional arguments for add_output.
 
         Returns
@@ -314,7 +314,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        logger : object
+        logger: object
             The object that manages logging output.
         """
         # All outputs must have surrogates assigned either explicitly or through the default
@@ -341,9 +341,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         vec_size = self.options['vec_size']
@@ -401,7 +401,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        vec : <Vector>
+        vec: <Vector>
             pointer to the input vector.
 
         Returns
@@ -430,7 +430,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        vec : <Vector>
+        vec: <Vector>
             pointer to the input vector.
 
         Returns
@@ -462,14 +462,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        of : str or list of str
+        of: str or list of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt: str or list of str
             The name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
-        dependent : bool(True)
+        dependent: bool(True)
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
@@ -478,24 +478,24 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
             allocated for every pair.
-        rows : ndarray of int or None
+        rows: ndarray of int or None
             Row indices for each nonzero entry.  For sparse subjacobians only.
-        cols : ndarray of int or None
+        cols: ndarray of int or None
             Column indices for each nonzero entry.  For sparse subjacobians only.
-        val : float or ndarray of float or scipy.sparse
+        val: float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
-        method : str
+        method: str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
             defined analytic derivatives. Default is 'exact'.
-        step : float
+        step: float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form: string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
+        step_calc: string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
@@ -511,9 +511,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         vec_size = self.options['vec_size']

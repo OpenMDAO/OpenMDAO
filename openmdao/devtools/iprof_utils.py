@@ -60,13 +60,13 @@ def find_qualified_name(filename, line, cache, full=True):
 
     Parameters
     ----------
-    filename : str
+    filename: str
         Name of file containing source code.
-    line : int
+    line: int
         Line number within the given file.
-    cache : dict
+    cache: dict
         A dictionary containing infomation by filename.
-    full : bool
+    full: bool
         If True, assemble the full name else return the parts
 
     Returns
@@ -245,7 +245,7 @@ def _collect_methods(method_patterns=None):
 
     Parameters
     ----------
-    method_patterns : [(pattern1, (class1, class2, ... class_n)), ... (pattern_n, (class_n1, class_n2, ...)]
+    method_patterns: [(pattern1, (class1, class2, ... class_n)), ... (pattern_n, (class_n1, class_n2, ...)]
         List of tuples of glob patterns and lists of classes used for isinstance checks
 
     Returns

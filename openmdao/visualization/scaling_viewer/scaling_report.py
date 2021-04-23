@@ -197,16 +197,16 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
     Parameters
     ----------
-    driver : Driver
+    driver: Driver
         The driver used for the scaling report.
-    outfile : str, optional
+    outfile: str, optional
         The name of the output html file.  Defaults to 'connections.html'.
-    show_browser : bool, optional
+    show_browser: bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
-    title : str, optional
+    title: str, optional
         Sets the title of the web page.
-    jac : bool
+    jac: bool
         If True, show jacobian information.
 
     Returns
@@ -473,7 +473,7 @@ def _scaling_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
@@ -505,9 +505,9 @@ def _scaling_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
     """
     def _set_run_driver_flag(problem):

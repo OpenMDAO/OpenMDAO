@@ -54,7 +54,7 @@ def split_ep(entry_point):
 
     Parameters
     ----------
-    entry_point : EntryPoint
+    entry_point: EntryPoint
         Entry point object.
 
     Returns
@@ -75,11 +75,11 @@ def _filtered_ep_iter(epgroup, includes=None, excludes=()):
 
     Parameters
     ----------
-    epgroup : str
+    epgroup: str
         Entry point group name.
-    includes : iter of str or None
+    includes: iter of str or None
         Sequence of package names to include.
-    excludes : iter of str or None
+    excludes: iter of str or None
         Sequence of package names to exclude.
 
     Yields
@@ -109,11 +109,11 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
 
     Parameters
     ----------
-    package : str
+    package: str
         The package name.
-    dir_excludes : iter of str
+    dir_excludes: iter of str
         Glob patterns for directory exclusion.
-    outstream : file-like
+    outstream: file-like
         Output stream.  Defaults to stdout.
 
     Returns
@@ -246,7 +246,7 @@ def _compute_entry_points_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('package', nargs=1,
@@ -261,9 +261,9 @@ def _compute_entry_points_exec(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str  (ignored)
+    user_args: list of str  (ignored)
         Args to be passed to the user script.
 
     Returns
@@ -284,13 +284,13 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
 
     Parameters
     ----------
-    types : iter of str or None
+    types: iter of str or None
         Sequence of entry point type names, e.g., component, group, driver, etc.
-    includes : iter of str or None
+    includes: iter of str or None
         Sequence of packages to include.
-    excludes : iter of str
+    excludes: iter of str
         Sequence of packages to exclude.
-    show_docs : bool
+    show_docs: bool
         If True, display docstring after each entry.
 
     Returns
@@ -331,7 +331,7 @@ def _list_installed_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('types', nargs='*', help='List these types of installed classes. '
@@ -350,9 +350,9 @@ def _list_installed_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str  (ignored)
+    user_args: list of str  (ignored)
         Args to be passed to the user script.
 
     Returns
@@ -369,7 +369,7 @@ def find_plugins(types=None):
 
     Parameters
     ----------
-    types : iter of str or None
+    types: iter of str or None
         Sequence of entry point type names, e.g., component, group, driver, etc.
 
     Returns
@@ -400,10 +400,10 @@ def find_plugins(types=None):
 
         resdict = response.json()
 
-        if 'items' not in resdict:
+        items = resdict.get('items', None)
+        if not items:
             print(f"Query returned no items for topic '{_github_topics[type_]}'.")
         else:
-            items = resdict['items']
             for item in items:
                 url = item['html_url']
                 name = item['name']
@@ -414,17 +414,18 @@ def find_plugins(types=None):
                     wid2 = len(url)
                 pkgs[url] = (name, topics)
 
+        incomplete = resdict.get('incomplete_results', None)
+        if incomplete:
+            print("\nResults are incomplete.\n")
+
     template = '{:<{wid1}}  {:<{wid2}}  {}'
     if pkgs:
         print(template.format('Pkg Name', 'URL', 'Topics', wid1=wid1, wid2=wid2))
-        print(template.format('--------', '___', '______', wid1=wid1, wid2=wid2))
+        print(template.format('--------', '---', '------', wid1=wid1, wid2=wid2))
         for url, (name, topics) in sorted(pkgs.items(), key=lambda x: x[1][0]):
             print(template.format(name, url, topics, wid1=wid1, wid2=wid2))
     else:
         print("No matching packages found.")
-
-    if resdict['incomplete_results']:
-        print("\nResults are incomplete.\n")
 
     return pkgs
 
@@ -435,7 +436,7 @@ def _find_plugins_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('types', nargs='*', help='Find these types of plugins. '
@@ -448,9 +449,9 @@ def _find_plugins_exec(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str  (ignored)
+    user_args: list of str  (ignored)
         Args to be passed to the user script.
 
     Returns

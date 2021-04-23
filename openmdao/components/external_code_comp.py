@@ -18,7 +18,7 @@ class ExternalCodeDelegate(object):
 
     Attributes
     ----------
-    _comp : ExternalCodeComp or ExternalCodeImplicitComp object
+    _comp: ExternalCodeComp or ExternalCodeImplicitComp object
         The external code object this delegate is associated with.
     """
 
@@ -28,7 +28,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        comp : ExternalCodeComp or ExternalCodeImplicitComp object
+        comp: ExternalCodeComp or ExternalCodeImplicitComp object
             The external code object this delegate is associated with.
         """
         self._comp = comp
@@ -68,7 +68,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        logger : object
+        logger: object
             The object that manages logging output.
         """
         # check for the command
@@ -103,7 +103,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        files : iterable
+        files: iterable
             Contains files to check.
 
         Returns
@@ -121,7 +121,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        command : List
+        command: list
             Optional command. Otherwise use the command in self.options['command'].
         """
         comp = self._comp
@@ -180,7 +180,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        command : List
+        command: list
             List containing OS command string.
 
         Returns
@@ -241,15 +241,15 @@ class ExternalCodeComp(ExplicitComponent):
 
     Attributes
     ----------
-    stdin : str or file object
+    stdin: str or file object
         Input stream external code reads from.
-    stdout : str or file object
+    stdout: str or file object
         Output stream external code writes to.
-    stderr : str or file object
+    stderr: str or file object
         Error stream external code writes to.
     _external_code_runner: ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
-    return_code : int
+    return_code: int
         Exit status of the child process.
     """
 
@@ -259,7 +259,7 @@ class ExternalCodeComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
@@ -287,7 +287,7 @@ class ExternalCodeComp(ExplicitComponent):
 
         Parameters
         ----------
-        logger : object
+        logger: object
             The object that manages logging output.
         """
         # check for the command
@@ -301,9 +301,9 @@ class ExternalCodeComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             Unscaled, dimensional input variables read via inputs[key].
-        outputs : Vector
+        outputs: Vector
             Unscaled, dimensional output variables read via outputs[key].
         """
         self._external_code_runner.run_component()
@@ -318,15 +318,15 @@ class ExternalCodeImplicitComp(ImplicitComponent):
 
     Attributes
     ----------
-    stdin : str or file object
+    stdin: str or file object
         Input stream external code reads from.
-    stdout : str or file object
+    stdout: str or file object
         Output stream external code writes to.
-    stderr : str or file object
+    stderr: str or file object
         Error stream external code writes to.
     _external_code_runner: ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
-    return_code : int
+    return_code: int
         Exit status of the child process.
     """
 
@@ -336,7 +336,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
@@ -371,7 +371,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
 
         Parameters
         ----------
-        logger : object
+        logger: object
             The object that manages logging output.
         """
         self._external_code_runner.check_config(logger)
@@ -384,11 +384,11 @@ class ExternalCodeImplicitComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
-        residuals : Vector
+        residuals: Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
         command = self.options['command_apply']
@@ -401,9 +401,9 @@ class ExternalCodeImplicitComp(ImplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         command = self.options['command_solve']

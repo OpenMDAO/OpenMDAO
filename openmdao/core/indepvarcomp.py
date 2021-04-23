@@ -19,12 +19,12 @@ class IndepVarComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : str or None
+        name: str or None
             name of the variable.
             If None, variables should be defined external to this class by calling add_output.
-        val : float or ndarray
+        val: float or ndarray
             value of the variable if a single variable is being defined.
-        **kwargs : dict
+        **kwargs: dict
             keyword arguments.
         """
         super().__init__(**kwargs)
@@ -116,39 +116,39 @@ class IndepVarComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val: float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape : int or tuple or list or None
+        shape: int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
-        units : str or None
+        units: str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : None
+        res_units: None
             This argument is deprecated because it was unused.
-        desc : str
+        desc: str
             description of the variable
-        lower : None
+        lower: None
             This argument is deprecated because it was unused.
-        upper : None
+        upper: None
             This argument is deprecated because it was unused.
-        ref : None
+        ref: None
             This argument is deprecated because it was unused.
-        ref0 : None
+        ref0: None
             This argument is deprecated because it was unused.
-        res_ref : None
+        res_ref: None
             This argument is deprecated because it was unused.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
-        shape_by_conn : bool
+        shape_by_conn: bool
             If True, shape this output to match its connected input(s).
-        copy_shape : str or None
+        copy_shape: str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
-        distributed : bool
+        distributed: bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
         """
@@ -201,13 +201,13 @@ class IndepVarComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val: float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        desc : str
+        desc: str
             description of the variable.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
         """
@@ -225,9 +225,9 @@ class IndepVarComp(ExplicitComponent):
 
         Parameters
         ----------
-        jac : Jacobian or None
+        jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln: boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
@@ -240,7 +240,7 @@ class _AutoIndepVarComp(IndepVarComp):
 
     Attributes
     ----------
-    _remotes : set
+    _remotes: set
         Set of var names connected to remote inputs.
     """
 
@@ -250,12 +250,12 @@ class _AutoIndepVarComp(IndepVarComp):
 
         Parameters
         ----------
-        name : str or None
+        name: str or None
             name of the variable.
             If None, variables should be defined external to this class by calling add_output.
-        val : float or ndarray
+        val: float or ndarray
             value of the variable if a single variable is being defined.
-        **kwargs : dict
+        **kwargs: dict
             keyword arguments.
         """
         super().__init__(name, val, **kwargs)
@@ -287,11 +287,11 @@ class _AutoIndepVarComp(IndepVarComp):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val: float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        units : str or None
+        units: str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
         """

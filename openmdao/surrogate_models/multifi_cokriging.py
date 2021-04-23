@@ -52,7 +52,7 @@ def constant_regression(x):
 
     Parameters
     ----------
-    x : array_like
+    x: array_like
         Input data.
 
     Returns
@@ -74,7 +74,7 @@ def linear_regression(x):
 
     Parameters
     ----------
-    x : array_like
+    x: array_like
         Input data.
 
     Returns
@@ -100,17 +100,17 @@ def squared_exponential_correlation(theta, d):
 
     Parameters
     ----------
-    theta : array_like
+    theta: array_like
         An array with shape 1 (isotropic) or n (anisotropic) giving the
         autocorrelation parameter(s).
-    d : array_like
+    d: array_like
         An array with shape (n_eval, n_features) giving the componentwise
         distances between locations x and x' at which the correlation model
         should be evaluated.
 
     Returns
     -------
-    r : array_like
+    r: array_like
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
@@ -136,9 +136,9 @@ def l1_cross_distances(X, Y=None):
 
     Parameters
     ----------
-    X : array_like
+    X: array_like
         An array with shape (n_samples_X, n_features)
-    Y : array_like
+    Y: array_like
         An array with shape (n_samples_Y, n_features)
 
     Returns
@@ -183,24 +183,24 @@ class MultiFiCoKriging(object):
 
     Attributes
     ----------
-    corr : Object
+    corr: object
         Correlation function to use, default is squared_exponential_correlation.
-    n_features : ndarray
+    n_features: ndarray
         Number of features for each fidelity level.
-    n_samples : ndarray
+    n_samples: ndarray
         Number of samples for each fidelity level.
-    nlevel : int
+    nlevel: int
         Number of fidelity levels.
-    normalize : bool, optional
+    normalize: bool, optional
         When true, normalize X and Y so that the mean is at zero.
-    regr : string or callable
+    regr: string or callable
         A regression function returning an array of outputs of the linear
         regression functional basis for Universal Kriging purpose.
         regr is assumed to be the same for all levels of code.
         Default assumes a simple constant regression trend.
         Available built-in regression models are:
         'constant', 'linear'
-    rho_regr : string or callable or None
+    rho_regr: string or callable or None
         A regression function returning an array of outputs of the linear
         regression functional basis. Defines the regression function for the
         autoregressive parameter rho.
@@ -208,14 +208,14 @@ class MultiFiCoKriging(object):
         Default assumes a simple constant regression trend.
         Available built-in regression models are:
         'constant', 'linear'
-    theta : double, array_like or list or None
+    theta: double, array_like or list or None
         Value of correlation parameters if they are known; no optimization is run.
         Default is None, so that optimization is run.
         if double: value is replicated for all features and all levels.
         if array_like: an array with shape (n_features, ) for
         isotropic calculation. It is replicated for all levels.
         if list: a list of nlevel arrays specifying value for each level
-    theta0 : double, array_like or list or None
+    theta0: double, array_like or list or None
         Starting point for the maximum likelihood estimation of the
         best set of parameters.
         Default is None and meaning use of the default 0.5*np.ones(n_features)
@@ -223,7 +223,7 @@ class MultiFiCoKriging(object):
         if array_like: an array with shape (n_features, ) for
         isotropic calculation. It is replicated for all levels.
         if list: a list of nlevel arrays specifying value for each level
-    thetaL : double, array_like or list or None
+    thetaL: double, array_like or list or None
         Lower bound on the autocorrelation parameters for maximum
         likelihood estimation.
         Default is None meaning use of the default 1e-5*np.ones(n_features).
@@ -231,7 +231,7 @@ class MultiFiCoKriging(object):
         if array_like: An array with shape matching theta0's. It is replicated
         for all levels of code.
         if list: a list of nlevel arrays specifying value for each level
-    thetaU : double, array_like or list or None
+    thetaU: double, array_like or list or None
         Upper bound on the autocorrelation parameters for maximum
         likelihood estimation.
         Default is None meaning use of default value 50*np.ones(n_features).
@@ -239,15 +239,15 @@ class MultiFiCoKriging(object):
         if array_like: An array with shape matching theta0's. It is replicated
         for all levels of code.
         if list: a list of nlevel arrays specifying value for each level
-    X_mean : float
+    X_mean: float
         Mean of the low fidelity training data for X.
-    X_std : float
+    X_std: float
         Standard deviation of the low fidelity training data for X.
-    y_mean : float
+    y_mean: float
         Mean of the low fidelity training data for y.
-    y_std : float
+    y_std: float
         Standard deviation of the low fidelity training data for y.
-    _nfev : int
+    _nfev: int
         Number of function evaluations.
 
     Examples
@@ -308,14 +308,14 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        regr : string or callable, optional
+        regr: string or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis for Universal Kriging purpose.
             regr is assumed to be the same for all levels of code.
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
-        rho_regr : string or callable, optional
+        rho_regr: string or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis. Defines the regression function for the
             autoregressive parameter rho.
@@ -323,14 +323,14 @@ class MultiFiCoKriging(object):
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
-        theta : double, array_like or list, optional
+        theta: double, array_like or list, optional
             Value of correlation parameters if they are known; no optimization is run.
             Default is None, so that optimization is run.
             if double: value is replicated for all features and all levels.
             if array_like: an array with shape (n_features, ) for
             isotropic calculation. It is replicated for all levels.
             if list: a list of nlevel arrays specifying value for each level
-        theta0 : double, array_like or list, optional
+        theta0: double, array_like or list, optional
             Starting point for the maximum likelihood estimation of the
             best set of parameters.
             Default is None and meaning use of the default 0.5*np.ones(n_features)
@@ -338,7 +338,7 @@ class MultiFiCoKriging(object):
             if array_like: an array with shape (n_features, ) for
             isotropic calculation. It is replicated for all levels.
             if list: a list of nlevel arrays specifying value for each level
-        thetaL : double, array_like or list, optional
+        thetaL: double, array_like or list, optional
             Lower bound on the autocorrelation parameters for maximum
             likelihood estimation.
             Default is None meaning use of the default 1e-5*np.ones(n_features).
@@ -346,7 +346,7 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-        thetaU : double, array_like or list, optional
+        thetaU: double, array_like or list, optional
             Upper bound on the autocorrelation parameters for maximum
             likelihood estimation.
             Default is None meaning use of default value 50*np.ones(n_features).
@@ -354,7 +354,7 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-        normalize : bool, optional
+        normalize: bool, optional
             When true, normalize X and Y so that the mean is at zero.
         """
         self.corr = squared_exponential_correlation
@@ -382,9 +382,9 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : Integer
+        lvl: integer
             Level of fidelity
-        theta : array_like
+        theta: array_like
             An array containing the autocorrelation parameters at which the
             Gaussian Process model parameters should be determined.
             Default uses the built-in autocorrelation parameters
@@ -411,16 +411,16 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        X : list of double array_like elements
+        X: list of double array_like elements
             A list of arrays with the input at which observations were made, from lowest
             fidelity to highest fidelity. Designs must be nested
             with X[i] = np.vstack([..., X[i+1])
-        y : list of double array_like elements
+        y: list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from lowest fidelity to highest fidelity.
-        initial_range : float
+        initial_range: float
             Initial range for the optimizer.
-        tol : float
+        tol: float
             Optimizer terminates when the tolerance tol is reached.
         """
         # Run input checks
@@ -528,9 +528,9 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : Integer
+        lvl: integer
             Level of fidelity
-        theta : array_like, optional
+        theta: array_like, optional
             An array containing the autocorrelation parameters at which the
             Gaussian Process model parameters should be determined.
             Default uses the built-in autocorrelation parameters
@@ -606,11 +606,11 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : integer
+        lvl: integer
             Level of fidelity
-        initial_range : float
+        initial_range: float
             Initial range of the optimizer
-        tol : float
+        tol: float
             Optimizer terminates when the tolerance tol is reached.
 
         Returns
@@ -665,10 +665,10 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        X : array_like
+        X: array_like
             An array with shape (n_eval, n_features) giving the point(s) at
             which the prediction(s) should be made.
-        eval_MSE : boolean, optional
+        eval_MSE: boolean, optional
             A boolean specifying whether the Mean Squared Error should be
             evaluated or not. Default assumes evalMSE is True.
 
@@ -772,11 +772,11 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        X : list of double array_like elements
+        X: list of double array_like elements
             A list of arrays with the input at which observations were made, from lowest
             fidelity to highest fidelity. Designs must be nested
             with X[i] = np.vstack([..., X[i+1])
-        y : list of double array_like elements
+        y: list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from lowest fidelity to highest fidelity.
         """
@@ -897,7 +897,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
     Attributes
     ----------
-    model : MultiFiCoKriging
+    model: MultiFiCoKriging
         Contains MultiFiCoKriging surrogate.
     """
 
@@ -907,7 +907,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
-        **kwargs : keyword args
+        **kwargs: keyword args
             Some implementations of record_derivatives need additional args.
         """
         super().__init__(**kwargs)
@@ -975,7 +975,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
-        new_x : array_like
+        new_x: array_like
             An array with shape (n_eval, n_features) giving the point(s) at
             which the prediction(s) should be made.
 
@@ -998,10 +998,10 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
-        X : array_like
+        X: array_like
             An array with shape (n_samples_X, n_features) with the input at which observations
             were made.
-        Y : array_like
+        Y: array_like
             An array with shape (n_samples_X, n_features) with the observations of the scalar
             output to be predicted.
         """
@@ -1025,9 +1025,9 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
-        X : array_like
+        X: array_like
             An array with shape (n_samples_X, n_features)
-        Y : array_like
+        Y: array_like
             An array with shape (n_samples_Y, n_features)
 
         Returns

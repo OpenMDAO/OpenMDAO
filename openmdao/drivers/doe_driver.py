@@ -5,6 +5,8 @@ Design-of-Experiments Driver.
 import traceback
 import inspect
 
+import numpy as np
+
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
@@ -20,13 +22,13 @@ class DOEDriver(Driver):
 
     Attributes
     ----------
-    _name : str
+    _name: str
         The name used to identify this driver in recorded cases.
-    _recorders : list
+    _recorders: list
         List of case recorders that have been added to this driver.
-    _problem_comm : MPI.Comm or None
+    _problem_comm: MPI.Comm or None
         The MPI communicator for the Problem.
-    _color : int or None
+    _color: int or None
         In MPI, the cached color is used to determine which cases to run on this proc.
     """
 
@@ -36,10 +38,10 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        generator : DOEGenerator, list or None
+        generator: DOEGenerator, list or None
             The case generator or a list of DOE cases.
 
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         # if given a list, create a ListGenerator
@@ -90,7 +92,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        comm : MPI.Comm or <FakeComm> or None
+        comm: MPI.Comm or <FakeComm> or None
             The communicator for the Problem.
 
         Returns
@@ -179,7 +181,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        case : list
+        case: list
             list of name, value tuples for the design variables.
         """
         metadata = {}
@@ -187,7 +189,10 @@ class DOEDriver(Driver):
         for dv_name, dv_val in case:
             try:
                 msg = None
-                self.set_design_var(dv_name, dv_val)
+                if isinstance(dv_val, np.ndarray):
+                    self.set_design_var(dv_name, dv_val.flatten())
+                else:
+                    self.set_design_var(dv_name, dv_val)
             except ValueError as err:
                 msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
             finally:
@@ -216,10 +221,10 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        design_vars : dict
+        design_vars: dict
             Dictionary of design variables for which to generate values.
 
-        model : Group
+        model: Group
             The model containing the design variables (used by some generators).
 
         Yields
@@ -241,7 +246,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        recorder : CaseRecorder
+        recorder: CaseRecorder
            A recorder instance.
         """
         # keep track of recorders so we can flag them as parallel
@@ -280,7 +285,7 @@ class DOEDriver(Driver):
 
         Parameters
         ----------
-        case_name : str
+        case_name: str
             Name of current case.
 
         Returns

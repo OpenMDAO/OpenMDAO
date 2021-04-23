@@ -20,7 +20,7 @@ class DotProductComp(ExplicitComponent):
 
     Attributes
     ----------
-    _products : list
+    _products: list
         Cache the data provided during `add_product`
         so everything can be saved until setup is called.
     """
@@ -31,7 +31,7 @@ class DotProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -73,23 +73,23 @@ class DotProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        c_name : str
+        c_name: str
             The name of the vector product output.
-        a_name : str
+        a_name: str
             The name of the first vector input.
-        b_name : str
+        b_name: str
             The name of the second input.
-        c_units : str or None
+        c_units: str or None
             The units of the output.
-        a_units : str or None
+        a_units: str or None
             The units of input a.
-        b_units : str or None
+        b_units: str or None
             The units of input b.
-        vec_size : int
+        vec_size: int
             The number of points at which the dot vector product
             should be computed simultaneously.  The shape of
             the output is (vec_size,).
-        length : int
+        length: int
             The length of the vectors a and b.  Their shapes are
             (vec_size, length)
         """
@@ -172,9 +172,9 @@ class DotProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs : Vector
+        outputs: Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         for product in self._products:
@@ -188,9 +188,9 @@ class DotProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         for product in self._products:

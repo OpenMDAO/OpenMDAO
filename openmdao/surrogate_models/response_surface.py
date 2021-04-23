@@ -14,11 +14,11 @@ class ResponseSurface(SurrogateModel):
 
     Attributes
     ----------
-    betas : ndarray
+    betas: ndarray
         Vector of response surface equation coefficients.
-    m : int
+    m: int
         Number of training points.
-    n : int
+    n: int
         Number of independent variables.
     """
 
@@ -39,9 +39,9 @@ class ResponseSurface(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Training input locations
-        y : array-like
+        y: array-like
             Model responses at given inputs.
         """
         super().train(x, y)
@@ -78,7 +78,7 @@ class ResponseSurface(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate is evaluated.
 
         Returns
@@ -115,7 +115,7 @@ class ResponseSurface(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate Jacobian is evaluated.
 
         Returns

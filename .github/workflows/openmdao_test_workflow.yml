@@ -28,6 +28,7 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
+            UPLOAD_DOCS: True
 
           # try latest versions
           - PY: 3
@@ -48,11 +49,16 @@ jobs:
             OPTIONAL: '[all]'
 
     steps:
+      # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
+      - name: Add the current IP address, long hostname and short hostname record to /etc/hosts file
+        run: |
+          echo -e "$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)\t$(hostname -f) $(hostname -s)" | sudo tee -a /etc/hosts
+
       - name: Create SSH key
         shell: bash
         env:
-          SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
-          SSH_KNOWN_HOSTS: ${{secrets.SSH_KNOWN_HOSTS}}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
@@ -64,116 +70,121 @@ jobs:
       - run: |
           git fetch --prune --unshallow --tags
 
-      - uses: actions/setup-python@v2
-        with:
-          python-version:  ${{ matrix.PY }}
-
       - name: Install & test
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
           COVERALLS_PARALLEL: True
         run: |
-          echo "=============================================================";
-          echo "Run #${GITHUB_RUN_NUMBER}";
-          echo "Run ID: ${GITHUB_RUN_ID}";
-          echo "Testing: ${GITHUB_REPOSITORY}";
-          echo "Triggered by: ${GITHUB_EVENT_NAME}";
-          echo "Initiated by: ${GITHUB_ACTOR}";
-          echo "=============================================================";
+          echo "============================================================="
+          echo "Run #${GITHUB_RUN_NUMBER}"
+          echo "Run ID: ${GITHUB_RUN_ID}"
+          echo "Testing: ${GITHUB_REPOSITORY}"
+          echo "Triggered by: ${GITHUB_EVENT_NAME}"
+          echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "============================================================="
 
-          echo "=============================================================";
-          echo "Create conda environment";
-          echo "=============================================================";
-          source $CONDA/etc/profile.d/conda.sh;
-          echo $CONDA/bin >> $GITHUB_PATH;
-          conda create -n OpenMDAO python=${{ matrix.PY }} numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y;
-          conda activate OpenMDAO;
+          echo "============================================================="
+          echo "Create conda environment"
+          echo "============================================================="
+          source $CONDA/etc/profile.d/conda.sh
+          echo $CONDA/bin >> $GITHUB_PATH
+          conda create -n OpenMDAO python=${{ matrix.PY }} numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+          conda activate OpenMDAO
 
           if [ "${{ matrix.PETSc }}" ]; then
-            echo "=============================================================";
-            echo "Install PETSc";
-            echo "=============================================================";
-            conda install -c anaconda mpi4py -q -y;
-            conda install -c conda-forge petsc=${{ matrix.PETSc }} petsc4py -q -y;
+            echo "============================================================="
+            echo "Install PETSc"
+            echo "============================================================="
+            conda install -c anaconda mpi4py -q -y
+            conda install -c conda-forge petsc=${{ matrix.PETSc }} petsc4py -q -y
           fi
 
           if [ "${{ matrix.PYOPTSPARSE }}" ]; then
-            echo "=============================================================";
-            echo "Install pyoptsparse";
-            echo "=============================================================";
+            echo "============================================================="
+            echo "Install pyoptsparse"
+            echo "============================================================="
 
-            git clone -q https://github.com/OpenMDAO/build_pyoptsparse;
+            git clone -q https://github.com/OpenMDAO/build_pyoptsparse
 
-            cd build_pyoptsparse;
-            chmod 755 ./build_pyoptsparse.sh;
+            cd build_pyoptsparse
+            chmod 755 ./build_pyoptsparse.sh
 
             if [ "${{ matrix.PETSc }}" ] && [ "${{ matrix.PYOPTSPARSE }}" == "v1.2"]; then
-              PAROPT=-a;
+              PAROPT=-a
             fi
 
             if [ "${{ matrix.SNOPT }}" == "7.7" ] && [ "${{ secrets.SNOPT_LOCATION_77 }}" ]; then
-              echo "  > Secure copying SNOPT 7.7 over SSH";
-              mkdir SNOPT;
-              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT;
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src;
+              echo "  > Secure copying SNOPT 7.7 over SSH"
+              mkdir SNOPT
+              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
 
             elif [ "${{ matrix.SNOPT }}" == "7.2" ] && [ "${{ secrets.SNOPT_LOCATION_72 }}" ]; then
-              echo "  > Secure copying SNOPT 7.2 over SSH";
-              mkdir SNOPT;
-              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT;
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source;
+              echo "  > Secure copying SNOPT 7.2 over SSH"
+              mkdir SNOPT
+              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
 
             else
               if [ "${{ matrix.SNOPT }}" ]; then
-                echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available";
+                echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
               fi
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}";
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
             fi
 
-            cd ..;
+            cd ..
 
-            export LD_LIBRARY_PATH=$HOME/ipopt/lib;
+            export LD_LIBRARY_PATH=$HOME/ipopt/lib
           fi
 
-          echo "=============================================================";
-          echo "Install OpenMDAO";
-          echo "=============================================================";
-          pip install .${{ matrix.OPTIONAL }};
+          echo "============================================================="
+          echo "Install OpenMDAO"
+          echo "============================================================="
+          pip install .${{ matrix.OPTIONAL }}
 
-          echo "=============================================================";
-          echo "Install optional packages for testing/coverage";
-          echo "=============================================================";
-          if [ "${{ matrix.OPTIONAL }}" == "[all]" ]; then
-            pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
-            pyppeteer-install;
+          echo "============================================================="
+          echo "Install optional packages for testing/coverage"
+          echo "============================================================="
+          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
+            pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+            pyppeteer-install
           fi
 
-          echo "=============================================================";
-          echo "List installed packages/versions";
-          echo "=============================================================";
-          conda list;
+          echo "============================================================="
+          echo "List installed packages/versions"
+          echo "============================================================="
+          conda list
 
-          echo "=============================================================";
-          echo "Run tests with coverage (from directory other than repo root)";
-          echo "=============================================================";
-          cd openmdao/docs;
+          echo "============================================================="
+          echo "Run tests with coverage (from directory other than repo root)"
+          echo "============================================================="
+          cd openmdao/docs
           cp ../../.coveragerc .
-          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao;
+          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao
           
-          if [ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]; then
-            echo "=============================================================";
-            echo "Make docs";
-            echo "=============================================================";
-            make strict;
+          if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
+            echo "============================================================="
+            echo "Make docs"
+            echo "============================================================="
+            make strict
           fi
 
-          echo "=============================================================";
-          echo "Submit coverage";
-          echo "=============================================================";
-          pip install git+https://github.com/swryan/coveralls-python;
-          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`;
-          coveralls --base_dir $SITE_DIR;
+          echo "============================================================="
+          echo "Submit coverage"
+          echo "============================================================="
+          pip install git+https://github.com/swryan/coveralls-python
+          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
+          coveralls --base_dir $SITE_DIR
+          
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
+            if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
+              echo "============================================================="
+              echo "Upload docs"
+              echo "============================================================="
+              python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
+            fi
+          fi
 
       - uses: act10ns/slack@v1
         env:
@@ -203,10 +214,6 @@ jobs:
       - run: |
           git fetch --prune --unshallow --tags
 
-      - uses: actions/setup-python@v2
-        with:
-          python-version:  ${{ matrix.PY }}
-
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
@@ -218,49 +225,49 @@ jobs:
           COVERALLS_SERVICE_NAME: "github"
           COVERALLS_PARALLEL: True
         run: |
-          echo "=============================================================";
-          echo "Run #$env:GITHUB_RUN_NUMBER";
-          echo "Run ID: $env:GITHUB_RUN_ID";
-          echo "Testing: $env:GITHUB_REPOSITORY";
-          echo "Triggered by: $env:GITHUB_EVENT_NAME";
-          echo "Initiated by: $env:GITHUB_ACTOR";
-          echo "=============================================================";
+          echo "============================================================="
+          echo "Run #$env:GITHUB_RUN_NUMBER"
+          echo "Run ID: $env:GITHUB_RUN_ID"
+          echo "Testing: $env:GITHUB_REPOSITORY"
+          echo "Triggered by: $env:GITHUB_EVENT_NAME"
+          echo "Initiated by: $env:GITHUB_ACTOR"
+          echo "============================================================="
 
-          echo "=============================================================";
-          echo "Create conda environment";
-          echo "=============================================================";
+          echo "============================================================="
+          echo "Create conda environment"
+          echo "============================================================="
           conda create -n OpenMDAO python=${{ matrix.PY }} numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y;
-          conda activate OpenMDAO;
+          conda activate OpenMDAO
 
-          echo "=============================================================";
-          echo "Install OpenMDAO";
-          echo "=============================================================";
-          pip install .[all];
+          echo "============================================================="
+          echo "Install OpenMDAO"
+          echo "============================================================="
+          pip install .[all]
 
-          echo "=============================================================";
-          echo "Install optional packages for testing/coverage";
-          echo "=============================================================";
-          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
-          pyppeteer-install;
+          echo "============================================================="
+          echo "Install optional packages for testing/coverage"
+          echo "============================================================="
+          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          pyppeteer-install
 
-          echo "=============================================================";
-          echo "List installed packages/versions";
-          echo "=============================================================";
-          conda list;
+          echo "============================================================="
+          echo "List installed packages/versions"
+          echo "============================================================="
+          conda list
 
-          echo "=============================================================";
-          echo "Run tests with coverage (from directory other than repo root)";
-          echo "=============================================================";
-          cd openmdao\docs;
+          echo "============================================================="
+          echo "Run tests with coverage (from directory other than repo root)"
+          echo "============================================================="
+          cd openmdao\docs
           copy ..\..\.coveragerc .
-          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao;
+          testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao
 
-          echo "=============================================================";
-          echo "Submit coverage";
-          echo "=============================================================";
-          pip install git+https://github.com/swryan/coveralls-python;
-          $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))";
-          coveralls --base_dir $SITE_DIR;
+          echo "============================================================="
+          echo "Submit coverage"
+          echo "============================================================="
+          pip install git+https://github.com/swryan/coveralls-python
+          $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
+          coveralls --base_dir $SITE_DIR
 
       - uses: act10ns/slack@v1
         env:

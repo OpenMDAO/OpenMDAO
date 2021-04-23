@@ -15,7 +15,7 @@ class LinearInterpolator(NNBase):
 
         Parameters
         ----------
-        neighbor_idx : ndarray
+        neighbor_idx: ndarray
             Location indices for nearest neighbors.
 
         Returns
@@ -68,7 +68,7 @@ class LinearInterpolator(NNBase):
 
         Parameters
         ----------
-        prediction_points : ndarray
+        prediction_points: ndarray
             Points at which predictions are computed.
 
         Returns
@@ -116,7 +116,7 @@ class LinearInterpolator(NNBase):
 
         Parameters
         ----------
-        prediciton_points : ndarray
+        prediciton_points: ndarray
             Prediction points at which the gradient is calculated.
 
         Returns

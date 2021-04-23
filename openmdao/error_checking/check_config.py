@@ -35,9 +35,9 @@ def _check_cycles(group, infos=None):
 
     Parameters
     ----------
-    group : <Group>
+    group: <Group>
         The Group being checked for dataflow issues
-    infos : list
+    infos: list
         List to collect informational messages.
 
     Returns
@@ -62,9 +62,9 @@ def _check_ubcs(group, warnings):
 
     Parameters
     ----------
-    group : <Group>
+    group: <Group>
         The Group being checked for dataflow issues
-    warnings : list
+    warnings: list
         List to collect warning messages.
     """
     cycles = _check_cycles(group)
@@ -103,9 +103,9 @@ def _check_cycles_prob(prob, logger):
 
     Parameters
     ----------
-    prob : <Problem>
+    prob: <Problem>
         The Problem being checked for cycles.
-    logger : object
+    logger: object
         The object that manages logging output.
 
     """
@@ -123,9 +123,9 @@ def _check_ubcs_prob(prob, logger):
 
     Parameters
     ----------
-    prob : <Problem>
+    prob: <Problem>
         The Problem being checked for dataflow issues.
-    logger : object
+    logger: object
         The object that manages logging output.
 
     """
@@ -143,9 +143,9 @@ def _get_used_before_calc_subs(group, input_srcs):
 
     Parameters
     ----------
-    group : <Group>
+    group: <Group>
         The Group where we're checking subsystem order.
-    input_srcs : {}
+    input_srcs: {}
         dict containing variable abs names for sources of the inputs.
         This describes all variable connections, either explicit or implicit,
         in the entire model.
@@ -194,9 +194,9 @@ def _check_dup_comp_inputs(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     if isinstance(problem.model, Component):
@@ -234,9 +234,9 @@ def _trim_str(obj, size):
 
     Parameters
     ----------
-    obj : object
+    obj: object
         Object to be stringified and trimmed.
-    size : int
+    size: int
         Max allowable size of the returned string.
 
     Returns
@@ -265,13 +265,13 @@ def _list_has_val_mismatch(discretes, names, units, vals):
 
     Parameters
     ----------
-    discretes : set-like
+    discretes: set-like
         Set of discrete variable names.
-    names : list
+    names: list
         List of variable names.
-    units : list
+    units: list
         List of units corresponding to names.
-    vals : list
+    vals: list
         List of values corresponding to names.
 
     Returns
@@ -309,9 +309,9 @@ def _check_hanging_inputs(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     model = problem.model
@@ -345,9 +345,9 @@ def _check_comp_has_no_outputs(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     msg = []
@@ -366,9 +366,9 @@ def _check_auto_ivc_warnings(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     if hasattr(problem.model, "_auto_ivc_warnings"):
@@ -382,9 +382,9 @@ def _check_system_configs(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     for system in problem.model.system_iter(include_self=True, recurse=True):
@@ -403,9 +403,9 @@ def _check_solvers(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     iter_nl_depth = iter_ln_depth = np.inf
@@ -484,9 +484,9 @@ def _check_missing_recorders(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     # Look for Driver recorder
@@ -512,7 +512,7 @@ def _get_promoted_connected_ins(g):
 
     Parameters
     ----------
-    g : Group
+    g: Group
         Starting Group.
 
     Returns
@@ -551,9 +551,9 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
 
     Parameters
     ----------
-    problem : <Problem>
+    problem: <Problem>
         The problem being checked.
-    logger : object
+    logger: object
         The object that manages logging output.
     """
     prom_conn_ins = _get_promoted_connected_ins(problem.model)
@@ -602,7 +602,7 @@ def _check_config_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model')
@@ -620,9 +620,9 @@ def _check_config_cmd(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Args to be passed to the user script.
 
     Returns
@@ -662,9 +662,9 @@ def check_allocate_complex_ln(group, under_cs):
 
     Parameters
     ----------
-    group : <Group>
+    group: <Group>
         Group to be checked.
-    under_cs : bool
+    under_cs: bool
         Flag indicates if complex vectors were allocated in a containing Group or were force
         allocated in setup.
 

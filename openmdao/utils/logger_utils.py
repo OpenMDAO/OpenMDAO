@@ -15,13 +15,13 @@ def _set_handler(logger, handler, level, use_format):
 
     Parameters
     ----------
-    logger : object
+    logger: object
         Logger object.
-    handler : logging handler
+    handler: logging handler
         handler to add to the logger
-    level : int
+    level: int
         Logging level for this logger. Default is logging.INFO (level 20).
-    use_format : bool
+    use_format: bool
         Set to True to use the openmdao format "Level: message".
     """
     # set a format which is simpler for console use
@@ -40,19 +40,19 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
 
     Parameters
     ----------
-    name : str
+    name: str
         Name of the logger to be returned, will be created if it doesn't exist.
-    level : int
+    level: int
         Logging level for this logger. Default is logging.INFO (level 20).
         (applied only when creating a new logger or setting a new stream).
-    use_format : bool
+    use_format: bool
         Set to True to use the openmdao format "Level: message".
         (applied only when creating a new logger or setting a new stream).
-    out_stream : 'stdout', 'stderr' or file-like
+    out_stream: 'stdout', 'stderr' or file-like
         output stream to which logger output will be directed.
-    out_file : str or None
+    out_file: str or None
         If not None, add a FileHandler to write to this file.
-    lock : bool
+    lock: bool
         if True, do not allow the handler to be changed until unlocked.
         if False, unlock the handler for the logger.
 
@@ -114,7 +114,7 @@ class TestLogger(object):
 
     Attributes
     ----------
-    _msgs : dict
+    _msgs: dict
         Stores lists of messages under 'error', 'warning' and 'info' keys.
     """
 
@@ -130,7 +130,7 @@ class TestLogger(object):
 
         Parameters
         ----------
-        msg : str
+        msg: str
             An error message.
         """
         self._msgs['error'].append(msg)
@@ -141,7 +141,7 @@ class TestLogger(object):
 
         Parameters
         ----------
-        msg : str
+        msg: str
             A warning message.
         """
         self._msgs['warning'].append(msg)
@@ -152,7 +152,7 @@ class TestLogger(object):
 
         Parameters
         ----------
-        msg : str
+        msg: str
             An informational message.
         """
         self._msgs['info'].append(msg)
@@ -163,7 +163,7 @@ class TestLogger(object):
 
         Parameters
         ----------
-        msg : str
+        msg: str
             A debugging message.
         """
         self._msgs['debug'].append(msg)
@@ -174,7 +174,7 @@ class TestLogger(object):
 
         Parameters
         ----------
-        typ : str
+        typ: str
             Type of messages ('error', 'warning', 'info') to be returned.
 
         Returns
@@ -190,10 +190,10 @@ class TestLogger(object):
 
         Parameters
         ----------
-        typ : str
+        typ: str
             Type of messages ('error', 'warning', 'info') to be returned.
 
-        message : str
+        message: str
             The message to match.
 
         Returns
@@ -215,10 +215,10 @@ class TestLogger(object):
 
         Parameters
         ----------
-        typ : str
+        typ: str
             Type of messages ('error', 'warning', 'info') to be searched.
 
-        message : str
+        message: str
             The message to match.
         """
         if not self.contains(typ, message):

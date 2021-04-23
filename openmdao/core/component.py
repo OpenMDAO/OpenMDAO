@@ -36,7 +36,7 @@ def _valid_var_name(name):
 
     Parameters
     ----------
-    name : str
+    name: str
         Proposed name.
 
     Returns
@@ -59,25 +59,25 @@ class Component(System):
 
     Attributes
     ----------
-    _approx_schemes : OrderedDict
+    _approx_schemes: OrderedDict
         A mapping of approximation types to the associated ApproximationScheme.
-    _var_rel2meta : dict
+    _var_rel2meta: dict
         Dictionary mapping relative names to metadata.
         This is only needed while adding inputs and outputs. During setup, these are used to
         build the dictionaries of metadata.
-    _static_var_rel2meta : dict
+    _static_var_rel2meta: dict
         Static version of above - stores data for variables added outside of setup.
-    _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
+    _var_rel_names: {'input': [str, ...], 'output': [str, ...]}
         List of relative names of owned variables existing on current proc.
         This is only needed while adding inputs and outputs. During setup, these are used to
         determine the list of absolute names.
-    _static_var_rel_names : dict
+    _static_var_rel_names: dict
         Static version of above - stores names of variables added outside of setup.
-    _declared_partials : dict
+    _declared_partials: dict
         Cached storage of user-declared partials.
-    _declared_partial_checks : list
+    _declared_partial_checks: list
         Cached storage of user-declared check partial options.
-    _no_check_partials : bool
+    _no_check_partials: bool
         If True, the check_partials function will ignore this component.
     """
 
@@ -87,7 +87,7 @@ class Component(System):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             available here and in all descendants of this system.
         """
         super().__init__(**kwargs)
@@ -139,14 +139,14 @@ class Component(System):
 
         Parameters
         ----------
-        pathname : str
+        pathname: str
             Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
+        mode: str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
-        prob_meta : dict
+        prob_meta: dict
             Problem level metadata.
         """
         super()._setup_procs(pathname, comm, mode, prob_meta)
@@ -417,7 +417,7 @@ class Component(System):
 
         Parameters
         ----------
-        info : dict
+        info: dict
             Coloring metadata dict.
         """
         ofs, allwrt = self._get_partials_varlists()
@@ -450,7 +450,7 @@ class Component(System):
 
         Parameters
         ----------
-        sparsity : dict
+        sparsity: dict
             A nested dict of the form dct[of][wrt] = (rows, cols, shape)
         """
         # sparsity uses relative names, so we need to convert to absolute
@@ -473,37 +473,37 @@ class Component(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable
+        val: float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
-        shape : int or tuple or list or None
+        shape: int or tuple or list or None
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+        src_indices: int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
             A value of None implies this input depends on all entries of source.
             Default is None. The shapes of the target and src_indices must match,
             and form of the entries within is determined by the value of 'flat_src_indices'.
-        flat_src_indices : bool
+        flat_src_indices: bool
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
-        units : str or None
+        units: str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
-        desc : str
+        desc: str
             description of the variable
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
-        shape_by_conn : bool
+        shape_by_conn: bool
             If True, shape this input to match its connected output.
-        copy_shape : str or None
+        copy_shape: str or None
             If a str, that str is the name of a variable. Shape this input to match that of
             the named variable.
-        distributed : bool
+        distributed: bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
 
@@ -622,13 +622,13 @@ class Component(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : a picklable object
+        val: a picklable object
             The initial value of the variable being added.
-        desc : str
+        desc: str
             description of the variable
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
 
@@ -678,49 +678,49 @@ class Component(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val: float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape : int or tuple or list or None
+        shape: int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
-        units : str or None
+        units: str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : str or None
+        res_units: str or None
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
-        desc : str
+        desc: str
             description of the variable.
-        lower : float or list or tuple or ndarray or Iterable or None
+        lower: float or list or tuple or ndarray or Iterable or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
-        upper : float or list or tuple or ndarray or or Iterable None
+        upper: float or list or tuple or ndarray or or Iterable None
             upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
-        ref : float or ndarray
+        ref: float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0 : float or ndarray
+        ref0: float or ndarray
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 0. Default is 0.
-        res_ref : float or ndarray
+        res_ref: float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        tags : str or list of strs or set of strs
+        tags: str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
-        shape_by_conn : bool
+        shape_by_conn: bool
             If True, shape this output to match its connected input(s).
-        copy_shape : str or None
+        copy_shape: str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
-        distributed : bool
+        distributed: bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
 
@@ -865,13 +865,13 @@ class Component(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : a picklable object
+        val: a picklable object
             The initial value of the variable being added.
-        desc : str
+        desc: str
             description of the variable.
-        tags : str or list of strs or set of strs
+        tags: str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
 
@@ -918,7 +918,7 @@ class Component(System):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the added variable.
         """
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
@@ -930,13 +930,13 @@ class Component(System):
 
         Parameters
         ----------
-        abs_in2out : dict
+        abs_in2out: dict
             Mapping of connected inputs to their source.  Names are absolute.
-        all_abs2meta : dict
+        all_abs2meta: dict
             Mapping of absolute names to metadata for all variables in the model.
-        all_abs2idx : dict
+        all_abs2idx: dict
             Dictionary mapping an absolute name to its allprocs variable index.
-        all_sizes : dict
+        all_sizes: dict
             Mapping of vec_names and types to sizes of each variable in all procs.
 
         Returns
@@ -993,17 +993,17 @@ class Component(System):
 
         Parameters
         ----------
-        of : str or list of str
+        of: str or list of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt: str or list of str
             The name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
-        method : str
+        method: str
             The type of approximation that should be used. Valid options include:
                 - 'fd': Finite Difference
-        **kwargs : dict
+        **kwargs: dict
             Keyword arguments for controlling the behavior of the approximation.
         """
         pattern_matches = self._find_partial_matches(of, wrt)
@@ -1034,14 +1034,14 @@ class Component(System):
 
         Parameters
         ----------
-        of : str or list of str
+        of: str or list of str
             The name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt : str or list of str
+        wrt: str or list of str
             The name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
-        dependent : bool(True)
+        dependent: bool(True)
             If False, specifies no dependence between the output(s) and the
             input(s). This is only necessary in the case of a sparse global
             jacobian, because if 'dependent=False' is not specified and
@@ -1050,24 +1050,24 @@ class Component(System):
             for that pair.  In the case of a dense global jacobian it doesn't
             matter because the space for a dense subjac will always be
             allocated for every pair.
-        rows : ndarray of int or None
+        rows: ndarray of int or None
             Row indices for each nonzero entry.  For sparse subjacobians only.
-        cols : ndarray of int or None
+        cols: ndarray of int or None
             Column indices for each nonzero entry.  For sparse subjacobians only.
-        val : float or ndarray of float or scipy.sparse
+        val: float or ndarray of float or scipy.sparse
             Value of subjacobian.  If rows and cols are not None, this will
             contain the values found at each (row, col) location in the subjac.
-        method : str
+        method: str
             The type of approximation that should be used. Valid options include:
             'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
             defined analytic derivatives. Default is 'exact'.
-        step : float
+        step: float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form: string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
+        step_calc: string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
@@ -1187,35 +1187,35 @@ class Component(System):
 
         Parameters
         ----------
-        wrt : str or list of str
+        wrt: str or list of str
             The name or names of the variables that derivatives are taken with respect to.
             This can contain input names, output names, or glob patterns.
-        method : str
+        method: str
             Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
+        form: str
             Finite difference form, can be "forward", "central", or "backward". Leave
             undeclared to keep unchanged from previous or default value.
-        step : float
+        step: float
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
-        per_instance : bool
+        per_instance: bool
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
-        num_full_jacs : int
+        num_full_jacs: int
             Number of times to repeat partial jacobian computation when computing sparsity.
-        tol : float
+        tol: float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
-        orders : int
+        orders: int
             Number of orders above and below the tolerance to check during the tolerance sweep.
-        perturb_size : float
+        perturb_size: float
             Size of input/output perturbation during generation of sparsity.
-        min_improve_pct : float
+        min_improve_pct: float
             If coloring does not improve (decrease) the number of solves more than the given
             percentage, coloring will not be used.
-        show_summary : bool
+        show_summary: bool
             If True, display summary information after generating coloring.
-        show_sparsity : bool
+        show_sparsity: bool
             If True, display sparsity with coloring info after generating coloring.
         """
         super().declare_coloring(wrt, method, form, step, per_instance,
@@ -1234,22 +1234,22 @@ class Component(System):
 
         Parameters
         ----------
-        wrt : str or list of str
+        wrt: str or list of str
             The name or names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
-        method : str
+        method: str
             Method for check: "fd" for finite difference, "cs" for complex step.
-        form : str
+        form: str
             Finite difference form for check, can be "forward", "central", or "backward". Leave
             undeclared to keep unchanged from previous or default value.
-        step : float
+        step: float
             Step size for finite difference check. Leave undeclared to keep unchanged from previous
             or default value.
-        step_calc : str
+        step_calc: str
             Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
             relative.  Leave undeclared to keep unchanged from previous or default value.
-        directional : bool
+        directional: bool
             Set to True to perform a single directional derivative for each vector variable in the
             pattern named in wrt.
         """
@@ -1289,7 +1289,7 @@ class Component(System):
 
         Returns
         -------
-        dict(wrt : (options))
+        dict(wrt: (options))
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
@@ -1347,14 +1347,14 @@ class Component(System):
 
         Parameters
         ----------
-        of : tuple of str
+        of: tuple of str
             The names of the residuals that derivatives are being computed for.
             May also contain glob patterns.
-        wrt : tuple of str
+        wrt: tuple of str
             The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain glob patterns.
-        dct : dict
+        dct: dict
             Metadata dict specifying shape, and/or approx properties.
         """
         val = dct['value'] if 'value' in dct else None
@@ -1485,10 +1485,10 @@ class Component(System):
 
         Parameters
         ----------
-        of_pattern : str or list of str
+        of_pattern: str or list of str
             The relative name of the residual(s) that derivatives are being computed for.
             May also contain a glob pattern.
-        wrt_pattern : str or list of str
+        wrt_pattern: str or list of str
             The relative name of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
             May also contain a glob pattern.
@@ -1514,11 +1514,11 @@ class Component(System):
 
         Parameters
         ----------
-        abs_key : tuple(str, str)
+        abs_key: tuple(str, str)
             The of/wrt pair (given absolute names) defining the partial derivative.
-        val : ndarray
+        val: ndarray
             Subjac value.
-        shape : tuple
+        shape: tuple
             Expected shape of val.
         """
         out_size, in_size = shape

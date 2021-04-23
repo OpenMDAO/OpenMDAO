@@ -74,28 +74,28 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
 
     Parameters
     ----------
-    top : System or Problem
+    top: System or Problem
         The top object in the tree.
-    show_solvers : bool
+    show_solvers: bool
         If True, include solver types in the tree.
-    show_jacs : bool
+    show_jacs: bool
         If True, include jacobian types in the tree.
-    show_colors : bool
+    show_colors: bool
         If True and stream is a terminal that supports it, display in color.
-    show_approx : bool
+    show_approx: bool
         If True, mark systems that are approximating their derivatives.
-    filter : function(System)
+    filter: function(System)
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
         be displayed along with any name, value pairs returned from the filter.
-    show_sizes : bool
+    show_sizes: bool
         If True, show input and output sizes for each System.
-    max_depth : int
+    max_depth: int
         Maximum depth for display.
-    rank : int
+    rank: int
         If MPI is active, the tree will only be displayed on this rank.  Only objects local
         to the given rank will be displayed.
-    stream : File-like
+    stream: File-like
         Where dump output will go.
     """
     cprint, Fore, Back, Style = _get_color_printer(stream, show_colors, rank=rank)
@@ -218,9 +218,9 @@ def config_summary(problem, stream=sys.stdout):
 
     Parameters
     ----------
-    problem : Problem
+    problem: Problem
         The Problem to be summarized.
-    stream : File-like
+    stream: File-like
         Where the output will be written.
     """
     model = problem.model
@@ -365,7 +365,7 @@ def profiling(outname='prof.out'):
 
     Parameters
     ----------
-    outname : str
+    outname: str
         Name of the output file containing profiling stats.
     """
     import cProfile
@@ -418,11 +418,11 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
 
     Parameters
     ----------
-    fname : str
+    fname: str
         Name of the trace file(s).  <.rank> will be appended to the name on each rank.
-    skip : set-like
+    skip: set-like
         Collection of function names to skip.
-    flush : bool
+    flush: bool
         If True, flush print buffer after every print call.
     """
     if MPI is None:

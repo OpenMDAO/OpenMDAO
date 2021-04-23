@@ -10,9 +10,9 @@ class SurrogateModel(object):
 
     Attributes
     ----------
-    options : <OptionsDictionary>
+    options: <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    trained : bool
+    trained: bool
         True when surrogate has been trained.
     """
 
@@ -22,7 +22,7 @@ class SurrogateModel(object):
 
         Parameters
         ----------
-        **kwargs : dict
+        **kwargs: dict
             options dictionary.
         """
         self.trained = False
@@ -37,9 +37,9 @@ class SurrogateModel(object):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Training input locations
-        y : array-like
+        y: array-like
             Model responses at given inputs.
         """
         self.trained = True
@@ -50,7 +50,7 @@ class SurrogateModel(object):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point(s) at which the surrogate is evaluated.
         """
         if not self.trained:
@@ -64,7 +64,7 @@ class SurrogateModel(object):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Vectorized point(s) at which the surrogate is evaluated.
         """
         pass
@@ -75,7 +75,7 @@ class SurrogateModel(object):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point at which the surrogate Jacobian is evaluated.
         """
         pass
@@ -98,9 +98,9 @@ class MultiFiSurrogateModel(SurrogateModel):
 
         Parameters
         ----------
-        x : array-like
+        x: array-like
             Point(s) at which the surrogate is evaluated.
-        y : array-like
+        y: array-like
             Model responses at given inputs.
         """
         super().train(x, y)
@@ -112,9 +112,9 @@ class MultiFiSurrogateModel(SurrogateModel):
 
         Parameters
         ----------
-        x : list of (m samples, n inputs) ndarrays
+        x: list of (m samples, n inputs) ndarrays
             Values representing the multi-fidelity training case inputs.
-        y : list of ndarray
+        y: list of ndarray
             output training values which corresponds to the multi-fidelity
             training case input given by x.
         """

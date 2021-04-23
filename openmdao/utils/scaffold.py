@@ -26,7 +26,7 @@ def _scaffold_setup_parser(parser):
 
     Parameters
     ----------
-    parser : argparse subparser
+    parser: argparse subparser
         The parser we're adding options to.
     """
     parser.add_argument('-c', '--class', action='store', dest='class_name',
@@ -82,9 +82,9 @@ def _scaffold_exec(options, user_args):
 
     Parameters
     ----------
-    options : argparse Namespace
+    options: argparse Namespace
         Command line options.
-    user_args : list of str
+    user_args: list of str
         Command line options after '--' (if any).  Passed to user script.
     """
     base = options.base
@@ -131,8 +131,8 @@ def _scaffold_exec(options, user_args):
 
                 setup_dict = {
                     'name': dist_name,
-                    'version': '???',
-                    'description': '???',
+                    'version': '0.0.1',
+                    'description': '',
                     'keywords': keywords,
                     'license': '???',
                     'packages': [pkg_name, pkg_name + '.' + 'test'],

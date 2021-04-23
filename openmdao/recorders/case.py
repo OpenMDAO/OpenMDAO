@@ -26,48 +26,48 @@ class Case(object):
 
     Attributes
     ----------
-    source : str
+    source: str
         The unique id of the system/solver/driver/problem that did the recording.
-    name : str
+    name: str
         The unique identifier for this case.
-    parent : str
+    parent: str
         The iteration coordinate of the parent case for this iteration if any, else None.
-    counter : int
+    counter: int
         The unique sequential index of this case in the recording.
-    timestamp : float
+    timestamp: float
         Time of execution of the case.
-    success : str
+    success: str
         Success flag for the case.
-    msg : str
+    msg: str
         Message associated with the case.
-    outputs : PromAbsDict
+    outputs: PromAbsDict
         Map of outputs to values recorded.
-    inputs : PromAbsDict or None
+    inputs: PromAbsDict or None
         Map of inputs to values recorded, None if not recorded.
-    residuals : PromAbsDict or None
+    residuals: PromAbsDict or None
         Map of outputs to residuals recorded, None if not recorded.
-    derivatives : PromAbsDict or None
+    derivatives: PromAbsDict or None
         Map of (output, input) to derivatives recorded, None if not recorded.
-    parent : str
+    parent: str
         The full unique identifier for the parent this iteration.
-    abs_err : float or None
+    abs_err: float or None
         Absolute tolerance (None if not recorded).
-    rel_err : float or None
+    rel_err: float or None
         Relative tolerance (None if not recorded).
-    _prom2abs : {'input': dict, 'output': dict}
+    _prom2abs: {'input': dict, 'output': dict}
         Dictionary mapping promoted names of all variables to absolute names.
-    _abs2prom : {'input': dict, 'output': dict}
+    _abs2prom: {'input': dict, 'output': dict}
         Dictionary mapping absolute names of all variables to promoted names.
-    _abs2meta : dict
+    _abs2meta: dict
         Dictionary mapping absolute names of all variables to variable metadata.
-    _conns : dict
+    _conns: dict
         Dictionary of all model connections.
-    _auto_ivc_map : dict
+    _auto_ivc_map: dict
         Dictionary that maps all auto_ivc sources to either an absolute input name for single
         connections or a promoted input name for multiple connections. This is for output display.
-    _var_info : dict
+    _var_info: dict
         Dictionary with information about variables (scaling, indices, execution order).
-    _format_version : int
+    _format_version: int
         A version number specifying the format of array data, if not numpy arrays.
     """
 
@@ -78,25 +78,25 @@ class Case(object):
 
         Parameters
         ----------
-        source : str
+        source: str
             The unique id of the system/solver/driver/problem that did the recording.
-        data : dict-like
+        data: dict-like
             Dictionary of data for a case
-        prom2abs : {'input': dict, 'output': dict}
+        prom2abs: {'input': dict, 'output': dict}
             Dictionary mapping promoted names of all variables to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
+        abs2prom: {'input': dict, 'output': dict}
             Dictionary mapping absolute names of all variables to promoted names.
-        abs2meta : dict
+        abs2meta: dict
             Dictionary mapping absolute names of all variables to variable metadata.
-        conns : dict
+        conns: dict
             Dictionary of all model connections.
-        auto_ivc_map : dict
+        auto_ivc_map: dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info : dict
+        var_info: dict
             Dictionary with information about variables (scaling, indices, execution order).
-        data_format : int
+        data_format: int
             A version number specifying the format of array data, if not numpy arrays.
         """
         self.source = source
@@ -123,7 +123,7 @@ class Case(object):
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
-        self.rel_err = data['abs_err'] if 'rel_err' in data.keys() else None
+        self.rel_err = data['rel_err'] if 'rel_err' in data.keys() else None
 
         # rename solver keys
         if 'solver_inputs' in data.keys():
@@ -218,7 +218,7 @@ class Case(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted or relative variable name in the root system's namespace.
 
         Returns
@@ -247,11 +247,11 @@ class Case(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted or relative variable name in the root system's namespace.
-        units : str, optional
+        units: str, optional
             Units to convert to before upon return.
-        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+        indices: int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
 
         Returns
@@ -288,7 +288,7 @@ class Case(object):
 
         Parameters
         ----------
-        name : str
+        name: str
             Promoted or relative variable name in the root system's namespace.
 
         Returns
@@ -325,9 +325,9 @@ class Case(object):
 
         Parameters
         ----------
-        scaled : bool
+        scaled: bool
             If True, then return scaled values.
-        use_indices : bool
+        use_indices: bool
             If True, apply indices.
 
         Returns
@@ -343,9 +343,9 @@ class Case(object):
 
         Parameters
         ----------
-        scaled : bool
+        scaled: bool
             If True, then return scaled values.
-        use_indices : bool
+        use_indices: bool
             If True, apply indices.
 
         Returns
@@ -361,9 +361,9 @@ class Case(object):
 
         Parameters
         ----------
-        scaled : bool
+        scaled: bool
             If True, then return scaled values.
-        use_indices : bool
+        use_indices: bool
             If True, apply indices.
 
         Returns
@@ -379,9 +379,9 @@ class Case(object):
 
         Parameters
         ----------
-        scaled : bool
+        scaled: bool
             If True, then return scaled values.
-        use_indices : bool
+        use_indices: bool
             If True, apply indices.
 
         Returns
@@ -408,36 +408,36 @@ class Case(object):
 
         Parameters
         ----------
-        values : bool, optional
+        values: bool, optional
             When True, display/return input values. Default is True.
-        prom_name : bool, optional
+        prom_name: bool, optional
             When True, display/return the promoted name of the variable.
             Default is False.
-        units : bool, optional
+        units: bool, optional
             When True, display/return units. Default is False.
-        shape : bool, optional
+        shape: bool, optional
             When True, display/return the shape of the value. Default is False.
-        desc : bool, optional
+        desc: bool, optional
             When True, display/return description. Default is False.
-        hierarchical : bool, optional
+        hierarchical: bool, optional
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
+        print_arrays: bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : iter of str or None
+        includes: iter of str or None
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
-        excludes : iter of str or None
+        excludes: iter of str or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -509,52 +509,52 @@ class Case(object):
 
         Parameters
         ----------
-        explicit : bool, optional
+        explicit: bool, optional
             include outputs from explicit components. Default is True.
-        implicit : bool, optional
+        implicit: bool, optional
             include outputs from implicit components. Default is True.
-        values : bool, optional
+        values: bool, optional
             When True, display/return output values. Default is True.
-        prom_name : bool, optional
+        prom_name: bool, optional
             When True, display/return the promoted name of the variable.
             Default is False.
-        residuals : bool, optional
+        residuals: bool, optional
             When True, display/return residual values. Default is False.
-        residuals_tol : float, optional
+        residuals_tol: float, optional
             If set, limits the output of list_outputs to only variables where
             the norm of the resids array is greater than the given 'residuals_tol'.
             Default is None.
-        units : bool, optional
+        units: bool, optional
             When True, display/return units. Default is False.
-        shape : bool, optional
+        shape: bool, optional
             When True, display/return the shape of the value. Default is False.
-        bounds : bool, optional
+        bounds: bool, optional
             When True, display/return bounds (lower and upper). Default is False.
-        scaling : bool, optional
+        scaling: bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
-        desc : bool, optional
+        desc: bool, optional
             When True, display/return description. Default is False.
-        hierarchical : bool, optional
+        hierarchical: bool, optional
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool, optional
+        print_arrays: bool, optional
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs
+        tags: str or list of strs
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : iter of str or None
+        includes: iter of str or None
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
-        excludes : iter of str or None
+        excludes: iter of str or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
-        list_autoivcs : bool
+        list_autoivcs: bool
             If True, include auto_ivc outputs in the listing.  Defaults to False.
-        out_stream : file-like
+        out_stream: file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -640,19 +640,19 @@ class Case(object):
 
         Parameters
         ----------
-        var_type : 'input', 'explicit' or 'implicit'
+        var_type: 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        var_data : list
+        var_data: list
             List of (name, dict of vals and metadata) tuples.
-        hierarchical : bool
+        hierarchical: bool
             When True, human readable output shows variables in hierarchical format.
-        print_arrays : bool
+        print_arrays: bool
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        out_stream : file-like object
+        out_stream: file-like object
             Where to send human readable output.
             Set to None to suppress.
         """
@@ -693,13 +693,13 @@ class Case(object):
 
         Parameters
         ----------
-        var_type : str
+        var_type: str
             String indicating which value for 'type' should be accepted for a variable
             to be included in the returned map.  Allowed values are: ['desvar', 'objective',
             'constraint', 'response'].
-        scaled : bool
+        scaled: bool
             If True, then return scaled values.
-        use_indices : bool
+        use_indices: bool
             If True, apply indices.
 
         Returns
@@ -752,18 +752,18 @@ class PromAbsDict(dict):
 
     Attributes
     ----------
-    _values : array or dict
+    _values: array or dict
         Array or dict of values accessible via absolute variable name.
-    _keys : array
+    _keys: array
         Absolute variable names that map to the values in the _values array.
-    _prom2abs : dict
+    _prom2abs: dict
         Dictionary mapping promoted names in the output vector to absolute names.
-    _abs2prom : dict
+    _abs2prom: dict
         Dictionary mapping absolute names to promoted names.
-    _auto_ivc_map : dict
+    _auto_ivc_map: dict
         Dictionary that maps all auto_ivc sources to either an absolute input name for single
         connections or a promoted input name for multiple connections. This is for output display.
-    _DERIV_KEY_SEP : str
+    _DERIV_KEY_SEP: str
         Separator character for derivative keys.
     """
 
@@ -774,17 +774,17 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        values : array or dict
+        values: array or dict
             Numpy structured array or dictionary of values.
-        prom2abs : dict
+        prom2abs: dict
             Dictionary mapping promoted names to absolute names.
-        abs2prom : dict
+        abs2prom: dict
             Dictionary mapping absolute names in the output vector to promoted names.
-        data_format : int
+        data_format: int
             A version number specifying the OpenMDAO SQL case database version.
-        in_prom2abs : dict
+        in_prom2abs: dict
            Dictionary mapping promoted names in the input vector to absolute names.
-        auto_ivc_map : dict
+        auto_ivc_map: dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
@@ -875,7 +875,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : tuple or string
+        key: tuple or string
             derivative key as either (of, wrt) or 'of!wrt'.
 
         Returns
@@ -921,7 +921,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key: string
             Absolute or promoted variable name.
 
         Returns
@@ -963,9 +963,9 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key: string
             Absolute or promoted variable name.
-        value : any
+        value: any
             value for variable
         """
         auto_ivc_map = self._auto_ivc_map

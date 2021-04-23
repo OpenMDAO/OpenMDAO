@@ -19,13 +19,13 @@ class InterpLagrange3(InterpAlgorithm):
 
         Parameters
         ----------
-        grid : tuple(ndarray)
+        grid: tuple(ndarray)
             Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
+        values: ndarray
             Array containing the table values for all dimensions.
-        interp : class
+        interp: class
             Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
+        **kwargs: dict
             Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, **kwargs)
@@ -38,12 +38,12 @@ class InterpLagrange3(InterpAlgorithm):
 
         Parameters
         ----------
-        x : ndarray
+        x: ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx: integer
             Interval index for x.
-        slice_idx : List of <slice>
+        slice_idx: list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 

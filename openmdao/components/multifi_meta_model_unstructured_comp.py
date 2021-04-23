@@ -12,9 +12,9 @@ def _get_name_fi(name, fi_index):
 
     Parameters
     ----------
-    name : str
+    name: str
         base name
-    fi_index : int
+    fi_index: int
         fidelity level
 
     Returns
@@ -72,13 +72,13 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
     Attributes
     ----------
-    _input_sizes : list
+    _input_sizes: list
         Stores the size of the inputs at each level.
-    _static_input_sizes : list
+    _static_input_sizes: list
         Stores the size of the inputs at each level for inputs added outside of setup.
-    _nfi : float
+    _nfi: float
         number of levels of fidelity
-    _training_input : dict
+    _training_input: dict
         Training data for inputs.
     """
 
@@ -88,7 +88,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         Parameters
         ----------
-        **kwargs : dict of keyword arguments
+        **kwargs: dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -120,14 +120,14 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         Parameters
         ----------
-        pathname : str
+        pathname: str
             Global name of the system, including the path.
-        comm : MPI.Comm or <FakeComm>
+        comm: MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : str
+        mode: str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint).
-        prob_meta : dict
+        prob_meta: dict
             Problem level options.
         """
         self._input_sizes = list(self._static_input_sizes)
@@ -141,27 +141,27 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable
+        val: float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
-        shape : int or tuple or list or None
+        shape: int or tuple or list or None
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+        src_indices: int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
             If val is given as an array_like object, the shapes of val and
             src_indices must match. A value of None implies this input depends
             on all entries of source. Default is None.
-        flat_src_indices : bool
+        flat_src_indices: bool
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise each entry must be a tuple or list of size equal
             to the number of dimensions of the source.
-        units : str or None
+        units: str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
-        desc : str
+        desc: str
             description of the variable
         """
         metadata = super().add_input(name, val, shape=shape, src_indices=src_indices,
@@ -196,51 +196,51 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         Parameters
         ----------
-        name : str
+        name: str
             name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray
+        val: float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        surrogate : SurrogateModel
+        surrogate: SurrogateModel
             Surrogate model to use.
-        shape : int or tuple or list or None
+        shape: int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
-        units : str or None
+        units: str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : str or None
+        res_units: str or None
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
-        desc : str
+        desc: str
             description of the variable.
-        lower : float or list or tuple or ndarray or Iterable or None
+        lower: float or list or tuple or ndarray or Iterable or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
-        upper : float or list or tuple or ndarray or or Iterable None
+        upper: float or list or tuple or ndarray or or Iterable None
             upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
-        ref : float
+        ref: float
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0 : float
+        ref0: float
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 0. Default is 0.
-        res_ref : float
+        res_ref: float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        tags : str or list of strs or set of strs
+        tags: str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
-        shape_by_conn : bool
+        shape_by_conn: bool
             If True, shape this output to match its connected input(s).
-        copy_shape : str or None
+        copy_shape: str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
-        distributed : bool
+        distributed: bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
         """
