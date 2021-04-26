@@ -4,11 +4,11 @@ import importlib
 import inspect
 
 try:
-    from IPython.display import display, HTML, Code
+    from IPython.display import display, HTML, IFrame, Code
     from IPython import get_ipython
     ipy = get_ipython() is not None
 except ImportError:
-    ipy = None
+    ipy = display = HTML = IFrame = None
 
 from openmdao.utils.general_utils import simple_warning
 
