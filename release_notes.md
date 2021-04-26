@@ -35,10 +35,9 @@ See the following sections for a complete list of changes.
 ## New Features:
 
 - The unit 'as' for attoseconds now works. [#1963](https://github.com/OpenMDAO/OpenMDAO/pull/1963)
-- Added support for sparse FD, setting of jacobian columns, and using sparse arrays in coloring algorithms. [#1967](https://github.com/OpenMDAO/OpenMDAO/pull/1967)
 - Warnings for MPI/PETSc failed import are now suppressed. [#1968](https://github.com/OpenMDAO/OpenMDAO/pull/1968)
 - Added OpenMDAO version to case recorder file [#1971](https://github.com/OpenMDAO/OpenMDAO/pull/1971)
-- Added `add_setup_check()` hook that is called immediately after setup. [#1976](https://github.com/OpenMDAO/OpenMDAO/pull/1976)
+- Added `_setup_check()` hook that is called immediately after setup. [#1976](https://github.com/OpenMDAO/OpenMDAO/pull/1976)
 - User can now add expressions to ExecComp using "add_expr". [#1977](https://github.com/OpenMDAO/OpenMDAO/pull/1977)
 - Added argument to list_problem_vars to optionally return unscaled values. [#1980](https://github.com/OpenMDAO/OpenMDAO/pull/1980)
 - Added OpenMDAO-specific warnings. [#1982](https://github.com/OpenMDAO/OpenMDAO/pull/1982)
@@ -63,6 +62,7 @@ See the following sections for a complete list of changes.
 
 ## Miscellaneous:
 
+- Added support for sparse FD, setting of jacobian columns, and using sparse arrays in coloring algorithms. [#1967](https://github.com/OpenMDAO/OpenMDAO/pull/1967)
 - Moved CI to Github Actions. [#1974](https://github.com/OpenMDAO/OpenMDAO/pull/1974)
 - Updated warning logic for pull requests. [#1979](https://github.com/OpenMDAO/OpenMDAO/pull/1979)
 - Github CI now checks coverage. [#1995](https://github.com/OpenMDAO/OpenMDAO/pull/1995)
