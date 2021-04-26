@@ -79,7 +79,7 @@ def display_source(reference, hide_doc_string=False):
                        "`pip install openmdao[docs]` to upgrade.")
 
 
-def show_options_table(reference):
+def show_options_table(reference, recording_options=False):
     """
     Return the options table of the given reference path.
 
@@ -87,6 +87,9 @@ def show_options_table(reference):
     ----------
     reference: str
         Dot path of desired class or function.
+
+    recording_options: bool
+        If True, display recording options instead of options.
 
     Returns
     -------
@@ -96,7 +99,10 @@ def show_options_table(reference):
     obj = _get_object_from_reference(reference)()
 
     if ipy:
-        return display(HTML(obj.options.to_table(fmt='html')))
+        if not recording_options:
+            return display(HTML(obj.options.to_table(fmt='html')))
+        else:
+            return display(HTML(obj.recording_options.to_table(fmt='html')))
     else:
         simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
                        "`pip install openmdao[docs]` to upgrade.")
