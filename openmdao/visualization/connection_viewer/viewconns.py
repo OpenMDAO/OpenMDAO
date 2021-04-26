@@ -21,6 +21,7 @@ from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
 
+
 def _val2str(val):
     if isinstance(val, np.ndarray):
         if val.size > 5:
