@@ -6,8 +6,7 @@ from io import StringIO
 
 import openmdao.api as om
 
-from openmdao.core.notebook_utils import notebook_mode, tabulate
-
+from openmdao.utils.notebook_utils import notebook_mode, tabulate
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 

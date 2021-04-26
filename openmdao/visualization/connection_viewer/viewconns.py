@@ -15,12 +15,11 @@ except ImportError:
 
 import openmdao
 from openmdao.core.problem import Problem
-from openmdao.core.notebook_utils import notebook, colab
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
-
+from openmdao.utils.notebook_utils import notebook, colab
 
 def _val2str(val):
     if isinstance(val, np.ndarray):

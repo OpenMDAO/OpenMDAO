@@ -10,7 +10,7 @@ import functools
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.warnings import warn_deprecation
-from openmdao.core.notebook_utils import notebook
+from openmdao.utils.notebook_utils import notebook
 
 
 def _redirect_streams(to_fd):

@@ -16,11 +16,7 @@ from openmdao.warnings import issue_warning, CaseRecorderWarning
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
-from openmdao.core.notebook_utils import notebook, tabulate
-try:
-    from IPython.display import display, HTML
-except ImportError:
-    display = HTML = None
+from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
 
 import pickle
 import zlib
