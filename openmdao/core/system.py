@@ -19,7 +19,6 @@ import numpy as np
 import networkx as nx
 
 import openmdao
-from openmdao.core.notebook_utils import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -41,6 +40,7 @@ from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarnin
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
+from openmdao.utils.notebook_utils import notebook, tabulate
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 

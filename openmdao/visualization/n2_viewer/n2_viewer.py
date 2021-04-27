@@ -8,15 +8,9 @@ import networkx as nx
 
 import numpy as np
 
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
-
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.notebook_utils import notebook, colab
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -30,6 +24,7 @@ from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
+from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
