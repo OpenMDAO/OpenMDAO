@@ -31,40 +31,40 @@ class SqliteCaseReader(BaseCaseReader):
 
     Attributes
     ----------
-    problem_metadata: dict
+    problem_metadata : dict
         Metadata about the problem, including the system hierachy and connections.
-    solver_metadata: dict
+    solver_metadata : dict
         The solver options for each solver in the recorded model.
-    _system_options: dict
+    _system_options : dict
         Metadata about each system in the recorded model, including options and scaling factors.
-    _format_version: int
+    _format_version : int
         The version of the format assumed when loading the file.
-    _solver_metadata: dict
+    _solver_metadata : dict
         Metadata for all the solvers in the model, including their type and options
-    _filename: str
+    _filename : str
         The path to the filename containing the recorded data.
-    _abs2meta: dict
+    _abs2meta : dict
         Dictionary mapping variables to their metadata
-    _abs2prom: {'input': dict, 'output': dict}
+    _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
-    _prom2abs: {'input': dict, 'output': dict}
+    _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _conns: dict
+    _conns : dict
         Dictionary of all model connections.
-    _auto_ivc_map: dict
+    _auto_ivc_map : dict
         Dictionary that maps all auto_ivc sources to either an absolute input name for single
         connections or a promoted input name for multiple connections. This is for output display.
-    _driver_cases: DriverCases
+    _driver_cases : DriverCases
         Helper object for accessing cases from the driver_iterations table.
-    _deriv_cases: DerivCases
+    _deriv_cases : DerivCases
         Helper object for accessing cases from the driver_derivatives table.
-    _system_cases: SystemCases
+    _system_cases : SystemCases
         Helper object for accessing cases from the system_iterations table.
-    _solver_cases: SolverCases
+    _solver_cases : SolverCases
         Helper object for accessing cases from the solver_iterations table.
-    _problem_cases: ProblemCases
+    _problem_cases : ProblemCases
         Helper object for accessing cases from the problem_cases table.
-    _global_iterations: list
+    _global_iterations : list
         List of iteration cases and the table and row in which they are found.
     """
 
@@ -74,11 +74,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The path to the filename containing the recorded data.
-        pre_load: bool
+        pre_load : bool
             If True, load all the data into memory during initialization.
-        metadata_filename: str
+        metadata_filename : str
             The path to the filename containing the recorded metadata, if separate.
         """
         super().__init__(filename, pre_load)
@@ -179,7 +179,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        cur: sqlite3.Cursor
+        cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
         cur.execute('select * from metadata')
@@ -275,7 +275,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        cur: sqlite3.Cursor
+        cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
         cur.execute("SELECT model_viewer_data FROM driver_metadata")
@@ -297,7 +297,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        cur: sqlite3.Cursor
+        cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
         cur.execute("SELECT id, scaling_factors, component_metadata FROM system_metadata")
@@ -322,7 +322,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        cur: sqlite3.Cursor
+        cur : sqlite3.Cursor
             Database cursor to use for reading the data.
         """
         cur.execute("SELECT id, solver_options, solver_class FROM solver_metadata")
@@ -344,7 +344,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        cur: sqlite3.Cursor
+        cur : sqlite3.Cursor
             Database cursor to use for reading the data.
 
         Returns
@@ -371,7 +371,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -413,9 +413,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source: {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -468,11 +468,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        tree: dict
+        tree : dict
             Nested dictionary of system information
-        path: str or None
+        path : str or None
             Pathname of root system (None for the root model)
-        paths: list
+        paths : list
             List to which pathnames are appended
 
         Returns
@@ -499,11 +499,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        run_number: int
+        run_number : int
             Run_driver or run_model iteration to inspect
-        system: str or None
+        system : str or None
             Pathname of system (None for all systems)
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -543,7 +543,7 @@ class SqliteCaseReader(BaseCaseReader):
                         out_stream.write(f"Run Number: {num}\n")
                         num_header = num
 
-                    out_stream.write(f"    Subsystem: {name}\n")
+                    out_stream.write(f"    Subsystem : {name}\n")
 
                 dct[name] = {}
 
@@ -563,11 +563,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        run_number: int
+        run_number : int
             Run_driver or run_model iteration to inspect
-        solver: str or None
+        solver : str or None
             Pathname of solver (None for all solvers)
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -621,15 +621,15 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source: {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
             case name}
             If not None, only cases originating from the specified source or case are returned.
-        recurse: bool, optional
+        recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
-        flat: bool, optional
+        flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -720,9 +720,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        coord: an iteration coordinate
+        coord : an iteration coordinate
             Identifies the parent of the cases to return.
-        out_stream: file-like object
+        out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
 
@@ -804,7 +804,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        coord: an iteration coordinate
+        coord : an iteration coordinate
             Identifies the parent of the cases to return.
 
         Returns
@@ -856,11 +856,11 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source: {'problem', 'driver', component pathname, solver pathname, case_name}
+        source : {'problem', 'driver', component pathname, solver pathname, case_name}
             Identifies which cases to return.
-        recurse: bool, optional
+        recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-        flat: bool, optional
+        flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
 
@@ -881,9 +881,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        case_ids: OrderedDict
+        case_ids : OrderedDict
             The nested dictionary of case IDs.
-        cases: OrderedDict
+        cases : OrderedDict
             The nested dictionary of cases.
 
         Returns
@@ -907,9 +907,9 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        case_id: str or int
+        case_id : str or int
             The unique identifier of the case to return or an index into all cases.
-        recurse: bool, optional
+        recurse : bool, optional
             If True, will return all successors to the case as well.
 
         Returns
@@ -955,36 +955,36 @@ class CaseTable(object):
 
     Attributes
     ----------
-    _filename: str
+    _filename : str
         The name of the recording file from which to instantiate the case reader.
-    _format_version: int
+    _format_version : int
         The version of the format assumed when loading the file.
-    _table_name: str
+    _table_name : str
         The name of the table in the database.
-    _index_name: str
+    _index_name : str
         The name of the case index column in the table.
-    _global_iterations: list
+    _global_iterations : list
         List of iteration cases and the table and row in which they are found.
-    _abs2prom: {'input': dict, 'output': dict}
+    _abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names.
-    _abs2meta: dict
+    _abs2meta : dict
         Dictionary mapping absolute variable names to variable metadata.
-    _prom2abs: {'input': dict, 'output': dict}
+    _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _conns: dict
+    _conns : dict
         Dictionary of all model connections.
-    _var_info: dict
+    _var_info : dict
         Dictionary with information about variables (scaling, indices, execution order).
-    _sources: list
+    _sources : list
         List of sources of cases in the table.
-    _keys: list
+    _keys : list
         List of keys of cases in the table.
-    _cases: dict
+    _cases : dict
         Dictionary mapping keys to cases that have already been loaded.
-    _auto_ivc_map: dict
+    _auto_ivc_map : dict
         Dictionary that maps all auto_ivc sources to either an absolute input name for single
         connections or a promoted input name for multiple connections. This is for output display.
-    _global_iterations: list
+    _global_iterations : list
         List of iteration cases and the table and row in which they are found.
     """
 
@@ -995,29 +995,29 @@ class CaseTable(object):
 
         Parameters
         ----------
-        fname: str
+        fname : str
             The name of the recording file from which to instantiate the case reader.
-        ver: int
+        ver : int
             The version of the format assumed when loading the file.
-        table: str
+        table : str
             The name of the table in the database.
-        index: str
+        index : str
             The name of the case index column in the table.
-        giter: list of tuple
+        giter : list of tuple
             The global iterations table.
-        abs2prom: {'input': dict, 'output': dict}
+        abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
-        abs2meta: dict
+        abs2meta : dict
             Dictionary mapping absolute variable names to variable metadata.
-        prom2abs: {'input': dict, 'output': dict}
+        prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        conns: dict
+        conns : dict
             Dictionary of all model connections.
-        auto_ivc_map: dict
+        auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info: dict
+        var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
         self._filename = fname
@@ -1061,7 +1061,7 @@ class CaseTable(object):
 
         Parameters
         ----------
-        source: str, optional
+        source : str, optional
             A source of cases or the iteration coordinate of a case.
             If not None, only cases originating from the specified source or case are returned.
 
@@ -1098,11 +1098,11 @@ class CaseTable(object):
 
         Parameters
         ----------
-        source: str, optional
+        source : str, optional
             If not None, only cases that have the specified source will be returned
-        recurse: bool, optional
+        recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
-        flat: bool, optional
+        flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
 
@@ -1152,9 +1152,9 @@ class CaseTable(object):
 
         Parameters
         ----------
-        case_id: str or int
+        case_id : str or int
             The string-identifier of the case to be retrieved or the index of the case.
-        cache: bool
+        cache : bool
             If True, case will be cached for faster access by key.
 
         Returns
@@ -1211,12 +1211,12 @@ class CaseTable(object):
 
         Parameters
         ----------
-        case_idx: int
+        case_idx : int
             The case number that we want the iteration coordinate for.
 
         Returns
         -------
-        iteration_coordinate: str
+        iteration_coordinate : str
             The iteration coordinate.
         """
         # if keys have not been cached yet, get them now
@@ -1231,7 +1231,7 @@ class CaseTable(object):
 
         Parameters
         ----------
-        cache: bool
+        cache : bool
             If True, cases will be cached for faster access by key.
         """
         with sqlite3.connect(self._filename) as con:
@@ -1289,7 +1289,7 @@ class CaseTable(object):
 
         Parameters
         ----------
-        iteration_coordinate: str
+        iteration_coordinate : str
             The full unique identifier for this iteration.
 
         Returns
@@ -1305,7 +1305,7 @@ class CaseTable(object):
 
         Parameters
         ----------
-        row_id: int
+        row_id : int
             The row_id of the case in the table.
 
         Returns
@@ -1328,7 +1328,7 @@ class CaseTable(object):
 
         Parameters
         ----------
-        source: str
+        source : str
             The source.
 
         Returns
@@ -1355,25 +1355,25 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The name of the recording file from which to instantiate the case reader.
-        format_version: int
+        format_version : int
             The version of the format assumed when loading the file.
-        giter: list of tuple
+        giter : list of tuple
             The global iterations table.
-        abs2prom: {'input': dict, 'output': dict}
+        abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
-        abs2meta: dict
+        abs2meta : dict
             Dictionary mapping absolute variable names to variable metadata.
-        prom2abs: {'input': dict, 'output': dict}
+        prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        conns: dict
+        conns : dict
             Dictionary of all model connections.
-        auto_ivc_map: dict
+        auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info: dict
+        var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
@@ -1390,7 +1390,7 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        cache: bool
+        cache : bool
             If True, cases will be cached for faster access by key.
         """
         with sqlite3.connect(self._filename) as con:
@@ -1427,9 +1427,9 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        case_id: int or str
+        case_id : int or str
             The integer index or string-identifier of the case to be retrieved.
-        cache: bool
+        cache : bool
             If True, cache the case so it does not have to be fetched on next access.
 
         Returns
@@ -1496,7 +1496,7 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        iteration_coordinate: str
+        iteration_coordinate : str
             The full unique identifier for this iteration.
 
         Returns
@@ -1512,7 +1512,7 @@ class DriverCases(CaseTable):
 
         Parameters
         ----------
-        row_id: int
+        row_id : int
             The row_id of the case in the table.
 
         Returns
@@ -1535,25 +1535,25 @@ class SystemCases(CaseTable):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The name of the recording file from which to instantiate the case reader.
-        format_version: int
+        format_version : int
             The version of the format assumed when loading the file.
-        giter: list of tuple
+        giter : list of tuple
             The global iterations table.
-        abs2prom: {'input': dict, 'output': dict}
+        abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
-        abs2meta: dict
+        abs2meta : dict
             Dictionary mapping absolute variable names to variable metadata.
-        prom2abs: {'input': dict, 'output': dict}
+        prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        conns: dict
+        conns : dict
             Dictionary of all model connections.
-        auto_ivc_map: dict
+        auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info: dict
+        var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
@@ -1574,25 +1574,25 @@ class SolverCases(CaseTable):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The name of the recording file from which to instantiate the case reader.
-        format_version: int
+        format_version : int
             The version of the format assumed when loading the file.
-        giter: list of tuple
+        giter : list of tuple
             The global iterations table.
-        abs2prom: {'input': dict, 'output': dict}
+        abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
-        abs2meta: dict
+        abs2meta : dict
             Dictionary mapping absolute variable names to variable metadata.
-        prom2abs: {'input': dict, 'output': dict}
+        prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        conns: dict
+        conns : dict
             Dictionary of all model connections.
-        auto_ivc_map: dict
+        auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info: dict
+        var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
@@ -1606,7 +1606,7 @@ class SolverCases(CaseTable):
 
         Parameters
         ----------
-        iteration_coordinate: str
+        iteration_coordinate : str
             The full unique identifier for this iteration.
 
         Returns
@@ -1641,25 +1641,25 @@ class ProblemCases(CaseTable):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The name of the recording file from which to instantiate the case reader.
-        format_version: int
+        format_version : int
             The version of the format assumed when loading the file.
-        giter: list of tuple
+        giter : list of tuple
             The global iterations table.
-        abs2prom: {'input': dict, 'output': dict}
+        abs2prom : {'input': dict, 'output': dict}
             Dictionary mapping absolute names to promoted names.
-        abs2meta: dict
+        abs2meta : dict
             Dictionary mapping absolute variable names to variable metadata.
-        prom2abs: {'input': dict, 'output': dict}
+        prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        conns: dict
+        conns : dict
             Dictionary of all model connections.
-        auto_ivc_map: dict
+        auto_ivc_map : dict
             Dictionary that maps all auto_ivc sources to either an absolute input name for single
             connections or a promoted input name for multiple connections. This is for output
             display.
-        var_info: dict
+        var_info : dict
             Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
@@ -1684,7 +1684,7 @@ class ProblemCases(CaseTable):
 
         Parameters
         ----------
-        iteration_coordinate: str
+        iteration_coordinate : str
             The full unique identifier for this iteration.
 
         Returns
@@ -1700,7 +1700,7 @@ class ProblemCases(CaseTable):
 
         Parameters
         ----------
-        row_id: int
+        row_id : int
             The row_id of the case in the table.
 
         Returns

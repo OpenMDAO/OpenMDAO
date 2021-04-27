@@ -252,19 +252,19 @@ def setup(methods=None, verbose=None, memory=None, leaks=False, rank=-1, show_pt
 
     Parameters
     ----------
-    methods: list of (glob, (classes...)) or None
+    methods : list of (glob, (classes...)) or None
         Methods to be traced, based on glob patterns and isinstance checks.
-    verbose: bool
+    verbose : bool
         If True, show function locals and return values.
-    memory: bool
+    memory : bool
         If True, show functions that increase memory usage.
-    leaks: bool
+    leaks : bool
         If True, show objects that are created within a function and not garbage collected.
-    rank: int
+    rank : int
         MPI rank where output is desired.  The default, -1 means output from all ranks.
-    show_ptrs: bool
+    show_ptrs : bool
         If True, show addresses of printed objects.
-    outfile: file-like or str
+    outfile : file-like or str
         Output file.
     """
     _setup(_Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks, rank=rank,
@@ -297,16 +297,16 @@ def tracing(methods=None, verbose=False, memory=False, leaks=False, show_ptrs=Fa
 
     Parameters
     ----------
-    methods: list of (glob, (classes...)) or str or None
+    methods : list of (glob, (classes...)) or str or None
         Methods to be traced, based on glob patterns and isinstance checks. If value
         is a string, use that string to lookup a 'canned' method list by name.
-    verbose: bool
+    verbose : bool
         If True, show function locals and return values.
-    memory: bool
+    memory : bool
         If True, show functions that increase memory usage.
-    leaks: bool
+    leaks : bool
         If True, show objects that are created within a function and not garbage collected.
-    show_ptrs: bool
+    show_ptrs : bool
         If True, show addresses of printed objects.
     """
     setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, show_ptrs=show_ptrs)
@@ -323,18 +323,18 @@ class tracedfunc(object):
 
     Parameters
     ----------
-    methods: list of (glob, (classes...)) tuples, optional
+    methods : list of (glob, (classes...)) tuples, optional
         Methods to be traced, based on glob patterns and isinstance checks.
-    verbose: bool
+    verbose : bool
         If True, show function locals and return values.
-    memory: bool
+    memory : bool
         If True, show functions that increase memory usage.
-    leaks: bool
+    leaks : bool
         If True, show objects that are created within a function and not garbage collected.
-    filters: list of str or None
+    filters : list of str or None
         If not None, evaluate as an expression in the frame of matching trace functions. If
         True, include the function in the trace.  Up to one expresson per class.
-    show_ptrs: bool
+    show_ptrs : bool
         If True, show addresses of printed objects.
     """
     def __init__(self, methods=None, verbose=False, memory=False, leaks=False, filters=None,

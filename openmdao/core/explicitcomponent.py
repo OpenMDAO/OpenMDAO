@@ -20,9 +20,9 @@ class ExplicitComponent(Component):
 
     Attributes
     ----------
-    _inst_functs: dict
+    _inst_functs : dict
         Dictionary of names mapped to bound methods.
-    _has_compute_partials: bool
+    _has_compute_partials : bool
         If True, the instance overrides compute_partials.
     """
 
@@ -32,7 +32,7 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -84,7 +84,7 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        wrt_matches: set or None
+        wrt_matches : set or None
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
@@ -136,7 +136,7 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        recurse: bool
+        recurse : bool
             If True, setup jacobians in all descendants. (ignored)
         """
         if self._has_approx and self._use_derivatives:
@@ -152,50 +152,50 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        name: str
+        name : str
             name of the variable in this component's namespace.
-        val: float or list or tuple or ndarray
+        val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape: int or tuple or list or None
+        shape : int or tuple or list or None
             Shape of this variable, only required if val is not an array.
             Default is None.
-        units: str or None
+        units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units: str or None
+        res_units : str or None
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
-        desc: str
+        desc : str
             description of the variable.
-        lower: float or list or tuple or ndarray or None
+        lower : float or list or tuple or ndarray or None
             lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
-        upper: float or list or tuple or ndarray or None
+        upper : float or list or tuple or ndarray or None
             upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
-        ref: float
+        ref : float
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0: float
+        ref0 : float
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 0. Default is 0.
-        res_ref: float
+        res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        tags: str or list of strs
+        tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs and also when listing results from case recorders.
-        shape_by_conn: bool
+        shape_by_conn : bool
             If True, shape this output to match its connected input(s).
-        copy_shape: str or None
+        copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
-        distributed: bool
+        distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
 
@@ -278,7 +278,7 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        *args: list
+        *args : list
             List of positional arguments.
         """
         if self._run_root_only():
@@ -304,18 +304,18 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        jac: Jacobian or None
+        jac : Jacobian or None
             If None, use local jacobian, else use jac.
-        vec_names: [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
-        rel_systems: set of str
+        rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        scope_out: set or None
+        scope_out : set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
-        scope_in: set or None
+        scope_in : set or None
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
@@ -398,11 +398,11 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        vec_names: [str, ...]
+        vec_names : [str, ...]
             list of names of the right-hand-side vectors.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
 
         """
@@ -458,9 +458,9 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        jac: Jacobian or None
+        jac : Jacobian or None
             Ignored.
-        sub_do_ln: boolean
+        sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if not (self._has_compute_partials or self._approx_schemes):
@@ -484,13 +484,13 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs: Vector
+        outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
-        discrete_inputs: dict or None
+        discrete_inputs : dict or None
             If not None, dict containing discrete input values.
-        discrete_outputs: dict or None
+        discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
         pass
@@ -501,11 +501,11 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials: Jacobian
+        partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
-        discrete_inputs: dict or None
+        discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
         pass
@@ -521,15 +521,15 @@ class ExplicitComponent(Component):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        d_inputs: Vector
+        d_inputs : Vector
             see inputs; product must be computed only if var_name in d_inputs
-        d_outputs: Vector
+        d_outputs : Vector
             see outputs; product must be computed only if var_name in d_outputs
-        mode: str
+        mode : str
             either 'fwd' or 'rev'
-        discrete_inputs: dict or None
+        discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
         pass

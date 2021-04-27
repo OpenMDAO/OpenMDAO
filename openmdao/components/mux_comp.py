@@ -12,9 +12,9 @@ class MuxComp(ExplicitComponent):
 
     Attributes
     ----------
-    _vars: dict
+    _vars : dict
         Container mapping name of variables to be muxed with additional data.
-    _input_names: dict
+    _input_names : dict
         Container mapping name of variables to be muxed with associated inputs.
     """
 
@@ -24,7 +24,7 @@ class MuxComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             Arguments to be passed to the component initialization method.
         """
         super().__init__(**kwargs)
@@ -47,20 +47,20 @@ class MuxComp(ExplicitComponent):
 
         Parameters
         ----------
-        name: str
+        name : str
             name of the variable in this component's namespace.
-        val: float or list or tuple or ndarray or Iterable
+        val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
-        shape: int or tuple or list or None
+        shape : int or tuple or list or None
             Shape of the input variables to be muxed, only required if val is not an array.
             Default is None.
-        units: str or None
+        units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
-        desc: str
+        desc : str
             description of the variable
-        axis: int
+        axis : int
             The axis along which the elements will be stacked.  Note that N-dimensional inputs
             cannot be stacked along an axis greater than N.
         """
@@ -120,9 +120,9 @@ class MuxComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs: Vector
+        outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         opts = self.options

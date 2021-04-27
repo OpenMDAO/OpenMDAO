@@ -33,11 +33,11 @@ def _generate_fd_coeff(form, order, system):
 
     Parameters
     ----------
-    form: str
+    form : str
         Requested form of FD (e.g. 'forward', 'central', 'backward').
-    order: int
+    order : int
         The order of accuracy of the requested FD scheme.
-    system: System
+    system : System
         Containing system.
 
     Returns
@@ -68,11 +68,11 @@ class FiniteDifference(ApproximationScheme):
 
     Attributes
     ----------
-    _starting_outs: ndarray
+    _starting_outs : ndarray
         A copy of the starting outputs array used to restore the outputs to original values.
-    _starting_ins: ndarray
+    _starting_ins : ndarray
         A copy of the starting inputs array used to restore the inputs to original values.
-    _results_tmp: ndarray
+    _results_tmp : ndarray
         An array the same size as the system outputs. Used to store the results temporarily.
     """
 
@@ -97,13 +97,13 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        abs_key: tuple(str,str)
+        abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
-        system: System
+        system : System
             Containing System.
-        kwargs: dict
+        kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
-        vector: ndarray or None
+        vector : ndarray or None
             Direction for difference when using directional derivatives.
         """
         options = self.DEFAULT_OPTIONS.copy()
@@ -132,11 +132,11 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             System whose derivatives are being approximated.
-        wrt: str
+        wrt : str
             Name of wrt variable.
-        meta: dict
+        meta : dict
             Metadata dict.
 
         Returns
@@ -177,11 +177,11 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             System on which the execution is run.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
-        under_cs: bool
+        under_cs : bool
             True if we're currently under complex step at a higher level.
         """
         if not self._wrt_meta:
@@ -211,7 +211,7 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        data: tuple
+        data : tuple
             Not used.
 
         Returns
@@ -227,7 +227,7 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        array: ndarray
+        array : ndarray
             Result array after doing a finite difference.
 
         Returns
@@ -243,15 +243,15 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             The system having its derivs approximated.
-        idx_info: tuple of (Vector, ndarray of int)
+        idx_info : tuple of (Vector, ndarray of int)
             Tuple of wrt indices and corresponding data vector to perturb.
-        data: tuple of float
+        data : tuple of float
             Tuple of the form (deltas, coeffs, current_coeff)
-        results_array: ndarray
+        results_array : ndarray
             Where the results will be stored.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Returns
@@ -283,13 +283,13 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             The system having its derivs approximated.
-        idx_info: tuple of (Vector, ndarray of int)
+        idx_info : tuple of (Vector, ndarray of int)
             Tuple of wrt indices and corresponding data vector to perturb.
-        delta: float
+        delta : float
             Perturbation amount.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Returns
@@ -322,9 +322,9 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        data: tuple
+        data : tuple
             Tuple contains step size, and other info.
-        direction: ndarray
+        direction : ndarray
             Vector containing derivative direction.
 
         Returns

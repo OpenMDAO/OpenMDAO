@@ -21,7 +21,7 @@ def _redirect_streams(to_fd):
 
     Parameters
     ----------
-    to_fd: int
+    to_fd : int
         File descriptor to redirect to.
     """
     original_stdout_fd = sys.stdout.fileno()
@@ -111,7 +111,7 @@ if MPI:
 
         Parameters
         ----------
-        *msg: tuple of str
+        *msg : tuple of str
             Strings to be printed.
         """
         newmsg = ["%d: " % MPI.COMM_WORLD.rank] + list(msg)
@@ -126,7 +126,7 @@ else:
 
         Parameters
         ----------
-        *msg: tuple of str
+        *msg : tuple of str
             Strings to be printed.
         """
         for m in msg:
@@ -140,9 +140,9 @@ class FakeComm(object):
 
     Attributes
     ----------
-    rank: int
+    rank : int
         index of current proc; value is 0 because there is only 1 proc.
-    size: int
+    size : int
         number of procs in the comm; value is 1 since MPI is not available.
     """
 
@@ -165,7 +165,7 @@ def multi_proc_fail_check(comm):
 
     Parameters
     ----------
-    comm: MPI communicator or None
+    comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
     """
     if MPI is None:
@@ -197,7 +197,7 @@ def multi_proc_exception_check(comm):
 
     Parameters
     ----------
-    comm: MPI communicator or None
+    comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
     """
     if MPI is None or comm is None or comm.size == 1:
@@ -237,7 +237,7 @@ if MPI:
 
         Parameters
         ----------
-        fn: function
+        fn : function
             The function being checked for possible memory leaks.
 
         Returns
@@ -260,7 +260,7 @@ else:
 
         Parameters
         ----------
-        fn: function
+        fn : function
             The function being checked for possible memory leaks.
 
         Returns

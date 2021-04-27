@@ -14,9 +14,9 @@ def _descendents(mysystem, sysiter):
 
     Parameters
     ----------
-    mysystem: <System>
+    mysystem : <System>
         Starting system. We return only descendents of this system.
-    sysiter: iter of str
+    sysiter : iter of str
         Iterator of pathnames of ancestors of mysystem's descendents.
 
     Yields
@@ -74,7 +74,7 @@ class _ConfigInfo(object):
 
         Parameters
         ----------
-        group: <Group>
+        group : <Group>
             Group that has just been configured.
 
         Yields

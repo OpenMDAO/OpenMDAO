@@ -160,11 +160,11 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
 
     Parameters
     ----------
-    class_: class
+    class_ : class
         The starting class.
-    method_name: str
+    method_name : str
         The name of the class method.
-    stream: file-like
+    stream : file-like
         The output stream where output will be displayed.
 
     Returns

@@ -15,9 +15,9 @@ class _RecIteration(object):
 
     Attributes
     ----------
-    stack: list
+    stack : list
         A list that holds the stack of iteration coordinates.
-    prefix: str or None
+    prefix : str or None
         Prefix to prepend to iteration coordinates.
     """
 
@@ -77,7 +77,7 @@ class _RecIteration(object):
 
         Parameters
         ----------
-        iter_coord: tuple
+        iter_coord : tuple
             (func_name, iter_count) for the current iteration.
         """
         self.stack.append(iter_coord)
@@ -108,19 +108,19 @@ class Recording(object):
 
     Attributes
     ----------
-    name: str
+    name : str
         Name of object getting recorded.
-    iter_count: int
+    iter_count : int
         Current counter of iterations completed.
-    recording_requester: weakref to object
+    recording_requester : weakref to object
         The object that wants to be recorded.
-    stack: list
+    stack : list
         Stack containing names and iteration counts.
-    abs: float
+    abs : float
         Absolute error.
-    rel: float
+    rel : float
         Relative error.
-    _is_solver: bool
+    _is_solver : bool
         True if recording_requester is a Solver.
     """
 
@@ -130,11 +130,11 @@ class Recording(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Name of object getting recorded.
-        iter_count: int
+        iter_count : int
             Current counter of iterations completed.
-        recording_requester: object
+        recording_requester : object
             The object that wants to be recorded.
         """
         self.name = name
@@ -152,7 +152,7 @@ class Recording(object):
 
         Returns
         -------
-        self: object
+        self : object
             self
         """
         self.recording_requester()._recording_iter.push((self.name, self.iter_count))
@@ -164,7 +164,7 @@ class Recording(object):
 
         Parameters
         ----------
-        *args: array
+        *args : array
             Solver recording requires extra args.
         """
         requester = self.recording_requester()

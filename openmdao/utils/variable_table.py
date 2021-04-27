@@ -35,25 +35,25 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     Parameters
     ----------
-    pathname: str
+    pathname : str
         pathname to be printed. If None, defaults to 'model'
-    var_list: list of str
+    var_list : list of str
         List of variable names in the order they are to be written.
-    var_type: 'input', 'explicit' or 'implicit'
+    var_type : 'input', 'explicit' or 'implicit'
         Indicates type of variables, input or explicit/implicit output.
-    var_dict: dict
+    var_dict : dict
         dict storing vals and metadata for each var name
-    hierarchical: bool
+    hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
-    top_name: str
+    top_name : str
         the name of the top level group when using hierarchical format.
-    print_arrays: bool
+    print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
         When True, also display full values of the ndarray below the row. Format  is affected
         by the values set with numpy.set_printoptions
         Default is False.
-    out_stream: file-like object
+    out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
     """
@@ -197,9 +197,9 @@ def write_source_table(source_dicts, out_stream):
 
     Parameters
     ----------
-    source_dicts: dict or list of dicts
+    source_dicts : dict or list of dicts
         Dict of source and cases
-    out_stream: file-like object
+    out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
 
@@ -241,20 +241,20 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
 
     Parameters
     ----------
-    out_stream: file-like object
+    out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
-    row: str
+    row : str
         The string containing the contents of the beginning of this row output.
         Contains the name of the System or varname, possibley indented to show hierarchy.
 
-    column_names: list of str
+    column_names : list of str
         Indicates which columns will be written in this row.
 
-    var_dict: dict
+    var_dict : dict
         Contains the values to be written in this row. Keys are columns names.
 
-    print_arrays: bool
+    print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
         When True, also display full values of the ndarray below the row. Format  is affected

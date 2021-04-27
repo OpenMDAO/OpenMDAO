@@ -19,7 +19,7 @@ def get_module_path(fpath):
 
     Parameters
     ----------
-    fpath: str
+    fpath : str
         Pathname of file.
 
     Returns
@@ -51,21 +51,21 @@ def package_iter(start_dir='.', dir_includes=None, dir_excludes=(), file_include
     """
     Iterate over python files in packages (recursively) starting in start_dir.
 
-    NOTE: all *_includes and *_excludes are applied to *local* directory and file names.
+    NOTE : all *_includes and *_excludes are applied to *local* directory and file names.
 
     Parameters
     ----------
-    start_dir: str
+    start_dir : str
         Starting directory.
-    dir_includes: iter of str or None
+    dir_includes : iter of str or None
         Glob patterns for directory inclusion. Be careful here because dir names are local,
         so, for example, if includes=('foo',), then directory 'foo' would be included, but
         any subdirectories of 'foo' that were not also named 'foo' would not.
-    dir_excludes: iter of str
+    dir_excludes : iter of str
         Glob patterns for directory exclusion.
-    file_includes: iter of str or None
+    file_includes : iter of str or None
         Glob patterns for file inclusion.
-    file_excludes: iter of str
+    file_excludes : iter of str
         Glob patterns for file exclusion.
 
     Yields
@@ -91,23 +91,23 @@ def files_iter(start_dir='.', dir_includes=None, dir_excludes=(),
     """
     Iterate over files (recursively) starting in start_dir.
 
-    NOTE: all *_includes and *_excludes are applied to *local* directory and file names.
+    NOTE : all *_includes and *_excludes are applied to *local* directory and file names.
 
     Parameters
     ----------
-    start_dir: str
+    start_dir : str
         Starting directory.
-    dir_includes: iter of str or None
+    dir_includes : iter of str or None
         Glob patterns for directory inclusion. Be careful here because dir names are local,
         so, for example, if includes=('foo',), then directory 'foo' would be included, but
         any subdirectories of 'foo' that were not also named 'foo' would not.
-    dir_excludes: iter of str
+    dir_excludes : iter of str
         Glob patterns for directory exclusion.
-    file_includes: iter of str or None
+    file_includes : iter of str or None
         Glob patterns for file inclusion.
-    file_excludes: iter of str
+    file_excludes : iter of str
         Glob patterns for file exclusion.
-    package_only: bool
+    package_only : bool
         If True, only yield files that are contained in a python package.
 
     Yields
@@ -145,7 +145,7 @@ def _to_filename(spec):
 
     Parameters
     ----------
-    spec: str
+    spec : str
         The filename or testspec.
 
     Returns
@@ -172,9 +172,9 @@ def _load_and_exec(script_name, user_args):
 
     Parameters
     ----------
-    script_name: str
+    script_name : str
         The name of the script to load and exec.
-    user_args: list of str
+    user_args : list of str
         Args to be passed to the user script.
     """
     if ':' in script_name and not os.path.isfile(script_name):
@@ -203,7 +203,7 @@ def _load_and_run_test(testspec):
 
     Parameters
     ----------
-    testspec: str
+    testspec : str
         <fpath_or_modpath>:<testcase>.<method> OR <fpath_or_modpath>:<function>
     """
     syspath_save = sys.path[:]
@@ -228,9 +228,9 @@ def _run_test_func(mod, funcpath):
 
     Parameters
     ----------
-    mod: module
+    mod : module
         The module where the test resides.
-    funcpath: str
+    funcpath : str
         Either <testcase>.<method_name> or <func_name>.
 
     Returns

@@ -20,18 +20,18 @@ class ApproximationScheme(object):
 
     Attributes
     ----------
-    _approx_groups: list
+    _approx_groups : list
         A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
     _colored_approx_groups: list
         A list containing info for all colored approximation groups.
-    _approx_groups_cached_under_cs: bool
+    _approx_groups_cached_under_cs : bool
         Flag indicates whether approx_groups was generated under complex step from higher in the
         model hieararchy.
-    _wrt_meta: dict
+    _wrt_meta : dict
         A dict that maps wrt name to its fd/cs metadata.
-    _progress_out: None or file-like object
+    _progress_out : None or file-like object
         Attribute to output the progress of check_totals
-    _during_sparsity_comp: bool
+    _during_sparsity_comp : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
     """
@@ -75,9 +75,9 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             Group or component instance.
-        under_cs: bool
+        under_cs : bool
             Flag that indicates if we are under complex step.
 
         Returns
@@ -106,11 +106,11 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        abs_key: tuple(str,str)
+        abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
-        system: System
+        system : System
             Containing System.
-        kwargs: dict
+        kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
         raise NotImplementedError("add_approximation has not been implemented")
@@ -202,7 +202,7 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             The system having its derivs approximated.
         """
         abs2meta = system._var_allprocs_abs2meta
@@ -277,15 +277,15 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             System where this approximation is occurring.
-        colored_approx_groups: list of tuples of the form (data, jaccols, vec_ind_list, nzrows)
+        colored_approx_groups : list of tuples of the form (data, jaccols, vec_ind_list, nzrows)
             data -> metadata needed to perform cs or fd
             jaccols -> jacobian columns corresponding to a colored solve
             vec_ind_list -> list of tuples of the form (Vector, ndarray of int)
                 Tuple of wrt indices and corresponding data vector to perturb.
             nzrows -> rows containing nonzero values for each column in jaccols
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Yields
@@ -378,9 +378,9 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             System where this approximation is occurring.
-        approx_groups: list of tuples of the form (wrt, data, jaccols, vec, vec_idx, directional,
+        approx_groups : list of tuples of the form (wrt, data, jaccols, vec, vec_idx, directional,
                                                     dir_vector)
             wrt -> name of the 'with respect to' variable
             data -> metadata needed to perform cs or fd
@@ -390,7 +390,7 @@ class ApproximationScheme(object):
             directional -> if True we're computing a directional derivative (one approx for the
                            whole wrt variable instead of 1 per entry in the variable)
             dir_vector -> if directional is True, this may contain the direction vector
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Yields
@@ -493,12 +493,12 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             System on which the execution is run.
-        jac: None or dict-like
+        jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
         """
         if not self._wrt_meta:
@@ -532,15 +532,15 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             The owning system.
-        outarr: ndarray
+        outarr : ndarray
             Array containing local results from the outputs vector.
-        totarr: ndarray
+        totarr : ndarray
             Array sized to fit a total jac column.
-        of_iter: list
+        of_iter : list
             List of (of, start, end, inds) for each 'of' (row) variable in the total jacobian.
-        my_rem_out_vars: list
+        my_rem_out_vars : list
             List of names of local variables that are remote on other procs.
 
         Returns

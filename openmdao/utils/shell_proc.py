@@ -16,7 +16,7 @@ class CalledProcessError(subprocess.CalledProcessError):
 
     Attributes
     ----------
-    errormsg: str
+    errormsg : str
         Error message saved for string access.
     """
 
@@ -26,14 +26,14 @@ class CalledProcessError(subprocess.CalledProcessError):
 
         Parameters
         ----------
-        returncode: int
+        returncode : int
             Error code for this error.
-        cmd: str or list
+        cmd : str or list
             If a string, then this is the command line to execute, and the
             :class:`subprocess.Popen` ``shell`` argument is set True.
             Otherwise, this is a list of arguments; the first is the command
             to execute.
-        errormsg: str
+        errormsg : str
             Error message for this error.
         """
         super().__init__(returncode, cmd)
@@ -62,17 +62,17 @@ class ShellProc(subprocess.Popen):
 
     Attributes
     ----------
-    _stdin_arg: str, file, or int
+    _stdin_arg : str, file, or int
         Save handle to make closing easier.
-    _stdout_arg: str, file, or int
+    _stdout_arg : str, file, or int
         Save handle to make closing easier.
-    _stderr_arg: str, file, or int
+    _stderr_arg : str, file, or int
         Save handle to make closing easier.
-    _inp: str, file, or int
+    _inp : str, file, or int
         Save handle to make closing easier.
-    _out: str, file, or int
+    _out : str, file, or int
         Save handle to make closing easier.
-    _err: str, file, or int
+    _err : str, file, or int
         Save handle to make closing easier.
     """
 
@@ -83,26 +83,26 @@ class ShellProc(subprocess.Popen):
 
         Parameters
         ----------
-        args: str or list
+        args : str or list
             If a string, then this is the command line to execute and the
             :class:`subprocess.Popen` ``shell`` argument is set True.
             Otherwise, this is a list of arguments; the first is the command
             to execute.
-        stdin: str, file, or int
+        stdin : str, file, or int
             Specify handling of stdin stream. If a string, a file
             of that name is opened. Otherwise, see the :mod:`subprocess`
             documentation.
-        stdout: str, file, or int
+        stdout : str, file, or int
             Specify handling of stdout stream. If a string, a file
             of that name is opened. Otherwise, see the :mod:`subprocess`
             documentation.
-        stderr: str, file, or int
+        stderr : str, file, or int
             Specify handling of stderr stream. If a string, a file
             of that name is opened. Otherwise, see the :mod:`subprocess`
             documentation.
-        env: dict
+        env : dict
             Environment variables for the command.
-        universal_newlines: bool
+        universal_newlines : bool
             Set to True to turn on universal newlines.
         """
         environ = os.environ.copy()
@@ -170,7 +170,7 @@ class ShellProc(subprocess.Popen):
 
         Parameters
         ----------
-        timeout: float (seconds)
+        timeout : float (seconds)
             Maximum time to wait for the process to stop.
             A value of zero implies an infinite maximum wait.
 
@@ -197,10 +197,10 @@ class ShellProc(subprocess.Popen):
 
         Parameters
         ----------
-        poll_delay: float (seconds)
+        poll_delay : float (seconds)
             Time to delay between polling for command completion.
             A value of zero uses an internal default.
-        timeout: float (seconds)
+        timeout : float (seconds)
             Maximum time to wait for command completion.
             A value of zero implies an infinite maximum wait.
 
@@ -247,7 +247,7 @@ class ShellProc(subprocess.Popen):
 
         Parameters
         ----------
-        return_code: int
+        return_code : int
             Return code from :meth:`poll`.
 
         Returns
@@ -281,29 +281,29 @@ def call(args, stdin=None, stdout=None, stderr=None, env=None,
 
     Parameters
     ----------
-    args: str or list
+    args : str or list
         If a string, then this is the command line to execute and the
         :class:`subprocess.Popen` ``shell`` argument is set True.
         Otherwise, this is a list of arguments; the first is the command
         to execute.
-    stdin: str, file, or int
+    stdin : str, file, or int
         Specify handling of stdin stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    stdout: str, file, or int
+    stdout : str, file, or int
         Specify handling of stdout stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    stderr: str, file, or int
+    stderr : str, file, or int
         Specify handling of stderr stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    env: dict
+    env : dict
         Environment variables for the command.
-    poll_delay: float (seconds)
+    poll_delay : float (seconds)
         Time to delay between polling for command completion.
         A value of zero uses an internal default.
-    timeout: float (seconds)
+    timeout : float (seconds)
         Maximum time to wait for command completion.
         A value of zero implies an infinite maximum wait.
 
@@ -327,29 +327,29 @@ def check_call(args, stdin=None, stdout=None, stderr=None, env=None,
 
     Parameters
     ----------
-    args: str or list
+    args : str or list
         If a string, then this is the command line to execute, and the
         :class:`subprocess.Popen` ``shell`` argument is set True.
         Otherwise, this is a list of arguments; the first is the command
         to execute.
-    stdin: str, file, or int
+    stdin : str, file, or int
         Specify handling of stdin stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    stdout: str, file, or int
+    stdout : str, file, or int
         Specify handling of stdout stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    stderr: str, file, or int
+    stderr : str, file, or int
         Specify handling of stderr stream. If a string, a file
         of that name is opened. Otherwise, see the :mod:`subprocess`
         documentation.
-    env: dict
+    env : dict
         Environment variables for the command.
-    poll_delay: float (seconds)
+    poll_delay : float (seconds)
         Time to delay between polling for command completion.
         A value of zero uses an internal default.
-    timeout: float (seconds)
+    timeout : float (seconds)
         Maximum time to wait for command completion.
         A value of zero implies an infinite maximum wait.
     """

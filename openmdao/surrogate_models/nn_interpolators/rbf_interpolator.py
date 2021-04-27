@@ -13,13 +13,13 @@ class RBFInterpolator(NNBase):
 
     Attributes
     ----------
-    rbf_family: int
+    rbf_family : int
         Specifies the order of the radial basis function to be used.
         <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an order
         equal to <floor((dimensions-1)/2) + (3*comp) +1>.
-    N: int
+    N : int
         The number of neighbors used for interpolation.
-    weights: ndarray
+    weights : ndarray
         Weights for each interpolation point.
     """
 
@@ -30,15 +30,15 @@ class RBFInterpolator(NNBase):
 
         Parameters
         ----------
-        training_points: ndarray
+        training_points : ndarray
             ndarray of shape (num_points x independent dims) containing training input locations.
-        training_values: ndarray
+        training_values : ndarray
             ndarray of shape (num_points x dependent dims) containing training output values.
-        num_leaves: int
+        num_leaves : int
             How many leaves the tree should have.
-        num_neighbors: int
+        num_neighbors : int
             The number of neighbors to use for interpolation.
-        rbf_family: int
+        rbf_family : int
             Specifies the order of the radial basis function to be used.
             <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
             order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
@@ -69,11 +69,11 @@ class RBFInterpolator(NNBase):
 
         Parameters
         ----------
-        npp: int
+        npp : int
             Number of prediction points
-        T: int
+        T : int
             Radial distance
-        neighbor_idx: ndarray
+        neighbor_idx : ndarray
             Int array of neighbor indices.
 
         Returns
@@ -215,11 +215,11 @@ class RBFInterpolator(NNBase):
 
         Parameters
         ----------
-        prediction_points: ndarray
+        prediction_points : ndarray
             Array of prediction locations.
-        neighbor_idx: ndarray
+        neighbor_idx : ndarray
             Nearest neighbor indices for prediction points.
-        neighbor_dists: ndarray
+        neighbor_dists : ndarray
             Distances from prediction points to neighbors.
 
         Returns
@@ -365,7 +365,7 @@ class RBFInterpolator(NNBase):
 
         Parameters
         ----------
-        prediction_points: ndarray
+        prediction_points : ndarray
             Points at which interpolation is done.
 
         Returns
@@ -405,7 +405,7 @@ class RBFInterpolator(NNBase):
 
         Parameters
         ----------
-        prediction_points: ndarray
+        prediction_points : ndarray
             Points at which interpolation is done.
 
         Returns

@@ -14,7 +14,7 @@ class ParallelGroup(Group):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             dict of arguments available here and in all descendants of this
             Group.
         """

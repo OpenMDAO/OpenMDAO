@@ -7,13 +7,13 @@ class OutOfBoundsError(Exception):
 
     Attributes
     ----------
-    idx: int
+    idx : int
         index of the variable that is out of bounds.
-    value: double
+    value : double
         value of the variable that is out of bounds.
-    lower: double
+    lower : double
         lower bounds of the variable that is out of bounds.
-    upper: double
+    upper : double
         upper bounds of the variable that is out of bounds.
     """
 
@@ -23,15 +23,15 @@ class OutOfBoundsError(Exception):
 
         Parameters
         ----------
-        message: str
+        message : str
             description of error.
-        idx: int
+        idx : int
             index of the variable that is out of bounds.
-        value: double
+        value : double
             value of the variable that is out of bounds.
-        lower: double
+        lower : double
             lower bounds of the variable that is out of bounds.
-        upper: double
+        upper : double
             upper bounds of the variable that is out of bounds.
         """
         super().__init__(message)

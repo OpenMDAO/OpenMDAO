@@ -45,35 +45,35 @@ class InterpND(object):
 
     Attributes
     ----------
-    extrapolate: bool
+    extrapolate : bool
         If False, when interpolated values are requested outside of the domain of the input data,
         a ValueError is raised. If True, then the methods are allowed to extrapolate.
         Default is True (raise an exception).
-    grid: tuple
+    grid : tuple
         Collection of points that determine the regular grid.
-    table: <InterpTable>
+    table : <InterpTable>
         Table object that contains algorithm that performs the interpolation.
-    values: array_like, shape (m1, ..., mn, ...)
+    values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
-    x_interp: ndarray
+    x_interp : ndarray
         Cached non-decreasing vector of points to be interpolated when used as an order-reducing
         spline.
-    _compute_d_dvalues: bool
+    _compute_d_dvalues : bool
         When set to True, compute gradients with respect to the grid values.
-    _compute_d_dx: bool
+    _compute_d_dx : bool
         When set to True, compute gradients with respect to the interpolated point location.
-    _d_dx: ndarray
+    _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
-    _d_dvalues: ndarray
+    _d_dvalues : ndarray
         Cache of computed gradients with respect to table values.
-    _interp: class
+    _interp : class
         Class specified as interpolation algorithm, used to regenerate if needed.
-    _interp_config: dict
+    _interp_config : dict
         Configuration object that stores the number of points required for each interpolation
         method.
-    _interp_options: dict
+    _interp_options : dict
         Dictionary of cached interpolator-specific options.
-    _xi: ndarray
+    _xi : ndarray
         Cache of current evaluation point.
     """
 
@@ -93,28 +93,28 @@ class InterpND(object):
 
         Parameters
         ----------
-        method: str
+        method : str
             Name of interpolation method.
-        points: ndarray or tuple of ndarray
+        points : ndarray or tuple of ndarray
             The points defining the regular grid in n dimensions.
             For 1D interpolation, this can be an ndarray of table locations.
             For table interpolation, it can be a tuple or an ndarray. If it is a tuple, it should
             contain one ndarray for each table dimension.
             For spline evaluation, num_cp can be specified instead of points.
-        values: ndarray or tuple of ndarray or None
+        values : ndarray or tuple of ndarray or None
             These must be specified for interpolation.
             The data on the regular grid in n dimensions.
-        x_interp: ndarray or None
+        x_interp : ndarray or None
             If we are always interpolating at a fixed set of locations, then they can be
             specified here.
-        extrapolate: bool
+        extrapolate : bool
             If False, when interpolated values are requested outside of the domain of the input
             data, a ValueError is raised. If True, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
-        num_cp: None or int
+        num_cp : None or int
             Optional. When specified, use a linear distribution of num_cp control points. If you
             are using 'bsplines' as the method, then num_cp must be set instead of points.
-        **kwargs: dict
+        **kwargs : dict
             Interpolator-specific options to pass onward.
         """
         if not isinstance(method, str):
@@ -208,9 +208,9 @@ class InterpND(object):
 
         Parameters
         ----------
-        x: ndarray or tuple
+        x : ndarray or tuple
             Locations to interpolate.
-        compute_derivative: bool
+        compute_derivative : bool
             Set to True to compute derivatives with respect to x.
 
         Returns
@@ -250,9 +250,9 @@ class InterpND(object):
 
         Parameters
         ----------
-        values: ndarray(n_points)
+        values : ndarray(n_points)
             New data values for all points on the regular grid.
-        compute_derivative: bool
+        compute_derivative : bool
             Set to True to compute derivatives with respect to x.
 
         Returns
@@ -290,7 +290,7 @@ class InterpND(object):
 
         Parameters
         ----------
-        xi: ndarray of shape (..., ndim)
+        xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data.
 
         Returns
@@ -366,7 +366,7 @@ class InterpND(object):
 
         Parameters
         ----------
-        values: ndarray(n_nodes x n_points)
+        values : ndarray(n_nodes x n_points)
             The data on the regular grid in n dimensions.
 
         Returns
@@ -453,12 +453,12 @@ class InterpND(object):
 
         Parameters
         ----------
-        xi: ndarray of shape (..., ndim)
+        xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
 
         Returns
         -------
-        gradient: ndarray of shape (..., ndim)
+        gradient : ndarray of shape (..., ndim)
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
         if (self._xi is None) or (not np.array_equal(xi, self._xi)):
@@ -473,7 +473,7 @@ class InterpND(object):
 
         Parameters
         ----------
-        pt: ndarray
+        pt : ndarray
             Training point values.
 
         Returns
