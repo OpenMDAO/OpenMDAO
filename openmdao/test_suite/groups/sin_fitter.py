@@ -43,7 +43,7 @@ def lgl(n, tol=np.finfo(float).eps):
 
     Parameters
     ----------
-    n: int
+    n : int
         The number of LGL nodes requested.  The order of the polynomial is n-1.
 
     Returns

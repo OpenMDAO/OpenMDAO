@@ -30,9 +30,9 @@ def check_option(option, value):
 
     Parameters
     ----------
-    option: str
+    option : str
         The name of the option
-    value: any
+    value : any
         The value of the option
 
     Raises
@@ -49,7 +49,7 @@ def array_idx_iter(shape):
 
     Parameters
     ----------
-    shape: tuple
+    shape : tuple
         shape of the array.
     """
     for p in product(*[range(s) for s in shape]):
@@ -62,23 +62,23 @@ class ExecComp(ExplicitComponent):
 
     Attributes
     ----------
-    _kwargs: dict of named args
+    _kwargs : dict of named args
         Initial values of variables.
-    _exprs: list
+    _exprs : list
         List of expressions.
-    _codes: list
+    _codes : list
         List of code objects.
-    _has_diag_partials: bool
+    _has_diag_partials : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
-    _units: str or None
+    _units : str or None
         Units to be assigned to all variables in this component.
         Default is None, which means units are provided for variables individually.
-    complex_stepsize: double
+    complex_stepsize : double
         Step size used for complex step which is used for derivatives.
-    _manual_decl_partials: bool
+    _manual_decl_partials : bool
         If True, at least one partial has been declared by the user.
-    _requires_fd: dict
+    _requires_fd : dict
         Contains a mapping of 'of' variables to a tuple of the form (wrts, functs) for those
         'of' variables that require finite difference to be used to compute their derivatives.
     """
@@ -151,13 +151,13 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        exprs: str, tuple of str or list of str
+        exprs : str, tuple of str or list of str
             An assignment statement or iter of them. These express how the
             outputs are calculated based on the inputs.  In addition to
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
-        **kwargs: dict of named args
+        **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
             to contain metadata.  To set the initial value in addition to
@@ -243,11 +243,11 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        name: str
+        name : str
             Name of the callable.
-        callable_obj: callable
+        callable_obj : callable
             The callable.
-        complex_safe: bool
+        complex_safe : bool
             If True, the given callable works correctly with complex numbers.
         """
         global _expr_dict, _not_complex_safe
@@ -434,11 +434,11 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        expr: str
+        expr : str
             An assignment statement that expresses how the outputs are calculated based on the
             inputs. In addition to standard Python operators, a subset of numpy and scipy
             functions is supported.
-        **kwargs: dict of named args
+        **kwargs : dict of named args
             Initial values of variables can be set by setting a named arg with the var name.  If
             the value is a dict it is assumed to contain metadata.  To set the initial value in
             addition to other metadata, assign the initial value to the 'value' entry of the dict.
@@ -536,7 +536,7 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        state: dict
+        state : dict
             State to restore.
         """
         self.__dict__.update(state)
@@ -548,9 +548,9 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        *args: list
+        *args : list
             Positional args to be passed to base class version of declare_partials.
-        **kwargs: dict
+        **kwargs : dict
             Keyword args  to be passed to base class version of declare_partials.
 
         Returns
@@ -624,10 +624,10 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: `Vector`
+        inputs : `Vector`
             `Vector` containing inputs.
 
-        outputs: `Vector`
+        outputs : `Vector`
             `Vector` containing outputs.
         """
         for i, expr in enumerate(self._codes):
@@ -643,9 +643,9 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        jac: Jacobian or None
+        jac : Jacobian or None
             Ignored.
-        sub_do_ln: boolean
+        sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self._requires_fd:
@@ -671,10 +671,10 @@ class ExecComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: `VecWrapper`
+        inputs : `VecWrapper`
             `VecWrapper` containing parameters. (p)
 
-        partials: `Jacobian`
+        partials : `Jacobian`
             Contains sub-jacobians.
         """
         if self._manual_decl_partials:
@@ -740,11 +740,11 @@ class _TmpDict(object):
 
     Attributes
     ----------
-    _inner: dict-like
+    _inner : dict-like
         The dictionary to be wrapped.
-    _changed: dict-like
+    _changed : dict-like
         The key names for the values that were changed.
-    _complex: bool
+    _complex : bool
         If True, return a complex version of values from __getitem__.
     """
 
@@ -754,9 +754,9 @@ class _TmpDict(object):
 
         Parameters
         ----------
-        inner: dict-like
+        inner : dict-like
             The dictionary to be wrapped.
-        return_complex: bool, optional
+        return_complex : bool, optional
             If True, return a complex version of values from __getitem__
         """
         self._inner = inner
@@ -795,9 +795,9 @@ class _IODict(object):
 
     Attributes
     ----------
-    _inputs: dict-like
+    _inputs : dict-like
         The inputs object to be wrapped.
-    _outputs: dict-like
+    _outputs : dict-like
         The outputs object to be wrapped.
     """
 
@@ -807,10 +807,10 @@ class _IODict(object):
 
         Parameters
         ----------
-        outputs: dict-like
+        outputs : dict-like
             The outputs object to be wrapped.
 
-        inputs: dict-like
+        inputs : dict-like
             The inputs object to be wrapped.
         """
         self._outputs = outputs
@@ -835,11 +835,11 @@ def _import_functs(mod, dct, names=None):
 
     Parameters
     ----------
-    mod: object
+    mod : object
         Module to check.
-    dct: dict
+    dct : dict
         Dictionary that will contain the mapping
-    names: iter of str, optional
+    names : iter of str, optional
         If supplied, only map attrs that match the given names
     """
     if names is None:
@@ -919,7 +919,7 @@ class _NumpyMsg(object):
 
         Parameters
         ----------
-        namespace: str
+        namespace : str
             The numpy namespace (e.g. 'numpy' or 'np).
         """
         self.namespace = namespace
@@ -930,7 +930,7 @@ class _NumpyMsg(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             The name of the attribute/function.
 
         Raises

@@ -9,11 +9,11 @@ def overrides_method(method_name, obj, base):
 
     Parameters
     ----------
-    method_name: str
+    method_name : str
         Name of the method to search for.
-    obj: object
+    obj : object
         An object that is assumed to inherit from base.
-    base: class
+    base : class
         The base class that contains the base version of the named
         method.
 
@@ -39,9 +39,9 @@ class weak_method_wrapper(object):
 
     Attributes
     ----------
-    _ref: weakerf
+    _ref : weakerf
         The weakref to the method's owning instance.
-    __name__: str
+    __name__ : str
         The name of the method.
     """
 
@@ -51,9 +51,9 @@ class weak_method_wrapper(object):
 
         Parameters
         ----------
-        obj: object
+        obj : object
             The instance object.
-        fname: str
+        fname : str
             The name of the method.
         """
         self._ref = weakref.ref(obj)
@@ -65,9 +65,9 @@ class weak_method_wrapper(object):
 
         Parameters
         ----------
-        *args: tuple of obj
+        *args : tuple of obj
             Positional args.
-        **kwargs: dict
+        **kwargs : dict
             Named args.
 
         Returns

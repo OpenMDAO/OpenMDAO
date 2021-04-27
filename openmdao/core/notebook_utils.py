@@ -26,7 +26,7 @@ def _get_object_from_reference(reference):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class.
 
     Returns
@@ -55,9 +55,9 @@ def display_source(reference, hide_doc_string=False):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired function.
-    hide_doc_string: bool
+    hide_doc_string : bool
         Option to hide the docstring.
 
     Returns
@@ -85,7 +85,7 @@ def show_options_table(reference):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class or function.
 
     Returns
@@ -108,7 +108,7 @@ def cite(reference):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class or function.
     """
     obj = _get_object_from_reference(reference)()

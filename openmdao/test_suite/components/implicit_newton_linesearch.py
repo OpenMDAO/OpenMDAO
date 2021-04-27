@@ -52,8 +52,8 @@ class ImplCompTwoStates(om.ImplicitComponent):
     f(x,z) = xz + z - 4
     y = x + 2z
 
-    Sol: when x = 0.5, z = 2.666
-    Sol: when x = 2.0, z = 1.333
+    Sol : when x = 0.5, z = 2.666
+    Sol : when x = 2.0, z = 1.333
 
     Coupled derivs:
 
@@ -109,8 +109,8 @@ class ImplCompTwoStatesArrays(om.ImplicitComponent):
     f(x,z) = xz + z - 4
     y = x + 2z
 
-    Sol: when x = 0.5, z = 2.666
-    Sol: when x = 2.0, z = 1.333
+    Sol : when x = 0.5, z = 2.666
+    Sol : when x = 2.0, z = 1.333
 
     Coupled derivs:
 

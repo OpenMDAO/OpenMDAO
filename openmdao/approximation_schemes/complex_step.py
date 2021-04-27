@@ -21,7 +21,7 @@ class ComplexStep(ApproximationScheme):
 
     Attributes
     ----------
-    _fd: <FiniteDifference>
+    _fd : <FiniteDifference>
         When nested complex step is detected, we switch to Finite Difference.
     """
 
@@ -45,13 +45,13 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        abs_key: tuple(str,str)
+        abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
-        system: System
+        system : System
             Containing System.
-        vector: ndarray or None
+        vector : ndarray or None
             Direction for difference when using directional derivatives.
-        kwargs: dict
+        kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
         options = self.DEFAULT_OPTIONS.copy()
@@ -71,11 +71,11 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             System whose derivatives are being approximated.
-        wrt: str
+        wrt : str
             Name of wrt variable.
-        meta: dict
+        meta : dict
             Metadata dict.
 
         Returns
@@ -93,11 +93,11 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             System on which the execution is run.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
-        under_cs: bool
+        under_cs : bool
             True if we're currently under complex step at a higher level.
         """
         if not self._wrt_meta:
@@ -146,7 +146,7 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        delta: complex
+        delta : complex
             Complex number used to compute the multiplier.
 
         Returns
@@ -162,7 +162,7 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        array: ndarray of complex
+        array : ndarray of complex
             Result array after doing a complex step.
 
         Returns
@@ -178,15 +178,15 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        system: System
+        system : System
             The system having its derivs approximated.
-        idx_info: tuple of (Vector, ndarray of int)
+        idx_info : tuple of (Vector, ndarray of int)
             Tuple of wrt indices and corresponding data vector to perturb.
-        delta: complex
+        delta : complex
             Perturbation amount.
-        result_array: ndarray
+        result_array : ndarray
             An array used to store the results.
-        total: bool
+        total : bool
             If True total derivatives are being approximated, else partials.
 
         Returns
@@ -217,9 +217,9 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        data: float
+        data : float
             Step size for complex step.
-        direction: ndarray
+        direction : ndarray
             Vector containing derivative direction.
 
         Returns

@@ -20,22 +20,22 @@ def _print_violations(outputs, lower, upper):
 
     Parameters
     ----------
-    outputs: <Vector>
+    outputs : <Vector>
         Vector containing the outputs.
-    lower: <Vector>
+    lower : <Vector>
         Vector containing the lower bounds.
-    upper: <Vector>
+    upper : <Vector>
         Vector containing the upper bounds.
     """
     start = end = 0
     for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
-            msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
+            msg = (f"'{name}' exceeds upper bounds\n  Val : {val}\n  Upper : {upper[start:end]}\n")
             issue_warning(msg, category=SolverWarning)
 
         if lower is not None and any(val < lower[start:end]):
-            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Lower: {lower[start:end]}\n")
+            msg = (f"'{name}' exceeds lower bounds\n  Val : {val}\n  Lower : {lower[start:end]}\n")
             issue_warning(msg, category=SolverWarning)
 
         start = end
@@ -47,12 +47,12 @@ class LinesearchSolver(NonlinearSolver):
 
     Attributes
     ----------
-    _do_subsolve: bool
+    _do_subsolve : bool
         Flag used by parent solver to tell the line search whether to solve subsystems while
         backtracking.
-    _lower_bounds: ndarray or None
+    _lower_bounds : ndarray or None
         Lower bounds array.
-    _upper_bounds: ndarray or None
+    _upper_bounds : ndarray or None
         Upper bounds array.
     """
 
@@ -62,7 +62,7 @@ class LinesearchSolver(NonlinearSolver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             Options dictionary.
         """
         super().__init__(**kwargs)
@@ -95,9 +95,9 @@ class LinesearchSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system: System
+        system : System
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -148,9 +148,9 @@ class LinesearchSolver(NonlinearSolver):
 
         Parameters
         ----------
-        step: <Vector>
+        step : <Vector>
             Newton step; the backtracking is applied to this vector in-place.
-        alpha: float
+        alpha : float
             Step size parameter.
         """
         system = self._system()
@@ -236,7 +236,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
     Attributes
     ----------
-    _analysis_error_raised: bool
+    _analysis_error_raised : bool
         Flag is set to True if a subsystem raises an AnalysisError.
     """
 
@@ -248,7 +248,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             Options dictionary.
         """
         super().__init__(**kwargs)
@@ -372,9 +372,9 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         Parameters
         ----------
-        fval: float
+        fval : float
             Current line search objective value.
-        method: str, optional
+        method : str, optional
             Method to calculate stopping condition. Can be "Armijo" or "Goldstein".
 
         Returns
@@ -398,7 +398,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         Parameters
         ----------
-        rho: float
+        rho : float
             Contraction factor
         """
         self.alpha *= rho  # update alpha
@@ -469,13 +469,13 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
     ----------
     u :<Vector>
         Output vector.
-    du: <Vector>
+    du : <Vector>
         Newton step; the backtracking is applied to this vector in-place.
-    alpha: float
+    alpha : float
         step size.
-    lower_bounds: ndarray
+    lower_bounds : ndarray
         Lower bounds array.
-    upper_bounds: ndarray
+    upper_bounds : ndarray
         Upper bounds array.
     """
     # The assumption is that alpha * du has been added to self (i.e., u)
@@ -532,13 +532,13 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     ----------
     u :<Vector>
         Output vector.
-    du: <Vector>
+    du : <Vector>
         Newton step; the backtracking is applied to this vector in-place.
-    alpha: float
+    alpha : float
         step size.
-    lower_bounds: ndarray
+    lower_bounds : ndarray
         Lower bounds array.
-    upper_bounds: ndarray
+    upper_bounds : ndarray
         Upper bounds array.
     """
     # The assumption is that alpha * step has been added to this vector
@@ -576,13 +576,13 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     ----------
     u :<Vector>
         Output vector.
-    du: <Vector>
+    du : <Vector>
         Newton step; the backtracking is applied to this vector in-place.
-    alpha: float
+    alpha : float
         step size.
-    lower_bounds: ndarray
+    lower_bounds : ndarray
         Lower bounds array.
-    upper_bounds: ndarray
+    upper_bounds : ndarray
         Upper bounds array.
     """
     # The assumption is that alpha * step has been added to this vector

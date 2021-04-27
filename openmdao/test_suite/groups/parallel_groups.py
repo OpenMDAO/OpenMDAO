@@ -124,7 +124,7 @@ class FanInGrouped2(om.Group):
 
 class DiamondFlat(om.Group):
     """
-    Topology: one - two - one.
+    Topology : one - two - one.
 
     This one is flat."""
 
@@ -154,7 +154,7 @@ class DiamondFlat(om.Group):
 
 class Diamond(om.Group):
     """
-    Topology: one - two - one.
+    Topology : one - two - one.
     """
 
     def __init__(self):
@@ -228,7 +228,7 @@ class ConvergeDivergeFlat(om.Group):
 
 class ConvergeDiverge(om.Group):
     """
-    Topology: one - two - one - two - one.
+    Topology : one - two - one - two - one.
 
     Used for testing parallel reverse scatters.
     """
@@ -274,7 +274,7 @@ class ConvergeDiverge(om.Group):
 
 class ConvergeDivergeGroups(om.Group):
     """
-    Topology: one - two - one - two - one.
+    Topology : one - two - one - two - one.
 
     Used for testing parallel reverse scatters. This version contains some
     deeper nesting.

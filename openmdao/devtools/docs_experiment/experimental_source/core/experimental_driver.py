@@ -17,51 +17,51 @@ class ExperimentalDriver(object):
 
     Attributes
     ----------
-    fail: bool
+    fail : bool
         Reports whether the driver ran successfully.
-    iter_count: int
+    iter_count : int
         Keep track of iterations for case recording.
-    options: list
+    options : list
         List of options
-    options: <OptionsDictionary>
+    options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    recording_options: <OptionsDictionary>
+    recording_options : <OptionsDictionary>
         Dictionary with driver recording options.
-    cite: str
+    cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
-    _problem: <Problem>
+    _problem : <Problem>
         Pointer to the containing problem.
-    supports: <OptionsDictionary>
+    supports : <OptionsDictionary>
         Provides a consistant way for drivers to declare what features they support.
-    _designvars: dict
+    _designvars : dict
         Contains all design variable info.
-    _cons: dict
+    _cons : dict
         Contains all constraint info.
-    _objs: dict
+    _objs : dict
         Contains all objective info.
-    _responses: dict
+    _responses : dict
         Contains all response info.
-    _rec_mgr: <RecordingManager>
+    _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
-    _vars_to_record: dict
+    _vars_to_record : dict
         Dict of lists of var names indicating what to record
-    _model_viewer_data: dict
+    _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
-    _remote_dvs: dict
+    _remote_dvs : dict
         Dict of design variables that are remote on at least one proc. Values are
         (owning rank, size).
-    _remote_cons: dict
+    _remote_cons : dict
         Dict of constraints that are remote on at least one proc. Values are
         (owning rank, size).
-    _remote_objs: dict
+    _remote_objs : dict
         Dict of objectives that are remote on at least one proc. Values are
         (owning rank, size).
-    _remote_responses: dict
+    _remote_responses : dict
         A combined dict containing entries from _remote_cons and _remote_objs.
-    _total_coloring: tuple of dicts
+    _total_coloring : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
-    _res_jacs: dict
+    _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
     """
 
@@ -140,7 +140,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        recorder: CaseRecorder
+        recorder : CaseRecorder
            A recorder instance.
         """
         self._rec_mgr.append(recorder)
@@ -159,7 +159,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        problem: <Problem>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         pass
@@ -172,11 +172,11 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Name of the variable of interest.
-        meta: dict
+        meta : dict
             Metadata for the variable of interest.
-        remote_vois: dict
+        remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
 
@@ -228,7 +228,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        filter: list
+        filter : list
             List of desvar names used by recorders.
 
         Returns
@@ -250,9 +250,9 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Global pathname of the design variable.
-        value: float or ndarray
+        value : float or ndarray
             Value for the design variable.
         """
         if (name in self._remote_dvs and
@@ -283,7 +283,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        filter: list
+        filter : list
             List of response names used by recorders.
 
         Returns
@@ -304,7 +304,7 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        filter: list
+        filter : list
             List of objective names used by recorders.
 
         Returns
@@ -325,13 +325,13 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        ctype: string
+        ctype : string
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-        lintype: string
+        lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
-        filter: list
+        filter : list
             List of constraint names used by recorders.
 
         Returns
@@ -418,22 +418,22 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        of: list of variable name strings or None
+        of : list of variable name strings or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt: list of variable name strings or None
+        wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format: string
+        return_format : string
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
-        use_abs_names: bool
+        use_abs_names : bool
             Set to True when passing in global names to skip some translation steps.
 
         Returns
         -------
-        derivs: object
+        derivs : object
             Derivatives in form requested by 'return_format'.
         """
         prob = self._problem
@@ -546,14 +546,14 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        root: <System>
+        root : <System>
             the root System for the Problem
-        local_vars: dict
+        local_vars : dict
             local variable names and values
 
         Returns
         -------
-        dct: dict
+        dct : dict
             variable names and values.
         """
         # if trace:

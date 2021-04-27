@@ -21,9 +21,9 @@ def divide_cases(ncases, nprocs):
 
     Parameters
     ----------
-    ncases: int
+    ncases : int
         Number of load cases.
-    nprocs: int
+    nprocs : int
         Number of processors.
 
     Returns

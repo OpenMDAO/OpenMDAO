@@ -14,9 +14,9 @@ def _check_cite(obj, citations):
 
     Parameters
     ----------
-    obj: object
+    obj : object
         the instance to check for citations on
-    citations: dict
+    citations : dict
         the dictionary to add a citation to, if found
     """
     if inspect.isclass(obj):
@@ -34,7 +34,7 @@ def find_citations(prob):
 
     Parameters
     ----------
-    prob: <Problem>
+    prob : <Problem>
         The Problem instance to be searched
 
     Returns
@@ -66,9 +66,9 @@ def _filter_citations(citations, classes):
 
     Parameters
     ----------
-    citations: dict
+    citations : dict
         Dict of citations keyed by class.
-    classes: list of str
+    classes : list of str
         List of class names for classes to include in the displayed citations.
 
     Returns
@@ -92,11 +92,11 @@ def print_citations(prob, classes=None, out_stream=_DEFAULT_OUT_STREAM):
 
     Parameters
     ----------
-    prob: <Problem>
+    prob : <Problem>
         The Problem instance to be searched
-    classes: list of str
+    classes : list of str
         List of class names for classes to include in the displayed citations.
-    out_stream: file-like object
+    out_stream : file-like object
         Where to send human readable output. Default is sys.stdout.
         Set to None to suppress.
     """

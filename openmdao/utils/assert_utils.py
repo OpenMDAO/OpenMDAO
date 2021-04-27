@@ -24,9 +24,9 @@ def assert_warning(category, msg):
 
     Parameters
     ----------
-    category: class
+    category : class
         The class of the expected warning.
-    msg: str
+    msg : str
         The text of the expected warning.
 
     Raises
@@ -58,7 +58,7 @@ def assert_warnings(expected_warnings):
 
     Parameters
     ----------
-    expected_warnings: iterable of (class, str)
+    expected_warnings : iterable of (class, str)
         The category and text of the expected warnings.
 
     Raises
@@ -86,9 +86,9 @@ def assert_no_warning(category, msg=None):
 
     Parameters
     ----------
-    category: class
+    category : class
         The class of the warning.
-    msg: str or None
+    msg : str or None
         The text of the warning. If None then only the warning class will be checked.
 
     Raises
@@ -115,7 +115,7 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
 
     Parameters
     ----------
-    data: dict of dicts of dicts
+    data : dict of dicts of dicts
             First key:
                 is the component name;
             Second key:
@@ -127,9 +127,9 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
                 forward - fd, adjoint - fd, forward - adjoint.
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
-    atol: float
+    atol : float
         absolute error. Default is 1e-6.
-    rtol: float
+    rtol : float
         relative error. Default is 1e-6.
     """
     error_string = ''
@@ -231,11 +231,11 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
 
     Parameters
     ----------
-    system: System
+    system : System
         The system under which to search for approximated partials.
-    include_self: bool
+    include_self : bool
         If True, include this system in the iteration.
-    recurse: bool
+    recurse : bool
         If True, iterate over the whole tree under this system.
 
     Raises
@@ -266,11 +266,11 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
 
     Parameters
     ----------
-    system: System
+    system : System
         The system under which to search for approximated partials.
-    include_self: bool
+    include_self : bool
         If True, include this system in the iteration.
-    recurse: bool
+    recurse : bool
         If True, iterate over the whole tree under this system.
 
     Raises
@@ -295,13 +295,13 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
 
     Parameters
     ----------
-    test_case: :class:`unittest.TestCase`
+    test_case : class:`unittest.TestCase`
         TestCase instance used for assertions.
-    actual: float, array-like, dict
+    actual : float, array-like, dict
         The value from the test.
-    desired: float, array-like, dict
+    desired : float, array-like, dict
         The value expected.
-    tolerance: float
+    tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
 
     Returns
@@ -384,11 +384,11 @@ def assert_near_equal(actual, desired, tolerance=1e-15):
 
     Parameters
     ----------
-    actual: float, array-like, dict
+    actual : float, array-like, dict
         The value from the test.
-    desired: float, array-like, dict
+    desired : float, array-like, dict
         The value expected.
-    tolerance: float
+    tolerance : float
         Maximum relative error ``(actual - desired) / desired``.
 
     Returns
@@ -473,9 +473,9 @@ def assert_equal_arrays(a1, a2):
 
     Parameters
     ----------
-    a1: array
+    a1 : array
         The first array to compare.
-    a2: array
+    a2 : array
         The second array to compare.
     """
     assert a1.shape == a2.shape
@@ -489,7 +489,7 @@ def skip_helper(msg):
 
     Parameters
     ----------
-    msg: str
+    msg : str
         The skip messaage.
 
     Raises
@@ -511,15 +511,15 @@ class SkipParameterized(object):
 
         Parameters
         ----------
-        input: iterable
+        input : iterable
             Not used (part of parameterized API).
-        name_func: function
+        name_func : function
             Not used (part of parameterized API).
-        doc_func: function
+        doc_func : function
             Not used (part of parameterized API).
-        skip_on_empty: bool
+        skip_on_empty : bool
             Not used (part of parameterized API).
-        **legacy: dict
+        **legacy : dict
             Not used (part of parameterized API).
 
         Returns
@@ -533,9 +533,9 @@ class SkipParameterized(object):
             """
             Wrap a function so that it raises a SkipTest.
 
-            f: function
+            f : function
                 Function to be wrapped.
-            instance: None
+            instance : None
                 Not used (part of parameterized API).
 
             Returns

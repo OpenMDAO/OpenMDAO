@@ -34,9 +34,9 @@ def _convert_auto_ivc_to_conn_name(conns_dict, name):
 
     Parameters
     ----------
-    conns_dict: dict
+    conns_dict : dict
         Dictionary of global connections.
-    name: str
+    name : str
         Name of auto_ivc to be found.
 
     Returns
@@ -55,7 +55,7 @@ def ignore_errors(flag=None):
 
     Parameters
     ----------
-    flag: bool or None
+    flag : bool or None
         If not None, set the value of _ignore_errors to this value.
 
     Returns
@@ -75,11 +75,11 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning):
 
     Parameters
     ----------
-    msg: str
+    msg : str
         The error/warning message.
-    exc: Exception class
+    exc : Exception class
         This exception class is used to create the exception to be raised.
-    category: warning class
+    category : warning class
         This category is the class of warning to be issued.
     """
     if ignore_errors():
@@ -95,7 +95,7 @@ def ignore_errors_context(flag=True):
 
     Parameters
     ----------
-    flag: bool
+    flag : bool
         If not None, set ignore_errors to this value.
     """
     save = ignore_errors()
@@ -112,11 +112,11 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
 
     Parameters
     ----------
-    msg: str
+    msg : str
         The warning message.
-    category: class
+    category : class
         The warning class.
-    stacklevel: int
+    stacklevel : int
         Number of levels up the stack to identify as the warning location.
     """
     warn_deprecation('simple_warning is deprecated.  Use openmdao.warnings.issue_warning instead.')
@@ -134,13 +134,13 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     Parameters
     ----------
-    name: str
+    name : str
         The name of the value.
-    value: float or list or tuple or ndarray or Iterable
+    value : float or list or tuple or ndarray or Iterable
         The value of a variable.
-    shape: int or tuple or list or None
+    shape : int or tuple or list or None
         The expected or desired shape of the value.
-    indices: int or list of ints or tuple of ints or int ndarray or None
+    indices : int or list of ints or tuple of ints or int ndarray or None
         The indices of a source variable, used to determine shape if shape is None.
         If shape is not None, the shape of the indices must match shape.
 
@@ -218,14 +218,14 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
 
     Parameters
     ----------
-    ref: float or ndarray, optional
+    ref : float or ndarray, optional
         Value of response variable that scales to 1.0 in the driver.
-    ref0: float or ndarray, optional
+    ref0 : float or ndarray, optional
         Value of response variable that scales to 0.0 in the driver.
-    adder: float or ndarray, optional
+    adder : float or ndarray, optional
         Value to add to the model value to get the scaled value. Adder
         is first in precedence.
-    scaler: float or ndarray, optional
+    scaler : float or ndarray, optional
         Value to multiply the model value to get the scaled value. Scaler
         is second in precedence.
 
@@ -281,9 +281,9 @@ def set_pyoptsparse_opt(optname, fallback=True):
 
     Parameters
     ----------
-    optname: str
+    optname : str
         Name of pyoptsparse optimizer that is requested by the test.
-    fallback: bool
+    fallback : bool
         If True, fall back to SLSQP if optname can't be found
 
     Returns
@@ -345,13 +345,13 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
 
     Parameters
     ----------
-    name: str
+    name : str
         The path of the variable relative to the current system.
-    values: float or numpy ndarray or Iterable
+    values : float or numpy ndarray or Iterable
         Values of the array option to be formatted to the expected form.
-    val_if_none: float or numpy ndarray
+    val_if_none : float or numpy ndarray
         The default value for the option if values is None.
-    flatten: bool
+    flatten : bool
         Set to True to flatten any ndarray return.
 
     Returns
@@ -401,7 +401,7 @@ class ContainsAll(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Name of the object being looked up.
 
         Returns
@@ -420,9 +420,9 @@ def all_ancestors(pathname, delim='.'):
 
     Parameters
     ----------
-    pathname: str
+    pathname : str
         Pathname of starting object.
-    delim: str
+    delim : str
         Delimiter used to split the name
     """
     parts = pathname.split(delim)
@@ -436,9 +436,9 @@ def find_matches(pattern, var_list):
 
     Parameters
     ----------
-    pattern: str
+    pattern : str
         String pattern
-    var_list: list of str
+    var_list : list of str
         List of variable names to search for pattern.
 
     Returns
@@ -459,11 +459,11 @@ def pad_name(name, pad_num=10, quotes=False):
 
     Parameters
     ----------
-    name: str
+    name : str
         The string to pad.
-    pad_num: int
+    pad_num : int
         The number of total spaces the string should take up.
-    quotes: bool
+    quotes : bool
         If name should be quoted.
 
     Returns
@@ -494,9 +494,9 @@ def run_model(prob, ignore_exception=False):
 
     Parameters
     ----------
-    prob: Problem
+    prob : Problem
         an instance of Problem
-    ignore_exception: bool
+    ignore_exception : bool
         Set to True to ignore an exception of any kind.
 
     Returns
@@ -525,7 +525,7 @@ def run_driver(prob):
 
     Parameters
     ----------
-    prob: Problem
+    prob : Problem
         an instance of Problem
 
     Returns
@@ -558,9 +558,9 @@ def printoptions(*args, **kwds):
 
     Parameters
     ----------
-    *args: list
+    *args : list
         Variable-length argument list.
-    **kwds: dict
+    **kwds : dict
         Arbitrary keyword arguments.
 
     Examples
@@ -616,11 +616,11 @@ def remove_whitespace(s, right=False, left=False):
 
     Parameters
     ----------
-    s: str
+    s : str
         The string to be modified.
-    right: bool
+    right : bool
         If True, remove white-space from the end of the string.
-    left: bool
+    left : bool
         If True, remove white-space from the beginning of the string.
 
     Returns
@@ -648,7 +648,7 @@ def str2valid_python_name(s):
 
     Parameters
     ----------
-    s: str
+    s : str
         The string to be translated.
 
     Returns
@@ -670,7 +670,7 @@ def make_serializable(o):
 
     Parameters
     ----------
-    o: object
+    o : object
         the object to be converted
 
     Returns
@@ -707,7 +707,7 @@ def make_serializable_key(o):
 
     Parameters
     ----------
-    o: object
+    o : object
         the object to be converted
 
     Returns
@@ -735,7 +735,7 @@ def default_noraise(o):
 
     Parameters
     ----------
-    o: object
+    o : object
         the object to be converted
 
     Returns
@@ -771,10 +771,10 @@ def make_set(str_data, name=None):
 
     Parameters
     ----------
-    str_data: None, str, or list of strs
+    str_data : None, str, or list of strs
         Character string(s) to be included in the set.
 
-    name: str, optional
+    name : str, optional
         A name to be used in error messages.
 
     Returns
@@ -811,12 +811,12 @@ def match_includes_excludes(name, includes=None, excludes=None):
 
     Parameters
     ----------
-    name: str
+    name : str
         Name to be checked for match.
-    includes: iter of str or None
+    includes : iter of str or None
         Glob patterns for name to include in the filtering.  None, the default, means
         include all.
-    excludes: iter of str or None
+    excludes : iter of str or None
         Glob patterns for name to exclude in the filtering.
 
     Returns
@@ -847,14 +847,14 @@ def match_prom_or_abs(name, prom_name, includes=None, excludes=None):
 
     Parameters
     ----------
-    name: str
+    name : str
         Unpromoted variable name to be checked for match.
-    prom_name: str
+    prom_name : str
         Promoted variable name to be checked for match.
-    includes: iter of str or None
+    includes : iter of str or None
         Glob patterns for name to include in the filtering.  None, the default, means
         to include all.
-    excludes: iter of str or None
+    excludes : iter of str or None
         Glob patterns for name to exclude in the filtering.
 
     Returns
@@ -887,7 +887,7 @@ def env_truthy(env_var):
 
     Parameters
     ----------
-    env_var: str
+    env_var : str
         The name of the environment variable.
 
     Returns
@@ -904,7 +904,7 @@ def common_subpath(pathnames):
 
     Parameters
     ----------
-    pathnames: iter of str
+    pathnames : iter of str
         Dotted pathnames of systems.
 
     Returns
@@ -941,7 +941,7 @@ def _is_slicer_op(indices):
 
     Parameters
     ----------
-    indices: ndarray
+    indices : ndarray
         Indices to check.
 
     Returns
@@ -961,11 +961,11 @@ def _slice_indices(slicer, arr_size, arr_shape):
 
     Parameters
     ----------
-    slicer: slice or tuple containing slices
+    slicer : slice or tuple containing slices
         Slice object to slice array
-    arr_size: int
+    arr_size : int
         Size of output array
-    arr_shape: tuple
+    arr_shape : tuple
         Tuple of output array shape
 
     Returns
@@ -993,7 +993,7 @@ def _prom2ivc_src_name_iter(prom_dict):
 
     Parameters
     ----------
-    prom_dict: dict
+    prom_dict : dict
         Original dict with some promoted paths.
 
     Yields
@@ -1016,7 +1016,7 @@ def _prom2ivc_src_item_iter(prom_dict):
 
     Parameters
     ----------
-    prom_dict: dict
+    prom_dict : dict
         Original dict with some promoted paths.
 
     Yields
@@ -1037,7 +1037,7 @@ def _prom2ivc_src_dict(prom_dict):
 
     Parameters
     ----------
-    prom_dict: dict
+    prom_dict : dict
         Original dict with some promoted paths.
 
     Returns
@@ -1054,13 +1054,13 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
 
     Parameters
     ----------
-    parent_src_inds: ndarray
+    parent_src_inds : ndarray
         Parent src_indices.
-    parent_src_shape: tuple
+    parent_src_shape : tuple
         Shape of source expected by parent.
-    my_src_inds: ndarray or fancy index
+    my_src_inds : ndarray or fancy index
         src_indices at the current system level, before conversion.
-    my_src_shape: tuple
+    my_src_shape : tuple
         Expected source shape at the current system level.
 
     Returns
@@ -1093,11 +1093,11 @@ def shape_from_idx(src_shape, src_inds, flat_src_inds):
 
     Parameters
     ----------
-    src_shape: tuple
+    src_shape : tuple
         Expected shape of source variable.
-    src_inds: ndarray or fancy index
+    src_inds : ndarray or fancy index
         Indices into the source variable.
-    flat_src_inds: bool
+    flat_src_inds : bool
         If True, src_inds index into a flat array.
 
     Returns
@@ -1163,7 +1163,7 @@ def shape2tuple(shape):
 
     Parameters
     ----------
-    shape: int or tuple
+    shape : int or tuple
         The given shape.
 
     Returns
@@ -1182,13 +1182,13 @@ def get_connection_owner(system, tgt):
     """
     Return (owner, promoted_src, promoted_tgt) for the given connected target.
 
-    Note: this is not speedy.  It's intended for use only in error messages.
+    Note : this is not speedy.  It's intended for use only in error messages.
 
     Parameters
     ----------
-    system: System
+    system : System
         Any System.  The search always goes from the model level down.
-    tgt: str
+    tgt : str
         Absolute pathname of the target variable.
 
     Returns

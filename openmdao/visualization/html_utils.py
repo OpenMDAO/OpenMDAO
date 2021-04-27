@@ -12,11 +12,11 @@ def head_and_body(head, body, attrs=None):
 
     Parameters
     ----------
-    head: str
+    head : str
         Head of HTML.
-    body: str
+    body : str
         Body of the HTML
-    attrs: dict or None
+    attrs : dict or None
         Attributes of the html element.
         Defaults to None.
 
@@ -40,23 +40,23 @@ def write_tags(tag, content='', attrs=None, cls_attr=None, uid=None, new_lines=F
 
     Parameters
     ----------
-    tag: str
+    tag : str
         Name of the tag.
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
-    attrs: dict or None
+    attrs : dict or None
         Attributes of the element.
         Defaults to None.
-    cls_attr: str or None
+    cls_attr : str or None
         The "class" attribute of the element.
-    uid: str or None
+    uid : str or None
         The "id" attribute of the element.
-    new_lines: bool
+    new_lines : bool
         Make new line after tags.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
         Defaults to 0.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
 
@@ -88,17 +88,17 @@ def write_div(content='', attrs=None, cls_attr=None, uid=None, indent=0, **kwarg
 
     Parameters
     ----------
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
-    attrs: dict
+    attrs : dict
         Attributes of the element.
-    cls_attr: str or None
+    cls_attr : str or None
         The "class" attribute of the element.
-    uid: str or None
+    uid : str or None
         The "id" attribute of the element.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-bult
         python names as "class" or "id" if misused.
 
@@ -116,15 +116,15 @@ def write_style(content='', attrs=None, indent=0, **kwargs):
 
     Parameters
     ----------
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
-    attrs: dict or None
+    attrs : dict or None
         Attributes of the element.
         Defaults to None.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
         Defaults to 0.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
 
@@ -147,15 +147,15 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
 
     Parameters
     ----------
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
-    attrs: dict or None
+    attrs : dict or None
         Attributes of the element.
         Defaults to None.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
         Defaults to 0.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
 
@@ -178,7 +178,7 @@ def write_paragraph(content):
 
     Parameters
     ----------
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
 
     Returns
@@ -195,11 +195,11 @@ def read_files(filenames, directory, extension):
 
     Parameters
     ----------
-    filenames: list of str
+    filenames : list of str
         List of names of files to read.
-    directory: str
+    directory : str
         Pathname of directory.
-    extension: str
+    extension : str
         Extension of file names.
 
     Returns
@@ -222,15 +222,15 @@ def add_button(title, content='', uid=None, indent=0, **kwargs):
 
     Parameters
     ----------
-    title: str
+    title : str
         Title of button.
-    content: str or list(str)
+    content : str or list(str)
         This goes into the body of the element.
-    uid: str or None
+    uid : str or None
         The "id" attribute of the element.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-bult
         python names as "class" or "id" if misused.
 
@@ -252,23 +252,23 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
 
     Parameters
     ----------
-    title: str
+    title : str
         Title of button.
-    id_naming: str
+    id_naming : str
         Prefix for the id's for the items in the menu.
-    options: list
+    options : list
         List of options for the menu.
-    button_content: str
+    button_content : str
         Class of icon fonts used for the menu buttons.
-    header: str
+    header : str
         Top item in the menu. It describes the purpose of the menu.
-    uid: str or None
+    uid : str or None
         The "id" attribute of the element.
-    indent: int
+    indent : int
         Indentation expressed in spaces.
-    option_formatter: func
+    option_formatter : func
         Function used to format the displayed menu options using the values from options arg.
-    **kwargs: dict
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-bult
         python names as "class" or "id" if misused.
 
@@ -302,13 +302,13 @@ def add_help(txt, diagram_filepath, header='Instructions', footer=''):
 
     Parameters
     ----------
-    txt: str
+    txt : str
         Help message/instructions.
-    diagram_filepath: str
+    diagram_filepath : str
         File path to the diagram file in SVG format.
-    header: str
+    header : str
         Message header.
-    footer: str
+    footer : str
         Additional info.
 
     Returns
@@ -337,12 +337,12 @@ def add_title(txt, heading='h1', align='center'):
 
     Parameters
     ----------
-    txt: str
+    txt : str
         Title text.
-    heading: str
+    heading : str
         Heading. Options are "h1" to "h6".
         Defaults to "h1"
-    align: str
+    align : str
         Defaults to "center"
 
     Returns
@@ -360,9 +360,9 @@ class UIElement(object):
 
     Attributes
     ----------
-    items: list
+    items : list
         List of UI elements contained by this element.
-    indent: int
+    indent : int
         Number of spaces for indent.
     """
 
@@ -372,7 +372,7 @@ class UIElement(object):
 
         Parameters
         ----------
-        indent: int
+        indent : int
             Number of spaces to indent.
         """
         self.items = []
@@ -392,13 +392,13 @@ class ButtonGroup(UIElement):
 
         Parameters
         ----------
-        title: str
+        title : str
             Name to be shown.
-        content: str, optional
+        content : str, optional
             The content of the element.
-        uid: str or None
+        uid : str or None
             ID.
-        **kwargs: dict
+        **kwargs : dict
             Attributes passed to the button element.
 
         Returns
@@ -417,24 +417,24 @@ class ButtonGroup(UIElement):
 
         Parameters
         ----------
-        title: str
+        title : str
             Name to be shown.
-        id_naming: str or None, optional
+        id_naming : str or None, optional
             ID of an item will be id_naming + option
             Defaults to None.
-        options: list(str) or None, optional
+        options : list(str) or None, optional
             Items of the dropdown. Can be None, if filled with a script.
             Defaults to None.
-        button_content: str, optional
+        button_content : str, optional
             Content of the button.
-        header: str or None, optional
+        header : str or None, optional
             First item in the dropdown. Defaults to the title.
-        uid: str or None, optional
+        uid : str or None, optional
             ID.
-        option_formatter: None or callable, optional
+        option_formatter : None or callable, optional
             Text formatter for the dropdown items. Called with one item.
             Defaults to None.
-        **kwargs: dict
+        **kwargs : dict
             Attributes passed to the dropdown element.
 
         Returns
@@ -503,7 +503,7 @@ class TemplateWriter(object):
 
     Attributes
     ----------
-    template: str
+    template : str
         Contents of template file.
     """
 
@@ -513,15 +513,15 @@ class TemplateWriter(object):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             Name of template file.
-        embeddable: bool
+        embeddable : bool
             If true, create file so that it can be embedded in a webpage.
-        title: str
+        title : str
             Title of diagram.
-        styles: dict
+        styles : dict
             Dictionary of CSS styles.
-        head_srcs: dict
+        head_srcs : dict
             Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         # Load template
@@ -561,9 +561,9 @@ class TemplateWriter(object):
 
         Parameters
         ----------
-        ref: str
+        ref : str
             Reference string in template file.
-        txt: str
+        txt : str
             String used to replace text in template file.
         """
         self._replace(ref=ref, txt=txt)
@@ -574,7 +574,7 @@ class TemplateWriter(object):
 
         Parameters
         ----------
-        outfile: str
+        outfile : str
             Path name for file to write to.
         """
         with open(outfile, 'w', encoding='utf-8') as f:  # write output file
@@ -590,9 +590,9 @@ class DiagramWriter(TemplateWriter):
 
     Attributes
     ----------
-    toolbar: Toolbar
+    toolbar : Toolbar
         The toolbar with button groups for this diagram.
-    help: Toolbar
+    help : Toolbar
         String of HTML for the help dialog.
     """
 
@@ -602,15 +602,15 @@ class DiagramWriter(TemplateWriter):
 
         Parameters
         ----------
-        filename: str
+        filename : str
             Name of template file.
-        embeddable: bool
+        embeddable : bool
             If true, create file so that it can be embedded in a webpage.
-        title: str
+        title : str
             Title of diagram.
-        styles: dict
+        styles : dict
             Dictionary of CSS styles.
-        head_srcs: dict
+        head_srcs : dict
             Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles,
@@ -624,13 +624,13 @@ class DiagramWriter(TemplateWriter):
 
         Parameters
         ----------
-        txt: str
+        txt : str
             Text.
-        diagram_filepath: str
+        diagram_filepath : str
             File path to the diagram file in SVG format.
-        header: str
+        header : str
             Title of the modal.
-        footer: str
+        footer : str
             Extra info.
 
         Returns
@@ -648,7 +648,7 @@ class DiagramWriter(TemplateWriter):
 
         Parameters
         ----------
-        outfile: str
+        outfile : str
             Name of the output file (include extension).
         """
         self.insert('{{toolbar}}', self.toolbar.write())
