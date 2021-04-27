@@ -1,7 +1,7 @@
 **********************************
 # Release Notes for OpenMDAO 3.9.0
 
-April 26, 2021
+April 27, 2021
 
 OpenMDAO 3.9.0 features an API change to the serial/parallel implementation
 in OpenMDAO, a significant performance increase in approximated partials,
