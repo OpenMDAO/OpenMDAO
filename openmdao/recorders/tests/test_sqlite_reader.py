@@ -4113,9 +4113,9 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
+            "    Subsystem : root",
             "        assembled_jac_type: dense",
-            "    Subsystem: p1",
+            "    Subsystem : p1",
             "        distributed: False",
             "        name: UNDEFINED",
             "        val: 1.0",

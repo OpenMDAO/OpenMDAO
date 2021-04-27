@@ -31,11 +31,11 @@ def _print_violations(outputs, lower, upper):
     for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
-            msg = (f"'{name}' exceeds upper bounds\n  Val : {val}\n  Upper : {upper[start:end]}\n")
+            msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
             issue_warning(msg, category=SolverWarning)
 
         if lower is not None and any(val < lower[start:end]):
-            msg = (f"'{name}' exceeds lower bounds\n  Val : {val}\n  Lower : {lower[start:end]}\n")
+            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Lower: {lower[start:end]}\n")
             issue_warning(msg, category=SolverWarning)
 
         start = end
