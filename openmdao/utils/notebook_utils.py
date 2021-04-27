@@ -88,7 +88,7 @@ def show_options_table(reference, recording_options=False):
     reference : str
         Dot path of desired class or function.
 
-    recording_options: bool
+    recording_options : bool
         If True, display recording options instead of options.
 
     Returns
