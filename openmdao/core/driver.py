@@ -94,7 +94,7 @@ class Driver(object):
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _res_jacs : dict
         Dict of sparse subjacobians for use with certain optimizers, e.g. pyOptSparseDriver.
-    _total_jac: _TotalJacInfo or None
+    _total_jac : _TotalJacInfo or None
         Cached total jacobian handling object.
     """
 

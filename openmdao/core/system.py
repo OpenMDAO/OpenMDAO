@@ -128,9 +128,9 @@ class System(object):
         abs / abs_name: absolute, unpromoted variable name, seen from root (unique).
         rel / rel_name: relative, unpromoted variable name, seen from current system (unique).
         prom / prom_name: relative, promoted variable name, seen from current system (non-unique).
-        idx : global variable index among variables on all procs (I/O indices separate).
-        my_idx : index among variables in this system, on this processor (I/O indices separate).
-        io : indicates explicitly that input and output variables are combined in the same dict.
+        idx: global variable index among variables on all procs (I/O indices separate).
+        my_idx: index among variables in this system, on this processor (I/O indices separate).
+        io: indicates explicitly that input and output variables are combined in the same dict.
 
     Attributes
     ----------
@@ -2157,7 +2157,7 @@ class System(object):
 
         Yields
         ------
-        (d_inputs, d_outputs, d_residuals): tuple of Vectors
+        (d_inputs, d_outputs, d_residuals) : tuple of Vectors
             Yields the three Vectors configured internally to deal only
             with variables relevant to the current matrix vector product.
 
@@ -2234,7 +2234,7 @@ class System(object):
 
         Returns
         -------
-        (inputs, outputs, residuals): tuple of <Vector> instances
+        (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
@@ -2254,7 +2254,7 @@ class System(object):
 
         Returns
         -------
-        (inputs, outputs, residuals): tuple of <Vector> instances
+        (inputs, outputs, residuals) : tuple of <Vector> instances
             Yields the inputs, outputs, and residuals linear vectors for vec_name.
         """
         if self._inputs is None:

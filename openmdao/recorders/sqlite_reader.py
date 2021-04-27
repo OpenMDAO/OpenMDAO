@@ -605,7 +605,7 @@ class SqliteCaseReader(BaseCaseReader):
                         out_stream.write(f"Run Number: {num}\n")
                         num_header = num
 
-                    out_stream.write(f"    Solver : {name}\n")
+                    out_stream.write(f"    Solver: {name}\n")
 
                 dct[name] = {}
 

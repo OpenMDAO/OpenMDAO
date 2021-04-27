@@ -101,7 +101,7 @@ class ScipyOptimizeDriver(Driver):
     _grad_cache : OrderedDict
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _exc_info: 3 item tuple
+    _exc_info : 3 item tuple
         Storage for exception and traceback information.
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives

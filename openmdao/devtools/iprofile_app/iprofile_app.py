@@ -60,7 +60,7 @@ def _stratify(call_data, sortby='time'):
         # now further group each group by parent, then sort those in descending order
         # by 'sortby'
         depth_groups.append({
-            key : sorted(sub, key=lambda d: d[sortby], reverse=True)
+            key: sorted(sub, key=lambda d: d[sortby], reverse=True)
                 for key, sub in groupby(sorted(group, key=_parent_key), key=_parent_key)
         })
 

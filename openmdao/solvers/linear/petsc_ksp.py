@@ -122,7 +122,7 @@ class Monitor(object):
 
     Attributes
     ----------
-    _solver: _solver
+    _solver : _solver
         the openmdao solver.
     _norm : float
         the current norm.

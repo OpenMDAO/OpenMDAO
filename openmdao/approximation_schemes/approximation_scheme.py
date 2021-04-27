@@ -22,7 +22,7 @@ class ApproximationScheme(object):
     ----------
     _approx_groups : list
         A list of approximation tuples ordered into groups of 'of's matching the same 'wrt'.
-    _colored_approx_groups : list
+    _colored_approx_groups: list
         A list containing info for all colored approximation groups.
     _approx_groups_cached_under_cs : bool
         Flag indicates whether approx_groups was generated under complex step from higher in the
