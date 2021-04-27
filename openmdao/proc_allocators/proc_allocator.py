@@ -9,9 +9,9 @@ class ProcAllocationError(Exception):
 
     Attributes
     ----------
-    msg: str
+    msg : str
         The message string.
-    sub_inds: list of int
+    sub_inds : list of int
         Indices of subsystems in _subsystems_allprocs in parent.
     """
 
@@ -21,9 +21,9 @@ class ProcAllocationError(Exception):
 
         Parameters
         ----------
-        msg: str
+        msg : str
             The message string.
-        sub_inds: list of int
+        sub_inds : list of int
             Indices of subsystems in _subsystems_allprocs in parent.
         """
         super().__init__(msg)
@@ -37,7 +37,7 @@ class ProcAllocator(object):
 
     Attributes
     ----------
-    parallel: boolean
+    parallel : boolean
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
     """
@@ -48,7 +48,7 @@ class ProcAllocator(object):
 
         Parameters
         ----------
-        parallel: bool
+        parallel : bool
             If True, split subsystem comm.
         """
         self.parallel = parallel
@@ -59,20 +59,20 @@ class ProcAllocator(object):
 
         Parameters
         ----------
-        proc_info: list of (min_procs, max_procs, weight)
+        proc_info : list of (min_procs, max_procs, weight)
             Information used to determine MPI process allocation to subsystems.
-        nsubs: int
+        nsubs : int
             Number of subsystems.
-        comm: MPI.Comm or <FakeComm>
+        comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
 
         Returns
         -------
-        isubs: [int, ...]
+        isubs : [int, ...]
             indices of the owned local subsystems.
-        sub_comm: MPI.Comm or <FakeComm>
+        sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
-        sub_proc_range: (int, int)
+        sub_proc_range : (int, int)
             The range of processors that the subcomm owns, among those of comm.
         """
         if self.parallel and comm.size > 1:
@@ -98,9 +98,9 @@ class ProcAllocator(object):
 
         Parameters
         ----------
-        proc_info: list of (min_procs, max_procs, weight)
+        proc_info : list of (min_procs, max_procs, weight)
             Information used to determine MPI process allocation to subsystems.
-        comm: MPI.Comm or <FakeComm>
+        comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
 
         Returns
@@ -128,16 +128,16 @@ class ProcAllocator(object):
 
         Parameters
         ----------
-        proc_info: list of (min_procs, max_procs, weight)
+        proc_info : list of (min_procs, max_procs, weight)
             Information used to determine MPI process allocation to subsystems.
-        comm: MPI.Comm or <FakeComm>
+        comm : MPI.Comm or <FakeComm>
             communicator of the owning system.
 
         Returns
         -------
-        isubs: [int, ...]
+        isubs : [int, ...]
             indices of the owned local subsystems.
-        sub_comm: MPI.Comm or <FakeComm>
+        sub_comm : MPI.Comm or <FakeComm>
             communicator to pass to the subsystems.
         """
         pass

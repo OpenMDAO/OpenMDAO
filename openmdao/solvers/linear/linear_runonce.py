@@ -18,11 +18,11 @@ class LinearRunOnce(LinearBlockGS):
 
         Parameters
         ----------
-        vec_names: [str, ...]
+        vec_names : [str, ...]
             List of names of the right-hand-side vectors.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Names of systems relevant to the current solve.
         """
         self._vec_names = vec_names

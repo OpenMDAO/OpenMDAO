@@ -17,7 +17,7 @@ class VectorMagnitudeComp(ExplicitComponent):
 
     Attributes
     ----------
-    _magnitudes: list
+    _magnitudes : list
         Cache the data provided during `add_magnitude`
         so everything can be saved until setup is called.
     """
@@ -28,7 +28,7 @@ class VectorMagnitudeComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -62,17 +62,17 @@ class VectorMagnitudeComp(ExplicitComponent):
 
         Parameters
         ----------
-        mag_name: str
+        mag_name : str
             The name of the output vector magnitude.
-        in_name: str
+        in_name : str
             The name of the input vector.
-        units: str or None
+        units : str or None
             The units of the input vector.
-        vec_size: int
+        vec_size : int
             The number of points at which the dot vector product
             should be computed simultaneously.  The shape of
             the output is (vec_size,).
-        length: int
+        length : int
             The length of the vectors a and b.  Their shapes are
             (vec_size, length)
         """
@@ -132,9 +132,9 @@ class VectorMagnitudeComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs: Vector
+        outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         for magnitude in self._magnitudes:
@@ -147,9 +147,9 @@ class VectorMagnitudeComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials: Jacobian
+        partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         for magnitude in self._magnitudes:

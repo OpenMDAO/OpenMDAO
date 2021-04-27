@@ -26,7 +26,7 @@ def stack_outputs(outputs_dict):
 
     Parameters
     ----------
-    outputs_dict: dict
+    outputs_dict : dict
         Dictionary of outputs
 
     Returns
@@ -43,77 +43,77 @@ class MetaModelVisualization(object):
 
     Attributes
     ----------
-    prob: Problem
+    prob : Problem
         Name of variable corresponding to Problem Component
-    meta_model: MetaModel
+    meta_model : MetaModel
         Name of empty Meta Model Component object reference
-    resolution: int
+    resolution : int
         Number used to calculate width and height of contour plot
-    is_structured_meta_model: bool
+    is_structured_meta_model : bool
         Boolean used to signal whether the meta model is structured or unstructured
-    slider_source: ColumnDataSource
+    slider_source : ColumnDataSource
         Data source containing dictionary of sliders
-    contour_training_data_source: ColumnDataSource
+    contour_training_data_source : ColumnDataSource
         Data source containing dictionary of training data points
-    bottom_plot_source: ColumnDataSource
+    bottom_plot_source : ColumnDataSource
         Data source containing data for the bottom subplot
-    bottom_plot_scatter_source: ColumnDataSource
+    bottom_plot_scatter_source : ColumnDataSource
         Data source containing scatter point data for the bottom subplot
-    right_plot_source: ColumnDataSource
+    right_plot_source : ColumnDataSource
         Data source containing data for the right subplot
-    right_plot_scatter_source: ColumnDataSource
+    right_plot_scatter_source : ColumnDataSource
         Data source containing scatter point data for the right subplot
-    contour_plot_source: ColumnDataSource
+    contour_plot_source : ColumnDataSource
         Data source containing data for the contour plot
-    input_names: list
+    input_names : list
         List of input data titles as strings
-    output_names: list
+    output_names : list
         List of output data titles as strings
-    training_inputs: dict
+    training_inputs : dict
         Dictionary of input training data
-    x_input_select: Select
+    x_input_select : Select
         Bokeh Select object containing a list of inputs for the x axis
-    y_input_select: Select
+    y_input_select : Select
         Bokeh Select object containing a list of inputs for the y axis
-    output_select: Select
+    output_select : Select
         Bokeh Select object containing a list of inputs for the outputs
-    x_input_slider: Slider
+    x_input_slider : Slider
         Bokeh Slider object containing a list of input values for the x axis
-    y_input_slider: Slider
+    y_input_slider : Slider
         Bokeh Slider object containing a list of input values for the y axis
-    slider_dict: dict
+    slider_dict : dict
         Dictionary of slider names and their respective slider objects
-    predict_inputs: dict
+    predict_inputs : dict
         Dictionary containing training data points to predict at.
-    num_inputs: int
+    num_inputs : int
         Number of inputs
-    num_outputs: int
+    num_outputs : int
         Number of outputs
-    limit_range: array
+    limit_range : array
         Array containing the range of each input
-    scatter_distance: TextInput
+    scatter_distance : TextInput
         Text input for user to enter custom value to calculate distance of training points around
         slice line
-    right_alphas: array
+    right_alphas : array
         Array of points containing alpha values for right plot
-    bottom_alphas: array
+    bottom_alphas : array
         Array of points containing alpha values for bottom plot
-    dist_range: float
+    dist_range : float
         Value taken from scatter_distance used for calculating distance of training points around
         slice line
-    x_index: int
+    x_index : int
         Value of x axis column
-    y_index: int
+    y_index : int
         Value of y axis column
-    output_variable: int
+    output_variable : int
         Value of output axis column
-    sliders_and_selects: layout
+    sliders_and_selects : layout
         Layout containing the sliders and select elements
-    doc_layout: layout
+    doc_layout : layout
         Contains first row of plots
-    doc_layout2: layout
+    doc_layout2 : layout
         Contains second row of plots
-    Z: array
+    Z : array
         A 2D array containing contour plot data
     """
 
@@ -123,11 +123,11 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        model: MetaModelComponent
+        model : MetaModelComponent
             Reference to meta model component
-        resolution: int
+        resolution : int
             Value used to calculate the size of contour plot meshgrid
-        doc: Document
+        doc : Document
             The bokeh document to build.
         """
         self.prob = Problem()
@@ -264,7 +264,7 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        metamodel: MetaModelComponent
+        metamodel : MetaModelComponent
             Reference to meta model component
 
         """
@@ -347,7 +347,7 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        data: dict
+        data : dict
             Dictionary containing training points.
 
         Returns
@@ -693,9 +693,9 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        compute_distance: bool
+        compute_distance : bool
             If true, compute the distance of training points from surrogate line.
-        source: str
+        source : str
             Which subplot the method is being called from.
 
         Returns
@@ -758,9 +758,9 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        compute_distance: bool
+        compute_distance : bool
             If true, compute the distance of training points from surrogate line.
-        source: str
+        source : str
             Which subplot the method is being called from.
 
         Returns
@@ -816,18 +816,18 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        scaled_points: array
+        scaled_points : array
             Array of normalized slider positions.
-        training_points: array
+        training_points : array
             Array of input training data.
-        source: str
+        source : str
             Which subplot the method is being called from.
 
         Returns
         -------
-        idxs: array
+        idxs : array
             Index of closest points that are within the dist range.
-        x_tree: array
+        x_tree : array
             One dimentional array of points that are within the dist range.
         """
         # Column of the input
@@ -854,18 +854,18 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        scaled_points: array
+        scaled_points : array
             Array of normalized slider positions.
-        training_points: array
+        training_points : array
             Array of input training data.
-        source: str
+        source : str
             Which subplot the method is being called from.
 
         Returns
         -------
-        idxs: array
+        idxs : array
             Index of closest points that are within the dist range.
-        x_tree: array
+        x_tree : array
             Array of points that are within the dist range.
         """
         # Column of the input
@@ -940,13 +940,13 @@ def view_metamodel(meta_model_comp, resolution, port_number, browser):
 
     Parameters
     ----------
-    meta_model_comp: MetaModelStructuredComp or MetaModelUnStructuredComp
+    meta_model_comp : MetaModelStructuredComp or MetaModelUnStructuredComp
         The metamodel component.
-    resolution: int
+    resolution : int
         Number of points to control contour plot resolution.
-    port_number: int
+    port_number : int
         Bokeh plot port number.
-    browser: bool
+    browser : bool
         Boolean to show the browser
     """
     from bokeh.application.application import Application

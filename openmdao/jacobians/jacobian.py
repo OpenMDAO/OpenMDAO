@@ -31,21 +31,21 @@ class Jacobian(object):
 
     Attributes
     ----------
-    _system: <System>
+    _system : <System>
         Pointer to the system that is currently operating on this Jacobian.
-    _subjacs_info: dict
+    _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
-    _under_complex_step: bool
+    _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
-    _abs_keys: defaultdict
+    _abs_keys : defaultdict
         A cache dict for key to absolute key.
-    _randomize: bool
+    _randomize : bool
         If True, sparsity is being computed for simultaneous derivative coloring.
-    _col_var_info: dict
+    _col_var_info : dict
         Maps column name to start, end, and slice/indices into the result array.
-    _colnames: list
+    _colnames : list
         List of column var names.
-    _col2name_ind: ndarray
+    _col2name_ind : ndarray
         Array that maps jac col index to index of column name.
     """
 
@@ -55,7 +55,7 @@ class Jacobian(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             Parent system to this jacobian.
         """
         self._system = weakref.ref(system)
@@ -79,14 +79,14 @@ class Jacobian(object):
 
         Parameters
         ----------
-        abs_key: (str, str)
+        abs_key : (str, str)
             Absolute name pair of sub-Jacobian.
 
         Returns
         -------
-        out_size: int
+        out_size : int
             local size of the output variable.
-        in_size: int
+        in_size : int
             local size of the input variable.
         """
         abs2meta = self._system()._var_allprocs_abs2meta
@@ -103,7 +103,7 @@ class Jacobian(object):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             Promoted or relative name pair of sub-Jacobian.
 
         Returns
@@ -119,7 +119,7 @@ class Jacobian(object):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             Promoted or relative name pair of sub-Jacobian.
 
         Returns
@@ -140,9 +140,9 @@ class Jacobian(object):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             Promoted or relative name pair of sub-Jacobian.
-        subjac: int or float or ndarray or sparse matrix
+        subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
         abs_key = self._get_abs_key(key)
@@ -223,7 +223,7 @@ class Jacobian(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             System that is updating this jacobian.
         """
         pass
@@ -234,15 +234,15 @@ class Jacobian(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             System that is updating this jacobian.
-        d_inputs: Vector
+        d_inputs : Vector
             inputs linear vector.
-        d_outputs: Vector
+        d_outputs : Vector
             outputs linear vector.
-        d_residuals: Vector
+        d_residuals : Vector
             residuals linear vector.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
         """
         pass
@@ -253,9 +253,9 @@ class Jacobian(object):
 
         Parameters
         ----------
-        subjac: ndarray or csc_matrix
+        subjac : ndarray or csc_matrix
             Sub-jacobian to be randomized.
-        key: tuple (of, wrt)
+        key : tuple (of, wrt)
             Key for subjac within the jacobian.
 
         Returns
@@ -297,7 +297,7 @@ class Jacobian(object):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         for meta in self._subjacs_info.values():
@@ -383,11 +383,11 @@ class Jacobian(object):
 
         Parameters
         ----------
-        system: System
+        system : System
             The system that owns this jacobian.
-        icol: int
+        icol : int
             Column index.
-        column: ndarray
+        column : ndarray
             Column value.
 
         """

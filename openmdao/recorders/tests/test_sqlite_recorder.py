@@ -332,9 +332,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 0",
-            "    Subsystem: root",
+            "    Subsystem : root",
             "        assembled_jac_type: csc",
-            "    Subsystem: p1",
+            "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
             "        name: UNDEFINED",
@@ -349,7 +349,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        ref0: 0.0",
             "        res_ref: None",
             "        tags: None",
-            "    Subsystem: p2",
+            "    Subsystem : p2",
             "        distributed: False",
             "        run_root_only: False",
             "        name: UNDEFINED",
@@ -364,10 +364,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        ref0: 0.0",
             "        res_ref: None",
             "        tags: None",
-            "    Subsystem: comp",
+            "    Subsystem : comp",
             "        distributed: False",
             "        run_root_only: False",
-            "    Subsystem: con",
+            "    Subsystem : con",
             "        distributed: False",
             "        run_root_only: False",
             "        has_diag_partials: False",
@@ -388,7 +388,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
+            "    Subsystem : root",
             "        assembled_jac_type: dense",
             ""
         ]
@@ -427,9 +427,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 0",
-            "    Subsystem: root",
+            "    Subsystem : root",
             "        assembled_jac_type: csc",
-            "    Subsystem: p1",
+            "    Subsystem : p1",
             "        distributed: False",
             "        run_root_only: False",
             "        name: UNDEFINED",
@@ -444,7 +444,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        ref0: 0.0",
             "        res_ref: None",
             "        tags: None",
-            "    Subsystem: p2",
+            "    Subsystem : p2",
             "        distributed: False",
             "        run_root_only: False",
             "        name: UNDEFINED",
@@ -459,10 +459,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        ref0: 0.0",
             "        res_ref: None",
             "        tags: None",
-            "    Subsystem: comp",
+            "    Subsystem : comp",
             "        distributed: False",
             "        run_root_only: False",
-            "    Subsystem: con",
+            "    Subsystem : con",
             "        distributed: False",
             "        run_root_only: False",
             "        has_diag_partials: False",
@@ -483,7 +483,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
+            "    Subsystem : root",
             "        assembled_jac_type: dense",
             ""
         ]

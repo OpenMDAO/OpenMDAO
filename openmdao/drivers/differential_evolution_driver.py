@@ -33,16 +33,16 @@ class DifferentialEvolutionDriver(Driver):
 
     Attributes
     ----------
-    _concurrent_pop_size: int
+    _concurrent_pop_size : int
         Number of points to run concurrently when model is a parallel one.
-    _concurrent_color: int
+    _concurrent_color : int
         Color of current rank when running a parallel model.
-    _desvar_idx: dict
+    _desvar_idx : dict
         Keeps track of the indices for each desvar, since DifferentialEvolution sees an array of
         design variables.
-    _ga: <DifferentialEvolution>
+    _ga : <DifferentialEvolution>
         Main genetic algorithm lies here.
-    _randomstate: np.random.RandomState, int
+    _randomstate : np.random.RandomState, int
          Random state (or seed-number) which controls the seed and random draws.
     """
 
@@ -52,7 +52,7 @@ class DifferentialEvolutionDriver(Driver):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
@@ -121,7 +121,7 @@ class DifferentialEvolutionDriver(Driver):
 
         Parameters
         ----------
-        problem: <Problem>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         super()._setup_driver(problem)
@@ -143,7 +143,7 @@ class DifferentialEvolutionDriver(Driver):
 
         Parameters
         ----------
-        comm: MPI.Comm or <FakeComm> or None
+        comm : MPI.Comm or <FakeComm> or None
             The communicator for the Problem.
 
         Returns
@@ -307,9 +307,9 @@ class DifferentialEvolutionDriver(Driver):
 
         Parameters
         ----------
-        x: ndarray
+        x : ndarray
             Value of design variables.
-        icase: int
+        icase : int
             Case number, used for identification when run in parallel.
 
         Returns
@@ -414,21 +414,21 @@ class DifferentialEvolution(object):
     """
     Differential Evolution Genetic Algorithm.
 
-    TODO: add better references than: https://en.wikipedia.org/wiki/Differential_evolution
+    TODO : add better references than: https://en.wikipedia.org/wiki/Differential_evolution
 
     Attributes
     ----------
-    comm: MPI communicator or None
+    comm : MPI communicator or None
         The MPI communicator that will be used objective evaluation for each generation.
-    lchrom: int
+    lchrom : int
         Chromosome length.
-    model_mpi: None or tuple
+    model_mpi : None or tuple
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
         to evaluate on this rank.
-    npop: int
+    npop : int
         Population size.
-    objfun: function
+    objfun : function
         Objective function callback.
     """
 
@@ -438,11 +438,11 @@ class DifferentialEvolution(object):
 
         Parameters
         ----------
-        objfun: function
+        objfun : function
             Objective callback function.
-        comm: MPI communicator or None
+        comm : MPI communicator or None
             The MPI communicator that will be used objective evaluation for each generation.
-        model_mpi: None or tuple
+        model_mpi : None or tuple
             If the model in objfun is also parallel, then this will contain a tuple with the the
             total number of population points to evaluate concurrently, and the color of the point
             to evaluate on this rank.
@@ -460,21 +460,21 @@ class DifferentialEvolution(object):
 
         Parameters
         ----------
-        x0: ndarray
+        x0 : ndarray
             Initial design values
-        vlb: ndarray
+        vlb : ndarray
             Lower bounds array.
-        vub: ndarray
+        vub : ndarray
             Upper bounds array.
-        pop_size: int
+        pop_size : int
             Number of points in the population.
-        max_gen: int
+        max_gen : int
             Number of generations to run the GA.
-        random_state: np.random.RandomState, int
+        random_state : np.random.RandomState, int
             Random state (or seed-number) which controls the seed and random draws.
-        F: float
+        F : float
             Differential rate
-        Pc: float
+        Pc : float
             Crossover rate
 
         Returns

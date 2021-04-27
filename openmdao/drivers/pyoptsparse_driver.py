@@ -116,32 +116,32 @@ class pyOptSparseDriver(Driver):
 
     Attributes
     ----------
-    fail: bool
+    fail : bool
         Flag that indicates failure of most recent optimization.
-    hist_file: str or None
+    hist_file : str or None
         File location for saving pyopt_sparse optimization history.
         Default is None for no output.
-    hotstart_file: str
+    hotstart_file : str
         Optional file to hot start the optimization.
-    opt_settings: dict
+    opt_settings : dict
         Dictionary for setting optimizer-specific options.
-    pyopt_solution: Solution
+    pyopt_solution : Solution
         Pyopt_sparse solution object.
-    _check_jac: bool
+    _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
-    _exc_info: None or <Exception>
+    _exc_info : None or <Exception>
         Cached exception that was raised in the _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
-    _indep_list: list
+    _indep_list : list
         List of design variables.
-    _quantities: list
+    _quantities : list
         Contains the objectives plus nonlinear constraints.
-    _signal_cache: <Function>
+    _signal_cache : <Function>
         Cached function pointer that was assigned as handler for signal defined in option
         user_terminate_signal.
-    _user_termination_flag: bool
+    _user_termination_flag : bool
         This is set to True when the user sends a signal to terminate the job.
     """
 
@@ -151,7 +151,7 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
         if Optimization is None:
@@ -239,7 +239,7 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        problem: <Problem>
+        problem : <Problem>
             Pointer to the containing problem.
         """
         super()._setup_driver(problem)
@@ -527,15 +527,15 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        dv_dict: dict
+        dv_dict : dict
             Dictionary of design variable values.
 
         Returns
         -------
-        func_dict: dict
+        func_dict : dict
             Dictionary of all functional variables evaluated at design point.
 
-        fail: int
+        fail : int
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
@@ -608,17 +608,17 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        dv_dict: dict
+        dv_dict : dict
             Dictionary of design variable values.
-        func_dict: dict
+        func_dict : dict
             Dictionary of all functional variables evaluated at design point.
 
         Returns
         -------
-        sens_dict: dict
+        sens_dict : dict
             Dictionary of dictionaries for gradient of each dv/func pair
 
-        fail: int
+        fail : int
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
@@ -740,7 +740,7 @@ class pyOptSparseDriver(Driver):
 
         Parameters
         ----------
-        coloring: Coloring or None
+        coloring : Coloring or None
             Current coloring.
         """
         total_sparsity = None

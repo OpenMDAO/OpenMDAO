@@ -15,7 +15,7 @@ class COOMatrix(Matrix):
 
     Attributes
     ----------
-    _coo: coo_matrix
+    _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
     """
 
@@ -25,9 +25,9 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        comm: MPI.Comm or <FakeComm>
+        comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
-        is_internal: bool
+        is_internal : bool
             If True, this is the int_mtx of an AssembledJacobian.
         """
         super().__init__(comm, is_internal)
@@ -39,7 +39,7 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             Parent system of this matrix.
 
         Returns
@@ -137,11 +137,11 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        num_rows: int
+        num_rows : int
             number of rows in the matrix.
-        num_cols: int
+        num_cols : int
             number of cols in the matrix.
-        system: <System>
+        system : <System>
             owning system.
         """
         data, rows, cols = self._build_coo(system)
@@ -163,9 +163,9 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             the global output and input variable names.
-        jac: ndarray or scipy.sparse or tuple
+        jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
         idxs, jac_type, factor = self._metadata[key]
@@ -188,11 +188,11 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        in_vec: ndarray[:]
+        in_vec : ndarray[:]
             incoming vector to multiply.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        mask: ndarray of type bool, or None
+        mask : ndarray of type bool, or None
             Array used to zero out part of the matrix data.
 
         Returns
@@ -231,12 +231,12 @@ class COOMatrix(Matrix):
         """
         Create masking array for this matrix.
 
-        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Note : this only applies when this Matrix is an 'ext_mtx' inside of a
         Jacobian object.
 
         Parameters
         ----------
-        d_inputs: Vector
+        d_inputs : Vector
             The inputs linear vector.
 
         Returns
@@ -268,7 +268,7 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:
@@ -285,7 +285,7 @@ class COOMatrix(Matrix):
 
         Parameters
         ----------
-        mask: ndarray
+        mask : ndarray
             The mask of indices to zero out.
 
         Returns

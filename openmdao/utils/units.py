@@ -46,7 +46,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        item: key
+        item : key
             key to get the item
 
         Returns
@@ -65,7 +65,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: dict
+        other : dict
             the dict instance to be coerced
 
         Returns
@@ -83,7 +83,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: NumberDict
+        other : NumberDict
             the other NumberDict Instance
 
         Returns
@@ -104,7 +104,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: NumberDict
+        other : NumberDict
             the other NumberDict Instance
 
         Returns
@@ -125,7 +125,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: NumberDict
+        other : NumberDict
             the other NumberDict Instance
 
         Returns
@@ -146,7 +146,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: NumberDict
+        other : NumberDict
             the other NumberDict Instance
 
         Returns
@@ -167,7 +167,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: int
+        other : int
             value to divide by
 
         Returns
@@ -188,7 +188,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other: NumberDict
+        other : NumberDict
             the other NumberDict Instance
 
         Returns
@@ -209,16 +209,16 @@ class PhysicalUnit(object):
 
     Attributes
     ----------
-    _names: dict or str
+    _names : dict or str
         A dictionary mapping each name component to its
         associated integer power (e.g., C{{'m': 1, 's': -1}})
         for M{m/s}). As a shorthand, a string may be passed
         which is assigned an implicit power 1.
-    _factor: float
+    _factor : float
         A scaling factor.
-    _powers: list of int
+    _powers : list of int
         The integer powers for each of the nine base units.
-    _offset: float
+    _offset : float
         An additive offset to the base unit (used only for temperatures)
     """
 
@@ -228,16 +228,16 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        names: dict or str
+        names : dict or str
             A dictionary mapping each name component to its
             associated integer power (e.g., C{{'m': 1, 's': -1}})
             for M{m/s}). As a shorthand, a string may be passed
             which is assigned an implicit power 1.
-        factor: float
+        factor : float
             A scaling factor.
-        powers: list of int
+        powers : list of int
             The integer powers for each of the nine base units.
-        offset: float
+        offset : float
             An additive offset to the base unit (used only for temperatures).
         """
         if isinstance(names, str):
@@ -278,7 +278,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be compared to
 
         Returns
@@ -297,7 +297,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be compared to
 
         Returns
@@ -315,7 +315,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be compared to
 
         Returns
@@ -333,7 +333,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be compared to
 
         Returns
@@ -363,7 +363,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be operated on
 
         Returns
@@ -392,7 +392,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             The other physical unit to be operated on
 
         Returns
@@ -412,7 +412,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        power: float or int
+        power : float or int
             power to raise self by
 
         Returns
@@ -481,7 +481,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             Another unit.
 
         Returns
@@ -518,7 +518,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        other: PhysicalUnit
+        other : PhysicalUnit
             Another unit.
 
         Returns
@@ -557,7 +557,7 @@ class PhysicalUnit(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             the name
         """
         self._names = NumberDict()
@@ -600,11 +600,11 @@ def _new_unit(name, factor, powers):
 
     Parameters
     ----------
-    name: str
+    name : str
         The name of the new unit
-    factor: float
+    factor : float
         conversion factor to base units
-    powers: [int, ...]
+    powers : [int, ...]
         power of base units
 
     """
@@ -617,15 +617,15 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 
     Parameters
     ----------
-    name: str
+    name : str
         The name of the unit
-    baseunit: str or instance of PhysicalUnit
+    baseunit : str or instance of PhysicalUnit
         The unit upon which this offset unit is based.
-    factor: str
+    factor : str
         The scaling factor used to define the new unit w.r.t. baseunit
-    offset: float
+    offset : float
         zero offset for new unit
-    comment: str
+    comment : str
         optional comment to describe unit
     """
     if isinstance(baseunit, str):
@@ -651,11 +651,11 @@ def add_unit(name, unit, comment=''):
 
     Parameters
     ----------
-    name: str
+    name : str
         The name of the unit being added. For example: 'Hz'
-    unit: str
+    unit : str
         definition of the unit w.r.t. some other unit.  For example: '1/s'
-    comment: str
+    comment : str
         optional comment to describe unit
     """
     if comment:
@@ -685,7 +685,7 @@ def _do_nothing(string):
 
     Parameters
     ----------
-    string: str
+    string : str
         The string to be transformed for the ConfigParser
 
     Returns
@@ -705,7 +705,7 @@ def import_library(libfilepointer):
 
     Parameters
     ----------
-    libfilepointer: file
+    libfilepointer : file
         new library file to work with
 
     Returns
@@ -765,7 +765,7 @@ def update_library(filename):
 
     Parameters
     ----------
-    filename: string or file
+    filename : string or file
         Source of units configuration data.
     """
     if isinstance(filename, basestring):
@@ -793,7 +793,7 @@ def _update_library(cfg):
 
     Parameters
     ----------
-    cfg: ConfigParser
+    cfg : ConfigParser
         ConfigParser loaded with unit_lib.ini data
     """
     retry1 = set()
@@ -858,9 +858,9 @@ def _find_unit(unit, error=False):
 
     Parameters
     ----------
-    unit: str
+    unit : str
         str representing the desired unit
-    error: bool
+    error : bool
         If True, raise exception if unit isn't found.
 
     Returns
@@ -940,7 +940,7 @@ def valid_units(unit):
 
     Parameters
     ----------
-    unit: str
+    unit : str
         String representation of the units.
 
     Returns
@@ -957,7 +957,7 @@ def conversion_to_base_units(units):
 
     Parameters
     ----------
-    units: str
+    units : str
         String representation of the units.
 
     Returns
@@ -982,9 +982,9 @@ def is_compatible(old_units, new_units):
 
     Parameters
     ----------
-    old_units: str
+    old_units : str
         original units as a string.
-    new_units: str or None
+    new_units : str or None
         new units to return the value in; if None, return in standard units.
 
     Returns
@@ -1007,9 +1007,9 @@ def unit_conversion(old_units, new_units):
 
     Parameters
     ----------
-    old_units: str
+    old_units : str
         original units as a string.
-    new_units: str
+    new_units : str
         new units to return the value in.
 
     Returns
@@ -1026,9 +1026,9 @@ def get_conversion(old_units, new_units):
 
     Parameters
     ----------
-    old_units: str
+    old_units : str
         original units as a string.
-    new_units: str
+    new_units : str
         new units to return the value in.
 
     Returns
@@ -1048,11 +1048,11 @@ def convert_units(val, old_units, new_units=None):
 
     Parameters
     ----------
-    val: float
+    val : float
         value in original units.
-    old_units: str or None
+    old_units : str or None
         original units as a string or None.
-    new_units: str or None
+    new_units : str or None
         new units to return the value in or None.
 
     Returns
@@ -1079,13 +1079,13 @@ def _has_val_mismatch(units1, val1, units2, val2):
 
     Parameters
     ----------
-    units1: str or None
+    units1 : str or None
         Units for first value.
-    val1: float or ndarray
+    val1 : float or ndarray
         First value.
-    units2: str or None
+    units2 : str or None
         Units for second value.
-    val2: float or ndarray
+    val2 : float or ndarray
         Second value.
     """
     if units1 != units2:
@@ -1114,9 +1114,9 @@ def simplify_unit(old_unit_str, msginfo=''):
 
     Parameters
     ----------
-    old_unit_str: str
+    old_unit_str : str
         Unit string to simplify.
-    msginfo: str
+    msginfo : str
         A string prepended to the ValueError which is raised if the units are invalid.
 
     Returns

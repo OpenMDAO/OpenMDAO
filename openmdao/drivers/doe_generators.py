@@ -25,10 +25,10 @@ class DOEGenerator(object):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables (used by some subclasses).
 
         Returns
@@ -49,7 +49,7 @@ class ListGenerator(DOEGenerator):
 
     Attributes
     ----------
-    _data: list
+    _data : list
         List of collections of name, value pairs for the design variables.
     """
 
@@ -59,7 +59,7 @@ class ListGenerator(DOEGenerator):
 
         Parameters
         ----------
-        data: list
+        data : list
             list of collections of name, value pairs for the design variables
         """
         super().__init__()
@@ -76,10 +76,10 @@ class ListGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables.
 
         Yields
@@ -131,7 +131,7 @@ class CSVGenerator(DOEGenerator):
 
     Attributes
     ----------
-    _filename: str
+    _filename : str
            the name of the file from which to read cases
     """
 
@@ -141,7 +141,7 @@ class CSVGenerator(DOEGenerator):
 
         Parameters
         ----------
-        filename: str
+        filename : str
                the name of the file from which to read cases
         """
         super().__init__()
@@ -160,10 +160,10 @@ class CSVGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables.
 
         Yields
@@ -210,9 +210,9 @@ class UniformGenerator(DOEGenerator):
 
     Attributes
     ----------
-    _num_samples: int
+    _num_samples : int
         The number of samples in the DOE.
-    _seed: int or None
+    _seed : int or None
         Random seed.
     """
 
@@ -222,10 +222,10 @@ class UniformGenerator(DOEGenerator):
 
         Parameters
         ----------
-        num_samples: int, optional
+        num_samples : int, optional
             The number of samples to run. Defaults to 1.
 
-        seed: int or None, optional
+        seed : int or None, optional
             Seed for random number generator.
         """
         super().__init__()
@@ -239,10 +239,10 @@ class UniformGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables (not used).
 
         Yields
@@ -278,7 +278,7 @@ class _pyDOE_Generator(DOEGenerator):
 
     Attributes
     ----------
-    _levels: int or dict(str, int)
+    _levels : int or dict(str, int)
         The number of evenly spaced levels between each design variable
         lower and upper bound. Dictionary input is supported by Full Factorial or
         Generalized Subset Design.
@@ -290,7 +290,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        levels: int or dict, optional
+        levels : int or dict, optional
             The number of evenly spaced levels between each design variable
             lower and upper bound.  Dictionary input is supported by Full Factorial or
             Generalized Subset Design.
@@ -309,7 +309,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        name: str
+        name : str
             Design variable name
 
         Returns
@@ -338,10 +338,10 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables (not used).
 
         Yields
@@ -405,7 +405,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        size: int
+        size : int
             The number of factors for the design.
 
         Returns
@@ -427,7 +427,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        size: int
+        size : int
             The number of factors for the design.
 
         Returns
@@ -444,10 +444,10 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
 
     Attributes
     ----------
-    _reduction: int
+    _reduction : int
         Reduction factor (bigger than 1). Larger `reduction` means fewer
         experiments in the design and more possible complementary designs.
-    _n: int, optional
+    _n : int, optional
         Number of complementary GSD-designs. The complementary
         designs are balanced analogous to fold-over in two-level fractional
         factorial designs.
@@ -460,13 +460,13 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        levels: int or dict
+        levels : int or dict
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
-        reduction: int
+        reduction : int
             Reduction factor (bigger than 1). Larger `reduction` means fewer
             experiments in the design and more possible complementary designs.
-        n: int, optional
+        n : int, optional
             Number of complementary GSD-designs. The complementary
             designs are balanced analogous to fold-over in two-level fractional
             factorial designs.
@@ -482,7 +482,7 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        size: int
+        size : int
             The number of factors for the design.
 
         Returns
@@ -510,7 +510,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        size: int
+        size : int
             The number of factors for the design.
 
         Returns
@@ -531,7 +531,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
 
     Attributes
     ----------
-    _center: int
+    _center : int
         The number of center points to include.
     """
 
@@ -541,7 +541,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        center: int, optional
+        center : int, optional
             The number of center points to include (default = None).
         """
         super().__init__(levels=3)
@@ -553,7 +553,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
 
         Parameters
         ----------
-        size: int
+        size : int
             The number of factors for the design.
 
         Returns
@@ -577,14 +577,14 @@ class LatinHypercubeGenerator(DOEGenerator):
 
     Attributes
     ----------
-    _samples: int
+    _samples : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
-    _criterion: string
+    _criterion : string
         the pyDOE criterion to use.
-    _iterations: int
+    _iterations : int
         The number of iterations to use for maximin and correlations algorithms.
-    _seed: int or None
+    _seed : int or None
         Random seed.
     """
 
@@ -601,20 +601,20 @@ class LatinHypercubeGenerator(DOEGenerator):
         """
         Initialize the LatinHypercubeGenerator.
 
-        See: https://pythonhosted.org/pyDOE/randomized.html
+        See : https://pythonhosted.org/pyDOE/randomized.html
 
         Parameters
         ----------
-        samples: int, optional
+        samples : int, optional
             The number of samples to generate for each factor (Defaults to n)
-        criterion: str, optional
+        criterion : str, optional
             Allowable values are "center" or "c", "maximin" or "m",
             "centermaximin" or "cm", and "correlation" or "corr". If no value
             given, the design is simply randomized.
-        iterations: int, optional
+        iterations : int, optional
             The number of iterations in the maximin and correlations algorithms
             (Defaults to 5).
-        seed: int, optional
+        seed : int, optional
             Random seed to use if design is randomized. Defaults to None.
         """
         super().__init__()
@@ -636,10 +636,10 @@ class LatinHypercubeGenerator(DOEGenerator):
 
         Parameters
         ----------
-        design_vars: OrderedDict
+        design_vars : OrderedDict
             Dictionary of design variables for which to generate values.
 
-        model: Group
+        model : Group
             The model containing the design variables (not used).
 
         Yields

@@ -30,7 +30,7 @@ class MatrixVectorProductComp(ExplicitComponent):
 
     Attributes
     ----------
-    _products: list
+    _products : list
         Cache the data provided during `add_product`
         so everything can be saved until setup is called.
     """
@@ -41,7 +41,7 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
@@ -84,22 +84,22 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        A_name: str
+        A_name : str
             The name of the matrix input.
-        x_name: str
+        x_name : str
             The name of the vector input.
-        b_name: str
+        b_name : str
             The name of the vector product output.
-        A_units: str or None
+        A_units : str or None
             The units of the input matrix.
-        x_units: str or None
+        x_units : str or None
             The units of the input vector.
-        b_units: str or None
+        b_units : str or None
             The units of the output matrix.
-        vec_size: int
+        vec_size : int
             The number of points at which the matrix vector product
             should be computed simultaneously.
-        A_shape: tuple of (int, int)
+        A_shape : tuple of (int, int)
             The shape of the matrix at each point.
             The first element also specifies the size of the output at each point.
             The second element specifies the size of the input vector at each point.
@@ -205,9 +205,9 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs: Vector
+        outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         for product in self._products:
@@ -223,9 +223,9 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials: Jacobian
+        partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         for product in self._products:

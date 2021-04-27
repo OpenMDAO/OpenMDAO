@@ -41,23 +41,23 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     Parameters
     ----------
-    root: System or Problem
+    root : System or Problem
         The root for the desired tree.
 
-    outfile: str, optional
+    outfile : str, optional
         The name of the output html file.  Defaults to 'connections.html'.
 
-    show_browser: bool, optional
+    show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
 
-    show_values: bool, optional
+    show_values : bool, optional
         If True, retrieve the values and display them.
 
-    precision: int, optional
+    precision : int, optional
         Sets the precision for displaying array values.
 
-    title: str, optional
+    title : str, optional
         Sets the title of the web page.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:

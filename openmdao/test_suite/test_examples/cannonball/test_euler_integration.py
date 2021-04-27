@@ -18,11 +18,11 @@ class TestEulerExample(unittest.TestCase):
 
             Parameters
             ----------
-            gam_init: float
+            gam_init : float
                 Initial cannonball firing angle in degrees.
-            prob: <Problem>
+            prob : <Problem>
                 OpenMDAO problem that contains the equations of motion.
-            complex_step: bool
+            complex_step : bool
                 Set to True to perform complex step.
 
             Returns
@@ -86,9 +86,9 @@ class TestEulerExample(unittest.TestCase):
 
             Parameters
             ----------
-            gam_init: float
+            gam_init : float
                 Initial cannonball firing angle in degrees.
-            prob: <Problem>
+            prob : <Problem>
                 OpenMDAO problem that contains the equations of motion.
 
             Returns

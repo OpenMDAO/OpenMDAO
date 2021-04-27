@@ -11,7 +11,7 @@ def abs(x):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         array value to be computed on
 
     Returns
@@ -31,9 +31,9 @@ def norm(x, axis=None):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         array value to be computed on
-    axis: None or int
+    axis : None or int
         axis to perform the norm up to
 
     Returns
@@ -49,9 +49,9 @@ def arctan2(y, x):
 
     Parameters
     ----------
-    y: float or complex
+    y : float or complex
         The length of the side opposite the angle being determined.
-    x: float or complex
+    x : float or complex
         The length of the side adjacent to the angle being determined.
 
     Returns

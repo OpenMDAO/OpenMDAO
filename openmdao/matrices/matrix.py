@@ -18,13 +18,13 @@ class Matrix(object):
 
     Attributes
     ----------
-    _comm: MPI.Comm or <FakeComm>
+    _comm : MPI.Comm or <FakeComm>
         communicator of the top-level system that owns the <Jacobian>.
-    _matrix: object
+    _matrix : object
         implementation-specific representation of the actual matrix.
-    _submats: dict
+    _submats : dict
         dictionary of sub-jacobian data keyed by (out_name, in_name).
-    _metadata: dict
+    _metadata : dict
         implementation-specific data for the sub-jacobians.
     """
 
@@ -34,9 +34,9 @@ class Matrix(object):
 
         Parameters
         ----------
-        comm: MPI.Comm or <FakeComm>
+        comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
-        is_internal: bool
+        is_internal : bool
             If True, this is the int_mtx of an AssembledJacobian.
         """
         self._comm = comm
@@ -50,20 +50,20 @@ class Matrix(object):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             Tuple of the form (output_var_name, input_var_name).
-        info: dict
+        info : dict
             sub-jacobian metadata.
-        irow: int
+        irow : int
             the starting row index (offset) for this sub-jacobian.
-        icol: int
+        icol : int
             the starting col index (offset) for this sub-jacobian.
-        src_indices: ndarray
+        src_indices : ndarray
             indices from the source variable that an input variable
             connects to.
-        shape: tuple
+        shape : tuple
             Shape of the specified submatrix.
-        factor: float or None
+        factor : float or None
             Unit conversion factor.
         """
         self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
@@ -74,11 +74,11 @@ class Matrix(object):
 
         Parameters
         ----------
-        num_rows: int
+        num_rows : int
             number of rows in the matrix.
-        num_cols: int
+        num_cols : int
             number of cols in the matrix.
-        system: <System>
+        system : <System>
             owning system.
         """
         pass
@@ -89,9 +89,9 @@ class Matrix(object):
 
         Parameters
         ----------
-        key: (str, str)
+        key : (str, str)
             the global output and input variable names.
-        jac: ndarray or scipy.sparse or tuple
+        jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
         pass
@@ -102,11 +102,11 @@ class Matrix(object):
 
         Parameters
         ----------
-        vec: ndarray[:]
+        vec : ndarray[:]
             incoming vector to multiply.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        mask: ndarray of type bool, or None
+        mask : ndarray of type bool, or None
             Array used to mask out part of the input vector.
 
         Returns
@@ -137,7 +137,7 @@ class Matrix(object):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
@@ -149,15 +149,15 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
 
     Parameters
     ----------
-    jrows: index array
+    jrows : index array
         Array of row indices.
-    jcols: index array
+    jcols : index array
         Array of column indices.
-    irow: int
+    irow : int
         Row index for start of sub-jacobian.
-    icol: int
+    icol : int
         Column index for start of sub-jacobian.
-    src_indices: index array
+    src_indices : index array
         Index array of which values to pull from a source into an input
         variable.
 
