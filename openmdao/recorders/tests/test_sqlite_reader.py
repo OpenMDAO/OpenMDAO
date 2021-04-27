@@ -4129,7 +4129,7 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
             "        ref0: 0.0",
             "        res_ref: None",
             "        tags: None",
-            "    Subsystem: p2",
+            "    Subsystem : p2",
             "        distributed: False",
             "        name: UNDEFINED",
             "        val: 1.0",
