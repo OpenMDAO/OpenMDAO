@@ -394,10 +394,10 @@ class _TotalJacInfo(object):
             owns = self.model._owning_rank
 
             abs2meta_out = self.model._var_allprocs_abs2meta['output']
+            loc_abs = self.model._var_abs2meta['output']
             for vecname in model._lin_vec_names:
                 sizes = self.model._var_sizes[vecname]['output']
                 abs2idx = self.model._var_allprocs_abs2idx[vecname]
-                loc_abs = self.model._var_abs2meta['output']
                 full_j_tgts = []
                 full_j_srcs = []
 
