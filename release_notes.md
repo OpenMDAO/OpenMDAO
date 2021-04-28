@@ -1,4 +1,78 @@
 **********************************
+# Release Notes for OpenMDAO 3.9.0
+
+April 28, 2021
+
+OpenMDAO 3.9.0 features an API change to the serial/parallel implementation
+in OpenMDAO, a significant performance increase in approximated partials,
+and several other improvements.
+
+Most OpenMDAO components allow inputs and outputs to be added after the
+component is instantiated.  This now applies to ExecComp as well.  New
+expressions can be added to ExecComp using the `add_expr` method.
+
+OpenMDAO can sometimes produce numerous verbose warnings during setup.
+We now implement our own Warning classes so that the verbosity of these
+warnings can be changed through the use of Python's warning filtering
+functionality.
+
+See the following sections for a complete list of changes.
+
+## New Deprecations
+
+- Environment variable OPENMDAO_REQUIRE_MPI is now OPENMDAO_USE_MPI. [#1968](https://github.com/OpenMDAO/OpenMDAO/pull/1968)
+
+## Backwards Incompatible API Changes:
+
+- dynamically shaped connection between distributed outputs and serial inputs are no longer allowed. [#2013](https://github.com/OpenMDAO/OpenMDAO/pull/2013)
+- dynamically shaped connections now by default assume local data transfer to distributed inputs, i.e., size/shape and src_indices in the input correspond to the local part of the output. [#2013](https://github.com/OpenMDAO/OpenMDAO/pull/2013)
+- old behavior of connecting distributed outputs to serial inputs was to have the serial input in each proc contain the full distributed size of the output. To achieve this same behavior, user must now specify src_indices for the input of om.slicer[:] (recommended) or an index array matching the full distrib size of the output. [#2013](https://github.com/OpenMDAO/OpenMDAO/pull/2013)
+
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- The unit 'as' for attoseconds now works. [#1963](https://github.com/OpenMDAO/OpenMDAO/pull/1963)
+- Warnings for MPI/PETSc failed import are now suppressed. [#1968](https://github.com/OpenMDAO/OpenMDAO/pull/1968)
+- Added OpenMDAO version to case recorder file [#1971](https://github.com/OpenMDAO/OpenMDAO/pull/1971)
+- Added `_setup_check()` hook that is called immediately after setup. [#1976](https://github.com/OpenMDAO/OpenMDAO/pull/1976)
+- User can now add expressions to ExecComp using "add_expr". [#1977](https://github.com/OpenMDAO/OpenMDAO/pull/1977)
+- Added argument to list_problem_vars to optionally return unscaled values. [#1980](https://github.com/OpenMDAO/OpenMDAO/pull/1980)
+- Added OpenMDAO-specific warnings. [#1982](https://github.com/OpenMDAO/OpenMDAO/pull/1982)
+- Added notebook utils for upcoming documentation built in Jupyter Book [#1984](https://github.com/OpenMDAO/OpenMDAO/pull/1984)
+- Reduced the size of the case database files by compressing JSON & BLOBs in case db, and create separate metadata db for parallel runs [#1989](https://github.com/OpenMDAO/OpenMDAO/pull/1989)
+- Decreased memory required for partial coloring by changing the way the sparsity matrix is computed. [#2000](https://github.com/OpenMDAO/OpenMDAO/pull/2000)
+- Added a change to get_val such that, when `from_src` is false, the data is obtained locally rather than from the source. [#2005](https://github.com/OpenMDAO/OpenMDAO/pull/2005)
+- Changed default behavior when computing src_indices between variables when one side is distributed. [#2013](https://github.com/OpenMDAO/OpenMDAO/pull/2013)
+
+
+## Bug Fixes:
+- Fixed a bug where the global_size was incorrect for a design variable that is specified with indices on an IVC output declared as a distributed component. [#1986](https://github.com/OpenMDAO/OpenMDAO/pull/1986)
+- Generate more informative error message if a src_indices containing slicing operators was incorrectly set. [#1988](https://github.com/OpenMDAO/OpenMDAO/pull/1988)
+- Fix to allow showing N2 diagrams in Jupyter notebook when the file path is absolute. [#1998](https://github.com/OpenMDAO/OpenMDAO/pull/1998)
+- Disable USE_PROC_FILES when MPI is used in a notebook. [#2001](https://github.com/OpenMDAO/OpenMDAO/pull/2001)
+- Fixed a bug so that order doesn't matter when promoting wildcards and aliased names on add_subsystem. [#2002](https://github.com/OpenMDAO/OpenMDAO/pull/2002)
+- Covered ipython imports for imports without [all] import [#2006](https://github.com/OpenMDAO/OpenMDAO/pull/2006)
+- Fixed bug in handling of response from github query when looking for plugins [#2010](https://github.com/OpenMDAO/OpenMDAO/pull/2010)
+- Fixed bug where the rel_err on a case was actually the abs_err. [#2012](https://github.com/OpenMDAO/OpenMDAO/pull/2012)
+- Fixed a bug with multidimensional inputs in DOE driver [#2016](https://github.com/OpenMDAO/OpenMDAO/pull/2016)
+- Fixed scaffold test warnings and a KrigingSurrogate test failure [#2018](https://github.com/OpenMDAO/OpenMDAO/pull/2018)
+
+## Miscellaneous:
+
+- Added support for sparse FD, setting of jacobian columns, and using sparse arrays in coloring algorithms. [#1967](https://github.com/OpenMDAO/OpenMDAO/pull/1967)
+- Moved CI to Github Actions. [#1974](https://github.com/OpenMDAO/OpenMDAO/pull/1974)
+- Updated warning logic for pull requests. [#1979](https://github.com/OpenMDAO/OpenMDAO/pull/1979)
+- Github CI now checks coverage. [#1995](https://github.com/OpenMDAO/OpenMDAO/pull/1995)
+- Added IPython to notebook and doc dependencies. [#2004](https://github.com/OpenMDAO/OpenMDAO/pull/2004)
+- Added CI testing without optional dependencies. [#2008](https://github.com/OpenMDAO/OpenMDAO/pull/2008)
+- Implemented a workaround for a github actions issue. [#2015](https://github.com/OpenMDAO/OpenMDAO/pull/2015)
+- Docs are now uploaded from github action instead of travis. [#2020](https://github.com/OpenMDAO/OpenMDAO/pull/2020)
+- Removed Travis CI badge from README [#2022](https://github.com/OpenMDAO/OpenMDAO/pull/2022)
+
+**********************************
 # Release Notes for OpenMDAO 3.8.0
 
 March 16, 2021
@@ -13,7 +87,7 @@ well formulated.
 
 ## Backwards Incompatible NON-API Changes:
 
-
+- None
 
 
 ## New Features:
