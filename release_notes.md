@@ -1,7 +1,7 @@
 **********************************
 # Release Notes for OpenMDAO 3.9.0
 
-April 27, 2021
+April 28, 2021
 
 OpenMDAO 3.9.0 features an API change to the serial/parallel implementation
 in OpenMDAO, a significant performance increase in approximated partials,
@@ -58,7 +58,7 @@ See the following sections for a complete list of changes.
 - Fixed bug in handling of response from github query when looking for plugins [#2010](https://github.com/OpenMDAO/OpenMDAO/pull/2010)
 - Fixed bug where the rel_err on a case was actually the abs_err. [#2012](https://github.com/OpenMDAO/OpenMDAO/pull/2012)
 - Fixed a bug with multidimensional inputs in DOE driver [#2016](https://github.com/OpenMDAO/OpenMDAO/pull/2016)
-- Fixed scaffold test warnings and a KriggingSurrogate test failure [#2018](https://github.com/OpenMDAO/OpenMDAO/pull/2018)
+- Fixed scaffold test warnings and a KrigingSurrogate test failure [#2018](https://github.com/OpenMDAO/OpenMDAO/pull/2018)
 
 ## Miscellaneous:
 
@@ -70,8 +70,7 @@ See the following sections for a complete list of changes.
 - Added CI testing without optional dependencies. [#2008](https://github.com/OpenMDAO/OpenMDAO/pull/2008)
 - Implemented a workaround for a github actions issue. [#2015](https://github.com/OpenMDAO/OpenMDAO/pull/2015)
 - Docs are now uploaded from github action instead of travis. [#2020](https://github.com/OpenMDAO/OpenMDAO/pull/2020)
-- Changed colon position in doc strings to update to Sphinx 3 format. [#2021](https://github.com/OpenMDAO/OpenMDAO/pull/2021)
-- Removeed Travis CI badge from README [#2022](https://github.com/OpenMDAO/OpenMDAO/pull/2022)
+- Removed Travis CI badge from README [#2022](https://github.com/OpenMDAO/OpenMDAO/pull/2022)
 
 **********************************
 # Release Notes for OpenMDAO 3.8.0
