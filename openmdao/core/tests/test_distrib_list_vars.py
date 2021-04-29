@@ -75,7 +75,8 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size=size), promotes=[('invec', 'y'), 'sum'])
+        prob.model.add_subsystem('summer', Summer(size=size), promotes_outputs=['sum'])
+        prob.model.promotes('summer', inputs=[('invec', 'y')], src_indices=om.slicer[:])
 
         prob.setup(force_alloc_complex=True)  # force complex array storage to detect mpi bug
 
@@ -420,7 +421,7 @@ class DistributedListVarsTest(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()
@@ -573,7 +574,7 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()

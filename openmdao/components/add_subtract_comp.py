@@ -100,7 +100,7 @@ class AddSubtractComp(ExplicitComponent):
 
         Parameters
         ----------
-        complex : Boolean
+        complex : boolean
             Set True to enable complex math (e.g. for complex step verification)
         """
         self.options.declare('complex', types=bool, default=False,

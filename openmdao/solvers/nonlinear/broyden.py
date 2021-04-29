@@ -9,7 +9,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, SetupWarning
 from openmdao.utils.mpi import MPI
 
 
@@ -238,7 +238,7 @@ class BroydenSolver(NonlinearSolver):
             msg = "The following states are not covered by a solver, and may have been " + \
                   "omitted from the BroydenSolver 'state_vars': "
             msg += ', '.join(sorted(missing))
-            simple_warning(msg)
+            issue_warning(msg, category=SetupWarning)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -547,9 +547,9 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             New inverse Jacobian.
         """
-        # TODO : Consider promoting this capability out into OpenMDAO so other solvers can use the
+        # TODO: Consider promoting this capability out into OpenMDAO so other solvers can use the
         # same code.
-        # TODO : Can do each state in parallel if procs are available.
+        # TODO: Can do each state in parallel if procs are available.
         system = self._system()
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']

@@ -123,7 +123,7 @@ class InterpAkima(InterpAlgorithm):
             interpolate here. Remaining elements are interpolated on sub tables.
         idx : integer
             Interval index for x.
-        slice_idx : List of <slice>
+        slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating
             tables.
 

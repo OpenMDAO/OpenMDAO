@@ -15,11 +15,12 @@ except ImportError:
 
 import openmdao
 from openmdao.core.problem import Problem
-from openmdao.core.notebook_utils import notebook, colab
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
+from openmdao.utils.notebook_utils import notebook, colab
+from openmdao.warnings import issue_warning
 
 
 def _val2str(val):
@@ -41,7 +42,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     Parameters
     ----------
-    root : system or Problem
+    root : System or Problem
         The root for the desired tree.
 
     outfile : str, optional
@@ -88,11 +89,15 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         all_vars[io] = chain(system._var_abs2meta[io].items(),
                              [(prefix + n, m) for n, m in system._var_discrete[io].items()])
 
+    if show_values and system._outputs is None:
+        issue_warning("Values will not be shown because final_setup has not been called yet.",
+                      prefix=system.msginfo)
+
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for t, meta in all_vars['input']:
             s = connections[t]
-            if show_values:
+            if show_values and system._outputs is not None:
                 if s.startswith('_auto_ivc.'):
                     val = system.get_val(t, flat=True, get_remote=True,
                                          from_src=False)

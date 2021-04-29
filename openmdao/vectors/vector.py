@@ -32,7 +32,7 @@ class Vector(object):
     _name : str
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
-        Type: 'input' for input vectors; 'output' for output/residual vectors.
+        Type : 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
@@ -49,7 +49,7 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
-    _alloc_complex : Bool
+    _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
@@ -442,18 +442,6 @@ class Vector(object):
             this vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type %s' %
-                                  type(self).__name__)
-
-    def scale(self, scale_to):
-        """
-        Scale this vector to normalized or physical form.
-
-        Parameters
-        ----------
-        scale_to : str
-            Values are "phys" or "norm" to scale to physical or normalized.
-        """
-        raise NotImplementedError('scale not defined for vector type %s' %
                                   type(self).__name__)
 
     def asarray(self, copy=False):

@@ -49,7 +49,7 @@ class MetaModelVisualization(object):
         Name of empty Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
-    is_structured_meta_model : Bool
+    is_structured_meta_model : bool
         Boolean used to signal whether the meta model is structured or unstructured
     slider_source : ColumnDataSource
         Data source containing dictionary of sliders

@@ -190,7 +190,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
     def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
                    desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an output variable to the component.
 
@@ -240,6 +240,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
         """
         super().add_output(name, val, shape=shape,
                            units=units, res_units=res_units,
@@ -248,7 +251,8 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                            ref0=ref0, res_ref=res_ref,
                            surrogate=surrogate, tags=tags,
                            shape_by_conn=shape_by_conn,
-                           copy_shape=copy_shape)
+                           copy_shape=copy_shape,
+                           distributed=distributed)
         self._training_output[name] = self._nfi * [np.empty(0)]
 
         # Add train:<outvar>_fi<n>

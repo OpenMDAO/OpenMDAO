@@ -99,11 +99,11 @@ class DistribStateImplicit(om.ImplicitComponent):
 
         Parameters
         ----------
-        d_outputs : Vector
+        d_outputs: Vector
             unscaled, dimensional quantities read via d_outputs[key]
-        d_residuals : Vector
+        d_residuals: Vector
             unscaled, dimensional quantities read via d_residuals[key]
-        mode : str
+        mode: str
             either 'fwd' or 'rev'
         """
         # Note: we are just preconditioning with Identity as a proof of concept.
@@ -272,11 +272,11 @@ class TestUserDefinedSolver(unittest.TestCase):
 
                 Parameters
                 ----------
-                d_outputs : Vector
+                d_outputs: Vector
                     unscaled, dimensional quantities read via d_outputs[key]
-                d_residuals : Vector
+                d_residuals: Vector
                     unscaled, dimensional quantities read via d_residuals[key]
-                mode : str
+                mode: str
                     either 'fwd' or 'rev'
                 """
                 # Note: we are just preconditioning with Identity as a proof of concept.

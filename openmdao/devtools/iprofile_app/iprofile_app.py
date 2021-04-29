@@ -133,7 +133,7 @@ else:
             # assemble our call_data nodes into a tree structure, where each
             # entry contains that node's call data and a dict containing each
             # child keyed by call path.
-            self.call_tree = tree = defaultdict(lambda : [None, {}])
+            self.call_tree = tree = defaultdict(lambda: [None, {}])
             for path, data in self.call_data.items():
                 data['id'] = path
                 parts = path.rsplit('|', 1)

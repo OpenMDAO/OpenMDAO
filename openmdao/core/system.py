@@ -19,7 +19,6 @@ import numpy as np
 import networkx as nx
 
 import openmdao
-from openmdao.core.notebook_utils import notebook, tabulate
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
@@ -34,11 +33,14 @@ from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
+    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
+from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
+    UnusedOptionWarning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    simple_warning, make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
+    make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
+from openmdao.utils.notebook_utils import notebook, tabulate
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -123,12 +125,12 @@ class System(object):
     All subclasses have their attributes defined here.
 
     In attribute names:
-        abs / abs_name : absolute, unpromoted variable name, seen from root (unique).
-        rel / rel_name : relative, unpromoted variable name, seen from current system (unique).
-        prom / prom_name : relative, promoted variable name, seen from current system (non-unique).
-        idx : global variable index among variables on all procs (I/O indices separate).
-        my_idx : index among variables in this system, on this processor (I/O indices separate).
-        io : indicates explicitly that input and output variables are combined in the same dict.
+        abs / abs_name: absolute, unpromoted variable name, seen from root (unique).
+        rel / rel_name: relative, unpromoted variable name, seen from current system (unique).
+        prom / prom_name: relative, promoted variable name, seen from current system (non-unique).
+        idx: global variable index among variables on all procs (I/O indices separate).
+        my_idx: index among variables in this system, on this processor (I/O indices separate).
+        io: indicates explicitly that input and output variables are combined in the same dict.
 
     Attributes
     ----------
@@ -215,11 +217,9 @@ class System(object):
         across multiple processes.
     _vars_to_gather : dict
         Contains names of non-distributed variables that are remote on at least one proc in the comm
-    _dist_var_locality : dict
-        Contains names of distrib vars mapped to the ranks in the comm where they are local.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
-        Dictionary containing all explicit & implicit connections owned by this system
-        or any descendant system. The data is the same across all processors.
+        Dictionary containing all explicit & implicit connections (continuous and discrete)
+        owned by this system or any descendant system. The data is the same across all processors.
     _vectors : {'input': dict, 'output': dict, 'residual': dict}
         Dictionaries of vectors keyed by vec_name.
     _inputs : <Vector>
@@ -278,7 +278,7 @@ class System(object):
     supports_multivecs : bool
         If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
         or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
-    matrix_free : Bool
+    matrix_free : bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian or any of its subsystems do.
     _relevant : dict
@@ -303,11 +303,15 @@ class System(object):
         True if this system has input scaling.
     _has_input_adder : bool
         True if this system has scaling that includes an adder term.
-    _has_bounds: bool
+    _has_bounds : bool
         True if this system has upper or lower bounds on outputs.
+    _has_distrib_vars : bool
+        If True, this System contains at least one distributed variable. Used to determine if a
+        parallel group or distributed component is below a DirectSolver so that we can raise an
+        exception.
     _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
-    _filtered_vars_to_record: Dict
+    _filtered_vars_to_record : Dict
         Dict of list of var names to record
     _vector_class : class
         Class to use for data vectors.  After setup will contain the value of either
@@ -398,7 +402,6 @@ class System(object):
         self._subsystems_allprocs = {}
         self._subsystems_myproc = []
         self._vars_to_gather = {}
-        self._dist_var_locality = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
@@ -477,9 +480,10 @@ class System(object):
         self._has_input_scaling = False
         self._has_input_adder = False
         self._has_bounds = False
+        self._has_distrib_vars = False
+        self._has_approx = False
 
         self._vector_class = None
-        self._has_approx = False
 
         self._assembled_jac = None
 
@@ -890,8 +894,10 @@ class System(object):
 
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
-                simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
-                               "coloring was set, so recurse was ignored." % self.pathname)
+                issue_warning('recurse was passed to use_fixed_coloring but a specific coloring '
+                              'was set, so recurse was ignored.',
+                              prefix=self.pathname,
+                              category=UnusedOptionWarning)
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
@@ -970,7 +976,7 @@ class System(object):
         options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
-        options['repeat'] = num_full_jacs
+        options['num_full_jacs'] = num_full_jacs
         options['tol'] = tol
         options['orders'] = orders
         options['perturb_size'] = perturb_size
@@ -1039,9 +1045,10 @@ class System(object):
                     break
             else:  # no approx derivs found
                 if not (self._owns_approx_of or self._owns_approx_wrt):
-                    simple_warning("%s: No approx partials found but coloring was requested.  "
-                                   "Declaring ALL partials as dense and approx (method='%s')" %
-                                   (self.msginfo, info['method']))
+                    issue_warning("No approx partials found but coloring was requested.  "
+                                  "Declaring ALL partials as dense and approx "
+                                  "(method='{}')".format(info['method']),
+                                  prefix=self.msginfo, category=DerivativesWarning)
                     try:
                         self.declare_partials('*', '*', method=info['method'])
                     except AttributeError:  # this system must be a group
@@ -1095,14 +1102,20 @@ class System(object):
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
 
-        # TODO: add some flag to allow user to toggle this behavior
-        if True:
-            # update jacobian subjac metadata to get rid of rows/cols
-            self._jacobian._remove_approx_sparsity()
-
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
+
+        # tell approx scheme to limit itself to only colored columns
+        approx_scheme._reset()
+        approx_scheme._during_sparsity_comp = True
+
+        self._update_wrt_matches(info)
+
+        save_jac = self._jacobian
+
+        # use special sparse jacobian to collect sparsity info
+        self._jacobian = _ColSparsityJac(self, info)
 
         for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
@@ -1118,26 +1131,27 @@ class System(object):
 
                 for scheme in self._approx_schemes.values():
                     scheme._reset()  # force a re-initialization of approx
+                    approx_scheme._during_sparsity_comp = True
 
             self.run_linearize()
-            self._jacobian._save_sparsity(self)
+
+        sparsity, sp_info = self._jacobian.get_sparsity()
+
+        self._jacobian = save_jac
+
+        # revert uncolored approx back to normal
+        approx_scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
 
-        self._update_wrt_matches(info)
-
-        ordered_of_info = list(self._jac_of_iter())
         ordered_wrt_info = list(self._jac_wrt_iter(info['wrt_matches']))
-        sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
-                                                             tol=info['tol'],
-                                                             orders=info['orders'])
+        ordered_of_info = list(self._jac_of_iter())
 
         sp_info['sparsity_time'] = sparsity_time
         sp_info['pathname'] = self.pathname
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        self._jacobian._jac_summ = None  # reclaim the memory
         if self.pathname:
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
@@ -1148,8 +1162,9 @@ class System(object):
         pct = coloring._solves_info()[-1]
         if info['min_improve_pct'] > pct:
             info['coloring'] = info['static'] = None
-            simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
-                           "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
+            msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less than min " \
+                  f"allowed ({info['min_improve_pct']:.1f}%)."
+            issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
             if not info['per_instance']:
                 coloring_mod._CLASS_COLORINGS[coloring_fname] = None
             return [None]
@@ -1921,11 +1936,9 @@ class System(object):
 
             Parameters
             ----------
-            io : str
-                Input/output variable
             matches : dict {'input': ..., 'output': ...}
                 Dict of promoted names and associated info.
-            match_type : IntEnum
+            match_type : intEnum
                 Indicates whether match is an explicit name, rename, or pattern match.
             name : str
                 Name of promoted variable that is specified multiple times.
@@ -1961,8 +1974,9 @@ class System(object):
                                        f"'{old_key}'.")
 
             if old_key != '*':
-                simple_warning(f"{self.msginfo}: {io} variable '{name}', promoted using "
-                               f"{new_using}, was already promoted using {old_using}.")
+                msg = f"{io} variable '{name}', promoted using {new_using}, " \
+                      f"was already promoted using {old_using}."
+                issue_warning(msg, prefix=self.msginfo, category=PromotionWarning)
 
             return match_type == _MatchType.PATTERN
 
@@ -3049,9 +3063,15 @@ class System(object):
                 meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
                 if src_name in abs2idx:
+                    indices = meta['indices']
                     meta = abs2meta_out[src_name]
                     out[name]['distributed'] = meta['distributed']
-                    out[name]['global_size'] = meta['global_size']
+                    if indices is not None:
+                        # Index defined in this response.
+                        out[name]['global_size'] = len(indices) if meta['distributed'] \
+                            else meta['global_size']
+                    else:
+                        out[name]['global_size'] = meta['global_size']
                 else:
                     out[name]['global_size'] = 0  # discrete var
 
@@ -4470,10 +4490,16 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            src_indices = None  # FIXME: remote var could have src_indices
+            if 'src_slice' in vmeta:
+                smeta = self._var_allprocs_abs2meta['output'][src]
+                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
+                                             smeta['shape'])
+            else:
+                src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
+        vdynshape = vmeta['shape_by_conn']
         has_src_indices = any(self._var_allprocs_abs2meta['input'][n]['has_src_indices']
                               for n in abs_ins)
 
@@ -4496,7 +4522,14 @@ class System(object):
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
                     vshape = shp
-        else:
+
+        if self.comm.size > 1 and get_remote:
+            if self.comm.rank == self._owning_rank[abs_name]:
+                self.comm.bcast(has_src_indices, root=self.comm.rank)
+            else:
+                has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
+
+        if name not in scope_sys._var_prom2inds:
             is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
             src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
@@ -4504,6 +4537,7 @@ class System(object):
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
+        dynshape = vdynshape or smeta['shape_by_conn']
         slocal = src in model_ref._var_abs2meta['output']
 
         if self.comm.size > 1:
@@ -4528,7 +4562,7 @@ class System(object):
                 if is_slice:
                     val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
-                elif distrib and (sdistrib or not slocal) and not get_remote:
+                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes[vec_name]['output'][:, var_idx]
@@ -4536,7 +4570,7 @@ class System(object):
                     end = start + sizes[self.comm.rank]
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
-                            src_indices = src_indices - np.min(src_indices)
+                            src_indices = src_indices - start
                         val = val.ravel()[src_indices]
                         fail = 0
                     else:

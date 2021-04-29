@@ -123,7 +123,7 @@ class Case(object):
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
-        self.rel_err = data['abs_err'] if 'rel_err' in data.keys() else None
+        self.rel_err = data['rel_err'] if 'rel_err' in data.keys() else None
 
         # rename solver keys
         if 'solver_inputs' in data.keys():

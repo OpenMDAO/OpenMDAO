@@ -360,7 +360,7 @@ class UIElement(object):
 
     Attributes
     ----------
-    items: list
+    items : list
         List of UI elements contained by this element.
     indent : int
         Number of spaces for indent.

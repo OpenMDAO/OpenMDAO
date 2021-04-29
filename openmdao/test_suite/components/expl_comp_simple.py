@@ -25,22 +25,6 @@ class TestExplCompSimpleDense(TestExplCompSimple):
         partials['area', 'width'] = inputs['length']
 
 
-class TestExplCompSimpleSpmtx(TestExplCompSimple):
-
-    def compute_partials(self, inputs, partials):
-        partials['area', 'length'] = scipy.sparse.csr_matrix(
-            (inputs['width'], (0, 0)))
-        partials['area', 'width'] = scipy.sparse.csr_matrix(
-            (inputs['length'], (0, 0)))
-
-
-class TestExplCompSimpleSparse(TestExplCompSimple):
-
-    def compute_partials(self, inputs, partials):
-        partials['area', 'length'] = (inputs['width'], 0, 0)
-        partials['area', 'width'] = (inputs['length'], 0, 0)
-
-
 class TestExplCompSimpleJacVec(TestExplCompSimple):
 
     def setup_partials(self):
@@ -55,7 +39,7 @@ class TestExplCompSimpleJacVec(TestExplCompSimple):
         if mode == 'fwd':
 
             # TODO: Assignment back into the results vector doesn't work with
-            # intermediate variables (seem commented out line).
+            # intermediate variables (see commented out line).
 
             if 'width' in d_inputs:
                 #d_area += d_inputs['width']*length

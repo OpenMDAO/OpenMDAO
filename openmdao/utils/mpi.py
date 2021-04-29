@@ -9,7 +9,8 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import warn_deprecation
+from openmdao.utils.notebook_utils import notebook
 
 
 def _redirect_streams(to_fd):
@@ -307,4 +308,5 @@ else:
 
 
 if os.environ.get('USE_PROC_FILES') or os.environ.get('PROC_FILES_DIR'):
-    use_proc_files()
+    if not notebook:
+        use_proc_files()

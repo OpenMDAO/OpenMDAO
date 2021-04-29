@@ -70,7 +70,7 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
 
     Parameters
     ----------
-    root : system or Problem
+    root : System or Problem
         The top level system or Problem.
 
     outfile : str, optional

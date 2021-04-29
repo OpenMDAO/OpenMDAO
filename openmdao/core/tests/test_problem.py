@@ -14,6 +14,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.utils.units import convert_units
+from openmdao.warnings import DerivativesWarning
 
 try:
     from parameterized import parameterized
@@ -1416,7 +1417,7 @@ class TestProblem(unittest.TestCase):
               "You chose 'fwd' for a problem with 99 design variables and 10 " \
               "response variables (objectives and nonlinear constraints)."
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(DerivativesWarning, msg):
             prob.final_setup()
 
     def test_setup_bad_mode_direction_rev(self):
@@ -1438,7 +1439,7 @@ class TestProblem(unittest.TestCase):
               "You chose 'rev' for a problem with 10 design variables and 20 " \
               "response variables (objectives and nonlinear constraints)."
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(DerivativesWarning, msg):
             prob.final_setup()
 
     def test_run_before_setup(self):

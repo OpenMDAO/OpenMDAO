@@ -16,7 +16,7 @@ import os.path
 from collections import OrderedDict
 
 from configparser import RawConfigParser as ConfigParser
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -65,7 +65,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other : Dict
+        other : dict
             the dict instance to be coerced
 
         Returns

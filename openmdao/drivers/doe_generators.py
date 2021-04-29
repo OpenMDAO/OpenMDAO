@@ -601,7 +601,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         """
         Initialize the LatinHypercubeGenerator.
 
-        See: https://pythonhosted.org/pyDOE/randomized.html
+        See : https://pythonhosted.org/pyDOE/randomized.html
 
         Parameters
         ----------

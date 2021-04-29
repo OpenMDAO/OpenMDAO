@@ -51,7 +51,7 @@ def package_iter(start_dir='.', dir_includes=None, dir_excludes=(), file_include
     """
     Iterate over python files in packages (recursively) starting in start_dir.
 
-    NOTE: all *_includes and *_excludes are applied to *local* directory and file names.
+    NOTE : all *_includes and *_excludes are applied to *local* directory and file names.
 
     Parameters
     ----------
@@ -91,7 +91,7 @@ def files_iter(start_dir='.', dir_includes=None, dir_excludes=(),
     """
     Iterate over files (recursively) starting in start_dir.
 
-    NOTE: all *_includes and *_excludes are applied to *local* directory and file names.
+    NOTE : all *_includes and *_excludes are applied to *local* directory and file names.
 
     Parameters
     ----------

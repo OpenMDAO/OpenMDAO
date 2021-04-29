@@ -3,7 +3,8 @@ RecordingManager class definition.
 """
 import time
 
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import warn_deprecation
 
 try:
     from openmdao.utils.mpi import MPI
@@ -21,7 +22,7 @@ class RecordingManager(object):
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
-    _has_serial_recorders: bool
+    _has_serial_recorders : bool
         True if any of the recorders managed by this object are serial recorders.
     """
 
@@ -181,7 +182,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        True/False : bool
+        True/False: bool
             True if RecordingManager is managing at least one recorder
         """
         return True if self._recorders else False

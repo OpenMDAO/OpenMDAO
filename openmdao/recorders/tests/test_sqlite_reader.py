@@ -33,6 +33,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_sc
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -46,7 +47,7 @@ def count_keys(d):
 
     Parameters
     ----------
-    d : nested OrderedDict
+    d: nested OrderedDict
         The dictionary of cases to be counted.
     """
     count = 0
@@ -2164,10 +2165,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        msg = ("Trying to record option 'options value to fail' which cannot be pickled on system "
-               "'subs' <class IndepVarComp>. Set 'recordable' to False. Skipping recording options for "
-               "this system.")
-        with assert_warning(UserWarning, msg):
+        msg = ("'subs' <class IndepVarComp>: Trying to record option 'options value to fail' which "
+               "cannot be pickled on this system. Set option 'recordable' to False. Skipping "
+               "recording options for this system.")
+        with assert_warning(om.CaseRecorderWarning, msg):
             prob.run_model()
 
         prob.cleanup()
@@ -2757,6 +2758,33 @@ class TestSqliteCaseReader(unittest.TestCase):
         for case in expected_cases:
             self.assertTrue(case in all_driver_cases)
 
+    def test_abs_rel_error(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', ImplCompTwoStates())
+
+        # mda solver
+        nl = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        nl.options['maxiter'] = 2
+        nl.recording_options['record_abs_error'] = True
+        nl.recording_options['record_rel_error'] = True
+        nl.recording_options['record_solver_residuals'] = True
+        nl.add_recorder(self.recorder)
+
+        prob.setup()
+        prob.set_val('comp.y', 8.0)
+        prob.set_val('comp.z', 5.0)
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(cr.list_cases()[-1])
+
+        norm =  nl._iter_get_norm()
+        norm0 = nl._norm0
+        self.assertEqual(case.abs_err, norm)
+        self.assertEqual(case.rel_err, norm/norm0)
+
     def test_linesearch(self):
         prob = om.Problem()
 
@@ -3021,7 +3049,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         msg = "The BaseCaseReader.system_metadata attribute is deprecated. " \
         "Use `list_model_options` instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             options = cr.system_metadata
 
     def test_system_options_attribute_deprecated(self):
@@ -3034,7 +3062,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = om.CaseReader(self.filename)
         msg = "The system_options attribute is deprecated. Use `list_model_options` instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             options = cr.system_options
 
     def test_sqlite_reader_problem_derivatives(self):
@@ -4033,9 +4061,9 @@ def _assert_model_matches_case(case, system):
 
     Parameters
     ----------
-    case : Case object
+    case: Case object
         Case to be used for the comparison.
-    system : System object
+    system: System object
         System to be used for the comparison.
     """
     case_inputs = case.inputs
@@ -4085,43 +4113,43 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
-            "        assembled_jac_type : dense",
-            "    Subsystem: p1",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: p2",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: comp",
-            "        distributed : False",
-            "    Subsystem: con",
-            "        distributed : False",
-            "        has_diag_partials : False",
-            "        units : None",
-            "        shape : None",
+            "    Subsystem : root",
+            "        assembled_jac_type: dense",
+            "    Subsystem : p1",
+            "        distributed: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : p2",
+            "        distributed: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : comp",
+            "        distributed: False",
+            "    Subsystem : con",
+            "        distributed: False",
+            "        has_diag_partials: False",
+            "        units: None",
+            "        shape: None",
             ""
         ]
 

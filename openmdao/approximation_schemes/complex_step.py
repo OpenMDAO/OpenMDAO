@@ -4,9 +4,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
-from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.coloring import Coloring
+from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
 
 class ComplexStep(ApproximationScheme):
@@ -61,9 +60,9 @@ class ComplexStep(ApproximationScheme):
 
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
-            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
-                           f"'{wrt}.")
-        self._wrt_meta[wrt] = options
+            self._wrt_meta[wrt].update(options)
+        else:
+            self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, wrt, meta):
@@ -88,7 +87,7 @@ class ComplexStep(ApproximationScheme):
         step *= 1j
         return step
 
-    def compute_approximations(self, system, jac, total=False):
+    def compute_approx_col_iter(self, system, total=False, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -96,10 +95,10 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : dict-like
-            Approximations are stored in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
+        under_cs : bool
+            True if we're currently under complex step at a higher level.
         """
         if not self._wrt_meta:
             return
@@ -110,15 +109,15 @@ class ComplexStep(ApproximationScheme):
             if not self._fd:
                 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
-                msg = "Nested complex step detected. Finite difference will be used for '%s'."
-                simple_warning(msg % system.pathname)
+                issue_warning("Nested complex step detected. Finite difference will be used.",
+                              prefix=system.pathname, category=DerivativesWarning)
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
                 for wrt in self._wrt_meta:
                     fd.add_approximation(wrt, system, empty)
 
-            self._fd.compute_approximations(system, jac, total=total)
+            yield from self._fd.compute_approx_col_iter(system, total=total)
             return
 
         saved_inputs = system._inputs._get_data().copy()
@@ -132,7 +131,7 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            self._compute_approximations(system, jac, total, under_cs=True)
+            yield from self._compute_approx_col_iter(system, total, under_cs=True)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)
@@ -147,7 +146,7 @@ class ComplexStep(ApproximationScheme):
 
         Parameters
         ----------
-        delta :  complex
+        delta : complex
             Complex number used to compute the multiplier.
 
         Returns

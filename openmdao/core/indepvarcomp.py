@@ -4,7 +4,8 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.general_utils import make_set, warn_deprecation, ensure_compatible
+from openmdao.utils.general_utils import make_set, ensure_compatible
+from openmdao.warnings import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -109,7 +110,7 @@ class IndepVarComp(ExplicitComponent):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+                   shape_by_conn=False, copy_shape=None, distributed=None):
         """
         Add an independent variable to this component.
 
@@ -147,6 +148,9 @@ class IndepVarComp(ExplicitComponent):
         copy_shape : str or None
             If a str, that str is the name of a variable. Shape this output to match that of
             the named variable.
+        distributed : bool
+            If True, this variable is a distributed variable, so it can have different sizes/values
+            across MPI processes.
         """
         if res_units is not None:
             warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
@@ -187,7 +191,7 @@ class IndepVarComp(ExplicitComponent):
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
-                  'copy_shape': copy_shape,
+                  'copy_shape': copy_shape, 'distributed': distributed,
                   }
         super().add_output(name, val, **kwargs)
 
@@ -267,17 +271,15 @@ class _AutoIndepVarComp(IndepVarComp):
                 all_remotes.update(remotes)
 
             if all_remotes:
-                self.options['distributed'] = True
+                self._has_distrib_vars = True
 
-            self._remotes = all_remotes
-            for name in all_remotes:
-                self._static_var_rel2meta[name]['distributed'] = True
+                self._remotes = all_remotes
+                for name in all_remotes:
+                    self._static_var_rel2meta[name]['distributed'] = True
 
         super()._set_vector_class()
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None):
+    def add_output(self, name, val=1.0, units=None):
         """
         Add an independent variable to this component.
 
@@ -289,34 +291,9 @@ class _AutoIndepVarComp(IndepVarComp):
             name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array.
-            Default is None.
         units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
-        res_units : None
-            This argument is deprecated because it was unused.
-        desc : str
-            description of the variable
-        lower : None
-            This argument is deprecated because it was unused.
-        upper : None
-            This argument is deprecated because it was unused.
-        ref : None
-            This argument is deprecated because it was unused.
-        ref0 : None
-            This argument is deprecated because it was unused.
-        res_ref : None
-            This argument is deprecated because it was unused.
-        tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_outputs.
-        shape_by_conn : bool
-            If True, shape this output to match its connected input(s).
-        copy_shape : str or None
-            If a str, that str is the name of a variable. Shape this output to match that of
-            the named variable.
         """
         # Add the output quickly.
         # We don't need to check for errors because we get the value straight from a

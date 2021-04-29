@@ -790,7 +790,7 @@ class MetaModelTestCase(unittest.TestCase):
               "The derivatives computed using the defaults are:\n" \
               "    trig.sin_x, trig.x\n"
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(om.DerivativesWarning, msg):
             prob = no_surrogate_test_setup(trig)
 
         J = prob.compute_totals(of=['trig.sin_x'], wrt=['indep.x'])
@@ -863,7 +863,7 @@ class MetaModelTestCase(unittest.TestCase):
               "The derivatives computed using the defaults are:\n" \
               "    trig.sin_x, trig.x2\n"
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(om.DerivativesWarning, msg):
             prob.run_model()
 
         self.assertEqual('fd', trig._subjacs_info[('trig.sin_x', 'trig.x1')]['method'])

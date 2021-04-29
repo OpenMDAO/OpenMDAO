@@ -9,8 +9,8 @@ from numpy import ndarray, imag, complex as npcomplex
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils import cs_safe
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -21,7 +21,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn'}
+_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
 
 
 def check_option(option, value):
@@ -614,8 +614,9 @@ class ExecComp(ExplicitComponent):
                 idx = len(self.pathname) + 1 if self.pathname else 0
                 undeclared = ', '.join([' wrt '.join((f"'{of[idx:]}'", f"'{wrt[idx:]}'"))
                                         for of, wrt in undeclared])
-                simple_warning(f"{self.msginfo}: The following partial derivatives have not been "
-                               f"declared so they are assumed to be zero: [{undeclared}].")
+                issue_warning(f"The following partial derivatives have not been "
+                              f"declared so they are assumed to be zero: [{undeclared}].",
+                              prefix=self.msginfo, category=DerivativesWarning)
 
     def compute(self, inputs, outputs):
         """

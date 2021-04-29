@@ -3,9 +3,8 @@ from collections import namedtuple, defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _full_slice
-from openmdao.utils.coloring import Coloring
-from openmdao.utils.general_utils import simple_warning
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -122,9 +121,9 @@ class FiniteDifference(ApproximationScheme):
         options['vector'] = vector
         wrt = abs_key[1]
         if wrt in self._wrt_meta:
-            simple_warning(f"{system.msginfo}: overriding previous approximation defined for "
-                           f"'{wrt}.")
-        self._wrt_meta[wrt] = options
+            self._wrt_meta[wrt].update(options)
+        else:
+            self._wrt_meta[wrt] = options
         self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, wrt, meta):
@@ -172,7 +171,7 @@ class FiniteDifference(ApproximationScheme):
 
         return deltas, coeffs, current_coeff
 
-    def compute_approximations(self, system, jac=None, total=False):
+    def compute_approx_col_iter(self, system, total=False, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -180,17 +179,13 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
         total : bool
             If True total derivatives are being approximated, else partials.
+        under_cs : bool
+            True if we're currently under complex step at a higher level.
         """
         if not self._wrt_meta:
             return
-
-        if jac is None:
-            jac = system._jacobian
 
         self._starting_outs = system._outputs.asarray(copy=True)
         self._starting_resids = system._residuals.asarray(copy=True)
@@ -200,7 +195,7 @@ class FiniteDifference(ApproximationScheme):
         else:
             self._results_tmp = self._starting_resids.copy()
 
-        self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
+        yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs)
 
         # reclaim some memory
         self._starting_ins = None
@@ -216,7 +211,7 @@ class FiniteDifference(ApproximationScheme):
 
         Parameters
         ----------
-        data :  tuple
+        data : tuple
             Not used.
 
         Returns

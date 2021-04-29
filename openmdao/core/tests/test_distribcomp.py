@@ -8,6 +8,7 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.warnings import DistributedComponentWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -325,11 +326,11 @@ class NOMPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        msg = "The 'distributed' option is set to True for Component C2, " \
+        msg = "'C2' <class DistribInputComp>: Component contains distributed variables, " \
               "but there is no distributed vector implementation (MPI/PETSc) " \
               "available. The default non-distributed vectors will be used."
 
-        with assert_warning(UserWarning, msg):
+        with assert_warning(DistributedComponentWarning, msg):
             p.setup()
 
         # Conclude setup but don't run model.
@@ -426,7 +427,7 @@ class MPITests(unittest.TestCase):
         model.add_subsystem("Cdist", DistribInputDistribOutputComp(arr_size=size))
         model.add_subsystem("Cserial", InOutArrayComp(arr_size=size))
         model.connect('indep.x', 'Cdist.invec')
-        model.connect('Cdist.outvec', 'Cserial.invec')
+        model.connect('Cdist.outvec', 'Cserial.invec', src_indices=om.slicer[:])
         p.setup()
         p.run_model()
         msg = "<model> <class Group>: Non-distributed variable 'Cserial.invec' has a distributed source, 'Cdist.outvec', so you must retrieve its value using 'get_remote=True'."
@@ -700,7 +701,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
                                                  y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
-        top.connect('C2.outvec', 'C3.x')
+        top.connect('C2.outvec', 'C3.x', src_indices=om.slicer[:])
         p.setup()
 
         # Conclude setup but don't run model.
@@ -817,7 +818,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
-        top.connect('C2.outvec', 'C3.invec')
+        top.connect('C2.outvec', 'C3.invec', om.slicer[:])
         p.setup()
 
         # Conclude setup but don't run model.
@@ -1048,7 +1049,9 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        # to copy the full distributed output C2.outvec into C3.invec on all procs, we need
+        # to specify src_indices=om.slicer[:]
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()

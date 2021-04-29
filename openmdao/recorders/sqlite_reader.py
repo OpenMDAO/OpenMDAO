@@ -10,17 +10,13 @@ import numpy as np
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
-from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
+from openmdao.warnings import issue_warning, CaseRecorderWarning
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
-from openmdao.core.notebook_utils import notebook, tabulate
-try:
-    from IPython.display import display, HTML
-except ImportError:
-    display = HTML = None
+from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
 
 import pickle
 import zlib
@@ -519,7 +515,7 @@ class SqliteCaseReader(BaseCaseReader):
         dct = {}
 
         if not self._system_options:
-            simple_warning("System options not recorded.")
+            issue_warning("System options not recorded.", category=CaseRecorderWarning)
             return dct
 
         if out_stream is _DEFAULT_OUT_STREAM:
@@ -547,7 +543,7 @@ class SqliteCaseReader(BaseCaseReader):
                         out_stream.write(f"Run Number: {num}\n")
                         num_header = num
 
-                    out_stream.write(f"    Subsystem: {name}\n")
+                    out_stream.write(f"    Subsystem : {name}\n")
 
                 dct[name] = {}
 
@@ -557,7 +553,7 @@ class SqliteCaseReader(BaseCaseReader):
                     dct[name][opt] = val
 
                     if out_stream:
-                        out_stream.write(f"        {opt} : {val}\n")
+                        out_stream.write(f"        {opt}: {val}\n")
 
         return dct
 
@@ -583,7 +579,7 @@ class SqliteCaseReader(BaseCaseReader):
         dct = {}
 
         if not self.solver_metadata:
-            simple_warning("Solver options not recorded.")
+            issue_warning("Solver options not recorded.", category=CaseRecorderWarning)
             return dct
 
         if out_stream is _DEFAULT_OUT_STREAM:
@@ -615,7 +611,7 @@ class SqliteCaseReader(BaseCaseReader):
                     dct[name][opt] = val
 
                     if out_stream:
-                        out_stream.write(f"        {opt} : {val}\n")
+                        out_stream.write(f"        {opt}: {val}\n")
 
         return dct
 
@@ -1192,8 +1188,9 @@ class CaseTable(object):
                 # check for situations where parsing the iter coord doesn't work correctly
                 iter_source = self._get_source(row[self._index_name])
                 if iter_source != source:
-                    simple_warning('Mismatched source for %d: %s = %s vs %s' %
-                                   (row['id'], row[self._index_name], iter_source, source))
+                    msg = f'Mismatched source for {row["id"]}: {row[self._index_name]} = ' \
+                          f'{iter_source} vs {source}'
+                    issue_warning(msg, category=CaseRecorderWarning)
             else:
                 source = self._get_source(row[self._index_name])
 

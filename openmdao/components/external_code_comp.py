@@ -121,7 +121,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        command : List
+        command : list
             Optional command. Otherwise use the command in self.options['command'].
         """
         comp = self._comp
@@ -180,7 +180,7 @@ class ExternalCodeDelegate(object):
 
         Parameters
         ----------
-        command : List
+        command : list
             List containing OS command string.
 
         Returns
@@ -247,7 +247,7 @@ class ExternalCodeComp(ExplicitComponent):
         Output stream external code writes to.
     stderr : str or file object
         Error stream external code writes to.
-    _external_code_runner: ExternalCodeDelegate object
+    _external_code_runner : ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
     return_code : int
         Exit status of the child process.
@@ -324,7 +324,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Output stream external code writes to.
     stderr : str or file object
         Error stream external code writes to.
-    _external_code_runner: ExternalCodeDelegate object
+    _external_code_runner : ExternalCodeDelegate object
         The delegate object that handles all the running of the external code for this object.
     return_code : int
         Exit status of the child process.

@@ -12,10 +12,11 @@ import time
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.general_utils import ContainsAll, simple_warning, _prom2ivc_src_dict
+from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI, check_mpi_env, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
+from openmdao.warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
 
 
@@ -72,7 +73,7 @@ class _TotalJacInfo(object):
     output_list : list of str
         List of names of output variables for this total jacobian.  In fwd mode, outputs
         are responses.  In rev mode, outputs are design variables.
-    output_vec : Dict of vectors keyed by vec_name.
+    output_vec : dict of vectors keyed by vec_name.
         Designated output vectors based on value of fwd.
     owning_ranks : dict
         Map of absolute var name to the MPI process that owns it.
@@ -252,7 +253,7 @@ class _TotalJacInfo(object):
                            "be turned off.\ncoloring design vars: %s, current design vars: "
                            "%s\ncoloring responses: %s, current responses: %s." %
                            (driver_wrt, wrt, driver_of, of))
-                    simple_warning(msg)
+                    issue_warning(msg, category=DerivativesWarning)
                     self.simul_coloring = None
 
             if not isinstance(self.simul_coloring, Coloring):
@@ -801,7 +802,7 @@ class _TotalJacInfo(object):
                 if name in abs2idx and name in slices and name not in self.remote_vois:
                     var_idx = abs2idx[name]
                     slc = slices[name]
-                    if MPI and meta['distributed'] and model.comm.size > 1 and self.get_remote:
+                    if MPI and meta['distributed'] and self.get_remote:
                         if indices is not None:
                             local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
@@ -1715,7 +1716,7 @@ class _TotalJacInfo(object):
             if raise_error:
                 raise RuntimeError(msg)
             else:
-                simple_warning(msg)
+                issue_warning(msg, category=DerivativesWarning)
 
         # Check for zero cols, which correspond to design vars that don't affect anything.
         for j in np.arange(ncols):
@@ -1734,7 +1735,7 @@ class _TotalJacInfo(object):
             if raise_error:
                 raise RuntimeError(msg)
             else:
-                simple_warning(msg)
+                issue_warning(msg, category=DerivativesWarning)
 
     def _restore_linear_solution(self, vec_names, key, mode):
         """
