@@ -873,19 +873,17 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model = self.setup_model(size=6)
         pdc = 'a'
         model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        #model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
         prob = om.Problem(model=model)
 
-        #import wingdbstub
+        import wingdbstub
 
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
         assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
-        #assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
 
