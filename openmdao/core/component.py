@@ -330,24 +330,24 @@ class Component(System):
             self._var_relevant_names['linear'] = nl_relnames
             self._var_allprocs_abs2idx['linear'] = nl_abs2idx
 
-            # Initialize size arrays for other linear vecs besides 'linear'
-            # (which is the same as 'nonlinear')
-            for vec_name in self._lin_rel_vec_name_list[1:]:
-                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
-                # all procs for a given component, so we don't have to mess with figuring out what
-                # vars are local.
-                relnames = self._var_allprocs_relevant_names[vec_name]
+            # # Initialize size arrays for other linear vecs besides 'linear'
+            # # (which is the same as 'nonlinear')
+            # for vec_name in self._lin_rel_vec_name_list[1:]:
+            #     # at component level, _var_allprocs_* is the same as var_* since all vars exist in
+            #     # all procs for a given component, so we don't have to mess with figuring out what
+            #     # vars are local.
+            #     relnames = self._var_allprocs_relevant_names[vec_name]
 
-                sizes[vec_name] = {}
-                for io in ('input', 'output'):
-                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
-                                                        dtype=INT_DTYPE)
-                    # Variables for this vec_name are a subset of those for nonlinear, so just
-                    # take columns of the nonlinear sizes array
-                    for idx, abs_name in enumerate(relnames[io]):
-                        sz[:, idx] = nl_sizes[io][:, nl_abs2idx[abs_name]]
+            #     sizes[vec_name] = {}
+            #     for io in ('input', 'output'):
+            #         sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
+            #                                             dtype=INT_DTYPE)
+            #         # Variables for this vec_name are a subset of those for nonlinear, so just
+            #         # take columns of the nonlinear sizes array
+            #         for idx, abs_name in enumerate(relnames[io]):
+            #             sz[:, idx] = nl_sizes[io][:, nl_abs2idx[abs_name]]
 
-                self._setup_var_index_maps(vec_name)
+            #     self._setup_var_index_maps(vec_name)
 
     def _setup_partials(self):
         """

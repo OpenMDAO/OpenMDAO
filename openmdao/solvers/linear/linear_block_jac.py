@@ -15,7 +15,7 @@ class LinearBlockJac(BlockLinearSolver):
         """
         system = self._system()
         mode = self._mode
-        vec_names = self._vec_names
+        vec_names = ['linear']
 
         subs = [s for s in system._subsystems_myproc
                 if self._rel_systems is None or s.pathname in self._rel_systems]

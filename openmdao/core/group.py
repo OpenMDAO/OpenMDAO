@@ -1328,18 +1328,18 @@ class Group(System):
 
         sizes = self._var_sizes
         nl_sizes = sizes['nonlinear']
-        for vec_name in vec_names:
-            sizes[vec_name] = {}
+        # for vec_name in vec_names:
+        #     sizes[vec_name] = {}
 
-            for io in ['input', 'output']:
-                sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[vec_name][io])),
-                                                    INT_DTYPE)
+        #     for io in ['input', 'output']:
+        #         sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[vec_name][io])),
+        #                                             INT_DTYPE)
 
-                # Compute _var_sizes based on 'nonlinear' var sizes
-                for idx, abs_name in enumerate(relnames[vec_name][io]):
-                    sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
+        #         # Compute _var_sizes based on 'nonlinear' var sizes
+        #         for idx, abs_name in enumerate(relnames[vec_name][io]):
+        #             sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
 
-            self._setup_var_index_maps(vec_name)
+        #     self._setup_var_index_maps(vec_name)
 
         if self.comm.size > 1:
             if (self._has_distrib_vars or self._contains_parallel_group or
@@ -2703,18 +2703,18 @@ class Group(System):
             jac = self._assembled_jac
 
         if jac is not None:
-            for vec_name in vec_names:
-                with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                    d_inputs, d_outputs, d_residuals = vecs
-                    jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+            # for vec_name in vec_names:
+            with self._matvec_context('linear', scope_out, scope_in, mode) as vecs:
+                d_inputs, d_outputs, d_residuals = vecs
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
         # Apply recursion
         else:
             if rel_systems is not None:
                 irrelevant_subs = [s for s in self._subsystems_myproc
                                    if s.pathname not in rel_systems]
             if mode == 'fwd':
-                for vec_name in vec_names:
-                    self._transfer(vec_name, mode)
+                # for vec_name in vec_names:
+                self._transfer('linear', mode)
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
@@ -2726,12 +2726,12 @@ class Group(System):
                                          scope_out, scope_in)
 
             if mode == 'rev':
-                for vec_name in vec_names:
-                    self._transfer(vec_name, mode)
-                    if rel_systems is not None:
-                        for s in irrelevant_subs:
-                            # zero out dvecs of irrelevant subsystems
-                            s._vectors['output']['linear'].set_val(0.0)
+                # for vec_name in vec_names:
+                self._transfer('linear', mode)
+                if rel_systems is not None:
+                    for s in irrelevant_subs:
+                        # zero out dvecs of irrelevant subsystems
+                        s._vectors['output']['linear'].set_val(0.0)
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -2749,32 +2749,30 @@ class Group(System):
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
-            for vec_name in vec_names:
-                if vec_name in self._rel_vec_names:
-                    d_outputs = self._vectors['output'][vec_name]
-                    d_residuals = self._vectors['residual'][vec_name]
+            # for vec_name in vec_names:
+            #     if vec_name in self._rel_vec_names:
+            d_outputs = self._vectors['output']['linear']
+            d_residuals = self._vectors['residual']['linear']
 
-                    if mode == 'fwd':
-                        if self._has_resid_scaling:
-                            with self._unscaled_context(outputs=[d_outputs],
-                                                        residuals=[d_residuals]):
-                                d_outputs.set_vec(d_residuals)
-                        else:
-                            d_outputs.set_vec(d_residuals)
+            if mode == 'fwd':
+                if self._has_resid_scaling:
+                    with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                        d_outputs.set_vec(d_residuals)
+                else:
+                    d_outputs.set_vec(d_residuals)
 
-                        # ExplicitComponent jacobian defined with -1 on diagonal.
-                        d_outputs *= -1.0
+                # ExplicitComponent jacobian defined with -1 on diagonal.
+                d_outputs *= -1.0
 
-                    else:  # rev
-                        if self._has_resid_scaling:
-                            with self._unscaled_context(outputs=[d_outputs],
-                                                        residuals=[d_residuals]):
-                                d_residuals.set_vec(d_outputs)
-                        else:
-                            d_residuals.set_vec(d_outputs)
+            else:  # rev
+                if self._has_resid_scaling:
+                    with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                        d_residuals.set_vec(d_outputs)
+                else:
+                    d_residuals.set_vec(d_outputs)
 
-                        # ExplicitComponent jacobian defined with -1 on diagonal.
-                        d_residuals *= -1.0
+                # ExplicitComponent jacobian defined with -1 on diagonal.
+                d_residuals *= -1.0
 
         else:
             vec_names = [v for v in vec_names if v in self._rel_vec_names]

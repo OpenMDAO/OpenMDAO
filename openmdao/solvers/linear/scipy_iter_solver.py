@@ -204,7 +204,7 @@ class ScipyKrylov(LinearSolver):
 
         fail = False
 
-        for vec_name in self._vec_names:
+        for vec_name in ['linear']:
 
             self._vec_name = vec_name
 
@@ -261,7 +261,7 @@ class ScipyKrylov(LinearSolver):
             The preconditioned Vector.
         """
         system = self._system()
-        vec_name = self._vec_name
+        vec_name = 'linear'
         mode = self._mode
 
         # Need to clear out any junk from the inputs.

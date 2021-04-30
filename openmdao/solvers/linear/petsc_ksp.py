@@ -356,7 +356,7 @@ class PETScKrylov(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        for vec_name in vec_names:
+        for vec_name in ['linear']:
 
             self._vec_name = vec_name
 

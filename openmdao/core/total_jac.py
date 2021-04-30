@@ -396,8 +396,8 @@ class _TotalJacInfo(object):
             abs2meta_out = self.model._var_allprocs_abs2meta['output']
             loc_abs = self.model._var_abs2meta['output']
             for vecname in model._lin_vec_names:
-                sizes = self.model._var_sizes[vecname]['output']
-                abs2idx = self.model._var_allprocs_abs2idx[vecname]
+                sizes = self.model._var_sizes['linear']['output']
+                abs2idx = self.model._var_allprocs_abs2idx['linear']
                 full_j_tgts = []
                 full_j_srcs = []
 
@@ -618,9 +618,9 @@ class _TotalJacInfo(object):
                 in_idxs = parallel_deriv_color = matmat = None
                 cache_lin_sol = False
 
-            in_var_idx = abs2idx[rhsname][name]
-            sizes = var_sizes[rhsname]['output']
-            offsets = var_offsets[rhsname]['output']
+            in_var_idx = abs2idx['linear'][name]
+            sizes = var_sizes['linear']['output']
+            offsets = var_offsets['linear']['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
 
@@ -781,10 +781,10 @@ class _TotalJacInfo(object):
         for vecname in model._lin_vec_names:
             inds = []
             jac_inds = []
-            sizes = model._var_sizes[vecname]['output']
-            ncols = model._vectors['output'][vecname]._ncol
-            slices = model._vectors['output'][vecname].get_slice_dict()
-            abs2idx = model._var_allprocs_abs2idx[vecname]
+            sizes = model._var_sizes['linear']['output']
+            ncols = model._vectors['output']['linear']._ncol
+            slices = model._vectors['output']['linear'].get_slice_dict()
+            abs2idx = model._var_allprocs_abs2idx['linear']
             jstart = jend = 0
 
             for name in names:
@@ -974,7 +974,7 @@ class _TotalJacInfo(object):
         """
         idxs = imeta['idx_list']
         for tup in zip(*idxs):
-            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, None
+            yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, imeta
 
     def matmat_iter(self, imeta, mode):
         """
@@ -1061,11 +1061,11 @@ class _TotalJacInfo(object):
         """
         vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
-        self._zero_vecs(vecname, mode)
+        self._zero_vecs('linear', mode)
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            self.input_vec[mode][vecname].set_val(self.seeds[mode][idx], loc_idx)
+            self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
             return rel_systems, (vecname,), (idx, mode)
@@ -1131,11 +1131,15 @@ class _TotalJacInfo(object):
         all_rel_systems = set()
         vec_names = set()
 
+        dist = self.comm.size > 1
+        rank = self.comm.rank
+
         for i in inds:
-            rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
-            _update_rel_systems(all_rel_systems, rel_systems)
-            if vnames is not None:
-                vec_names.add(vnames[0])
+            if not dist or self.in_loc_idxs[mode][i] >= 0:
+                rel_systems, vnames, _ = self.single_input_setter(i, imeta, mode)
+                _update_rel_systems(all_rel_systems, rel_systems)
+                if vnames is not None:
+                    vec_names.add(vnames[0])
 
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
@@ -1257,7 +1261,7 @@ class _TotalJacInfo(object):
         """
         vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        deriv_val = self.output_vec[mode][vecname].asarray()
+        deriv_val = self.output_vec[mode]['linear'].asarray()
         if not self.get_remote:
             loc_idx = self.loc_jac_idxs[mode][i]
             if loc_idx >= 0:
@@ -1309,7 +1313,7 @@ class _TotalJacInfo(object):
             scratch[:] = self.J[i]
             self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
-    def single_jac_setter(self, i, mode):
+    def single_jac_setter(self, i, mode, meta):
         """
         Set the appropriate part of the total jacobian for a single input index.
 
@@ -1319,12 +1323,14 @@ class _TotalJacInfo(object):
             Total jacobian row or column index.
         mode: str
             Direction of derivative solution.
+        meta : dict
+            Metadata dict.
         """
         self.simple_single_jac_scatter(i, mode)
         if self.comm.size > 1:
             self._jac_setter_dist(i, mode)
 
-    def par_deriv_jac_setter(self, inds, mode):
+    def par_deriv_jac_setter(self, inds, mode, meta):
         """
         Set the appropriate part of the total jacobian for multiple input indices.
 
@@ -1334,14 +1340,26 @@ class _TotalJacInfo(object):
             Total jacobian row or column indices.
         mode: str
             Direction of derivative solution.
+        meta : dict
+            Metadata dict.
         """
         dist = self.comm.size > 1
-        for i in inds:
+        if dist:
+            i = inds[self.comm.rank]
             self.simple_single_jac_scatter(i, mode)
-            if dist:
-                self._jac_setter_dist(i, mode)
+            if mode == 'rev':
+                raw = self.comm.allgather((i, self.J[i]))
+                for ind, row in raw:
+                    self.J[ind, :] = row
+            else:  # fwd
+                raw = self.comm.allgather((i, self.J[:, i]))
+                for ind, col in raw:
+                    self.J[:, ind] = col
+        else:
+            for i in inds:
+                self.simple_single_jac_scatter(i, mode)
 
-    def simul_coloring_jac_setter(self, inds, mode):
+    def simul_coloring_jac_setter(self, inds, mode, meta):
         """
         Set the appropriate part of the total jacobian for simul coloring input indices.
 
@@ -1351,6 +1369,8 @@ class _TotalJacInfo(object):
             Total jacobian row or column indices.
         mode: str
             Direction of derivative solution.
+        meta : dict
+            Metadata dict.
         """
         row_col_map = self.simul_coloring.get_row_col_map(mode)
         fwd = mode == 'fwd'
@@ -1381,7 +1401,7 @@ class _TotalJacInfo(object):
                 if dist:
                     self._jac_setter_dist(i, mode)
 
-    def matmat_jac_setter(self, inds, mode):
+    def matmat_jac_setter(self, inds, mode, meta):
         """
         Set the appropriate part of the total jacobian for matrix matrix input indices.
 
@@ -1391,6 +1411,8 @@ class _TotalJacInfo(object):
             Total jacobian row or column indices.
         mode: str
             Direction of derivative solution. (ignored)
+        meta : dict
+            Metadata dict.
         """
         # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
         # so any relevance can be determined only once.
@@ -1422,7 +1444,7 @@ class _TotalJacInfo(object):
             for i in inds:
                 self._jac_setter_dist(i, mode)
 
-    def par_deriv_matmat_jac_setter(self, inds, mode):
+    def par_deriv_matmat_jac_setter(self, inds, mode, meta):
         """
         Set the appropriate part of the total jacobian for par_deriv matrix matrix input indices.
 
@@ -1432,6 +1454,8 @@ class _TotalJacInfo(object):
             Total jacobian row or column indices.
         mode: str
             Direction of derivative solution. (ignored)
+        meta : dict
+            Metadata dict.
         """
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs, mode)
@@ -1458,10 +1482,10 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._lin_vec_names:
-            vec_dinput[vec_name].set_val(0.0)
-            vec_doutput[vec_name].set_val(0.0)
-            vec_dresid[vec_name].set_val(0.0)
+        # for vec_name in model._lin_vec_names:
+        vec_dinput['linear'].set_val(0.0)
+        vec_doutput['linear'].set_val(0.0)
+        vec_dresid['linear'].set_val(0.0)
 
         # Linearize Model
         ln_solver = model._linear_solver
@@ -1521,7 +1545,7 @@ class _TotalJacInfo(object):
                     if debug_print:
                         print(f'Elapsed Time: {time.time() - t0} secs\n', flush=True)
 
-                    jac_setter(inds, mode)
+                    jac_setter(inds, mode, imeta)
 
         # Driver scaling.
         if self.has_scaling:
@@ -1561,10 +1585,10 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        for vec_name in model._lin_vec_names:
-            model._vectors['input'][vec_name].set_val(0.0)
-            model._vectors['output'][vec_name].set_val(0.0)
-            model._vectors['residual'][vec_name].set_val(0.0)
+        # for vec_name in model._lin_vec_names:
+        model._vectors['input']['linear'].set_val(0.0)
+        model._vectors['output']['linear'].set_val(0.0)
+        model._vectors['residual']['linear'].set_val(0.0)
 
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.

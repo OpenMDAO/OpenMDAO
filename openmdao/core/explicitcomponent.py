@@ -321,7 +321,7 @@ class ExplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
-        for vec_name in vec_names:
+        for vec_name in ['linear']:
             if vec_name not in self._rel_vec_names:
                 continue
 
@@ -406,32 +406,32 @@ class ExplicitComponent(Component):
             Set of names of relevant systems based on the current linear solve.
 
         """
-        for vec_name in vec_names:
-            if vec_name in self._rel_vec_names:
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
+        # for vec_name in vec_names:
+        #     if vec_name in self._rel_vec_names:
+        d_outputs = self._vectors['output']['linear']
+        d_residuals = self._vectors['residual']['linear']
 
-                if mode == 'fwd':
-                    if self._has_resid_scaling:
-                        with self._unscaled_context(outputs=[d_outputs],
-                                                    residuals=[d_residuals]):
-                            d_outputs.set_vec(d_residuals)
-                    else:
-                        d_outputs.set_vec(d_residuals)
+        if mode == 'fwd':
+            if self._has_resid_scaling:
+                with self._unscaled_context(outputs=[d_outputs],
+                                            residuals=[d_residuals]):
+                    d_outputs.set_vec(d_residuals)
+            else:
+                d_outputs.set_vec(d_residuals)
 
-                    # ExplicitComponent jacobian defined with -1 on diagonal.
-                    d_outputs *= -1.0
+            # ExplicitComponent jacobian defined with -1 on diagonal.
+            d_outputs *= -1.0
 
-                else:  # rev
-                    if self._has_resid_scaling:
-                        with self._unscaled_context(outputs=[d_outputs],
-                                                    residuals=[d_residuals]):
-                            d_residuals.set_vec(d_outputs)
-                    else:
-                        d_residuals.set_vec(d_outputs)
+        else:  # rev
+            if self._has_resid_scaling:
+                with self._unscaled_context(outputs=[d_outputs],
+                                            residuals=[d_residuals]):
+                    d_residuals.set_vec(d_outputs)
+            else:
+                d_residuals.set_vec(d_outputs)
 
-                    # ExplicitComponent jacobian defined with -1 on diagonal.
-                    d_residuals *= -1.0
+            # ExplicitComponent jacobian defined with -1 on diagonal.
+            d_residuals *= -1.0
 
     def _compute_partials_wrapper(self):
         """

@@ -969,19 +969,19 @@ class BlockLinearSolver(LinearSolver):
     def _create_rhs_vecs(self):
         self._rhs_vecs = rhs = {}
         system = self._system()
-        for vec_name in system._lin_rel_vec_name_list:
-            if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
-            else:
-                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
+        # for vec_name in system._lin_rel_vec_name_list:
+        if self._mode == 'fwd':
+            rhs['linear'] = system._vectors['residual']['linear'].asarray(True)
+        else:
+            rhs['linear'] = system._vectors['output']['linear'].asarray(True)
 
     def _update_rhs_vecs(self):
         system = self._system()
-        for vec_name in system._lin_rel_vec_name_list:
-            if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name].asarray()
-            else:
-                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name].asarray()
+        # for vec_name in system._lin_rel_vec_name_list:
+        if self._mode == 'fwd':
+            self._rhs_vecs['linear'][:] = system._vectors['residual']['linear'].asarray()
+        else:
+            self._rhs_vecs['linear'][:] = system._vectors['output']['linear'].asarray()
 
     def _set_complex_step_mode(self, active):
         """
@@ -1040,7 +1040,7 @@ class BlockLinearSolver(LinearSolver):
             b_vecs = system._vectors['output']
 
         norm = 0
-        for vec_name in system._lin_rel_vec_name_list:
+        for vec_name in ['linear']:   # system._lin_rel_vec_name_list:
             b_vecs[vec_name] -= self._rhs_vecs[vec_name]
             norm += b_vecs[vec_name].get_norm()**2
 

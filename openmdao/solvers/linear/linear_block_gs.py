@@ -67,10 +67,10 @@ class LinearBlockGS(BlockLinearSolver):
                 d_vec = system._vectors['output']
             else:
                 d_vec = system._vectors['residual']
-            vec_names = self._vec_names
-            for vec_name in vec_names:
-                self._delta_d_n_1[vec_name] = d_vec[vec_name].asarray(copy=True)
-                self._theta_n_1[vec_name] = 1.0
+            # vec_names = self._vec_names
+            # for vec_name in vec_names:
+            self._delta_d_n_1['linear'] = d_vec['linear'].asarray(copy=True)
+            self._theta_n_1['linear'] = 1.0
 
         return super()._iter_initialize()
 
@@ -99,28 +99,28 @@ class LinearBlockGS(BlockLinearSolver):
             else:
                 d_out_vec = system._vectors['residual']
 
-            for vec_name in vec_names:
-                d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
-                delta_d_n[vec_name] = d_out_vec[vec_name].asarray(copy=True)
+            # for vec_name in vec_names:
+            d_n['linear'] = d_out_vec['linear'].asarray(copy=True)
+            delta_d_n['linear'] = d_out_vec['linear'].asarray(copy=True)
 
         if mode == 'fwd':
             for subsys, _ in system._subsystems_allprocs.values():
                 if self._rel_systems is not None and subsys.pathname not in self._rel_systems:
                     continue
-                for vec_name in vec_names:
-                    # must always do the transfer on all procs even if subsys not local
-                    system._transfer(vec_name, mode, subsys.name)
+                # for vec_name in vec_names:
+                # must always do the transfer on all procs even if subsys not local
+                system._transfer('linear', mode, subsys.name)
 
                 if not subsys._is_local:
                     continue
 
                 scope_out, scope_in = system._get_scope(subsys)
                 subsys._apply_linear(None, vec_names, self._rel_systems, mode, scope_out, scope_in)
-                for vec_name in vec_names:
-                    if vec_name in subsys._rel_vec_names:
-                        b_vec = system._vectors['residual'][vec_name]
-                        b_vec *= -1.0
-                        b_vec += self._rhs_vecs[vec_name]
+                # for vec_name in vec_names:
+                #     if vec_name in subsys._rel_vec_names:
+                b_vec = system._vectors['residual']['linear']
+                b_vec *= -1.0
+                b_vec += self._rhs_vecs['linear']
                 subsys._solve_linear(vec_names, mode, self._rel_systems)
 
         else:  # rev
@@ -133,24 +133,24 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 if subsys._is_local:
-                    for vec_name in vec_names:
-                        if vec_name in subsys._rel_vec_names:
-                            b_vec = system._vectors['output'][vec_name]
-                            b_vec.set_val(0.0)
-                            system._transfer(vec_name, mode, sname)
-                            b_vec *= -1.0
-                            b_vec += self._rhs_vecs[vec_name]
+                    # for vec_name in vec_names:
+                    #     if vec_name in subsys._rel_vec_names:
+                    b_vec = system._vectors['output']['linear']
+                    b_vec.set_val(0.0)
+                    system._transfer('linear', mode, sname)
+                    b_vec *= -1.0
+                    b_vec += self._rhs_vecs['linear']
 
                     subsys._solve_linear(vec_names, mode, self._rel_systems)
                     scope_out, scope_in = system._get_scope(subsys)
                     subsys._apply_linear(None, vec_names, self._rel_systems, mode,
                                          scope_out, scope_in)
                 else:   # subsys not local
-                    for vec_name in vec_names:
-                        system._transfer(vec_name, mode, sname)
+                    # for vec_name in vec_names:
+                    system._transfer('linear', mode, sname)
 
         if use_aitken:
-            for vec_name in vec_names:
+            for vec_name in ['linear']:
                 if self._mode == 'fwd':
                     d_resid_vec = system._vectors['residual'][vec_name]
                     d_out_vec = system._vectors['output'][vec_name]

@@ -656,7 +656,7 @@ class System(object):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        for vec_name in vec_names:
+        for vec_name in vec_names[:2]:
             sizes = self._var_sizes[vec_name]['output']
             ncol = 1
             if vec_name == 'nonlinear':
@@ -1761,7 +1761,7 @@ class System(object):
 
         vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
 
-        for vec_name in vec_names:
+        for vec_name in vec_names[:2]:
 
             # Only allocate complex in the vectors we need.
             vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
@@ -2281,7 +2281,7 @@ class System(object):
             offsets = self._var_offsets = {}
             vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
-            for vec_name in vec_names:
+            for vec_name in ['linear']:
                 offsets[vec_name] = off_vn = {}
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]

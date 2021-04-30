@@ -169,6 +169,8 @@ class TestParallelGroups(unittest.TestCase):
         model.add_constraint('par.C2.y', upper=0.0, parallel_deriv_color='parc')
 
         prob.model.linear_solver = om.LinearBlockGS()
+        
+        #import wingdbstub
 
         prob.setup(check=False, mode='rev')
         prob.set_solver_print(level=0)

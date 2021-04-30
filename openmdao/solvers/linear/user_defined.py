@@ -59,7 +59,7 @@ class LinearUserDefined(LinearSolver):
         if solve is None:
             solve = system.solve_linear
 
-        for vec_name in self._vec_names:
+        for vec_name in ['linear']:
             self._vec_name = vec_name
 
             d_outputs = system._vectors['output'][vec_name]

@@ -82,7 +82,7 @@ class PETScTransfer(DefaultTransfer):
         mypathlen = len(group.pathname) + 1 if group.pathname else 0
         allsubs = group._subsystems_allprocs
 
-        for vec_name in vec_names:
+        for vec_name in ['linear']:
             relvars, _ = group._relevant[vec_name]['@all']
 
             # Initialize empty lists for the transfer indices

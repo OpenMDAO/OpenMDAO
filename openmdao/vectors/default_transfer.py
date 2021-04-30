@@ -54,7 +54,7 @@ class DefaultTransfer(Transfer):
 
         mypathlen = len(group.pathname + '.' if group.pathname else '')
 
-        for vec_name in vec_names:
+        for vec_name in ['linear']:
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
             relvars_out = relvars['output']

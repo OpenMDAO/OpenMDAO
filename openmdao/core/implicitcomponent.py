@@ -195,59 +195,59 @@ class ImplicitComponent(Component):
         if jac is None:
             jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
-        for vec_name in vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        # for vec_name in vec_names:
+        #     if vec_name not in self._rel_vec_names:
+        #         continue
 
-            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+        with self._matvec_context('linear', scope_out, scope_in, mode) as vecs:
+            d_inputs, d_outputs, d_residuals = vecs
 
-                # Jacobian and vectors are all scaled, unitless
-                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+            # Jacobian and vectors are all scaled, unitless
+            jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because apply_linear does nothing.
-                if not self.matrix_free:
-                    continue
+            # if we're not matrix free, we can skip the bottom of
+            # this loop because apply_linear does nothing.
+            if not self.matrix_free:
+                return
 
-                # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(
-                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
+            # Jacobian and vectors are all unscaled, dimensional
+            with self._unscaled_context(
+                    outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
 
-                    # set appropriate vectors to read_only to help prevent user error
-                    if mode == 'fwd':
-                        d_inputs.read_only = d_outputs.read_only = True
-                    elif mode == 'rev':
-                        d_residuals.read_only = True
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_inputs.read_only = d_outputs.read_only = True
+                elif mode == 'rev':
+                    d_residuals.read_only = True
 
-                    try:
-                        if d_inputs._ncol > 1:
-                            if self.has_apply_multi_linear:
-                                with self._call_user_function('apply_multi_linear',
-                                                              protect_outputs=True):
-                                    self.apply_multi_linear(self._inputs, self._outputs,
-                                                            d_inputs, d_outputs, d_residuals, mode)
-                            else:
-                                with self._call_user_function('apply_linear',
-                                                              protect_outputs=True):
-                                    for i in range(d_inputs._ncol):
-                                        # need to make the multivecs look like regular single vecs
-                                        # since the component doesn't know about multivecs.
-                                        d_inputs._icol = i
-                                        d_outputs._icol = i
-                                        d_residuals._icol = i
-                                        self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                                   d_inputs, d_outputs, d_residuals,
-                                                                   mode)
-                                d_inputs._icol = None
-                                d_outputs._icol = None
-                                d_residuals._icol = None
+                try:
+                    if d_inputs._ncol > 1:
+                        if self.has_apply_multi_linear:
+                            with self._call_user_function('apply_multi_linear',
+                                                          protect_outputs=True):
+                                self.apply_multi_linear(self._inputs, self._outputs,
+                                                        d_inputs, d_outputs, d_residuals, mode)
                         else:
-                            with self._call_user_function('apply_linear', protect_outputs=True):
-                                self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                           d_inputs, d_outputs, d_residuals, mode)
-                    finally:
-                        d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
+                            with self._call_user_function('apply_linear',
+                                                          protect_outputs=True):
+                                for i in range(d_inputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_inputs._icol = i
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                               d_inputs, d_outputs, d_residuals,
+                                                               mode)
+                            d_inputs._icol = None
+                            d_outputs._icol = None
+                            d_residuals._icol = None
+                    else:
+                        with self._call_user_function('apply_linear', protect_outputs=True):
+                            self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                       d_inputs, d_outputs, d_residuals, mode)
+                finally:
+                    d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -267,40 +267,40 @@ class ImplicitComponent(Component):
 
         else:
             failed = False
-            for vec_name in vec_names:
-                if vec_name not in self._rel_vec_names:
-                    continue
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
+            # for vec_name in vec_names:
+            #     if vec_name not in self._rel_vec_names:
+            #         continue
+            d_outputs = self._vectors['output']['linear']
+            d_residuals = self._vectors['residual']['linear']
 
-                with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    # set appropriate vectors to read_only to help prevent user error
-                    if mode == 'fwd':
-                        d_residuals.read_only = True
-                    elif mode == 'rev':
-                        d_outputs.read_only = True
+            with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_residuals.read_only = True
+                elif mode == 'rev':
+                    d_outputs.read_only = True
 
-                    try:
-                        if d_outputs._ncol > 1:
-                            if self.has_solve_multi_linear:
-                                with self._call_user_function('solve_multi_linear'):
-                                    self.solve_multi_linear(d_outputs, d_residuals, mode)
-                            else:
-                                with self._call_user_function('solve_linear'):
-                                    for i in range(d_outputs._ncol):
-                                        # need to make the multivecs look like regular single vecs
-                                        # since the component doesn't know about multivecs.
-                                        d_outputs._icol = i
-                                        d_residuals._icol = i
-                                        self.solve_linear(d_outputs, d_residuals, mode)
-
-                                    d_outputs._icol = None
-                                    d_residuals._icol = None
+                try:
+                    if d_outputs._ncol > 1:
+                        if self.has_solve_multi_linear:
+                            with self._call_user_function('solve_multi_linear'):
+                                self.solve_multi_linear(d_outputs, d_residuals, mode)
                         else:
                             with self._call_user_function('solve_linear'):
-                                self.solve_linear(d_outputs, d_residuals, mode)
-                    finally:
-                        d_outputs.read_only = d_residuals.read_only = False
+                                for i in range(d_outputs._ncol):
+                                    # need to make the multivecs look like regular single vecs
+                                    # since the component doesn't know about multivecs.
+                                    d_outputs._icol = i
+                                    d_residuals._icol = i
+                                    self.solve_linear(d_outputs, d_residuals, mode)
+
+                                d_outputs._icol = None
+                                d_residuals._icol = None
+                    else:
+                        with self._call_user_function('solve_linear'):
+                            self.solve_linear(d_outputs, d_residuals, mode)
+                finally:
+                    d_outputs.read_only = d_residuals.read_only = False
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():
