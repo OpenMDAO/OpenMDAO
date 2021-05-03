@@ -405,24 +405,17 @@ class DirectSolver(LinearSolver):
 
         return inv_jac
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
             Names of systems relevant to the current solve.
         """
-        if len(vec_names) > 1 or vec_names[0] != 'linear':
-            raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
-
-        self._vec_names = vec_names
-
         system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size

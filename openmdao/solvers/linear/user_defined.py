@@ -34,7 +34,7 @@ class LinearUserDefined(LinearSolver):
 
         self.solve_function = solve_function
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().
 
@@ -42,14 +42,11 @@ class LinearUserDefined(LinearSolver):
 
         Parameters
         ----------
-        vec_names: list
-            list of vector names.
         mode: string
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
 
@@ -59,14 +56,11 @@ class LinearUserDefined(LinearSolver):
         if solve is None:
             solve = system.solve_linear
 
-        for vec_name in ['linear']:
-            self._vec_name = vec_name
+        d_outputs = system._vectors['output']['linear']
+        d_resids = system._vectors['residual']['linear']
 
-            d_outputs = system._vectors['output'][vec_name]
-            d_resids = system._vectors['residual'][vec_name]
+        self._iter_count = 0
 
-            self._iter_count = 0
-
-            # run custom solver
-            with system._unscaled_context(outputs=[d_outputs], residuals=[d_resids]):
-                solve(d_outputs, d_resids, mode)
+        # run custom solver
+        with system._unscaled_context(outputs=[d_outputs], residuals=[d_resids]):
+            solve(d_outputs, d_resids, mode)

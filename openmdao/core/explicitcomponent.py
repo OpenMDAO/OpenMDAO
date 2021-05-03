@@ -298,7 +298,7 @@ class ExplicitComponent(Component):
         else:
             self.compute_jacvec_product(*args)
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -306,8 +306,6 @@ class ExplicitComponent(Component):
         ----------
         jac: Jacobian or None
             If None, use local jacobian, else use jac.
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         mode: str
@@ -321,100 +319,74 @@ class ExplicitComponent(Component):
         """
         J = self._jacobian if jac is None else jac
 
-        for vec_name in ['linear']:
-            if vec_name not in self._rel_vec_names:
-                continue
+        with self._matvec_context(scope_out, scope_in, mode) as vecs:
+            d_inputs, d_outputs, d_residuals = vecs
 
-            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+            # Jacobian and vectors are all scaled, unitless
+            J._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # Jacobian and vectors are all scaled, unitless
-                J._apply(self, d_inputs, d_outputs, d_residuals, mode)
+            if not self.matrix_free:
+                # if we're not matrix free, we can skip the bottom of
+                # this loop because compute_jacvec_product does nothing.
+                return
 
-                if not self.matrix_free:
-                    # if we're not matrix free, we can skip the bottom of
-                    # this loop because compute_jacvec_product does nothing.
-                    continue
+            # Jacobian and vectors are all unscaled, dimensional
+            with self._unscaled_context(outputs=[self._outputs], residuals=[d_residuals]):
 
-                # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(
-                        outputs=[self._outputs], residuals=[d_residuals]):
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_inputs.read_only = True
+                else:  # rev
+                    d_residuals.read_only = True
 
-                    # set appropriate vectors to read_only to help prevent user error
-                    if mode == 'fwd':
-                        d_inputs.read_only = True
-                    else:  # rev
-                        d_residuals.read_only = True
+                try:
+                    # handle identity subjacs (output_or_resid wrt itself)
+                    if isinstance(J, DictionaryJacobian):
+                        rflat = self._vectors['residual']['linear']._abs_get_val
+                        oflat = self._vectors['output']['linear']._abs_get_val
+                        d_out_names = self._vectors['output']['linear']._names
 
-                    try:
-                        # handle identity subjacs (output_or_resid wrt itself)
-                        if isinstance(J, DictionaryJacobian):
-                            rflat = self._vectors['residual'][vec_name]._abs_get_val
-                            oflat = self._vectors['output'][vec_name]._abs_get_val
-                            d_out_names = self._vectors['output'][vec_name]._names
-                            vnames = self._var_relevant_names[vec_name]['output']
+                        # 'val' in the code below is a reference to the part of the
+                        # output or residual array corresponding to the variable 'v'
+                        if mode == 'fwd':
+                            for v in self._var_abs2meta['output']:
+                                if v in d_out_names and (v, v) not in self._subjacs_info:
+                                    val = rflat(v)
+                                    val -= oflat(v)
+                        else:  # rev
+                            for v in self._var_abs2meta['output']:
+                                if v in d_out_names and (v, v) not in self._subjacs_info:
+                                    val = oflat(v)
+                                    val -= rflat(v)
 
-                            # 'val' in the code below is a reference to the part of the
-                            # output or residual array corresponding to the variable 'v'
-                            if mode == 'fwd':
-                                for v in vnames:
-                                    if v in d_out_names and (v, v) not in self._subjacs_info:
-                                        val = rflat(v)
-                                        val -= oflat(v)
-                            else:  # rev
-                                for v in vnames:
-                                    if v in d_out_names and (v, v) not in self._subjacs_info:
-                                        val = oflat(v)
-                                        val -= rflat(v)
+                    args = [self._inputs, d_inputs, d_residuals, mode]
+                    if self._discrete_inputs:
+                        args.append(self._discrete_inputs)
 
-                        args = [self._inputs, d_inputs, d_residuals, mode]
-                        if self._discrete_inputs:
-                            args.append(self._discrete_inputs)
+                    # We used to negate the residual here, and then re-negate after the hook
+                    with self._call_user_function('compute_jacvec_product'):
+                        self._compute_jacvec_product_wrapper(*args)
+                finally:
+                    d_inputs.read_only = d_residuals.read_only = False
 
-                        # We used to negate the residual here, and then re-negate after the hook
-                        if d_inputs._ncol > 1:
-                            if self.supports_multivecs:
-                                with self._call_user_function('compute_multi_jacvec_product'):
-                                    self.compute_multi_jacvec_product(*args)
-                            else:
-                                for i in range(d_inputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_residuals._icol = i
-                                    with self._call_user_function('compute_jacvec_product'):
-                                        self._compute_jacvec_product_wrapper(*args)
-                                d_inputs._icol = None
-                                d_residuals._icol = None
-                        else:
-                            with self._call_user_function('compute_jacvec_product'):
-                                self._compute_jacvec_product_wrapper(*args)
-                    finally:
-                        d_inputs.read_only = d_residuals.read_only = False
-
-    def _solve_linear(self, vec_names, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
 
         """
-        # for vec_name in vec_names:
-        #     if vec_name in self._rel_vec_names:
         d_outputs = self._vectors['output']['linear']
         d_residuals = self._vectors['residual']['linear']
 
         if mode == 'fwd':
             if self._has_resid_scaling:
-                with self._unscaled_context(outputs=[d_outputs],
-                                            residuals=[d_residuals]):
+                with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     d_outputs.set_vec(d_residuals)
             else:
                 d_outputs.set_vec(d_residuals)
@@ -424,8 +396,7 @@ class ExplicitComponent(Component):
 
         else:  # rev
             if self._has_resid_scaling:
-                with self._unscaled_context(outputs=[d_outputs],
-                                            residuals=[d_residuals]):
+                with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                     d_residuals.set_vec(d_outputs)
             else:
                 d_residuals.set_vec(d_outputs)

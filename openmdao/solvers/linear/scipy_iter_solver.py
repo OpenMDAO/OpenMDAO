@@ -137,19 +137,18 @@ class ScipyKrylov(LinearSolver):
         ndarray
             the outgoing array after the product.
         """
-        vec_name = self._vec_name
         system = self._system()
 
         if self._mode == 'fwd':
-            x_vec = system._vectors['output'][vec_name]
-            b_vec = system._vectors['residual'][vec_name]
+            x_vec = system._vectors['output']['linear']
+            b_vec = system._vectors['residual']['linear']
         else:  # rev
-            x_vec = system._vectors['residual'][vec_name]
-            b_vec = system._vectors['output'][vec_name]
+            x_vec = system._vectors['residual']['linear']
+            b_vec = system._vectors['output']['linear']
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
                              scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
@@ -177,20 +176,17 @@ class ScipyKrylov(LinearSolver):
         self._mpi_print(self._iter_count, norm, norm / self._norm0)
         self._iter_count += 1
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
             Names of systems relevant to the current solve.
         """
-        self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
 
@@ -204,47 +200,43 @@ class ScipyKrylov(LinearSolver):
 
         fail = False
 
-        for vec_name in ['linear']:
+        if self._mode == 'fwd':
+            x_vec = system._vectors['output']['linear']
+            b_vec = system._vectors['residual']['linear']
+        else:  # rev
+            x_vec = system._vectors['residual']['linear']
+            b_vec = system._vectors['output']['linear']
 
-            self._vec_name = vec_name
+        x_vec_combined = x_vec.asarray()
+        size = x_vec_combined.size
+        linop = LinearOperator((size, size), dtype=float,
+                                matvec=self._mat_vec)
 
-            if self._mode == 'fwd':
-                x_vec = system._vectors['output'][vec_name]
-                b_vec = system._vectors['residual'][vec_name]
-            else:  # rev
-                x_vec = system._vectors['residual'][vec_name]
-                b_vec = system._vectors['output'][vec_name]
+        # Support a preconditioner
+        if self.precon:
+            M = LinearOperator((size, size),
+                                matvec=self._apply_precon,
+                                dtype=float)
+        else:
+            M = None
 
-            x_vec_combined = x_vec.asarray()
-            size = x_vec_combined.size
-            linop = LinearOperator((size, size), dtype=float,
-                                   matvec=self._mat_vec)
-
-            # Support a preconditioner
-            if self.precon:
-                M = LinearOperator((size, size),
-                                   matvec=self._apply_precon,
-                                   dtype=float)
+        self._iter_count = 0
+        if solver is gmres:
+            if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
+                x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
+                                    x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                    callback=self._monitor)
             else:
-                M = None
+                x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
+                                    x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                    callback=self._monitor)
+        else:
+            x, info = solver(linop, b_vec.asarray(True), M=M,
+                                x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                callback=self._monitor)
 
-            self._iter_count = 0
-            if solver is gmres:
-                if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                     x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                     callback=self._monitor)
-                else:
-                    x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                     x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
-                                     callback=self._monitor)
-            else:
-                x, info = solver(linop, b_vec.asarray(True), M=M,
-                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                 callback=self._monitor)
-
-            fail |= (info != 0)
-            x_vec.set_val(x)
+        fail |= (info != 0)
+        x_vec.set_val(x)
 
     def _apply_precon(self, in_vec):
         """
@@ -261,26 +253,25 @@ class ScipyKrylov(LinearSolver):
             The preconditioned Vector.
         """
         system = self._system()
-        vec_name = 'linear'
         mode = self._mode
 
         # Need to clear out any junk from the inputs.
-        system._vectors['input'][vec_name].set_val(0.0)
+        system._vectors['input']['linear'].set_val(0.0)
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
-            x_vec = system._vectors['output'][vec_name]
-            b_vec = system._vectors['residual'][vec_name]
+            x_vec = system._vectors['output']['linear']
+            b_vec = system._vectors['residual']['linear']
         else:  # rev
-            x_vec = system._vectors['residual'][vec_name]
-            b_vec = system._vectors['output'][vec_name]
+            x_vec = system._vectors['residual']['linear']
+            b_vec = system._vectors['output']['linear']
 
         # set value of b vector to KSP provided value
         b_vec.set_val(in_vec)
 
         # call the preconditioner
         self._solver_info.append_precon()
-        self.precon.solve([vec_name], mode)
+        self.precon.solve(mode)
         self._solver_info.pop()
 
         # return resulting value of x vector

@@ -52,9 +52,9 @@ class DictionaryJacobian(Jacobian):
         if entry not in self._iter_keys:
             subjacs = self._subjacs_info
             keys = []
-            for res_name in system._var_relevant_names[vec_name]['output']:
+            for res_name in system._var_abs2meta['output']:
                 for type_ in ('output', 'input'):
-                    for name in system._var_relevant_names[vec_name][type_]:
+                    for name in system._var_abs2meta[type_]:
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
@@ -94,7 +94,6 @@ class DictionaryJacobian(Jacobian):
         rflat = d_residuals._abs_get_val
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
-        ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
         is_explicit = isinstance(system, ExplicitComponent)
 
@@ -140,28 +139,14 @@ class DictionaryJacobian(Jacobian):
                             linds, rinds = rinds, linds
                         if self._under_complex_step:
                             # bincount only works with float, so split into parts
-                            if ncol > 1:
-                                for i in range(ncol):
-                                    prod = right_vec[:, i][rinds] * subjac
-                                    left_vec[:, i].real += np.bincount(linds, prod.real,
-                                                                       minlength=left_vec.shape[0])
-                                    left_vec[:, i].imag += np.bincount(linds, prod.imag,
-                                                                       minlength=left_vec.shape[0])
-                            else:
-                                prod = right_vec[rinds] * subjac
-                                left_vec[:].real += np.bincount(linds, prod.real,
-                                                                minlength=left_vec.size)
-                                left_vec[:].imag += np.bincount(linds, prod.imag,
-                                                                minlength=left_vec.size)
+                            prod = right_vec[rinds] * subjac
+                            left_vec[:].real += np.bincount(linds, prod.real,
+                                                            minlength=left_vec.size)
+                            left_vec[:].imag += np.bincount(linds, prod.imag,
+                                                            minlength=left_vec.size)
                         else:
-                            if ncol > 1:
-                                for i in range(ncol):
-                                    left_vec[:, i] += np.bincount(linds,
-                                                                  right_vec[:, i][rinds] * subjac,
-                                                                  minlength=left_vec.shape[0])
-                            else:
-                                left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
-                                                           minlength=left_vec.size)
+                            left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                                                       minlength=left_vec.size)
 
                     else:
                         if not fwd:

@@ -396,8 +396,8 @@ class _TotalJacInfo(object):
             abs2meta_out = self.model._var_allprocs_abs2meta['output']
             loc_abs = self.model._var_abs2meta['output']
             for vecname in model._lin_vec_names:
-                sizes = self.model._var_sizes['linear']['output']
-                abs2idx = self.model._var_allprocs_abs2idx['linear']
+                sizes = self.model._var_sizes['output']
+                abs2idx = self.model._var_allprocs_abs2idx
                 full_j_tgts = []
                 full_j_srcs = []
 
@@ -583,11 +583,10 @@ class _TotalJacInfo(object):
                     end += meta['size']
 
                 parallel_deriv_color = meta['parallel_deriv_color']
-                matmat = meta['vectorize_derivs']
                 cache_lin_sol = meta['cache_linear_solution']
 
-                _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring)
-                if matmat or parallel_deriv_color:
+                _check_voi_meta(name, parallel_deriv_color, simul_coloring)
+                if parallel_deriv_color:
                     rhsname = name
 
                     if parallel_deriv_color:
@@ -615,12 +614,12 @@ class _TotalJacInfo(object):
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']
                 irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
-                in_idxs = parallel_deriv_color = matmat = None
+                in_idxs = parallel_deriv_color = None
                 cache_lin_sol = False
 
-            in_var_idx = abs2idx['linear'][name]
-            sizes = var_sizes['linear']['output']
-            offsets = var_offsets['linear']['output']
+            in_var_idx = abs2idx[name]
+            sizes = var_sizes['output']
+            offsets = var_offsets['output']
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
 
@@ -668,31 +667,14 @@ class _TotalJacInfo(object):
             if parallel_deriv_color:
                 has_par_deriv_color = True
                 if parallel_deriv_color not in idx_iter_dict:
-                    if matmat:
-                        it = self.par_deriv_matmat_iter
-                    else:
-                        it = self.par_deriv_iter
+                    it = self.par_deriv_iter
                     imeta = defaultdict(bool)
                     imeta['par_deriv_color'] = parallel_deriv_color
-                    imeta['matmat'] = matmat
                     imeta['idx_list'] = [(start, end)]
                     idx_iter_dict[parallel_deriv_color] = (imeta, it)
                 else:
                     imeta, _ = idx_iter_dict[parallel_deriv_color]
-                    if imeta['matmat'] != matmat:
-                        raise RuntimeError('Mixing of vectorized and non-vectorized derivs in '
-                                           'the same parallel color group (%s) is not '
-                                           'supported.' % parallel_deriv_color)
                     imeta['idx_list'].append((start, end))
-            elif matmat:
-                if name not in idx_iter_dict:
-                    imeta = defaultdict(bool)
-                    imeta['matmat'] = matmat
-                    imeta['idx_list'] = [np.arange(start, end, dtype=INT_DTYPE)]
-                    idx_iter_dict[name] = (imeta, self.matmat_iter)
-                else:
-                    raise RuntimeError("Variable name '%s' matches a parallel_deriv_color "
-                                       "name." % name)
             elif not simul_coloring:  # plain old single index iteration
                 imeta = defaultdict(bool)
                 imeta['idx_list'] = np.arange(start, end, dtype=INT_DTYPE)
@@ -781,10 +763,9 @@ class _TotalJacInfo(object):
         for vecname in model._lin_vec_names:
             inds = []
             jac_inds = []
-            sizes = model._var_sizes['linear']['output']
-            ncols = model._vectors['output']['linear']._ncol
+            sizes = model._var_sizes['output']
             slices = model._vectors['output']['linear'].get_slice_dict()
-            abs2idx = model._var_allprocs_abs2idx['linear']
+            abs2idx = model._var_allprocs_abs2idx
             jstart = jend = 0
 
             for name in names:
@@ -807,8 +788,7 @@ class _TotalJacInfo(object):
                             local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                             dist_offset = np.sum(sizes_idx[:myproc])
-                            full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
-                                                  dtype=INT_DTYPE)
+                            full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
                             inds.append(full_inds[local_idx])
                             jac_inds.append(jstart + dist_offset +
                                             np.arange(len(local_idx), dtype=INT_DTYPE))
@@ -816,16 +796,14 @@ class _TotalJacInfo(object):
                                 name2jinds[name] = jac_inds[-1]
                         else:
                             dist_offset = np.sum(sizes[:myproc, var_idx])
-                            inds.append(np.arange(slc.start / ncols, slc.stop / ncols,
-                                                  dtype=INT_DTYPE))
+                            inds.append(np.arange(slc.start, slc.stop, dtype=INT_DTYPE))
                             jac_inds.append(np.arange(jstart + dist_offset,
                                             jstart + dist_offset + sizes[myproc, var_idx],
                                             dtype=INT_DTYPE))
                             if fwd or not self.get_remote:
                                 name2jinds[name] = jac_inds[-1]
                     else:
-                        idx_array = np.arange(slc.start // ncols, slc.stop // ncols,
-                                              dtype=INT_DTYPE)
+                        idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
                         if indices is not None:
                             idx_array = idx_array[indices]
                         inds.append(idx_array)
@@ -976,55 +954,6 @@ class _TotalJacInfo(object):
         for tup in zip(*idxs):
             yield tup, self.par_deriv_input_setter, self.par_deriv_jac_setter, imeta
 
-    def matmat_iter(self, imeta, mode):
-        """
-        Iterate over index lists for the matrix matrix case.
-
-        Parameters
-        ----------
-        imeta: dict
-            Dictionary of iteration metadata.
-        mode: str
-            Direction of derivative solution.
-
-        Yields
-        ------
-        list of int
-            Current indices.
-        method
-            Input setter method.
-        method
-            Jac setter method.
-        """
-        for idx_list in imeta['idx_list']:
-            yield idx_list, self.matmat_input_setter, self.matmat_jac_setter, None
-
-    def par_deriv_matmat_iter(self, imeta, mode):
-        """
-        Iterate over index lists for the combined parallel deriv matrix matrix case.
-
-        Parameters
-        ----------
-        imeta: dict
-            Dictionary of iteration metadata.
-        mode: str
-            Direction of derivative solution.
-
-        Yields
-        ------
-        list of ndarray of int
-            Current indices.
-        method
-            Input setter method.
-        method
-            Jac setter method.
-        """
-        # here, idxs is a list of arrays.  One array in the list for each parallel deriv
-        # variable, and the entries in each array are all of the indices corresponding
-        # to that variable's rows or columns in the total jacobian.
-        idxs = imeta['idx_list']
-        yield idxs, self.par_deriv_matmat_input_setter, self.par_deriv_matmat_jac_setter, None
-
     def _zero_vecs(self, vecname, mode):
         vecs = self.model._vectors
 
@@ -1143,105 +1072,6 @@ class _TotalJacInfo(object):
 
         if vec_names:
             return all_rel_systems, sorted(vec_names), (inds[0], mode)
-        else:
-            return all_rel_systems, None, None
-
-    def matmat_input_setter(self, inds, imeta, mode):
-        """
-        Set -1's into the input vector in the matrix-matrix case.
-
-        Parameters
-        ----------
-        inds: ndarray of int
-            Total jacobian row or column indices.
-        imeta: dict
-            Dictionary of iteration metadata.
-        mode: str
-            Direction of derivative solution.
-
-        Returns
-        -------
-        set
-            Set of relevant system names.
-        tuple of str or None
-            (vec_name,) or None if linear solve caching is inactive.
-        int or None
-            key used for storage of cached linear solve (if active, else None).
-        """
-        input_vec = self.input_vec[mode]
-        in_idx_map = self.in_idx_map[mode]
-        in_loc_idxs = self.in_loc_idxs[mode]
-
-        vec_name, rel_systems, cache_lin_sol = in_idx_map[inds[0]]
-
-        self._zero_vecs(vec_name, mode)
-
-        dinputs = input_vec[vec_name]
-
-        for col, i in enumerate(inds):
-            loc_idx = in_loc_idxs[i]
-            if loc_idx != -1:
-                # We apply a -1 here because the derivative of the output is minus the derivative
-                # of the residual in openmdao.
-                dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
-
-        if cache_lin_sol:
-            return rel_systems, (vec_name,), (inds[0], mode)
-        else:
-            return rel_systems, None, None
-
-    def par_deriv_matmat_input_setter(self, inds, imeta, mode):
-        """
-        Set -1's into the input vector in the matrix matrix with parallel deriv case.
-
-        Parameters
-        ----------
-        inds: list of ndarray of int
-            Total jacobian row or column indices.
-        imeta: dict
-            Dictionary of iteration metadata.
-        mode: str
-            Direction of derivative solution.
-
-        Returns
-        -------
-        set
-            Set of relevant system names.
-        list of str or None
-            vec_names or None if linear solve caching is inactive.
-        int or None
-            key used for storage of cached linear solve (if active, else None).
-        """
-        input_vec = self.input_vec[mode]
-        in_idx_map = self.in_idx_map[mode]
-        in_loc_idxs = self.in_loc_idxs[mode]
-
-        all_rel_systems = set()
-        cache = False
-
-        vec_names = set()
-        for matmat_idxs in inds:
-            vec_name, rel_systems, cache_lin_sol = in_idx_map[matmat_idxs[0]]
-            if cache_lin_sol:
-                vec_names.add(vec_name)
-            cache |= cache_lin_sol
-            _update_rel_systems(all_rel_systems, rel_systems)
-
-            self._zero_vecs(vec_name, mode)
-
-            dinputs = input_vec[vec_name]
-            ncol = dinputs._ncol
-
-            for col, i in enumerate(matmat_idxs):
-                loc_idx = in_loc_idxs[i]
-                if loc_idx != -1:
-                    if ncol > 1:
-                        dinputs.set_val(self.seeds[mode][i], (loc_idx, col))
-                    else:
-                        dinputs.set_val(self.seeds[mode][i], loc_idx)
-
-        if cache:
-            return all_rel_systems, sorted(vec_names), (inds[0][0], mode)
         else:
             return all_rel_systems, None, None
 
@@ -1379,9 +1209,6 @@ class _TotalJacInfo(object):
         J = self.J
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
 
-        # because simul_coloring cannot be used with vectorized derivs (matmat) or parallel
-        # deriv coloring, vecname will always be 'linear', and we don't need to check
-        # vecname for each index.
         deriv_val = self.output_vec[mode]['linear'].asarray()
         if self.jac_scratch is None:
             reduced_derivs = deriv_val[deriv_idxs['linear']]
@@ -1400,65 +1227,6 @@ class _TotalJacInfo(object):
                 J[i, row_col_map[i]] = reduced_derivs[row_col_map[i]]
                 if dist:
                     self._jac_setter_dist(i, mode)
-
-    def matmat_jac_setter(self, inds, mode, meta):
-        """
-        Set the appropriate part of the total jacobian for matrix matrix input indices.
-
-        Parameters
-        ----------
-        inds: ndarray of int
-            Total jacobian row or column indices.
-        mode: str
-            Direction of derivative solution. (ignored)
-        meta : dict
-            Metadata dict.
-        """
-        # in plain matmat, all inds are for a single variable for each iteration of the outer loop,
-        # so any relevance can be determined only once.
-        vecname, _, _ = self.in_idx_map[mode][inds[0]]
-        dist = self.comm.size > 1
-        fwd = mode == 'fwd'
-        J = self.J
-
-        deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        jac_inds = jac_idxs[vecname]
-        outvec = self.output_vec[mode][vecname].asarray()
-        ilen = len(inds)
-        if fwd:
-            for col, i in enumerate(inds):
-                if ilen > 1:
-                    colarr = outvec[:, col]
-                else:
-                    colarr = outvec
-                J[jac_inds, i] = colarr[deriv_idxs[vecname]]
-        else:  # rev
-            for col, i in enumerate(inds):
-                if ilen > 1:
-                    colarr = outvec[:, col]
-                else:
-                    colarr = outvec
-                J[i, jac_inds] = colarr[deriv_idxs[vecname]]
-
-        if dist:
-            for i in inds:
-                self._jac_setter_dist(i, mode)
-
-    def par_deriv_matmat_jac_setter(self, inds, mode, meta):
-        """
-        Set the appropriate part of the total jacobian for par_deriv matrix matrix input indices.
-
-        Parameters
-        ----------
-        inds: list of ndarray of int
-            Total jacobian row or column indices.
-        mode: str
-            Direction of derivative solution. (ignored)
-        meta : dict
-            Metadata dict.
-        """
-        for matmat_idxs in inds:
-            self.matmat_jac_setter(matmat_idxs, mode)
 
     def compute_totals(self):
         """
@@ -1534,13 +1302,7 @@ class _TotalJacInfo(object):
                             model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
                             self._save_linear_solution(vec_names, cache_key, self.mode)
                         else:
-                            if par_deriv and key in par_deriv:
-                                # parallel colored derivatives only need to solve
-                                # the vectors relevant to this color, not all of them
-                                vecnames_par_deriv = par_deriv[key].copy()
-                                model._solve_linear(vecnames_par_deriv, mode, rel_systems)
-                            else:
-                                model._solve_linear(model._lin_vec_names, mode, rel_systems)
+                            model._solve_linear(mode, rel_systems)
 
                     if debug_print:
                         print(f'Elapsed Time: {time.time() - t0} secs\n', flush=True)
@@ -1962,7 +1724,7 @@ def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, 
     return tot
 
 
-def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):
+def _check_voi_meta(name, parallel_deriv_color, simul_coloring):
     """
     Check the contents of the given metadata for incompatible options.
 
@@ -1974,17 +1736,12 @@ def _check_voi_meta(name, parallel_deriv_color, matmat, simul_coloring):
         Name of the variable.
     parallel_deriv_color: str
         Color of parallel deriv grouping.
-    matmat: bool
-        If True, vectorize derivatives for this variable.
     simul_coloring: ndarray
         Array of colors. Each entry corresponds to a column or row of the total jacobian.
     """
     if simul_coloring:
         if parallel_deriv_color:
             raise RuntimeError("Using both simul_coloring and parallel_deriv_color with "
-                               "variable '%s' is not supported." % name)
-        if matmat:
-            raise RuntimeError("Using both simul_coloring and vectorize_derivs with "
                                "variable '%s' is not supported." % name)
 
 
@@ -1999,14 +1756,12 @@ def _fix_pdc_lengths(idx_iter_dict):
     """
     for imeta, _ in idx_iter_dict.values():
         par_deriv_color = imeta['par_deriv_color']
-        matmat = imeta['matmat']
         range_list = imeta['idx_list']
         if par_deriv_color:
-            if not matmat:
-                lens = np.array([end - start for start, end in range_list])
-                maxlen = np.max(lens)
-                diffs = lens - maxlen
-            if not matmat and np.any(diffs):
+            lens = np.array([end - start for start, end in range_list])
+            maxlen = np.max(lens)
+            diffs = lens - maxlen
+            if np.any(diffs):
                 for i, diff in enumerate(diffs):
                     start, end = range_list[i]
                     if diff < 0:

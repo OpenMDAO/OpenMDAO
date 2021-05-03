@@ -292,7 +292,7 @@ class TestJacobian(unittest.TestCase):
 
         # fwd apply_linear test
         d_outputs.set_val(1.0)
-        prob.model.run_apply_linear(['linear'], 'fwd')
+        prob.model.run_apply_linear('fwd')
         d_residuals.set_val(d_residuals.asarray() - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
@@ -300,7 +300,7 @@ class TestJacobian(unittest.TestCase):
         d_outputs.set_val(0.0)
         d_residuals.set_val(check_vec)
 
-        prob.model.run_solve_linear(['linear'], 'fwd')
+        prob.model.run_solve_linear('fwd')
 
         d_outputs -= work
         self.assertAlmostEqual(d_outputs.get_norm(), 0, delta=1e-6)
@@ -312,14 +312,14 @@ class TestJacobian(unittest.TestCase):
 
         # rev apply_linear test
         d_residuals.set_val(1.0)
-        prob.model.run_apply_linear(['linear'], 'rev')
+        prob.model.run_apply_linear('rev')
         d_outputs.set_val(d_outputs.asarray() - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
         d_residuals.set_val(0.0)
         d_outputs.set_val(check_vec)
-        prob.model.run_solve_linear(['linear'], 'rev')
+        prob.model.run_solve_linear('rev')
         d_residuals -= work
         self.assertAlmostEqual(d_residuals.get_norm(), 0, delta=1e-6)
 
@@ -992,19 +992,19 @@ class TestJacobian(unittest.TestCase):
         wrts = [f'comp.x{i}' for i in range(len(comp.wrtsizes))]
         p.check_partials(out_stream=None, show_only_incorrect=True)
         p.model.comp._jacobian.set_col(p.model.comp, 5, comp.sparsity[:, 5] * 99)
-        
+
         # check dy0/dx2 (3x3)
         subinfo = comp._subjacs_info['comp.y0', 'comp.x2']
         arr = np.zeros(subinfo['shape'])
         arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
         assert_near_equal(arr[:, 0], comp.sparsity[0:3, 5] * 99)
-        
+
         # check dy1/dx2 (5x3)
         subinfo = comp._subjacs_info['comp.y1', 'comp.x2']
         arr = np.zeros(subinfo['shape'])
         arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
         assert_near_equal(arr[:, 0], comp.sparsity[3:8, 5] * 99)
-        
+
         # check dy2/dx2 (2x3)
         subinfo = comp._subjacs_info['comp.y2', 'comp.x2']
         arr = np.zeros(subinfo['shape'])

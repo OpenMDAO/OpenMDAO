@@ -383,35 +383,6 @@ class TestParallelListStates(unittest.TestCase):
         self.assertEqual(sorted(p.model._list_states_allprocs()), ['par.C1.x', 'par.C2.x', 'par.C4.x'])
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MatMatParDevTestCase(unittest.TestCase):
-    N_PROCS = 2
-
-    def test_size_1_matmat(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(2)))
-        indeps.add_output('y', 1.0)
-        par = p.model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('C1', om.ExecComp('y=2*x', x=np.zeros(2), y=np.zeros(2)))
-        par.add_subsystem('C2', om.ExecComp('y=3*x'))
-        p.model.connect("indeps.x", "par.C1.x")
-        p.model.connect("indeps.y", "par.C2.x")
-        p.model.add_design_var('indeps.x', vectorize_derivs=True, parallel_deriv_color='foo')
-        p.model.add_design_var('indeps.y', vectorize_derivs=True, parallel_deriv_color='foo')
-        par.add_objective('C2.y')
-        par.add_constraint('C1.y', lower=0.0)
-        p.setup(mode='fwd')
-
-        p.run_model()
-
-        # prior to bug fix, this would raise an exception
-        J = p.compute_totals()
-        np.testing.assert_array_equal(J['par.C1.y', 'indeps.x'], np.eye(2)*2.)
-        np.testing.assert_array_equal(J['par.C2.y', 'indeps.x'], np.zeros((1,2)))
-        np.testing.assert_array_equal(J['par.C1.y', 'indeps.y'], np.zeros((2,1)))
-        np.testing.assert_array_equal(J['par.C2.y', 'indeps.y'], np.array([[3.]]))
-
-
 class ExComp(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('num_nodes', types=int)

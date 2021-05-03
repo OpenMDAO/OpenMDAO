@@ -156,13 +156,13 @@ class TestLinearSystemComp(unittest.TestCase):
 
         # Forward mode with RHS of self.b
         d_residuals['lin.x'] = b
-        lingrp.run_solve_linear(['linear'], 'fwd')
+        lingrp.run_solve_linear('fwd')
         sol = d_outputs['lin.x']
         assert_near_equal(sol, x, .0001)
 
         # Reverse mode with RHS of self.b_T
         d_outputs['lin.x'] = b_T
-        lingrp.run_solve_linear(['linear'], 'rev')
+        lingrp.run_solve_linear('rev')
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
@@ -219,13 +219,13 @@ class TestLinearSystemComp(unittest.TestCase):
 
         # Forward mode with RHS of self.b
         d_residuals['lin.x'] = b
-        lingrp.run_solve_linear(['linear'], 'fwd')
+        lingrp.run_solve_linear('fwd')
         sol = d_outputs['lin.x']
         assert_near_equal(sol, x, .0001)
 
         # Reverse mode with RHS of self.b_T
         d_outputs['lin.x'] = b_T
-        lingrp.run_solve_linear(['linear'], 'rev')
+        lingrp.run_solve_linear('rev')
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 
@@ -291,13 +291,13 @@ class TestLinearSystemComp(unittest.TestCase):
 
         # Forward mode with RHS of self.b
         d_residuals['lin.x'] = b
-        lingrp.run_solve_linear(['linear'], 'fwd')
+        lingrp.run_solve_linear('fwd')
         sol = d_outputs['lin.x']
         assert_near_equal(sol, x, .0001)
 
         # Reverse mode with RHS of self.b_T
         d_outputs['lin.x'] = b_T
-        lingrp.run_solve_linear(['linear'], 'rev')
+        lingrp.run_solve_linear('rev')
         sol = d_residuals['lin.x']
         assert_near_equal(sol, x, .0001)
 

@@ -576,7 +576,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_full_model_fd(self):
 
         class DontCall(om.LinearRunOnce):
-            def solve(self, vec_names, mode, rel_systems=None):
+            def solve(self, mode, rel_systems=None):
                 raise RuntimeError("This solver should be ignored!")
 
         class Simple(om.ExplicitComponent):

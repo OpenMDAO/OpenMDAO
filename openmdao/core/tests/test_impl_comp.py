@@ -1093,7 +1093,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_linear(['linear'], 'fwd')
+            prob.model.run_apply_linear('fwd')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
@@ -1113,7 +1113,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_linear(['linear'], 'fwd')
+            prob.model.run_apply_linear('fwd')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
@@ -1133,7 +1133,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_linear(['linear'], 'fwd')
+            prob.model.run_apply_linear('fwd')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'a' in input vector "
@@ -1153,7 +1153,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_linear(['linear'], 'fwd')
+            prob.model.run_apply_linear('fwd')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
@@ -1173,7 +1173,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_apply_linear(['linear'], 'rev')
+            prob.model.run_apply_linear('rev')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'x' in residual vector "
@@ -1192,7 +1192,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         prob.run_model()
 
         with self.assertRaises(om.AnalysisError):
-            prob.model.run_apply_linear(['linear'], 'rev')
+            prob.model.run_apply_linear('rev')
 
         # verify read_only status is reset after AnalysisError
         prob['bad.a'] = 111.
@@ -1213,7 +1213,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_solve_linear(['linear'], 'rev')
+            prob.model.run_solve_linear('rev')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'x' in output vector "
@@ -1233,7 +1233,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
         # check input vector
         with self.assertRaises(ValueError) as cm:
-            prob.model.run_solve_linear(['linear'], 'fwd')
+            prob.model.run_solve_linear('fwd')
 
         self.assertEqual(str(cm.exception),
                          "'bad' <class BadComp>: Attempt to set value of 'x' in residual vector "
@@ -1252,7 +1252,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         prob.model.run_linearize()
 
         with self.assertRaises(om.AnalysisError):
-            prob.model.run_solve_linear(['linear'], 'fwd')
+            prob.model.run_solve_linear('fwd')
 
         # verify read_only status is reset after AnalysisError
         prob.model.bad._vectors['residual']['linear']['x'] = 111.

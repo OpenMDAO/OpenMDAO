@@ -158,8 +158,8 @@ class Group(System):
     _conn_discrete_in2out: {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit discrete var connections owned
         by this system only. The data is the same across all processors.
-    _transfers: dict of dict of dict of Transfers
-        First key is the vec_name, second key is mode, third is subname where
+    _transfers: dict of dict of Transfers
+        First key iis mode, second is subname where
         mode is 'fwd' or 'rev' and subname is the subsystem name
         or subname can be None for the full, simultaneous transfer.
     _discrete_transfers: dict of discrete transfer metadata
@@ -361,7 +361,7 @@ class Group(System):
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
-                    if abs_out not in excl_sub._var_allprocs_abs2idx['linear']:
+                    if abs_out not in excl_sub._var_allprocs_abs2idx:
                         scope_in.add(abs_in)
             scope_in = frozenset(scope_in)
 
@@ -759,7 +759,7 @@ class Group(System):
 
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         if self.comm.size > 1:
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            abs2idx = self._var_allprocs_abs2idx
             all_abs2meta = self._var_allprocs_abs2meta
             all_abs2meta_in = all_abs2meta['input']
             conns = self._conn_global_abs_in2out
@@ -1298,18 +1298,11 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
 
-        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
-        nl_relnames = self._var_relevant_names['nonlinear']
-
         all_abs2meta = self._var_allprocs_abs2meta
         iproc = self.comm.rank
         for io in ('input', 'output'):
-            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
-            nl_relnames[io] = list(self._var_abs2meta[io])
-
-            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
-                                                                len(all_abs2meta[io])),
-                                                                dtype=INT_DTYPE)
+            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(all_abs2meta[io])),
+                                                   dtype=INT_DTYPE)
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 if name in abs2meta:
@@ -1319,32 +1312,12 @@ class Group(System):
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        self._setup_var_index_maps('nonlinear')
-        self._var_allprocs_abs2meta['linear'] = self._var_allprocs_abs2idx['nonlinear']
-
-        relnames = self._var_allprocs_relevant_names
-        vec_names = self._lin_rel_vec_name_list[1:] if self._use_derivatives else []
-        abs2idx = self._var_allprocs_abs2idx['nonlinear']
-
-        sizes = self._var_sizes
-        nl_sizes = sizes['nonlinear']
-        # for vec_name in vec_names:
-        #     sizes[vec_name] = {}
-
-        #     for io in ['input', 'output']:
-        #         sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[vec_name][io])),
-        #                                             INT_DTYPE)
-
-        #         # Compute _var_sizes based on 'nonlinear' var sizes
-        #         for idx, abs_name in enumerate(relnames[vec_name][io]):
-        #             sz[:, idx] = nl_sizes[io][:, abs2idx[abs_name]]
-
-        #     self._setup_var_index_maps(vec_name)
+        self._setup_var_index_maps()
 
         if self.comm.size > 1:
             if (self._has_distrib_vars or self._contains_parallel_group or
-                not np.all(self._var_sizes['nonlinear']['output']) or
-               not np.all(self._var_sizes['nonlinear']['input'])):
+                not np.all(self._var_sizes['output']) or
+               not np.all(self._var_sizes['input'])):
 
                 if self._distributed_vector_class is not None:
                     self._vector_class = self._distributed_vector_class
@@ -1354,13 +1327,6 @@ class Group(System):
         else:
             self._vector_class = self._local_vector_class
 
-        if self._use_derivatives:
-            self._var_sizes['linear'] = self._var_sizes['nonlinear']
-            self._var_allprocs_relevant_names['linear'] = \
-                self._var_allprocs_relevant_names['nonlinear']
-            self._var_relevant_names['linear'] = self._var_relevant_names['nonlinear']
-            self._var_allprocs_abs2idx['linear'] = self._var_allprocs_abs2idx['nonlinear']
-
         self._compute_owning_ranks()
 
     def _compute_owning_ranks(self):
@@ -1369,10 +1335,10 @@ class Group(System):
 
         if self.comm.size > 1:
             owns = self._owning_rank
-            self._owned_sizes = self._var_sizes['nonlinear']['output'].copy()
-            abs2idx = self._var_allprocs_abs2idx['nonlinear']
+            self._owned_sizes = self._var_sizes['output'].copy()
+            abs2idx = self._var_allprocs_abs2idx
             for io in ('input', 'output'):
-                sizes = self._var_sizes['nonlinear'][io]
+                sizes = self._var_sizes[io]
                 for name, meta in abs2meta[io].items():
                     i = abs2idx[name]
                     for rank in range(self.comm.size):
@@ -1393,7 +1359,7 @@ class Group(System):
                                 owns[n] = rank
                         remote.update(all_set - names)
         else:
-            self._owned_sizes = self._var_sizes['nonlinear']['output']
+            self._owned_sizes = self._var_sizes['output']
 
     def _setup_global_connections(self, conns=None):
         """
@@ -1826,8 +1792,8 @@ class Group(System):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
-        sizes_out = self._var_sizes['nonlinear']['output']
-        out_idxs = self._var_allprocs_abs2idx['nonlinear']
+        sizes_out = self._var_sizes['output']
+        out_idxs = self._var_allprocs_abs2idx
 
         nproc = self.comm.size
 
@@ -2135,7 +2101,7 @@ class Group(System):
             If None, perform a full transfer.
             If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
-        xfer = self._transfers[vec_name][mode]
+        xfer = self._transfers[mode]
         if sub in xfer:
             xfer = xfer[sub]
         else:
@@ -2674,7 +2640,7 @@ class Group(System):
         """
         pass
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -2682,8 +2648,6 @@ class Group(System):
         ----------
         jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         mode: str
@@ -2695,16 +2659,13 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        vec_names = [v for v in vec_names if v in self._rel_vec_names]
-
         if self._owns_approx_jac:
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
 
         if jac is not None:
-            # for vec_name in vec_names:
-            with self._matvec_context('linear', scope_out, scope_in, mode) as vecs:
+            with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
         # Apply recursion
@@ -2713,7 +2674,6 @@ class Group(System):
                 irrelevant_subs = [s for s in self._subsystems_myproc
                                    if s.pathname not in rel_systems]
             if mode == 'fwd':
-                # for vec_name in vec_names:
                 self._transfer('linear', mode)
                 if rel_systems is not None:
                     for s in irrelevant_subs:
@@ -2722,25 +2682,21 @@ class Group(System):
 
             for subsys in self._subsystems_myproc:
                 if rel_systems is None or subsys.pathname in rel_systems:
-                    subsys._apply_linear(jac, vec_names, rel_systems, mode,
-                                         scope_out, scope_in)
+                    subsys._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
             if mode == 'rev':
-                # for vec_name in vec_names:
                 self._transfer('linear', mode)
                 if rel_systems is not None:
                     for s in irrelevant_subs:
                         # zero out dvecs of irrelevant subsystems
                         s._vectors['output']['linear'].set_val(0.0)
 
-    def _solve_linear(self, vec_names, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
@@ -2749,8 +2705,6 @@ class Group(System):
         if self._owns_approx_jac:
             # No subsolves if we are approximating our jacobian. Instead, we behave like an
             # ExplicitComponent and pass on the values in the derivatives vectors.
-            # for vec_name in vec_names:
-            #     if vec_name in self._rel_vec_names:
             d_outputs = self._vectors['output']['linear']
             d_residuals = self._vectors['residual']['linear']
 
@@ -2775,8 +2729,7 @@ class Group(System):
                 d_residuals *= -1.0
 
         else:
-            vec_names = [v for v in vec_names if v in self._rel_vec_names]
-            self._linear_solver.solve(vec_names, mode, rel_systems)
+            self._linear_solver.solve(mode, rel_systems)
 
     def _linearize(self, jac, sub_do_ln=True):
         """

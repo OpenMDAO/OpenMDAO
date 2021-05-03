@@ -539,8 +539,8 @@ class Problem(object):
                                 model._outputs.set_var(src, value, None, flat)
                             else:
                                 if tmeta['distributed']:
-                                    ssizes = model._var_sizes['nonlinear']['output']
-                                    sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                    ssizes = model._var_sizes['output']
+                                    sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
                                     start = np.sum(ssizes[:myrank, sidx])
                                     end = start + ssize
@@ -729,7 +729,7 @@ class Problem(object):
         data = rvec.asarray()
         data *= -1.
 
-        self.model.run_solve_linear(['linear'], mode)
+        self.model.run_solve_linear(mode)
 
         if mode == 'fwd':
             return {n: lvec[n].copy() for n in lnames}
@@ -1198,7 +1198,7 @@ class Problem(object):
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(None, ['linear'], _contains_all, mode)
+                                comp._apply_linear(None, _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)

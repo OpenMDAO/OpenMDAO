@@ -77,7 +77,7 @@ class Vector(object):
     # Listing of relevant citations that should be referenced when
     cite = ""
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
 
@@ -93,13 +93,10 @@ class Vector(object):
             Pointer to the vector owned by the root system.
         alloc_complex: bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
-        ncol: int
-            Number of columns for multi-vectors.
         """
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._ncol = ncol
         self._icol = None
         self._len = 0
 

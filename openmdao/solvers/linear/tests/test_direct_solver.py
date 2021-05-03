@@ -127,7 +127,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_val(0.0)
         g1._linearize(g1._assembled_jac)
         g1.linear_solver._linearize()
-        g1.run_solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
@@ -138,7 +138,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
-        g1.run_solve_linear(['linear'], 'rev')
+        g1.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)

@@ -220,14 +220,14 @@ class AssembledJacobian(Jacobian):
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
 
         iproc = system.comm.rank
-        sizes = system._var_sizes['linear']['input']
-        abs2idx = system._var_allprocs_abs2idx['linear']
+        sizes = system._var_sizes['input']
+        abs2idx = system._var_allprocs_abs2idx
         in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
                      system._var_abs2meta['input'] if n not in conns}
 
         subjacs_info = self._subjacs_info
 
-        sizes = system._var_sizes['linear']['output']
+        sizes = system._var_sizes['output']
         for s in system.system_iter(recurse=True, include_self=True, typ=Component):
             for res_abs_name, res_meta in s._var_abs2meta['output'].items():
                 res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])

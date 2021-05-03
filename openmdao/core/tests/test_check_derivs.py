@@ -9,7 +9,6 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
-from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec

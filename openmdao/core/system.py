@@ -202,7 +202,7 @@ class System(object):
     _var_allprocs_abs2idx: dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_sizes: {<vecname>: {'input': ndarray, 'output': ndarray}, ...}
+    _var_sizes: {'input': ndarray, 'output': ndarray}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
@@ -627,11 +627,7 @@ class System(object):
                                           'output': OrderedDict(),
                                           'residual': OrderedDict()}
 
-        relevant = self._relevant
-        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
-        vectorized_vois = self._problem_meta['vectorized_vois']
         force_alloc_complex = self._problem_meta['force_alloc_complex']
-        abs2idx = self._var_allprocs_abs2idx
 
         # Check for complex step to set vectors up appropriately.
         # If any subsystem needs complex step, then we need to allocate it everywhere.
@@ -656,27 +652,17 @@ class System(object):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        for vec_name in vec_names[:2]:
-            sizes = self._var_sizes[vec_name]['output']
+        for vec_name in ('nonlinear', 'linear'):
+            sizes = self._var_sizes['output']
             ncol = 1
             if vec_name == 'nonlinear':
                 alloc_complex = nl_alloc_complex
             else:
                 alloc_complex = ln_alloc_complex
 
-                if vec_name != 'linear':
-                    if vec_name in vectorized_vois:
-                        voi = vectorized_vois[vec_name]
-                        if 'size' in voi:
-                            ncol = voi['size']
-                        else:
-                            owner = self._owning_rank[vec_name]
-                            ncol = sizes[owner, abs2idx[vec_name][vec_name]]
-
             for key in ['input', 'output', 'residual']:
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
-                                                                 alloc_complex=alloc_complex,
-                                                                 ncol=ncol)
+                                                                 alloc_complex=alloc_complex)
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -788,13 +774,6 @@ class System(object):
         self._setup_dynamic_shapes()
 
         self._top_level_post_connections(mode)
-
-        # Now that connections are setup, we need to convert relevant vector names into their
-        # auto_ivc source where applicable.
-        conns = self._conn_global_abs_in2out
-        new_names = [conns[v] if v in conns else v for v in self._vec_names]
-        self._problem_meta['vec_names'] = new_names
-        self._problem_meta['lin_vec_names'] = new_names[1:]
 
         self._setup_relevance(mode)
         self._setup_var_sizes()
@@ -1444,12 +1423,10 @@ class System(object):
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
-        self._var_sizes = {'nonlinear': {}}
+        self._var_sizes = {}
         self._owned_sizes = None
-        self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
-        self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
-    def _setup_var_index_maps(self, vec_name):
+    def _setup_var_index_maps(self):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
 
@@ -1458,9 +1435,9 @@ class System(object):
         vec_name: str
             Name of vector.
         """
-        abs2idx = self._var_allprocs_abs2idx[vec_name] = {}
+        abs2idx = self._var_allprocs_abs2idx = {}
         for io in ['input', 'output']:
-            for i, abs_name in enumerate(self._var_allprocs_relevant_names[vec_name][io]):
+            for i, abs_name in enumerate(self._var_allprocs_abs2meta[io]):
                 abs2idx[abs_name] = i
 
     def _setup_global_shapes(self):
@@ -1471,7 +1448,7 @@ class System(object):
 
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
-            sizes = self._var_sizes['nonlinear'][io]
+            sizes = self._var_sizes[io]
             for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 local_shape = mymeta['shape']
                 if mymeta['distributed']:
@@ -1595,10 +1572,7 @@ class System(object):
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
             return self.get_relevant_vars(desvars, responses, mode)
         else:
-            relevant = defaultdict(dict)
-            relevant['nonlinear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                              ContainsAll())}
-            return relevant
+            return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
     def _setup_driver_units(self):
         """
@@ -1707,21 +1681,6 @@ class System(object):
         else:
             self._relevant = relevant
 
-        self._rel_vec_name_list = ['nonlinear', 'linear']
-        for vec_name in self._vec_names[2:]:
-            rel, relsys = relevant[vec_name]['@all']
-            if self.pathname in relsys:
-                self._rel_vec_name_list.append(vec_name)
-            for io in ('input', 'output'):
-                relio = rel[io]
-                self._var_allprocs_relevant_names[vec_name][io].extend(
-                    v for v in self._var_allprocs_abs2meta[io] if v in relio)
-                self._var_relevant_names[vec_name][io].extend(
-                    v for v in self._var_abs2meta[io] if v in relio)
-
-        self._rel_vec_names = frozenset(self._rel_vec_name_list)
-        self._lin_rel_vec_name_list = self._rel_vec_name_list[1:]
-
         for s in self._subsystems_myproc:
             s._setup_relevance(mode, relevant)
 
@@ -1759,9 +1718,7 @@ class System(object):
 
         vector_class = self._vector_class
 
-        vec_names = self._rel_vec_name_list if self._use_derivatives else self._vec_names
-
-        for vec_name in vec_names[:2]:
+        for vec_name in ('nonlinear', 'linear'):
 
             # Only allocate complex in the vectors we need.
             vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
@@ -1769,8 +1726,7 @@ class System(object):
             for kind in ['input', 'output', 'residual']:
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec,
-                    alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
+                    vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -2130,7 +2086,7 @@ class System(object):
                     vec.scale_to_phys()
 
     @contextmanager
-    def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
+    def _matvec_context(self, scope_out, scope_in, mode, clear=True):
         """
         Context manager for vectors.
 
@@ -2140,8 +2096,6 @@ class System(object):
 
         Parameters
         ----------
-        vec_name: str
-            Name of the vector to use.
         scope_out: frozenset or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
@@ -2162,9 +2116,9 @@ class System(object):
             with variables relevant to the current matrix vector product.
 
         """
-        d_inputs = self._vectors['input'][vec_name]
-        d_outputs = self._vectors['output'][vec_name]
-        d_residuals = self._vectors['residual'][vec_name]
+        d_inputs = self._vectors['input']['linear']
+        d_outputs = self._vectors['output']['linear']
+        d_residuals = self._vectors['residual']['linear']
 
         if clear:
             if mode == 'fwd':
@@ -2243,30 +2197,22 @@ class System(object):
 
         return self._inputs, self._outputs, self._residuals
 
-    def get_linear_vectors(self, vec_name='linear'):
+    def get_linear_vectors(self):
         """
         Return the linear inputs, outputs, and residuals vectors.
-
-        Parameters
-        ----------
-        vec_name: str
-            Name of the linear right-hand-side vector. The default is 'linear'.
 
         Returns
         -------
         (inputs, outputs, residuals): tuple of <Vector> instances
-            Yields the inputs, outputs, and residuals linear vectors for vec_name.
+            Yields the linear inputs, outputs, and residuals vectors.
         """
         if self._inputs is None:
             raise RuntimeError("{}: Cannot get vectors because setup has not yet been "
                                "called.".format(self.msginfo))
 
-        if vec_name not in self._vectors['input']:
-            raise ValueError("%s: There is no linear vector named %s" % (self.msginfo, vec_name))
-
-        return (self._vectors['input'][vec_name],
-                self._vectors['output'][vec_name],
-                self._vectors['residual'][vec_name])
+        return (self._vectors['input']['linear'],
+                self._vectors['output']['linear'],
+                self._vectors['residual']['linear'])
 
     def _get_var_offsets(self):
         """
@@ -2279,22 +2225,15 @@ class System(object):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
-
-            for vec_name in ['linear']:
-                offsets[vec_name] = off_vn = {}
-                for type_ in ['input', 'output']:
-                    vsizes = self._var_sizes[vec_name][type_]
-                    if vsizes.size > 0:
-                        csum = np.empty(vsizes.size, dtype=INT_DTYPE)
-                        csum[0] = 0
-                        csum[1:] = np.cumsum(vsizes)[:-1]
-                        off_vn[type_] = csum.reshape(vsizes.shape)
-                    else:
-                        off_vn[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
-
-            if self._use_derivatives:
-                offsets['nonlinear'] = offsets['linear']
+            for type_ in ['input', 'output']:
+                vsizes = self._var_sizes[type_]
+                if vsizes.size > 0:
+                    csum = np.empty(vsizes.size, dtype=INT_DTYPE)
+                    csum[0] = 0
+                    csum[1:] = np.cumsum(vsizes)[:-1]
+                    offsets[type_] = csum.reshape(vsizes.shape)
+                else:
+                    offsets[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
         return self._var_offsets
 
@@ -3042,8 +2981,8 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = model._var_sizes['nonlinear']['output']
-            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            sizes = model._var_sizes['output']
+            abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
 
             for name, meta in out.items():
@@ -3168,8 +3107,8 @@ class System(object):
 
         if get_sizes:
             # Size them all
-            sizes = model._var_sizes['nonlinear']['output']
-            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            sizes = model._var_sizes['output']
+            abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
             for prom_name, response in out.items():
                 name = response['ivc_source']
@@ -3825,7 +3764,7 @@ class System(object):
         with self._scaled_context_all():
             self._solve_nonlinear()
 
-    def run_apply_linear(self, vec_names, mode, scope_out=None, scope_in=None):
+    def run_apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product.
 
@@ -3833,8 +3772,6 @@ class System(object):
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         scope_out: set or None
@@ -3845,9 +3782,9 @@ class System(object):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, vec_names, ContainsAll(), mode, scope_out, scope_in)
+            self._apply_linear(None, ContainsAll(), mode, scope_out, scope_in)
 
-    def run_solve_linear(self, vec_names, mode):
+    def run_solve_linear(self, mode):
         """
         Apply inverse jac product.
 
@@ -3855,13 +3792,11 @@ class System(object):
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         """
         with self._scaled_context_all():
-            self._solve_linear(vec_names, mode, ContainsAll())
+            self._solve_linear(mode, ContainsAll())
 
     def run_linearize(self, sub_do_ln=True):
         """
@@ -3897,7 +3832,7 @@ class System(object):
         """
         pass
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_in=None, scope_out=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -3905,8 +3840,6 @@ class System(object):
         ----------
         jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         mode: str
@@ -3920,14 +3853,12 @@ class System(object):
         """
         raise NotImplementedError(self.msginfo + ": _apply_linear has not been overridden")
 
-    def _solve_linear(self, vec_names, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
@@ -4303,8 +4234,8 @@ class System(object):
             myrank = self.comm.rank
             if rank is None:   # bcast
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[vec_name][abs_name]
-                    sizes = self._var_sizes[vec_name][typ][:, idx]
+                    idx = self._var_allprocs_abs2idx[abs_name]
+                    sizes = self._var_sizes[typ][:, idx]
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
@@ -4324,8 +4255,8 @@ class System(object):
                     val = new_val
             else:   # retrieve to rank
                 if distrib:
-                    idx = self._var_allprocs_abs2idx[vec_name][abs_name]
-                    sizes = self._var_sizes[vec_name][typ][:, idx]
+                    idx = self._var_allprocs_abs2idx[abs_name]
+                    sizes = self._var_sizes[typ][:, idx]
                     # TODO: could cache these offsets
                     offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
                     offsets[1:] = np.cumsum(sizes[:-1])
@@ -4339,7 +4270,7 @@ class System(object):
                         val.shape = meta['global_shape'] if get_remote else meta['shape']
                 else:
                     if rank != owner:
-                        tag = self._var_allprocs_abs2idx[vec_name][abs_name]
+                        tag = self._var_allprocs_abs2idx[abs_name]
                         # avoid tag collisions between inputs, outputs, and resids
                         if kind != 'output':
                             tag += len(self._var_allprocs_abs2meta['output'])
@@ -4563,9 +4494,9 @@ class System(object):
                     val.shape = src_shape
                     val = val[tuple(src_indices)].ravel()
                 elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
-                    var_idx = self._var_allprocs_abs2idx[vec_name][src]
+                    var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
-                    sizes = self._var_sizes[vec_name]['output'][:, var_idx]
+                    sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
@@ -5097,10 +5028,6 @@ class System(object):
                                       total_systems)
                 else:
                     relinp['@all'] = ({'input': set(), 'output': set()}, set())
-
-        relevant['linear'] = {'@all': ({'input': ContainsAll(), 'output': ContainsAll()},
-                                       ContainsAll())}
-        relevant['nonlinear'] = relevant['linear']
 
         return relevant
 

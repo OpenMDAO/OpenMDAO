@@ -171,7 +171,7 @@ class ImplicitComponent(Component):
         else:
             self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -179,8 +179,6 @@ class ImplicitComponent(Component):
         ----------
         jac: Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         mode: str
@@ -195,11 +193,7 @@ class ImplicitComponent(Component):
         if jac is None:
             jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
-        # for vec_name in vec_names:
-        #     if vec_name not in self._rel_vec_names:
-        #         continue
-
-        with self._matvec_context('linear', scope_out, scope_in, mode) as vecs:
+        with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             # Jacobian and vectors are all scaled, unitless
@@ -221,55 +215,28 @@ class ImplicitComponent(Component):
                     d_residuals.read_only = True
 
                 try:
-                    if d_inputs._ncol > 1:
-                        if self.has_apply_multi_linear:
-                            with self._call_user_function('apply_multi_linear',
-                                                          protect_outputs=True):
-                                self.apply_multi_linear(self._inputs, self._outputs,
-                                                        d_inputs, d_outputs, d_residuals, mode)
-                        else:
-                            with self._call_user_function('apply_linear',
-                                                          protect_outputs=True):
-                                for i in range(d_inputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_inputs._icol = i
-                                    d_outputs._icol = i
-                                    d_residuals._icol = i
-                                    self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                               d_inputs, d_outputs, d_residuals,
-                                                               mode)
-                            d_inputs._icol = None
-                            d_outputs._icol = None
-                            d_residuals._icol = None
-                    else:
-                        with self._call_user_function('apply_linear', protect_outputs=True):
-                            self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                       d_inputs, d_outputs, d_residuals, mode)
+                    with self._call_user_function('apply_linear', protect_outputs=True):
+                        self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                   d_inputs, d_outputs, d_residuals, mode)
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
-    def _solve_linear(self, vec_names, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names: [str, ...]
-            list of names of the right-hand-side vectors.
         mode: str
             'fwd' or 'rev'.
         rel_systems: set of str
             Set of names of relevant systems based on the current linear solve.
         """
         if self._linear_solver is not None:
-            self._linear_solver.solve(vec_names, mode, rel_systems)
+            self._linear_solver.solve(mode, rel_systems)
 
         else:
             failed = False
-            # for vec_name in vec_names:
-            #     if vec_name not in self._rel_vec_names:
-            #         continue
             d_outputs = self._vectors['output']['linear']
             d_residuals = self._vectors['residual']['linear']
 
@@ -281,24 +248,8 @@ class ImplicitComponent(Component):
                     d_outputs.read_only = True
 
                 try:
-                    if d_outputs._ncol > 1:
-                        if self.has_solve_multi_linear:
-                            with self._call_user_function('solve_multi_linear'):
-                                self.solve_multi_linear(d_outputs, d_residuals, mode)
-                        else:
-                            with self._call_user_function('solve_linear'):
-                                for i in range(d_outputs._ncol):
-                                    # need to make the multivecs look like regular single vecs
-                                    # since the component doesn't know about multivecs.
-                                    d_outputs._icol = i
-                                    d_residuals._icol = i
-                                    self.solve_linear(d_outputs, d_residuals, mode)
-
-                                d_outputs._icol = None
-                                d_residuals._icol = None
-                    else:
-                        with self._call_user_function('solve_linear'):
-                            self.solve_linear(d_outputs, d_residuals, mode)
+                    with self._call_user_function('solve_linear'):
+                        self.solve_linear(d_outputs, d_residuals, mode)
                 finally:
                     d_outputs.read_only = d_residuals.read_only = False
 

@@ -42,10 +42,9 @@ class DefaultVector(Vector):
             zeros array of correct size to hold all of this vector's variables.
         """
         system = self._system()
-        ncol = self._ncol
-        size = np.sum(system._var_sizes[self._name][self._typ][system.comm.rank, :])
+        size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
         dtype = complex if self._alloc_complex else float
-        return np.zeros(size, dtype=dtype) if ncol == 1 else np.zeros((size, ncol), dtype=dtype)
+        return np.zeros(size, dtype=dtype)
 
     def _extract_root_data(self):
         """
@@ -58,14 +57,13 @@ class DefaultVector(Vector):
         """
         system = self._system()
         type_ = self._typ
-        ncol = self._ncol
         root_vec = self._root_vector
 
         slices = root_vec.get_slice_dict()
 
-        mynames = system._var_relevant_names[self._name][type_]
+        mynames = list(system._var_abs2meta[type_])
         if mynames:
-            myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
+            myslice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
         else:
             myslice = slice(0, 0)
 
@@ -121,7 +119,6 @@ class DefaultVector(Vector):
         system = self._system()
         io = self._typ
         kind = self._kind
-        ncol = self._ncol
 
         do_scaling = self._do_scaling
         if do_scaling:
@@ -131,17 +128,10 @@ class DefaultVector(Vector):
         self._views = views = {}
         self._views_flat = views_flat = {}
 
-        abs2meta = system._var_abs2meta[io]
         start = end = 0
-        for abs_name in system._var_relevant_names[self._name][io]:
-            meta = abs2meta[abs_name]
+        for abs_name, meta in system._var_abs2meta[io].items():
             end = start + meta['size']
             shape = meta['shape']
-            if ncol > 1:
-                if not isinstance(shape, tuple):
-                    shape = (shape,)
-                shape = tuple(list(shape) + [ncol])
-
             views_flat[abs_name] = v = self._data[start:end]
             if shape != v.shape:
                 v = v.view()
@@ -279,14 +269,9 @@ class DefaultVector(Vector):
         """
         adder, scaler = self._scaling
         data = self.asarray()
-        if self._ncol == 1:
-            if adder is not None:  # nonlinear only
-                data -= adder
-            data /= scaler
-        else:
-            if adder is not None:  # nonlinear only
-                data -= adder
-            data /= scaler[:, np.newaxis]
+        if adder is not None:  # nonlinear only
+            data -= adder
+        data /= scaler
 
     def scale_to_phys(self):
         """
@@ -294,14 +279,9 @@ class DefaultVector(Vector):
         """
         adder, scaler = self._scaling
         data = self.asarray()
-        if self._ncol == 1:
-            data *= scaler
-            if adder is not None:  # nonlinear only
-                data += adder
-        else:
-            data *= scaler[:, np.newaxis]
-            if adder is not None:  # nonlinear only
-                data += adder
+        data *= scaler
+        if adder is not None:  # nonlinear only
+            data += adder
 
     def asarray(self, copy=False):
         """
@@ -423,8 +403,8 @@ class DefaultVector(Vector):
         if self._slices is None:
             slices = {}
             start = end = 0
-            for name in self._system()._var_relevant_names[self._name][self._typ]:
-                end += self._views_flat[name].size
+            for name, arr in self._views_flat.items():
+                end += arr.size
                 slices[name] = slice(start, end)
                 start = end
             self._slices = slices

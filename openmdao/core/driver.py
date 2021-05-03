@@ -340,7 +340,7 @@ class Driver(object):
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
             owning_ranks = model._owning_rank
-            sizes = model._var_sizes['nonlinear']['output']
+            sizes = model._var_sizes['output']
             rank = model.comm.rank
             nprocs = model.comm.size
             for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):
@@ -353,8 +353,8 @@ class Driver(object):
 
                 if meta['distributed']:
 
-                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
-                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    idx = model._var_allprocs_abs2idx[vname]
+                    dist_sizes = model._var_sizes['output'][:, idx]
                     total_dist_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
