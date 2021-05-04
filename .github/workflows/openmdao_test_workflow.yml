@@ -207,9 +207,10 @@ jobs:
           echo "============================================================="
           echo "Submit coverage"
           echo "============================================================="
+          cp $HOME/.coverage .
           pip install git+https://github.com/swryan/coveralls-python
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --base_dir $SITE_DIR --submit $HOME/.coverage
+          coveralls --base_dir $SITE_DIR
           
       - name: Notify slack
         uses: act10ns/slack@v1
