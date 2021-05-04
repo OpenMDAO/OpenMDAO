@@ -29,11 +29,11 @@ def array2slice(arr):
 
 
 class Indexer(object):
-    def __init__(self):
-        self._src_shape = None
-
     def set_src_shape(self, shape):
-        self._src_shape = shape
+        raise NotImplementedError("No implementation of set_src_shape found.")
+
+    def __call__(self):
+        raise NotImplementedError("No implementation of __call__ found.")
 
     def as_slice(self):
         raise NotImplementedError("No implementation of as_slice found.")
@@ -41,10 +41,15 @@ class Indexer(object):
     def as_array(self):
         raise NotImplementedError("No implementation of as_array found.")
 
+    def shape(self):
+        raise NotImplementedError("No implementation of shape found.")
+
+    def shaped(self):
+        raise NotImplementedError("No implementation of shaped found.")
+
 
 class IntIndexer(Indexer):
     def __init__(self, idx):
-        super().__init__()
         self._idx = idx
         if idx >= 0:
             self._shaped_idx = idx
@@ -54,13 +59,17 @@ class IntIndexer(Indexer):
     def __call__(self):
         return self._idx
 
+    def shaped(self):
+        if self._shaped_idx is None:
+            raise ValueError(f"IntIndex value has no source shape and index is {self._idx}.")
+        return self._shaped_idx
+
     def shape(self):
         return 1
 
     def set_src_shape(self, shape):
-        super().set_src_shape(shape)
         if self._idx < 0:
-            if np.is_scalar(shape):
+            if np.isscalar(shape):
                 self._shaped_idx = self._idx + shape
             else:
                 self._shaped_idx = self._idx + shape[0]
@@ -78,7 +87,6 @@ class IntIndexer(Indexer):
 
 class SliceIndexer(Indexer):
     def __init__(self, slc):
-        super().__init__()
         start, stop, step = slc.start, slc.stop, slc.step
         self._slice = deepcopy(slc)
         start, stop, step = self._slice.start, self._slice.stop, self._slice.step
@@ -94,29 +102,33 @@ class SliceIndexer(Indexer):
     def __call__(self):
         return self._slice
 
+    def shaped(self):
+        if self._shaped_slice is None:
+            raise RuntimeError(f"Can't get shape of {self._slice} because source shape is unknown.")
+        return self._shaped_slice
+
     def shape(self):
         if self._shaped_slice is None:
             raise RuntimeError(f"Can't get shape of {self._slice} because source shape is unknown.")
-        return ((self._shaped_slice.stop - self._shaped_slice.start) // self._shaped_slice.step)
+        return abs((self._shaped_slice.stop - self._shaped_slice.start) // self._shaped_slice.step)
 
     def set_src_shape(self, shape):
-        super().set_src_shape(shape)
         if np.isscalar(shape):
             length = shape
         elif len(shape) == 1:
             length = shape[0]
         else:
-            raise RuntimeError(f"shape {shape} passed to set_src_shape is not have dimension of 1")
+            raise RuntimeError(f"shape {shape} passed to set_src_shape does not have dimension of 1")
 
         slc = self._slice
 
         if slc.start is None or slc.start < 0 or slc.stop is None or slc.stop < 0:  # need shape
             start = 0 if slc.start is None else slc.start
             if start < 0:
-                start = length - start
+                start = length + start
             stop = length if slc.stop is None else slc.stop
             if stop < 0:
-                stop = length - stop
+                stop = length + stop
             step = 1 if slc.step is None else slc.step
 
             self._shaped_slice = slice(start, stop, step)
@@ -135,12 +147,20 @@ class SliceIndexer(Indexer):
 
 class ArrayIndexer(Indexer):
     def __init__(self, arr):
-        super().__init__()
         self.arr = np.asarray(arr)
         self._slice = None
+        if np.any(self.arr < 0):
+            self._shaped_arr = None
+        else:
+            self._shaped_arr = self.arr
 
     def __call__(self):
         return self.arr
+    
+    def shaped(self):
+        if self._shaped_arr is None:
+            raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
+        return self._shaped_arr
 
     def shape(self):
         return self.arr.shape
@@ -157,6 +177,12 @@ class ArrayIndexer(Indexer):
     def as_array(self):
         return self.arr
 
+    def set_src_shape(self, shape):
+        assert np.isscalar(shape) or len(shape) == 1
+        size = shape if np.isscalar(shape) else shape[0]
+        if self._shaped_arr is None:  # must have at least 1 negative index
+            self._shaped_arr = self.arr.copy()
+            self._shaped_arr[self._shaped_arr < 0] += size
 
 class MultiIndexer(Indexer):
     def __init__(self, tup):
