@@ -101,62 +101,65 @@ jobs:
           echo "============================================================="
           pip install .${{ matrix.OPTIONAL }}
 
-      - name: Install optional dependencies
+      - name: Install PETSc
+        if: matrix.PETSc
         shell: bash -l {0}
         run: |
-          if [[ "${{ matrix.PETSc }}" ]]; then
-            echo "============================================================="
-            echo "Install PETSc"
-            echo "============================================================="
-            conda install -c conda-forge mpi4py petsc=${{ matrix.PETSc }} petsc4py -q -y
-            echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+          echo "============================================================="
+          echo "Install PETSc"
+          echo "============================================================="
+          conda install -c conda-forge mpi4py petsc=${{ matrix.PETSc }} petsc4py -q -y
+          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+
+      - name: Install pyOptSparse
+        if: matrix.PYOPTSPARSE
+        shell: bash -l {0}
+        run: |
+          echo "============================================================="
+          echo "Install pyoptsparse"
+          echo "============================================================="
+
+          git clone -q https://github.com/OpenMDAO/build_pyoptsparse
+
+          cd build_pyoptsparse
+          chmod 755 ./build_pyoptsparse.sh
+
+          if [[ "${{ matrix.PETSc }}" && "${{ matrix.PYOPTSPARSE }}" == "v1.2" ]]; then
+            PAROPT=-a
           fi
 
-          if [[ "${{ matrix.PYOPTSPARSE }}" ]]; then
-            echo "============================================================="
-            echo "Install pyoptsparse"
-            echo "============================================================="
+          if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+            echo "  > Secure copying SNOPT 7.7 over SSH"
+            mkdir SNOPT
+            scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
 
-            git clone -q https://github.com/OpenMDAO/build_pyoptsparse
+          elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
+            echo "  > Secure copying SNOPT 7.2 over SSH"
+            mkdir SNOPT
+            scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
+            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
 
-            cd build_pyoptsparse
-            chmod 755 ./build_pyoptsparse.sh
-
-            if [[ "${{ matrix.PETSc }}" && "${{ matrix.PYOPTSPARSE }}" == "v1.2" ]]; then
-              PAROPT=-a
+          else
+            if [[ "${{ matrix.SNOPT }}" ]]; then
+              echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
-
-            if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.7 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
-
-            elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.2 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
-
-            else
-              if [[ "${{ matrix.SNOPT }}" ]]; then
-                echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
-              fi
-              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
-            fi
-
-            cd ..
-
-            echo "LD_LIBRARY_PATH=$HOME/ipopt/lib" >> $GITHUB_ENV
+            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
           fi
 
+          cd ..
+
+          echo "LD_LIBRARY_PATH=$HOME/ipopt/lib" >> $GITHUB_ENV
+
+      - name: Install optional dependencies
+        if: matrix.OPTIONAL == '[all]'
+        shell: bash -l {0}
+        run: |
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          if [[ "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
-            pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-            pyppeteer-install
-          fi
+          pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
+          pyppeteer-install
 
       - name: Display conda info
         shell: bash -l {0}
@@ -204,10 +207,9 @@ jobs:
           echo "============================================================="
           echo "Submit coverage"
           echo "============================================================="
-          cd $HOME
           pip install git+https://github.com/swryan/coveralls-python
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --base_dir $SITE_DIR
+          coveralls --base_dir $SITE_DIR --submit $HOME/.coverage
           
       - name: Notify slack
         uses: act10ns/slack@v1
