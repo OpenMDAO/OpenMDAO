@@ -1,4 +1,38 @@
 **********************************
+# Release Notes for OpenMDAO 3.9.1
+
+May 04, 2021
+
+OpenMDAO 3.9.1 is a patch release that fixes a bug in check_totals as well
+as resolving an issue that prevents systems from being repickled without
+being run.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes:
+
+- None
+- 
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- None
+
+## Bug Fixes:
+
+- Fixed a bug that prevented systems from being repickled without running them. [#2034](https://github.com/OpenMDAO/OpenMDAO/pull/2034)
+- Fixed a bug in check_totals that was causing an IndexError. [#2038](https://github.com/OpenMDAO/OpenMDAO/pull/2038)
+
+## Miscellaneous:
+
+- Refactored the github workflow to make it more modular. [#2036](https://github.com/OpenMDAO/OpenMDAO/pull/2036)
+
+**********************************
 # Release Notes for OpenMDAO 3.9.0
 
 April 28, 2021
