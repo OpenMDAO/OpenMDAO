@@ -176,6 +176,21 @@ jobs:
           cp .coveragerc $HOME
           cd $HOME
           testflo -n 1 openmdao --timeout=120 --show_skipped --coverage --coverpkg openmdao
+
+      - name: Submit coverage
+        shell: bash -l {0}
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_SERVICE_NAME: "github"
+          COVERALLS_PARALLEL: True
+        run: |
+          echo "============================================================="
+          echo "Submit coverage"
+          echo "============================================================="
+          cp $HOME/.coverage .
+          pip install git+https://github.com/swryan/coveralls-python
+          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
+          coveralls --base_dir $SITE_DIR
           
       - name: Make docs
         shell: bash -l {0}
@@ -197,21 +212,6 @@ jobs:
             fi
           fi
 
-      - name: Submit coverage
-        shell: bash -l {0}
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_SERVICE_NAME: "github"
-          COVERALLS_PARALLEL: True
-        run: |
-          echo "============================================================="
-          echo "Submit coverage"
-          echo "============================================================="
-          cp $HOME/.coverage .
-          pip install git+https://github.com/swryan/coveralls-python
-          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --base_dir $SITE_DIR
-          
       - name: Notify slack
         uses: act10ns/slack@v1
         env:
@@ -320,7 +320,7 @@ jobs:
         if: always()
 
   coveralls:
-    name: Finish coveralls
+    name: Finish coverage
     needs: [ubuntu_tests, windows_tests]
     runs-on: ubuntu-latest
     steps:
