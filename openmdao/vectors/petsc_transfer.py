@@ -76,8 +76,6 @@ class PETScTransfer(DefaultTransfer):
         mypathlen = len(group.pathname) + 1 if group.pathname else 0
         allsubs = group._subsystems_allprocs
 
-        relvars, _ = group._relevant['@all']
-
         # Initialize empty lists for the transfer indices
         xfer_in = []
         xfer_out = []
@@ -95,9 +93,6 @@ class PETScTransfer(DefaultTransfer):
 
         # Loop through all connections owned by this system
         for abs_in, abs_out in group._conn_abs_in2out.items():
-            if abs_out not in relvars['output'] or abs_in not in relvars['input']:
-                continue
-
             # Only continue if the input exists on this processor
             if abs_in in abs2meta_in:
 
@@ -130,8 +125,8 @@ class PETScTransfer(DefaultTransfer):
                         # defined by now).  dist output to serial input conns w/o src_indices
                         # are not allowed.
                         raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
-                                            f"'{abs_out}' to serial input '{abs_in}' without "
-                                            "declaring src_indices.")
+                                           f"'{abs_out}' to serial input '{abs_in}' without "
+                                           "declaring src_indices.")
                     else:
                         rank = myproc if abs_out in abs2meta_out else owner
                         offset = offsets_out[rank, idx_out]
@@ -164,8 +159,8 @@ class PETScTransfer(DefaultTransfer):
 
                 # 2. Compute the input indices
                 input_inds = np.arange(offsets_in[myproc, idx_in],
-                                        offsets_in[myproc, idx_in] +
-                                        sizes_in[myproc, idx_in], dtype=INT_DTYPE)
+                                       offsets_in[myproc, idx_in] +
+                                       sizes_in[myproc, idx_in], dtype=INT_DTYPE)
 
                 # Now the indices are ready - input_inds, output_inds
                 sub_in = abs_in[mypathlen:].split('.', 1)[0]

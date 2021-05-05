@@ -209,14 +209,11 @@ class ScipyKrylov(LinearSolver):
 
         x_vec_combined = x_vec.asarray()
         size = x_vec_combined.size
-        linop = LinearOperator((size, size), dtype=float,
-                                matvec=self._mat_vec)
+        linop = LinearOperator((size, size), dtype=float, matvec=self._mat_vec)
 
         # Support a preconditioner
         if self.precon:
-            M = LinearOperator((size, size),
-                                matvec=self._apply_precon,
-                                dtype=float)
+            M = LinearOperator((size, size), matvec=self._apply_precon, dtype=float)
         else:
             M = None
 
@@ -224,16 +221,16 @@ class ScipyKrylov(LinearSolver):
         if solver is gmres:
             if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                    x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                    callback=self._monitor)
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                                 callback=self._monitor)
             else:
                 x, info = solver(linop, b_vec.asarray(True), M=M, restart=restart,
-                                    x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
-                                    callback=self._monitor)
+                                 x0=x_vec_combined, maxiter=maxiter, tol=atol, atol='legacy',
+                                 callback=self._monitor)
         else:
             x, info = solver(linop, b_vec.asarray(True), M=M,
-                                x0=x_vec_combined, maxiter=maxiter, tol=atol,
-                                callback=self._monitor)
+                             x0=x_vec_combined, maxiter=maxiter, tol=atol,
+                             callback=self._monitor)
 
         fail |= (info != 0)
         x_vec.set_val(x)

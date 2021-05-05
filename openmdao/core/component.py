@@ -298,7 +298,7 @@ class Component(System):
 
         for io in ('input', 'output'):
             sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
-                                                    dtype=INT_DTYPE)
+                                                   dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']

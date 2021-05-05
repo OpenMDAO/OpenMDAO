@@ -98,7 +98,7 @@ class DefaultTransfer(Transfer):
 
                 # 2. Compute the input indices
                 input_inds = np.arange(offsets_in[idx_in],
-                                        offsets_in[idx_in] + sizes_in[idx_in], dtype=INT_DTYPE)
+                                       offsets_in[idx_in] + sizes_in[idx_in], dtype=INT_DTYPE)
                 if indices is not None:
                     input_inds = input_inds.reshape(indices.shape)
 

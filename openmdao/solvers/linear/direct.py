@@ -235,7 +235,6 @@ class DirectSolver(LinearSolver):
         seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_scope()
-        vnames = ['linear']
 
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
@@ -245,7 +244,7 @@ class DirectSolver(LinearSolver):
             xvec.set_val(seed)
 
             # apply linear
-            system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
+            system._apply_linear(self._assembled_jac, self._rel_systems, 'fwd',
                                  scope_out, scope_in)
 
             # put new value in out_vec

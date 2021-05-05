@@ -31,7 +31,6 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
-from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -461,7 +460,6 @@ class System(object):
 
         self.supports_multivecs = False
 
-        self._relevant = None
         self._mode = None
 
         self._scope_cache = {}
@@ -746,7 +744,6 @@ class System(object):
 
         self.pathname = ''
         self.comm = comm
-        self._relevant = None
         self._mode = mode
 
         # Besides setting up the processors, this method also builds the model hierarchy.
@@ -775,7 +772,7 @@ class System(object):
 
         self._top_level_post_connections(mode)
 
-        self._setup_relevance(mode)
+        self._problem_meta['relevant'] = self._init_relevance(mode)
         self._setup_var_sizes()
 
         self._top_level_post_sizes()
@@ -1507,7 +1504,6 @@ class System(object):
             Derivative direction, either 'fwd' or 'rev'.
         """
         vois = set()
-        vectorized_vois = {}
 
         if self._use_derivatives:
             vec_names = ['nonlinear', 'linear']
@@ -1516,8 +1512,6 @@ class System(object):
             for system in self.system_iter(include_self=True, recurse=True):
                 for name, meta in system._get_vec_names_from_vois(mode):
                     vois.add(system.get_source(name))
-                    if meta['vectorize_derivs']:
-                        vectorized_vois[name] = meta
 
             vec_names.extend(sorted(vois))
         else:
@@ -1525,7 +1519,6 @@ class System(object):
 
         self._problem_meta['vec_names'] = vec_names
         self._problem_meta['lin_vec_names'] = vec_names[1:]
-        self._problem_meta['vectorized_vois'] = vectorized_vois
 
     def _get_vec_names_from_vois(self, mode):
         """
@@ -1557,6 +1550,8 @@ class System(object):
         """
         Create the relevance dictionary.
 
+        This is only called on the top level System.
+
         Parameters
         ----------
         mode: str
@@ -1571,14 +1566,14 @@ class System(object):
             desvars = self.get_design_vars(recurse=True, get_sizes=False, use_prom_ivc=False)
             responses = self.get_responses(recurse=True, get_sizes=False, use_prom_ivc=False)
             return self.get_relevant_vars(desvars, responses, mode)
-        else:
-            return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
+
+        return {'@all': ({'input': ContainsAll(), 'output': ContainsAll()}, ContainsAll())}
 
     def _setup_driver_units(self):
         """
         Compute unit conversions for driver variables.
         """
-        abs2meta = self._var_abs2meta['output']
+        abs2meta = self._var_allprocs_abs2meta['output']
         pro2abs = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
 
@@ -1663,26 +1658,6 @@ class System(object):
 
         for s in self._subsystems_myproc:
             s._setup_driver_units()
-
-    def _setup_relevance(self, mode, relevant=None):
-        """
-        Set up the relevance dictionary.
-
-        Parameters
-        ----------
-        mode: str
-            Derivative direction, either 'fwd' or 'rev'.
-        relevant: dict or None
-            Dictionary mapping VOI name to all variables necessary for computing
-            derivatives between the VOI and all other VOIs.
-        """
-        if relevant is None:  # should only occur at top level on full setup
-            self._relevant = relevant = self._init_relevance(mode)
-        else:
-            self._relevant = relevant
-
-        for s in self._subsystems_myproc:
-            s._setup_relevance(mode, relevant)
 
     def _setup_connections(self):
         """
@@ -2286,12 +2261,12 @@ class System(object):
         return self._problem_meta['vec_names']
 
     @property
-    def _lin_vec_names(self):
-        return self._problem_meta['lin_vec_names']
-
-    @property
     def _recording_iter(self):
         return self._problem_meta['recording_iter']
+
+    @property
+    def _relevant(self):
+        return self._problem_meta['relevant']
 
     @property
     def _static_mode(self):
@@ -4881,24 +4856,26 @@ class System(object):
 
         Parameters
         ----------
-        desvars: list of str
-            Names of design variables.
-        responses: list of str
-            Names of response variables.
+        desvars: dict
+            Dictionary of design variable metadata.
+        responses: dict
+            Dictionary of response variable metadata.
         mode: str
             Direction of derivatives, either 'fwd' or 'rev'.
 
         Returns
         -------
         dict
-            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs, dep_systems)
+            Dict of ({'outputs': dep_outputs, 'inputs': dep_inputs}, dep_systems)
             keyed by design vars and responses.
         """
         conns = self._conn_global_abs_in2out
         relevant = defaultdict(dict)
 
         # Create a hybrid graph with components and all connected vars.  If a var is connected,
-        # also connect it to its corresponding component.
+        # also connect it to its corresponding component.  This results in a smaller graph
+        # (fewer edges) than would be the case for a pure variable graph where all inputs
+        # to a particular component would have to be connected to all outputs from that component.
         graph = nx.DiGraph()
         for tgt, src in conns.items():
             if src not in graph:
@@ -4936,20 +4913,33 @@ class System(object):
 
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
-        dvcache = {}
         rescache = {}
+        pd_dv_locs = {}
+        pd_res_locs = {}
+        pd_common = defaultdict(dict)
 
-        for desvar in desvars:
-            if desvar not in dvcache:
-                dvcache[desvar] = set(all_connected_nodes(graph, desvar))
+        for desvar, dvmeta in desvars.items():
+            dvset = set(self.all_connected_nodes(graph, desvar))
+            if dvmeta.get('parallel_deriv_color'):
+                pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
 
-            for response in responses:
+            for response, resmeta in responses.items():
                 if response not in rescache:
-                    rescache[response] = set(all_connected_nodes(grev, response))
+                    rescache[response] = set(self.all_connected_nodes(grev, response))
+                    if resmeta.get('parallel_deriv_color'):
+                        pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
+                                                                             local=True))
 
-                common = dvcache[desvar].intersection(rescache[response])
+                common = dvset.intersection(rescache[response])
 
                 if common:
+                    dv = conns[desvar] if desvar in conns else desvar
+                    r = conns[response] if response in conns else response
+                    if desvar in pd_dv_locs and pd_dv_locs[desvar]:
+                        pd_common[dv][r] = pd_dv_locs[desvar].intersection(rescache[response])
+                    elif response in pd_res_locs and pd_res_locs[response]:
+                        pd_common[r][dv] = pd_res_locs[response].intersection(dvset)
+
                     input_deps = set()
                     output_deps = set()
                     sys_deps = set()
@@ -4974,17 +4964,11 @@ class System(object):
                     input_deps = set()
                     output_deps = set([response])
                     parts = desvar.rsplit('.', 1)
-                    if len(parts) == 1:
-                        s = ''
-                    else:
-                        s = parts[0]
-                    sys_deps = set(all_ancestors(s))
+                    sys_deps = set(all_ancestors('' if len(parts) == 1 else parts[0]))
 
                 if common or desvar == response:
-                    if desvar in conns:
-                        desvar = conns[desvar]
-                    if response in conns:
-                        response = conns[response]
+                    desvar = conns[desvar] if desvar in conns else desvar
+                    response = conns[response] if response in conns else response
                     if mode != 'rev':  # fwd or auto
                         relevant[desvar][response] = ({'input': input_deps,
                                                        'output': output_deps}, sys_deps)
@@ -4993,6 +4977,22 @@ class System(object):
                                                        'output': output_deps}, sys_deps)
 
                     sys_deps.add('')  # top level Group is always relevant
+
+        dvcache = None
+        rescache = None
+
+        if pd_common:
+            # we have some parallel deriv colors, so update relevance entries to throw out
+            # any dependencies that aren't on the same rank
+            for inp, sub in relevant.items():
+                for out, tup in sub.items():
+                    meta = tup[0]
+                    if inp in pd_common:
+                        meta['input'] = meta['input'].intersection(pd_common[inp][out])
+                        meta['output'] = meta['output'].intersection(pd_common[inp][out])
+                        if out not in meta['output']:
+                            meta['input'] = set()
+                            meta['output'] = set()
 
         voi_lists = []
         if mode != 'rev':
@@ -5018,18 +5018,67 @@ class System(object):
                         total_inps = set()
                         total_outs = set()
                         total_systems = set()
+
                     for out in outputs:
                         if out in relinp:
                             dct, systems = relinp[out]
                             total_inps.update(dct['input'])
                             total_outs.update(dct['output'])
                             total_systems.update(systems)
+
                     relinp['@all'] = ({'input': total_inps, 'output': total_outs},
                                       total_systems)
                 else:
                     relinp['@all'] = ({'input': set(), 'output': set()}, set())
 
         return relevant
+
+    def all_connected_nodes(self, graph, start, local=False):
+        """
+        Yield all downstream nodes starting at the given node.
+
+        Parameters
+        ----------
+        graph: network.DiGraph
+            Graph being traversed.
+        start: hashable object
+            Identifier of the starting node.
+        local: bool
+            If True and a non-local node is encountered in the traversal, the traversal
+            ends on that branch.
+
+        Yields
+        ------
+        str
+            Each node found when traversal starts at start.
+        """
+        if local:
+            abs2meta_in = self._var_abs2meta['input']
+            abs2meta_out = self._var_abs2meta['output']
+            all_abs2meta_in = self._var_allprocs_abs2meta['input']
+            all_abs2meta_out = self._var_allprocs_abs2meta['output']
+
+            def is_local(name):
+                return (name in abs2meta_in or name in abs2meta_out or
+                        (name not in all_abs2meta_in and name not in all_abs2meta_out))
+
+        stack = [start]
+        visited = set(stack)
+        if not local or is_local(start):
+            yield start
+        else:
+            return
+
+        while stack:
+            src = stack.pop()
+            for tgt in graph[src]:
+                if not local or is_local(tgt):
+                    yield tgt
+                else:
+                    continue
+                if tgt not in visited:
+                    visited.add(tgt)
+                    stack.append(tgt)
 
     def _generate_md5_hash(self):
         """

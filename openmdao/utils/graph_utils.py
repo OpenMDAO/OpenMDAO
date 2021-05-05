@@ -38,8 +38,8 @@ def all_connected_nodes(graph, start):
 
     Yields
     ------
-    list
-        A list of all nodes found when traversal starts at start.
+    str
+        Each node found when traversal starts at start.
     """
     stack = [start]
     visited = set(stack)

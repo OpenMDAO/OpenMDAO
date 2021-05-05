@@ -84,7 +84,7 @@ class Vector(object):
         Parameters
         ----------
         name: str
-            The name of the vector: 'nonlinear', 'linear', or right-hand side name.
+            The name of the vector: 'nonlinear' or 'linear'.
         kind: str
             The kind of vector, 'input', 'output', or 'residual'.
         system: <System>

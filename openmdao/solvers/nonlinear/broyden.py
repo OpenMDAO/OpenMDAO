@@ -583,7 +583,7 @@ class BroydenSolver(NonlinearSolver):
                     d_wrt[j] = 1.0
 
                 # Solve for total derivatives.
-                ln_solver.solve(['linear'], 'fwd')
+                ln_solver.solve('fwd')
 
                 # Extract results.
                 for of_name in states:

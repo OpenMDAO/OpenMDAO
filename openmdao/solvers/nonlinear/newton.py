@@ -230,7 +230,7 @@ class NewtonSolver(NonlinearSolver):
 
         self._linearize()
 
-        self.linear_solver.solve(['linear'], 'fwd')
+        self.linear_solver.solve('fwd')
 
         if self.linesearch:
             self.linesearch._do_subsolve = do_subsolve

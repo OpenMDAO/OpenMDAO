@@ -353,7 +353,6 @@ class _TotalJacInfo(object):
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
     def _compute_jac_scatters(self, mode, rowcol_size, get_remote):
-        self.jac_scatters[mode] = jac_scatters = {}
         model = self.model
         nproc = self.comm.size
 
@@ -395,66 +394,64 @@ class _TotalJacInfo(object):
 
             abs2meta_out = self.model._var_allprocs_abs2meta['output']
             loc_abs = self.model._var_abs2meta['output']
-            for vecname in model._lin_vec_names:
-                sizes = self.model._var_sizes['output']
-                abs2idx = self.model._var_allprocs_abs2idx
-                full_j_tgts = []
-                full_j_srcs = []
+            sizes = self.model._var_sizes['output']
+            abs2idx = self.model._var_allprocs_abs2idx
+            full_j_tgts = []
+            full_j_srcs = []
 
-                start = end = 0
-                for name in name2jinds:
-                    if name not in abs2idx:
-                        continue
+            start = end = 0
+            for name in name2jinds:
+                if name not in abs2idx:
+                    continue
 
-                    if name in loc_abs:
-                        end += abs2meta_out[name]['size']
+                if name in loc_abs:
+                    end += abs2meta_out[name]['size']
 
-                    if get_remote and abs2meta_out[name]['distributed']:
-                        srcinds = name2jinds[name]
+                if get_remote and abs2meta_out[name]['distributed']:
+                    srcinds = name2jinds[name]
+                    myinds = srcinds + myoffset
+                    for rank in range(nproc):
+                        if rank != myrank:
+                            offset = rowcol_size * rank   # J is same size on all procs
+                            full_j_srcs.append(myinds)
+                            full_j_tgts.append(srcinds + offset)
+                elif not self.get_remote and not abs2meta_out[name]['distributed']:
+                    var_idx = abs2idx[name]
+                    mysize = sizes[myrank, var_idx]
+                    if mysize > 0:
+                        srcinds = np.arange(start, end, dtype=INT_DTYPE)
                         myinds = srcinds + myoffset
                         for rank in range(nproc):
-                            if rank != myrank:
-                                offset = rowcol_size * rank   # J is same size on all procs
+                            if rank != myrank and sizes[rank, var_idx] > 0:
+                                offset = np.sum(jac_sizes[:rank])
                                 full_j_srcs.append(myinds)
                                 full_j_tgts.append(srcinds + offset)
-                    elif not self.get_remote and not abs2meta_out[name]['distributed']:
-                        var_idx = abs2idx[name]
-                        mysize = sizes[myrank, var_idx]
-                        if mysize > 0:
-                            srcinds = np.arange(start, end, dtype=INT_DTYPE)
-                            myinds = srcinds + myoffset
-                            for rank in range(nproc):
-                                if rank != myrank and sizes[rank, var_idx] > 0:
-                                    offset = np.sum(jac_sizes[:rank])
-                                    full_j_srcs.append(myinds)
-                                    full_j_tgts.append(srcinds + offset)
-                    elif owns[name] == myrank:
-                        srcinds = name2jinds[name]
-                        myinds = srcinds + myoffset
-                        var_idx = abs2idx[name]
-                        for rank in range(nproc):
-                            if rank != myrank and sizes[rank, var_idx] == 0:
-                                offset = rowcol_size * rank   # J is same size on all procs
-                                full_j_srcs.append(myinds)
-                                full_j_tgts.append(srcinds + offset)
+                elif owns[name] == myrank:
+                    srcinds = name2jinds[name]
+                    myinds = srcinds + myoffset
+                    var_idx = abs2idx[name]
+                    for rank in range(nproc):
+                        if rank != myrank and sizes[rank, var_idx] == 0:
+                            offset = rowcol_size * rank   # J is same size on all procs
+                            full_j_srcs.append(myinds)
+                            full_j_tgts.append(srcinds + offset)
 
-                    if name in loc_abs:
-                        start = end
+                if name in loc_abs:
+                    start = end
 
-                if full_j_srcs:
-                    full_src_inds = np.hstack(full_j_srcs)
-                    full_tgt_inds = np.hstack(full_j_tgts)
-                else:
-                    full_src_inds = np.zeros(0, dtype=INT_DTYPE)
-                    full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
+            if full_j_srcs:
+                full_src_inds = np.hstack(full_j_srcs)
+                full_tgt_inds = np.hstack(full_j_tgts)
+            else:
+                full_src_inds = np.zeros(0, dtype=INT_DTYPE)
+                full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
 
-                src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
-                tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
-                jac_scatters[vecname] = PETSc.Scatter().create(src_vec, src_indexset,
-                                                               tgt_vec, tgt_indexset)
+            src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
+            tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
+            self.jac_scatters[mode] = PETSc.Scatter().create(src_vec, src_indexset,
+                                                             tgt_vec, tgt_indexset)
         else:
-            for vecname in model._lin_vec_names:
-                jac_scatters[vecname] = None
+            self.jac_scatters[mode] = None
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
         """
@@ -560,10 +557,14 @@ class _TotalJacInfo(object):
         qoi_i = self.input_meta[mode]
         qoi_o = self.output_meta[mode]
         if qoi_i and qoi_o:
-            non_rel_outs = [out for out in self.output_list[mode]
-                            if out not in qoi_i and out not in qoi_o]
+            for out in self.output_list[mode]:
+                if out not in qoi_o and out not in qoi_i:
+                    non_rel_outs = True
+                    break
+            else:
+                non_rel_outs = False
         else:
-            non_rel_outs = None
+            non_rel_outs = False
 
         for name in input_list:
             rhsname = 'linear'
@@ -623,6 +624,16 @@ class _TotalJacInfo(object):
             gstart = np.sum(sizes[:iproc, in_var_idx])
             gend = gstart + sizes[iproc, in_var_idx]
 
+            # if we're doing parallel deriv coloring, we only want to set the seed on one proc
+            # for each var in a given color
+            if parallel_deriv_color:
+                if fwd:
+                    relev = relevant[name]['@all'][0]['output']
+                else:
+                    relev = relevant[name]['@all'][0]['input']
+            else:
+                relev = None
+
             if in_var_meta['distributed']:
                 ndups = 1
             else:
@@ -630,7 +641,7 @@ class _TotalJacInfo(object):
                 # We don't iterate over the full distributed size in this case.
                 irange += gstart
 
-                if fwd:
+                if fwd or parallel_deriv_color:
                     ndups = 1
                 else:
                     # find the number of duplicate components in rev mode so we can divide
@@ -644,7 +655,7 @@ class _TotalJacInfo(object):
             # solve_linear, or it will contain -1, indicating we should not set any
             # value before calling solve_linear.
             loc_i = np.full(irange.shape, -1, dtype=INT_DTYPE)
-            if gend > gstart:
+            if gend > gstart and (relev is None or relev):
                 loc = np.nonzero(np.logical_and(irange >= gstart, irange < gend))[0]
                 if in_idxs is None:
                     if in_var_meta['distributed']:
@@ -760,67 +771,66 @@ class _TotalJacInfo(object):
         myproc = self.comm.rank
         name2jinds = {}  # map varname to jac row or col idxs that we must scatter to other procs
 
-        for vecname in model._lin_vec_names:
-            inds = []
-            jac_inds = []
-            sizes = model._var_sizes['output']
-            slices = model._vectors['output']['linear'].get_slice_dict()
-            abs2idx = model._var_allprocs_abs2idx
-            jstart = jend = 0
+        inds = []
+        jac_inds = []
+        sizes = model._var_sizes['output']
+        slices = model._vectors['output']['linear'].get_slice_dict()
+        abs2idx = model._var_allprocs_abs2idx
+        jstart = jend = 0
 
-            for name in names:
-                indices = vois[name]['indices'] if name in vois else None
-                meta = allprocs_abs2meta_out[name]
+        for name in names:
+            indices = vois[name]['indices'] if name in vois else None
+            meta = allprocs_abs2meta_out[name]
 
-                if indices is not None:
-                    sz = len(indices)
+            if indices is not None:
+                sz = len(indices)
+            else:
+                if self.get_remote:
+                    sz = meta['global_size']
                 else:
-                    if self.get_remote:
-                        sz = meta['global_size']
-                    else:
-                        sz = meta['size']
+                    sz = meta['size']
 
-                if name in abs2idx and name in slices and name not in self.remote_vois:
-                    var_idx = abs2idx[name]
-                    slc = slices[name]
-                    if MPI and meta['distributed'] and self.get_remote:
-                        if indices is not None:
-                            local_idx, sizes_idx, _ = self._dist_driver_vars[name]
+            if name in abs2idx and name in slices and name not in self.remote_vois:
+                var_idx = abs2idx[name]
+                slc = slices[name]
+                if MPI and meta['distributed'] and self.get_remote:
+                    if indices is not None:
+                        local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
-                            dist_offset = np.sum(sizes_idx[:myproc])
-                            full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
-                            inds.append(full_inds[local_idx])
-                            jac_inds.append(jstart + dist_offset +
-                                            np.arange(len(local_idx), dtype=INT_DTYPE))
-                            if fwd or not self.get_remote:
-                                name2jinds[name] = jac_inds[-1]
-                        else:
-                            dist_offset = np.sum(sizes[:myproc, var_idx])
-                            inds.append(np.arange(slc.start, slc.stop, dtype=INT_DTYPE))
-                            jac_inds.append(np.arange(jstart + dist_offset,
-                                            jstart + dist_offset + sizes[myproc, var_idx],
-                                            dtype=INT_DTYPE))
-                            if fwd or not self.get_remote:
-                                name2jinds[name] = jac_inds[-1]
-                    else:
-                        idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
-                        if indices is not None:
-                            idx_array = idx_array[indices]
-                        inds.append(idx_array)
-                        jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
+                        dist_offset = np.sum(sizes_idx[:myproc])
+                        full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        inds.append(full_inds[local_idx])
+                        jac_inds.append(jstart + dist_offset +
+                                        np.arange(len(local_idx), dtype=INT_DTYPE))
                         if fwd or not self.get_remote:
                             name2jinds[name] = jac_inds[-1]
+                    else:
+                        dist_offset = np.sum(sizes[:myproc, var_idx])
+                        inds.append(np.arange(slc.start, slc.stop, dtype=INT_DTYPE))
+                        jac_inds.append(np.arange(jstart + dist_offset,
+                                        jstart + dist_offset + sizes[myproc, var_idx],
+                                        dtype=INT_DTYPE))
+                        if fwd or not self.get_remote:
+                            name2jinds[name] = jac_inds[-1]
+                else:
+                    idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                    if indices is not None:
+                        idx_array = idx_array[indices]
+                    inds.append(idx_array)
+                    jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
+                    if fwd or not self.get_remote:
+                        name2jinds[name] = jac_inds[-1]
 
-                if name not in self.remote_vois:
-                    jend += sz
-                    jstart = jend
+            if name not in self.remote_vois:
+                jend += sz
+                jstart = jend
 
-            if inds:
-                sol_idxs[vecname] = np.hstack(inds)
-                jac_idxs[vecname] = np.hstack(jac_inds)
-            else:
-                sol_idxs[vecname] = np.zeros(0, dtype=INT_DTYPE)
-                jac_idxs[vecname] = np.zeros(0, dtype=INT_DTYPE)
+        if inds:
+            sol_idxs['linear'] = np.hstack(inds)
+            jac_idxs['linear'] = np.hstack(jac_inds)
+        else:
+            sol_idxs['linear'] = np.zeros(0, dtype=INT_DTYPE)
+            jac_idxs['linear'] = np.zeros(0, dtype=INT_DTYPE)
 
         return sol_idxs, jac_idxs, name2jinds
 
@@ -1089,7 +1099,6 @@ class _TotalJacInfo(object):
         mode: str
             Direction of derivative solution.
         """
-        vecname, _, _ = self.in_idx_map[mode][i]
         deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
         deriv_val = self.output_vec[mode]['linear'].asarray()
         if not self.get_remote:
@@ -1100,9 +1109,9 @@ class _TotalJacInfo(object):
                 return
 
         if mode == 'fwd':
-            self.J[jac_idxs[vecname], i] = deriv_val[deriv_idxs[vecname]]
+            self.J[jac_idxs['linear'], i] = deriv_val[deriv_idxs['linear']]
         else:  # rev
-            self.J[i, jac_idxs[vecname]] = deriv_val[deriv_idxs[vecname]]
+            self.J[i, jac_idxs['linear']] = deriv_val[deriv_idxs['linear']]
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1117,7 +1126,7 @@ class _TotalJacInfo(object):
         """
         if (self.get_remote and mode == 'fwd') or (not self.get_remote and mode == 'rev'):
             vecname, _, _ = self.in_idx_map[mode][i]
-            scatter = self.jac_scatters[mode][vecname]
+            scatter = self.jac_scatters[mode]
             if scatter is not None:
                 if mode == 'fwd':
                     self.src_petsc[mode].array = self.J[:, i]
@@ -1250,7 +1259,6 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        # for vec_name in model._lin_vec_names:
         vec_dinput['linear'].set_val(0.0)
         vec_doutput['linear'].set_val(0.0)
         vec_dresid['linear'].set_val(0.0)
@@ -1298,9 +1306,9 @@ class _TotalJacInfo(object):
                     # any input variables involved in this linear solution.
                     with model._scaled_context_all():
                         if cache_key is not None and not has_lin_cons and self.mode == mode:
-                            self._restore_linear_solution(vec_names, cache_key, self.mode)
-                            model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
-                            self._save_linear_solution(vec_names, cache_key, self.mode)
+                            self._restore_linear_solution(cache_key, self.mode)
+                            model._solve_linear(self.mode, rel_systems)
+                            self._save_linear_solution(cache_key, self.mode)
                         else:
                             model._solve_linear(mode, rel_systems)
 
@@ -1347,7 +1355,6 @@ class _TotalJacInfo(object):
 
         # Prepare model for calculation by cleaning out the derivatives
         # vectors.
-        # for vec_name in model._lin_vec_names:
         model._vectors['input']['linear'].set_val(0.0)
         model._vectors['output']['linear'].set_val(0.0)
         model._vectors['residual']['linear'].set_val(0.0)
@@ -1523,14 +1530,12 @@ class _TotalJacInfo(object):
             else:
                 issue_warning(msg, category=DerivativesWarning)
 
-    def _restore_linear_solution(self, vec_names, key, mode):
+    def _restore_linear_solution(self, key, mode):
         """
         Restore the previous linear solution.
 
         Parameters
         ----------
-        vec_names: list of str
-            Names of output vectors to restore.
         key: hashable object
             Key to lookup linear solution.
         mode: str
@@ -1538,32 +1543,23 @@ class _TotalJacInfo(object):
         """
         lin_sol_cache = self.lin_sol_cache
         if key in lin_sol_cache:
-            lin_sol = lin_sol_cache[key]
-            for i, vec_name in enumerate(vec_names):
-                save_vec = lin_sol[i]
-                doutputs = self.output_vec[mode][vec_name]
-                doutputs.set_val(save_vec)
+            doutputs = self.output_vec[mode]['linear']
+            doutputs.set_val(lin_sol_cache[key])
         else:
-            lin_sol_cache[key] = lin_sol = []
-            for vec_name in vec_names:
-                lin_sol.append(deepcopy(self.output_vec[mode][vec_name].asarray()))
+            lin_sol_cache[key] = deepcopy(self.output_vec[mode]['linear'].asarray())
 
-    def _save_linear_solution(self, vec_names, key, mode):
+    def _save_linear_solution(self, key, mode):
         """
         Save the current linear solution.
 
         Parameters
         ----------
-        vec_names: list of str
-            Names of output vectors to restore.
         key: hashable object
             Key to lookup linear solution.
         mode: str
             Direction of derivative solution.
         """
-        lin_sol = self.lin_sol_cache[key]
-        for i, vec_name in enumerate(vec_names):
-            lin_sol[i][:] = self.output_vec[mode][vec_name].asarray()
+        self.lin_sol_cache[key][:] = self.output_vec[mode]['linear'].asarray()
 
     def _do_driver_scaling(self, J):
         """
