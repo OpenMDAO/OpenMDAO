@@ -474,11 +474,12 @@ class Driver(object):
                 # sort the results since _var_allprocs_abs2prom isn't ordered
                 myinputs = sorted([n for n in model._var_allprocs_abs2prom['input']
                                   if check_path(n, incl, excl)])
-
+        myoutputs = list(myoutputs)
+        myoutputs.sort() # sorting the list ensures the outputs are iterated  
+                         # over in the same order even on mulitple procs
         vars2record = {
             'input': myinputs,
-            'output': list(myoutputs).sort(), # sorting the list ensures the outputs are iterated  
-                                              # over in the same order even on mulitple procs
+            'output': myoutputs,
             'residual': myresiduals
         }
 
