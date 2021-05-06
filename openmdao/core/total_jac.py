@@ -133,7 +133,6 @@ class _TotalJacInfo(object):
         self.return_format = return_format
         self.lin_sol_cache = {}
         self.debug_print = debug_print
-        self.par_deriv = {}
         self.par_deriv_printnames = {}
         self.get_remote = get_remote
 
@@ -591,10 +590,8 @@ class _TotalJacInfo(object):
                     rhsname = name
 
                     if parallel_deriv_color:
-                        if parallel_deriv_color not in self.par_deriv:
-                            self.par_deriv[parallel_deriv_color] = []
+                        if parallel_deriv_color not in self.par_deriv_printnames:
                             self.par_deriv_printnames[parallel_deriv_color] = []
-                        self.par_deriv[parallel_deriv_color].append(name)
 
                         print_name = name
                         if name in self.ivc_print_names:
@@ -1184,16 +1181,28 @@ class _TotalJacInfo(object):
         """
         dist = self.comm.size > 1
         if dist:
-            i = inds[self.comm.rank]
-            self.simple_single_jac_scatter(i, mode)
+            for i in inds:
+                if self.in_loc_idxs[mode][i] >= 0:
+                    self.simple_single_jac_scatter(i, mode)
+                    break
+            else:
+                i = -1
             if mode == 'rev':
-                raw = self.comm.allgather((i, self.J[i]))
+                if i < 0:
+                    raw = self.comm.allgather((i, None))
+                else:
+                    raw = self.comm.allgather((i, self.J[i]))
                 for ind, row in raw:
-                    self.J[ind, :] = row
+                    if row is not None:
+                        self.J[ind, :] = row
             else:  # fwd
-                raw = self.comm.allgather((i, self.J[:, i]))
+                if i < 0:
+                    raw = self.comm.allgather((i, None))
+                else:
+                    raw = self.comm.allgather((i, self.J[:, i]))
                 for ind, col in raw:
-                    self.J[:, ind] = col
+                    if col is not None:
+                        self.J[:, ind] = col
         else:
             for i in inds:
                 self.simple_single_jac_scatter(i, mode)
@@ -1247,7 +1256,6 @@ class _TotalJacInfo(object):
             Derivatives in form requested by 'return_format'.
         """
         debug_print = self.debug_print
-        par_deriv = self.par_deriv
         par_print = self.par_deriv_printnames
 
         has_lin_cons = self.has_lin_cons
@@ -1282,24 +1290,20 @@ class _TotalJacInfo(object):
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
 
                     if debug_print:
-                        if par_deriv and key in par_deriv:
+                        if par_print and key in par_print:
                             varlist = '(' + ', '.join([name for name in par_print[key]]) + ')'
-                            print('Solving color:', key, varlist)
+                            print('Solving color:', key, varlist, flush=True)
                         else:
                             if key == '@simul_coloring':
                                 print(f'In mode: {mode}, Solving variable(s) using simul '
                                       'coloring:')
                                 for local_ind in imeta['coloring']._local_indices(inds=inds,
                                                                                   mode=self.mode):
-                                    print("   {}".format(local_ind))
+                                    print(f"   {local_ind}", flush=True)
                             else:
-                                print('In mode: %s.' % mode)
-                                print_key = key
-                                if key in self.ivc_print_names:
-                                    print_key = self.ivc_print_names[key]
-                                print("('{0}', [{1}])".format(print_key, inds))
+                                print(f"In mode: {mode}.\n('{self.ivc_print_names.get(key, key)}'"
+                                      f", [{inds}])", flush=True)
 
-                        sys.stdout.flush()
                         t0 = time.time()
 
                     # restore old linear solution if cache_linear_solution was set by the user for

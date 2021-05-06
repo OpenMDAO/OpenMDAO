@@ -114,32 +114,6 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
-    def test_fan_in_parallel_sets_fwd(self):
-
-        prob = om.Problem()
-        prob.model = FanInGrouped()
-
-        # An extra unconnected desvar was in the original test.
-        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
-
-        prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.sub.linear_solver = om.LinearBlockGS()
-
-        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('x3')
-        prob.model.add_objective('c3.y')
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        indep_list = ['x1', 'x2']
-        unknown_list = ['c3.y']
-
-        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
-
     def test_debug_print_option_totals_color(self):
 
         prob = om.Problem()
@@ -205,9 +179,9 @@ class ParDerivTestCase(unittest.TestCase):
         # Piggyback to make sure the distributed norm calculation is correct.
         vec = prob.model._vectors['residual']['linear']
         norm_val = vec.get_norm()
-        # NOTE: BAN updated the norm value for the PR that added seed splitting, i.e.
-        # the seed, c2.y in this case, is half what it was before (-.5 vs. -1).
-        assert_near_equal(norm_val, 6.422616289332565, 1e-6)
+        # NOTE: BAN updated the norm value for the PR that removed vec_names vectors.
+        # the seeds for the constraints are now back to -1 instead of -.5
+        assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -762,6 +736,12 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model = self.setup_model(size=6)
         pdc = 'a'
         model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        # setting dc2.y2 to a parallel deriv color is no longer valid, i.e. setting multiple variables
+        # on the same component to the same parallel color makes no sense because they can't be solved
+        # for in parallel.  In the past, we maintained separate vectors and rhs for each par deriv var
+        # so they *could* be solved for simultaneously, but we now just use a single linear vector and
+        # rhs so this isn't possible.
+        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0)
         model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
@@ -771,6 +751,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
         assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+        assert_near_equal(data[('pg.dc2.y2', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc2.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
 
@@ -791,7 +772,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model = self.setup_model(size=5)
         pdc = 'a'
         model.add_constraint('dc1.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        model.add_constraint('dc2.y2', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', lower=-1.0, upper=1.0)
         model.add_constraint('dc2.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         # objective is a scalar - gets its own color to avoid being called 10x
         model.add_objective('dc3.y', index=2, parallel_deriv_color='b')
