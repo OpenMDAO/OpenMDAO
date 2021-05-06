@@ -2388,5 +2388,39 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
 
+class CheckTotalsIndices(unittest.TestCase):
+
+    def test_w_indices(self):
+        class TopComp(om.ExplicitComponent):
+
+            def setup(self):
+
+                size = 10
+
+                self.add_input('c_ae_C', np.zeros(size))
+                self.add_input('theta_c2_C', np.zeros(size))
+                self.add_output('c_ae', np.zeros(size))
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        prob = om.Problem()
+        model = prob.model
+
+        geom = model.add_subsystem('tcomp', TopComp())
+
+        # setting indices here caused an indexing error later on
+        model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
+        model.add_constraint('tcomp.c_ae', lower=0.e0,)
+
+        prob.setup()
+
+        prob.run_model()
+        check = prob.check_totals(compact_print=True)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -41,7 +41,7 @@ def _is_context_manager(func):
 
     Parameters
     ----------
-    func: function or method
+    func : function or method
         The function or method to be tested.
 
     Returns
@@ -64,12 +64,12 @@ class ReturnFinder(ast.NodeVisitor):
 
     Attributes
     ----------
-    has_return: bool
+    has_return : bool
         When visit is called, this NodeVisitor will recurse through the
         syntax tree and find any instance of return that is not in a nested
         function.  If it finds return, it is set to True, otherwise it is
         False.
-    passes: bool
+    passes : bool
         Set to True if the method does nothing but pass (i.e. is not yet
         implemented or is a 'virtual' method in a base class)
     """
@@ -138,7 +138,7 @@ class DecoratorFinder(ast.NodeVisitor):
 
     Attributes
     ----------
-    decorators: dict
+    decorators : dict
         The dict where the keys are function names and the values are
         the corresponding decorators.
     """
@@ -153,7 +153,7 @@ class DecoratorFinder(ast.NodeVisitor):
 
         Parameters
         ----------
-        node: node
+        node : node
             The node being visited
 
         """
@@ -174,12 +174,12 @@ class LintTestCase(unittest.TestCase):
         """
         Parameters
         ----------
-        numpy_doc_string: numpydoc.docscrape.NumpyDocString
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
             An instance of the NumpyDocString parsed from the method
 
         Returns
         -------
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
@@ -212,15 +212,15 @@ class LintTestCase(unittest.TestCase):
 
         Parameters
         ----------
-        argspec: namedtuple
+        argspec : namedtuple
             Method argument information from inspect.getargspec (python2) or
             inspect.getfullargspec (python3)
-        numpy_doc_string: numpydoc.docscrape.NumpyDocString
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
             An instance of the NumpyDocString parsed from the method
 
         Returns
         -------
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
@@ -249,33 +249,23 @@ class LintTestCase(unittest.TestCase):
 
             # Check formatting
             for entry in numpy_doc_string['Parameters']:
-                if ": " in entry[0]:
-                    param_and_type = entry[0].split(": ")
-                    name = param_and_type[0]
-                    type_ = param_and_type[1]
-                    name = name + ":"
-                else:
-                    name = entry[0]
-                    type_ = entry[1]
-
+                name = entry[0]
+                type_ = entry[1]
                 desc = '\n'.join(entry[2])
-                if not ':' in name:
-                    new_failures.append('no colon immediately after parameter '
-                                        'name \'{0}\' '.format(name.split(':')[0]))
+                if ':' in name:
+                    new_failures.append('colon after parameter '
+                                         'name \'{0}\' and before type must '
+                                         'be surrounded by '
+                                         'spaces'.format(name.split(':')[0]))
                 if type_ == '':
-                    new_failures.append(entry[2])
                     new_failures.append('no type info given for '
                                         'Parameter {0}'.format(name))
                 if desc == '':
                     new_failures.append('no description given for '
-                                        'Parameter {0}'.format(name))
+                                         'Parameter {0}'.format(name))
 
-            documented_arg_set = set()
-            for item in numpy_doc_string['Parameters']:
-                if ": " in item[0]:
-                    documented_arg_set.add(item[0].split(": ")[0])
-                else:
-                    documented_arg_set.add(item[0])
+            documented_arg_set = set(item[0] for item in
+                                     numpy_doc_string['Parameters'])
 
             # Arguments that aren't documented
             undocumented = arg_set - documented_arg_set
@@ -297,16 +287,16 @@ class LintTestCase(unittest.TestCase):
 
         Parameters
         ----------
-        func: method or function
+        func : method or function
             The method being checked
-        numpy_doc_string: numpydoc.docscrape.NumpyDocString
+        numpy_doc_string : numpydoc.docscrape.NumpyDocString
             An instance of the NumpyDocString parsed from the method
-        name_required: bool
+        name_required : bool
             If True, a name is required for the return value.
 
         Returns
         -------
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
@@ -356,17 +346,17 @@ class LintTestCase(unittest.TestCase):
 
         Parameters
         ----------
-        dir_name: str
+        dir_name : str
             The name of the directory in which the method is defined.
-        file_name: str
+        file_name : str
             The name of the file in which the method is defined.
-        class_name: str
+        class_name : str
             The name of the class to which the method belongs
-        method_name: str
+        method_name : str
             The name of the method
-        method: instancemethod
+        method : instancemethod
             The method being tested.
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
@@ -414,15 +404,15 @@ class LintTestCase(unittest.TestCase):
 
         Parameters
         ----------
-        dir_name: str
+        dir_name : str
             The name of the directory in which the method is defined.
-        file_name: str
+        file_name : str
             The name of the file in which the method is defined.
-        class_name: str
+        class_name : str
             The name of the class being checked.
-        clss: Class
+        clss : class
             The class being tested.
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is
@@ -453,15 +443,15 @@ class LintTestCase(unittest.TestCase):
 
         Parameters
         ----------
-        dir_name: str
+        dir_name : str
             The name of the directory in which the method is defined.
-        file_name: str
+        file_name : str
             The name of the file in which the method is defined.
-        func_name: str
+        func_name : str
             The name of the function being checked
-        func: function
+        func : function
             The function being tested.
-        failures: dict
+        failures : dict
             The failures encountered by the method.  These are all stored
             so that we can fail once at the end of the check_method method
             with information about every failure. Form is

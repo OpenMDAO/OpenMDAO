@@ -97,7 +97,7 @@ class CycleGroup(ParametericTestGroup):
 
         expected_theta = (2 * np.pi - PSI) / (num_comp - 1)
         self.expected_values = {
-            theta_name: expected_theta,
+            theta_name : expected_theta,
             'last.x_norm2': 0.5 * self.size,
         }
 

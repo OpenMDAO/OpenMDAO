@@ -86,7 +86,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        root_vector: Vector or None
+        root_vector : Vector or None
             the root's vector instance or None, if we are at the root.
         """
         if root_vector is None:  # we're the root
@@ -164,7 +164,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             vector to add to self.
 
         Returns
@@ -185,7 +185,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             vector to subtract from self.
 
         Returns
@@ -206,7 +206,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        vec: Vector, int, float or ndarray
+        vec : Vector, int, float or ndarray
             Value to multiply self.
 
         Returns
@@ -227,9 +227,9 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        val: int or float
+        val : int or float
             scalar.
-        vec: <Vector>
+        vec : <Vector>
             this vector times val is added to self.
         """
         data = self.asarray()
@@ -241,7 +241,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             the vector whose values self is set to.
         """
         data = self.asarray()
@@ -253,9 +253,9 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        val: float or ndarray
+        val : float or ndarray
             scalar or array to set data array to.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -289,7 +289,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        copy: bool
+        copy : bool
             If True, return a copy of the array.
 
         Returns
@@ -326,9 +326,9 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        val: ndarray
+        val : ndarray
             Value to set into the data array.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -340,9 +340,9 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        val: ndarray
+        val : ndarray
             Value to set into the data array.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -354,9 +354,9 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        val: ndarray
+        val : ndarray
             Value to set into the data array.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -368,7 +368,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             The incoming vector being dotted with self.
 
         Returns
@@ -423,5 +423,6 @@ class DefaultVector(Vector):
             state minus system member.
         """
         state = self.__dict__.copy()
-        del state['_system']
+        if '_system' in state:
+            del state['_system']
         return state

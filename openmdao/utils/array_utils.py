@@ -19,7 +19,7 @@ def shape_to_len(shape):
 
     Parameters
     ----------
-    shape: tuple
+    shape : tuple
         Numpy shape tuple.
 
     Returns
@@ -47,9 +47,9 @@ def evenly_distrib_idxs(num_divisions, arr_size):
 
     Parameters
     ----------
-    num_divisions: int
+    num_divisions : int
         Number of parts to divide the array into.
-    arr_size: int
+    arr_size : int
         Number of entries in the array.
 
     Returns
@@ -82,11 +82,11 @@ def take_nth(rank, size, seq):
 
     Parameters
     ----------
-    rank: int
+    rank : int
         MPI rank of this process.
-    size: int
+    size : int
         Size of the array we're taking nth entries from.
-    seq: iter
+    seq : iter
         Iterator containing the values being returned.
     """
     assert(rank < size)
@@ -113,9 +113,9 @@ def convert_neg(arr, size):
 
     Parameters
     ----------
-    arr: ndarray
+    arr : ndarray
         Array having negative indices converted.
-    size: int
+    size : int
         Dimension of the array.
 
     Returns
@@ -137,15 +137,15 @@ def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
 
     Parameters
     ----------
-    arr: ndarray
+    arr : ndarray
         Array being visualized.
-    prob: Problem or None
+    prob : Problem or None
         Problem object.
-    of: list of str or None
+    of : list of str or None
         Names of response variables used in derivative calculation.
-    wrt: list of str or None
+    wrt : list of str or None
         Names of design variables used in derivative calculation.
-    stream: file-like
+    stream : file-like
         Stream where output will be written.
     """
     if len(arr.shape) != 2:
@@ -197,9 +197,9 @@ def array_connection_compatible(shape1, shape2):
 
     Parameters
     ----------
-    shape1: tuple of int
+    shape1 : tuple of int
         Shape of the first array.
-    shape2: tuple of int
+    shape2 : tuple of int
         Shape of the second array.
 
     Returns
@@ -242,17 +242,17 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
 
     Parameters
     ----------
-    data: ndarray
+    data : ndarray
         Array of values
-    rows: index array
+    rows : index array
         Array of row indices.
-    cols: index array
+    cols : index array
         Array of column indices.
-    nrow: int
+    nrow : int
         Number of rows in sub jacobian.
-    ncol: int
+    ncol : int
         Number of columns in sub jacobian.
-    num_nodes: int
+    num_nodes : int
         Number of vectorized copies to tile.
 
     Returns
@@ -286,7 +286,7 @@ def _global2local_offsets(global_offsets):
 
     Parameters
     ----------
-    global_offsets: dict
+    global_offsets : dict
         Arrays of global offsets keyed by vec_name and deriv direction.
 
     Returns
@@ -311,15 +311,15 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
 
     Parameters
     ----------
-    full_idxs: ndarray
+    full_idxs : ndarray
         Indices into the full array (which could be outs + ins or just ins)
-    inputs: Vector
+    inputs : Vector
         Inputs vector.
-    outputs: Vector
+    outputs : Vector
         Outputs vector.
-    use_full_cols: bool
+    use_full_cols : bool
         If True,  full idxs are into the full outs + ins vector.
-    is_total: bool
+    is_total : bool
         If True, total derivatives are being computed and wrt vector is the outputs vector.
 
     Returns
@@ -347,13 +347,13 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
 
     Parameters
     ----------
-    src_indices: ndarray
+    src_indices : ndarray
         Array of src_indices.  Can be flat or multi-dimensional.
-    shape_in: tuple
+    shape_in : tuple
         Shape of the input variable.
-    shape_out: tuple
+    shape_out : tuple
         Shape of the output variable.
-    size_out: int
+    size_out : int
         Size of the output variable.
 
     Returns
@@ -379,7 +379,7 @@ def sizes2offsets(size_array):
 
     Parameters
     ----------
-    size_array: ndarray
+    size_array : ndarray
         Array of sizes.
 
     Returns
@@ -400,7 +400,7 @@ def abs_complex(x):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         Input array.
 
     Returns
@@ -419,9 +419,9 @@ def dv_abs_complex(x, x_deriv):
 
     Parameters
     ----------
-    x: ndarray
+    x : ndarray
         Input array, used for determining which elements to negate.
-    x_deriv: ndarray
+    x_deriv : ndarray
         Incominng partial derivative array, may have one additional dimension.
 
     Returns
@@ -453,11 +453,11 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
 
     Parameters
     ----------
-    shape: tuple
+    shape : tuple
         Desired shape of the matrix.
-    density_ratio: float
+    density_ratio : float
         Approximate ratio of nonzero to zero entries in the desired matrix.
-    dtype: type
+    dtype : type
         Specifies type of the values in the returned matrix.
 
     Returns
@@ -493,9 +493,9 @@ def sparse_subinds(orig, inds):
 
     Parameters
     ----------
-    orig: ndarray
+    orig : ndarray
         Either row or col indices (part of a subjac sparsity pattern).
-    inds: ndarray or list
+    inds : ndarray or list
         Sub-indices introduced when adding a desvar or response.
 
     Returns

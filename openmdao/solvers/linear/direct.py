@@ -17,9 +17,9 @@ def index_to_varname(system, loc):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System containing the Directsolver.
-    loc: int
+    loc : int
         Index of row or column.
 
     Returns
@@ -50,11 +50,11 @@ def loc_to_error_msg(system, loc_txt, loc):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System containing the Directsolver.
-    loc_txt: str
+    loc_txt : str
         Either 'row' or 'col'.
-    loc: int
+    loc : int
         Index of row or column.
 
     Returns
@@ -73,9 +73,9 @@ def format_singular_error(system, matrix):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System containing the Directsolver.
-    matrix: ndarray
+    matrix : ndarray
         Matrix of interest.
 
     Returns
@@ -134,9 +134,9 @@ def format_nan_error(system, matrix):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System containing the Directsolver.
-    matrix: ndarray
+    matrix : ndarray
         Matrix of interest.
 
     Returns
@@ -195,9 +195,9 @@ class DirectSolver(LinearSolver):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -410,9 +410,9 @@ class DirectSolver(LinearSolver):
 
         Parameters
         ----------
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Names of systems relevant to the current solve.
         """
         system = self._system()

@@ -68,7 +68,7 @@ def setup(methods=None, finalize=True):
     Parameters
     ----------
 
-    methods: list, optional
+    methods : list, optional
         A list of tuples of profiled methods to override the default set.  The first
         entry is the method name or glob pattern and the second is a tuple of class
         objects used for isinstance checking.  The default set of methods is:
@@ -79,7 +79,7 @@ def setup(methods=None, finalize=True):
                 "*": (System, Jacobian, Matrix, Solver, Driver, Problem),
             ]
 
-    finalize: bool
+    finalize : bool
         If True, register a function to finalize the profile before exit.
 
     """
@@ -226,7 +226,7 @@ def _process_1_profile(fname):
     Parameters
     ----------
 
-    flist: list of str
+    flist : list of str
         Names of raw profiling data files.
 
     """
@@ -269,7 +269,7 @@ def _process_profile(flist):
     Parameters
     ----------
 
-    flist: list of str
+    flist : list of str
         Names of raw profiling data files.
 
     """
@@ -401,9 +401,9 @@ def _iprof_py_file(options, user_args):
 
     Parameters
     ----------
-    options: argparse Namespace
+    options : argparse Namespace
         Command line options.
-    user_args: list of str
+    user_args : list of str
         Command line options after '--' (if any).  Passed to user script.
     """
     if not func_group:

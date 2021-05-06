@@ -27,9 +27,9 @@ class SolverInfo(object):
 
     Attributes
     ----------
-    prefix: str
+    prefix : str
         Prefix to prepend during this iprint.
-    stack: list
+    stack : list
         List of strings; strings are popped and appended as needed.
     """
 
@@ -96,7 +96,7 @@ class SolverInfo(object):
 
         Parameters
         ----------
-        cache: tuple(str, list)
+        cache : tuple(str, list)
             cache of current stack
         """
         self.prefix, self.stack = cache
@@ -111,31 +111,31 @@ class Solver(object):
 
     Attributes
     ----------
-    _system: <System>
+    _system : <System>
         Pointer to the owning system.
-    _depth: int
+    _depth : int
         How many subsolvers deep this solver is (0 means not a subsolver).
-    _mode: str
+    _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
-    _iter_count: int
+    _iter_count : int
         Number of iterations for the current invocation of the solver.
-    _rec_mgr: <RecordingManager>
+    _rec_mgr : <RecordingManager>
         object that manages all recorders added to this solver
-    cite: str
+    cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
-    options: <OptionsDictionary>
+    options : <OptionsDictionary>
         Options dictionary.
-    recording_options: <OptionsDictionary>
+    recording_options : <OptionsDictionary>
         Recording options dictionary.
-    supports: <OptionsDictionary>
+    supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
-    _filtered_vars_to_record: Dict
+    _filtered_vars_to_record : Dict
         Dict of list of var names to record
-    _norm0: float
+    _norm0 : float
         Normalization factor
-    _problem_meta: dict
+    _problem_meta : dict
         Problem level metadata.
     """
 
@@ -148,7 +148,7 @@ class Solver(object):
 
         Parameters
         ----------
-        **kwargs: dict of keyword arguments
+        **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Solver options.
         """
         self._system = None
@@ -257,7 +257,7 @@ class Solver(object):
 
         Parameters
         ----------
-        recorder: <CaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
         if MPI:
@@ -279,9 +279,9 @@ class Solver(object):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         self._system = weakref.ref(system)
@@ -331,11 +331,11 @@ class Solver(object):
 
         Parameters
         ----------
-        level: int
+        level : int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        type_: str
+        type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         self.options['iprint'] = level
@@ -346,11 +346,11 @@ class Solver(object):
 
         Parameters
         ----------
-        iteration: int
+        iteration : int
             iteration counter, 0-based.
-        abs_res: float
+        abs_res : float
             current absolute residual norm.
-        rel_res: float
+        rel_res : float
             current relative residual norm.
         """
         if (self.options['iprint'] == 2 and
@@ -436,7 +436,7 @@ class Solver(object):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             Keyword arguments (used for abs and rel error).
         """
         if not self._rec_mgr._recorders:
@@ -484,7 +484,7 @@ class Solver(object):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
@@ -510,7 +510,7 @@ class NonlinearSolver(Solver):
 
     Attributes
     ----------
-    _err_cache: dict
+    _err_cache : dict
         Dictionary holding input and output vectors at start of iteration, if requested.
     """
 
@@ -520,7 +520,7 @@ class NonlinearSolver(Solver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             options dictionary.
         """
         super().__init__(**kwargs)
@@ -770,9 +770,9 @@ class LinearSolver(Solver):
 
     Attributes
     ----------
-    _rel_systems: set of str
+    _rel_systems : set of str
         Names of systems relevant to the current solve.
-    _assembled_jac: AssembledJacobian or None
+    _assembled_jac : AssembledJacobian or None
         If not None, the AssembledJacobian instance used by this solver.
     """
 
@@ -782,7 +782,7 @@ class LinearSolver(Solver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             options dictionary.
         """
         self._rel_systems = None
@@ -802,7 +802,7 @@ class LinearSolver(Solver):
 
         Parameters
         ----------
-        recorder: <CaseRecorder>
+        recorder : <CaseRecorder>
            A recorder instance to be added to RecManager.
         """
         raise RuntimeError('Recording is not supported on Linear Solvers.')
@@ -822,9 +822,9 @@ class LinearSolver(Solver):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -838,9 +838,9 @@ class LinearSolver(Solver):
 
         Parameters
         ----------
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
         raise NotImplementedError("class %s does not implement solve()." % (type(self).__name__))
@@ -952,9 +952,9 @@ class BlockLinearSolver(LinearSolver):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -983,7 +983,7 @@ class BlockLinearSolver(LinearSolver):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:
@@ -1039,9 +1039,9 @@ class BlockLinearSolver(LinearSolver):
 
         Parameters
         ----------
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
         self._rel_systems = rel_systems

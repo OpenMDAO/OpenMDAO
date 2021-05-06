@@ -11,7 +11,7 @@ class LinearUserDefined(LinearSolver):
 
     Attributes
     ----------
-    solve_function: function
+    solve_function : function
         Custom function containing the solve_linear function. The default is None, which means
         the name defaults to "solve_linear".
     """
@@ -24,10 +24,10 @@ class LinearUserDefined(LinearSolver):
 
         Parameters
         ----------
-        solve_function: function
+        solve_function : function
             Custom function containing the solve_linear function. The default is None, which means
             the name defaults to "solve_linear".
-        **kwargs: dict
+        **kwargs : dict
             Options dictionary.
         """
         super().__init__(**kwargs)
@@ -42,9 +42,9 @@ class LinearUserDefined(LinearSolver):
 
         Parameters
         ----------
-        mode: string
+        mode : string
             Derivative mode, can be 'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
         self._rel_systems = rel_systems

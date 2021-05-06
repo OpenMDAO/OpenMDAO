@@ -17,10 +17,10 @@ class NewtonSolver(NonlinearSolver):
 
     Attributes
     ----------
-    linear_solver: LinearSolver
+    linear_solver : LinearSolver
         Linear solver to use to find the Newton search direction. The default
         is the parent system's linear solver.
-    linesearch: NonlinearSolver
+    linesearch : NonlinearSolver
         Line search algorithm. Default is None for no line search.
     """
 
@@ -32,7 +32,7 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             options dictionary.
         """
         super().__init__(**kwargs)
@@ -70,9 +70,9 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        system: System
+        system : System
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -106,11 +106,11 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        level: int
+        level : int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        type_: str
+        type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         super()._set_solver_print(level=level, type_=type_)
@@ -258,7 +258,7 @@ class NewtonSolver(NonlinearSolver):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         if self.linear_solver is not None:

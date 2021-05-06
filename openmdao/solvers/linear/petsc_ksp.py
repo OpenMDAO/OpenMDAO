@@ -71,7 +71,7 @@ def _get_petsc_vec_array_new(vec):
 
     Parameters
     ----------
-    vec: petsc vector
+    vec : petsc vector
         Vector whose data is being requested.
 
     Returns
@@ -90,7 +90,7 @@ def _get_petsc_vec_array_old(vec):
 
     Parameters
     ----------
-    vec: petsc vector
+    vec : petsc vector
         Vector whose data is being requested.
 
     Returns
@@ -122,11 +122,11 @@ class Monitor(object):
 
     Attributes
     ----------
-    _solver: _solver
+    _solver : _solver
         the openmdao solver.
-    _norm: float
+    _norm : float
         the current norm.
-    _norm0: float
+    _norm0 : float
         the norm for the first iteration.
     """
 
@@ -136,7 +136,7 @@ class Monitor(object):
 
         Parameters
         ----------
-        solver: object
+        solver : object
             the openmdao solver.
         """
         self._solver = solver
@@ -149,11 +149,11 @@ class Monitor(object):
 
         Parameters
         ----------
-        ksp: object
+        ksp : object
             the KSP solver.
-        counter: int
+        counter : int
             the counter.
-        norm: float
+        norm : float
             the norm.
         """
         if counter == 0 and norm != 0.0:
@@ -170,9 +170,9 @@ class PETScKrylov(LinearSolver):
 
     Attributes
     ----------
-    precon: Solver
+    precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
-    _ksp: dist
+    _ksp : dist
         dictionary of KSP instances (keyed on vector name).
     """
 
@@ -184,7 +184,7 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
         super().__init__(**kwargs)
@@ -234,9 +234,9 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -250,11 +250,11 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        level: int
+        level : int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        type_: str
+        type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         super()._set_solver_print(level=level, type_=type_)
@@ -269,20 +269,20 @@ class PETScKrylov(LinearSolver):
         The following attributes must be defined when solve is called to
         provide information used in this callback:
 
-        _system: System
+        _system : System
             pointer to the owning system.
-        _vec_name: str
+        _vec_name : str
             the right-hand-side (RHS) vector name.
-        _mode: str
+        _mode : str
             'fwd' or 'rev'.
 
         Parameters
         ----------
-        mat: PETSc.Mat
+        mat : PETSc.Mat
             PETSc matrix object.
-        in_vec: PetSC Vector
+        in_vec : PetSC Vector
             Incoming vector.
-        result: PetSC Vector
+        result : PetSC Vector
             Empty array into which we place the matrix-vector product.
         """
         # assign x and b vectors based on mode
@@ -333,9 +333,9 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        mode: string
+        mode : string
             Derivative mode, can be 'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Names of systems relevant to the current solve.
         """
         self._rel_systems = rel_systems
@@ -385,11 +385,11 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        mat: PETSc.Mat
+        mat : PETSc.Mat
             PETSc matrix object.
-        in_vec: PETSc.Vector
+        in_vec : PETSc.Vector
             Incoming vector
-        result: PETSc.Vector
+        result : PETSc.Vector
             Empty vector in which the preconditioned in_vec is stored.
         """
         if self.precon:
@@ -429,7 +429,7 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        system: `System`
+        system : `System`
             Parent `System` object.
 
         Returns

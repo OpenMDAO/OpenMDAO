@@ -20,11 +20,11 @@ class DenseMatrix(COOMatrix):
 
         Parameters
         ----------
-        num_rows: int
+        num_rows : int
             number of rows in the matrix.
-        num_cols: int
+        num_cols : int
             number of cols in the matrix.
-        system: <System>
+        system : <System>
             owning system.
         """
         super()._build(num_rows, num_cols)
@@ -36,11 +36,11 @@ class DenseMatrix(COOMatrix):
 
         Parameters
         ----------
-        in_vec: ndarray[:]
+        in_vec : ndarray[:]
             incoming vector to multiply.
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        mask: ndarray of type bool, or None
+        mask : ndarray of type bool, or None
             Array used to mask out part of the input vector.
 
         Returns
@@ -79,12 +79,12 @@ class DenseMatrix(COOMatrix):
         """
         Create masking array for this matrix.
 
-        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Note : this only applies when this Matrix is an 'ext_mtx' inside of a
         Jacobian object.
 
         Parameters
         ----------
-        d_inputs: Vector
+        d_inputs : Vector
             The inputs linear vector.
 
         Returns

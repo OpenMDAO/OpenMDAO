@@ -29,48 +29,48 @@ class Vector(object):
 
     Attributes
     ----------
-    _name: str
+    _name : str
         The name of the vector: 'nonlinear' or 'linear'.
-    _typ: str
+    _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
-    _kind: str
+    _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
-    _system: System
+    _system : System
         Pointer to the owning system.
-    _iproc: int
+    _iproc : int
         Global processor index.
-    _length: int
+    _length : int
         Length of flattened vector.
-    _views: dict
+    _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
-    _views_flat: dict
+    _views_flat : dict
         Dictionary mapping absolute variable names to the flattened ndarray views.
-    _names: set([str, ...])
+    _names : set([str, ...])
         Set of variables that are relevant in the current context.
-    _root_vector: Vector
+    _root_vector : Vector
         Pointer to the vector owned by the root system.
-    _alloc_complex: bool
+    _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
-    _data: ndarray
+    _data : ndarray
         Actual allocated data.
-    _slices: dict
+    _slices : dict
         Mapping of var name to slice.
-    _under_complex_step: bool
+    _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _ncol: int
+    _ncol : int
         Number of columns for multi-vectors.
-    _icol: int or None
+    _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.
-    _do_scaling: bool
+    _do_scaling : bool
         True if this vector performs scaling.
-    _do_adder: bool
+    _do_adder : bool
         True if this vector's scaling includes an additive term.
-    _scaling: dict
+    _scaling : dict
         Contains scale factors to convert data arrays.
-    read_only: bool
+    read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
-    _len: int
+    _len : int
         Total length of data vector (including shared memory parts).
     """
 
@@ -83,15 +83,15 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             The name of the vector: 'nonlinear' or 'linear'.
-        kind: str
+        kind : str
             The kind of vector, 'input', 'output', or 'residual'.
-        system: <System>
+        system : <System>
             Pointer to the owning system.
-        root_vector: <Vector>
+        root_vector : <Vector>
             Pointer to the vector owned by the root system.
-        alloc_complex: bool
+        alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._name = name
@@ -202,7 +202,7 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Promoted or relative variable name in the owning system's namespace.
 
         Returns
@@ -242,7 +242,7 @@ class Vector(object):
 
         Parameters
         ----------
-        flat: bool
+        flat : bool
             If True, return the flattened values.
         """
         arrs = self._views_flat if flat else self._views
@@ -267,7 +267,7 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Promoted or relative variable name in the owning system's namespace.
 
         Returns
@@ -283,7 +283,7 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Absolute variable name.
 
         Returns
@@ -299,7 +299,7 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Promoted or relative variable name in the owning system's namespace.
 
         Returns
@@ -328,9 +328,9 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Absolute name in the owning system's namespace.
-        flat: bool
+        flat : bool
             If True, return the flat value.
 
         Returns
@@ -353,9 +353,9 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             Promoted or relative variable name in the owning system's namespace.
-        value: float or list or tuple or ndarray
+        value : float or list or tuple or ndarray
             variable value to set
         """
         self.set_var(name, value)
@@ -368,7 +368,7 @@ class Vector(object):
 
         Parameters
         ----------
-        root_vector: <Vector> or None
+        root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
         raise NotImplementedError('_initialize_data not defined for vector type %s' %
@@ -391,7 +391,7 @@ class Vector(object):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             vector to add to self.
         """
         raise NotImplementedError('__iadd__ not defined for vector type %s' %
@@ -405,7 +405,7 @@ class Vector(object):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             vector to subtract from self.
         """
         raise NotImplementedError('__isub__ not defined for vector type %s' %
@@ -419,7 +419,7 @@ class Vector(object):
 
         Parameters
         ----------
-        val: int or float
+        val : int or float
             scalar to multiply self.
         """
         raise NotImplementedError('__imul__ not defined for vector type %s' %
@@ -433,9 +433,9 @@ class Vector(object):
 
         Parameters
         ----------
-        val: int or float
+        val : int or float
             scalar.
-        vec: <Vector>
+        vec : <Vector>
             this vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type %s' %
@@ -449,7 +449,7 @@ class Vector(object):
 
         Parameters
         ----------
-        copy: bool
+        copy : bool
             If True, return a copy of the array.
 
         Returns
@@ -484,7 +484,7 @@ class Vector(object):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             the vector whose values self is set to.
         """
         raise NotImplementedError('set_vec not defined for vector type %s' %
@@ -498,9 +498,9 @@ class Vector(object):
 
         Parameters
         ----------
-        val: float or ndarray
+        val : float or ndarray
             scalar or array to set data array to.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
         """
         raise NotImplementedError('set_arr not defined for vector type %s' %
@@ -512,13 +512,13 @@ class Vector(object):
 
         Parameters
         ----------
-        name: str
+        name : str
             The name of the variable.
-        val: float or ndarray
+        val : float or ndarray
             Scalar or array to set data array to.
-        idxs: int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices.
             The locations where the data array should be updated.
-        flat: bool
+        flat : bool
             If True, set into flattened variable.
         """
         abs_name = self._name2abs_name(name)
@@ -557,7 +557,7 @@ class Vector(object):
 
         Parameters
         ----------
-        vec: <Vector>
+        vec : <Vector>
             The incoming vector being dotted with self.
         """
         raise NotImplementedError('dot not defined for vector type %s' %
@@ -591,7 +591,7 @@ class Vector(object):
 
         Parameters
         ----------
-        active: bool
+        active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
         self._under_complex_step = active

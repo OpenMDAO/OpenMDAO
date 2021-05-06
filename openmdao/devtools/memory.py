@@ -37,11 +37,11 @@ try:
 
         Parameters
         ----------
-        msg: str
+        msg : str
             String prepended to each reported memory usage.
-        out: file-like
+        out : file-like
             Output will be sent to this stream.
-        resident: bool
+        resident : bool
             If True, report resident memory usage, else virtual.
 
         Returns
@@ -66,7 +66,7 @@ try:
 
         Parameters
         ----------
-        fn: function
+        fn : function
             The function being decorated.
 
         Returns
@@ -96,13 +96,13 @@ try:
 
         Parameters
         ----------
-        niter: int
+        niter : int
             Number of times to run func.
-        func: function
+        func : function
             A function that takes no arguments.
-        *args: tuple
+        *args : tuple
             Positional args passed to func.
-        **kwargs: dict
+        **kwargs : dict
             Named args to be passed to func.
         """
         gc.collect()
@@ -138,13 +138,13 @@ try:
 
         Parameters
         ----------
-        lst: list
+        lst : list
             List used to collect objects and deltas.
-        fn: function
+        fn : function
             The function being checked for possible memory leaks.
-        *args: tuple
+        *args : tuple
             Positional args passed to fn.
-        **kwargs: dict
+        **kwargs : dict
             Named args to be passed to fn.
 
         Returns
@@ -169,7 +169,7 @@ try:
 
         Parameters
         ----------
-        fn: function
+        fn : function
             The function being checked for possible memory leaks.
 
         Returns
@@ -193,13 +193,13 @@ try:
 
         Parameters
         ----------
-        niter: int
+        niter : int
             Number of times to run func.
-        func: function
+        func : function
             A function that takes no arguments.
-        *args: tuple
+        *args : tuple
             Positional args passed to func.
-        **kwargs: dict
+        **kwargs : dict
             Named args to be passed to func.
 
         Returns
@@ -235,9 +235,9 @@ try:
 
         Parameters
         ----------
-        leakset: set of tuples of the form (objtype, count)
+        leakset : set of tuples of the form (objtype, count)
             Output of check_iter_leaks.
-        out: file-like
+        out : file-like
             Output stream.
         """
         if leakset:
@@ -272,9 +272,9 @@ def plot_mem(mems, fname=None):
 
     Parameters
     ----------
-    mems: iter of float
+    mems : iter of float
         Iterator containing memory usage values.
-    fname: str (optional)
+    fname : str (optional)
         If specified, save the plot to this file.
     """
     import matplotlib.pyplot as plt

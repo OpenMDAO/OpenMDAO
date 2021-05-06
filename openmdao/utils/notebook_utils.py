@@ -4,11 +4,11 @@ import importlib
 import inspect
 
 try:
-    from IPython.display import display, HTML, Code
+    from IPython.display import display, HTML, IFrame, Code
     from IPython import get_ipython
     ipy = get_ipython() is not None
 except ImportError:
-    ipy = None
+    ipy = display = HTML = IFrame = None
 
 from openmdao.utils.general_utils import simple_warning
 
@@ -26,7 +26,7 @@ def _get_object_from_reference(reference):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class.
 
     Returns
@@ -55,9 +55,9 @@ def display_source(reference, hide_doc_string=False):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired function.
-    hide_doc_string: bool
+    hide_doc_string : bool
         Option to hide the docstring.
 
     Returns
@@ -79,14 +79,17 @@ def display_source(reference, hide_doc_string=False):
                        "`pip install openmdao[docs]` to upgrade.")
 
 
-def show_options_table(reference):
+def show_options_table(reference, recording_options=False):
     """
     Return the options table of the given reference path.
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class or function.
+
+    recording_options : bool
+        If True, display recording options instead of options.
 
     Returns
     -------
@@ -96,7 +99,10 @@ def show_options_table(reference):
     obj = _get_object_from_reference(reference)()
 
     if ipy:
-        return display(HTML(obj.options.to_table(fmt='html')))
+        if not recording_options:
+            return display(HTML(obj.options.to_table(fmt='html')))
+        else:
+            return display(HTML(obj.recording_options.to_table(fmt='html')))
     else:
         simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
                        "`pip install openmdao[docs]` to upgrade.")
@@ -108,7 +114,7 @@ def cite(reference):
 
     Parameters
     ----------
-    reference: str
+    reference : str
         Dot path of desired class or function.
     """
     obj = _get_object_from_reference(reference)()

@@ -8,15 +8,9 @@ import networkx as nx
 
 import numpy as np
 
-try:
-    from IPython.display import IFrame, display, HTML
-except ImportError:
-    IFrame = display = None
-
 from openmdao.components.exec_comp import ExecComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.core.notebook_utils import notebook, colab
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
@@ -30,6 +24,7 @@ from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
+from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
@@ -51,7 +46,7 @@ def _convert_nans_in_nested_list(val_as_list):
 
     Parameters
     ----------
-    val_as_list: list, possibly nested
+    val_as_list : list, possibly nested
         the list whose nan elements need to be converted
     """
     for i, val in enumerate(val_as_list):
@@ -74,12 +69,12 @@ def _convert_ndarray_to_support_nans_in_json(val):
 
     Parameters
     ----------
-    val: ndarray
+    val : ndarray
         the numpy array to be converted
 
     Returns
     -------
-    object: list, possibly nested
+    object : list, possibly nested
         The equivalent list with any nan values replaced with the string "nan".
     """
     val_as_list = val.tolist()
@@ -162,7 +157,7 @@ def _serialize_single_option(option):
 
     Parameters
     ----------
-    option: object
+    option : object
         Option to be serialized.
 
     Returns
@@ -312,7 +307,7 @@ def _get_declare_partials(system):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         A System in the model.
 
     Returns
@@ -344,12 +339,12 @@ def _get_viewer_data(data_source, case_id=None):
 
     Parameters
     ----------
-    data_source: <Problem> or <Group> or str
+    data_source : <Problem> or <Group> or str
         A Problem or Group or case recorder filename containing the model or model data.
         If the case recorder file from a parallel run has separate metadata, the
         filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
 
-    case_id: int or str or None
+    case_id : int or str or None
         Case name or index of case in SQL file.
 
     Returns
@@ -521,27 +516,27 @@ def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddab
 
     Parameters
     ----------
-    data_source: <Problem> or str
+    data_source : <Problem> or str
         The Problem or case recorder database containing the model or model data.
 
-    case_id: int, str, or None
+    case_id : int, str, or None
         Case name or index of case in SQL file if data_source is a database.
 
-    outfile: str, optional
+    outfile : str, optional
         The name of the final output file
 
-    show_browser: bool, optional
+    show_browser : bool, optional
         If True, pop up the system default web browser to view the generated html file.
         Defaults to True.
 
-    embeddable: bool, optional
+    embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
 
-    title: str, optional
+    title : str, optional
         The title for the diagram. Used in the HTML title.
 
-    use_declare_partial_info: ignored
+    use_declare_partial_info : ignored
         This option is no longer used because it is now always true.
         Still present for backwards compatibility.
 

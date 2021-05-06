@@ -12,13 +12,13 @@ class SplineComp(ExplicitComponent):
 
     Attributes
     ----------
-    interp_to_cp: dict
+    interp_to_cp : dict
         Dictionary of relationship between the interpolated data and its control points.
-    interps: dict
+    interps : dict
         Dictionary of interpolations for each output.
     _n_cp = int
         Number of control points.
-    _spline_cache: list
+    _spline_cache : list
         Cached arguments passed to add_spline. These are processed in setup.
     """
 
@@ -28,7 +28,7 @@ class SplineComp(ExplicitComponent):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             Interpolator options to pass onward.
         """
         super().__init__(**kwargs)
@@ -69,13 +69,13 @@ class SplineComp(ExplicitComponent):
 
         Parameters
         ----------
-        y_cp_name: str
+        y_cp_name : str
             Name for the y control points input.
-        y_interp_name: str
+        y_interp_name : str
             Name of the y interpolated points output.
-        y_cp_val: list or ndarray
+        y_cp_val : list or ndarray
             List/array of default y control point values.
-        y_units: str or None
+        y_units : str or None
             Units of the y variable.
         """
         self._spline_cache.append((y_cp_name, y_interp_name, y_cp_val, y_units))
@@ -158,9 +158,9 @@ class SplineComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        outputs: Vector
+        outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
         for out_name, interp in self.interps.items():
@@ -186,9 +186,9 @@ class SplineComp(ExplicitComponent):
 
         Parameters
         ----------
-        inputs: Vector
+        inputs : Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials: Jacobian
+        partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         for out_name, interp in self.interps.items():

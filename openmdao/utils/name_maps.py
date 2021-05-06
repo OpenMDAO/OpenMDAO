@@ -7,9 +7,9 @@ def rel_name2abs_name(system, rel_name):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which the given name is relative.
-    rel_name: str
+    rel_name : str
         Given relative variable name.
 
     Returns
@@ -26,9 +26,9 @@ def abs_name2rel_name(system, abs_name):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which the given name is relative.
-    abs_name: str
+    abs_name : str
         Given absolute variable name.
 
     Returns
@@ -45,9 +45,9 @@ def rel_key2abs_key(system, rel_key):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which the given key is relative.
-    rel_key: (str, str)
+    rel_key : (str, str)
         Given relative variable name pair.
 
     Returns
@@ -64,9 +64,9 @@ def abs_key2rel_key(system, abs_key):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which the given key is relative.
-    abs_key: (str, str)
+    abs_key : (str, str)
         Given absolute variable name pair.
 
     Returns
@@ -85,11 +85,11 @@ def prom_name2abs_name(system, prom_name, type_):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which prom_name is relative.
-    prom_name: str
+    prom_name : str
         Promoted variable name in the owning system's namespace.
-    type_: str
+    type_ : str
         Either 'input' or 'output'.
 
     Returns
@@ -129,9 +129,9 @@ def name2abs_name(system, name):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which name is relative.
-    name: str
+    name : str
         Promoted or relative variable name in the owning system's namespace.
 
     Returns
@@ -169,9 +169,9 @@ def name2abs_names(system, name):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which name is relative.
-    name: str
+    name : str
         Promoted or relative variable name in the owning system's namespace.
 
     Returns
@@ -217,9 +217,9 @@ def prom_key2abs_key(system, prom_key):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which prom_key is relative.
-    prom_key: (str, str)
+    prom_key : (str, str)
         Promoted name pair of sub-Jacobian.
 
     Returns
@@ -254,9 +254,9 @@ def key2abs_key(system, key):
 
     Parameters
     ----------
-    system: <System>
+    system : <System>
         System to which prom_key is relative.
-    key: (str, str)
+    key : (str, str)
         Promoted or relative name pair of sub-Jacobian.
 
     Returns

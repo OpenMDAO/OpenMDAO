@@ -22,7 +22,7 @@ class ScipyKrylov(LinearSolver):
 
     Attributes
     ----------
-    precon: Solver
+    precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
     """
 
@@ -34,7 +34,7 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        **kwargs: {}
+        **kwargs : {}
             dictionary of options set by the instantiating class/script.
         """
         super().__init__(**kwargs)
@@ -76,9 +76,9 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        system: <System>
+        system : <System>
             pointer to the owning system.
-        depth: int
+        depth : int
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
@@ -92,11 +92,11 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        level: int
+        level : int
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
-        type_: str
+        type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
         super()._set_solver_print(level=level, type_=type_)
@@ -129,7 +129,7 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        in_arr: ndarray
+        in_arr : ndarray
             the incoming array.
 
         Returns
@@ -163,7 +163,7 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        res: ndarray
+        res : ndarray
             the current residual vector.
         """
         norm = np.linalg.norm(res)
@@ -182,9 +182,9 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Names of systems relevant to the current solve.
         """
         self._rel_systems = rel_systems
@@ -241,7 +241,7 @@ class ScipyKrylov(LinearSolver):
 
         Parameters
         ----------
-        in_vec: ndarray
+        in_vec : ndarray
             Incoming vector.
 
         Returns

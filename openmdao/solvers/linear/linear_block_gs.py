@@ -11,10 +11,10 @@ class LinearBlockGS(BlockLinearSolver):
 
     Attributes
     ----------
-    _delta_d_n_1: ndarray
+    _delta_d_n_1 : ndarray
         Cached change in the d_output vectors for the previous iteration. Only used if the
         aitken acceleration option is turned on.
-    _theta_n_1: float
+    _theta_n_1 : float
         Cached relaxation factor from previous iteration. Only used if the aitken acceleration
         option is turned on.
     """
@@ -27,7 +27,7 @@ class LinearBlockGS(BlockLinearSolver):
 
         Parameters
         ----------
-        **kwargs: dict
+        **kwargs : dict
             options dictionary.
         """
         super().__init__(**kwargs)

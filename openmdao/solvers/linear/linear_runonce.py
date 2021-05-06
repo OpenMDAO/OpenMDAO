@@ -18,9 +18,9 @@ class LinearRunOnce(LinearBlockGS):
 
         Parameters
         ----------
-        mode: str
+        mode : str
             'fwd' or 'rev'.
-        rel_systems: set of str
+        rel_systems : set of str
             Names of systems relevant to the current solve.
         """
         self._mode = mode
