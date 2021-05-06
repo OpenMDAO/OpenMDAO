@@ -41,7 +41,7 @@ class MuxComp(ExplicitComponent):
         self.options.declare('vec_size', types=int, default=2,
                              desc='The number of elements to be combined into an output.')
 
-    def add_var(self, name, val=1.0, shape=None, units=None, desc='', axis=0):
+    def add_var(self, name, val=1.0, shape=None, units=None, desc='', axis=0, method='stack'):
         """
         Add an output variable to be muxed, and all associated input variables.
 
@@ -63,8 +63,11 @@ class MuxComp(ExplicitComponent):
         axis : int
             The axis along which the elements will be stacked.  Note that N-dimensional inputs
             cannot be stacked along an axis greater than N.
+        method : str
+            Options are: (stack, concatenate). Default method is stack.
         """
-        self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
+        self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis,
+                            'method': method}
 
         opts = self.options
         vec_size = opts['vec_size']
@@ -75,9 +78,15 @@ class MuxComp(ExplicitComponent):
         in_shape = np.asarray(options['val']).shape \
             if options['shape'] is None else options['shape']
         in_size = np.prod(in_shape)
-        out_shape = list(in_shape)
-        out_shape.insert(options['axis'], vec_size)
+        if method == 'concatenate':
+            out_shape = np.asarray(in_shape)
+            out_shape[axis] *= vec_size
+            out_shape = list(out_shape)
+        else:
+            out_shape = list(in_shape)
+            out_shape.insert(options['axis'], vec_size)
         kwgs.pop('shape')
+        kwgs.pop('method')
         ax = kwgs.pop('axis')
 
         in_dimension = len(in_shape)
@@ -93,6 +102,7 @@ class MuxComp(ExplicitComponent):
                         desc=options['desc'])
 
         self._input_names[name] = []
+        self.out_shape = out_shape
 
         for i in range(vec_size):
             in_name = '{0}_{1}'.format(name, i)
@@ -108,7 +118,10 @@ class MuxComp(ExplicitComponent):
             for j in range(in_size):
                 in_templates[i].flat[:] = 0
                 in_templates[i].flat[j] = 1
-                temp_out = np.stack(in_templates, axis=ax)
+                if method == 'concatenate':
+                    temp_out = np.concatenate(in_templates, axis=ax)
+                else:
+                    temp_out = np.stack(in_templates, axis=ax)
                 cs.append(j)
                 rs.append(int(np.nonzero(temp_out.ravel())[0]))
 
@@ -132,4 +145,7 @@ class MuxComp(ExplicitComponent):
             ax = self._vars[var]['axis']
             invar = self._input_names[var]
             vals = [inputs[invar[i]] for i in range(vec_size)]
-            outputs[var][...] = np.stack(vals, axis=ax)
+            if self._vars[var]['method'] == 'concatenate':
+                outputs[var][...] = np.concatenate(vals, axis=ax)
+            else:
+                outputs[var][...] = np.stack(vals, axis=ax)

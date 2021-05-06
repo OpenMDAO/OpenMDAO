@@ -104,6 +104,56 @@ class TestMuxCompScalar(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
+class TestMuxCompScalarConcat(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 10
+
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        for i in range(self.nn):
+            ivc.add_output(name='a_{0}'.format(i), val=1.0)
+            ivc.add_output(name='b_{0}'.format(i), val=1.0)
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['*'])
+
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=self.nn))
+
+        mux_comp.add_var('a', shape=(1,), axis=0, method='concatenate')
+        mux_comp.add_var('b', shape=(1,), axis=0, method='concatenate')
+
+        for i in range(self.nn):
+            self.p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
+            self.p.model.connect('b_{0}'.format(i), 'mux_comp.b_{0}'.format(i))
+
+        self.p.setup(force_alloc_complex=True)
+
+        for i in range(self.nn):
+            self.p['a_{0}'.format(i)] = np.random.rand(1)
+            self.p['b_{0}'.format(i)] = np.random.rand(1)
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            out_i = self.p['mux_comp.a'][i]
+            in_i = self.p['a_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+            out_i = self.p['mux_comp.b'][i]
+            in_i = self.p['b_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
+
+
 class TestMuxComp1D(unittest.TestCase):
 
     def setUp(self):
@@ -209,6 +259,60 @@ class TestMuxComp2D(unittest.TestCase):
 
             out_i = self.p['mux_comp.c'][:, :, i]
             in_i = self.p['c_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
+
+
+class TestMuxComp2DConcat(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 10
+
+        a_shape = (3, 3)
+        b_shape = (2, 4)
+
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        for i in range(self.nn):
+            ivc.add_output(name='a_{0}'.format(i), shape=a_shape)
+            ivc.add_output(name='b_{0}'.format(i), shape=b_shape)
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['*'])
+
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=self.nn))
+
+        mux_comp.add_var('a', shape=a_shape, axis=0, method='concatenate')
+        mux_comp.add_var('b', shape=b_shape, axis=1, method='concatenate')
+
+        for i in range(self.nn):
+            self.p.model.connect('a_{0}'.format(i), 'mux_comp.a_{0}'.format(i))
+            self.p.model.connect('b_{0}'.format(i), 'mux_comp.b_{0}'.format(i))
+
+        self.p.setup(force_alloc_complex=True)
+
+        for i in range(self.nn):
+            self.p['a_{0}'.format(i)] = np.random.rand(*a_shape)
+            self.p['b_{0}'.format(i)] = np.random.rand(*b_shape)
+
+        self.p.run_model()
+
+    def test_results(self):
+        a_shape = (3, 3)
+        b_shape = (2, 4)
+        for i in range(self.nn):
+            out_i = self.p['mux_comp.a'][i*a_shape[0]:(i+1)*a_shape[0], ...]
+            in_i = self.p['a_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+            out_i = self.p['mux_comp.b'][:, i*b_shape[1]:(i+1)*b_shape[1]]
+            in_i = self.p['b_{0}'.format(i)]
             assert_near_equal(in_i, out_i)
 
     def test_partials(self):
