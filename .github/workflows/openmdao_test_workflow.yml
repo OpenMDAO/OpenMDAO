@@ -306,7 +306,7 @@ jobs:
           echo "============================================================="
           echo "Submit coverage"
           echo "============================================================="
-          cd $HOME
+          copy $HOME\.coverage .
           pip install git+https://github.com/swryan/coveralls-python
           $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
           coveralls --base_dir $SITE_DIR
