@@ -225,5 +225,5 @@ else:
             serve_thread = _startThread(tornado.ioloop.IOLoop.current().start)
             launch_thread = _startThread(lambda: _launch_browser(options.port))
 
-            while serve_thread.isAlive():
+            while serve_thread.is_alive():
                 serve_thread.join(timeout=1)
