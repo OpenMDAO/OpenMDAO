@@ -103,8 +103,6 @@ class DefaultVector(Vector):
                     # reuse the nonlinear scaling vecs since they're the same as ours
                     nlvec = self._system()._root_vecs[self._kind]['nonlinear']
                     self._scaling = (None, nlvec._scaling[1])
-                else:
-                    self._scaling = (None, np.ones(data.size))
         else:
             self._data, self._scaling = self._extract_root_data()
 

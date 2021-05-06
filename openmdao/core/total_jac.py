@@ -761,8 +761,6 @@ class _TotalJacInfo(object):
         dict
             Mapping of var name to jacobian row or column indices.
         """
-        sol_idxs = {}
-        jac_idxs = {}
         model = self.model
         fwd = mode == 'fwd'
         myproc = self.comm.rank
@@ -823,11 +821,11 @@ class _TotalJacInfo(object):
                 jstart = jend
 
         if inds:
-            sol_idxs['linear'] = np.hstack(inds)
-            jac_idxs['linear'] = np.hstack(jac_inds)
+            sol_idxs = np.hstack(inds)
+            jac_idxs = np.hstack(jac_inds)
         else:
-            sol_idxs['linear'] = np.zeros(0, dtype=INT_DTYPE)
-            jac_idxs['linear'] = np.zeros(0, dtype=INT_DTYPE)
+            sol_idxs = np.zeros(0, dtype=INT_DTYPE)
+            jac_idxs = np.zeros(0, dtype=INT_DTYPE)
 
         return sol_idxs, jac_idxs, name2jinds
 
@@ -1106,9 +1104,9 @@ class _TotalJacInfo(object):
                 return
 
         if mode == 'fwd':
-            self.J[jac_idxs['linear'], i] = deriv_val[deriv_idxs['linear']]
+            self.J[jac_idxs, i] = deriv_val[deriv_idxs]
         else:  # rev
-            self.J[i, jac_idxs['linear']] = deriv_val[deriv_idxs['linear']]
+            self.J[i, jac_idxs] = deriv_val[deriv_idxs]
 
     def _jac_setter_dist(self, i, mode):
         """
@@ -1229,11 +1227,11 @@ class _TotalJacInfo(object):
 
         deriv_val = self.output_vec[mode]['linear'].asarray()
         if self.jac_scratch is None:
-            reduced_derivs = deriv_val[deriv_idxs['linear']]
+            reduced_derivs = deriv_val[deriv_idxs]
         else:
             reduced_derivs = self.jac_scratch[mode][0]
             reduced_derivs[:] = 0.0
-            reduced_derivs[jac_idxs['linear']] = deriv_val[deriv_idxs['linear']]
+            reduced_derivs[jac_idxs] = deriv_val[deriv_idxs]
 
         if fwd:
             for i in inds:

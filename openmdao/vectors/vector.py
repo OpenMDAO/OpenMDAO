@@ -30,7 +30,7 @@ class Vector(object):
     Attributes
     ----------
     _name: str
-        The name of the vector: 'nonlinear', 'linear', or right-hand side name.
+        The name of the vector: 'nonlinear' or 'linear'.
     _typ: str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind: str
