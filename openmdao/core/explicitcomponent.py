@@ -11,7 +11,7 @@ from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
 
-_inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
+_inst_functs = ['compute_jacvec_product']
 
 
 class ExplicitComponent(Component):
@@ -46,14 +46,8 @@ class ExplicitComponent(Component):
         Configure this system to assign children settings and detect if matrix_free.
         """
         new_jacvec_prod = getattr(self, 'compute_jacvec_product', None)
-        new_multi_jacvec_prod = getattr(self, 'compute_multi_jacvec_product', None)
 
-        self.supports_multivecs = (overrides_method('compute_multi_jacvec_product',
-                                                    self, ExplicitComponent) or
-                                   (new_multi_jacvec_prod is not None and
-                                    new_multi_jacvec_prod !=
-                                    self._inst_functs['compute_multi_jacvec_product']))
-        self.matrix_free = self.supports_multivecs or (
+        self.matrix_free = (
             overrides_method('compute_jacvec_product', self, ExplicitComponent) or
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))

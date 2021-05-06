@@ -159,7 +159,7 @@ class Group(System):
         Dictionary containing all explicit & implicit discrete var connections owned
         by this system only. The data is the same across all processors.
     _transfers : dict of dict of Transfers
-        First key iis mode, second is subname where
+        First key is mode, second is subname where
         mode is 'fwd' or 'rev' and subname is the subsystem name
         or subname can be None for the full, simultaneous transfer.
     _discrete_transfers : dict of discrete transfer metadata

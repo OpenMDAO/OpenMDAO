@@ -274,9 +274,6 @@ class System(object):
         Driver design variables added outside of setup.
     _static_responses : dict of dict
         Driver responses added outside of setup.
-    supports_multivecs : bool
-        If True, this system overrides compute_multi_jacvec_product (if an ExplicitComponent),
-        or solve_multi_linear/apply_multi_linear (if an ImplicitComponent).
     matrix_free : bool
         This is set to True if the component overrides the appropriate function with a user-defined
         matrix vector product with the Jacobian or any of its subsystems do.
@@ -457,8 +454,6 @@ class System(object):
         self._static_subsystems_allprocs = {}
         self._static_design_vars = OrderedDict()
         self._static_responses = OrderedDict()
-
-        self.supports_multivecs = False
 
         self._mode = None
 
@@ -4983,7 +4978,7 @@ class System(object):
 
         if pd_common:
             # we have some parallel deriv colors, so update relevance entries to throw out
-            # any dependencies that aren't on the same rank
+            # any dependencies that aren't on the same rank.
             for inp, sub in relevant.items():
                 for out, tup in sub.items():
                     meta = tup[0]

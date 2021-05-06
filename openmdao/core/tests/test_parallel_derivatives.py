@@ -738,7 +738,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         # setting dc2.y2 to a parallel deriv color is no longer valid, i.e. setting multiple variables
         # on the same component to the same parallel color makes no sense because they can't be solved
-        # for in parallel.  In the past, we maintained separate vectors and rhs for each par deriv var
+        # in parallel.  In the past, we maintained separate vectors and rhs for each par deriv var
         # so they *could* be solved for simultaneously, but we now just use a single linear vector and
         # rhs so this isn't possible.
         model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0)

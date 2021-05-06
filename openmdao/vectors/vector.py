@@ -57,8 +57,6 @@ class Vector(object):
         Mapping of var name to slice.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _ncol : int
-        Number of columns for multi-vectors.
     _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.

@@ -6,7 +6,7 @@ from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 
-_inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
+_inst_functs = ['apply_linear']
 
 
 class ImplicitComponent(Component):
@@ -41,25 +41,10 @@ class ImplicitComponent(Component):
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
         new_apply_linear = getattr(self, 'apply_linear', None)
-        new_apply_multi_linear = getattr(self, 'apply_multi_linear', None)
-        new_solve_multi_linear = getattr(self, 'solve_multi_linear', None)
 
         self.matrix_free = (overrides_method('apply_linear', self, ImplicitComponent) or
                             (new_apply_linear is not None and
                              self._inst_functs['apply_linear'] != new_apply_linear))
-        self.has_apply_multi_linear = (overrides_method('apply_multi_linear',
-                                                        self, ImplicitComponent) or
-                                       (new_apply_multi_linear is not None and
-                                        self._inst_functs['apply_multi_linear'] !=
-                                        new_apply_multi_linear))
-        self.has_solve_multi_linear = (overrides_method('solve_multi_linear',
-                                                        self, ImplicitComponent) or
-                                       (new_solve_multi_linear is not None and
-                                        self._inst_functs['solve_multi_linear'] !=
-                                        new_solve_multi_linear))
-
-        self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
-        self.matrix_free |= self.has_apply_multi_linear
 
     def _apply_nonlinear(self):
         """
