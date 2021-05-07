@@ -5,7 +5,7 @@ A console script wrapper for multiple openmdao functions.
 import sys
 import os
 import argparse
-from openmdao import __version__ as version
+from distutils.core import run_setup
 
 try:
     import pkg_resources
@@ -14,6 +14,7 @@ except ImportError:
 
 from itertools import chain
 
+from openmdao import __version__ as version
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
@@ -441,6 +442,43 @@ def _cite_cmd(options, user_args):
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
+def _show_dependency_versions_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao show_dep_versions' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('--include_dependencies', action='store_true', help="Show dependency variables")
+
+def _show_dependency_versions(options, user_args):
+    if options.include_dependencies:
+
+        setup_path = os.getcwd() + "/"
+        if 'openmdao' in setup_path:
+            setup_path = setup_path[:setup_path.index('openmdao')]
+
+        print(setup_path + "setup.py")
+        result = run_setup(setup_path + "setup.py", stop_after="init")
+
+        om_vers = pkg_resources.require('openmdao')[0].version
+        print(f"openmdao: {om_vers}")
+
+        for pkg in result.install_requires:
+            if '>' in pkg:
+                pkg = pkg[:pkg.index('>')]
+            elif '<' in pkg:
+                pkg = pkg[:pkg.index('<')]
+            elif '=' in pkg:
+                pkg = pkg[:pkg.index('=')]
+
+            try:
+                version = pkg_resources.require(pkg)[0].version
+                print(f"{pkg}: {version}")
+            except:
+                print(f"{pkg}: Version Not Found")
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -453,6 +491,8 @@ _command_map = {
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
                              'Compute entry point declarations to add to the setup.py file.'),
+    'debug': (_show_dependency_versions_parser, _show_dependency_versions,
+                             'Show dependency versions'),
     'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
                      'Find openmdao plugins on github.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,

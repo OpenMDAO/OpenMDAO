@@ -1,10 +1,14 @@
 import re
-
+from os import getcwd
 from setuptools import setup
+
+_root_path = getcwd() + "/"
+if 'openmdao' in _root_path:
+    _root_path = _root_path[:_root_path.index('openmdao')]
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
-    open('openmdao/__init__.py').read(),
+    open(_root_path + 'openmdao/__init__.py').read(),
 )[0]
 
 optional_dependencies = {
