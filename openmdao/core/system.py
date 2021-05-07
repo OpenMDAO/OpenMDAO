@@ -4909,10 +4909,11 @@ class System(object):
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
         rescache = {}
-        pd_dv_locs = {}  #  local nodes dependent on a par deriv desvar
+        pd_dv_locs = {}  # local nodes dependent on a par deriv desvar
         pd_res_locs = {}  # local nodes dependent on a par deriv response
         pd_common = defaultdict(dict)
-        pd_err_chk = defaultdict(dict)  # for each par deriv color, keep list of all local dep nodes for each var
+        # for each par deriv color, keep list of all local dep nodes for each var
+        pd_err_chk = defaultdict(dict)
 
         for desvar, dvmeta in desvars.items():
             dvset = set(self.all_connected_nodes(graph, desvar))
@@ -4982,7 +4983,8 @@ class System(object):
         rescache = None
 
         if pd_dv_locs or pd_res_locs:
-            # check to make sure we don't have any overlapping dependencies between vars of the same color
+            # check to make sure we don't have any overlapping dependencies between vars of the
+            # same color
             vtype = 'design variable' if mode == 'fwd' else 'response'
             err = (None, None)
             for pdcolor, dct in pd_err_chk.items():
