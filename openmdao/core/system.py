@@ -4909,21 +4909,26 @@ class System(object):
         nodes = graph.nodes
         grev = graph.reverse(copy=False)
         rescache = {}
-        pd_dv_locs = {}
-        pd_res_locs = {}
+        pd_dv_locs = {}  #  local nodes dependent on a par deriv desvar
+        pd_res_locs = {}  # local nodes dependent on a par deriv response
         pd_common = defaultdict(dict)
+        pd_err_chk = defaultdict(dict)  # for each par deriv color, keep list of all local dep nodes for each var
 
         for desvar, dvmeta in desvars.items():
             dvset = set(self.all_connected_nodes(graph, desvar))
-            if dvmeta.get('parallel_deriv_color'):
+            parallel_deriv_color = dvmeta.get('parallel_deriv_color')
+            if parallel_deriv_color:
                 pd_dv_locs[desvar] = set(self.all_connected_nodes(graph, desvar, local=True))
+                pd_err_chk[parallel_deriv_color][desvar] = pd_dv_locs[desvar]
 
             for response, resmeta in responses.items():
                 if response not in rescache:
                     rescache[response] = set(self.all_connected_nodes(grev, response))
-                    if resmeta.get('parallel_deriv_color'):
+                    parallel_deriv_color = resmeta.get('parallel_deriv_color')
+                    if parallel_deriv_color:
                         pd_res_locs[response] = set(self.all_connected_nodes(grev, response,
                                                                              local=True))
+                        pd_err_chk[parallel_deriv_color][response] = pd_res_locs[response]
 
                 common = dvset.intersection(rescache[response])
 
@@ -4976,18 +4981,37 @@ class System(object):
         dvcache = None
         rescache = None
 
-        if pd_common:
+        if pd_dv_locs or pd_res_locs:
+            # check to make sure we don't have any overlapping dependencies between vars of the same color
+            vtype = 'design variable' if mode == 'fwd' else 'response'
+            err = (None, None)
+            for pdcolor, dct in pd_err_chk.items():
+                seen = set()
+                for vname, nodes in dct.items():
+                    if seen.intersection(nodes):
+                        err = (vname, pdcolor)
+                        break
+                    seen.update(nodes)
+
+            all_errs = self.comm.allgather(err)
+            for n, color in all_errs:
+                if n is not None:
+                    raise RuntimeError(f"{self.msginfo}: {vtype} '{n}' has overlapping dependencies"
+                                       f" on the same rank with other {vtype}s in "
+                                       f"parallel_deriv_color '{color}'.")
+
             # we have some parallel deriv colors, so update relevance entries to throw out
             # any dependencies that aren't on the same rank.
-            for inp, sub in relevant.items():
-                for out, tup in sub.items():
-                    meta = tup[0]
-                    if inp in pd_common:
-                        meta['input'] = meta['input'].intersection(pd_common[inp][out])
-                        meta['output'] = meta['output'].intersection(pd_common[inp][out])
-                        if out not in meta['output']:
-                            meta['input'] = set()
-                            meta['output'] = set()
+            if pd_common:
+                for inp, sub in relevant.items():
+                    for out, tup in sub.items():
+                        meta = tup[0]
+                        if inp in pd_common:
+                            meta['input'] = meta['input'].intersection(pd_common[inp][out])
+                            meta['output'] = meta['output'].intersection(pd_common[inp][out])
+                            if out not in meta['output']:
+                                meta['input'] = set()
+                                meta['output'] = set()
 
         voi_lists = []
         if mode != 'rev':

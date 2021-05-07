@@ -774,8 +774,7 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model.add_constraint('dc1.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_constraint('dc2.y2', lower=-1.0, upper=1.0)
         model.add_constraint('dc2.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        # objective is a scalar - gets its own color to avoid being called 10x
-        model.add_objective('dc3.y', index=2, parallel_deriv_color='b')
+        model.add_objective('dc3.y', index=2)
 
         prob = om.Problem(model=model)
         prob.setup(mode='rev', force_alloc_complex=True)
@@ -798,6 +797,19 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         self.assertEqual(dc2count, 10)
         # one solve on proc 2
         self.assertEqual(dc3count, 1)
+
+    def test_parallel_deriv_coloring_overlap_err(self):
+        model = self.setup_model(size=6)
+        pdc = 'a'
+        model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
+
+        prob = om.Problem(model=model)
+        with self.assertRaises(Exception) as ctx:
+            prob.setup(mode='rev')
+        self.assertEqual(str(ctx.exception), "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the same rank with other responses in parallel_deriv_color 'a'.")
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
