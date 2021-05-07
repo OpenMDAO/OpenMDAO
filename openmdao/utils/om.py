@@ -453,8 +453,8 @@ def _show_dependency_versions_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('--show_dependencies', action='store_true', help="Show dependency "
-                        "variables")
+    parser.add_argument('--show_dependencies', action='store_true', help="Show dependencies "
+                        "and versions")
 
 
 def _show_dependency_versions(options, user_args):
