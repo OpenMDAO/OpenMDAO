@@ -6,6 +6,7 @@ import sys
 import os
 import argparse
 from distutils.core import run_setup
+import warnings
 
 try:
     import pkg_resources
@@ -442,6 +443,7 @@ def _cite_cmd(options, user_args):
     ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
+
 def _show_dependency_versions_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao show_dep_versions' command.
@@ -451,34 +453,48 @@ def _show_dependency_versions_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('--include_dependencies', action='store_true', help="Show dependency variables")
+    parser.add_argument('--show_dependencies', action='store_true', help="Show dependency "
+                        "variables")
+
 
 def _show_dependency_versions(options, user_args):
-    if options.include_dependencies:
+    if options.show_dependencies:
 
         setup_path = os.getcwd() + "/"
         if 'openmdao' in setup_path:
             setup_path = setup_path[:setup_path.index('openmdao')]
 
-        print(setup_path + "setup.py")
-        result = run_setup(setup_path + "setup.py", stop_after="init")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            setup_info = run_setup(setup_path + "setup.py", stop_after="init")
+
+        dep_dict = {"required dependencies": setup_info.install_requires}
+
+        for key, val in setup_info.extras_require.items():
+            if key != 'all':
+                dep_dict[key] = val
 
         om_vers = pkg_resources.require('openmdao')[0].version
-        print(f"openmdao: {om_vers}")
+        print(f"openmdao: {om_vers}\n")
 
-        for pkg in result.install_requires:
-            if '>' in pkg:
-                pkg = pkg[:pkg.index('>')]
-            elif '<' in pkg:
-                pkg = pkg[:pkg.index('<')]
-            elif '=' in pkg:
-                pkg = pkg[:pkg.index('=')]
+        for key, pkg_list in dep_dict.items():
+            print(f"{key} \n--------")
+            for pkg in pkg_list:
+                if '>' in pkg:
+                    pkg = pkg[:pkg.index('>')]
+                elif '<' in pkg:
+                    pkg = pkg[:pkg.index('<')]
+                elif '=' in pkg:
+                    pkg = pkg[:pkg.index('=')]
 
-            try:
-                version = pkg_resources.require(pkg)[0].version
-                print(f"{pkg}: {version}")
-            except:
-                print(f"{pkg}: Version Not Found")
+                try:
+                    version = pkg_resources.require(pkg)[0].version
+                    print(f"{pkg}: {version}")
+                except DistributionNotFound:
+                    print(f"{pkg}: Module not installed")
+
+            print("\n")
+
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -492,7 +508,7 @@ _command_map = {
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
                              'Compute entry point declarations to add to the setup.py file.'),
     'debug': (_show_dependency_versions_parser, _show_dependency_versions,
-                             'Show dependency versions'),
+              'Show dependency versions'),
     'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
                      'Find openmdao plugins on github.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
