@@ -33,11 +33,6 @@ However, because the problem is separable, we know that :math:`\frac{dy_i}{dx_j}
 Therefore, it is safe to do all the linear solves at the same time, and we can get a significant
 computational savings with no additional complexity of memory costs.
 
-.. tip::
-
-     If your problem isn't separable, you might still be able to make use of :ref:`vectorized derivatives<theory_vectorized_derivatives>`.
-     This alternate algorithm offers similar computational gains, but comes with a non-trivial increase in memory usage.
-
 
 A Simple Example
 ----------------

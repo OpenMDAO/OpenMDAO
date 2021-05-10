@@ -1996,17 +1996,14 @@ class TestProblem(unittest.TestCase):
                 desvar_opts=['lower', 'upper', 'ref', 'ref0',
                              'indices', 'adder', 'scaler',
                              'parallel_deriv_color',
-                             'vectorize_derivs',
                              'cache_linear_solution'],
                 cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
                            'indices', 'adder', 'scaler', 'linear',
                            'parallel_deriv_color',
-                           'vectorize_derivs',
                            'cache_linear_solution'],
                 objs_opts=['ref', 'ref0',
                            'indices', 'adder', 'scaler',
                            'parallel_deriv_color',
-                           'vectorize_derivs',
                            'cache_linear_solution'],
             )
         finally:
@@ -2015,10 +2012,10 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[3],
                     r'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
                     r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
-                    r'vectorize_derivs\s+cache_linear_solution')
+                    r'cache_linear_solution')
         self.assertRegex(output[5],
                     r'^z\s+\|[0-9.e+-]+\|\s+2\s+\|10.0\|\s+\|[0-9.e+-]+\|\s+None\s+'
-                    r'None\s+None\s+None\s+None\s+None\s+False\s+False')
+                    r'None\s+None\s+None\s+None\s+None\s+False')
 
         # With all the optional columns and print_arrays
         stdout = sys.stdout
@@ -2029,17 +2026,14 @@ class TestProblem(unittest.TestCase):
                                    desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                                 'indices', 'adder', 'scaler',
                                                 'parallel_deriv_color',
-                                                'vectorize_derivs',
                                                 'cache_linear_solution'],
                                    cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
                                               'indices', 'adder', 'scaler', 'linear',
                                               'parallel_deriv_color',
-                                              'vectorize_derivs',
                                               'cache_linear_solution'],
                                    objs_opts=['ref', 'ref0',
                                               'indices', 'adder', 'scaler',
                                               'parallel_deriv_color',
-                                              'vectorize_derivs',
                                               'cache_linear_solution'],
                                    )
         finally:
@@ -2126,14 +2120,12 @@ class TestProblem(unittest.TestCase):
         prob.list_problem_vars(print_arrays=True,
                                desvar_opts=['lower', 'upper', 'ref', 'ref0',
                                             'indices', 'adder', 'scaler',
-                                            'parallel_deriv_color',
-                                            'vectorize_derivs'],
+                                            'parallel_deriv_color'],
                                cons_opts=['lower', 'upper', 'equals', 'ref', 'ref0',
                                           'indices', 'adder', 'scaler', 'linear'],
                                objs_opts=['ref', 'ref0',
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
-                                          'vectorize_derivs',
                                           'cache_linear_solution'])
 
     def test_error_msg_set_val_before_setup(self):

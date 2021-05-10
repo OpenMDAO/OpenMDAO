@@ -256,26 +256,6 @@ class DecoupledTestCase(unittest.TestCase):
         expected[:,:asize] = np.eye(asize)*8.0
         assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
-    def test_parallel_fwd_multi(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
-        prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
-        prob.model.add_constraint('Con1.y', upper=0.0)
-        prob.model.add_constraint('Con2.y', upper=0.0)
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.zeros((asize, asize+2))
-        expected[:,:asize] = np.eye(asize)*8.0
-        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
-
     def test_serial_rev(self):
         asize = self.asize
         prob = self.setup_model()

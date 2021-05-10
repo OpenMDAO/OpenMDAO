@@ -1531,7 +1531,7 @@ class System(object):
         pro2abs = self._var_allprocs_prom2abs_list
         try:
             for prom_name, data in vois.items():
-                if data['parallel_deriv_color'] is not None or data['vectorize_derivs']:
+                if data['parallel_deriv_color'] is not None:
                     if prom_name in pro2abs['output']:
                         yield pro2abs['output'][prom_name][0], data
                     else:
@@ -2401,8 +2401,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, vectorize_derivs=False,
-                       cache_linear_solution=False):
+                       parallel_deriv_color=None, cache_linear_solution=False):
         r"""
         Add a design variable to this system.
 
@@ -2435,8 +2434,6 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
-            If True, vectorize derivative calculations.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2545,14 +2542,13 @@ class System(object):
 
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
-        dvs['vectorize_derivs'] = vectorize_derivs
 
         design_vars[name] = dvs
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     vectorize_derivs=False, cache_linear_solution=False):
+                     cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2597,8 +2593,6 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
-            If True, vectorize derivative calculations.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2749,14 +2743,13 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
 
         resp['parallel_deriv_color'] = parallel_deriv_color
-        resp['vectorize_derivs'] = vectorize_derivs
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       vectorize_derivs=False, cache_linear_solution=False):
+                       cache_linear_solution=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2793,8 +2786,6 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
-            If True, vectorize derivative calculations.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2812,12 +2803,11 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      vectorize_derivs=False, cache_linear_solution=False):
+                      cache_linear_solution=False):
         r"""
         Add a response variable to this system.
 
@@ -2846,8 +2836,6 @@ class System(object):
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
-        vectorize_derivs : bool
-            If True, vectorize derivative calculations.
         cache_linear_solution : bool
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
@@ -2884,7 +2872,6 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
     def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):

@@ -63,5 +63,4 @@ of these features, or how to restructure your problem to make use of them in the
     assembled_jacobian.rst
     simul_derivs.rst
     parallel_derivs.rst
-    vectorized_derivs.rst
     linear_restart.rst
