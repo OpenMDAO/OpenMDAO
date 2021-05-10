@@ -620,5 +620,6 @@ def openmdao_cmd():
         else:
             print("\nNothing to do.")
 
+
 if __name__ == '__main__':
     openmdao_cmd()
