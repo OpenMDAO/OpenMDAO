@@ -4,6 +4,7 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.warnings import warn_deprecation
 
 
 class DemuxComp(ExplicitComponent):
@@ -33,6 +34,8 @@ class DemuxComp(ExplicitComponent):
         self._output_names = {}
 
         self._no_check_partials = True
+
+        warn_deprecation("DemuxComp is being deprecated.")
 
     def initialize(self):
         """
