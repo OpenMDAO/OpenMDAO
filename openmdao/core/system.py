@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning
+    UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
@@ -2637,6 +2637,10 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs:
+            warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding design "
+                             f"variable '{name}' is deprecated and will be removed in a future "
+                             "release.")
 
         design_vars[name] = dvs
 
@@ -2841,6 +2845,9 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs:
+            warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding response "
+                             f"'{name}' is deprecated and will be removed in a future release.")
 
         responses[name] = resp
 

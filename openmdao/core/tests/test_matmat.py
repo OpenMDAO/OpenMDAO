@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 
 class QuadraticCompVectorized(om.ImplicitComponent):
@@ -635,10 +636,14 @@ class MatMatTestCase(unittest.TestCase):
 
     def test_phases_multi_rev(self):
         N_PHASES = 4
-        p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
 
+        with assert_warning(OMDeprecationWarning,
+                            "<class Group>: The 'vectorize_derivs' arg is deprecated and "
+                            "will be removed in a future release."):
+            p, expected = phase_model(order=20, nphases=N_PHASES, vectorize=True)
+         
         p.setup(mode='rev')
-
+           
         p.run_driver()
 
         for i in range(N_PHASES):
