@@ -444,56 +444,49 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def _show_dependency_versions_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao show_dep_versions' command.
+def _show_dependency_versions():
+    import openmdao
 
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('--show_dependencies', action='store_true', help="Show dependencies "
-                        "and versions")
+    setup_path = os.path.realpath(os.path.dirname(os.path.dirname(openmdao.__file__)))
+    setup_file = os.path.join(setup_path, 'setup.py')
+    if not os.path.exists(setup_file):
+        print('--show_dependencies only works in a development environment.')
+        return
 
+    setup_path = os.getcwd() + "/"
+    if 'openmdao' in setup_path:
+        setup_path = setup_path[:setup_path.index('openmdao')]
 
-def _show_dependency_versions(options, user_args):
-    if options.show_dependencies:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
+        setup_info = run_setup(setup_path + "setup.py", stop_after="init")
 
-        setup_path = os.getcwd() + "/"
-        if 'openmdao' in setup_path:
-            setup_path = setup_path[:setup_path.index('openmdao')]
+    dep_dict = {"required dependencies": setup_info.install_requires}
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore")
-            setup_info = run_setup(setup_path + "setup.py", stop_after="init")
+    for key, val in setup_info.extras_require.items():
+        if key != 'all':
+            dep_dict[key] = val
 
-        dep_dict = {"required dependencies": setup_info.install_requires}
+    om_vers = pkg_resources.require('openmdao')[0].version
+    print(f"openmdao: {om_vers}\n")
 
-        for key, val in setup_info.extras_require.items():
-            if key != 'all':
-                dep_dict[key] = val
+    for key, pkg_list in dep_dict.items():
+        print(f"{key} \n--------")
+        for pkg in pkg_list:
+            if '>' in pkg:
+                pkg = pkg[:pkg.index('>')]
+            elif '<' in pkg:
+                pkg = pkg[:pkg.index('<')]
+            elif '=' in pkg:
+                pkg = pkg[:pkg.index('=')]
 
-        om_vers = pkg_resources.require('openmdao')[0].version
-        print(f"openmdao: {om_vers}\n")
+            try:
+                version = pkg_resources.require(pkg)[0].version
+                print(f"{pkg}: {version}")
+            except DistributionNotFound:
+                print(f"{pkg}: Module not installed")
 
-        for key, pkg_list in dep_dict.items():
-            print(f"{key} \n--------")
-            for pkg in pkg_list:
-                if '>' in pkg:
-                    pkg = pkg[:pkg.index('>')]
-                elif '<' in pkg:
-                    pkg = pkg[:pkg.index('<')]
-                elif '=' in pkg:
-                    pkg = pkg[:pkg.index('=')]
-
-                try:
-                    version = pkg_resources.require(pkg)[0].version
-                    print(f"{pkg}: {version}")
-                except DistributionNotFound:
-                    print(f"{pkg}: Module not installed")
-
-            print("\n")
+        print("\n")
 
 
 # this dict should contain names mapped to tuples of the form:
@@ -507,8 +500,6 @@ _command_map = {
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
     'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
                              'Compute entry point declarations to add to the setup.py file.'),
-    'debug': (_show_dependency_versions_parser, _show_dependency_versions,
-              'Show dependency versions'),
     'find_plugins': (_find_plugins_setup_parser, _find_plugins_exec,
                      'Find openmdao plugins on github.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
@@ -563,6 +554,8 @@ def openmdao_cmd():
                                      ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
 
     parser.add_argument('--version', action='version', version=version)
+    parser.add_argument('--show_dependencies', action='store_true', help="Show dependencies "
+                        "and versions")
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -622,9 +615,10 @@ def openmdao_cmd():
 
         if hasattr(options, 'executor'):
             options.executor(options, user_args)
+        elif options.show_dependencies:
+            _show_dependency_versions()
         else:
             print("\nNothing to do.")
-
 
 if __name__ == '__main__':
     openmdao_cmd()

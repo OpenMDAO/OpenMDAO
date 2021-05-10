@@ -1,8 +1,8 @@
 import re
-from os import getcwd
+import os
 from setuptools import setup
 
-_root_path = getcwd() + "/"
+_root_path = os.path.realpath(os.path.dirname(__file__)) + "/"
 if 'openmdao' in _root_path:
     _root_path = _root_path[:_root_path.index('openmdao')]
 
