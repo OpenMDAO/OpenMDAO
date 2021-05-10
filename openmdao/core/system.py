@@ -4694,12 +4694,13 @@ class System(object):
             offset = len(self.pathname) + 1 if self.pathname else 0
 
             if self.comm.size == 1:
+                get = vec._abs_get_val
                 srcget = self._vectors['output'][vec_name]._abs_get_val
                 vdict = {}
                 if discrete_vec:
                     for n in variables:
                         if vec._contains_abs(n):
-                            vdict[n] = vec._abs_get_val(n, False)
+                            vdict[n] = get(n, False)
                         elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                         else:
@@ -4711,27 +4712,28 @@ class System(object):
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
-                            vdict[name] = vec._abs_get_val(name, False)
+                            vdict[name] = get(name, False)
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif parallel:
+                get = self._abs_get_val
                 vdict = {}
                 if discrete_vec:
                     for name in variables:
                         if vec._contains_abs(name):
-                            vdict[name] = vec._abs_get_val(name, get_remote=True, rank=0,
+                            vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
                         elif name[offset:] in discrete_vec and self._owning_rank[name] == rank:
                             vdict[name] = discrete_vec[name[offset:]]['value']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
-                            vdict[name] = vec._abs_get_val(name, get_remote=True, rank=0,
+                            vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
                         else:
                             ivc_path = conns[prom2abs_in[name][0]]
-                            vdict[name] = vec._abs_get_val(ivc_path, get_remote=True, rank=0,
+                            vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
                 io = 'input' if kind == 'input' else 'output'
