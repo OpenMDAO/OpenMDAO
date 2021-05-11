@@ -463,7 +463,7 @@ class Driver(object):
 
         myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
-            myoutputs.update(self._designvars)
+            myoutputs.update(model.get_source(n) for n in self._designvars)
         if recording_options['record_objectives'] or recording_options['record_responses']:
             myoutputs.update(self._objs)
         if recording_options['record_constraints'] or recording_options['record_responses']:

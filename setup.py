@@ -12,7 +12,7 @@ optional_dependencies = {
         'matplotlib',
         'numpydoc>=0.9.1',
         'redbaron',
-        'sphinx>=1.8.5',
+        'sphinx>=1.8.5,<4.0',
         'tabulate',
         'ipython'
     ],
