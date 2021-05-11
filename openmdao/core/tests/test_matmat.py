@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.warnings import OMDeprecationWarning
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 
 
 class QuadraticCompVectorized(om.ImplicitComponent):
@@ -80,7 +80,7 @@ class QCVProblem(om.Problem):
     A QuadraticCompVectorized problem with configurable component class.
     """
 
-    def __init__(self, comp_class=QuadraticCompVectorized):
+    def __init__(self, comp_class=QuadraticCompVectorized, vectorize_derivs=True):
         super().__init__()
 
         model = self.model
@@ -95,10 +95,10 @@ class QCVProblem(om.Problem):
         model.connect('p.b', 'comp.b')
         model.connect('p.c', 'comp.c')
 
-        model.add_design_var('p.a', vectorize_derivs=True)
-        model.add_design_var('p.b', vectorize_derivs=True)
-        model.add_design_var('p.c', vectorize_derivs=True)
-        model.add_constraint('comp.x', vectorize_derivs=True)
+        model.add_design_var('p.a', vectorize_derivs=vectorize_derivs)
+        model.add_design_var('p.b', vectorize_derivs=vectorize_derivs)
+        model.add_design_var('p.c', vectorize_derivs=vectorize_derivs)
+        model.add_constraint('comp.x', vectorize_derivs=vectorize_derivs)
 
         model.linear_solver = om.LinearBlockGS()
 
@@ -685,6 +685,16 @@ class MatMatTestCase(unittest.TestCase):
         assert_near_equal(J['comp.x', 'p.b'], np.diag(np.array([-0.14644661, -0.1, -0.07421663])), 1e-4)
         assert_near_equal(J['comp.x', 'p.c'], np.diag(np.array([-0.35355339, -0.2, -0.13867505])), 1e-4)
 
+    def test_implicit_warning(self):
+        prob = QCVProblem()
+        with assert_warning(OMDeprecationWarning, "'comp' <class QuadraticCompVectorized>: has an apply_multi_linear and/or a solve_multi_linear method, but support for vectorized derivatives is deprecated and will be removed in a future release."):
+            prob.setup(mode='fwd')
+
+        # test that warning will occur if method defined even if vectorized_derivs is False
+        prob = QCVProblem(vectorize_derivs=False)
+        with assert_warning(OMDeprecationWarning, "'comp' <class QuadraticCompVectorized>: has an apply_multi_linear and/or a solve_multi_linear method, but support for vectorized derivatives is deprecated and will be removed in a future release."):
+            prob.setup(mode='fwd')
+
     def test_apply_multi_linear_inputs_read_only(self):
         class BadComp(QuadraticCompVectorized):
             def apply_multi_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
@@ -874,6 +884,13 @@ class ComputeMultiJacVecTestCase(unittest.TestCase):
 
         assert_near_equal(J[('comp.f_xy', 'px.x')], np.eye(5)*p['py.y'], 1e-5)
         assert_near_equal(J[('comp.f_xy', 'py.y')], np.eye(5)*p['px.x'], 1e-5)
+
+    def test_compute_multi_jacvec_prod_fwd_multi_warnings(self):
+        with assert_warning(OMDeprecationWarning, "'comp' <class MultiJacVec>: has a compute_multi_jacvec_product method, but support for vectorized derivatives is deprecated and will be removed in a future release."):
+            p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=True, mode='fwd')
+
+        with assert_warning(OMDeprecationWarning, "'comp' <class MultiJacVec>: has a compute_multi_jacvec_product method, but support for vectorized derivatives is deprecated and will be removed in a future release."):
+            p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='fwd')
 
     def test_compute_multi_jacvec_prod_rev_multi(self):
         p = self.setup_model(size=5, comp_class=MultiJacVec, vectorize=False, mode='rev')
