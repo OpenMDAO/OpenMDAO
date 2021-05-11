@@ -722,17 +722,18 @@ class System(object):
         str
             The absolute name of the source variable.
         """
-        if self._problem_meta is None or 'prom2abs' not in self._problem_meta:
+        try:
+            prom2abs = self._problem_meta['prom2abs']
+        except StandardError:
             raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
-                               "before Problem.setup is complete.")
+                               "before Problem.setup has been called.")
 
-        model = self._problem_meta['model_ref']()
-        prom2abs = self._problem_meta['prom2abs']
-        if name in prom2abs['input']:
-            name = prom2abs['input'][name][0]
-        elif name in prom2abs['output']:
+        if name in prom2abs['output']:
             return prom2abs['output'][name][0]
 
+        if name in prom2abs['input']:
+            name = prom2abs['input'][name][0]
+        model = self._problem_meta['model_ref']()
         if name in model._conn_global_abs_in2out:
             return model._conn_global_abs_in2out[name]
 
