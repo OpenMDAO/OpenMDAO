@@ -447,15 +447,12 @@ def _cite_cmd(options, user_args):
 def _show_dependency_versions():
     import openmdao
 
-    setup_path = os.path.realpath(os.path.dirname(os.path.dirname(openmdao.__file__)))
+    setup_path = os.path.realpath(os.path.dirname(os.path.dirname(openmdao.__file__))) + "/"
     setup_file = os.path.join(setup_path, 'setup.py')
+    print(setup_file)
     if not os.path.exists(setup_file):
         print('--show_dependencies only works in a development environment.')
         return
-
-    setup_path = os.getcwd() + "/"
-    if 'openmdao' in setup_path:
-        setup_path = setup_path[:setup_path.index('openmdao')]
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
