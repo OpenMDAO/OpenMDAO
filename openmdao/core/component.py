@@ -1099,8 +1099,8 @@ class Component(System):
         if dependent:
             meta['value'] = val
             if rows is not None:
-                rows = np.array(rows, dtype=INT_DTYPE, copy=False).flatten()
-                cols = np.array(cols, dtype=INT_DTYPE, copy=False).flatten()
+                rows = np.array(rows, dtype=INT_DTYPE, copy=False)
+                cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
                 # Check the length of rows and cols to catch this easy mistake and give a
                 # clear message.

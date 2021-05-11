@@ -186,6 +186,53 @@ class TestDemuxComp3D(unittest.TestCase):
         cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
+class TestDemuxComp4D(unittest.TestCase):
+
+    def setUp(self):
+        self.nn = 10
+
+        self.p = om.Problem()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output(name='a', shape=(self.nn, 7, 3, 4))
+        ivc.add_output(name='b', shape=(3, self.nn))
+
+        self.p.model.add_subsystem(name='ivc',
+                                   subsys=ivc,
+                                   promotes_outputs=['a', 'b'])
+
+        demux_comp = self.p.model.add_subsystem(name='demux_comp',
+                                                subsys=om.DemuxComp(vec_size=self.nn))
+
+        demux_comp.add_var('a', shape=(self.nn, 7, 3, 4), axis=0)
+        demux_comp.add_var('b', shape=(3, self.nn), axis=1)
+
+        self.p.model.connect('a', 'demux_comp.a')
+        self.p.model.connect('b', 'demux_comp.b')
+
+        self.p.setup(force_alloc_complex=True)
+
+        self.p['a'] = np.random.rand(self.nn, 7, 3, 4)
+        self.p['b'] = np.random.rand(3, self.nn)
+
+        self.p.run_model()
+
+    def test_results(self):
+
+        for i in range(self.nn):
+            in_i = np.take(self.p['a'], indices=i, axis=0)
+            out_i = self.p['demux_comp.a_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+            in_i = np.take(self.p['b'], indices=i, axis=1)
+            out_i = self.p['demux_comp.b_{0}'.format(i)]
+            assert_near_equal(in_i, out_i)
+
+    def test_partials(self):
+        np.set_printoptions(linewidth=1024)
+        cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
+        assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
+
 
 class TestFeature(unittest.TestCase):
 
