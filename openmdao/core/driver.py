@@ -476,8 +476,8 @@ class Driver(object):
                                   if check_path(n, incl, excl)])
         vars2record = {
             'input': myinputs,
-            'output': sorted(myoutputs), # sorting the list ensures the outputs are iterated  
-                                         # over in the same order even on mulitple procs
+            'output': sorted(myoutputs),  # sorting the list ensures the outputs are iterated
+                                          # over in the same order even on mulitple procs
             'residual': myresiduals
         }
 
