@@ -1134,7 +1134,7 @@ class System(object):
                     scheme._reset()  # force a re-initialization of approx
                     approx_scheme._during_sparsity_comp = True
 
-            self.run_linearize()
+            self.run_linearize(sub_do_ln=False)
 
         sparsity, sp_info = self._jacobian.get_sparsity()
 
@@ -3878,7 +3878,7 @@ class System(object):
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
             self._linearize(self._assembled_jac, sub_do_ln=do_ln)
-            if self._linear_solver is not None:
+            if self._linear_solver is not None and sub_do_ln:
                 self._linear_solver._linearize()
 
     def _apply_nonlinear(self):

@@ -1127,7 +1127,7 @@ class Problem(object):
 
                 # Only really need to linearize once.
                 if mode == 'fwd':
-                    comp.run_linearize()
+                    comp.run_linearize(sub_do_ln=False)
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
