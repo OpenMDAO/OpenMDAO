@@ -35,7 +35,8 @@ class DemuxComp(ExplicitComponent):
 
         self._no_check_partials = True
 
-        warn_deprecation("DemuxComp is being deprecated.")
+        warn_deprecation("DemuxComp is being deprecated. This same functionality can be achieved "
+                         "directly in the connect/promotes indices arg using om.slicer.")
 
     def initialize(self):
         """
