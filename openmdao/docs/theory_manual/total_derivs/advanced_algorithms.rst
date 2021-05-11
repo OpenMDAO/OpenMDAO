@@ -10,4 +10,3 @@ This section details the types of structures within a model that are necessary i
 
     separable.rst
     fan_out.rst
-    vectorized.rst
