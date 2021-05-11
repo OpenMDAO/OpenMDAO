@@ -237,6 +237,43 @@ class MetaModelTestCase(unittest.TestCase):
         assert_near_equal(prob['mm.y1'], 1.0, .00001)
         assert_near_equal(prob['mm.y2'], 7.0, .00001)
 
+    def test_two_vector_inputs(self):
+        mm = om.MetaModelUnStructuredComp()
+        mm.add_input('x1', np.zeros(4))
+        mm.add_input('x2', np.zeros(4))
+        mm.add_output('y1', 0.)
+        mm.add_output('y2', 0.)
+
+        mm.options['default_surrogate'] = om.KrigingSurrogate()
+
+        prob = om.Problem()
+        prob.model.add_subsystem('mm', mm)
+        prob.setup()
+
+        mm.options['train:x1'] = [
+            [1.0, 1.0, 1.0, 1.0],
+            [2.0, 1.0, 1.0, 1.0],
+            [1.0, 2.0, 1.0, 1.0],
+            [1.0, 1.0, 2.0, 1.0],
+            [1.0, 1.0, 1.0, 2.0]
+        ]
+        mm.options['train:x2'] = [
+            [1.0, 1.0, 1.0, 1.0],
+            [2.0, 1.0, 1.0, 1.0],
+            [1.0, 2.0, 1.0, 1.0],
+            [1.0, 1.0, 2.0, 1.0],
+            [1.0, 1.0, 1.0, 2.0]
+        ]
+        mm.options['train:y1'] = [3.0, 2.0, 1.0, 6.0, -2.0]
+        mm.options['train:y2'] = [1.0, 4.0, 7.0, -3.0, 3.0]
+
+        prob['mm.x1'] = [1.0, 2.0, 1.0, 1.0]
+        prob['mm.x2'] = [1.0, 2.0, 1.0, 1.0]
+        prob.run_model()
+
+        assert_near_equal(prob['mm.y1'], 1.0, .00001)
+        assert_near_equal(prob['mm.y2'], 7.0, .00001)
+
     def test_array_inputs(self):
         mm = om.MetaModelUnStructuredComp()
         mm.add_input('x', np.zeros((2,2)))
