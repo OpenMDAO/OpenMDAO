@@ -449,7 +449,6 @@ def _show_dependency_versions():
 
     setup_path = os.path.realpath(os.path.dirname(os.path.dirname(openmdao.__file__))) + "/"
     setup_file = os.path.join(setup_path, 'setup.py')
-    print(setup_file)
     if not os.path.exists(setup_file):
         print('--show_dependencies only works in a development environment.')
         return
