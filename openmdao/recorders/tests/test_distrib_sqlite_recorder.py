@@ -25,15 +25,15 @@ else:
 
 class DistributedAdder(ExplicitComponent):
     """
-    Distributes the work of adding 10 to every item in the param vector
+    Distributes the work of adding 10 to every item in the input vectors
     """
 
-    def __init__(self, size):
+    def __init__(self, sizes):
         super().__init__()
 
         self.options['distributed'] = True
 
-        self.local_size = self.size = size
+        self.sizes = sizes
 
     def setup(self):
         """
@@ -44,25 +44,25 @@ class DistributedAdder(ExplicitComponent):
         comm = self.comm
         rank = comm.rank
 
-        # NOTE: evenly_distrib_idxs is a helper function to split the array
-        #       up as evenly as possible
-        sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
-        local_size, local_offset = sizes[rank], offsets[rank]
-        self.local_size = local_size
+        for n, size in enumerate(self.sizes):
+            # NOTE: evenly_distrib_idxs is a helper function to split the array
+            #       up as evenly as possible
+            sizes, offsets = evenly_distrib_idxs(comm.size, size)
+            local_size, local_offset = sizes[rank], offsets[rank]
 
-        start = local_offset
-        end = local_offset + local_size
+            start = local_offset
+            end = local_offset + local_size
 
-        self.add_input('x', val=np.zeros(local_size, float),
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_output('y', val=np.zeros(local_size, float))
+            self.add_input(f'in{n}', val=np.zeros(local_size, float),
+                           src_indices=np.arange(start, end, dtype=int))
+
+            self.add_output(f'out{n}', val=np.zeros(local_size, float))
 
     def compute(self, inputs, outputs):
 
         # NOTE: Each process will get just its local part of the vector
-        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
-
-        outputs['y'] = inputs['x'] + 10.
+        for n, size in enumerate(self.sizes):
+            outputs[f'out{n}'] = inputs[f'in{n}'] + 10.
 
 
 class Summer(ExplicitComponent):
@@ -71,18 +71,25 @@ class Summer(ExplicitComponent):
     vector addition and computes a total
     """
 
-    def __init__(self, size):
+    def __init__(self, sizes):
         super().__init__()
-        self.size = size
+        self.sizes = sizes
 
     def setup(self):
-        # NOTE: this component depends on the full y array, so OpenMDAO
-        #       will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(self.size))
+        for n, size in enumerate(self.sizes):
+            # NOTE: this component depends on the full input array, so OpenMDAO
+            #       will automatically gather all the values for it
+            self.add_input(f'in{n}', val=np.zeros(size))
+
         self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
-        outputs['sum'] = np.sum(inputs['y'])
+        val = 0.
+
+        for n in range(len(self.sizes)):
+             val += np.sum(inputs[f'in{n}'])
+
+        outputs['sum'] = val
 
 
 class Mygroup(Group):
@@ -137,40 +144,44 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-        size = 100  # how many items in the array
+        # create distributed variables of different sizes to catch mismatched collective calls
+        sizes = [7, 10, 12, 25, 33, 42]
+
         prob = Problem()
 
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
+        ivc = prob.model.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['*'])
+        for n, size in enumerate(sizes):
+            ivc.add_output(f'in{n}', np.ones(size))
+            prob.model.add_design_var(f'in{n}')
+
+        prob.model.add_subsystem('adder', DistributedAdder(sizes), promotes=['*'])
+
+        prob.model.add_subsystem('summer', Summer(sizes), promotes=['*'])
+        prob.model.add_objective('sum')
+
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['y']
+        prob.driver.recording_options['includes'] = [f'out{n}' for n in range(len(sizes))]
         prob.driver.add_recorder(self.recorder)
 
-        prob.model.add_design_var('x')
-        prob.model.add_objective('sum')
-
         prob.setup()
-
-        prob['x'] = np.ones(size)
-
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,)]
 
-        expected_desvars = {
-            "des_vars.x": prob['des_vars.x'],
-        }
+        expected_desvars = {}
+        for n in range(len(sizes)):
+            expected_desvars[f'ivc.in{n}'] = prob[f'ivc.in{n}']
 
         expected_objectives = {
             "summer.sum": prob['summer.sum'],
         }
 
         expected_outputs = expected_desvars.copy()
-        expected_outputs['plus.y'] = prob.get_val('plus.y', get_remote=True)
+        for n in range(len(sizes)):
+            expected_outputs[f'adder.out{n}'] = prob.get_val(f'adder.out{n}', get_remote=True)
 
         if prob.comm.rank == 0:
             expected_outputs.update(expected_objectives)
