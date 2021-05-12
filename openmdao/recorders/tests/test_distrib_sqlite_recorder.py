@@ -30,7 +30,6 @@ class DistributedAdder(om.ExplicitComponent):
     def __init__(self, sizes):
         super().__init__()
         self.sizes = sizes
-        self.options['distributed'] = True
 
     def setup(self):
         """
@@ -47,8 +46,8 @@ class DistributedAdder(om.ExplicitComponent):
             local_sizes, _ = evenly_distrib_idxs(comm.size, size)
             local_size = local_sizes[rank]
 
-            self.add_input(f'in{n}', val=np.zeros(local_size, float))
-            self.add_output(f'out{n}', val=np.zeros(local_size, float))
+            self.add_input(f'in{n}', val=np.zeros(local_size, float), distributed=True)
+            self.add_output(f'out{n}', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
 
@@ -60,7 +59,7 @@ class DistributedAdder(om.ExplicitComponent):
 class Summer(om.ExplicitComponent):
     """
     Aggregation component that collects all the values from the distributed
-    vector addition and computes a total
+    vectors and computes a total
     """
 
     def __init__(self, sizes):
@@ -69,17 +68,15 @@ class Summer(om.ExplicitComponent):
 
     def setup(self):
         for n, size in enumerate(self.sizes):
-            # NOTE: this component depends on the full input array, so OpenMDAO
-            #       will automatically gather all the values for it
-            self.add_input(f'in{n}', val=np.zeros(size))
+            self.add_input(f'summand{n}', val=np.zeros(size))
 
         self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
         val = 0.
 
-        for n in range(len(self.sizes)):
-             val += np.sum(inputs[f'in{n}'])
+        for name in inputs:
+             val += np.sum(inputs[name])
 
         outputs['sum'] = val
 
@@ -143,14 +140,14 @@ class DistributedRecorderTest(unittest.TestCase):
 
         ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
         for n, size in enumerate(sizes):
-            ivc.add_output(f'in{n}', np.ones(size))
+            ivc.add_output(f'in{n}', np.ones(size), distributed=True)
             prob.model.add_design_var(f'in{n}')
 
         prob.model.add_subsystem('adder', DistributedAdder(sizes), promotes=['*'])
 
         prob.model.add_subsystem('summer', Summer(sizes), promotes_outputs=['sum'])
-        for n in range(len(sizes)):
-            prob.model.promotes('summer', inputs=[f'in{n}'], src_indices=om.slicer[:])
+        for n, size in enumerate(sizes):
+            prob.model.promotes('summer', inputs=[f'summand{n}'], src_indices=om.slicer[:], src_shape=size)
         prob.model.add_objective('sum')
 
         prob.driver.recording_options['record_desvars'] = True
@@ -167,7 +164,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         expected_desvars = {}
         for n in range(len(sizes)):
-            expected_desvars[f'ivc.in{n}'] = prob[f'ivc.in{n}']
+            expected_desvars[f'ivc.in{n}'] = prob.get_val(f'ivc.in{n}', get_remote=True)
 
         expected_objectives = { "summer.sum": prob['summer.sum'] }
 
