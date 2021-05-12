@@ -162,7 +162,7 @@ class _SubHelper(object):
             return text.group()
 
 
-class ToInteger(TokenConverter):
+class _ToInteger(TokenConverter):
     """
     Converter for PyParsing that is used to turn a token into an int.
     """
@@ -188,7 +188,7 @@ class ToInteger(TokenConverter):
         return int(tokenlist[0])
 
 
-class ToFloat(TokenConverter):
+class _ToFloat(TokenConverter):
     """
     Converter for PyParsing that is used to turn a token into a float.
     """
@@ -214,7 +214,7 @@ class ToFloat(TokenConverter):
         return float(tokenlist[0].replace('D', 'E'))
 
 
-class ToNan(TokenConverter):
+class _ToNan(TokenConverter):
     """
     Converter for PyParsing that is used to turn a token into Python nan.
     """
@@ -240,7 +240,7 @@ class ToNan(TokenConverter):
         return float('nan')
 
 
-class ToInf(TokenConverter):
+class _ToInf(TokenConverter):
     """
     Converter for PyParsing that is used to turn a token into Python inf.
     """
@@ -1069,19 +1069,19 @@ class FileParser(object):
         sign = oneOf("+ -")
         ee = CaselessLiteral('E') | CaselessLiteral('D')
 
-        num_int = ToInteger(Combine(Optional(sign) + digits))
+        num_int = _ToInteger(Combine(Optional(sign) + digits))
 
-        num_float = ToFloat(Combine(
+        num_float = _ToFloat(Combine(
             Optional(sign) +
             ((digits + dot + Optional(digits)) | (dot + digits)) +
             Optional(ee + Optional(sign) + digits)
         ))
 
         # special case for a float written like "3e5"
-        mixed_exp = ToFloat(Combine(digits + ee + Optional(sign) + digits))
+        mixed_exp = _ToFloat(Combine(digits + ee + Optional(sign) + digits))
 
-        nan = (ToInf(oneOf("Inf -Inf")) |
-               ToNan(oneOf("NaN nan NaN%  NaNQ NaNS qNaN sNaN 1.#SNAN 1.#QNAN -1.#IND")))
+        nan = (_ToInf(oneOf("Inf -Inf")) |
+               _ToNan(oneOf("NaN nan NaN%  NaNQ NaNS qNaN sNaN 1.#SNAN 1.#QNAN -1.#IND")))
 
         string_text = Word(textchars)
 
