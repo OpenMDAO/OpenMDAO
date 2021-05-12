@@ -15,7 +15,7 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.mpi import MPI
 from openmdao.warnings import OMDeprecationWarning
 
@@ -161,11 +161,11 @@ class TestNotInstalled(unittest.TestCase):
                          'pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
 
-@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
+    @require_pyoptsparse()
     def test_design_vars_on_all_procs_pyopt(self):
 
         prob = om.Problem()
@@ -191,6 +191,7 @@ class TestMPIScatter(unittest.TestCase):
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
+    @require_pyoptsparse()
     def test_opt_distcomp(self):
         size = 7
 
@@ -230,10 +231,11 @@ class TestMPIScatter(unittest.TestCase):
                           np.zeros(7),
                           1e-5)
 
+    @require_pyoptsparse('ParOpt')
     def test_paropt_distcomp(self):
-        _, local_opt = set_pyoptsparse_opt('ParOpt')
-        if local_opt != 'ParOpt':
-            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+        # _, local_opt = set_pyoptsparse_opt('ParOpt')
+        # if local_opt != 'ParOpt':
+        #     raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
         size = 7
 
         prob = om.Problem()
@@ -2026,10 +2028,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
+    @require_pyoptsparse('ParOpt')
     def test_ParOpt_basic(self):
-        _, local_opt = set_pyoptsparse_opt('ParOpt')
-        if local_opt != 'ParOpt':
-            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
+        # _, local_opt = set_pyoptsparse_opt('ParOpt')
+        # if local_opt != 'ParOpt':
+        #     raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
