@@ -1,5 +1,6 @@
 """Define utils for use in testing."""
 import json
+import functools
 
 import numpy as np
 
