@@ -165,7 +165,7 @@ class TestNotInstalled(unittest.TestCase):
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
-    @require_pyoptsparse()
+    @require_pyoptsparse(OPTIMIZER)
     def test_design_vars_on_all_procs_pyopt(self):
 
         prob = om.Problem()
@@ -191,7 +191,7 @@ class TestMPIScatter(unittest.TestCase):
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
-    @require_pyoptsparse()
+    @require_pyoptsparse(OPTIMIZER)
     def test_opt_distcomp(self):
         size = 7
 
@@ -233,9 +233,6 @@ class TestMPIScatter(unittest.TestCase):
 
     @require_pyoptsparse('ParOpt')
     def test_paropt_distcomp(self):
-        # _, local_opt = set_pyoptsparse_opt('ParOpt')
-        # if local_opt != 'ParOpt':
-        #     raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
         size = 7
 
         prob = om.Problem()
@@ -274,7 +271,7 @@ class TestMPIScatter(unittest.TestCase):
                           1e-5)
 
 
-@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@require_pyoptsparse(OPTIMIZER)
 @use_tempdirs
 class TestPyoptSparse(unittest.TestCase):
 
@@ -2030,9 +2027,6 @@ class TestPyoptSparse(unittest.TestCase):
 
     @require_pyoptsparse('ParOpt')
     def test_ParOpt_basic(self):
-        # _, local_opt = set_pyoptsparse_opt('ParOpt')
-        # if local_opt != 'ParOpt':
-        #     raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
