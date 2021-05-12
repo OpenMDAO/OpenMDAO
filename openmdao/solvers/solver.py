@@ -15,7 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, SolverWarning
 from openmdao.core.component import Component
 
 _emptyset = set()
@@ -29,7 +29,7 @@ class SolverInfo(object):
     ----------
     prefix : str
         Prefix to prepend during this iprint.
-    stack : List
+    stack : list
         List of strings; strings are popped and appended as needed.
     """
 
@@ -133,9 +133,9 @@ class Solver(object):
     supports : <OptionsDictionary>
         Options dictionary describing what features are supported by this
         solver.
-    _filtered_vars_to_record: Dict
+    _filtered_vars_to_record : Dict
         Dict of list of var names to record
-    _norm0: float
+    _norm0 : float
         Normalization factor
     _problem_meta : dict
         Problem level metadata.
@@ -501,8 +501,7 @@ class Solver(object):
             return
 
         from openmdao.core.group import Group
-        if (isinstance(s, Group) and (s._has_distrib_vars or s._contains_parallel_group)) or \
-           (isinstance(s, Component) and s.options['distributed']):
+        if s._has_distrib_vars or (isinstance(s, Group) and s._contains_parallel_group):
             msg = "{} linear solver in {} cannot be used in or above a ParallelGroup or a " + \
                 "distributed component."
             raise RuntimeError(msg.format(type(self).__name__, s.msginfo))
@@ -624,7 +623,7 @@ class NonlinearSolver(Solver):
                            f"here: \n{pathname}nonlinear_solver.linesearch.options"
                            f"['print_bound_enforce']=True. "
                            f"\nThe bound(s) being violated now are:\n")
-                    simple_warning(msg)
+                    issue_warning(msg, category=SolverWarning)
 
                     self._single_iteration()
                     self.linesearch.options['print_bound_enforce'] = False

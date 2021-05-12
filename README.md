@@ -1,5 +1,4 @@
-[![TravisCI Badge][9]][10]
-[![AppVeyor Badge][11]][12]
+[![GitHub Actions Test Badge][17]][18]
 [![Coveralls Badge][13]][14]
 
 # [OpenMDAO][0]
@@ -156,13 +155,13 @@ browser.
 
 [8]: https://help.github.com/articles/changing-a-remote-s-url/ "Update Git Remote URL"
 
-[9]: https://travis-ci.org/OpenMDAO/OpenMDAO.svg?branch=master "TravisCI Badge"
-[10]: https://travis-ci.org/OpenMDAO/OpenMDAO "OpenMDAO @TravisCI"
-[11]: https://ci.appveyor.com/api/projects/status/33kct0irhbgcg8m1?svg=true "Build Badge"
-[12]: https://ci.appveyor.com/project/OpenMDAO/blue/branch/master "OpenMDAO @AppVeyor"
 [13]: https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master "Coverage Badge"
 [14]: https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master "OpenMDAO @Coveralls"
 
 [15]: https://en.wikipedia.org/wiki/Software_release_life_cycle#Beta "Wikipedia Beta"
 
 [16]: https://setuptools.readthedocs.io/en/latest/setuptools.html#development-mode "Pip Editable Mode"
+
+[17]: https://github.com/OpenMDAO/OpenMDAO/actions/workflows/openmdao_test_workflow.yml/badge.svg "Github Actions Badge"
+[18]: https://github.com/OpenMDAO/OpenMDAO/actions "Github Actions"
+

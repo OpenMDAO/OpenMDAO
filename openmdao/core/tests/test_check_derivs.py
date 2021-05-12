@@ -1912,6 +1912,45 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(partials)
 
+    def test_no_linsolve_during_check(self):
+        # ensure that solve_linear is not called during check partials
+        from openmdao.solvers.solver import LinearSolver
+
+        class ErrSolver(LinearSolver):
+            def _linearize(self):
+                raise RuntimeError("_linearize called")
+
+            def solve(self, vec_names, mode, rel_systems=None):
+                raise RuntimeError("solve called")
+
+            def _run_apply(self):
+                raise RuntimeError("_run_apply called")
+
+        class SingularImplicitComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('lhs', shape=10)
+                self.add_input('rhs', shape=10)
+
+                self.add_output('resid', shape=10)
+
+                self.declare_partials('*', '*', method='cs')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+
+                residuals['resid'] = inputs['lhs'] - inputs['rhs']
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('sing_check', SingularImplicitComp())
+        p.model.sing_check.linear_solver = ErrSolver()
+        p.setup()
+
+        p.run_model()
+
+        p.check_partials(out_stream=None)
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -2570,9 +2609,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[0])
-        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[1])
-        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[2])
+        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[2])
 
         prob.run_model()
 

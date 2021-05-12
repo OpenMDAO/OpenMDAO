@@ -32,7 +32,7 @@ class Vector(object):
     _name : str
         The name of the vector: 'nonlinear', 'linear', or right-hand side name.
     _typ : str
-        Type: 'input' for input vectors; 'output' for output/residual vectors.
+        Type : 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
@@ -49,7 +49,7 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
-    _alloc_complex : Bool
+    _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
@@ -444,18 +444,6 @@ class Vector(object):
         raise NotImplementedError('add_scale_vec not defined for vector type %s' %
                                   type(self).__name__)
 
-    def scale(self, scale_to):
-        """
-        Scale this vector to normalized or physical form.
-
-        Parameters
-        ----------
-        scale_to : str
-            Values are "phys" or "norm" to scale to physical or normalized.
-        """
-        raise NotImplementedError('scale not defined for vector type %s' %
-                                  type(self).__name__)
-
     def asarray(self, copy=False):
         """
         Return a flat array representation of this vector.
@@ -547,21 +535,22 @@ class Vector(object):
         if self._icol is not None:
             idxs = (idxs, self._icol)
 
-        value = np.asarray(val)
-
-        try:
-            if flat:
-                self._views_flat[abs_name][idxs] = value.flat
+        if flat:
+            if isinstance(val, float):
+                self._views_flat[abs_name][idxs] = val
             else:
-                self._views[abs_name][idxs] = value
-
-        except Exception as err:
+                self._views_flat[abs_name][idxs] = np.asarray(val).flat
+        else:
+            value = np.asarray(val)
             try:
-                value = value.reshape(self._views[abs_name][idxs].shape)
-            except Exception:
-                raise ValueError(f"{self._system().msginfo}: Failed to set value of "
-                                 f"'{name}': {str(err)}.")
-            self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs] = value
+            except Exception as err:
+                try:
+                    value = value.reshape(self._views[abs_name][idxs].shape)
+                except Exception:
+                    raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                                     f"'{name}': {str(err)}.")
+                self._views[abs_name][idxs] = value
 
     def dot(self, vec):
         """

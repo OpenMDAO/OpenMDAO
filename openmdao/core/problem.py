@@ -17,6 +17,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
@@ -30,8 +31,7 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, simple_warning, warn_deprecation, \
-    _is_slicer_op, _slice_indices
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import name2abs_names
@@ -44,6 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -966,10 +967,10 @@ class Problem(object):
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
-            simple_warning("Inefficient choice of derivative mode.  You chose '%s' for a "
-                           "problem with %d design variables and %d response variables "
-                           "(objectives and nonlinear constraints)." %
-                           (mode, desvar_size, response_size), RuntimeWarning)
+            issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
+                          f"problem with {desvar_size} design variables and {response_size} "
+                          "response variables (objectives and nonlinear constraints).",
+                          category=DerivativesWarning)
 
         if self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and \
                 hasattr(self.model, '_order_set') and self.model._order_set:
@@ -1126,7 +1127,7 @@ class Problem(object):
 
                 # Only really need to linearize once.
                 if mode == 'fwd':
-                    comp.run_linearize()
+                    comp.run_linearize(sub_do_ln=False)
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
@@ -1306,7 +1307,6 @@ class Problem(object):
         model.run_apply_nonlinear()
 
         # Finite Difference to calculate Jacobian
-        jac_key = 'J_fd'
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
@@ -1318,6 +1318,7 @@ class Problem(object):
 
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
+            added_wrts = set()
 
             of, wrt = comp._get_partials_varlists()
 
@@ -1372,17 +1373,21 @@ class Problem(object):
                 else:
                     vector = None
 
-                approximations[fd_options['method']].add_approximation(abs_key, self.model,
-                                                                       fd_options, vector=vector)
+                # prevent adding multiple approxs with same wrt (and confusing users with warnings)
+                if abs_key[1] not in added_wrts:
+                    approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                           fd_options,
+                                                                           vector=vector)
+                    added_wrts.add(abs_key[1])
 
-            approx_jac = {}
+            approx_jac = _CheckingJacobian(comp)
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
-                partials_data[c_name][rel_key][jac_key] = partial
+                partials_data[c_name][rel_key]['J_fd'] = partial
 
                 # If this is a directional derivative, convert the analytic to a directional one.
                 wrt = rel_key[1]
@@ -1412,7 +1417,7 @@ class Problem(object):
             msg += str(list(comps_could_not_cs))
             msg += "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
                    "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
-            simple_warning(msg)
+            issue_warning(msg, category=DerivativesWarning)
 
         _assemble_derivative_data(partials_data, rel_err_tol, abs_err_tol, out_stream,
                                   compact_print, comps, all_fd_options, indep_key=indep_key,
@@ -1661,6 +1666,7 @@ class Problem(object):
     def list_problem_vars(self,
                           show_promoted_name=True,
                           print_arrays=False,
+                          driver_scaling=True,
                           desvar_opts=[],
                           cons_opts=[],
                           objs_opts=[],
@@ -1678,6 +1684,10 @@ class Problem(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        driver_scaling : bool, optional
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         desvar_opts : list of str
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
@@ -1700,7 +1710,7 @@ class Problem(object):
 
         # Design vars
         desvars = self.driver._designvars
-        vals = self.driver.get_design_var_values(get_remote=True)
+        vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         header = "Design Variables"
         col_names = default_col_names + desvar_opts
         self._write_var_info_table(header, col_names, desvars, vals,
@@ -1710,7 +1720,7 @@ class Problem(object):
 
         # Constraints
         cons = self.driver._cons
-        vals = self.driver.get_constraint_values()
+        vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         header = "Constraints"
         col_names = default_col_names + cons_opts
         self._write_var_info_table(header, col_names, cons, vals,
@@ -1719,7 +1729,7 @@ class Problem(object):
                                    col_spacing=2)
 
         objs = self.driver._objs
-        vals = self.driver.get_objective_values()
+        vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
         header = "Objectives"
         col_names = default_col_names + objs_opts
         self._write_var_info_table(header, col_names, objs, vals,
@@ -1935,7 +1945,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             Set to None to suppress.
     compact_print : bool
         If results should be printed verbosely or in a table.
-    system_list : Iterable
+    system_list : iterable
         The systems (in the proper order) that were checked.0
     global_options : dict
         Dictionary containing the options for the approximation.
@@ -1985,7 +1995,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         if sys_name not in derivative_data:
             msg = "No derivative data found for %s '%s'." % (sys_type, sys_name)
-            simple_warning(msg)
+            issue_warning(msg, category=DerivativesWarning)
             continue
 
         derivatives = derivative_data[sys_name]
@@ -1995,13 +2005,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
         # Sorted keys ensures deterministic ordering
         sorted_keys = sorted(derivatives.keys())
+        num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
 
         if not suppress_output:
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
             out_buffer = StringIO()
-            num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'
                 out_buffer.write(header_str)
@@ -2072,7 +2082,12 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info = derivatives[of, wrt]
             # TODO total derivs may have been computed in rev mode, not fwd
             forward = derivative_info['J_fwd']
-            fd = derivative_info['J_fd']
+            try:
+                fd = derivative_info['J_fd']
+            except KeyError:
+                # this can happen when a partial is not declared, which means it should be zero
+                fd = np.zeros(forward.shape)
+
             if do_rev:
                 reverse = derivative_info.get('J_rev')
 
@@ -2237,13 +2252,13 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                             out_buffer.write('     Forward')
                         else:
                             out_buffer.write('    Analytic')
-                        out_buffer.write(' Magnitude : {:.6e}\n'.format(magnitude.forward))
+                        out_buffer.write(' Magnitude: {:.6e}\n'.format(magnitude.forward))
                     if do_rev:
-                        txt = '     Reverse Magnitude : {:.6e}'
+                        txt = '     Reverse Magnitude: {:.6e}'
                         if out_stream:
                             out_buffer.write(txt.format(magnitude.reverse) + '\n')
                     if out_stream:
-                        out_buffer.write('          Fd Magnitude : {:.6e} ({})\n'.format(
+                        out_buffer.write('          Fd Magnitude: {:.6e} ({})\n'.format(
                             magnitude.fd, fd_desc))
 
                     # Absolute Errors

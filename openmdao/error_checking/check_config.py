@@ -14,9 +14,10 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
-from openmdao.utils.general_utils import printoptions, simple_warning, ignore_errors
-from openmdao.utils.units import convert_units, _has_val_mismatch
+from openmdao.utils.general_utils import printoptions, ignore_errors
+from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
+from openmdao.warnings import issue_warning, SetupWarning
 
 
 _UNSET = object()
@@ -176,9 +177,9 @@ def _get_used_before_calc_subs(group, input_srcs):
                     (parallel_solver[src_sys] not in ["NL: NLBJ", "NL: Newton", "BROYDEN"]) and
                     src_sys == tgt_sys and
                     not hierarchy_check):
-                simple_warning("Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver "
-                               "to '%s' when connecting components inside parallel "
-                               "groups" % (src_sys))
+                msg = f"Need to attach NonlinearBlockJac, NewtonSolver, or BroydenSolver " \
+                      f"to '{src_sys}' when connecting components inside parallel groups"
+                issue_warning(msg, category=SetupWarning)
                 ubcs[tgt_abs.rsplit('.', 1)[0]].add(src_abs.rsplit('.', 1)[0])
             if (src_sys in allsubs and tgt_sys in allsubs and
                     (allsubs[src_sys].index > allsubs[tgt_sys].index)):
@@ -367,6 +368,8 @@ def _check_auto_ivc_warnings(problem, logger):
     ----------
     problem : <Problem>
         The problem being checked.
+    logger : object
+        The object that manages logging output.
     """
     if hasattr(problem.model, "_auto_ivc_warnings"):
         for i in problem.model._auto_ivc_warnings:

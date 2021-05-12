@@ -77,6 +77,7 @@
             ],
             "options": {
                 "distributed": false,
+                "run_root_only": false,
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -180,8 +181,9 @@
                             ],
                             "options": {
                                 "assembled_jac_type": "csc",
-                                "distributed": false
-                            }
+                                "distributed": false,
+                                "run_root_only": false
+                    }
                         }
                     ],
                     "options": {
@@ -253,8 +255,9 @@
                         }
                     ],
                     "options": {
-                        "distributed": false
-                    }
+                        "distributed": false,
+                        "run_root_only": false
+            }
                 },
                 {
                     "name": "d2",
@@ -309,8 +312,9 @@
                         }
                     ],
                     "options": {
-                        "distributed": false
-                    }
+                        "distributed": false,
+                        "run_root_only": false
+            }
                 }
             ],
             "options": {
@@ -397,6 +401,7 @@
             ],
             "options": {
                 "distributed": false,
+                "run_root_only": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -446,6 +451,7 @@
             ],
             "options": {
                 "distributed": false,
+                "run_root_only": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -495,6 +501,7 @@
             ],
             "options": {
                 "distributed": false,
+                "run_root_only": false,
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,

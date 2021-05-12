@@ -268,7 +268,7 @@ class TestParallelGroups(unittest.TestCase):
         model.add_subsystem('C1', DistribExecComp(['y=2.5*x', 'y=3.5*x'], arr_size=size), promotes=['x'])
         model.add_subsystem('sink', om.ExecComp('y=-1.5 * x', x=np.zeros(size), y=np.zeros(size)))
 
-        model.connect('C1.y', 'sink.x')
+        model.connect('C1.y', 'sink.x', src_indices=om.slicer[:])
 
         of=['sink.y']
         wrt=['x']

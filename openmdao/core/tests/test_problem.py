@@ -14,6 +14,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.utils.units import convert_units
+from openmdao.warnings import DerivativesWarning
 
 try:
     from parameterized import parameterized
@@ -1416,7 +1417,7 @@ class TestProblem(unittest.TestCase):
               "You chose 'fwd' for a problem with 99 design variables and 10 " \
               "response variables (objectives and nonlinear constraints)."
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(DerivativesWarning, msg):
             prob.final_setup()
 
     def test_setup_bad_mode_direction_rev(self):
@@ -1438,7 +1439,7 @@ class TestProblem(unittest.TestCase):
               "You chose 'rev' for a problem with 10 design variables and 20 " \
               "response variables (objectives and nonlinear constraints)."
 
-        with assert_warning(RuntimeWarning, msg):
+        with assert_warning(DerivativesWarning, msg):
             prob.final_setup()
 
     def test_run_before_setup(self):
@@ -2050,6 +2051,55 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         self.assertRegex(output[12], r'^\s+upper:')
         self.assertRegex(output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
+
+    def test_list_problem_vars_driver_scaling(self):
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                             upper=np.array([10.0, 10.0]), ref=1.5)
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj', ref=3.0)
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0, ref=2.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        # Driver Scaling
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            prob.list_problem_vars()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('1.31' in output[5]) # z
+        self.assertTrue('-10.' in output[14]) # con
+        self.assertTrue('1.06' in output[21]) # obj
+
+        # Model Scaling
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            prob.list_problem_vars(driver_scaling=False)
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+
+        self.assertTrue('1.9' in output[5]) # z
+        self.assertTrue('-20.' in output[14]) # con
+        self.assertTrue('3.18' in output[21]) # obj
 
     def test_feature_list_problem_vars(self):
         import numpy as np

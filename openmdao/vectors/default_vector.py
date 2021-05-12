@@ -445,5 +445,6 @@ class DefaultVector(Vector):
             state minus system member.
         """
         state = self.__dict__.copy()
-        del state['_system']
+        if '_system' in state:
+            del state['_system']
         return state

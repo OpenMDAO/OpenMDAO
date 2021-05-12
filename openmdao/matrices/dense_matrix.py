@@ -79,7 +79,7 @@ class DenseMatrix(COOMatrix):
         """
         Create masking array for this matrix.
 
-        Note: this only applies when this Matrix is an 'ext_mtx' inside of a
+        Note : this only applies when this Matrix is an 'ext_mtx' inside of a
         Jacobian object.
 
         Parameters

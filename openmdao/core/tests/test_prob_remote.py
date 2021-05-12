@@ -150,7 +150,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                 self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
                 self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
                 self.add_subsystem('sum', om.ExecComp('z = sum(y)', y=np.zeros((N,)), z=0.0))
-                self.connect('dst.y', 'sum.y')
+                self.connect('dst.y', 'sum.y', src_indices=om.slicer[:])
 
                 self.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
                 self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])

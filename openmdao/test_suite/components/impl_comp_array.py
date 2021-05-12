@@ -35,25 +35,15 @@ class TestImplCompArrayDense(TestImplCompArray):
         jacobian['x', 'rhs'] = -np.eye(2)
 
 
-class TestImplCompArraySpmtx(TestImplCompArray):
-
-    def linearize(self, inputs, outputs, jacobian):
-        ones = np.ones(2)
-        inds = np.arange(2)
-
-        jacobian['x', 'x'] = scipy.sparse.csr_matrix(self.mtx)
-        jacobian['x', 'rhs'] = scipy.sparse.csr_matrix((-ones, (inds, inds)))
-
-
 class TestImplCompArraySparse(TestImplCompArray):
 
-    def linearize(self, inputs, outputs, jacobian):
-        ones = np.ones(2)
-        inds = np.arange(2)
+    def setup_partials(self):
+        self.declare_partials(of='x', wrt='x')
+        self.declare_partials(of='x', wrt='rhs', rows=np.arange(2), cols=np.arange(2))
 
-        jacobian['x', 'x'] = (self.mtx.flatten(),
-                              np.arange(4), np.arange(4))
-        jacobian['x', 'rhs'] = (-ones, inds, inds)
+    def linearize(self, inputs, outputs, jacobian):
+        jacobian['x', 'x'] = self.mtx
+        jacobian['x', 'rhs'] = -np.ones(2)
 
 
 class TestImplCompArrayMatVec(TestImplCompArray):
@@ -68,9 +58,14 @@ class TestImplCompArrayMatVec(TestImplCompArray):
                      mode):
 
         if mode == 'fwd':
-            d_residuals['x'] += self.mtx.dot(d_outputs['x'])
-            d_residuals['x'] += -d_inputs['rhs']
-
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_residuals['x'] += self.mtx.dot(d_outputs['x'])
+                if 'rhs' in d_inputs:
+                    d_residuals['x'] += -d_inputs['rhs']
         else:
-            d_outputs['x'] += self.mtx.dot(d_residuals['x'])
-            d_inputs['rhs'] += -d_residuals['x']
+            if 'x' in d_residuals:
+                if 'x' in d_outputs:
+                    d_outputs['x'] += self.mtx.dot(d_residuals['x'])
+                if 'rhs' in d_inputs:
+                    d_inputs['rhs'] += -d_residuals['x']

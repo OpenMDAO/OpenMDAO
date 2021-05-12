@@ -8,7 +8,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.notebook_mode import notebook_mode
+
 
 # Components
 from openmdao.components.add_subtract_comp import AddSubtractComp
@@ -68,10 +68,6 @@ try:
 except ImportError:
     PETScVector = None
 
-# Developer Tools
-from openmdao.visualization.n2_viewer.n2_viewer import n2
-from openmdao.visualization.connection_viewer.viewconns import view_connections
-
 # Drivers
 from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
@@ -90,10 +86,22 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.case_reader import CaseReader
 
 # Visualizations
+from openmdao.visualization.n2_viewer.n2_viewer import n2
+from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
+
+# Notebook Utils
+from openmdao.utils.notebook_utils import notebook_mode, display_source, show_options_table, cite
 
 # Units
 from openmdao.utils.units import convert_units, unit_conversion
+
+# Warning Options
+from openmdao.warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
+    SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
+    DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
+    MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning
+
 
 # set up tracing or memory profiling if env vars are set.
 import os

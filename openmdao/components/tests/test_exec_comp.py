@@ -20,7 +20,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.utils import cs_safe
+from openmdao.warnings import OMDeprecationWarning
 
 _ufunc_test_data = {
     'min': {
@@ -293,7 +293,7 @@ else:
         'check_func': scipy.special.factorial,
         'args': {'f': {'value': np.zeros(6)},
                  'x': {'value': np.random.random(6)}},
-        'warning': (DeprecationWarning,
+        'warning': (OMDeprecationWarning,
                     "The 'factorial' function is deprecated. "
                     "It is no longer supported for SciPy versions >= 1.5.")
     }
@@ -1235,6 +1235,138 @@ class TestExecComp(unittest.TestCase):
         self.assertTrue("balance" in text)
         self.assertTrue("x_1" in text)
 
+    def test_add_expr(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp('y=x',
+                             x={'value' : 3.0, 'units' : 'mm'},
+                             y={'shape' : (1, ), 'units' : 'cm'})
+
+        excomp.add_expr('z = 2.9*x',
+                        z={'shape' : (1, ), 'units' : 's'})
+
+        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
+    def test_add_expr_bare(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp()
+
+        excomp.add_expr('z = 2.9*x',
+                        x={'value' : 3.0, 'units' : 'mm'},
+                        z={'shape' : (1, ), 'units' : 's'})
+
+        p.model.add_subsystem('comp', excomp, promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+
+    def test_add_expr_configure(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     z={'shape' : (1, ), 'units' : 's'})
+
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
+    def test_add_expr_configure_delay_defaults(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     z={'shape' : (1, ), 'units' : 's'})
+
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
+    def test_add_expr_errors(self):
+        p = om.Problem()
+
+        excomp = om.ExecComp('y=x',
+                             x={'value' : 3.0, 'units' : 'mm'},
+                             y={'shape' : (1, ), 'units' : 'cm'})
+
+        with self.assertRaises(NameError) as cm:
+            excomp.add_expr('z = 2.9*x',
+                            x={'value' : 3.0, 'units' : 'cm'},
+                            z={'shape' : (1, ), 'units' : 's'})
+
+        self.assertEquals(cm.exception.args[0],
+                          "Defaults for 'x' have already been defined in a previous "
+                          "expression.")
+
+        with self.assertRaises(TypeError) as cm:
+            excomp.add_expr(p)
+
+        self.assertEquals(cm.exception.args[0],
+                          "Argument 'expr' must be of type 'str', but type 'Problem' was found.")
+
+        excomp.add_expr('y = 2.9*x')
+        p.model.add_subsystem('zzz', excomp)
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEquals(cm.exception.args[0],
+                          "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
+
+    def test_feature_add_expr(self):
+        import numpy as np
+        import openmdao.api as om
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('y=x',
+                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     y={'shape' : (1, ), 'units' : 'cm'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('z = 2.9*x',
+                                     z={'shape' : (1, ), 'units' : 's'})
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
+        assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
+
 
 class TestFunctionRegistration(unittest.TestCase):
 
@@ -1337,8 +1469,10 @@ class TestFunctionRegistration(unittest.TestCase):
             p = om.Problem()
             comp = p.model.add_subsystem('comp', om.ExecComp(['out1 = unsafe(x) * z',
                                                               'out2 = safe(y) + z'], shape=size))
-            comp.declare_partials('out1', ['x', 'z'], method='fd')
-            comp.declare_partials('out2', ['y', 'z'], method='cs')
+            rows = cols = np.arange(size)
+            comp.declare_partials('out1', ['x', 'z'], rows=rows, cols=cols, method='fd')
+            comp.declare_partials('out2', ['y'], rows=rows, cols=cols, method='cs')
+            comp.declare_partials('out2', ['z'], rows=rows, cols=cols, method='fd')
             p.setup()
             xx = np.arange(1, size + 1, dtype=float)
             p['comp.x'] = x = xx * 3.
@@ -1354,7 +1488,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out1', 'comp.z'], np.eye(size) * x**2, 1e-6)
             assert_near_equal(J['comp.out2', 'comp.x'], np.zeros((size, size)), 1e-11)
             assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-11)
-            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-11)
+            assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
 
             data = p.check_partials(out_stream=None)
             self.assertEqual(list(data), ['comp'])
@@ -1471,13 +1605,17 @@ class TestFunctionRegistration(unittest.TestCase):
             p.model.connect("comp.y", "sink.x")
             p.setup()
             p['indeps.x'] = 3.
+
             # if shape_by_conn results in inputs and outputs being different shapes, we can't detect if that's
             # an error or not because we don't know how the expressions evaluate, so we have to wait until
             # compute runs and just report as an error during expression evaluation.
-            with self.assertRaises(Exception) as cm:
+
+            # have to use regex to handle differences in numpy print formats for shape
+            msg = "'comp' <class ExecComp>: Error occurred evaluating 'y = double\(x\) \* 3\.':\n" \
+                  "'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast " \
+                  "input array from shape \(10.*\) into shape \(8.*\)."
+            with self.assertRaisesRegex(Exception, msg) as cm:
                 p.run_model()
-            self.assertEquals(cm.exception.args[0],
-                              "'comp' <class ExecComp>: Error occurred evaluating 'y = double(x) * 3.':\n'comp' <class ExecComp>: Failed to set value of 'y': could not broadcast input array from shape (10) into shape (8).")
 
     def test_shape_by_conn_bug_has_diag_partials_bug(self):
         # this is for a bug where has_diag_partials was being ignored when shape_by_conn
@@ -1557,7 +1695,7 @@ _MASK = np.array(
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape) + 1e-5
+    sparsity = np.random.random(mask.shape) + 1e-5
     return sparsity * mask
 
 

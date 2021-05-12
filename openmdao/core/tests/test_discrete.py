@@ -14,7 +14,7 @@ from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_near_equal, assert_no_warning
 from openmdao.utils.general_utils import remove_whitespace
-from openmdao.utils.logger_utils import TestLogger
+from openmdao.warnings import OMDeprecationWarning
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -699,7 +699,7 @@ class DiscreteTestCase(unittest.TestCase):
                "False, but in future this will result in an error. Use `array.size > 0` to check "
                "that an array is not empty.")
 
-        with assert_no_warning(DeprecationWarning, msg):
+        with assert_no_warning(OMDeprecationWarning, msg):
             prob.run_model()
 
 class SolverDiscreteTestCase(unittest.TestCase):

@@ -12,13 +12,14 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation, _prom2ivc_src_dict, \
+from openmdao.utils.general_utils import _prom2ivc_src_dict, \
     _prom2ivc_src_name_iter
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -462,7 +463,7 @@ class Driver(object):
 
         myoutputs = set(myoutputs)
         if recording_options['record_desvars']:
-            myoutputs.update(self._designvars)
+            myoutputs.update(model.get_source(n) for n in self._designvars)
         if recording_options['record_objectives'] or recording_options['record_responses']:
             myoutputs.update(self._objs)
         if recording_options['record_constraints'] or recording_options['record_responses']:
@@ -610,7 +611,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, get_remote=True):
+    def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
         Return the design variable values.
 
@@ -622,13 +623,18 @@ class Driver(object):
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
+        driver_scaling : bool
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
 
         Returns
         -------
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dv, self._remote_dvs, get_remote=get_remote)
+        return {n: self._get_voi_val(n, dv, self._remote_dvs, get_remote=get_remote,
+                                     driver_scaling=driver_scaling)
                 for n, dv in self._designvars.items()}
 
     def set_design_var(self, name, value, set_remote=True):
@@ -1080,7 +1086,8 @@ class Driver(object):
 
         problem = self._problem()
         if not problem.model._use_derivatives:
-            simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
+            issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
+                          category=DerivativesWarning)
             return
 
         total_coloring = self._get_static_coloring()

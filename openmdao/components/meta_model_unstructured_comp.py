@@ -7,8 +7,8 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import rel_key2abs_key
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):
@@ -306,7 +306,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             msg += "The derivatives computed using the defaults are:\n"
             for abs_key in non_declared_partials:
                 msg += "    {}, {}\n".format(*abs_key)
-            simple_warning(msg, RuntimeWarning)
+            issue_warning(msg, category=DerivativesWarning)
 
     def check_config(self, logger):
         """
@@ -585,6 +585,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 for row_idx, v in enumerate(val):
                     v = np.asarray(v)
                     inputs[row_idx, idx:idx + sz] = v.flat
+                idx += sz
 
         # Assemble output data and train each output.
         for name, shape in self._surrogate_output_names:

@@ -48,7 +48,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import ignore_errors, warn_deprecation
+from openmdao.utils.general_utils import ignore_errors
+from openmdao.warnings import warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -60,7 +61,10 @@ def _n2_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
+    parser.add_argument('file', nargs=1,
+                        help='Python script or recording containing the model. '
+                        'If metadata from a parallel run was recorded in a separate file, '
+                        'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',

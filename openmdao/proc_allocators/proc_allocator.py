@@ -1,5 +1,6 @@
 """Define the base ProcAllocator class."""
 import numpy as np
+from openmdao.core.constants import INT_DTYPE
 
 
 class ProcAllocationError(Exception):
@@ -113,10 +114,10 @@ class ProcAllocator(object):
         """
         nproc = comm.size
 
-        min_procs = np.array([minp for minp, _, _ in proc_info], dtype=int)
+        min_procs = np.array([minp for minp, _, _ in proc_info], dtype=INT_DTYPE)
         # if max_procs entry is None or > nproc, it just becomes nproc
         max_procs = np.array([nproc if maxp is None or maxp > nproc else
-                              maxp for _, maxp, _ in proc_info], dtype=int)
+                              maxp for _, maxp, _ in proc_info], dtype=INT_DTYPE)
         weights = np.array([weight for _, _, weight in proc_info])
 
         return min_procs, max_procs, weights

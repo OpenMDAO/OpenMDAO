@@ -17,6 +17,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -206,7 +207,8 @@ class TestMPIScatter(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -2677,7 +2679,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['optimizer'] = "SNOPT"
 
         msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.driver.options['user_teriminate_signal'] = None
 
 
@@ -2708,9 +2710,9 @@ class MatMultCompExact(om.ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         if self.sparse:

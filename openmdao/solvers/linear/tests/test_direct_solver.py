@@ -856,7 +856,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         prob.model = group
         prob.model.linear_solver = om.DirectSolver()
         prob.model.connect('P.x', 'C1.x')
-        prob.model.connect('C1.y', 'C2.y')
+        prob.model.connect('C1.y', 'C2.y', src_indices=om.slicer[:])
 
 
         prob.setup(check=False, mode='fwd')
@@ -884,7 +884,7 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
 
         prob.model.linear_solver = om.DirectSolver()
         group.connect('P.x', 'sub.C1.x')
-        group.connect('sub.C1.y', 'sub.C2.y')
+        group.connect('sub.C1.y', 'sub.C2.y', src_indices=om.slicer[:])
 
         prob.setup(check=False, mode='fwd')
         with self.assertRaises(Exception) as cm:

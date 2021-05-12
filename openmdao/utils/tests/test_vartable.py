@@ -6,8 +6,7 @@ from io import StringIO
 
 import openmdao.api as om
 
-from openmdao.core.notebook_mode import notebook_mode, tabulate
-
+from openmdao.utils.notebook_utils import notebook_mode, tabulate
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 
@@ -53,8 +52,8 @@ class TestNotebookListIO(unittest.TestCase):
 
         # capture HTML output from variable_table
         self.html_stream = StringIO()
-        variable_table.HTML = lambda x : self.html_stream.write(x)
-        sqlite_reader.HTML = lambda x : self.html_stream.write(x)
+        variable_table.HTML = lambda x: self.html_stream.write(x)
+        sqlite_reader.HTML = lambda x: self.html_stream.write(x)
 
         # create recorder
         self.filename = "cases.sql"
@@ -255,8 +254,8 @@ class TestNotebookCaseReader(unittest.TestCase):
 
         # capture HTML output from variable_table
         self.html_stream = StringIO()
-        variable_table.HTML = lambda x : self.html_stream.write(x)
-        sqlite_reader.HTML = lambda x : self.html_stream.write(x)
+        variable_table.HTML = lambda x: self.html_stream.write(x)
+        sqlite_reader.HTML = lambda x: self.html_stream.write(x)
 
         # create recorder
         self.filename = "cases.sql"
@@ -492,8 +491,8 @@ class TestNotebookDriverCases(unittest.TestCase):
 
         # capture HTML output from variable_table
         self.html_stream = StringIO()
-        variable_table.HTML = lambda x : self.html_stream.write(x)
-        sqlite_reader.HTML = lambda x : self.html_stream.write(x)
+        variable_table.HTML = lambda x: self.html_stream.write(x)
+        sqlite_reader.HTML = lambda x: self.html_stream.write(x)
 
         # create & run problem, generate cases
         model = om.Group()

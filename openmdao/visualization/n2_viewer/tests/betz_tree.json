@@ -88,6 +88,7 @@
             ],
             "options": {
                 "distributed": false,
+                "run_root_only": false,
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -243,7 +244,8 @@
                 }
             ],
             "options": {
-                "distributed": false
+                "distributed": false,
+                "run_root_only": false
             }
         }
     ],

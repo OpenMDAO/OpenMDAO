@@ -9,21 +9,25 @@ additional MPI capability.
 from collections import OrderedDict
 import json
 import signal
+from distutils.version import LooseVersion
 
 import numpy as np
 from scipy.sparse import coo_matrix
 
 try:
-    from pyoptsparse import Optimization
+    import pyoptsparse
+    Optimization = pyoptsparse.Optimization
 except ImportError:
     Optimization = None
+    pyoptsparse = None
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
-from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
+from openmdao.warnings import issue_warning, DerivativesWarning
 
 
 # names of optimizers that use gradients
@@ -310,9 +314,9 @@ class pyOptSparseDriver(Driver):
                 info = self._coloring_info
                 if info['min_improve_pct'] > pct:
                     info['coloring'] = info['static'] = None
-                    simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less "
-                                   "than min allowed (%.1f%%)." % (self.msginfo, pct,
-                                                                   info['min_improve_pct']))
+                    msg = f"Coloring was deactivated.  Improvement of {pct:.1f}% was less " \
+                          f"than min allowed ({info['min_improve_pct']:.1f}%)."
+                    issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], weak_method_wrapper(self, '_objfunc'),
@@ -329,7 +333,11 @@ class pyOptSparseDriver(Driver):
                                  value=input_vals[name],
                                  lower=meta['lower'], upper=meta['upper'])
 
-        opt_prob.finalizeDesignVariables()
+        if not hasattr(pyoptsparse, '__version__') or \
+           LooseVersion(pyoptsparse.__version__) < LooseVersion('2.5.1'):
+            opt_prob.finalizeDesignVariables()
+        else:
+            opt_prob.finalize()
 
         # Add all objectives
         objs = self.get_objective_values()
@@ -764,8 +772,8 @@ class pyOptSparseDriver(Driver):
                 continue
             self._res_jacs[res] = {}
             for dv, (rows, cols, shape) in resdict.items():
-                rows = np.array(rows, dtype=int)
-                cols = np.array(cols, dtype=int)
+                rows = np.array(rows, dtype=INT_DTYPE)
+                cols = np.array(cols, dtype=INT_DTYPE)
 
                 self._res_jacs[res][dv] = {
                     'coo': [rows, cols, np.zeros(rows.size)],

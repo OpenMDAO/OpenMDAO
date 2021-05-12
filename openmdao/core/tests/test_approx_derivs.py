@@ -18,7 +18,7 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 import time
@@ -62,7 +62,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(model._approx_schemes['fd']._wrt_meta), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -186,7 +186,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._wrt_meta), 2)
 
     def test_paraboloid_subbed_in_setup(self):
         class MyModel(om.Group):
@@ -220,7 +220,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._wrt_meta), 2)
 
     def test_paraboloid_subbed_with_connections(self):
         prob = om.Problem()
@@ -254,12 +254,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         Jfd = sub._jacobian
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
-
-        # 3 outputs x 2 inputs
-        n_entries = 0
-        for k, v in sub._approx_schemes['fd']._exec_dict.items():
-            n_entries += len(v)
-        self.assertEqual(n_entries, 6)
 
     def test_array_comp(self):
 
@@ -1000,7 +994,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['cs']._exec_dict), 2)
+        self.assertEqual(len(model._approx_schemes['cs']._wrt_meta), 2)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1036,7 +1030,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['cs']._exec_dict), 2)
+        self.assertEqual(len(sub._approx_schemes['cs']._wrt_meta), 2)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1077,12 +1071,6 @@ class TestGroupComplexStep(unittest.TestCase):
         Jfd = sub._jacobian
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.bx.xin'], [[-6.0]], 1e-6)
         assert_near_equal(Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
-
-        # 3 outputs x 2 inputs
-        n_entries = 0
-        for k, v in sub._approx_schemes['cs']._exec_dict.items():
-            n_entries += len(v)
-        self.assertEqual(n_entries, 6)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1843,7 +1831,15 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        expected_warnings = [(om.DerivativesWarning,
+                              'd1: Nested complex step detected. '
+                              'Finite difference will be used.'),
+                             (om.DerivativesWarning,
+                              'd2: Nested complex step detected. '
+                              'Finite difference will be used.')]
+
+        with assert_warnings(expected_warnings):
+            J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
@@ -1860,8 +1856,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         class TestImplCompArrayDense(TestImplCompArray):
 
-            def setup(self):
-                super().setup()
+            def setup_partials(self):
                 self.declare_partials('*', '*', method='cs')
 
         prob = self.prob = om.Problem()
@@ -2073,6 +2068,63 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.run_model()
 
         prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
+
+    def test_partials_bad_sparse_explicit(self):
+        class BadSparsityComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.sparsity = np.array(
+                    [[1, 0, 1, 0, 0, 1, 1],
+                     [0, 1, 0, 1, 0, 1, 0],
+                     [0, 0, 1, 0, 0, 0, 1],
+                     [1, 0, 0, 1, 0, 1, 0],
+                     [0, 1, 0, 1, 1, 0, 1]], dtype=int)
+
+                self.add_input('x0', val=np.ones(4))
+                self.add_input('x1', val=np.ones(2))
+                self.add_input('x2', val=np.ones(1))
+
+                self.add_output('y0', val=np.zeros(2))
+                self.add_output('y1', val=np.zeros(3))
+
+                rows, cols = np.nonzero(self.sparsity[0:2, 0:4])
+                self.declare_partials(of='y0', wrt='x0', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[0:2, 4:6])
+                self.declare_partials(of='y0', wrt='x1', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[0:2, 6:7])
+                self.declare_partials(of='y0', wrt='x2', rows=rows, cols=cols, method='cs')
+                # corrupt the rows/cols
+                bad_sparsity = self.sparsity[2:5, 0:4].copy()
+                bad_sparsity[1, 3] = 0  # missing nz at col x0[3] row y1[1]
+                rows, cols = np.nonzero(bad_sparsity)
+                self.declare_partials(of='y1', wrt='x0', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[2:5, 4:6])
+                self.declare_partials(of='y1', wrt='x1', rows=rows, cols=cols, method='cs')
+                rows, cols = np.nonzero(self.sparsity[2:5, 6:7])
+                self.declare_partials(of='y1', wrt='x2', rows=rows, cols=cols, method='cs')
+
+            def compute(self, inputs, outputs):
+                prod = self.sparsity.dot(inputs.asarray())
+                start = end = 0
+                for i in range(2):
+                    outname = 'y%d' % i
+                    end += outputs[outname].size
+                    outputs[outname] = prod[start:end]
+                    start = end
+
+        prob = om.Problem()
+        model = prob.model
+        comp = model.add_subsystem('comp', BadSparsityComp())
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with self.assertRaises(Exception) as cm:
+            prob.check_partials(includes=['comp'])
+
+        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
+
 
 
 class ApproxTotalsFeature(unittest.TestCase):
@@ -2335,6 +2387,40 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         data  = prob.check_totals(method='cs', out_stream=None)
         assert_near_equal(data[('pg.dc1.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
         assert_near_equal(data[('pg.dc3.y', 'iv.x')]['abs error'][0], 0.0, 1e-6)
+
+class CheckTotalsIndices(unittest.TestCase):
+
+    def test_w_indices(self):
+        class TopComp(om.ExplicitComponent):
+
+            def setup(self):
+
+                size = 10
+
+                self.add_input('c_ae_C', np.zeros(size))
+                self.add_input('theta_c2_C', np.zeros(size))
+                self.add_output('c_ae', np.zeros(size))
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        prob = om.Problem()
+        model = prob.model
+
+        geom = model.add_subsystem('tcomp', TopComp())
+
+        # setting indices here caused an indexing error later on
+        model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
+        model.add_constraint('tcomp.c_ae', lower=0.e0,)
+
+        prob.setup()
+
+        prob.run_model()
+        check = prob.check_totals(compact_print=True)
+
 
 if __name__ == "__main__":
     unittest.main()

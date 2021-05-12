@@ -50,7 +50,7 @@ class WeightedInterpolator(NNBase):
         ----------
         prediction_points : ndarray
             Points at which interpolation is done.
-        num_neighbors :  int
+        num_neighbors : int
             Number of neighbors to use.
         dist_eff : float
             Exponent used for the distance weighting. Using dist_eff=0 will default to
@@ -107,7 +107,7 @@ class WeightedInterpolator(NNBase):
         ----------
         prediction_points : ndarray
             Points at which interpolation is done.
-        num_neighbors :  int
+        num_neighbors : int
             Number of neighbors to use.
         dist_eff : float
             Exponent used for the distance weighting. Using dist_eff=0 will default to

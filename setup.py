@@ -12,16 +12,18 @@ optional_dependencies = {
         'matplotlib',
         'numpydoc>=0.9.1',
         'redbaron',
-        'sphinx>=1.8.5',
-        'tabulate'
+        'sphinx>=1.8.5,<4.0',
+        'tabulate',
+        'ipython'
     ],
     'notebooks': [
         'notebook',
-        'tabulate'
+        'tabulate',
+        'ipython'
     ],
     'visualization': [
         'bokeh>=1.3.4',
-        'colorama',
+        'colorama'
     ],
     'test': [
         'parameterized',
@@ -113,7 +115,7 @@ setup(
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
-        'openmdao.visualization' : [
+        'openmdao.visualization': [
             'common/libs/*.js',
             'common/style/*.css'
         ],

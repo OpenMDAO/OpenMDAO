@@ -446,11 +446,11 @@ class TestDOEDriver(unittest.TestCase):
             opts = {}
 
         with printoptions(**opts):
-            with self.assertRaises(ValueError) as err:
+            # have to use regex to handle differences in numpy print formats for shape
+            msg = f"Error assigning p1.x = \[ 0.  0.  0.  0.\]: could not broadcast " \
+                  f"input array from shape \(4.*\) into shape \(1.*\)"
+            with self.assertRaisesRegex(ValueError, msg):
                 prob.run_driver()
-            self.assertEqual(str(err.exception),
-                             "Error assigning p1.x = [ 0.  0.  0.  0.]: "
-                             "could not broadcast input array from shape (4) into shape (1)")
 
     def test_uniform(self):
         prob = om.Problem()
@@ -1341,6 +1341,46 @@ class TestDOEDriver(unittest.TestCase):
         # Last value in fullfactorial DOE is 11, which gives 121.
         assert_near_equal(prob.get_val('y'), np.array([121., 4., 9.]))
 
+    def test_multidimensional_inputs(self):
+        # Create a subsystem with multidimensional array inputs
+        matmul_comp = om.ExecComp('z = matmul(x,y)',
+                                  x=np.ones((3, 3)),
+                                  y=np.ones((3, 3)),
+                                  z=np.ones((3, 3)))
+
+        # Single execution test
+        prob = om.Problem()
+        prob.model.add_subsystem('matmul', matmul_comp, promotes=['*'])
+        prob.setup()
+
+        prob['x'] = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        prob['y'] = np.array([[9, 8, 7], [6, 5, 4], [3, 2, 1]])
+
+        prob.run_model()
+
+        # DOE test
+        prob2 = om.Problem()
+        prob2.model.add_subsystem('matmul', matmul_comp, promotes=['*'])
+        prob2.model.add_design_var('x')
+        prob2.model.add_design_var('y')
+        prob2.model.add_objective('z')
+        prob2.setup()
+
+        case_list = [
+            [('x', prob['x']), ('y', prob['y'])]
+        ]
+
+        prob2.driver = om.DOEDriver(case_list)
+        prob2.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob2.run_driver()
+        prob2.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        outputs = cr.get_case(0).outputs
+
+        for name in ('x', 'y', 'z'):
+            assert_near_equal(outputs[name], prob[name])
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
@@ -2001,7 +2041,10 @@ class TestParallelDOEFeature(unittest.TestCase):
         filename = "cases.sql_%d" % rank
         self.assertEqual(filename, "cases.sql_%d" % rank)
 
-        cr = om.CaseReader(filename)
+        # SqliteCaseReader will automatically look for cases.sql_meta if
+        # metadata_filename is not specified, but test by explicitly
+        # using it here.
+        cr = om.CaseReader(filename, metadata_filename = 'cases.sql_meta')
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -2012,6 +2055,17 @@ class TestParallelDOEFeature(unittest.TestCase):
 
         self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expect_text)
+
+        del cr
+
+        # Test for missing metadata db file error
+        try:
+            cr_test = om.CaseReader(filename, metadata_filename = 'nonexistant_filename')
+            found_metadata = True
+        except IOError:
+            found_metadata = False
+
+        self.assertFalse(found_metadata, "No error from SqliteCaseReader for missing metadata file.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -2115,7 +2169,8 @@ class TestParallelDistribDOE(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

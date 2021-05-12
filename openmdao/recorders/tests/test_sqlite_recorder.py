@@ -27,8 +27,9 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, \
     assert_warning, assert_no_warning
-from openmdao.utils.general_utils import determine_adder_scaler, remove_whitespace
+from openmdao.utils.general_utils import determine_adder_scaler
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 from openmdao.utils.general_utils import set_pyoptsparse_opt
@@ -38,9 +39,12 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-# do not show matplotlib plots
-import matplotlib
-matplotlib.use('Agg')
+try:
+    # do not show matplotlib plots
+    import matplotlib.pyplot as plt
+    plt.switch_backend('Agg')
+except ImportError:
+    plt = None
 
 
 class Cycle(om.Group):
@@ -328,44 +332,48 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 0",
-            "    Subsystem: root",
-            "        assembled_jac_type : csc",
-            "    Subsystem: p1",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: p2",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: comp",
-            "        distributed : False",
-            "    Subsystem: con",
-            "        distributed : False",
-            "        has_diag_partials : False",
-            "        units : None",
-            "        shape : None",
-            "        shape_by_conn : False",
+            "    Subsystem : root",
+            "        assembled_jac_type: csc",
+            "    Subsystem : p1",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : p2",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : comp",
+            "        distributed: False",
+            "        run_root_only: False",
+            "    Subsystem : con",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        has_diag_partials: False",
+            "        units: None",
+            "        shape: None",
+            "        shape_by_conn: False",
             ""
         ]
 
@@ -380,8 +388,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
-            "        assembled_jac_type : dense",
+            "    Subsystem : root",
+            "        assembled_jac_type: dense",
             ""
         ]
 
@@ -419,44 +427,48 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 0",
-            "    Subsystem: root",
-            "        assembled_jac_type : csc",
-            "    Subsystem: p1",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: p2",
-            "        distributed : False",
-            "        name : UNDEFINED",
-            "        val : 1.0",
-            "        shape : None",
-            "        units : None",
-            "        res_units : None",
-            "        desc : None",
-            "        lower : None",
-            "        upper : None",
-            "        ref : 1.0",
-            "        ref0 : 0.0",
-            "        res_ref : None",
-            "        tags : None",
-            "    Subsystem: comp",
-            "        distributed : False",
-            "    Subsystem: con",
-            "        distributed : False",
-            "        has_diag_partials : False",
-            "        units : None",
-            "        shape : None",
-            "        shape_by_conn : False",
+            "    Subsystem : root",
+            "        assembled_jac_type: csc",
+            "    Subsystem : p1",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : p2",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        name: UNDEFINED",
+            "        val: 1.0",
+            "        shape: None",
+            "        units: None",
+            "        res_units: None",
+            "        desc: None",
+            "        lower: None",
+            "        upper: None",
+            "        ref: 1.0",
+            "        ref0: 0.0",
+            "        res_ref: None",
+            "        tags: None",
+            "    Subsystem : comp",
+            "        distributed: False",
+            "        run_root_only: False",
+            "    Subsystem : con",
+            "        distributed: False",
+            "        run_root_only: False",
+            "        has_diag_partials: False",
+            "        units: None",
+            "        shape: None",
+            "        shape_by_conn: False",
             ""
         ]
 
@@ -471,8 +483,8 @@ class TestSqliteRecorder(unittest.TestCase):
 
         expected = [
             "Run Number: 1",
-            "    Subsystem: root",
-            "        assembled_jac_type : dense",
+            "    Subsystem : root",
+            "        assembled_jac_type: dense",
             ""
         ]
 
@@ -646,7 +658,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver.add_recorder(om.SqliteRecorder(self.filename))
 
         prob.setup()
-        with assert_no_warning(DeprecationWarning):
+        with assert_no_warning(OMDeprecationWarning):
             prob.final_setup()
         prob.cleanup()
 
@@ -1441,7 +1453,7 @@ class TestSqliteRecorder(unittest.TestCase):
             try:
                 ln = nl.linear_solver = solver()
             except RuntimeError as err:
-                if str(err).endswith('PETSc is not available.'):
+                if str(err).count('PETSc is not available.') > 0:
                     continue
                 else:
                     raise err
@@ -1934,7 +1946,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         msg = "'Problem.record_iteration' has been deprecated. Use 'Problem.record' instead."
 
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.record_iteration('final')
         prob.cleanup()
 
@@ -2516,7 +2528,7 @@ class TestSqliteRecorder(unittest.TestCase):
         rec_mgr = RecordingManager()
         msg = "The 'record_metadata' function is deprecated. " \
               "All system and solver options are recorded automatically."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             rec_mgr.record_metadata(None)
 
 
@@ -3323,6 +3335,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)
 
+    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_solver_recorder(self):
         import numpy as np
         import matplotlib.pyplot as plt
@@ -3407,6 +3420,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(case.get_constraints(), {'con1': 0., 'con2': -20.2447}, tolerance=1e-4)
         assert_near_equal(case.get_objectives(), {'obj': 3.18339395}, tolerance=1e-4)
 
+    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_plot_des_vars(self):
         import matplotlib.pyplot as plt
         import numpy as np

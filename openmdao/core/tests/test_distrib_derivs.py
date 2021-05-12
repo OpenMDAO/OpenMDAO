@@ -163,7 +163,7 @@ class MPITests2(unittest.TestCase):
                                                    x=np.zeros((9, 3)),
                                                    y=np.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
-        prob.model.connect('comp.outvec', 'total.x')
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -191,7 +191,7 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         prob.model = group
         prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.connect('C1.y', 'C2.y')
+        prob.model.connect('C1.y', 'C2.y', src_indices=om.slicer[:])
 
 
         prob.setup(check=False, mode='fwd')
@@ -233,8 +233,8 @@ class MPITests2(unittest.TestCase):
         root.connect('sub.C2.y', 'C2.x')
         root.connect('sub.C3.y', 'C3.x')
 
-        root.connect("C1.y", "sub.C2.x")
-        root.connect("C1.y", "sub.C3.x")
+        root.connect("C1.y", "sub.C2.x", src_indices=om.slicer[:])
+        root.connect("C1.y", "sub.C3.x", src_indices=om.slicer[:])
         root.connect("P.x", "C1.x")
 
         root.nonlinear_solver = nlsolver()
@@ -293,7 +293,7 @@ class MPITests2(unittest.TestCase):
         root.connect("sub.C2.y", "C3.x2")
         root.connect("P1.x", "sub.C1.x")
         root.connect("P2.x", "sub.C2.x")
-        root.connect("C3.y", "C4.x")
+        root.connect("C3.y", "C4.x", src_indices=om.slicer[:])
 
         root.nonlinear_solver = nlsolver()
 
@@ -332,7 +332,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -405,7 +407,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -478,7 +482,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -551,7 +557,9 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
-                          promotes=['*'])
+                          promotes_outputs=['*'])
+
+        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         sub.connect('dummy.xd', 'parab.x')
         sub.connect('dummy.yd', 'parab.y')
@@ -619,7 +627,9 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
-                          promotes=['*'])
+                          promotes_outputs=['*'])
+
+        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -633,7 +643,7 @@ class MPITests2(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.run_model()
 
-        msg = "'sub' <class Group> : Approx_totals is not supported on a group with a distributed "
+        msg = "'sub' <class Group>: Approx_totals is not supported on a group with a distributed "
         msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
         self.assertEqual(str(context.exception), msg)
 
@@ -676,19 +686,22 @@ class MPITests2(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['*'])
         model.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
-        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes_outputs=['*'])
+        model.promotes('ndp', inputs=['f_xy'], src_indices=om.slicer[:])
         model.add_subsystem("parab2", DistParab(arr_size=size2))
         model.add_subsystem("ndp2", NonDistComp(arr_size=size2))
 
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.connect('x2', 'parab2.x')
         model.connect('y2', 'parab2.y')
         model.connect('a2', 'parab2.a')
-        model.connect('parab2.f_xy', 'ndp2.f_xy')
+        model.connect('parab2.f_xy', 'ndp2.f_xy', src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -896,7 +909,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -954,7 +969,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -992,7 +1009,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1098,7 +1117,8 @@ class MPITestsBug(unittest.TestCase):
                                    subsys=vanderpol_ode_rate_collect(num_nodes=nn),
                                    promotes_outputs=['x0dot'])
 
-                self.connect('vanderpol_ode_delay.x0dot', 'vanderpol_ode_rate_collect.partx0dot')
+                self.connect('vanderpol_ode_delay.x0dot', 'vanderpol_ode_rate_collect.partx0dot',
+                             src_indices=om.slicer[:])
 
         class vanderpol_ode_delay(om.ExplicitComponent):
 
@@ -1194,9 +1214,10 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", SummerDerivs(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob.set_val('indep.x', np.ones(size))
@@ -1237,7 +1258,8 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0)
@@ -1276,9 +1298,10 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         model.add_subsystem("C3", SummerDerivs(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob['indep.x'] = np.ones(size)
@@ -1341,7 +1364,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         model.add_subsystem('dvs', dvs, promotes_outputs=['*'])
         model.add_subsystem('distcomp',DistribCompDenseJac(size=size), promotes_inputs=['*'])
         model.add_subsystem('execcomp',om.ExecComp('z = 2.2 * y', y=np.zeros((size,)), z=np.zeros((size,))))
-        model.connect('distcomp.y', 'execcomp.y')
+        model.connect('distcomp.y', 'execcomp.y', src_indices=om.slicer[:])
         model.add_design_var('x', lower=0.0, upper=10.0, scaler=1.0)
         model.add_constraint('execcomp.z', lower=4.2, scaler=1.0)
         model.add_objective('x')
@@ -1356,6 +1379,40 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
 
+
+class TestBugs(unittest.TestCase):
+
+    def test_distributed_ivc_as_desvar(self):
+        # Covers a case where a distributed IVC output is used as a desvar with indices.
+
+        class DVS(om.IndepVarComp):
+            def initialize(self):
+                self.options['distributed'] = True
+            def setup(self):
+                self.add_output('state', np.ones(4))
+
+        class SolverComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options['distributed'] = True
+            def setup(self):
+                self.add_input('state',shape_by_conn=True)
+                self.add_output('func')
+                self.declare_partials('func','state',method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['func'] += np.sum(inputs['state'])
+
+        prob = om.Problem()
+        dvs = prob.model.add_subsystem('dvs',DVS())
+        prob.model.add_subsystem('solver', SolverComp())
+        prob.model.connect('dvs.state','solver.state')
+        prob.model.add_design_var('dvs.state', indices=[0,2])
+        prob.model.add_objective('solver.func')
+
+        prob.setup()
+        prob.run_model()
+        totals = prob.check_totals(wrt='dvs.state')
+        assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

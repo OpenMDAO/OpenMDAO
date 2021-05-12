@@ -4,9 +4,9 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp
-from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.warnings import OMDeprecationWarning
 
 
 class TestSystem(unittest.TestCase):
@@ -261,13 +261,62 @@ class TestSystem(unittest.TestCase):
         prob = Problem()
         msg = "The recording option, record_model_metadata, on System is deprecated. " \
               "Recording of model metadata will always be done"
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.model.recording_options['record_model_metadata'] = True
 
         msg = "The recording option, record_metadata, on System is deprecated. " \
               "Recording of metadata will always be done"
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.model.recording_options['record_metadata'] = True
+
+    def test_setup_check_group(self):
+
+        class CustomGroup(Group):
+
+            def setup(self):
+                self._custom_setup = True
+
+            def _setup_check(self):
+                if not hasattr(self, '_custom_setup'):
+                    raise RuntimeError(f"{self.msginfo}: You forget to call super() in setup()")
+
+        class BadGroup(CustomGroup):
+
+            def setup(self):
+                # should call super().setup() here
+                pass
+
+        p = Problem(model=BadGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception), '<model> <class BadGroup>: You forget to call super() in setup()')
+
+    def test_setup_check_component(self):
+
+        class CustomComp(ExplicitComponent):
+
+            def setup(self):
+                self._custom_setup = True
+
+            def _setup_check(self):
+                if not hasattr(self, '_custom_setup'):
+                    raise RuntimeError(f"{self.msginfo}: You forget to call super() in setup()")
+
+        class BadComp(CustomComp):
+
+            def setup(self):
+                # should call super().setup() here
+                pass
+
+        p = Problem()
+        p.model.add_subsystem('comp', BadComp())
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception), "'comp' <class BadComp>: You forget to call super() in setup()")
 
 
 if __name__ == "__main__":

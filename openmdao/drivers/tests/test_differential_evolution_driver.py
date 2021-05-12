@@ -757,7 +757,8 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_subsystem('d1', D1(), promotes=['*'])
         model.add_subsystem('d2', D2(), promotes=['*'])
 
-        model.add_subsystem('obj_comp', Summer(), promotes=['*'])
+        model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
+        model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
         model.linear_solver = om.LinearBlockGS()
 
@@ -791,7 +792,8 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

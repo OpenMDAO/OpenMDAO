@@ -209,7 +209,7 @@ def read_files(filenames, directory, extension):
     """
     libs = dict()
     for name in filenames:
-        with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
+        with open(os.path.join(directory, '.'.join([name, extension])), "r", encoding="utf8") as f:
             libs[name] = f.read()
     return libs
 
@@ -360,7 +360,7 @@ class UIElement(object):
 
     Attributes
     ----------
-    items: list
+    items : list
         List of UI elements contained by this element.
     indent : int
         Number of spaces for indent.
@@ -525,7 +525,7 @@ class TemplateWriter(object):
             Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         # Load template
-        with open(filename, "r") as f:
+        with open(filename, "r", encoding="utf8") as f:
             self.template = template = f.read()
 
         head_scripts = ''
@@ -577,7 +577,7 @@ class TemplateWriter(object):
         outfile : str
             Path name for file to write to.
         """
-        with open(outfile, 'w') as f:  # write output file
+        with open(outfile, 'w', encoding='utf-8') as f:  # write output file
             f.write(self.template)
 
 

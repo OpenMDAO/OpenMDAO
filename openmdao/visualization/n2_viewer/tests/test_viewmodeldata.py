@@ -390,7 +390,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Load an N2 html, find the compressed data string, uncompress and decode it.
         """
-        file = open(filename, 'r')
+        file = open(filename, 'r', encoding='utf-8')
         for line in file:
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
@@ -453,7 +453,7 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.title_html_filename),
                         (self.title_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
-                        in open(self.title_html_filename).read())
+                        in open(self.title_html_filename, 'r', encoding='utf-8').read())
 
     def test_n2_connection_error(self):
         """
@@ -479,7 +479,7 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.conn_html_filename),
                         (self.conn_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
-                        in open(self.conn_html_filename).read())
+                        in open(self.conn_html_filename, 'r', encoding='utf-8').read())
 
 
 @use_tempdirs
@@ -491,12 +491,11 @@ class TestUnderMPI(unittest.TestCase):
 
         class myComp(om.ExplicitComponent):
             def initialize(self):
-                self.options['distributed'] = True
                 self.options.declare('foo', recordable=False)
 
             def setup(self):
-                self.add_input('x2')
-                self.add_output('x3')
+                self.add_input('x2', distributed=True)
+                self.add_output('x3', distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['x3'] = inputs['x2'] + 1

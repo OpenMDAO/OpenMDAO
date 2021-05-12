@@ -9,6 +9,8 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.warnings import warn_deprecation
+from openmdao.utils.notebook_utils import notebook
 
 
 def _redirect_streams(to_fd):
@@ -53,28 +55,53 @@ def use_proc_files():
         _redirect_streams(ofile.fileno())
 
 
-# Attempt to import mpi4py.
-# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
-# and raise exception on failure. If set to anything else, no import is attempted.
-if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
-        from mpi4py import MPI
-    else:
-        MPI = None
-# If OPENMDAO_REQUIRE_MPI is unset, attempt to import mpi4py, but continue on failure
-# with a notification.
-else:
+def check_mpi_env():
+    """
+    Determine if the environment variable governing MPI usage is set.
+
+    Returns
+    -------
+    bool
+        True if MPI is required, False if it's to be skipped, None if not set.
+    """
+    if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+        warn_deprecation("Set OPENMDAO_USE_MPI instead of OPENMDAO_REQUIRE_MPI.")
+
+    mpi_selection = os.environ.get('OPENMDAO_USE_MPI',
+                                   os.environ.get('OPENMDAO_REQUIRE_MPI', None))
+
+    # If OPENMDAO_USE_MPI is set to a postive value, the run will fail
+    # immediately if the import fails
+    if str(mpi_selection).lower() in ['always', '1', 'true', 'yes', 'y', 'on']:
+        return True
+
+    # If set to something else, no import is attempted.
+    if mpi_selection is not None:
+        return False
+
+    # If unset, the import will be attempted but give no warning if it fails.
+    return None
+
+
+use_mpi = check_mpi_env()
+if use_mpi is True:
     try:
         from mpi4py import MPI
     except ImportError:
-        MPI = None
-        sys.stdout.write("Unable to import mpi4py. Parallel processing unavailable.\n")
-        sys.stdout.flush()
-    else:
-        # If the import succeeded, but it doesn't look like a parallel
+        raise ImportError("Importing MPI failed and OPENMDAO_USE_MPI is true.")
+elif use_mpi is False:
+    MPI = None
+else:
+    try:
+        from mpi4py import MPI
+
+        # If the import succeeds, but it doesn't look like a parallel
         # run was intended, don't use MPI
         if MPI.COMM_WORLD.size == 1:
             MPI = None
+
+    except ImportError:
+        MPI = None
 
 
 if MPI:
@@ -281,4 +308,5 @@ else:
 
 
 if os.environ.get('USE_PROC_FILES') or os.environ.get('PROC_FILES_DIR'):
-    use_proc_files()
+    if not notebook:
+        use_proc_files()
