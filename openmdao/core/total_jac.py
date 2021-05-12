@@ -1693,49 +1693,45 @@ class _TotalJacInfo(object):
         raise_error : bool
             If True, raise an exception if a zero row or column is found.
         """
-        J = np.abs(self.J)
-        nrows, ncols = J.shape
-        zero_rows = []
-        zero_cols = []
+        nzrows, nzcols = np.nonzero(np.abs(self.J) > tol)
 
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
-        for j in np.arange(nrows):
-            if np.all(J[j, :] < tol):
-                for name, val in self.of_meta.items():
-                    if j > val[0].stop - 1:
-                        continue
-                    break
-                if name in self.ivc_print_names:
-                    name = self.ivc_print_names[name]
-                if name not in zero_rows:
-                    zero_rows.append(name)
+        row = np.ones(self.J.shape[0], dtype=bool)
+        row[nzrows] = False  # False in this case means nonzero
+        if np.any(row):  # there's at least 1 zero row
+            zero_rows = []
+            for name, tup in self.of_meta.items():
+                inds = tup[1]
+                zero_idxs = np.nonzero(row[tup[0]])[0]
+                if zero_idxs.size > 0:
+                    zero_rows.append((self.ivc_print_names.get(name, name), list(zero_idxs)))
 
-        if zero_rows:
-            msg = f"Constraints or objectives {zero_rows} cannot be impacted by the design " + \
-                "variables of the problem."
-            if raise_error:
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
+            if zero_rows:
+                msg = (f"Constraints or objectives {zero_rows} cannot be impacted by the design "
+                       "variables of the problem.")
+                if raise_error:
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
         # Check for zero cols, which correspond to design vars that don't affect anything.
-        for j in np.arange(ncols):
-            if np.all(J[:, j] < tol):
-                for name, val in self.wrt_meta.items():
-                    if j > val[0].stop - 1:
-                        continue
-                    break
-                if name in self.ivc_print_names:
-                    name = self.ivc_print_names[name]
-                if name not in zero_cols:
-                    zero_cols.append(name)
+        col = np.ones(self.J.shape[1], dtype=bool)
+        col[nzcols] = False  # False in this case means nonzero
+        if np.any(col):  # there's at least 1 zero col
+            zero_cols = []
+            for name, tup in self.wrt_meta.items():
+                inds = tup[1]
+                zero_idxs = np.nonzero(col[tup[0]])[0]
+                if zero_idxs.size > 0:
+                    zero_cols.append((self.ivc_print_names.get(name, name), list(zero_idxs)))
 
-        if zero_cols:
-            msg = f"Design variables {zero_cols} have no impact on the constraints or objective."
-            if raise_error:
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
+            if zero_cols:
+                msg = (f"Design variables {zero_cols} have no impact on the constraints or "
+                       "objective.")
+                if raise_error:
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
     def _restore_linear_solution(self, vec_names, key, mode):
         """

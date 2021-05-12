@@ -1837,15 +1837,16 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_singular_jac_error_responses(self):
         prob = om.Problem()
+        size = 3
         prob.model.add_subsystem('parab',
                                  om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                              'z = 12.0'],),
+                                              'z = 12.0'], shape=(3,)),
                                  promotes_inputs=['x', 'y'])
 
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,)), promotes_inputs=['x', 'y'])
 
-        prob.model.set_input_defaults('x', 3.0)
-        prob.model.set_input_defaults('y', -4.0)
+        prob.model.set_input_defaults('x', 3.0 * np.ones(size))
+        prob.model.set_input_defaults('y', -4.0 * np.ones(size))
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -1853,7 +1854,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.f_xy', index=1)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
 

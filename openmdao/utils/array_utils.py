@@ -372,6 +372,27 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     return np.ravel_multi_index(dimidxs, shape_out)
 
 
+def _flat_inds2var_inds(flat_inds, shape, sub_inds=None):
+    """
+    Convert flat indices into shaped indices.
+
+    Parameters
+    ----------
+    flat_inds : ndarray
+        The flat indices to be converted.
+    shape : tuple
+        Shape of the variable.
+    sub_inds : ndarray or None
+        For design vars or responses, indices they were declared with.
+
+    Returns
+    -------
+    list of ints if variable is scalar or 1D array else tuples
+        The converted indices.
+    """
+    pass
+
+
 def sizes2offsets(size_array):
     """
     For a given array of sizes, return an array of offsets.
