@@ -105,7 +105,7 @@ class DemuxComp(ExplicitComponent):
                             desc=options['desc'])
 
             rs = np.arange(np.prod(out_shape))
-            cs = np.atleast_1d(np.take(template, indices=i, axis=axis))
+            cs = np.atleast_1d(np.take(template, indices=i, axis=axis)).flatten()
 
             self.declare_partials(of=out_name, wrt=name, rows=rs, cols=cs, val=1.0)
 
