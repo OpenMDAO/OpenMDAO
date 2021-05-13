@@ -1840,10 +1840,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         size = 3
         prob.model.add_subsystem('parab',
                                  om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                              'z = 12.0'], shape=(3,)),
+                                              'z = 12.0'], shape=(size,)),
                                  promotes_inputs=['x', 'y'])
 
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,)), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(size,)),
+                                 promotes_inputs=['x', 'y'])
 
         prob.model.set_input_defaults('x', 3.0 * np.ones(size))
         prob.model.set_input_defaults('y', -4.0 * np.ones(size))
