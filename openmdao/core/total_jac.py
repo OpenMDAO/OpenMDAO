@@ -1691,7 +1691,7 @@ class _TotalJacInfo(object):
             if zero_idxs[0].size == 0:
                 return zero_idxs
             varr = np.zeros(shape, dtype=bool)
-            varr[inds[zero_idxs]] = True
+            varr.flat[inds[zero_idxs]] = True
             zero_idxs = np.nonzero(varr)
 
         return zero_idxs
@@ -1723,9 +1723,11 @@ class _TotalJacInfo(object):
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
-                        zero_rows.append((self.ivc_print_names.get(name, name), list(zero_idxs[0])))
+                        zero_rows.append((self.ivc_print_names.get(name, name),
+                                          list(zero_idxs[0])))
                     else:
-                        zero_rows.append((self.ivc_print_names.get(name, name), list(zip(*zero_idxs))))
+                        zero_rows.append((self.ivc_print_names.get(name, name),
+                                          list(zip(*zero_idxs))))
 
             if zero_rows:
                 zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
@@ -1746,13 +1748,16 @@ class _TotalJacInfo(object):
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
-                        zero_cols.append((self.ivc_print_names.get(name, name), list(zero_idxs[0])))
+                        zero_cols.append((self.ivc_print_names.get(name, name),
+                                          list(zero_idxs[0])))
                     else:
-                        zero_cols.append((self.ivc_print_names.get(name, name), list(zip(*zero_idxs))))
+                        zero_cols.append((self.ivc_print_names.get(name, name),
+                                          list(zip(*zero_idxs))))
 
             if zero_cols:
-                msg = (f"Design variables {zero_cols} have no impact on the constraints or "
-                       "objective.")
+                zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
+                msg = (f"Design variables [{', '.join(zero_cols)}] have no impact on the "
+                       "constraints or objective.")
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
