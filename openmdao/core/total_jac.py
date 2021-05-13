@@ -1678,6 +1678,24 @@ class _TotalJacInfo(object):
 
         return totals
 
+    def _get_zero_inds(self, name, tup, jac_arr):
+        inds = tup[1]  # these must be indices into the flattened var
+        shname = 'shape' if self.get_remote else 'global_shape'
+        shape = self.model._var_allprocs_abs2meta['output'][name][shname]
+        vslice = jac_arr[tup[0]]
+
+        if inds is None:
+            zero_idxs = np.nonzero(vslice.reshape(shape))
+        else:
+            zero_idxs = np.nonzero(vslice)
+            if zero_idxs[0].size == 0:
+                return zero_idxs
+            varr = np.zeros(shape, dtype=bool)
+            varr[inds[zero_idxs]] = True
+            zero_idxs = np.nonzero(varr)
+
+        return zero_idxs
+
     def check_total_jac(self, raise_error=True, tol=1e-16):
         """
         Check recently computed totals derivative jacobian for problems.
@@ -1701,14 +1719,18 @@ class _TotalJacInfo(object):
         if np.any(row):  # there's at least 1 zero row
             zero_rows = []
             for name, tup in self.of_meta.items():
-                inds = tup[1]
-                zero_idxs = np.nonzero(row[tup[0]])[0]
-                if zero_idxs.size > 0:
-                    zero_rows.append((self.ivc_print_names.get(name, name), list(zero_idxs)))
+                zero_idxs = self._get_zero_inds(name, tup, row)
+
+                if zero_idxs[0].size > 0:
+                    if len(zero_idxs) == 1:
+                        zero_rows.append((self.ivc_print_names.get(name, name), list(zero_idxs[0])))
+                    else:
+                        zero_rows.append((self.ivc_print_names.get(name, name), list(zip(*zero_idxs))))
 
             if zero_rows:
-                msg = (f"Constraints or objectives {zero_rows} cannot be impacted by the design "
-                       "variables of the problem.")
+                zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
+                msg = (f"Constraints or objectives [{', '.join(zero_rows)}] cannot be impacted by "
+                       "the design variables of the problem.")
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1720,10 +1742,13 @@ class _TotalJacInfo(object):
         if np.any(col):  # there's at least 1 zero col
             zero_cols = []
             for name, tup in self.wrt_meta.items():
-                inds = tup[1]
-                zero_idxs = np.nonzero(col[tup[0]])[0]
-                if zero_idxs.size > 0:
-                    zero_cols.append((self.ivc_print_names.get(name, name), list(zero_idxs)))
+                zero_idxs = self._get_zero_inds(name, tup, col)
+
+                if zero_idxs[0].size > 0:
+                    if len(zero_idxs) == 1:
+                        zero_cols.append((self.ivc_print_names.get(name, name), list(zero_idxs[0])))
+                    else:
+                        zero_cols.append((self.ivc_print_names.get(name, name), list(zip(*zero_idxs))))
 
             if zero_cols:
                 msg = (f"Design variables {zero_cols} have no impact on the constraints or "
