@@ -2145,6 +2145,21 @@ class TestProblem(unittest.TestCase):
             prob.set_val('x', 0.)
         self.assertEqual(str(cm.exception), "Problem: 'x' Cannot call set_val before setup.")
 
+    def test_nonflat_flat_inds(self):
+        # this tests when we have src_indices that refer to a flat source and are defined
+        # as 'flat_src_indices' but are not themselves in a flat array (in this case they're
+        # in a column array).
+        p = om.Problem()
+        p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones((3,3))))
+        p.model.add_subsystem('comp', om.ExecComp('y=x*2', shape=(3, 1)))
+        p.model.connect('ivc.x', 'comp.x', src_indices=np.arange(3, dtype=int).reshape((3,1)),
+                        flat_src_indices=True)
+        p.setup()
+        p.run_model()
+
+        # this test passes if it doesn't raise an exception here...
+        p['comp.x'] = np.arange(3) + 1.
+
 
 class NestedProblemTestCase(unittest.TestCase):
 
