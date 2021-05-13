@@ -531,13 +531,14 @@ class Problem(object):
                                 sshape, inds, flat = model._var_prom2inds[name]
                                 if inds is not None:
                                     if _is_slicer_op(inds):
-                                        inds = _slice_indices(inds, np.prod(sshape), sshape).ravel()
-                                        value = value.ravel()
+                                        inds = _slice_indices(inds, np.prod(sshape), sshape)
                                         flat = True
                                 src_indices = inds
                             if src_indices is None:
                                 model._outputs.set_var(src, value, None, flat)
                             else:
+                                if flat:
+                                    src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
                                     ssizes = model._var_sizes['nonlinear']['output']
                                     sidx = model._var_allprocs_abs2idx['nonlinear'][src]
