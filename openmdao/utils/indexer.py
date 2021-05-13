@@ -7,7 +7,7 @@ from openmdao.core.constants import INT_DTYPE
 
 def array2slice(arr):
     """
-    Try to convert an array to slice.  Return None if not possible.
+    Try to convert an array to slice.
 
     Conversion is only attempted for a 1D array.
 
@@ -15,6 +15,11 @@ def array2slice(arr):
     ----------
     arr : ndarray
         The array to be represented as a slice.
+    
+    Returns
+    -------
+    slice or None
+        If slice conversion is possible, return the slice, else return None
     """
     if arr.ndim == 1 and arr.size > 1:  # see if 1D array will convert to slice
         span = arr[1] - arr[0]
@@ -153,25 +158,27 @@ class ArrayIndexer(Indexer):
             self._shaped_arr = None
         else:
             self._shaped_arr = self.arr
+            self._slice = array2slice(self._shaped_arr)
 
     def __call__(self):
-        return self.arr
+        if self._slice is None:
+            return self.arr
+        else:
+            return self._slice
     
     def shaped(self):
-        if self._shaped_arr is None:
-            raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
-        return self._shaped_arr
+        if self._slice is not None:
+            return self._slice
+        if self._shaped_arr is not None:
+            return self._shaped_arr
+        raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
 
     def shape(self):
         return self.arr.shape
 
     def as_slice(self):
         if self._slice is None:
-            self._slice = array2slice(self.arr)
-
-        if self._slice is None:
             raise ValueError(f"array index cannot be converted to a slice.")
-
         return self._slice
 
     def as_array(self):
@@ -180,9 +187,13 @@ class ArrayIndexer(Indexer):
     def set_src_shape(self, shape):
         assert np.isscalar(shape) or len(shape) == 1
         size = shape if np.isscalar(shape) else shape[0]
-        if self._shaped_arr is None:  # must have at least 1 negative index
+        neg = self.arr < 0
+        if np.any(neg):  # must have at least 1 negative index
             self._shaped_arr = self.arr.copy()
-            self._shaped_arr[self._shaped_arr < 0] += size
+            self._shaped_arr[neg] += size
+        else:
+            self._shaped_arr = self.arr
+        self._slice = array2slice(self._shaped_arr)
 
 class MultiIndexer(Indexer):
     def __init__(self, tup):

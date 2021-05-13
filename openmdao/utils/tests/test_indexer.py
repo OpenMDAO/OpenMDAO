@@ -30,6 +30,84 @@ class IndexerTestCase(unittest.TestCase):
         ind.set_src_shape(src.shape)
         assert_equal(ind.shaped(), 6)
 
+    def test_simple_arr(self):
+        ind = indexer([5, 3, 7, 1])
+        src = np.arange(10)
+        assert_equal(src[ind.as_array()], [5,3,7,1])
+        assert_equal(src[ind.shaped()], [5,3,7,1])
+        assert_equal(ind.shape(), (4,))
+        try:
+            ind.as_slice()
+        except Exception as err:
+            self.assertEqual(str(err), "array index cannot be converted to a slice.")
+        else:
+            self.fail("Exception expected")
+
+    def test_contiguous_arr(self):
+        ind = indexer([3, 4, 5])
+        src = np.arange(10)
+        assert_equal(src[ind.as_array()], [3, 4, 5])
+        assert_equal(src[ind.shaped()], [3, 4, 5])
+        assert_equal(ind.shape(), (3,))
+        assert_equal(ind.as_slice(), slice(3, 6, 1))
+        assert_equal(ind.shaped(), slice(3, 6, 1))
+
+    def test_arr_to_slice_step2(self):
+        ind = indexer([1,3,5,7,9])
+        src = np.arange(10)
+        assert_equal(src[ind.as_array()], [1,3,5,7,9])
+        assert_equal(src[ind()], [1,3,5,7,9])
+        assert_equal(src[ind.as_slice()], [1,3,5,7,9])
+        assert_equal(ind.shape(), (5,))
+        self.assertEqual(ind.as_slice(), slice(1, 10, 2))
+
+    def test_neg_arr(self):
+        ind = indexer([5, 3, 7, -1])
+        src = np.arange(10)
+        assert_equal(src[ind.as_array()], [5,3,7,9])
+        assert_equal(ind.shape(), (4,))
+        try:
+            ind.as_slice()
+        except Exception as err:
+            self.assertEqual(str(err), "array index cannot be converted to a slice.")
+        else:
+            self.fail("Exception expected")
+
+        try:
+            ind.shaped()
+        except Exception as err:
+            self.assertEqual(str(err), "Can't determine extent of array because source shape is not known.")
+        else:
+            self.fail("Exception expected")
+
+        ind.set_src_shape(10)
+        assert_equal(ind.shaped(), [5,3,7,9])
+
+    def test_neg_arr_sliceable(self):
+        ind = indexer([-1, -3, -5])
+        src = np.arange(10)
+        assert_equal(src[ind.as_array()], [9, 7, 5])
+        assert_equal(ind.shape(), (3,))
+        try:
+            ind.as_slice()
+        except Exception as err:
+            self.assertEqual(str(err), "array index cannot be converted to a slice.")
+        else:
+            self.fail("Exception expected")
+
+        try:
+            ind.shaped()
+        except Exception as err:
+            self.assertEqual(str(err), "Can't determine extent of array because source shape is not known.")
+        else:
+            self.fail("Exception expected")
+
+        ind.set_src_shape(10)
+        assert_equal(ind.shaped(), slice(9, 4, -2))
+
+        slc = ind.as_slice()
+        assert_equal(slc, slice(9, 4, -2))
+
     def test_full_slice(self):
         ind = indexer[:]
         src = np.arange(10)
@@ -83,28 +161,6 @@ class IndexerTestCase(unittest.TestCase):
         self.fail("No test yet")
 
     def test_slice_step_neg(self):
-        pass
-
-    def test_simple_arr(self):
-        ind = indexer([5, 3, 7, 1])
-        src = np.arange(10)
-        assert_equal(src[ind.as_array()], [5,3,7,1])
-        assert_equal(ind.shape(), (4,))
-        try:
-            ind.as_slice()
-        except Exception as err:
-            self.assertEqual(str(err), "array index cannot be converted to a slice.")
-        else:
-            self.fail("Exception expected")
-
-    def test_arr_to_slice(self):
-        ind = indexer([1,3,5,7,9])
-        src = np.arange(10)
-        assert_equal(src[ind.as_array()], [1,3,5,7,9])
-        assert_equal(ind.shape(), (5,))
-        self.assertEqual(ind.as_slice(), slice(1, 10, 2))
-
-    def test_neg_arr(self):
         pass
 
 
