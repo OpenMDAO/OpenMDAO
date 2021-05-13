@@ -250,7 +250,7 @@ def _meta_model_cmd(options, user_args):
                 print("\nMetamodel '{}' not found. {}".format(pathname, try_str))
                 _mm_list(mm_names, options)
             else:
-                print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+                print("\n'{}' is not a Metamodel. {}".format(pathname, try_str))
                 _mm_list(mm_names, options)
         exit()
 

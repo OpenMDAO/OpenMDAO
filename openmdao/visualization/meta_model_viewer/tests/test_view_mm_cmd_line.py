@@ -34,3 +34,14 @@ class ViewMMCommandLineTest(unittest.TestCase):
         self.assertTrue(
             expected_output in output,
             msg='Metamodel was found when it should not have. Check example.')
+
+    def test_not_metamodel(self):
+        script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
+        cmd = 'openmdao view_mm {} -m {}'.format(script, 'dummy')
+        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
+        expected_output = (
+            "\nMetamodel 'dummy' not found. Try one of the following:\n"
+            "\nopenmdao view_mm -m mm {}".format(script)
+        )
+        self.assertTrue(
+            expected_output in output)
