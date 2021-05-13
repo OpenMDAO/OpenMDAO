@@ -2177,7 +2177,7 @@ class TestPyoptSparse(unittest.TestCase):
         with self.assertRaises(RuntimeError) as msg:
             prob.run_driver()
 
-        self.assertEqual(msg.exception.args[0],
+        self.assertEqual(str(msg.exception),
                          "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
 
     def test_singular_jac_ignore(self):

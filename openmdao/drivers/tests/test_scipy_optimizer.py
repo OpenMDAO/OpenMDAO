@@ -2019,6 +2019,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.add_design_var('y', lower=-50, upper=50)
         prob.model.add_design_var('z', lower=-50, upper=50)
 
+        # objective parab.f_z is not impacted by any quantities.
         prob.model.add_objective('parab.f_z', index=6)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)

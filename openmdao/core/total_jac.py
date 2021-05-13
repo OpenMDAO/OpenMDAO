@@ -1679,6 +1679,23 @@ class _TotalJacInfo(object):
         return totals
 
     def _get_zero_inds(self, name, tup, jac_arr):
+        """
+        Get zero indices relative to the named variable for jac row/col 'jac_arr'.
+
+        Parameters
+        ----------
+        name : str
+            Name of the design var or response.
+        tup : tuple
+            Contains jacobian slice and dv/response indices, if any.
+        jac_arr : ndarray
+            Row or column of jacobian being checked for zero entries.
+
+        Returns
+        -------
+        ndarray
+            Index array of zero entries.
+        """
         inds = tup[1]  # these must be indices into the flattened var
         shname = 'shape' if self.get_remote else 'global_shape'
         shape = self.model._var_allprocs_abs2meta['output'][name][shname]
@@ -1714,12 +1731,12 @@ class _TotalJacInfo(object):
         nzrows, nzcols = np.nonzero(np.abs(self.J) > tol)
 
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
-        row = np.ones(self.J.shape[0], dtype=bool)
-        row[nzrows] = False  # False in this case means nonzero
-        if np.any(row):  # there's at least 1 zero row
+        col = np.ones(self.J.shape[0], dtype=bool)
+        col[nzrows] = False  # False in this case means nonzero
+        if np.any(col):  # there's at least 1 row that's zero across all columns
             zero_rows = []
             for name, tup in self.of_meta.items():
-                zero_idxs = self._get_zero_inds(name, tup, row)
+                zero_idxs = self._get_zero_inds(name, tup, col)
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
@@ -1739,12 +1756,12 @@ class _TotalJacInfo(object):
                     issue_warning(msg, category=DerivativesWarning)
 
         # Check for zero cols, which correspond to design vars that don't affect anything.
-        col = np.ones(self.J.shape[1], dtype=bool)
-        col[nzcols] = False  # False in this case means nonzero
-        if np.any(col):  # there's at least 1 zero col
+        row = np.ones(self.J.shape[1], dtype=bool)
+        row[nzcols] = False  # False in this case means nonzero
+        if np.any(row):  # there's at least 1 col that's zero across all rows
             zero_cols = []
             for name, tup in self.wrt_meta.items():
-                zero_idxs = self._get_zero_inds(name, tup, col)
+                zero_idxs = self._get_zero_inds(name, tup, row)
 
                 if zero_idxs[0].size > 0:
                     if len(zero_idxs) == 1:
