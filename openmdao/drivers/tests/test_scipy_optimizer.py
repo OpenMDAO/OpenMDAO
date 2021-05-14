@@ -1837,15 +1837,17 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_singular_jac_error_responses(self):
         prob = om.Problem()
+        size = 3
         prob.model.add_subsystem('parab',
                                  om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                              'z = 12.0'],),
+                                              'z = 12.0'], shape=(size,)),
                                  promotes_inputs=['x', 'y'])
 
-        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(size,)),
+                                 promotes_inputs=['x', 'y'])
 
-        prob.model.set_input_defaults('x', 3.0)
-        prob.model.set_input_defaults('y', -4.0)
+        prob.model.set_input_defaults('x', 3.0 * np.ones(size))
+        prob.model.set_input_defaults('y', -4.0 * np.ones(size))
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -1853,7 +1855,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-50, upper=50)
         prob.model.add_design_var('y', lower=-50, upper=50)
-        prob.model.add_objective('parab.f_xy')
+        prob.model.add_objective('parab.f_xy', index=1)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
 
@@ -1866,14 +1868,14 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives ['parab.z'] cannot be impacted by the design " + \
+                         "Constraints or objectives [('parab.z', inds=[0, 1, 2])] cannot be impacted by the design " + \
                          "variables of the problem.")
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab',
                                      om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
-                                                  ]), #'foo = 0.0 * z'],),
+                                                  ]),
                                      promotes_inputs=['x', 'y', 'z'])
 
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
@@ -1901,7 +1903,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables ['z'] have no impact on the constraints or objective.")
+                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -1960,10 +1962,76 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives ['parab.z'] cannot be impacted by the design variables of the problem."
+        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
+
+    def test_singular_jac_error_desvars_multidim_indices_dv(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z'], shape=(3,2,2)),
+                                 promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
+        prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50, indices=[2,5,6])
+
+        prob.model.add_objective('parab.f_xy', index=6)
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] have no impact on the constraints or objective.")
+
+    def test_singular_jac_error_desvars_multidim_indices_con(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - z',
+                                              'f_z = z * 0.0'], shape=(3,2,2)),
+                                 promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
+        prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        # objective parab.f_z is not impacted by any quantities.
+        prob.model.add_objective('parab.f_z', index=6)
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
 
 class TestScipyOptimizeDriverFeatures(unittest.TestCase):

@@ -2140,7 +2140,7 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives ['parab.z'] cannot be impacted by the design " + \
+                         "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design " + \
                          "variables of the problem.")
 
     def test_singular_jac_error_desvars(self):
@@ -2175,7 +2175,7 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables ['z'] have no impact on the constraints or objective.")
+                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -2234,7 +2234,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives ['parab.z'] cannot be impacted by the design variables of the problem."
+        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
