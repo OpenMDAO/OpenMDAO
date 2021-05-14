@@ -3,7 +3,7 @@
 
 May 14, 2021
 
-OpenMDAO 3.9.2 is a patch release that fixes for bugs found in 3.9.1.
+OpenMDAO 3.9.2 is a patch release that fixes some bugs found in 3.9.1.
 
 ## New Deprecations
 
