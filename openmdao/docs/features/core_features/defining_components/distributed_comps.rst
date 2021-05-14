@@ -1,8 +1,8 @@
 .. _distributed_components:
 
-*************************************
-Components with Distributed Variables
-*************************************
+**********************
+Distributed Components
+**********************
 
 At times when you need to perform a computation using large input arrays, you may
 want to perform that computation in multiple processes, where each process
@@ -77,14 +77,14 @@ This example is run with two processes and a :code:`size` of 15:
 .. note::
 
     In this example, we introduce a new component called an :ref:`IndepVarComp<comp-type-1-indepvarcomp>`.
-    If you used OpenMDAO prior to version 3.2, then you are familiar with this component.  It is used to
-    define an independent variable.
+    If you used OpenMDAO prior to version 3.2, then you are familiar with this component.  It is used to 
+    define an independent variable. 
 
     You usually do not have to define these because OpenMDAO defines and uses them automatically for all
     unconnected inputs in your model. However, when we define a distributed input, we often
     use the "src_indices" attribute to determine the allocation of that input to the processors that the
     component sees. For some sets of these indices, it isn't possible to easily determine the full size
-    of the corresponding independent variable, and the `IndepVarComp` cannot be created automatically.  So,
+    of the corresponding independent variable, and the `IndepVarComp` cannot be created automatically.  So, 
     for unconnected inputs on a distributed component, you must manually create one, as we did in this example.
 
 
