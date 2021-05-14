@@ -1,5 +1,6 @@
 """Define utils for use in testing."""
 import json
+import functools
 
 import numpy as np
 
@@ -77,6 +78,55 @@ def use_tempdirs(cls):
     setattr(cls, 'tearDown', _new_teardown)
 
     return cls
+
+
+def require_pyoptsparse(optimizer=None):
+    """
+    Decorate test to raise a skiptest if a required pyoptsparse optimizer cannot be imported.
+
+    Parameters
+    ----------
+    optimizer : String
+        Pyoptsparse optimizer string. Default is None, which just checks for pyoptsparse.
+
+    Returns
+    -------
+    TestCase or TestCase.method
+        The decorated TestCase class or method.
+    """
+    def decorator(obj):
+
+        import unittest
+        try:
+            from pyoptsparse import OPT
+
+        except Exception:
+            msg = "pyoptsparse is not installed."
+
+            if not isinstance(obj, type):
+                @functools.wraps(obj)
+                def skip_wrapper(*args, **kwargs):
+                    raise unittest.SkipTest(msg)
+                obj = skip_wrapper
+            obj.__unittest_skip__ = True
+            obj.__unittest_skip_why__ = msg
+            return obj
+
+        try:
+            OPT(optimizer)
+        except Exception:
+            msg = "pyoptsparse is not providing %s" % optimizer
+
+            if not isinstance(obj, type):
+                @functools.wraps(obj)
+                def skip_wrapper(*args, **kwargs):
+                    raise unittest.SkipTest(msg)
+                obj = skip_wrapper
+            obj.__unittest_skip__ = True
+            obj.__unittest_skip_why__ = msg
+
+        return obj
+    return decorator
 
 
 class _ModelViewerDataTreeEncoder(json.JSONEncoder):

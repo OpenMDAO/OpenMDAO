@@ -1,4 +1,45 @@
 **********************************
+# Release Notes for OpenMDAO 3.9.2
+
+May 14, 2021
+
+OpenMDAO 3.9.2 is a patch release that fixes some bugs found in 3.9.1.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes:
+
+- None
+
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- Added `require_pyoptsparse` decorator for skipping tests when the necessary optimizers are not available. [#2064](https://github.com/OpenMDAO/OpenMDAO/pull/2064)
+
+## Bug Fixes:
+
+- Changed thread.isAlive to thread.is_alive for Python 3.9 compatibility in the profiler. [#2045](https://github.com/OpenMDAO/OpenMDAO/pull/2045)
+- Updated pyOptSparseDriver to handle an API change in pyOptSparse in version 2.5.1 [#2051](https://github.com/OpenMDAO/OpenMDAO/pull/2051)
+- Fixed DemuxComp issue not handling 3D arrays [#2052](https://github.com/OpenMDAO/OpenMDAO/pull/2052)
+- Fixed KeyError during recording setup when running under MPI when design variable was an input [#2053](https://github.com/OpenMDAO/OpenMDAO/pull/2053)
+- Require Sphinx < 4.0 for building docs for Python 3.6 compatibility. [#2055](https://github.com/OpenMDAO/OpenMDAO/pull/2055)
+- Added a small fix to MetaModelUnStructuredComp for multiple nD array training inputs [#2058](https://github.com/OpenMDAO/OpenMDAO/pull/2058)
+- Fixed _linearize was being called on linear solver unnecessarily during check_partials and partial sparsity computation [#2060](https://github.com/OpenMDAO/OpenMDAO/pull/2060)
+- Make sure variables to record are sorted so they are in sync across multiple procs. [#2065](https://github.com/OpenMDAO/OpenMDAO/pull/2065)
+- Fixed a bug in set_val when src_indices reference into a flat array but are not in a flat array themselves. [#2067](https://github.com/OpenMDAO/OpenMDAO/pull/2067)
+- Improved error message when there are zero rows or cols in the total Jacobian [#2069](https://github.com/OpenMDAO/OpenMDAO/pull/2069)
+
+## Miscellaneous:
+
+- Updated GitHub Workflow to include repo details when submitting coverage statistics. [#2043](https://github.com/OpenMDAO/OpenMDAO/pull/2043), [#2044](https://github.com/OpenMDAO/OpenMDAO/pull/2044)
+- Privatize some filewrap classes to solve problem with new doc build. [#2063](https://github.com/OpenMDAO/OpenMDAO/pull/2063)
+
+**********************************
 # Release Notes for OpenMDAO 3.9.1
 
 May 04, 2021

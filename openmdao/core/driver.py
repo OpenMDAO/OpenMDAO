@@ -446,7 +446,7 @@ class Driver(object):
         myinputs = myoutputs = myresiduals = []
 
         if recording_options['record_outputs']:
-            myoutputs = sorted([n for n, prom in abs2prom.items() if check_path(prom, incl, excl)])
+            myoutputs = [n for n, prom in abs2prom.items() if check_path(prom, incl, excl)]
 
             model_outs = model._outputs
 
@@ -472,14 +472,14 @@ class Driver(object):
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                # sort the results since _var_allprocs_abs2prom isn't ordered
-                myinputs = sorted([n for n in model._var_allprocs_abs2prom['input']
-                                  if check_path(n, incl, excl)])
+                myinputs = [n for n in model._var_allprocs_abs2prom['input']
+                            if check_path(n, incl, excl)]
 
+        # sort lists to ensure that vars are iterated over in the same order on all procs
         vars2record = {
-            'input': myinputs,
-            'output': list(myoutputs),
-            'residual': myresiduals
+            'input': sorted(myinputs),
+            'output': sorted(myoutputs),
+            'residual': sorted(myresiduals)
         }
 
         return vars2record
