@@ -987,9 +987,6 @@ class MPITestSimpleGA(unittest.TestCase):
 
 
 class D1(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -1001,11 +998,11 @@ class D1(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y2', np.ones((1, ), float),
+        self.add_input('y2', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('x', np.ones((1, ), float))
+        self.add_input('x', np.ones((1, ), float), distributed=True)
 
-        self.add_output('y1', np.ones((1, ), float))
+        self.add_output('y1', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y1', ['y2', 'x'])
 
@@ -1030,9 +1027,6 @@ class D1(om.ExplicitComponent):
 
 
 class D2(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -1044,10 +1038,10 @@ class D2(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y1', np.ones((1, ), float),
+        self.add_input('y1', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('y2', np.ones((1, ), float))
+        self.add_output('y2', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y2', ['y1'])
 

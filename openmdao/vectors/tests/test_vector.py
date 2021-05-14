@@ -62,7 +62,6 @@ A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])
 
 class DistribQuadtric(om.ImplicitComponent):
     def initialize(self):
-        self.options['distributed'] = True
         self.options.declare('size', types=int, default=1,
             desc="Size of input and output vectors.")
 
@@ -81,10 +80,10 @@ class DistribQuadtric(om.ImplicitComponent):
         # Get the local slice of A that this processor will be working with
         self.A_local = A[start:end,:]
 
-        self.add_input('x', np.ones(size_local, float),
+        self.add_input('x', np.ones(size_local, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('y', np.ones(size_local, float))
+        self.add_output('y', np.ones(size_local, float), distributed=True)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         x = inputs['x']

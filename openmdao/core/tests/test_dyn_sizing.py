@@ -109,42 +109,33 @@ class E(om.ExplicitComponent):
 
 
 class B_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
-        self.add_input('in', copy_shape='out')
-        self.add_output('out', shape_by_conn=True)
+        self.add_input('in', copy_shape='out', distributed=True)
+        self.add_output('out', shape_by_conn=True, distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = inputs['in']
 
 
 class C_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         if self.comm.rank == 0:
-            self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int))
+            self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int), distributed=True)
         elif self.comm.rank == 1:
-            self.add_input('in', shape=2, src_indices=np.arange(1,3, dtype=int))
+            self.add_input('in', shape=2, src_indices=np.arange(1,3, dtype=int), distributed=True)
         else:
-            self.add_input('in', shape=0, src_indices=np.arange(3,3, dtype=int))
+            self.add_input('in', shape=0, src_indices=np.arange(3,3, dtype=int), distributed=True)
 
-        self.add_output('out', shape=3)
+        self.add_output('out', shape=3, distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = np.sum(inputs['in']) * (self.comm.rank + 1)
 
 
 class D_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
-        self.add_input('in', shape_by_conn=True)
-        self.add_output('out', copy_shape='in')
+        self.add_input('in', shape_by_conn=True, distributed=True)
+        self.add_output('out', copy_shape='in', distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = inputs['in']
@@ -296,12 +287,11 @@ class DistribDynShapeComp(om.ExplicitComponent):
     def __init__(self, n_inputs=1):
         super().__init__()
         self.n_inputs = n_inputs
-        self.options['distributed'] = True
 
     def setup(self):
         for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
-            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
+            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}", distributed=True)
+            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}", distributed=True)
 
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
@@ -314,7 +304,6 @@ class DistribComp(om.ExplicitComponent):
         super().__init__()
         self.n_inputs = n_inputs
         self.global_size = global_size
-        self.options['distributed'] = True
 
     def setup(self):
         # evenly distribute the variable over the procs
@@ -322,8 +311,8 @@ class DistribComp(om.ExplicitComponent):
         sizes = [ave + 1 if p < res else ave for p in range(self.comm.size)]
 
         for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]))
-            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]))
+            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]), distributed=True)
+            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]), distributed=True)
 
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):

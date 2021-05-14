@@ -14,8 +14,6 @@ class DistribComp(om.ExplicitComponent):
     """Simple Distributed Component."""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('size', types=int, default=1,
                              desc="Size of input and output vectors.")
 
@@ -32,10 +30,10 @@ class DistribComp(om.ExplicitComponent):
         start = offsets[rank]
         end = start + mysize
 
-        self.add_input('invec', np.ones(mysize, float),
+        self.add_input('invec', np.ones(mysize, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('outvec', np.ones(mysize, float))
+        self.add_output('outvec', np.ones(mysize, float), distributed=True,)
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -64,8 +62,6 @@ class DistribCompDerivs(om.ExplicitComponent):
     """Simple Distributed Component with Derivatives."""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('size', types=int, default=1,
                              desc="Size of input and output vectors.")
 
@@ -81,8 +77,8 @@ class DistribCompDerivs(om.ExplicitComponent):
         self.mysize = mysize = sizes[rank]
 
         # don't set src_indices on the input, just use default behavior
-        self.add_input('invec', np.ones(mysize, float))
-        self.add_output('outvec', np.ones(mysize, float))
+        self.add_input('invec', np.ones(mysize, float), distributed=True)
+        self.add_output('outvec', np.ones(mysize, float), distributed=True)
 
     def setup_partials(self):
         # declare partial derivatives (diagonal of mysize)

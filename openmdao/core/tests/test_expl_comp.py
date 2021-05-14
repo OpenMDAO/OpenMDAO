@@ -1134,9 +1134,6 @@ class TestMPIExplComp(unittest.TestCase):
     def test_list_inputs_outputs_with_parallel_comps(self):
         class TestComp(om.ExplicitComponent):
 
-            def initialize(self):
-                self.options['distributed'] = False
-
             def setup(self):
                 self.add_input('x', shape=1)
                 self.add_output('y', shape=1)

@@ -19,7 +19,7 @@ optional_dependencies = {
     'notebooks': [
         'notebook',
         'tabulate',
-        'ipython'
+        'ipython',
     ],
     'visualization': [
         'bokeh>=1.3.4',

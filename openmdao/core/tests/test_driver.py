@@ -907,13 +907,11 @@ class TestDriverMPI(unittest.TestCase):
         class DistribComp(om.ExplicitComponent):
 
             def setup(self):
-                self.options['distributed'] = True
+                self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
+                self.add_input('x', shape=size, distributed=True) # this will connect to a distributed IVC
 
-                self.add_input('w', val=1.) # this will connect to a non-distributed IVC
-                self.add_input('x', shape=size) # this will connect to a distributed IVC
-
-                self.add_output('y', shape=1) # all-gathered output, duplicated on all procs
-                self.add_output('z', shape=size) # distributed output
+                self.add_output('y', shape=1, distributed=True) # all-gathered output, duplicated on all procs
+                self.add_output('z', shape=size, distributed=True) # distributed output
 
                 self.declare_partials('y', 'x')
                 self.declare_partials('y', 'w')
