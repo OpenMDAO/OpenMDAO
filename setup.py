@@ -10,11 +10,13 @@ __version__ = re.findall(
 optional_dependencies = {
     'docs': [
         'matplotlib',
+        'jupyter',
+        'nbconvert',
+        'testflo',
+        'ipyparallel',
         'numpydoc>=0.9.1',
-        'redbaron',
-        'sphinx>=1.8.5,<4.0',
         'tabulate',
-        'ipython'
+        'jupyter-book',
     ],
     'notebooks': [
         'notebook',

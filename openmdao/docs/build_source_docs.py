@@ -82,8 +82,8 @@ def _header_cell():
     return template
 
 
-def build_src_docs(top, dir, project_name='openmdao'):
-    # docs_dir = os.path.dirname(dir)
+def build_src_docs(top, src_dir, project_name='openmdao'):
+    # docs_dir = os.path.dirname(src_dir)
 
     doc_dir = os.path.join(top, "_srcdocs")
     if os.path.isdir(doc_dir):
@@ -109,7 +109,8 @@ def build_src_docs(top, dir, project_name='openmdao'):
         package_name = project_name + "." + package
 
         # the sub_listing is going into each package dir and listing what's in it
-        for sub_listing in sorted(os.listdir(os.path.join(dir + "openmdao/", package.replace('.','/')))):
+        package_dir = os.path.join(src_dir, package.replace('.','/'))
+        for sub_listing in sorted(os.listdir(package_dir)):
             # don't want to catalog files twice, nor use init files nor test dir
             if (os.path.isdir(sub_listing) and sub_listing != "tests") or \
                 (sub_listing.endswith(".py") and not sub_listing.startswith('_')):
@@ -188,4 +189,4 @@ def build_src_docs(top, dir, project_name='openmdao'):
     index.close()
 
 if __name__ == '__main__':
-    build_src_docs("openmdao_book/", "openmdao_book/OpenMDAO/")
+    build_src_docs("openmdao_book/", "..")
