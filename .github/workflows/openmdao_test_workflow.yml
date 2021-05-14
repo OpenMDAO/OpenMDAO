@@ -191,16 +191,37 @@ jobs:
           pip install git+https://github.com/swryan/coveralls-python
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
           coveralls --base_dir $SITE_DIR
-          
+
       - name: Make docs
         shell: bash -l {0}
         run: |
           if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
-            echo "============================================================="
-            echo "Make docs"
-            echo "============================================================="
+
             cd openmdao/docs
-            make strict
+
+            # Temporary: Install the latest jupyter-book which isn't on pypi
+            git clone -q https://github.com/executablebooks/jupyter-book
+            cd jupyter-book
+            pip install -e .
+            cd ..
+
+            echo "============================================================="
+            echo "Final additional setup to run MPI under notebooks"
+            echo "============================================================="
+            export OMPI_MCA_rmaps_base_oversubscribe=1
+            jupyter serverextension enable --py ipyparallel;
+            ipython profile create --parallel --profile=mpi;
+            echo "c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py;
+            echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py;
+            ipcluster start -n 4 --profile=mpi &
+            sleep 12
+
+            echo "============================================================="
+            echo "Build the docs"
+            echo "============================================================="
+            python build_source_docs.py;
+            jupyter-book build -W --keep-going openmdao_book
+            python copy_build_artifacts.py;
 
             if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
               if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
