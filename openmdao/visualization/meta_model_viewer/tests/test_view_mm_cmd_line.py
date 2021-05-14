@@ -24,7 +24,7 @@ class ViewMMCommandLineTest(unittest.TestCase):
             msg='Metamodel was specified when it should not have been. Check example.')
 
     def test_invalid_metamodel(self):
-        script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
+        script = os.path.abspath(example.__file__)
         cmd = 'openmdao view_mm {} -m {}'.format(script, 'interp')
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = (
@@ -36,7 +36,7 @@ class ViewMMCommandLineTest(unittest.TestCase):
             msg='Metamodel was found when it should not have. Check example.')
 
     def test_not_metamodel(self):
-        script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
+        script = os.path.abspath(example.__file__)
         cmd = 'openmdao view_mm {} -m {}'.format(script, 'dummy')
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = (

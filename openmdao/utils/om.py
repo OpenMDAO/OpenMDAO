@@ -241,16 +241,15 @@ def _meta_model_cmd(options, user_args):
             view_metamodel(comp, resolution, port_number, browser)
 
         else:
-            try_str = "Try one of the following:\n"
-
             if not pathname:
-                print("\nMetamodel not specified. {}".format(try_str))
+                print("\nMetamodel not specified. Try the following:")
                 _mm_list(mm_names, options)
             elif not comp:
-                print("\nMetamodel '{}' not found. {}".format(pathname, try_str))
+                print("\nMetamodel '{}' not found. Try one of the "
+                      "following:\n".format(pathname))
                 _mm_list(mm_names, options)
             else:
-                print("\n'{}' is not a Metamodel. {}".format(pathname, try_str))
+                print("\n'{}' is not a Metamodel.\n".format(pathname))
                 _mm_list(mm_names, options)
         exit()
 
