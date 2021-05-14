@@ -142,9 +142,6 @@ jobs:
 
           else
             if [[ "${{ matrix.SNOPT }}" ]]; then
-              cd ../openmdao/docs
-              python openmdao_book/other/disable_snopt_cells.py
-              cd -
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
             ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
@@ -201,6 +198,16 @@ jobs:
           if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
 
             cd openmdao/docs
+            if [[ "${{ secrets.SNOPT_LOCATION_71 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+              echo "============================================================="
+              echo "Build docs with SNOPT examples."
+              echo "============================================================="
+            else
+              echo "============================================================="
+              echo "Disabling SNOPT cells in notebooks."
+              echo "============================================================="
+              python openmdao_book/other/disable_snopt_cells.py
+            fi
 
             # Temporary: Install the latest jupyter-book which isn't on pypi
             git clone -q https://github.com/executablebooks/jupyter-book
