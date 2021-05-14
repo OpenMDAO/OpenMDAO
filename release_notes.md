@@ -36,8 +36,7 @@ OpenMDAO 3.9.2 is a patch release that fixes some bugs found in 3.9.1.
 
 ## Miscellaneous:
 
-- Updated GitHub Workflow to correctly submit coverage statistics. [#2043](https://github.com/OpenMDAO/OpenMDAO/pull/2043)
-- Added coverage statistics for windows.  [#2044](https://github.com/OpenMDAO/OpenMDAO/pull/2044)
+- Updated GitHub Workflow to include repo details when submitting coverage statistics. [#2043](https://github.com/OpenMDAO/OpenMDAO/pull/2043), [#2044](https://github.com/OpenMDAO/OpenMDAO/pull/2044)
 - Privatize some filewrap classes to solve problem with new doc build. [#2063](https://github.com/OpenMDAO/OpenMDAO/pull/2063)
 
 **********************************
