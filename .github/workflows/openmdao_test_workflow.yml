@@ -142,6 +142,9 @@ jobs:
 
           else
             if [[ "${{ matrix.SNOPT }}" ]]; then
+              cd ../openmdao/docs
+              python openmdao_book/other/disable_snopt_cells.py
+              cd -
               echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
             fi
             ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"

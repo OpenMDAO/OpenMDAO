@@ -85,8 +85,6 @@ setup(
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
         'openmdao.docs',
-        'openmdao.docs._exts',
-        'openmdao.docs._utils',
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',
@@ -144,7 +142,7 @@ setup(
             'static/*.html',
             'templates/*.html'
         ],
-        'openmdao.docs': ['*.py', '_utils/*.py'],
+        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py'],
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini', 'scaffolding_templates/*'],
         'openmdao.test_suite': [
