@@ -242,7 +242,7 @@ def _meta_model_cmd(options, user_args):
 
         else:
             if not pathname:
-                print("\nMetamodel not specified. Try the following:")
+                print("\nMetamodel not specified. Try the following:\n")
                 _mm_list(mm_names, options)
             elif not comp:
                 print("\nMetamodel '{}' not found. Try one of the "
