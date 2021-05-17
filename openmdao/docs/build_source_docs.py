@@ -117,7 +117,6 @@ def build_src_docs(top, src_dir, project_name='openmdao'):
                 # just want the name of e.g. dataxfer not dataxfer.py
                 sub_packages.append(sub_listing.rsplit('.')[0])
 
-
         if len(sub_packages) > 0:
             # continue to write in the top-level index file.
             # only document non-empty packages -- to avoid errors
@@ -187,6 +186,7 @@ def build_src_docs(top, src_dir, project_name='openmdao'):
         json.dump(data, f, indent=4)
         f.truncate()
     index.close()
+
 
 if __name__ == '__main__':
     build_src_docs("openmdao_book/", "..")
