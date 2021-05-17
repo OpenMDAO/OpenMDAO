@@ -468,7 +468,18 @@ class ScipyOptimizeDriver(Driver):
                                       # callback=None,
                                       options=self.opt_settings)
                 else:
-                    result = None
+                    self.opt_settings['disp'] = False
+                    result = result = minimize(self._objfunc, x_init,
+                                      # args=(),
+                                      method=opt,
+                                      jac=jac,
+                                      hess=hess,
+                                      # hessp=None,
+                                      bounds=bounds,
+                                      constraints=constraints,
+                                      tol=self.options['tol'],
+                                      # callback=None,
+                                      options=self.opt_settings)
             elif opt == 'basinhopping':
                 from scipy.optimize import basinhopping
 
@@ -548,8 +559,6 @@ class ScipyOptimizeDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        if MPI:
-            result = comm.allgather(result)[0]
         self.result = result
 
         if comm.rank == 0:
@@ -559,7 +568,7 @@ class ScipyOptimizeDriver(Driver):
                     print('Optimization FAILED.')
                     print(result.message)
                     print('-' * 35)
-    
+
                 elif self.options['disp']:
                     print('Optimization Complete')
                     print('-' * 35)

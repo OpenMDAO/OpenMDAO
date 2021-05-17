@@ -1,5 +1,5 @@
 """ Unit tests for the ScipyOptimizeDriver."""
-
+#import wingdbstub
 import unittest
 import sys
 from io import StringIO
@@ -157,6 +157,7 @@ class TestMPIScatter(unittest.TestCase):
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestScipyOptimizeDriverMPI(unittest.TestCase):
+    N_PROCS = 2
 
     def test_optimization_output_single_proc(self):
         prob = om.Problem()
@@ -187,8 +188,12 @@ class TestScipyOptimizeDriverMPI(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         msg = "Optimization terminated successfully.    (Exit mode 0)"
-        self.assertEqual(msg, output[0])
-        self.assertEqual(output.count(msg), 1)
+        if MPI.COMM_WORLD.rank == 0:
+            self.assertEqual(msg, output[0])
+            self.assertEqual(output.count(msg), 1)
+        else:
+            self.assertNotEqual(msg, output[0])
+            self.assertNotEqual(output.count(msg), 1)
 
 
 class TestScipyOptimizeDriver(unittest.TestCase):
