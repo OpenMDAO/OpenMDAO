@@ -198,7 +198,7 @@ jobs:
           if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
 
             cd openmdao/docs
-            if [[ "${{ secrets.SNOPT_LOCATION_71 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+            if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
               echo "============================================================="
               echo "Build docs with SNOPT examples."
               echo "============================================================="
