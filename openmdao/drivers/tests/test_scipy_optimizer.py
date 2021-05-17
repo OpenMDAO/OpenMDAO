@@ -1,6 +1,8 @@
 """ Unit tests for the ScipyOptimizeDriver."""
 
 import unittest
+import sys
+from io import StringIO
 
 from distutils.version import LooseVersion
 
@@ -12,6 +14,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
@@ -150,6 +153,42 @@ class TestMPIScatter(unittest.TestCase):
         assert_near_equal(con['parab.f_xy'],
                           np.zeros(7),
                           1e-5)
+
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class TestScipyOptimizeDriverMPI(unittest.TestCase):
+
+    def test_optimization_output_single_proc(self):
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-8
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0)
+        prob.model.add_constraint('con2', upper=0)
+
+        # Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+        prob.model.approx_totals()
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+        output = strout.getvalue().split('\n')
+        msg = "Optimization terminated successfully.    (Exit mode 0)"
+        self.assertEqual(msg, output[0])
+        self.assertEqual(output.count(msg), 1)
 
 
 class TestScipyOptimizeDriver(unittest.TestCase):

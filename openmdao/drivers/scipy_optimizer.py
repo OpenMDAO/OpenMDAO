@@ -2,7 +2,6 @@
 OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
-
 import sys
 from collections import OrderedDict
 from distutils.version import LooseVersion
@@ -15,7 +14,7 @@ import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import weak_method_wrapper
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, FakeComm
 from openmdao.warnings import issue_warning, DerivativesWarning
 
 # Optimizers in scipy.minimize
@@ -449,20 +448,27 @@ class ScipyOptimizeDriver(Driver):
                               f"than min allowed ({info['min_improve_pct']:.1f}%)."
                         issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
+        if MPI:
+            comm = MPI.COMM_WORLD
+        else:
+            comm = FakeComm()
         # optimize
         try:
             if opt in _optimizers:
-                result = minimize(self._objfunc, x_init,
-                                  # args=(),
-                                  method=opt,
-                                  jac=jac,
-                                  hess=hess,
-                                  # hessp=None,
-                                  bounds=bounds,
-                                  constraints=constraints,
-                                  tol=self.options['tol'],
-                                  # callback=None,
-                                  options=self.opt_settings)
+                if comm.rank == 0:
+                    result = minimize(self._objfunc, x_init,
+                                      # args=(),
+                                      method=opt,
+                                      jac=jac,
+                                      hess=hess,
+                                      # hessp=None,
+                                      bounds=bounds,
+                                      constraints=constraints,
+                                      tol=self.options['tol'],
+                                      # callback=None,
+                                      options=self.opt_settings)
+                else:
+                    result = None
             elif opt == 'basinhopping':
                 from scipy.optimize import basinhopping
 
@@ -542,23 +548,26 @@ class ScipyOptimizeDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
+        if MPI:
+            result = comm.allgather(result)[0]
         self.result = result
 
-        if hasattr(result, 'success'):
-            self.fail = False if result.success else True
-            if self.fail:
-                print('Optimization FAILED.')
+        if comm.rank == 0:
+            if hasattr(result, 'success'):
+                self.fail = False if result.success else True
+                if self.fail:
+                    print('Optimization FAILED.')
+                    print(result.message)
+                    print('-' * 35)
+    
+                elif self.options['disp']:
+                    print('Optimization Complete')
+                    print('-' * 35)
+            else:
+                self.fail = True  # It is not known, so the worst option is assumed
+                print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
-
-            elif self.options['disp']:
-                print('Optimization Complete')
-                print('-' * 35)
-        else:
-            self.fail = True  # It is not known, so the worst option is assumed
-            print('Optimization Complete (success not known)')
-            print(result.message)
-            print('-' * 35)
 
         return self.fail
 
