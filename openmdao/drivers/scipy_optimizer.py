@@ -469,7 +469,7 @@ class ScipyOptimizeDriver(Driver):
                                       options=self.opt_settings)
                 else:
                     self.opt_settings['disp'] = False
-                    result = result = minimize(self._objfunc, x_init,
+                    result = minimize(self._objfunc, x_init,
                                       # args=(),
                                       method=opt,
                                       jac=jac,
