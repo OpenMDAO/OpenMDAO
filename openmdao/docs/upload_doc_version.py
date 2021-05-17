@@ -62,12 +62,15 @@ def get_doc_version():
         return current_commit, 0
 
 
-def upload_doc_version(destination):
+def upload_doc_version(source_dir, destination):
     """
     Upload properly-named docs.
 
     Parameters
     ----------
+    source_dir : str
+        The path to the files to upload
+
     destination : str
         The destination for the documentation, [USER@]HOST:DIRECTORY
     """
@@ -81,19 +84,22 @@ def upload_doc_version(destination):
         destination += "latest"
 
     # execute the rsync to upload docs
-    cmd = "rsync -r --delete-after -v _build/html/* " + destination
-    status = subprocess.call(cmd, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE, shell=True)
+    cmd = f"rsync -r --delete-after -v {source_dir} {destination}"
+    proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    cmd_out, cmd_err = proc.communicate()
+    status = proc.returncode
 
     if status == 0:
         print("Uploaded documentation for", name if rel else "latest")
         return True
     else:
+        print("output:\n", cmd_out)
+        print("error:\n", cmd_err)
         raise Exception('Doc transfer failed.')
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Destination required, [USER@]HOST:DIRECTORY")
+    if len(sys.argv) != 3:
+        print(f"Source and Destination required: python {sys.argv[0]} [PATH]/_build/html [USER@]HOST:DIRECTORY")
     else:
-        upload_doc_version(sys.argv[1])
+        upload_doc_version(sys.argv[1], sys.argv[2])

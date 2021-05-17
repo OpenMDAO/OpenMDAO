@@ -219,26 +219,26 @@ jobs:
             echo "Final additional setup to run MPI under notebooks"
             echo "============================================================="
             export OMPI_MCA_rmaps_base_oversubscribe=1
-            jupyter serverextension enable --py ipyparallel;
-            ipython profile create --parallel --profile=mpi;
-            echo "c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py;
-            echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py;
+            jupyter serverextension enable --py ipyparallel
+            ipython profile create --parallel --profile=mpi
+            echo "c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py
+            echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py
             ipcluster start -n 4 --profile=mpi &
             sleep 12
 
             echo "============================================================="
             echo "Build the docs"
             echo "============================================================="
-            python build_source_docs.py;
+            python build_source_docs.py
             jupyter-book build -W --keep-going openmdao_book
-            python copy_build_artifacts.py;
+            python copy_build_artifacts.py
 
             if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
               if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
                 echo "============================================================="
                 echo "Upload docs"
                 echo "============================================================="
-                python upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
+                python upload_doc_version.py openmdao_book/_build/html/ ${{ secrets.DOCS_LOCATION }}
               fi
             fi
           fi
