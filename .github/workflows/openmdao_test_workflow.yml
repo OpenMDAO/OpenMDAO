@@ -238,7 +238,7 @@ jobs:
                 echo "============================================================="
                 echo "Upload docs"
                 echo "============================================================="
-                python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
+                python upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
               fi
             fi
           fi
