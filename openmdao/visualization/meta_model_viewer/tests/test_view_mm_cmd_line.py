@@ -7,39 +7,47 @@ try:
     import bokeh
 except ImportError:
     bokeh = None
-import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_model_example as example
 
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class ViewMMCommandLineTest(unittest.TestCase):
 
     def test_unspecified_metamodel(self):
-        script = os.path.join(os.path.dirname(__file__), 'example.py')
+        script = os.path.join(os.path.dirname(__file__), 'meta_model_cli_example.py')
         cmd = 'openmdao view_mm {}'.format(script)
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = ('\nMetamodel not specified. Try the following:\n'
                            '\nopenmdao view_mm -m interp1 {}'
                            '\nopenmdao view_mm -m interp2 {}\n'.format(script, script))
-        self.assertTrue(
-            expected_output in output)
+        self.assertTrue(expected_output in output)
 
     def test_invalid_metamodel(self):
-        script = os.path.abspath(example.__file__)
-        cmd = 'openmdao view_mm {} -m {}'.format(script, 'interp')
+        script = os.path.join(os.path.dirname(__file__), 'meta_model_cli_example.py')
+        cmd = 'openmdao view_mm {} -m {}'.format(script, 'IndepMeta')
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = (
-            "\nMetamodel 'interp' not found. Try one of the following:\n"
-            "\nopenmdao view_mm -m mm {}\n".format(script)
+            "\nMetamodel 'IndepMeta' not found. Try one of the following:\n"
+            "\nopenmdao view_mm -m interp1 {}"
+            "\nopenmdao view_mm -m interp2 {}".format(script, script)
         )
-        self.assertTrue(
-            expected_output in output)
+        self.assertTrue(expected_output in output)
 
     def test_not_metamodel(self):
-        script = os.path.abspath(example.__file__)
+        script = os.path.join(os.path.dirname(__file__), 'meta_model_cli_example.py')
         cmd = 'openmdao view_mm {} -m {}'.format(script, 'dummy')
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = (
-            "\nMetamodel 'dummy' not found. Try one of the following:\n"
-            "\nopenmdao view_mm -m mm {}".format(script)
+            "\n'dummy' is not a Metamodel. Try one of the following:\n"
+            "\nopenmdao view_mm -m interp1 {}"
+            "\nopenmdao view_mm -m interp2 {}".format(script, script)
         )
-        self.assertTrue(
-            expected_output in output)
+        self.assertTrue(expected_output in output)
+
+    def test_single_meta_model_fail(self):
+        script = os.path.join(os.path.dirname(__file__), 'single_meta_model_example.py')
+        cmd = 'openmdao view_mm {} -m {}'.format(script, 'dummy')
+        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
+        expected_output = (
+            "\n'dummy' is not a Metamodel. Try the following:\n"
+            "\nopenmdao view_mm -m interp1 {}".format(script)
+        )
+        self.assertTrue(expected_output in output)

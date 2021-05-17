@@ -249,8 +249,14 @@ def _meta_model_cmd(options, user_args):
                       "following:\n".format(pathname))
                 _mm_list(mm_names, options)
             else:
-                print("\n'{}' is not a Metamodel.\n".format(pathname))
-                _mm_list(mm_names, options)
+                print(3)
+                if len(mm_names) > 1:
+                    print("\n'{}' is not a Metamodel. Try one of the "
+                          "following:\n".format(pathname))
+                    _mm_list(mm_names, options)
+                else:
+                    print("\n'{}' is not a Metamodel. Try the following:\n".format(pathname))
+                    _mm_list(mm_names, options)
         exit()
 
     hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
