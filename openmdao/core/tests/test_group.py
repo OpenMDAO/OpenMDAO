@@ -1424,12 +1424,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_2d_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1450,12 +1447,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1499,12 +1493,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_negative_stop_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0

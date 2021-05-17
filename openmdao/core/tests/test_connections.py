@@ -557,9 +557,6 @@ class TestConnectionsDistrib(unittest.TestCase):
         # A bug formerly prevented this.
         class TestComp(om.ExplicitComponent):
 
-            def initialize(self):
-                self.options['distributed'] = False
-
             def setup(self):
                 self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
                 self.add_output('y', shape=1)
@@ -591,9 +588,6 @@ class TestConnectionsDistrib(unittest.TestCase):
     def test_serial_mpi_error_flat(self):
         # Make sure the flat branch works too.
         class TestComp(om.ExplicitComponent):
-
-            def initialize(self):
-                self.options['distributed'] = False
 
             def setup(self):
                 self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0, flat_src_indices=True)
@@ -631,20 +625,16 @@ class TestConnectionsError(unittest.TestCase):
     def test_incompatible_src_indices(self):
         class TestCompDist(om.ExplicitComponent):
         # this comp is distributed and forces PETScTransfer
-            def initialize(self):
-                self.options['distributed'] = True
 
             def setup(self):
-                self.add_input('x', shape=2)
-                self.add_output('y', shape=1)
+                self.add_input('x', shape=2, distributed=True)
+                self.add_output('y', shape=1, distributed=True)
                 self.declare_partials('y', 'x', val=1.0)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])
 
         class TestComp(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = False
 
             def setup(self):
                 # read SRC_INDICES on each proc
