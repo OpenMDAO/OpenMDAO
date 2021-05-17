@@ -15,7 +15,7 @@ class ViewMMCommandLineTest(unittest.TestCase):
         script = os.path.join(os.path.dirname(__file__), 'meta_model_cli_example.py')
         cmd = 'openmdao view_mm {}'.format(script)
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = ('\nMetamodel not specified. Try the following:\n'
+        expected_output = ('\nMetamodel not specified. Try one of the following:\n'
                            '\nopenmdao view_mm -m interp1 {}'
                            '\nopenmdao view_mm -m interp2 {}\n'.format(script, script))
         self.assertTrue(expected_output in output)
@@ -48,6 +48,16 @@ class ViewMMCommandLineTest(unittest.TestCase):
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = (
             "\n'dummy' is not a Metamodel. Try the following:\n"
+            "\nopenmdao view_mm -m interp1 {}".format(script)
+        )
+        self.assertTrue(expected_output in output)
+
+    def test_invalid_single_metamodel(self):
+        script = os.path.join(os.path.dirname(__file__), 'single_meta_model_example.py')
+        cmd = 'openmdao view_mm {} -m {}'.format(script, 'IndepMeta')
+        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
+        expected_output = (
+            "\nMetamodel 'IndepMeta' not found. Try the following:\n"
             "\nopenmdao view_mm -m interp1 {}".format(script)
         )
         self.assertTrue(expected_output in output)

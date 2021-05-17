@@ -242,21 +242,23 @@ def _meta_model_cmd(options, user_args):
 
         else:
             if not pathname:
-                print("\nMetamodel not specified. Try the following:\n")
+                print("\nMetamodel not specified. Try one of the following:\n")
                 _mm_list(mm_names, options)
             elif not comp:
-                print("\nMetamodel '{}' not found. Try one of the "
-                      "following:\n".format(pathname))
+                if len(mm_names) > 1:
+                    print("\nMetamodel '{}' not found. Try one of the "
+                        "following:\n".format(pathname))
+                else:
+                    print("\nMetamodel '{}' not found. Try the "
+                        "following:\n".format(pathname))
                 _mm_list(mm_names, options)
             else:
-                print(3)
                 if len(mm_names) > 1:
                     print("\n'{}' is not a Metamodel. Try one of the "
                           "following:\n".format(pathname))
-                    _mm_list(mm_names, options)
                 else:
                     print("\n'{}' is not a Metamodel. Try the following:\n".format(pathname))
-                    _mm_list(mm_names, options)
+                _mm_list(mm_names, options)
         exit()
 
     hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
