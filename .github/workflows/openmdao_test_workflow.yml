@@ -246,7 +246,7 @@ jobs:
       - name: Print Failure Logs
         if: ${{ failure() }}
         run: |
-          cat /home/runner/work/OpenMDAO_Book/OpenMDAO_Book/openmdao_book/_build/html/reports/*
+          cat /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*
 
       - name: Notify slack
         uses: act10ns/slack@v1
