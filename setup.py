@@ -167,6 +167,8 @@ setup(
             'webview=openmdao.utils.webview:webview_argv',
             'run_om_test=openmdao.devtools.run_test:run_test',
             'reset_notebook=openmdao.devtools.docutils:reset_notebook_cmd',
+            'find_notebook=openmdao.devtools.docutils:find_notebooks_cmd',
+            'show_notebook=openmdao.devtools.docutils:show_notebook_cmd',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_case_reader': [

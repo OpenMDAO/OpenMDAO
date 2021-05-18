@@ -1,4 +1,9 @@
 import json
+import os
+import sys
+import argparse
+from openmdao.utils.file_utils import files_iter
+
 
 def reset_notebook(fname, dryrun=False):
     """
@@ -50,11 +55,6 @@ def reset_notebook_cmd():
     """
     Run reset_notebook on notebook files.
     """
-    import os
-    import sys
-    import argparse
-    from openmdao.utils.file_utils import files_iter
-
     parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
                                      'remove empty cells of jupyter notebook(s).')
     parser.add_argument('file', nargs='*', help='Jupyter notebook file(s).')
@@ -108,3 +108,164 @@ def reset_notebook_cmd():
                 sys.exit(-1)
             if reset_notebook(f, args.dryrun):
                 print(updatestr, f)
+
+
+def nb2dict(fname):
+    with open(fname) as f:
+        return json.load(f)
+
+
+def notebook_filter(fname, filters):
+    """
+    Return True is the given notebook satisfies the given filter function.
+
+    Parameters
+    ----------
+    fname : str
+        Name of the notebook file.
+    filters : list of functions
+        The filter functions.  They take a dictionary as an arg and return True/False.
+
+    Returns
+    -------
+    bool
+        True if the filter returns True.
+    """
+    dct = nb2dict(fname)
+
+    for f in filters:
+        if f(dct):
+            return True
+
+    return False
+
+
+def is_parallel(dct):
+    """
+    Return True if the notebook containing the dict uses ipyparallel.
+    """
+    for cell in dct['cells']:
+        if cell['cell_type'] == 'code':
+            for line in cell['source']:
+                if 'ipyparallel' in line:
+                    return True
+    return False
+
+
+def section_filter(dct, section):
+    """
+    Return True if the notebook containing the dict contains the given section string.
+    """
+    for cell in dct['cells']:
+        if cell['cell_type'] == 'markdown':
+            for line in cell['source']:
+                if section in line and line.startswith('#'):
+                    return True
+    return False
+
+
+def string_filter(dct, s):
+    """
+    Return True if the notebook containing the dict contains the given string.
+    """
+    for cell in dct['cells']:
+        if cell['cell_type'] in ('markdown', 'code'):
+            for line in cell['source']:
+                if s in line:
+                    return True
+    return False
+
+
+def find_notebooks_iter(parallel=False, section=None, string=None):
+    filters = []
+    if parallel:
+        filters.append(is_parallel)
+    if section:
+        filters.append(lambda dct: section_filter(dct, section))
+    if string:
+        filters.append(lambda dct: string_filter(dct, string))
+
+    dexcludes = ['.ipynb_checkpoints', '_*']
+    for f in files_iter(file_includes=['*.ipynb'], dir_excludes=dexcludes):
+        if not filters or notebook_filter(f, filters):
+            yield f
+
+
+def find_notebooks_cmd():
+    """
+    Run find_notebooks on notebook files.
+    """
+    parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
+                                     'remove empty cells of jupyter notebook(s).')
+    parser.add_argument('-p', '--parallel', action='store_true', dest='parallel',
+                        help='List any notebooks that run parallel code.')
+    parser.add_argument('--section', action='store', dest='section',
+                        help='Look for notebook(s) having the given section string.')
+    parser.add_argument('-s', '--string', action='store', dest='string',
+                        help='Look for notebook(s) having the given string.')
+    args = parser.parse_args()
+
+    for f in find_notebooks_iter(parallel=args.parallel, section=args.section, string=args.string):
+        print(f)
+
+
+def pick_one(files):
+    print("Multiple matches found.")
+    while True:
+        for i, f in enumerate(files):
+            print(f"{i}) {f}")
+        try:
+            response = int(input("\nSelect the index of the file to view: "))
+        except ValueError:
+            print("\nBAD index.  Try again.\n")
+            continue
+        if response < 0 or response > (len(files) + 1):
+            print(f"\nIndex {response} is out of range.  Try again.\n")
+            continue
+        return files[response]
+
+
+def show_notebook_cmd():
+    """
+    Display a notebook given a keyword.
+    """
+    parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
+                                     'remove empty cells of jupyter notebook(s).')
+    parser.add_argument('file', nargs='?', help='Look for notebook having the given base filename')
+    parser.add_argument('--section', action='store', dest='section',
+                        help='Look for notebook(s) having the given section string.')
+    parser.add_argument('-s', '--string', action='store', dest='string',
+                        help='Look for notebook(s) having the given string in a code or markdown '
+                        'cell.')
+    args = parser.parse_args()
+
+    if args.file is None:
+        fname = None
+    elif args.file.endswith('.ipynb'):
+        fname = args.file
+    else:
+        fname = args.file + '.ipynb'
+
+    if fname is not None:
+        files = [f for f in find_notebooks_iter() if os.path.basename(f) == fname]
+        if not files:
+            print(f"Can't find file {fname}.")
+            sys.exit(-1)
+        elif len(files) == 1:
+            show_notebook(files[0], nb2dict(files[0]))
+        else:
+            f = pick_one(files)
+            show_notebook(f, nb2dict(f))
+    else:
+        files = list(find_notebooks_iter(section=args.section, string=args.string))
+        f = pick_one(files)
+        show_notebook(f, nb2dict(f))
+
+
+def show_notebook(f, dct):
+    if is_parallel(dct):
+        pidfile = os.path.join(os.path.expanduser('~'), '.ipython/profile_mpi/pid/ipcluster.pid')
+        if not os.path.isfile(pidfile):
+            print("cluster isn't running...")
+            sys.exit(-1)
+    os.system(f"jupyter notebook {f}")
