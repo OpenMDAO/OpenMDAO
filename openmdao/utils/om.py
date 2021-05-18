@@ -247,10 +247,10 @@ def _meta_model_cmd(options, user_args):
             elif not comp:
                 if len(mm_names) > 1:
                     print("\nMetamodel '{}' not found. Try one of the "
-                        "following:\n".format(pathname))
+                          "following:\n".format(pathname))
                 else:
                     print("\nMetamodel '{}' not found. Try the "
-                        "following:\n".format(pathname))
+                          "following:\n".format(pathname))
                 _mm_list(mm_names, options)
             else:
                 if len(mm_names) > 1:
