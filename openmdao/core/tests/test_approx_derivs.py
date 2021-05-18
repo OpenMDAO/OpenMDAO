@@ -2038,37 +2038,6 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.check_partials(method='cs', step=1e-14, out_stream=None)
 
-    def test_feature_under_complex_step(self):
-        import openmdao.api as om
-
-        class SimpleComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', val=1.0)
-                self.add_output('y', val=1.0)
-
-                self.declare_partials(of='y', wrt='x', method='cs')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 3.0*inputs['x']
-
-                if self.under_complex_step:
-                    print("Under complex step")
-                    print("x", inputs['x'])
-                    print("y", outputs['y'])
-
-        prob = om.Problem()
-        prob.model.add_subsystem('comp', SimpleComp())
-
-        prob.model.add_design_var('comp.x', lower=-100, upper=100)
-        prob.model.add_objective('comp.y')
-
-        prob.setup(force_alloc_complex=True)
-
-        prob.run_model()
-
-        prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
-
     def test_partials_bad_sparse_explicit(self):
         class BadSparsityComp(om.ExplicitComponent):
 

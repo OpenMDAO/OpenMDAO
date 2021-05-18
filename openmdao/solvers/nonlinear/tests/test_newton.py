@@ -41,21 +41,6 @@ class TestNewton(unittest.TestCase):
         assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
-    def test_feature_newton_basic(self):
-        """ Feature test for slotting a Newton solver and using it to solve
-        Sellar.
-        """
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver(solve_subsystems=False)))
-
-        prob.setup()
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
-        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-
     def test_sellar_grouped(self):
         # Tests basic Newton solution on Sellar in a subgroup
 
@@ -844,47 +829,9 @@ class TestNewton(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
 
-
 class TestNewtonFeatures(unittest.TestCase):
 
-    def test_feature_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                   z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.linear_solver = om.DirectSolver()
-
-        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-
-        prob.setup()
-
-        prob.set_val('x', 1.)
-        prob.set_val('z', np.array([5.0, 2.0]))
-
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
-        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-
     def test_feature_maxiter(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -915,10 +862,6 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.0607416105, .00001)
 
     def test_feature_rtol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -981,145 +924,6 @@ class TestNewtonFeatures(unittest.TestCase):
 
         assert_near_equal(prob.get_val('y1'), 25.5882856302, .00001)
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-
-    def test_feature_linear_solver(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.linear_solver = om.LinearBlockGS()
-
-        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-
-        newton.linear_solver = om.DirectSolver()
-
-        prob.setup()
-
-        prob.set_val('x', 1.)
-        prob.set_val('z', np.array([5.0, 2.0]))
-
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('y1'), 25.58830273, .00001)
-        assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
-
-    def test_feature_max_sub_solves(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import SubSellar
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('g1', SubSellar())
-        model.add_subsystem('g2', SubSellar())
-
-        model.connect('g1.y2', 'g2.x')
-        model.connect('g2.y2', 'g1.x')
-
-        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        model.nonlinear_solver = om.NewtonSolver()
-        model.linear_solver = om.DirectSolver()
-
-        g1 = model.g1
-        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = om.DirectSolver()
-
-        g2 = model.g2
-        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = om.DirectSolver()
-
-        model.nonlinear_solver = om.NewtonSolver()
-        model.linear_solver = om.ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
-        model.nonlinear_solver.options['max_sub_solves'] = 0
-
-        prob.setup()
-        prob.run_model()
-
-    def test_feature_err_on_non_converge(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
-        model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-
-        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
-                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
-
-        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
-
-        model.linear_solver = om.DirectSolver()
-
-        newton = model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        newton.options['maxiter'] = 1
-        newton.options['err_on_non_converge'] = True
-
-        prob.setup()
-
-        prob.set_val('x', 1.)
-        prob.set_val('z', np.array([5.0, 2.0]))
-
-        try:
-            prob.run_model()
-        except om.AnalysisError:
-            pass
-
-    def test_solve_subsystems_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import DoubleSellar
-
-        prob = om.Problem(model=DoubleSellar())
-        model = prob.model
-
-        g1 = model.g1
-        g1.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = om.DirectSolver()
-
-        g2 = model.g2
-        g2.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = om.DirectSolver()
-
-        model.nonlinear_solver = om.NewtonSolver()
-        model.linear_solver = om.ScipyKrylov()
-
-        model.nonlinear_solver.options['solve_subsystems'] = True
-
-        prob.setup()
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('g1.y1'), 0.64, .00001)
-        assert_near_equal(prob.get_val('g1.y2'), 0.80, .00001)
-        assert_near_equal(prob.get_val('g2.y1'), 0.64, .00001)
-        assert_near_equal(prob.get_val('g2.y2'), 0.80, .00001)
 
 
 if __name__ == "__main__":

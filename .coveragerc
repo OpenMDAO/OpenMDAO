@@ -1,8 +1,0 @@
-# .coveragerc to control coverage.py
-[report]
-omit =
-    */tests/*
-    */devtools/*
-    */test_suite/*
-    */docs/*
-    */code_review/*

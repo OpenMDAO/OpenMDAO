@@ -6,8 +6,7 @@ import os
 import sys
 import unittest
 
-from shutil import rmtree
-from tempfile import mkdtemp, mkstemp
+from tempfile import mkstemp
 from collections import OrderedDict
 
 import numpy as np
@@ -58,6 +57,7 @@ def count_keys(d):
             count += count_keys(d[k])
 
     return count
+
 
 class SellarDerivativesGroupedPreAutoIVC(om.Group):
     """

@@ -421,11 +421,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_specify_ksp_type(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -460,10 +455,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -498,10 +489,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
 
     def test_feature_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -536,10 +523,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_feature_rtol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -575,11 +558,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model

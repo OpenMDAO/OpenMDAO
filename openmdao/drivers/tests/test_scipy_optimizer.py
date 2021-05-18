@@ -1437,7 +1437,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue("('p1.x', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
-    def test_debug_print_option(self):
+    def test_debug_print_all_options(self):
 
         prob = om.Problem()
         model = prob.model
@@ -1581,9 +1581,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_multiple_objectives_error(self):
 
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = om.Problem()
         model = prob.model
 
@@ -1615,8 +1612,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
     def test_basinhopping(self):
-
-        import openmdao.api as om
 
         class Func2d(om.ExplicitComponent):
 
@@ -1658,8 +1653,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_basinhopping_bounded(self):
         # It should find the local minimum, which is inside the bounds
 
-        import openmdao.api as om
-
         class Func2d(om.ExplicitComponent):
 
             def setup(self):
@@ -1700,7 +1693,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
-        import openmdao.api as om
         # Example from the Scipy documentation
 
         size = 3  # size of the design variable
@@ -1739,8 +1731,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_differential_evolution(self):
         # Source of example:
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
-
-        import openmdao.api as om
         np.random.seed(6)
 
         size = 3  # size of the design variable
@@ -1778,8 +1768,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
         # In this example the minimum is not the unbounded global minimum.
 
-        import openmdao.api as om
-
         size = 3  # size of the design variable
 
         class Rastrigin(om.ExplicitComponent):
@@ -1815,7 +1803,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_shgo_rosenbrock(self):
         # Source of example:
         # https://stefan-endres.github.io/shgo/
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -2033,185 +2020,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertEqual(str(msg.exception),
                          "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
-
-class TestScipyOptimizeDriverFeatures(unittest.TestCase):
-
-    def test_feature_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = True
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_optimizer(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_maxiter(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['maxiter'] = 20
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_tol(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['tol'] = 1.0e-9
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_debug_print_option(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup()
-
-        prob.run_driver()
-
-    def test_feature_debug_print_option_totals(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['totals']
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup()
-
-        prob.run_driver()
-
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/
-
-        import numpy as np
-        import openmdao.api as om
 
         size = 3  # size of the design variable
 
