@@ -1,6 +1,6 @@
 import json
 
-def reset_notebook(fname):
+def reset_notebook(fname, dryrun=False):
     """
     Empties the output fields and resets execution_count in all code cells in the given notebook.
 
@@ -10,11 +10,13 @@ def reset_notebook(fname):
     ----------
     fname : str
         Name of the notebook file.
+    dryrun : bool
+        If True, don't actually update the file.
 
     Returns
     -------
     bool
-        True if the file was updated.
+        True if the file was updated or would have been updated if not a dry run.
     """
 
     with open(fname) as f:
@@ -37,7 +39,7 @@ def reset_notebook(fname):
 
     dct['cells'] = newcells
 
-    if changed:
+    if changed and not dryrun:
         with open(fname, 'w') as f:
             json.dump(dct, f, indent=1, ensure_ascii=False)
 
@@ -46,20 +48,63 @@ def reset_notebook(fname):
 
 def reset_notebook_cmd():
     """
-    Run reset_notebook on any notebook files passed in via the command line.
+    Run reset_notebook on notebook files.
     """
-    import os, sys
-    if len(sys.argv) < 2:
-        print(f"usage: python {os.path.basename(sys.argv[0])} <notebook_file(s)>")
-        sys.exit(-1)
+    import os
+    import sys
+    import argparse
+    from openmdao.utils.file_utils import files_iter
 
-    for fname in sys.argv[1:]:
-        if os.path.splitext(fname)[-1] != '.ipynb':
-            fname += '.ipynb'
+    parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
+                                     'remove empty cells of jupyter notebook(s).')
+    parser.add_argument('file', nargs='*', help='Jupyter notebook file(s).')
+    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
+                        help='Search through all directories at or below the current one for the '
+                        'specified file(s).  If no files are specified, reset all jupyter notebook '
+                        'files found.')
+    parser.add_argument('-i', '--include', action='append', dest='includes',
+                        default=[], help='If the --recurse option is active, this specifies a '
+                        'local filename or glob pattern to match. This argument may be supplied '
+                        'multiple times.')
+    parser.add_argument('-d', '--dryrun', action='store_true', dest='dryrun',
+                        help="Report which notebooks would be updated but don't actually update "
+                        "them.")
+    args = parser.parse_args()
 
-        if not os.path.isfile(fname):
-            print(f"Can't find file '{fname}'.")
+    if args.dryrun:
+        updatestr = 'Would have updated file'
+    else:
+        updatestr = 'Updated file'
+
+    if args.recurse:
+        if args.file:
+            print("When using the --recurse option, don't specify filenames. Use --include "
+                  "instead.")
             sys.exit(-1)
 
-        if reset_notebook(fname):
-            print("Updated file", fname)
+        if not args.includes:
+            args.includes = ['*.ipynb']
+
+        for f in files_iter(file_includes=args.includes):
+            if not f.endswith('.ipynb'):
+                print(f"Ignoring {f} (not a notebook).")
+                continue
+            if reset_notebook(f, args.dryrun):
+                print(updatestr, f)
+    else:
+
+        if args.includes:
+            print("The --include option only works when also using --recurse.")
+            sys.exit(-1)
+
+        for f in sorted(args.file):
+            if os.path.isdir(f):
+                continue
+            if not f.endswith('.ipynb'):
+                print(f"Ignoring {f} (not a notebook).")
+                continue
+            if not os.path.isfile(f):
+                print(f"Can't find file '{f}'.")
+                sys.exit(-1)
+            if reset_notebook(f, args.dryrun):
+                print(updatestr, f)
