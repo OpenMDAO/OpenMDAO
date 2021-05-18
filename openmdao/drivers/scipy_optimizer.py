@@ -150,6 +150,7 @@ class ScipyOptimizeDriver(Driver):
         self.iter_count = 0
         self._check_jac = False
         self._exc_info = None
+        self._problem_comm = None
 
         self.cite = CITATIONS
 
@@ -175,6 +176,24 @@ class ScipyOptimizeDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
+
+    def _setup_comm(self, comm):
+        """
+        Perform any driver-specific setup of communicators for the model.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator for the Problem model.
+        """
+        self._problem_comm = comm
+
+        return comm
 
     def _get_name(self):
         """
@@ -448,38 +467,23 @@ class ScipyOptimizeDriver(Driver):
                               f"than min allowed ({info['min_improve_pct']:.1f}%)."
                         issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
-        if MPI:
-            comm = MPI.COMM_WORLD
-        else:
-            comm = FakeComm()
         # optimize
         try:
             if opt in _optimizers:
-                if comm.rank == 0:
-                    result = minimize(self._objfunc, x_init,
-                                      # args=(),
-                                      method=opt,
-                                      jac=jac,
-                                      hess=hess,
-                                      # hessp=None,
-                                      bounds=bounds,
-                                      constraints=constraints,
-                                      tol=self.options['tol'],
-                                      # callback=None,
-                                      options=self.opt_settings)
-                else:
+                if self._problem_comm.rank != 0:
                     self.opt_settings['disp'] = False
-                    result = minimize(self._objfunc, x_init,
-                                      # args=(),
-                                      method=opt,
-                                      jac=jac,
-                                      hess=hess,
-                                      # hessp=None,
-                                      bounds=bounds,
-                                      constraints=constraints,
-                                      tol=self.options['tol'],
-                                      # callback=None,
-                                      options=self.opt_settings)
+
+                result = minimize(self._objfunc, x_init,
+                                  # args=(),
+                                  method=opt,
+                                  jac=jac,
+                                  hess=hess,
+                                  # hessp=None,
+                                  bounds=bounds,
+                                  constraints=constraints,
+                                  tol=self.options['tol'],
+                                  # callback=None,
+                                  options=self.opt_settings)
             elif opt == 'basinhopping':
                 from scipy.optimize import basinhopping
 
@@ -561,19 +565,22 @@ class ScipyOptimizeDriver(Driver):
 
         self.result = result
 
-        if comm.rank == 0:
-            if hasattr(result, 'success'):
-                self.fail = False if result.success else True
-                if self.fail:
+
+        if hasattr(result, 'success'):
+            self.fail = False if result.success else True
+            if self.fail:
+                if self._problem_comm.rank == 0:
                     print('Optimization FAILED.')
                     print(result.message)
                     print('-' * 35)
 
-                elif self.options['disp']:
+            elif self.options['disp']:
+                if self._problem_comm.rank == 0:
                     print('Optimization Complete')
                     print('-' * 35)
-            else:
-                self.fail = True  # It is not known, so the worst option is assumed
+        else:
+            self.fail = True  # It is not known, so the worst option is assumed
+            if self._problem_comm.rank == 0:
                 print('Optimization Complete (success not known)')
                 print(result.message)
                 print('-' * 35)
