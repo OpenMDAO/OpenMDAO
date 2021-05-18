@@ -166,6 +166,7 @@ setup(
             'wingproj=openmdao.devtools.wingproj:run_wing',
             'webview=openmdao.utils.webview:webview_argv',
             'run_om_test=openmdao.devtools.run_test:run_test',
+            'reset_notebook=openmdao.devtools.docutils:reset_notebook_cmd',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_case_reader': [

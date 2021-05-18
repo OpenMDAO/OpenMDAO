@@ -63,10 +63,3 @@ def reset_notebook_cmd():
 
         if reset_notebook(fname):
             print("Updated file", fname)
-
-
-# TODO: once OpenMDAO_Book is a python package, register a console script to call reset_notebook
-
-if __name__ == '__main__':
-    reset_notebook_cmd()
-

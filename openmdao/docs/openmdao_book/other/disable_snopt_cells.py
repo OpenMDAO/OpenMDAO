@@ -35,8 +35,6 @@ def disable_snopt_cells(fname):
     return changed
 
 
-# TODO: once OpenMDAO_Book is a python package, register a console script to call reset_notebook
-
 if __name__ == '__main__':
 
     notebooks = ['features/building_blocks/drivers/pyoptsparse_driver.ipynb']
