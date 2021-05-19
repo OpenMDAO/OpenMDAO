@@ -10,6 +10,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.core.constants import INT_DTYPE
+from openmdao.warnings import warn_deprecation
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
 
@@ -53,6 +54,12 @@ class ExplicitComponent(Component):
                                    (new_multi_jacvec_prod is not None and
                                     new_multi_jacvec_prod !=
                                     self._inst_functs['compute_multi_jacvec_product']))
+
+        if self.supports_multivecs:
+            warn_deprecation(f"{self.msginfo}: has a compute_multi_jacvec_product "
+                             "method, but support for vectorized derivatives is deprecated and "
+                             "will be removed in a future release.")
+
         self.matrix_free = self.supports_multivecs or (
             overrides_method('compute_jacvec_product', self, ExplicitComponent) or
             (new_jacvec_prod is not None and
