@@ -176,10 +176,8 @@ def string_filter(dct, s):
     return False
 
 
-def find_notebooks_iter(parallel=False, section=None, string=None):
+def find_notebooks_iter(section=None, string=None):
     filters = []
-    if parallel:
-        filters.append(is_parallel)
     if section:
         filters.append(lambda dct: section_filter(dct, section))
     if string:
@@ -189,24 +187,6 @@ def find_notebooks_iter(parallel=False, section=None, string=None):
     for f in files_iter(file_includes=['*.ipynb'], dir_excludes=dexcludes):
         if not filters or notebook_filter(f, filters):
             yield f
-
-
-def find_notebooks_cmd():
-    """
-    Run find_notebooks on notebook files.
-    """
-    parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
-                                     'remove empty cells of jupyter notebook(s).')
-    parser.add_argument('-p', '--parallel', action='store_true', dest='parallel',
-                        help='List any notebooks that run parallel code.')
-    parser.add_argument('--section', action='store', dest='section',
-                        help='Look for notebook(s) having the given section string.')
-    parser.add_argument('-s', '--string', action='store', dest='string',
-                        help='Look for notebook(s) having the given string.')
-    args = parser.parse_args()
-
-    for f in find_notebooks_iter(parallel=args.parallel, section=args.section, string=args.string):
-        print(f)
 
 
 def pick_one(files):
@@ -251,13 +231,15 @@ def show_notebook_cmd():
         if not files:
             print(f"Can't find file {fname}.")
             sys.exit(-1)
-        elif len(files) == 1:
-            show_notebook(files[0], nb2dict(files[0]))
-        else:
-            f = pick_one(files)
-            show_notebook(f, nb2dict(f))
     else:
         files = list(find_notebooks_iter(section=args.section, string=args.string))
+        if not files:
+            print(f"No matching notebook files found.")
+            sys.exit(-1)
+
+    if len(files) == 1:
+        show_notebook(files[0], nb2dict(files[0]))
+    else:
         f = pick_one(files)
         show_notebook(f, nb2dict(f))
 
