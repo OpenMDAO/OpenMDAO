@@ -23,11 +23,11 @@ def reset_notebook(fname, dryrun=False):
     bool
         True if the file was updated or would have been updated if not a dry run.
     """
+    changed = False
 
     with open(fname) as f:
         dct = json.load(f)
 
-    changed = False
     newcells = []
     for cell in dct['cells']:
         if cell['cell_type'] == 'code':
@@ -47,6 +47,7 @@ def reset_notebook(fname, dryrun=False):
     if changed and not dryrun:
         with open(fname, 'w') as f:
             json.dump(dct, f, indent=1, ensure_ascii=False)
+            print(file=f)  # avoid 'no newline at end of file' message
 
     return changed
 
