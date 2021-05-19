@@ -195,6 +195,7 @@ jobs:
 
       - name: Build docs
         if: matrix.BUILD_DOCS
+        id: build_docs
         shell: bash -l {0}
         run: |
           cd openmdao/docs
@@ -247,7 +248,7 @@ jobs:
           fi
 
       - name: Display doc build reports
-        if: ${{ failure() }}
+        if: steps.build_docs.outcome == 'failure'
         run: |
           cat /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*
 
