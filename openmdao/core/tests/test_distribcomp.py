@@ -47,16 +47,14 @@ class DistribCompSimple(om.ExplicitComponent):
     """Uses 2 procs but takes full input vars"""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=10,
                              desc="Size of input and output vectors.")
 
     def setup(self):
         arr_size = self.options['arr_size']
 
-        self.add_input('invec', np.ones(arr_size, float))
-        self.add_output('outvec', np.ones(arr_size, float))
+        self.add_input('invec', np.ones(arr_size, float), distributed=True)
+        self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
         if MPI and self.comm != MPI.COMM_NULL:
@@ -79,8 +77,6 @@ class DistribInputComp(om.ExplicitComponent):
     """Uses all procs and takes input var slices"""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -102,17 +98,16 @@ class DistribInputComp(om.ExplicitComponent):
         start = self.offsets[rank]
         end = start + self.sizes[rank]
 
-        self.add_input('invec', np.ones(self.sizes[rank], float),
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size))
+        self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size),
+                        distributed=True)
 
 
 class DistribOverlappingInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -146,8 +141,8 @@ class DistribOverlappingInputComp(om.ExplicitComponent):
             start = 4
             end = 11
 
-        self.add_output('outvec', np.zeros(arr_size, float))
-        self.add_input('invec', np.ones(size, float),
+        self.add_output('outvec', np.zeros(arr_size, float), distributed=True)
+        self.add_input('invec', np.ones(size, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
 
@@ -155,8 +150,6 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -178,16 +171,14 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
-        self.add_input('invec', np.ones(sizes[rank], float))
-        self.add_output('outvec', np.ones(sizes[rank], float))
+        self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
+        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
 
 
 class DistribCompWithDerivs(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices, but also computes partials"""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -216,8 +207,8 @@ class DistribCompWithDerivs(om.ExplicitComponent):
         end = start + sizes[rank]
 
         # don't set src_indices on the input and just use default behavior
-        self.add_input('invec', np.ones(sizes[rank], float))
-        self.add_output('outvec', np.ones(sizes[rank], float))
+        self.add_input('invec', np.ones(sizes[rank], float), distributed=True)
+        self.add_output('outvec', np.ones(sizes[rank], float), distributed=True)
         self.declare_partials('outvec', 'invec', rows=np.arange(0, sizes[rank]),
                                                  cols=np.arange(0, sizes[rank]))
 
@@ -240,8 +231,6 @@ class DistribNoncontiguousComp(om.ExplicitComponent):
     """
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -257,17 +246,15 @@ class DistribNoncontiguousComp(om.ExplicitComponent):
 
         idxs = list(take_nth(rank, comm.size, range(arr_size)))
 
-        self.add_input('invec', np.ones(len(idxs), float),
+        self.add_input('invec', np.ones(len(idxs), float), distributed=True,
                        src_indices=idxs)
-        self.add_output('outvec', np.ones(len(idxs), float))
+        self.add_output('outvec', np.ones(len(idxs), float), distributed=True)
 
 
 class DistribGatherComp(om.ExplicitComponent):
     """Uses 2 procs gathers a distrib input into a full output"""
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=11,
                              desc="Size of input and output vectors.")
 
@@ -292,9 +279,9 @@ class DistribGatherComp(om.ExplicitComponent):
         end = start + self.sizes[rank]
 
         # need to initialize the variable to have the correct local size
-        self.add_input('invec', np.ones(self.sizes[rank], float),
+        self.add_input('invec', np.ones(self.sizes[rank], float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('outvec', np.ones(arr_size, float))
+        self.add_output('outvec', np.ones(arr_size, float), distributed=True)
 
 
 class NonDistribGatherComp(om.ExplicitComponent):
@@ -346,18 +333,16 @@ class NOMPITests(unittest.TestCase):
 class DistribParaboloid(om.ExplicitComponent):
 
     def setup(self):
-        self.options['distributed'] = True
-
         if self.comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
 
-        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+        self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs, distributed=True) # this will connect to a distributed IVC
 
-        self.add_output('y', shape=1) # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=ndvs) # distributed output
+        self.add_output('y', shape=1, distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs, distributed=True) # distributed output
         self.declare_partials('y', 'x')
         self.declare_partials('y', 'w')
         self.declare_partials('z', 'x')

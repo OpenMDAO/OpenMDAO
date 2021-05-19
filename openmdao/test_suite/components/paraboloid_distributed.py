@@ -12,8 +12,6 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 class DistParab(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=10,
                              desc="Size of input and output vectors.")
 
@@ -33,14 +31,14 @@ class DistParab(om.ExplicitComponent):
         self.offset = offsets[rank]
         end = start + io_size
 
-        self.add_input('x', val=np.ones(io_size),
+        self.add_input('x', val=np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(io_size),
+        self.add_input('y', val=np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('a', val=-3.0 * np.ones(io_size),
+        self.add_input('a', val=-3.0 * np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('f_xy', val=np.ones(io_size))
+        self.add_output('f_xy', val=np.ones(io_size), distributed=True)
 
         if deriv_type == 'dense':
             self.declare_partials('f_xy', ['x', 'y', 'a'])
@@ -81,8 +79,6 @@ class DistParab(om.ExplicitComponent):
 class DistParabFeature(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=10,
                              desc="Size of input and output vectors.")
 
@@ -97,14 +93,14 @@ class DistParabFeature(om.ExplicitComponent):
         self.offset = offsets[rank]
         end = start + io_size
 
-        self.add_input('x', val=np.ones(io_size),
+        self.add_input('x', val=np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(io_size),
+        self.add_input('y', val=np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('offset', val=-3.0 * np.ones(io_size),
+        self.add_input('offset', val=-3.0 * np.ones(io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('f_xy', val=np.ones(io_size))
+        self.add_output('f_xy', val=np.ones(io_size), distributed=True)
 
         row_col = np.arange(io_size)
         self.declare_partials('f_xy', ['x', 'y', 'offset'], rows=row_col, cols=row_col)
