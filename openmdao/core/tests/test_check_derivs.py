@@ -1890,6 +1890,45 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(partials)
 
+    def test_no_linsolve_during_check(self):
+        # ensure that solve_linear is not called during check partials
+        from openmdao.solvers.solver import LinearSolver
+
+        class ErrSolver(LinearSolver):
+            def _linearize(self):
+                raise RuntimeError("_linearize called")
+
+            def solve(self, vec_names, mode, rel_systems=None):
+                raise RuntimeError("solve called")
+
+            def _run_apply(self):
+                raise RuntimeError("_run_apply called")
+
+        class SingularImplicitComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('lhs', shape=10)
+                self.add_input('rhs', shape=10)
+
+                self.add_output('resid', shape=10)
+
+                self.declare_partials('*', '*', method='cs')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+
+                residuals['resid'] = inputs['lhs'] - inputs['rhs']
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('sing_check', SingularImplicitComp())
+        p.model.sing_check.linear_solver = ErrSolver()
+        p.setup()
+
+        p.run_model()
+
+        p.check_partials(out_stream=None)
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -2264,18 +2303,16 @@ class TestCheckPartialsFeature(unittest.TestCase):
 class DistribParaboloid(om.ExplicitComponent):
 
     def setup(self):
-        self.options['distributed'] = True
-
         if self.comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
 
-        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+        self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs, distributed=True) # this will connect to a distributed IVC
 
-        self.add_output('y', shape=2) # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=ndvs) # distributed output
+        self.add_output('y', shape=2, distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs, distributed=True) # distributed output
         self.declare_partials('y', 'x')
         self.declare_partials('y', 'w')
         self.declare_partials('z', 'x')
@@ -2308,13 +2345,11 @@ class DistribParaboloid2D(om.ExplicitComponent):
         else:
             vshape = (2,2)
 
-        self.options['distributed'] = True
+        self.add_input('w', val=1., src_indices=np.array([1]), distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=vshape, distributed=True) # this will connect to a distributed IVC
 
-        self.add_input('w', val=1., src_indices=np.array([1])) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=vshape) # this will connect to a distributed IVC
-
-        self.add_output('y') # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=vshape) # distributed output
+        self.add_output('y', distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=vshape, distributed=True) # distributed output
         self.declare_partials('y', 'x')
         self.declare_partials('y', 'w')
         self.declare_partials('z', 'x')

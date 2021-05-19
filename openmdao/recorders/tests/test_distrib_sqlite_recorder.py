@@ -10,8 +10,7 @@ import numpy as np
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 
-from openmdao.api import ExecComp, ExplicitComponent, Problem, \
-    Group, ParallelGroup, IndepVarComp, SqliteRecorder, ScipyOptimizeDriver, slicer
+import openmdao.api as om
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
@@ -23,17 +22,14 @@ else:
     PETScVector = None
 
 
-class DistributedAdder(ExplicitComponent):
+class DistributedAdder(om.ExplicitComponent):
     """
-    Distributes the work of adding 10 to every item in the param vector
+    Distributes the work of adding 10 to every item in the input vectors
     """
 
-    def __init__(self, size):
+    def __init__(self, sizes):
         super().__init__()
-
-        self.options['distributed'] = True
-
-        self.local_size = self.size = size
+        self.sizes = sizes
 
     def setup(self):
         """
@@ -44,53 +40,53 @@ class DistributedAdder(ExplicitComponent):
         comm = self.comm
         rank = comm.rank
 
-        # NOTE: evenly_distrib_idxs is a helper function to split the array
-        #       up as evenly as possible
-        sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
-        local_size, local_offset = sizes[rank], offsets[rank]
-        self.local_size = local_size
+        for n, size in enumerate(self.sizes):
+            # NOTE: evenly_distrib_idxs is a helper function to split the array
+            #       up as evenly as possible
+            local_sizes, _ = evenly_distrib_idxs(comm.size, size)
+            local_size = local_sizes[rank]
 
-        start = local_offset
-        end = local_offset + local_size
-
-        self.add_input('x', val=np.zeros(local_size, float),
-                       src_indices=np.arange(start, end, dtype=int))
-        self.add_output('y', val=np.zeros(local_size, float))
+            self.add_input(f'in{n}', val=np.zeros(local_size, float), distributed=True)
+            self.add_output(f'out{n}', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
 
         # NOTE: Each process will get just its local part of the vector
-        # print('process {0:d}: {1}'.format(self.comm.rank, params['x'].shape))
+        for n, size in enumerate(self.sizes):
+            outputs[f'out{n}'] = inputs[f'in{n}'] + 10.
 
-        outputs['y'] = inputs['x'] + 10.
 
-
-class Summer(ExplicitComponent):
+class Summer(om.ExplicitComponent):
     """
     Aggregation component that collects all the values from the distributed
-    vector addition and computes a total
+    vectors and computes a total
     """
 
-    def __init__(self, size):
+    def __init__(self, sizes):
         super().__init__()
-        self.size = size
+        self.sizes = sizes
 
     def setup(self):
-        # NOTE: this component depends on the full y array, so OpenMDAO
-        #       will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(self.size))
+        for n, size in enumerate(self.sizes):
+            self.add_input(f'summand{n}', val=np.zeros(size))
+
         self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
-        outputs['sum'] = np.sum(inputs['y'])
+        val = 0.
+
+        for name in inputs:
+             val += np.sum(inputs[name])
+
+        outputs['sum'] = val
 
 
-class Mygroup(Group):
+class Mygroup(om.Group):
 
     def setup(self):
-        self.add_subsystem('indep_var_comp', IndepVarComp('x'), promotes=['*'])
-        self.add_subsystem('Cy', ExecComp('y=2*x'), promotes=['*'])
-        self.add_subsystem('Cc', ExecComp('c=x+2'), promotes=['*'])
+        self.add_subsystem('indep_var_comp', om.IndepVarComp('x'), promotes=['*'])
+        self.add_subsystem('Cy', om.ExecComp('y=2*x'), promotes=['*'])
+        self.add_subsystem('Cc', om.ExecComp('c=x+2'), promotes=['*'])
 
         self.add_design_var('x')
         self.add_constraint('c', lower=-3.)
@@ -104,7 +100,7 @@ class DistributedRecorderTest(unittest.TestCase):
     def setUp(self):
         self.dir = mkdtemp()
         self.filename = os.path.join(self.dir, "sqlite_test")
-        self.recorder = SqliteRecorder(self.filename)
+        self.recorder = om.SqliteRecorder(self.filename)
         self.eps = 1e-5
 
     def tearDown(self):
@@ -116,7 +112,7 @@ class DistributedRecorderTest(unittest.TestCase):
                 raise e
 
     def test_distrib_record_system(self):
-        prob = Problem()
+        prob = om.Problem()
 
         try:
             prob.model.add_recorder(self.recorder)
@@ -127,7 +123,7 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_solver(self):
-        prob = Problem()
+        prob = om.Problem()
         try:
             prob.model.nonlinear_solver.add_recorder(self.recorder)
         except RuntimeError as err:
@@ -137,41 +133,44 @@ class DistributedRecorderTest(unittest.TestCase):
             self.fail('RuntimeError expected.')
 
     def test_distrib_record_driver(self):
-        size = 100  # how many items in the array
-        prob = Problem()
+        # create distributed variables of different sizes to catch mismatched collective calls
+        sizes = [7, 10, 12, 25, 33, 42]
 
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size), promotes_outputs=['sum'])
-        prob.model.promotes('summer', inputs=['y'], src_indices=slicer[:])
+        prob = om.Problem()
+
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
+        for n, size in enumerate(sizes):
+            ivc.add_output(f'in{n}', np.ones(size), distributed=True)
+            prob.model.add_design_var(f'in{n}')
+
+        prob.model.add_subsystem('adder', DistributedAdder(sizes), promotes=['*'])
+
+        prob.model.add_subsystem('summer', Summer(sizes), promotes_outputs=['sum'])
+        for n, size in enumerate(sizes):
+            prob.model.promotes('summer', inputs=[f'summand{n}'], src_indices=om.slicer[:], src_shape=size)
+        prob.model.add_objective('sum')
+
         prob.driver.recording_options['record_desvars'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = ['y']
+        prob.driver.recording_options['includes'] = [f'out{n}' for n in range(len(sizes))]
         prob.driver.add_recorder(self.recorder)
 
-        prob.model.add_design_var('x')
-        prob.model.add_objective('sum')
-
         prob.setup()
-
-        prob['x'] = np.ones(size)
-
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
         coordinate = [0, 'Driver', (0,)]
 
-        expected_desvars = {
-            "des_vars.x": prob['des_vars.x'],
-        }
+        expected_desvars = {}
+        for n in range(len(sizes)):
+            expected_desvars[f'ivc.in{n}'] = prob.get_val(f'ivc.in{n}', get_remote=True)
 
-        expected_objectives = {
-            "summer.sum": prob['summer.sum'],
-        }
+        expected_objectives = { "summer.sum": prob['summer.sum'] }
 
         expected_outputs = expected_desvars.copy()
-        expected_outputs['plus.y'] = prob.get_val('plus.y', get_remote=True)
+        for n in range(len(sizes)):
+            expected_outputs[f'adder.out{n}'] = prob.get_val(f'adder.out{n}', get_remote=True)
 
         if prob.comm.rank == 0:
             expected_outputs.update(expected_objectives)
@@ -181,19 +180,19 @@ class DistributedRecorderTest(unittest.TestCase):
 
     def test_recording_remote_voi(self):
         # Create a parallel model
-        model = Group()
+        model = om.Group()
 
-        model.add_subsystem('par', ParallelGroup())
+        model.add_subsystem('par', om.ParallelGroup())
         model.par.add_subsystem('G1', Mygroup())
         model.par.add_subsystem('G2', Mygroup())
         model.connect('par.G1.y', 'Obj.y1')
         model.connect('par.G2.y', 'Obj.y2')
 
-        model.add_subsystem('Obj', ExecComp('obj=y1+y2'))
+        model.add_subsystem('Obj', om.ExecComp('obj=y1+y2'))
         model.add_objective('Obj.obj')
 
         # Configure driver to record VOIs on both procs
-        driver = ScipyOptimizeDriver(disp=False)
+        driver = om.ScipyOptimizeDriver(disp=False)
 
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_objectives'] = True
@@ -203,7 +202,7 @@ class DistributedRecorderTest(unittest.TestCase):
         driver.add_recorder(self.recorder)
 
         # Create problem and run driver
-        prob = Problem(model, driver)
+        prob = om.Problem(model, driver)
         prob.add_recorder(self.recorder)
         prob.setup(mode='fwd')
 
@@ -260,6 +259,43 @@ class DistributedRecorderTest(unittest.TestCase):
 
             expected_data = (('final', (t1, t2), expected_outputs),)
             assertProblemDataRecorded(self, expected_data, self.eps)
+
+    def test_input_desvar(self):
+        # this failed with a KeyError before the fix
+        class TopComp(om.ExplicitComponent):
+
+            def setup(self):
+
+                size = 10
+
+                self.add_input('c_ae_C', np.zeros(size))
+                self.add_input('theta_c2_C', np.zeros(size))
+                self.add_output('c_ae', np.zeros(size))
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                pass
+
+        prob = om.Problem()
+        model = prob.model
+
+        geom = model.add_subsystem('tcomp', TopComp())
+
+        model.add_design_var('tcomp.theta_c2_C', lower=-20., upper=20., indices=range(2, 9))
+        model.add_constraint('tcomp.c_ae', lower=0.e0,)
+
+        # Attach recorder to the problem
+        prob.add_recorder(self.recorder)
+        prob.recording_options['record_inputs'] = True
+        prob.recording_options['record_outputs'] = True
+        prob.recording_options['includes'] = ['*']
+
+        prob.setup()
+
+        prob.run_model()
+        prob.record('final')
 
 
 if __name__ == "__main__":

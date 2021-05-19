@@ -585,6 +585,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 for row_idx, v in enumerate(val):
                     v = np.asarray(v)
                     inputs[row_idx, idx:idx + sz] = v.flat
+                idx += sz
 
         # Assemble output data and train each output.
         for name, shape in self._surrogate_output_names:

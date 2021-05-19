@@ -1473,6 +1473,41 @@ class _TotalJacInfo(object):
 
         return totals
 
+    def _get_zero_inds(self, name, tup, jac_arr):
+        """
+        Get zero indices relative to the named variable for jac row/col 'jac_arr'.
+
+        Parameters
+        ----------
+        name : str
+            Name of the design var or response.
+        tup : tuple
+            Contains jacobian slice and dv/response indices, if any.
+        jac_arr : ndarray
+            Row or column of jacobian being checked for zero entries.
+
+        Returns
+        -------
+        ndarray
+            Index array of zero entries.
+        """
+        inds = tup[1]  # these must be indices into the flattened var
+        shname = 'shape' if self.get_remote else 'global_shape'
+        shape = self.model._var_allprocs_abs2meta['output'][name][shname]
+        vslice = jac_arr[tup[0]]
+
+        if inds is None:
+            zero_idxs = np.nonzero(vslice.reshape(shape))
+        else:
+            zero_idxs = np.nonzero(vslice)
+            if zero_idxs[0].size == 0:
+                return zero_idxs
+            varr = np.zeros(shape, dtype=bool)
+            varr.flat[inds[zero_idxs]] = True
+            zero_idxs = np.nonzero(varr)
+
+        return zero_idxs
+
     def check_total_jac(self, raise_error=True, tol=1e-16):
         """
         Check recently computed totals derivative jacobian for problems.
@@ -1488,49 +1523,57 @@ class _TotalJacInfo(object):
         raise_error : bool
             If True, raise an exception if a zero row or column is found.
         """
-        J = np.abs(self.J)
-        nrows, ncols = J.shape
-        zero_rows = []
-        zero_cols = []
+        nzrows, nzcols = np.nonzero(np.abs(self.J) > tol)
 
         # Check for zero rows, which correspond to constraints unaffected by any design vars.
-        for j in np.arange(nrows):
-            if np.all(J[j, :] < tol):
-                for name, val in self.of_meta.items():
-                    if j > val[0].stop - 1:
-                        continue
-                    break
-                if name in self.ivc_print_names:
-                    name = self.ivc_print_names[name]
-                if name not in zero_rows:
-                    zero_rows.append(name)
+        col = np.ones(self.J.shape[0], dtype=bool)
+        col[nzrows] = False  # False in this case means nonzero
+        if np.any(col):  # there's at least 1 row that's zero across all columns
+            zero_rows = []
+            for name, tup in self.of_meta.items():
+                zero_idxs = self._get_zero_inds(name, tup, col)
 
-        if zero_rows:
-            msg = f"Constraints or objectives {zero_rows} cannot be impacted by the design " + \
-                "variables of the problem."
-            if raise_error:
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
+                if zero_idxs[0].size > 0:
+                    if len(zero_idxs) == 1:
+                        zero_rows.append((self.ivc_print_names.get(name, name),
+                                          list(zero_idxs[0])))
+                    else:
+                        zero_rows.append((self.ivc_print_names.get(name, name),
+                                          list(zip(*zero_idxs))))
+
+            if zero_rows:
+                zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
+                msg = (f"Constraints or objectives [{', '.join(zero_rows)}] cannot be impacted by "
+                       "the design variables of the problem.")
+                if raise_error:
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
         # Check for zero cols, which correspond to design vars that don't affect anything.
-        for j in np.arange(ncols):
-            if np.all(J[:, j] < tol):
-                for name, val in self.wrt_meta.items():
-                    if j > val[0].stop - 1:
-                        continue
-                    break
-                if name in self.ivc_print_names:
-                    name = self.ivc_print_names[name]
-                if name not in zero_cols:
-                    zero_cols.append(name)
+        row = np.ones(self.J.shape[1], dtype=bool)
+        row[nzcols] = False  # False in this case means nonzero
+        if np.any(row):  # there's at least 1 col that's zero across all rows
+            zero_cols = []
+            for name, tup in self.wrt_meta.items():
+                zero_idxs = self._get_zero_inds(name, tup, row)
 
-        if zero_cols:
-            msg = f"Design variables {zero_cols} have no impact on the constraints or objective."
-            if raise_error:
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DerivativesWarning)
+                if zero_idxs[0].size > 0:
+                    if len(zero_idxs) == 1:
+                        zero_cols.append((self.ivc_print_names.get(name, name),
+                                          list(zero_idxs[0])))
+                    else:
+                        zero_cols.append((self.ivc_print_names.get(name, name),
+                                          list(zip(*zero_idxs))))
+
+            if zero_cols:
+                zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
+                msg = (f"Design variables [{', '.join(zero_cols)}] have no impact on the "
+                       "constraints or objective.")
+                if raise_error:
+                    raise RuntimeError(msg)
+                else:
+                    issue_warning(msg, category=DerivativesWarning)
 
     def _restore_linear_solution(self, key, mode):
         """

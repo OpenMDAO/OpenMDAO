@@ -9,14 +9,17 @@ additional MPI capability.
 from collections import OrderedDict
 import json
 import signal
+from distutils.version import LooseVersion
 
 import numpy as np
 from scipy.sparse import coo_matrix
 
 try:
-    from pyoptsparse import Optimization
+    import pyoptsparse
+    Optimization = pyoptsparse.Optimization
 except ImportError:
     Optimization = None
+    pyoptsparse = None
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
@@ -330,7 +333,11 @@ class pyOptSparseDriver(Driver):
                                  value=input_vals[name],
                                  lower=meta['lower'], upper=meta['upper'])
 
-        opt_prob.finalizeDesignVariables()
+        if not hasattr(pyoptsparse, '__version__') or \
+           LooseVersion(pyoptsparse.__version__) < LooseVersion('2.5.1'):
+            opt_prob.finalizeDesignVariables()
+        else:
+            opt_prob.finalize()
 
         # Add all objectives
         objs = self.get_objective_values()
