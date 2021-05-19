@@ -242,6 +242,7 @@ jobs:
             echo "============================================================="
             echo "Publish docs"
             echo "============================================================="
+            cd openmdao/docs
             python upload_doc_version.py openmdao_book/_build/html/ ${{ secrets.DOCS_LOCATION }}
           else
             echo "Docs destination not available."
