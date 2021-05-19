@@ -3278,5 +3278,42 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCheckPartialsDistrib(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_check_size_0(self):
+        # this test passes if it doesn't raise an exception.  The actual partials are not
+        # correct because compute_jacvec_product does nothing.
+        class DistributedConverter(om.ExplicitComponent):
+            "takes a serial input and converts it to a distributed output that is only on rank 0"
+            def setup(self):
+
+                shape_switch = 1 if self.comm.rank == 0 else 0
+                self.add_input('in1_serial', shape=5)
+                self.add_output('out1', shape=5*shape_switch, tags=['mphys_coupling'], distributed=True)
+
+                self.add_input('in2_serial', shape=15)
+                self.add_output('out2', shape=15*shape_switch, tags=['mphys_result'], distributed=True)
+
+            def compute(self,inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs["out1"] = inputs["in1_serial"]
+                    outputs["out2"] = inputs["in2_serial"]
+
+            # this was broken
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                pass # intentionally left empty because presence of this method triggers bug in check_partials
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('converter', DistributedConverter())
+
+        prob.setup(force_alloc_complex=True)
+
+        partials = prob.check_partials(compact_print=True, method='cs')
+
+
 if __name__ == "__main__":
     unittest.main()
