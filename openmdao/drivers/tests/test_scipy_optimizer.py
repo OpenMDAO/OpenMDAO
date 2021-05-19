@@ -21,6 +21,13 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.mpi import MPI
 
+try:
+    from openmdao.parallel_api import PETScVector
+    vector_class = PETScVector
+except ImportError:
+    vector_class = om.DefaultVector
+    PETScVector = None
+
 rosenbrock_size = 6  # size of the design variable
 
 def rosenbrock(x):
@@ -155,7 +162,7 @@ class TestMPIScatter(unittest.TestCase):
                           1e-5)
 
 
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and  PETScVector, "MPI and PETSc are required.")
 class TestScipyOptimizeDriverMPI(unittest.TestCase):
     N_PROCS = 2
 
