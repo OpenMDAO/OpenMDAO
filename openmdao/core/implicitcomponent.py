@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.core.component import Component
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
+from openmdao.warnings import warn_deprecation
 
 _inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
 
@@ -59,6 +60,12 @@ class ImplicitComponent(Component):
                                         new_solve_multi_linear))
 
         self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
+
+        if self.supports_multivecs:
+            warn_deprecation(f"{self.msginfo}: has an apply_multi_linear and/or a "
+                             "solve_multi_linear method, but support for vectorized derivatives "
+                             "is deprecated and will be removed in a future release.")
+
         self.matrix_free |= self.has_apply_multi_linear
 
     def _apply_nonlinear(self):

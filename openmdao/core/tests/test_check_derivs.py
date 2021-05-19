@@ -2325,18 +2325,16 @@ class TestCheckPartialsFeature(unittest.TestCase):
 class DistribParaboloid(om.ExplicitComponent):
 
     def setup(self):
-        self.options['distributed'] = True
-
         if self.comm.rank == 0:
             ndvs = 3
         else:
             ndvs = 2
 
-        self.add_input('w', val=1.) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=ndvs) # this will connect to a distributed IVC
+        self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs, distributed=True) # this will connect to a distributed IVC
 
-        self.add_output('y', shape=2) # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=ndvs) # distributed output
+        self.add_output('y', shape=2, distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs, distributed=True) # distributed output
         self.declare_partials('y', 'x')
         self.declare_partials('y', 'w')
         self.declare_partials('z', 'x')
@@ -2369,13 +2367,11 @@ class DistribParaboloid2D(om.ExplicitComponent):
         else:
             vshape = (2,2)
 
-        self.options['distributed'] = True
+        self.add_input('w', val=1., src_indices=np.array([1]), distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=vshape, distributed=True) # this will connect to a distributed IVC
 
-        self.add_input('w', val=1., src_indices=np.array([1])) # this will connect to a non-distributed IVC
-        self.add_input('x', shape=vshape) # this will connect to a distributed IVC
-
-        self.add_output('y') # all-gathered output, duplicated on all procs
-        self.add_output('z', shape=vshape) # distributed output
+        self.add_output('y', distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=vshape, distributed=True) # distributed output
         self.declare_partials('y', 'x')
         self.declare_partials('y', 'w')
         self.declare_partials('z', 'x')

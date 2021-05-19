@@ -91,32 +91,28 @@ class DistribExecComp(om.ExecComp):
 
 
 class DistribCoordComp(om.ExplicitComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.options['distributed'] = True
 
     def setup(self):
         comm = self.comm
         rank = comm.rank
 
         if rank == 0:
-            self.add_input('invec', np.zeros((5, 3)),
+            self.add_input('invec', np.zeros((5, 3)), distributed=True,
                            src_indices=[[(0, 0), (0, 1), (0, 2)],
                                         [(1, 0), (1, 1), (1, 2)],
                                         [(2, 0), (2, 1), (2, 2)],
                                         [(3, 0), (3, 1), (3, 2)],
                                         [(4, 0), (4, 1), (4, 2)]])
-            self.add_output('outvec', np.zeros((5, 3)))
+            self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
-            self.add_input('invec', np.zeros((4, 3)),
+            self.add_input('invec', np.zeros((4, 3)), distributed=True,
                            src_indices=[[(5, 0), (5, 1), (5, 2)],
                                         [(6, 0), (6, 1), (6, 2)],
                                         [(7, 0), (7, 1), (7, 2)],
                                         # use some negative indices here to
                                         # make sure they work
                                         [(-1, 0), (8, 1), (-1, 2)]])
-            self.add_output('outvec', np.zeros((4, 3)))
+            self.add_output('outvec', np.zeros((4, 3)), distributed=True)
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -752,18 +748,16 @@ class DistribStateImplicit(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.options['distributed'] = True
-
-        self.add_input('a', val=10., units='m', src_indices=[0])
+        self.add_input('a', val=10., units='m', src_indices=[0], distributed=True)
 
         rank = self.comm.rank
 
         GLOBAL_SIZE = 5
         sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
 
-        self.add_output('states', shape=int(sizes[rank]))
+        self.add_output('states', shape=int(sizes[rank]), distributed=True)
 
-        self.add_output('out_var', shape=1)
+        self.add_output('out_var', shape=1, distributed=True)
 
         self.local_size = sizes[rank]
 
@@ -826,8 +820,6 @@ class DistribStateImplicit(om.ImplicitComponent):
 class DistParab2(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=10,
                              desc="Size of input and output vectors.")
 
@@ -842,14 +834,14 @@ class DistParab2(om.ExplicitComponent):
         self.offset = offsets[rank]
         end = start + self.io_size
 
-        self.add_input('x', val=np.ones(self.io_size),
+        self.add_input('x', val=np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(self.io_size),
+        self.add_input('y', val=np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('a', val=-3.0 * np.ones(self.io_size),
+        self.add_input('a', val=-3.0 * np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('f_xy', val=np.ones(self.io_size))
+        self.add_output('f_xy', val=np.ones(self.io_size), distributed=True)
 
         self.declare_partials('f_xy', ['x', 'y'])
 
@@ -1124,7 +1116,6 @@ class MPITestsBug(unittest.TestCase):
 
             def initialize(self):
                 self.options.declare('num_nodes', types=int)
-                self.options['distributed'] = True
 
             def setup(self):
                 nn = self.options['num_nodes']
@@ -1135,10 +1126,10 @@ class MPITestsBug(unittest.TestCase):
                 start = offsets[rank]
                 end = start + sizes[rank]
 
-                self.add_input('x1', val=np.ones(sizes[rank]),
+                self.add_input('x1', val=np.ones(sizes[rank]), distributed=True,
                                src_indices=np.arange(start, end, dtype=int))
 
-                self.add_output('x0dot', val=np.ones(sizes[rank]))
+                self.add_output('x0dot', val=np.ones(sizes[rank]), distributed=True)
 
                 r = c = np.arange(sizes[rank])
                 self.declare_partials(of='x0dot', wrt='x1',  rows=r, cols=c)
@@ -1324,15 +1315,14 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
 class DistribCompDenseJac(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
         self.options.declare('size', default=7)
 
     def setup(self):
         N = self.options['size']
         rank = self.comm.rank
-        self.add_input('x', shape=1, src_indices=rank)
+        self.add_input('x', shape=1, src_indices=rank, distributed=True)
         sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
-        self.add_output('y', shape=sizes[rank])
+        self.add_output('y', shape=sizes[rank], distributed=True)
         # automatically infer dimensions without specifying rows, cols
         self.declare_partials('y', 'x')
 
@@ -1386,17 +1376,13 @@ class TestBugs(unittest.TestCase):
         # Covers a case where a distributed IVC output is used as a desvar with indices.
 
         class DVS(om.IndepVarComp):
-            def initialize(self):
-                self.options['distributed'] = True
             def setup(self):
-                self.add_output('state', np.ones(4))
+                self.add_output('state', np.ones(4), distributed=True)
 
         class SolverComp(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
             def setup(self):
-                self.add_input('state',shape_by_conn=True)
-                self.add_output('func')
+                self.add_input('state',shape_by_conn=True, distributed=True)
+                self.add_output('func', distributed=True)
                 self.declare_partials('func','state',method='fd')
 
             def compute(self, inputs, outputs):

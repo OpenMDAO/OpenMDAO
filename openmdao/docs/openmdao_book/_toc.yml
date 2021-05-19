@@ -1,0 +1,84 @@
+format: jb-book
+root: main
+parts:
+- caption: Getting Started
+  chapters:
+  - file: getting_started/getting_started
+- caption: Basic User Guide
+  chapters:
+  - file: basic_user_guide/basic_user_guide
+    sections:
+    - file: basic_user_guide/single_disciplinary_optimization/component_types
+    - file: basic_user_guide/single_disciplinary_optimization/first_analysis
+    - file: basic_user_guide/single_disciplinary_optimization/first_optimization
+    - file: basic_user_guide/multidisciplinary_optimization/sellar
+    - file: basic_user_guide/multidisciplinary_optimization/linking_vars
+    - file: basic_user_guide/multidisciplinary_optimization/sellar_opt
+    - file: basic_user_guide/command_line/check_setup
+    - file: basic_user_guide/command_line/make_n2
+    - file: basic_user_guide/reading_recording/basic_recording_example
+- caption: Advanced User Guide
+  chapters:
+  - file: advanced_user_guide/advanced_user_guide
+    sections:
+    - file: advanced_user_guide/models_implicit_components/models_with_solvers_implicit
+    - file: advanced_user_guide/models_implicit_components/implicit_with_balancecomp
+    - file: advanced_user_guide/analytic_derivatives/derivs_of_coupled_systems
+    - file: advanced_user_guide/analytic_derivatives/partial_derivs_implicit
+    - file: advanced_user_guide/analytic_derivatives/partial_derivs_explicit
+    - file: advanced_user_guide/recording/advanced_case_recording
+    - file: advanced_user_guide/example/euler_integration_example
+- caption: Reference Guide
+  chapters:
+  - file: theory_manual/theory_manual
+    sections:
+    - file: theory_manual/class_structure
+    - file: theory_manual/implicit_transformation_of_vars
+    - file: theory_manual/setup_stack
+    - file: theory_manual/solver_api
+    - file: theory_manual/scaling
+    - file: theory_manual/iter_count
+    - file: theory_manual/total_derivs_theory
+    - file: theory_manual/setup_linear_solvers
+    - file: theory_manual/advanced_linear_solvers_special_cases/advanced_linear_solvers_special_cases
+  - file: features/features
+    sections:
+    - file: features/core_features/main.md
+    - file: features/building_blocks/building_blocks
+    - file: features/recording/main.md
+    - file: features/model_visualization/main.md
+    - file: features/debugging/debugging.md
+    - file: features/warning_control/warnings
+    - file: features/units
+    - file: features/experimental/main.md
+  - file: examples/examples
+    sections:
+    - file: examples/tldr_paraboloid
+    - file: examples/paraboloid
+    - file: examples/betz_limit
+    - file: examples/hohmann_transfer/hohmann_transfer
+    - file: examples/keplers_equation
+    - file: examples/circuit_analysis_examples
+    - file: examples/beam_optimization_example
+    - file: examples/beam_optimization_example_part_2
+    - file: examples/simul_deriv_example
+- caption: Other Useful Docs
+  chapters:
+  - file: other_useful_docs/om_command.ipynb
+  - file: other/citing.ipynb
+  - file: other_useful_docs/building_a_tool/building_a_tool.md
+    sections:
+    - file: other_useful_docs/building_a_tool/repository_structure
+    - file: other_useful_docs/building_a_tool/github_pages
+    - file: other_useful_docs/building_a_tool/release_process
+    - file: other_useful_docs/building_a_tool/travis
+  - file: other_useful_docs/auto_ivc_api_translation
+  - file: other_useful_docs/api_translation
+  - file: other_useful_docs/file_wrap.ipynb
+  - file: _srcdocs/index
+  - file: other_useful_docs/developer_docs/developer_docs
+    sections:
+    - file: other_useful_docs/developer_docs/doc_build.ipynb
+    - file: other_useful_docs/developer_docs/doc_style_guide.ipynb
+    - file: other_useful_docs/developer_docs/sphinx_decorators.ipynb
+    - file: other_useful_docs/developer_docs/writing_plugins.ipynb
