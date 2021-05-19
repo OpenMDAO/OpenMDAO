@@ -234,7 +234,7 @@ jobs:
           python copy_build_artifacts.py
 
       - name: Publish docs
-        if: ${{ github.event_name == "push" && matrix.PUBLISH_DOCS && secrets.DOCS_LOCATION }}
+        if: ${{ github.event_name == 'push' && matrix.PUBLISH_DOCS && secrets.DOCS_LOCATION }}
         shell: bash -l {0}
         run: |
             echo "============================================================="
