@@ -234,13 +234,17 @@ jobs:
           python copy_build_artifacts.py
 
       - name: Publish docs
-        if: ${{ github.event_name == 'push' && matrix.PUBLISH_DOCS && secrets.DOCS_LOCATION }}
+        if: ${{ github.event_name == 'push' && matrix.PUBLISH_DOCS }}
         shell: bash -l {0}
         run: |
+          if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
             echo "============================================================="
-            echo "Upload docs"
+            echo "Publish docs"
             echo "============================================================="
             python upload_doc_version.py openmdao_book/_build/html/ ${{ secrets.DOCS_LOCATION }}
+          else
+            echo "Docs destination not available."
+          fi
 
       - name: Display doc build reports
         if: ${{ failure() }}
