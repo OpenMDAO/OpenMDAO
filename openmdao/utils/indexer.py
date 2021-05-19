@@ -52,6 +52,9 @@ class Indexer(object):
     def shaped(self):
         raise NotImplementedError("No implementation of shaped found.")
 
+    def flat(self):
+        return self()
+
 
 class IntIndexer(Indexer):
     def __init__(self, idx):
@@ -195,151 +198,38 @@ class ArrayIndexer(Indexer):
             self._shaped_arr = self.arr
         self._slice = array2slice(self._shaped_arr)
 
+
 class MultiIndexer(Indexer):
     def __init__(self, tup):
-        # if original idxs is a slice or fancy index (tuple of index arrays/slices),
-        #    self.tup is not None
-        # if original idxs is an array, self.arr is not None
-        self.tup = self.arr = self._src_shape = None
-        self.shaped_tup = self.shaped_arr = None
-        self.min = self.max = self._shape = None
-        self._shape_dependent = True
+        self._idx_list = [indexer(i) for i in tup]
+        self._src_shape = None
 
-        if _is_slicer_op(idxs):
-            if isinstance(idxs, tuple):
-                entries = idxs
-            else:  # plain slice
-                entries = (idxs,)
-            self.tup = entries
+    def __call__(self):
+        return tuple(i() for i in self._idx_list)
 
-            dims = []
-            for entry in entries:
-                if isinstance(entry, slice):
-                    if entry.start is None or entry.start is Ellipsis or entry.start < 0:
-                        break
-                    if entry.stop is None or entry.stop is Ellipsis or entry.stop < 0:
-                        break
-                    span = entry.stop - entry.start
-                    if span > 0:
-                        dims.append(span)
-                        if entry.step != 1:
-                            dims[-1] = 1 + (dims[-1] - 1) // entry.step
-                    else:
-                        dims.append(0)
-                elif np.isscalar(entry):
-                    if entry < 0:
-                        break
-                    dims.append(1)
-                else:  # index array
-                    dims.append(entry.size)
-            else:  # slice has no shape dependent entries
-                self.shaped_tup = self.tup
-                self._shape = tuple(dims)
-                self._shape_dependent = False
-        else:
-            self.arr = np.atleast_1d(idxs)
-            self._shape = self.arr.shape
-            if np.min(self.arr) >= 0:
-                self._shape_dependent = False
-                self.shaped_arr = self.arr
-                self.shaped_tup = array2slice(self.arr)
-
-    def __repr__(self):
-        if self.tup is not None:
-            if len(self.tup) == 1:
-                return f"indexer({self.tup[0]})"
-            else:
-                return f"indexer({self.tup})"
-        return f"indexer({self.arr})"
-
-    # def __call__(self, shaped=False):
-    #     if self.shaped_tup is not None:
-    #         return self.shaped_tup
-
-    #     if shaped:
-    #         if self.shaped_arr is not None:
-    #             return self.shaped_arr
-    #         self.src_shape()  # raise error
-    #     else:
-    #         if self.tup is not None:
-    #             if len(self.tup) == 1:
-    #                 return self.tup[0]
-    #             return self.tup
-    #         return self.arr
-
-    def _to_shaped_arr(self):
-        if self.shaped_arr is not None:
-            return self.shaped_arr
-
-        if self.arr is not None:  # array has negative entries
-            # TODO: make this more efficient later...
-            return np.arange(self.src_shape(), dtype=INT_DTYPE)[self.arr]
-
-        # must be a slice
-        return np.arange(self.src_shape(), dtype=INT_DTYPE)[self.tup]
-
-    def as_array(self, flat=False, shaped=False):
-        if shaped or flat:
-            arr = self._to_shaped_arr()
-            if flat:
-                return arr.ravel()
-            return arr
-        elif self.arr is not None:
-            return self.arr
-
-        # we must be a slice or fancy index
-        shape = self.shape()  # make sure we have shape
-        idx = np.arange(shape, dtype=INT_DTYPE)[self.shaped_tup]
-
-        if flat:
-            return idx.ravel()
-        return idx
-
-    def as_slice(self, flat=False, shaped=False):
-        if shaped or (flat and self.ndim() > 1):
-            self.shape()
-            if self.shaped_tup is None:
-                raise RuntimeError(f"Indexer {self} is not convertable to a flat slice.")
-            return self._to_flat_slice(self.shaped_tup)
-
-        if self.tup is None:
-            raise RuntimeError(f"Indexer {self} is not convertable to a slice.")
-
-        return self.tup
-
-    def size(self):
-        return np.product(self.shape())
+    def shaped(self):
+        return tuple(i.shaped() for i in self._idx_list)
 
     def shape(self):
-        # return shape of the indices themselves
-        if self._shape is not None:
-            return self._shape
-        raise RuntimeError(f"{self} does not have a known src_shape so can't compute its shape.")
+        return tuple(i.shape() for i in self._idx_list)
 
-    @property
-    def src_shape(self):
-        if self._src_shape is not None:
-            return self._src_shape
-        raise RuntimeError(f"{self} does not have a known src_shape.")
+    def as_slice(self):
+        return tuple(i.as_slice() for i in self._idx_list)
 
-    @src_shape.setter
-    def src_shape(self, shape):
-        self.shaped_tup = self.shaped_arr = None
+    def as_array(self):
+        # return as a flattened index array into a flat source
+        if self._src_shape is None:
+            raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
+
+        idxs = np.arange(np.product(self._src_shape), dtype=np.int32).reshape(self._src_shape)
+        
+        return idxs[self()].ravel()
+
+    def set_src_shape(self, shape):
+        assert len(shape) == len(self._idx_list)
+        for i, s in zip(self._idx_list, shape):
+            i.set_src_shape(s)
         self._src_shape = shape
-        # compute shapeds
-
-    def is_contiguous(self):
-        if self.tup is not None:
-            return self.tup.step in (1, None)
-
-    def ndim(self):
-        if self.tup is not None:
-            return len(self.tup)
-        return self.arr.ndim
-
-    def apply(self, parent):
-        # apply these indices to parent indices
-        pass
 
 
 class IndexMaker(object):
@@ -348,7 +238,7 @@ class IndexMaker(object):
             return IntIndexer(idx)
         if isinstance(idx, slice):
             return SliceIndexer(idx)
-        if _is_slicer_op(idx):
+        if isinstance(idx, tuple):
             return MultiIndexer(idx)
         return ArrayIndexer(idx)
 

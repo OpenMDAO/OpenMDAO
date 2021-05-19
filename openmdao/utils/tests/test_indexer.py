@@ -84,6 +84,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(ind.shaped(), [5,3,7,9])
 
     def test_neg_arr_sliceable(self):
+        # this array can be converted to a slice after the src shape has been set
         ind = indexer([-1, -3, -5])
         src = np.arange(10)
         assert_equal(src[ind.as_array()], [9, 7, 5])
@@ -157,34 +158,47 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(ind.shaped(), slice(3, 10, 1))
         assert_equal(ind.as_array(), np.array([3, 4, 5, 6, 7, 8, 9]))
 
-    def test_slice_ellipsis(self):
-        self.fail("No test yet")
-
-    def test_slice_step_neg(self):
-        pass
+    def test_slice_neg_step(self):
+        ind = indexer[6:2:-1]
+        src = np.arange(10)
+        assert_equal(ind.as_slice(), slice(6, 2, -1))
+        assert_equal(ind.as_array(), np.array([6, 5, 4, 3]))
+        assert_equal(ind.shape(), 4)
+        assert_equal(ind.shaped(), slice(6, 2, -1))
 
 
 class IndexerMultiDimTestCase(unittest.TestCase):
     def test_multi_slice(self):
-        pass
+        ind = indexer[:,:,:]
+        src = np.arange(27).reshape((3,3,3))
+        assert_equal(ind(), (slice(None), slice(None), slice(None)))
+        assert_equal(ind.as_slice(), (slice(None), slice(None), slice(None)))
+        with self.assertRaises(RuntimeError) as cm:
+            ind.shape()
+        self.assertEqual(cm.exception.args[0], "Can't get shape of slice(None, None, None) because source shape is unknown.")
+        with self.assertRaises(RuntimeError) as cm:
+            ind.as_array()
+        self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
+        ind.set_src_shape(src.shape)
+        assert_equal(ind.shape(), (3,3,3))
+        assert_equal(ind.shaped(), (slice(0, 3, 1), slice(0, 3, 1), slice(0, 3, 1)))
+        assert_equal(ind.as_array(), np.arange(27, dtype=np.int32))
 
     def test_slice_neg(self):
-        pass
-
-    def test_slice_none(self):
-        pass
-
-    def test_slice_ellipsis(self):
-        pass
-
-    def test_slice_step_neg(self):
-        pass
-
-    def test_simple_arr(self):
-        pass
-
-    def test_neg_arr(self):
-        pass
+        ind = indexer[:-1,:,:2]
+        src = np.arange(27).reshape((3,3,3))
+        assert_equal(ind(), (slice(None, -1), slice(None), slice(None, 2)))
+        assert_equal(ind.as_slice(), (slice(None, -1), slice(None), slice(None, 2)))
+        with self.assertRaises(RuntimeError) as cm:
+            ind.shape()
+        self.assertEqual(cm.exception.args[0], "Can't get shape of slice(None, -1, None) because source shape is unknown.")
+        with self.assertRaises(RuntimeError) as cm:
+            ind.as_array()
+        self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
+        ind.set_src_shape(src.shape)
+        assert_equal(ind.shape(), (2,3,2))
+        assert_equal(ind.shaped(), (slice(0, 2, 1), slice(0, 3, 1), slice(0, 2, 1)))
+        assert_equal(ind.as_array(), np.arange(27, dtype=np.int32).reshape((3,3,3))[:-1,:,:2].ravel())
 
 
 if __name__ == '__main__':
