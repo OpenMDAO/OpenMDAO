@@ -1,4 +1,5 @@
 
+import sys
 import numpy as np
 from copy import deepcopy
 
@@ -15,22 +16,25 @@ def array2slice(arr):
     ----------
     arr : ndarray
         The array to be represented as a slice.
-    
+
     Returns
     -------
     slice or None
         If slice conversion is possible, return the slice, else return None
     """
-    if arr.ndim == 1 and arr.size > 1:  # see if 1D array will convert to slice
-        span = arr[1] - arr[0]
-        if np.all((arr[1:] - arr[:-1]) == span):
-            if span > 0:
-                # array is increasing with constant span
-                return slice(arr[0], arr[-1] + 1, span)
-            elif span < 0:
-                 # array is decreasing with constant span
-                return slice(arr[0], arr[-1] - 1, span)
-               
+    if arr.ndim == 1:
+        if arr.size > 1:  # see if 1D array will convert to slice
+            span = arr[1] - arr[0]
+            if np.all((arr[1:] - arr[:-1]) == span):
+                if span > 0:
+                    # array is increasing with constant span
+                    return slice(arr[0], arr[-1] + 1, span)
+                elif span < 0:
+                    # array is decreasing with constant span
+                    return slice(arr[0], arr[-1] - 1, span)
+        else:
+            return slice(0, 0)
+
 
 
 class Indexer(object):
@@ -85,7 +89,8 @@ class IntIndexer(Indexer):
     def as_slice(self):
         if self._idx == -1:
             if self._shaped_idx is None:
-                raise RuntimeError(f"Can't express index {self._idx} as a slice because source shape is unknown.")
+                raise RuntimeError(f"Can't express index {self._idx} as a slice because source "
+                                   "shape is unknown.")
             return slice(self._shaped_idx, self._shaped_idx + 1)
         return slice(self._idx, self._idx + 1)
 
@@ -95,17 +100,11 @@ class IntIndexer(Indexer):
 
 class SliceIndexer(Indexer):
     def __init__(self, slc):
-        start, stop, step = slc.start, slc.stop, slc.step
-        self._slice = deepcopy(slc)
-        start, stop, step = self._slice.start, self._slice.stop, self._slice.step
-        if start is None:
-            start = 0
-        if step is None:
-            step = 1
-        if start < 0 or stop is None or stop < 0:  # need shape
+        self._slice = slc
+        if (slc.start is not None and slc.start < 0) or slc.stop is None or slc.stop < 0:
             self._shaped_slice = None
         else:
-            self._shaped_slice = slice(start, stop, step)
+            self._shaped_slice = slc
 
     def __call__(self):
         return self._slice
@@ -118,7 +117,9 @@ class SliceIndexer(Indexer):
     def shape(self):
         if self._shaped_slice is None:
             raise RuntimeError(f"Can't get shape of {self._slice} because source shape is unknown.")
-        return abs((self._shaped_slice.stop - self._shaped_slice.start) // self._shaped_slice.step)
+
+        # use maxsize here since _shaped_slice always has positive int start and stop
+        return len(range(*self._shaped_slice.indices(sys.maxsize)))
 
     def set_src_shape(self, shape):
         if np.isscalar(shape):
@@ -126,31 +127,21 @@ class SliceIndexer(Indexer):
         elif len(shape) == 1:
             length = shape[0]
         else:
-            raise RuntimeError(f"shape {shape} passed to set_src_shape does not have dimension of 1")
+            raise RuntimeError(f"shape {shape} passed to set_src_shape does not have dimension "
+                               "of 1")
 
-        slc = self._slice
-
-        if slc.start is None or slc.start < 0 or slc.stop is None or slc.stop < 0:  # need shape
-            start = 0 if slc.start is None else slc.start
-            if start < 0:
-                start = length + start
-            stop = length if slc.stop is None else slc.stop
-            if stop < 0:
-                stop = length + stop
-            step = 1 if slc.step is None else slc.step
-
-            self._shaped_slice = slice(start, stop, step)
+        self._shaped_slice = slice(*self._slice.indices(length))
 
     def as_slice(self):
         return self._slice
 
     def as_array(self):
         if self._shaped_slice is None:
-            raise RuntimeError(f"Can't convert {self._slice} to array because source shape is unknown.")
+            raise RuntimeError(f"Can't convert {self._slice} to array because source shape is "
+                               "unknown.")
 
-        return np.arange(self._shaped_slice.start, 
-                         self._shaped_slice.stop, 
-                         self._shaped_slice.step)
+        # use maxsize here since _shaped_slice always has positive int start and stop
+        return np.arange(*self._shaped_slice.indices(sys.maxsize), dtype=int)
 
 
 class ArrayIndexer(Indexer):
@@ -168,7 +159,7 @@ class ArrayIndexer(Indexer):
             return self.arr
         else:
             return self._slice
-    
+
     def shaped(self):
         if self._slice is not None:
             return self._slice
@@ -177,7 +168,7 @@ class ArrayIndexer(Indexer):
         raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
 
     def shape(self):
-        return self.arr.shape
+        return self.arr.size
 
     def as_slice(self):
         if self._slice is None:
@@ -201,7 +192,7 @@ class ArrayIndexer(Indexer):
 
 class MultiIndexer(Indexer):
     def __init__(self, tup):
-        self._idx_list = [indexer(i) for i in tup]
+        self._idx_list = [indexer[i] for i in tup]
         self._src_shape = None
 
     def __call__(self):
@@ -222,7 +213,7 @@ class MultiIndexer(Indexer):
             raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
 
         idxs = np.arange(np.product(self._src_shape), dtype=np.int32).reshape(self._src_shape)
-        
+
         return idxs[self()].ravel()
 
     def set_src_shape(self, shape):
@@ -240,12 +231,17 @@ class IndexMaker(object):
             return SliceIndexer(idx)
         if isinstance(idx, tuple):
             return MultiIndexer(idx)
-        return ArrayIndexer(idx)
+
+        idx = np.atleast_1d(idx)
+
+        # if array is convertable to a slice, store it as a slice
+        slc = array2slice(idx)
+        if slc is None:
+            return ArrayIndexer(idx)
+        else:
+            return SliceIndexer(slc)
 
     def __getitem__(self, idx):
-        return self._get_indexer(idx)
-
-    def __call__(self, idx):
         return self._get_indexer(idx)
 
 

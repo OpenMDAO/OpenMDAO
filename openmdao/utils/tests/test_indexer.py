@@ -8,7 +8,7 @@ from openmdao.utils.indexer import indexer
 
 class IndexerTestCase(unittest.TestCase):
     def test_int(self):
-        ind = indexer(4)
+        ind = indexer[4]
         src = np.arange(10)
         assert_equal(ind(), 4)
         assert_equal(ind.as_array(), np.array([4]))
@@ -17,7 +17,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(ind.as_slice(), slice(4, 5))
 
     def test_neg_int(self):
-        ind = indexer(-4)
+        ind = indexer[-4]
         src = np.arange(10)
         assert_equal(ind(), np.array([-4]))
         assert_equal(ind.as_array(), np.array([-4]))
@@ -31,11 +31,11 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(ind.shaped(), 6)
 
     def test_simple_arr(self):
-        ind = indexer([5, 3, 7, 1])
+        ind = indexer[[5, 3, 7, 1]]
         src = np.arange(10)
         assert_equal(src[ind.as_array()], [5,3,7,1])
         assert_equal(src[ind.shaped()], [5,3,7,1])
-        assert_equal(ind.shape(), (4,))
+        assert_equal(ind.shape(), 4)
         try:
             ind.as_slice()
         except Exception as err:
@@ -44,28 +44,28 @@ class IndexerTestCase(unittest.TestCase):
             self.fail("Exception expected")
 
     def test_contiguous_arr(self):
-        ind = indexer([3, 4, 5])
+        ind = indexer[[3, 4, 5]]
         src = np.arange(10)
         assert_equal(src[ind.as_array()], [3, 4, 5])
         assert_equal(src[ind.shaped()], [3, 4, 5])
-        assert_equal(ind.shape(), (3,))
+        assert_equal(ind.shape(), 3)
         assert_equal(ind.as_slice(), slice(3, 6, 1))
         assert_equal(ind.shaped(), slice(3, 6, 1))
 
     def test_arr_to_slice_step2(self):
-        ind = indexer([1,3,5,7,9])
+        ind = indexer[[1,3,5,7,9]]
         src = np.arange(10)
         assert_equal(src[ind.as_array()], [1,3,5,7,9])
         assert_equal(src[ind()], [1,3,5,7,9])
         assert_equal(src[ind.as_slice()], [1,3,5,7,9])
-        assert_equal(ind.shape(), (5,))
+        assert_equal(ind.shape(), 5)
         self.assertEqual(ind.as_slice(), slice(1, 10, 2))
 
     def test_neg_arr(self):
-        ind = indexer([5, 3, 7, -1])
+        ind = indexer[[5, 3, 7, -1]]
         src = np.arange(10)
         assert_equal(src[ind.as_array()], [5,3,7,9])
-        assert_equal(ind.shape(), (4,))
+        assert_equal(ind.shape(), 4)
         try:
             ind.as_slice()
         except Exception as err:
@@ -85,29 +85,23 @@ class IndexerTestCase(unittest.TestCase):
 
     def test_neg_arr_sliceable(self):
         # this array can be converted to a slice after the src shape has been set
-        ind = indexer([-1, -3, -5])
+        ind = indexer[[-1, -3, -5]]
         src = np.arange(10)
-        assert_equal(src[ind.as_array()], [9, 7, 5])
-        assert_equal(ind.shape(), (3,))
-        try:
-            ind.as_slice()
-        except Exception as err:
-            self.assertEqual(str(err), "array index cannot be converted to a slice.")
-        else:
-            self.fail("Exception expected")
+
+        slc = ind.as_slice()
+        assert_equal(slc, slice(-1, -6, -2))
 
         try:
             ind.shaped()
         except Exception as err:
-            self.assertEqual(str(err), "Can't determine extent of array because source shape is not known.")
+            self.assertEqual(str(err), "Can't get shape of slice(-1, -6, -2) because source shape is unknown.")
         else:
             self.fail("Exception expected")
 
         ind.set_src_shape(10)
+        assert_equal(ind.shape(), 3)
         assert_equal(ind.shaped(), slice(9, 4, -2))
-
-        slc = ind.as_slice()
-        assert_equal(slc, slice(9, 4, -2))
+        assert_equal(src[ind.as_array()], [9, 7, 5])
 
     def test_full_slice(self):
         ind = indexer[:]
