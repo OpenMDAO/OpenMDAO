@@ -195,7 +195,14 @@ class FiniteDifference(ApproximationScheme):
         else:
             self._results_tmp = self._starting_resids.copy()
 
-        yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs)
+        # Turn on complex step.
+        system._set_finite_difference_mode(True)
+
+        try:
+            yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs)
+        finally:
+            # Turn off complex step.
+            system._set_finite_difference_mode(False)
 
         # reclaim some memory
         self._starting_ins = None

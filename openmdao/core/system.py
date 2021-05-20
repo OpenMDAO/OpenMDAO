@@ -148,6 +148,8 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_finite_difference : bool
+        When True, this system is undergoing finite differencing.
     under_approx : bool
         When True, this system is undergoing approximation.
     iter_count : int
@@ -448,6 +450,7 @@ class System(object):
         self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
+        self.under_finite_difference = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -4081,6 +4084,20 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_finite_difference_mode(self, active):
+        """
+        Turn on or off finite difference mode.
+
+        Recurses to turn on or off finite difference mode in all subsystems.
+
+        Parameters
+        ----------
+        active : bool
+            Finite difference flag; set to True prior to commencing finite difference.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_finite_difference = active
 
     def _set_complex_step_mode(self, active):
         """
