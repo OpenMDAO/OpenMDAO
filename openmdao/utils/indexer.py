@@ -38,23 +38,11 @@ def array2slice(arr):
 
 
 class Indexer(object):
-    def set_src_shape(self, shape):
-        raise NotImplementedError("No implementation of set_src_shape found.")
-
-    def __call__(self):
-        raise NotImplementedError("No implementation of __call__ found.")
-
     def as_slice(self):
         raise NotImplementedError("No implementation of as_slice found.")
 
-    def as_array(self):
-        raise NotImplementedError("No implementation of as_array found.")
-
     def shape(self):
         raise NotImplementedError("No implementation of shape found.")
-
-    def shaped(self):
-        raise NotImplementedError("No implementation of shaped found.")
 
     def __len__(self):
         return np.product(self.shape())
@@ -221,7 +209,8 @@ class MultiIndexer(Indexer):
     def as_array(self):
         # return as a flattened index array into a flat source
         if self._src_shape is None:
-            raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
+            raise RuntimeError(f"Can't determine extent of array because source shape is not "
+                               "known.")
 
         idxs = np.arange(np.product(self._src_shape), dtype=np.int32).reshape(self._src_shape)
 

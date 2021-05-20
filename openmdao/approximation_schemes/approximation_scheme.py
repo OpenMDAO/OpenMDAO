@@ -276,7 +276,7 @@ class ApproximationScheme(object):
                 arr = None
 
             if wrt in approx_wrt_idx:
-                in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
+                in_idx = np.array(approx_wrt_idx[wrt].as_array(), dtype=int)
                 if arr is not None:
                     in_idx += slices[wrt].start
             else:
@@ -626,7 +626,7 @@ def _get_wrt_subjacs(system, approxs):
                 if sof in slicedict:
                     slc = slicedict[sof]
                     if sof in approx_of_idx:
-                        full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
+                        full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof].flat()])
                     else:
                         full_idxs.append(range(slc.start, slc.stop))
             if full_idxs:

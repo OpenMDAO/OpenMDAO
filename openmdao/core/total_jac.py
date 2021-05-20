@@ -751,7 +751,7 @@ class _TotalJacInfo(object):
                         idx_array = np.arange(slc.start // ncols, slc.stop // ncols,
                                               dtype=INT_DTYPE)
                         if indices is not None:
-                            idx_array = idx_array[indices]
+                            idx_array = idx_array[indices.flat()]
                         inds.append(idx_array)
                         jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
                         if fwd:
@@ -1715,7 +1715,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
         # This is a design variable that was declared as an obj/con.
         tot = np.eye(len(jac_meta['value']))
         if prom_out in of_idx:
-            tot = tot[of_idx[prom_out], :]
+            tot = tot[of_idx[prom_out].flat(), :]
         if prom_in in wrt_idx:
             tot = tot[:, wrt_idx[prom_in]]
     else:
