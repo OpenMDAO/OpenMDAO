@@ -10,7 +10,6 @@ from distutils.version import LooseVersion
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI

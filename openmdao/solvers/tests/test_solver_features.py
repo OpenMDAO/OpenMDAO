@@ -151,6 +151,8 @@ class TestSolverFeatures(unittest.TestCase):
 
     def test_feature_stall_detection_newton(self):
 
+        prob = om.Problem()
+
         prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 
         balance = prob.model.add_subsystem('balance', om.BalanceComp(),
@@ -171,6 +173,8 @@ class TestSolverFeatures(unittest.TestCase):
         prob.run_model()
 
     def test_feature_stall_detection_broyden(self):
+
+        prob = om.Problem()
 
         prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 

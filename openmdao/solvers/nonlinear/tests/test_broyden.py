@@ -11,6 +11,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:

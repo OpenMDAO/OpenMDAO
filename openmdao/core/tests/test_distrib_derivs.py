@@ -6,10 +6,11 @@ import itertools
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid_distributed import DistParab
+from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
+from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 try:
     from pyoptsparse import Optimization as pyoptsparse_opt

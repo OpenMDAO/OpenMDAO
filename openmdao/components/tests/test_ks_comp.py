@@ -3,12 +3,6 @@ import unittest
 
 import numpy as np
 
-try:
-    import matplotlib.pyplot as plt
-    plt.switch_backend('Agg')
-except ImportError:
-    plt = None
-
 import openmdao.api as om
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
@@ -284,7 +278,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
         assert_near_equal(prob.get_val('ks.KS'), [[-12.0]])
 
-    @unittest.skipIf(not plt, "requires matplotlib")
     def test_add_constraint(self):
 
         n = 50
@@ -312,20 +305,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob.run_driver()
 
         self.assertTrue(max(prob.get_val('comp.y')) <= 4.0)
-
-        fig, ax = plt.subplots()
-
-        x = prob.get_val('x')
-        y = prob.get_val('comp.y')
-
-        ax.plot(x, y, 'r.')
-        ax.plot(x, 4.0*np.ones_like(x), 'k--')
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.grid(True)
-        ax.text(-0.25, 0, f"k = {prob.get_val('k')[0]:6.3f}")
-
-        plt.show()
 
     def test_units(self):
 

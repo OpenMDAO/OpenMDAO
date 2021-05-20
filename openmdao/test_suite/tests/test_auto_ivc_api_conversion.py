@@ -4,6 +4,8 @@ are tested here.
 """
 import unittest
 
+import numpy as np
+
 import openmdao.api as om
 from openmdao.core.tests.test_distribcomp import DistribNoncontiguousComp
 from openmdao.test_suite.components.unit_conv import TgtCompC, TgtCompF, TgtCompK

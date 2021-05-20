@@ -5,6 +5,7 @@ import time
 import numpy as np
 
 import openmdao.api as om
+from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning

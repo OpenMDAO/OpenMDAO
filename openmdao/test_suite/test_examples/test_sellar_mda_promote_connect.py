@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 
+import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.utils.assert_utils import assert_near_equal
 

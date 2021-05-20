@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
+import openmdao.api as om
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
 
 

@@ -38,13 +38,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
-try:
-    # do not show matplotlib plots
-    import matplotlib.pyplot as plt
-    plt.switch_backend('Agg')
-except ImportError:
-    plt = None
-
 
 class Cycle(om.Group):
 
@@ -3290,7 +3283,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)
 
-    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_solver_recorder(self):
 
         # Instantiate your CaseReader
@@ -3300,15 +3292,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         solver_cases = cr.list_cases('root.cycle.nonlinear_solver', out_stream=None)
 
         self.assertEqual(f"Number of cases: {len(solver_cases)}", "Number of cases: 76")
-
-        # Plot the convergence of the two coupling variables (last 35 iterations)
-        y1_history = []
-        y2_history = []
-
-        for case_id in solver_cases[-35:]:
-            case = cr.get_case(case_id)
-            y1_history.append(case['y1'])
-            y2_history.append(case['y2'])
 
         # Get the final values
         case = cr.get_case(solver_cases[-1])
