@@ -21,6 +21,8 @@ class MyInterp(om.MetaModelUnStructuredComp):
 
 # define model with two metamodel components
 model = om.Group()
+model.add_subsystem('dummy', om.IndepVarComp(), promotes=['x'])
+model.dummy.add_output('x', 0.0)
 model.add_subsystem('interp1', MyInterp())
 model.add_subsystem('interp2', MyInterp())
 
