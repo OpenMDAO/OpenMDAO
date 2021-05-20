@@ -4,6 +4,7 @@ import pprint
 import sys
 import os
 import weakref
+from itertools import chain
 
 import numpy as np
 
@@ -284,6 +285,14 @@ class Driver(object):
         self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
 
+        # update src shapes for Indexer objects
+        varmeta = model._var_allprocs_abs2meta['output']
+        for name, meta in chain(self._designvars.items(), self._responses.items()):
+            inds = meta['indices']
+            if inds is not None:
+                inds.set_src_shape(varmeta[name]['global_shape'])
+                meta['size'] = np.product(inds.shape())
+
         src_design_vars = prom2ivc_src_dict(self._designvars)
         src_cons = prom2ivc_src_dict(self._cons)
         src_objs = prom2ivc_src_dict(self._objs)
@@ -523,6 +532,9 @@ class Driver(object):
         get = model._outputs._abs_get_val
         distributed_vars = self._dist_driver_vars
         indices = meta['indices']
+        if indices is not None:
+            shname = 'global_shape' if get_remote else 'shape'
+            indices.set_src_shape(model._var_allprocs_abs2meta['output'][name][shname])
 
         if meta.get('ivc_source') is not None:
             src_name = meta['ivc_source']
@@ -541,13 +553,13 @@ class Driver(object):
             if owner is None or rank is not None:
                 val = model.get_val(src_name, get_remote=get_remote, rank=rank, flat=True)
                 if indices is not None:
-                    val = val[indices]
+                    val = val[indices()]
             else:
                 if owner == comm.rank:
                     if indices is None:
                         val = get(name).copy()
                     else:
-                        val = get(name)[indices]
+                        val = get(name)[indices()]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -588,7 +600,7 @@ class Driver(object):
             elif indices is None:
                 val = get(src_name).copy()
             else:
-                val = get(src_name)[indices]
+                val = get(src_name)[indices.flat()]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values

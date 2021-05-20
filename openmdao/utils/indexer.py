@@ -56,8 +56,11 @@ class Indexer(object):
     def shaped(self):
         raise NotImplementedError("No implementation of shaped found.")
 
+    def __len__(self):
+        return np.product(self.shape())
+
     def flat(self):
-        return self()
+        return self.as_slice()
 
 
 class IntIndexer(Indexer):
@@ -145,18 +148,20 @@ class SliceIndexer(Indexer):
 
 
 class ArrayIndexer(Indexer):
-    def __init__(self, arr):
-        self.arr = np.asarray(arr)
+    def __init__(self, arr, multi=False):
+        self._arr = np.asarray(arr)
         self._slice = None
-        if np.any(self.arr < 0):
+        self._multi = multi
+        if np.any(self._arr < 0):
             self._shaped_arr = None
         else:
-            self._shaped_arr = self.arr
-            self._slice = array2slice(self._shaped_arr)
+            self._shaped_arr = self._arr
+            if not multi:
+                self._slice = array2slice(self._shaped_arr)
 
     def __call__(self):
         if self._slice is None:
-            return self.arr
+            return self._arr
         else:
             return self._slice
 
@@ -168,7 +173,7 @@ class ArrayIndexer(Indexer):
         raise RuntimeError(f"Can't determine extent of array because source shape is not known.")
 
     def shape(self):
-        return self.arr.size
+        return self._arr.size
 
     def as_slice(self):
         if self._slice is None:
@@ -176,23 +181,29 @@ class ArrayIndexer(Indexer):
         return self._slice
 
     def as_array(self):
-        return self.arr
+        return self._arr
+
+    def flat(self):
+        if self._slice:
+            return self._slice
+        return self._arr
 
     def set_src_shape(self, shape):
         assert np.isscalar(shape) or len(shape) == 1
         size = shape if np.isscalar(shape) else shape[0]
-        neg = self.arr < 0
+        neg = self._arr < 0
         if np.any(neg):  # must have at least 1 negative index
-            self._shaped_arr = self.arr.copy()
+            self._shaped_arr = self._arr.copy()
             self._shaped_arr[neg] += size
         else:
-            self._shaped_arr = self.arr
-        self._slice = array2slice(self._shaped_arr)
+            self._shaped_arr = self._arr
+        if not self._multi:
+            self._slice = array2slice(self._shaped_arr)
 
 
 class MultiIndexer(Indexer):
     def __init__(self, tup):
-        self._idx_list = [indexer[i] for i in tup]
+        self._idx_list = [indexer(i, multi=True) for i in tup]
         self._src_shape = None
 
     def __call__(self):
@@ -216,6 +227,9 @@ class MultiIndexer(Indexer):
 
         return idxs[self()].ravel()
 
+    def flat(self):
+        return self.as_array()
+
     def set_src_shape(self, shape):
         assert len(shape) == len(self._idx_list)
         for i, s in zip(self._idx_list, shape):
@@ -224,25 +238,34 @@ class MultiIndexer(Indexer):
 
 
 class IndexMaker(object):
-    def _get_indexer(self, idx):
+    def _get_indexer(self, idx, multi=False):
         if isinstance(idx, int):
             return IntIndexer(idx)
         if isinstance(idx, slice):
             return SliceIndexer(idx)
-        if isinstance(idx, tuple):
+
+        if not multi and isinstance(idx, tuple):
             return MultiIndexer(idx)
 
         idx = np.atleast_1d(idx)
 
-        # if array is convertable to a slice, store it as a slice
-        slc = array2slice(idx)
-        if slc is None:
-            return ArrayIndexer(idx)
+        if multi:
+            # can't convert sub-index arrays into sub slices because that can change
+            # the result
+            return ArrayIndexer(idx, multi)
         else:
-            return SliceIndexer(slc)
+            # if array is convertable to a slice, store it as a slice
+            slc = array2slice(idx)
+            if slc is None:
+                return ArrayIndexer(idx)
+            else:
+                return SliceIndexer(slc)
 
     def __getitem__(self, idx):
         return self._get_indexer(idx)
+
+    def __call__(self, idx, multi=False):
+        return self._get_indexer(idx, multi)
 
 
 indexer = IndexMaker()

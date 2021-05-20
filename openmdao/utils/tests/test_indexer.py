@@ -194,6 +194,24 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.shaped(), (slice(0, 2, 1), slice(0, 3, 1), slice(0, 2, 1)))
         assert_equal(ind.as_array(), np.arange(27, dtype=np.int32).reshape((3,3,3))[:-1,:,:2].ravel())
 
+    def test_mult_arr(self):
+        src = np.arange(27).reshape((3,3,3))
+        ind = indexer[[0,2], :, [1,2]]
+        assert_equal(ind(), ([0,2], slice(None, None, None), [1,2]))
+        with self.assertRaises(ValueError) as cm:
+            ind.as_slice()
+        self.assertEqual(cm.exception.args[0], "array index cannot be converted to a slice.")
+        with self.assertRaises(RuntimeError) as cm:
+            ind.shape()
+        self.assertEqual(cm.exception.args[0], "Can't get shape of slice(None, None, None) because source shape is unknown.")
+        with self.assertRaises(RuntimeError) as cm:
+            ind.as_array()
+        self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
+        ind.set_src_shape(src.shape)
+        assert_equal(ind.shape(), (2,3,2))
+        assert_equal(ind.shaped(), ([0, 2], slice(0, 3, 1), [1, 2]))
+        assert_equal(ind.as_array(), np.arange(27, dtype=np.int32).reshape((3,3,3))[[0,2], :, [1,2]].ravel())
+
 
 if __name__ == '__main__':
     unittest.main()

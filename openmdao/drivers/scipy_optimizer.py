@@ -312,6 +312,8 @@ class ScipyOptimizeDriver(Driver):
             keep_feasible = self.opt_settings.get('keep_feasible_bounds', True)
             bounds = Bounds(lb=lower, ub=upper, keep_feasible=keep_feasible)
 
+        varmeta = model._var_allprocs_abs2meta['output']
+
         # Constraints
         constraints = []
         i = 1  # start at 1 since row 0 is the objective.  Constraints start at row 1.
@@ -321,7 +323,11 @@ class ScipyOptimizeDriver(Driver):
 
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
-                size = meta['global_size'] if meta['distributed'] else meta['size']
+                if meta['indices'] is not None:
+                    meta['size'] = size = np.product(meta['indices'].shape())
+                else:
+                    vmeta = varmeta[name]
+                    size = vmeta['global_size'] if vmeta['distributed'] else vmeta['size']
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']

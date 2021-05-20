@@ -32,6 +32,7 @@ from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.indexer import indexer
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     simple_warning, make_set, ensure_compatible, match_prom_or_abs, _is_slicer_op
@@ -2461,6 +2462,18 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
+    def _check_indices(self, indices):
+        size = None
+        if indices is None or _is_slicer_op(indices):
+            pass
+        # If given, indices must be a sequence
+        elif not (isinstance(indices, Iterable) and
+                    all([isinstance(i, Integral) for i in indices])):
+            raise ValueError("{}: If specified, design var indices must be a sequence of "
+                                "integers.".format(self.msginfo))
+            size = np.asarray(indices).size
+        return size
+
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
@@ -2569,27 +2582,19 @@ class System(object):
 
         if indices is not None:
 
-            if _is_slicer_op(indices):
-                pass
-            # If given, indices must be a sequence
-            elif not (isinstance(indices, Iterable) and
-                      all([isinstance(i, Integral) for i in indices])):
-                raise ValueError("{}: If specified, design var indices must be a sequence of "
-                                 "integers.".format(self.msginfo))
-            else:
-                indices = np.atleast_1d(indices)
-                dvs['size'] = size = len(indices)
+            size = self._check_indices(indices)
 
-            # All refs: check the shape if necessary
-            for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
-                                       ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
-                if isinstance(item, np.ndarray):
-                    if item.size != size:
-                        raise ValueError("%s: When adding design var '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.msginfo, name,
-                                                                          item_name, size,
-                                                                          item.size))
-
+            if size is not None:
+                # All refs: check the shape if necessary
+                for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
+                                        ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
+                    if isinstance(item, np.ndarray):
+                        if item.size != size:
+                            raise ValueError("%s: When adding design var '%s', %s should have size "
+                                            "%d but instead has size %d." % (self.msginfo, name,
+                                                                            item_name, size,
+                                                                            item.size))
+            indices = indexer[indices]
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
@@ -2680,13 +2685,7 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if _is_slicer_op(indices):
-            pass
-        # If given, indices must be a sequence
-        elif (indices is not None and not (
-                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
-            raise ValueError("{}: If specified, response indices must be a sequence of "
-                             "integers.".format(self.msginfo))
+        size = self._check_indices(indices)
 
         if self._static_mode:
             responses = self._static_responses
@@ -2738,13 +2737,12 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                indices = np.atleast_1d(indices)
-                resp['size'] = len(indices)
+                indices = indexer[indices]
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
                 resp['size'] = 1
-                index = np.array([index], dtype=INT_DTYPE)
+                index = indexer[index]  # np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
@@ -2761,8 +2759,7 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        if resp['indices'] is not None:
-            size = resp['indices'].size
+        if size is not None:
             vlist = [ref, ref0, scaler, adder]
             nlist = ['ref', 'ref0', 'scaler', 'adder']
             if type_ == 'con':
