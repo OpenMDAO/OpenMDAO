@@ -246,3 +246,31 @@ class IndexMaker(object):
 
 
 indexer = IndexMaker()
+
+
+# Since this is already user facing we'll leave it as is, and just use the output of
+# __getitem__ to initialize our Indexer object that will be used internally.
+class Slicer(object):
+    """
+    Helper class that can be used when a slice is needed for indexing.
+    """
+
+    def __getitem__(self, val):
+        """
+        Pass through indices or slice.
+
+        Parameters
+        ----------
+        val : int or slice object or tuples of slice objects
+            Indices or slice to return.
+
+        Returns
+        -------
+        indices : int or slice object or tuples of slice objects
+            Indices or slice to return.
+        """
+        return val
+
+
+# instance of the Slicer class to be used by users
+slicer = Slicer()
