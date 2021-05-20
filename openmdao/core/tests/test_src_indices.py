@@ -321,8 +321,6 @@ class SrcIndicesTestCase(unittest.TestCase):
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
     def test_multi_promotes(self):
-        import numpy as np
-        import openmdao.api as om
 
         p = om.Problem()
         G = p.model.add_subsystem('G', om.Group())

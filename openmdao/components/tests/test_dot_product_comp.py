@@ -517,9 +517,6 @@ class TestFeature(unittest.TestCase):
         A simple example to compute power as the dot product of force and velocity vectors
         at 24 points simultaneously.
         """
-        import numpy as np
-
-        import openmdao.api as om
 
         n = 24
 
@@ -556,9 +553,6 @@ class TestFeature(unittest.TestCase):
         Simultaneously compute work as the dot product of force and displacement vectors
         and power as the dot product of force and velocity vectors at 24 points.
         """
-        import numpy as np
-
-        import openmdao.api as om
 
         n = 24
 

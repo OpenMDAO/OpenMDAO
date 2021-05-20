@@ -1,7 +1,6 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
-import sys
 import unittest
 
 from distutils.version import LooseVersion
@@ -2286,10 +2285,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not installed")
 
     def test_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2311,10 +2306,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_settings_print(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2337,10 +2328,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2364,10 +2351,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2395,8 +2378,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     # All of these tests require SNOPT
 
     def setUp(self):
-        from openmdao.utils.general_utils import set_pyoptsparse_opt
-
         OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
 
     def test_snopt_atol(self):

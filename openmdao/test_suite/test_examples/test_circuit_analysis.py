@@ -3,15 +3,13 @@ import numpy as np
 import unittest
 
 import openmdao.api as om
+from openmdao.test_suite.scripts.circuit_analysis import Circuit, Resistor, Diode, Node
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton_assembled(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
         class Circuit(om.Group):
 
@@ -67,9 +65,6 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton(self):
 
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
-
         class Circuit(om.Group):
 
             def setup(self):
@@ -122,9 +117,6 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton_many_iter(self):
 
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
-
         p = om.Problem()
         model = p.model
 
@@ -154,8 +146,6 @@ class TestCircuit(unittest.TestCase):
         assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
 
     def test_circuit_advanced_newton(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = om.Problem()
         model = p.model
@@ -194,8 +184,6 @@ class TestCircuit(unittest.TestCase):
         assert_near_equal(p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_voltage_source(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = om.Problem()
         model = p.model

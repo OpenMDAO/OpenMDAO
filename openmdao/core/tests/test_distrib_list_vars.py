@@ -560,9 +560,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_list_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
         size = 15
 

@@ -10,7 +10,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, \
     SellarDis1, SellarDis2
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 from openmdao.utils.mpi import MPI
 try:
@@ -52,10 +52,6 @@ class TestNLBGaussSeidel(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
     def test_feature_set_options(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model

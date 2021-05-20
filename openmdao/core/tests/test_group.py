@@ -3217,7 +3217,6 @@ class TestInConfigMPIparpar(Test3Deep):
 class TestFeatureAddSubsystem(unittest.TestCase):
 
     def test_group_simple(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
@@ -3228,7 +3227,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_simple_promoted(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('a', 3.0),
@@ -3243,7 +3241,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_nested(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('G1', om.Group())
@@ -3258,7 +3255,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
     def test_group_nested_promoted1(self):
-        import openmdao.api as om
 
         # promotes from bottom level up 1
         p = om.Problem()
@@ -3280,7 +3276,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 3.5)
 
     def test_group_nested_promoted2(self):
-        import openmdao.api as om
 
         # promotes up from G1 level
         p = om.Problem()
@@ -3305,7 +3300,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
 
     def test_group_rename_connect(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('aa', 3.0),
@@ -3325,7 +3319,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp2.b'), 9.0)
 
     def test_promotes_any(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3342,7 +3335,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(top.get_val('x'), 5)
 
     def test_promotes_inputs_and_outputs(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3363,9 +3355,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 class TestFeatureConnect(unittest.TestCase):
 
     def test_basic_connect_units(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3385,9 +3374,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('comp1.y'), 60.)
 
     def test_connect_1_to_many(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3404,9 +3390,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('C3.y'), 30.)
 
     def test_connect_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3430,9 +3413,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3461,9 +3441,6 @@ class TestFeatureConnect(unittest.TestCase):
 class TestFeatureSrcIndices(unittest.TestCase):
 
     def test_promote_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -3501,9 +3478,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_promote_src_indices_nonflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -3542,8 +3516,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C1.y'), 21.)
 
     def test_group_promotes_src_indices(self):
-        import numpy as np
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             """ multiplies input array by 2. """
@@ -3592,7 +3564,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
 class TestFeatureSetOrder(unittest.TestCase):
 
     def test_set_order(self):
-        import openmdao.api as om
 
         class ReportOrderComp(om.ExplicitComponent):
             """Adds name to list."""
@@ -3636,8 +3607,6 @@ class TestFeatureSetOrder(unittest.TestCase):
 class TestFeatureGetSubsystem(unittest.TestCase):
 
     def test_group_getsystem_top(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_group import BranchGroup
 
         p = om.Problem(model=BranchGroup())
         p.setup()
@@ -3652,7 +3621,6 @@ class TestFeatureGetSubsystem(unittest.TestCase):
 class TestFeatureConfigure(unittest.TestCase):
 
     def test_system_configure(self):
-        import openmdao.api as om
 
         class ImplSimple(om.ImplicitComponent):
 
@@ -3711,8 +3679,6 @@ class TestFeatureConfigure(unittest.TestCase):
         A simple example to compute the resultant force on an aircraft using data
         from an external source. Demonstrates adding I/O in the 'configure' method.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3773,8 +3739,6 @@ class TestFeatureConfigure(unittest.TestCase):
         """
         Like the example above but system we're calling list_outputs on is a Group.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3919,8 +3883,6 @@ class TestConfigureMPI(unittest.TestCase):
 class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
-        import openmdao.api as om
-        import numpy as np
 
         class Discipline(om.Group):
 
@@ -3966,6 +3928,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
 
 class TestNaturalNaming(unittest.TestCase):
+
     def test_buried_proms(self):
         p = om.Problem()
         model = p.model

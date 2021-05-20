@@ -19,7 +19,6 @@ except ImportError:
 class TestConversionGuideDoc(unittest.TestCase):
 
     def test_tldr(self):
-        import openmdao.api as om
 
         # build the model
         prob = om.Problem()
@@ -51,7 +50,6 @@ class TestConversionGuideDoc(unittest.TestCase):
         assert_near_equal(prob['y'], -7.33333, 1e-4)
 
     def test_get_set(self):
-        import openmdao.api as om
 
         # build the model
         prob = om.Problem()
@@ -66,7 +64,6 @@ class TestConversionGuideDoc(unittest.TestCase):
         prob.set_val('y', 15.0)
 
     def test_constrained(self):
-        import openmdao.api as om
 
         # We'll use the component that was defined in the last tutorial
         from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -147,9 +144,6 @@ class TestConversionGuideDoc(unittest.TestCase):
         assert_near_equal(prob.get_val('x2', 'degF'), 212.0)
 
     def test_promote_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -193,9 +187,6 @@ class TestConversionGuideDocMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_prob_getval_dist_par(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         size = 4
 

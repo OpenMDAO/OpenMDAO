@@ -11,7 +11,6 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple(self):
         """Define one independent variable and set its value."""
-        import openmdao.api as om
 
         comp = om.IndepVarComp('indep_var')
         prob = om.Problem(comp).setup()
@@ -23,7 +22,6 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
-        import openmdao.api as om
 
         comp = om.IndepVarComp('indep_var', val=2.0)
         prob = om.Problem(comp).setup()
@@ -32,7 +30,6 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
-        import openmdao.api as om
 
         comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
         prob = om.Problem(comp).setup()
@@ -41,9 +38,6 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_array(self):
         """Define one independent array variable."""
-        import numpy as np
-
-        import openmdao.api as om
 
         array = np.array([
             [1., 2.],
@@ -57,7 +51,6 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
-        import openmdao.api as om
 
         comp = om.IndepVarComp()
         comp.add_output('indep_var_1', val=1.0)
@@ -89,10 +82,9 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
-        from openmdao.api import Problem, IndepVarComp
 
-        comp = IndepVarComp('indep_var', tags='tag1')
-        prob = Problem(comp).setup(check=False)
+        comp = om.IndepVarComp('indep_var', tags='tag1')
+        prob = om.Problem(comp).setup(check=False)
         prob.run_model()
 
         # Outputs no tags
@@ -120,13 +112,12 @@ class TestIndepVarComp(unittest.TestCase):
     def test_add_output_with_tags(self):
         """Define two independent variables using the add_output method.
         Add tags to them and see if we can filter them with list_outputs"""
-        from openmdao.api import Problem, IndepVarComp
 
-        comp = IndepVarComp()
+        comp = om.IndepVarComp()
         comp.add_output('indep_var_1', val=1.0, tags="tag1")
         comp.add_output('indep_var_2', val=2.0, tags="tag2")
 
-        prob = Problem(comp).setup(check=False)
+        prob = om.Problem(comp).setup(check=False)
         prob.run_model()
 
         # Outputs no tags

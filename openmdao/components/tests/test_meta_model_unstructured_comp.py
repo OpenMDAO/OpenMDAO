@@ -460,9 +460,6 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature(self):
         # create a MetaModelUnStructuredComp, specifying surrogates for the outputs
-        import numpy as np
-
-        import openmdao.api as om
 
         trig = om.MetaModelUnStructuredComp()
 
@@ -491,9 +488,6 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature2d(self):
         # similar to previous example, but output is 2d
-        import numpy as np
-
-        import openmdao.api as om
 
         # create a MetaModelUnStructuredComp that predicts sine and cosine as an array
         trig = om.MetaModelUnStructuredComp(default_surrogate=om.KrigingSurrogate())
@@ -638,9 +632,6 @@ class MetaModelTestCase(unittest.TestCase):
         # Its as if you stamped out n copies of metamodel, ran n scalars
         # through its input, then muxed all those outputs into one contiguous
         # array but you skip all the n-copies thing and do it all as an array
-        import numpy as np
-
-        import openmdao.api as om
 
         size = 3
 
@@ -667,9 +658,6 @@ class MetaModelTestCase(unittest.TestCase):
 
     def test_metamodel_feature_vector2d(self):
         # similar to previous example, but processes 3 inputs/outputs at a time
-        import numpy as np
-
-        import openmdao.api as om
 
         size = 3
 
@@ -914,8 +902,6 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
 
     def test_feature_metamodel_use_fd_if_no_surrogate_linearize(self):
-        from math import sin
-        import openmdao.api as om
 
         class SinSurrogate(om.SurrogateModel):
             def train(self, x, y):
@@ -1111,9 +1097,6 @@ class MetaModelTestCase(unittest.TestCase):
 class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
     def test_kriging(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -1136,9 +1119,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 1e-4)
 
     def test_nearest_neighbor(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -1161,9 +1141,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 2e-3)
 
     def test_response_surface(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -1186,9 +1163,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob.get_val('sin_mm.f_x'), .5*np.sin(prob.get_val('sin_mm.x')), 2e-3)
 
     def test_kriging_options_eval_rmse(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -1214,9 +1188,6 @@ class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
         assert_near_equal(sin_mm._metadata('f_x')['rmse'][0, 0], 0.0, 1e-4)
 
     def test_nearest_neighbor_rbf_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
 

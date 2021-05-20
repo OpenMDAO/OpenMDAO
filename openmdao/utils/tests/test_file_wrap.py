@@ -669,7 +669,6 @@ class FileGenFeature(unittest.TestCase):
     }
 
     def setUp(self):
-        from openmdao.utils.file_wrap import InputFileGenerator
 
         global parser  # global so we don't need `self.` in feature doc
         parser = InputFileGenerator()
@@ -729,8 +728,6 @@ class FileGenFeature(unittest.TestCase):
 class FileParserFeature(unittest.TestCase):
 
     def setUp(self):
-        import numpy
-        from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
         parser = FileParser()
@@ -810,8 +807,6 @@ class FileParserFeature(unittest.TestCase):
 class FileParser2dFeature(unittest.TestCase):
 
     def setUp(self):
-        import numpy
-        from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
         parser = FileParser()
@@ -844,7 +839,6 @@ class FileParser2dFeature(unittest.TestCase):
 class FileParserDelimFeature(unittest.TestCase):
 
     def setUp(self):
-        from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
         parser = FileParser()
@@ -873,7 +867,6 @@ class FileParserDelimFeature(unittest.TestCase):
 class FileParserColumnsFeature(unittest.TestCase):
 
     def setUp(self):
-        from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
         parser = FileParser()
@@ -899,7 +892,6 @@ class FileParserColumnsFeature(unittest.TestCase):
 class FileParserArrayColumnsFeature(unittest.TestCase):
 
     def setUp(self):
-        from openmdao.utils.file_wrap import FileParser
 
         global parser  # global so we don't need `self.` in feature doc
         parser = FileParser()

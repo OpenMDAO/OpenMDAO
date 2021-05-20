@@ -1,16 +1,16 @@
 import unittest
 
+import numpy as np
+from scipy.optimize import minimize
+
+import openmdao.api as om
+from openmdao.test_suite.test_examples.cannonball.cannonball_ode import CannonballODE
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestEulerExample(unittest.TestCase):
 
     def test_feature_example(self):
-        import numpy as np
-        from scipy.optimize import minimize
-
-        import openmdao.api as om
-        from openmdao.test_suite.test_examples.cannonball.cannonball_ode import CannonballODE
 
         def eval_cannonball_range(gam_init, prob, complex_step=False):
             """

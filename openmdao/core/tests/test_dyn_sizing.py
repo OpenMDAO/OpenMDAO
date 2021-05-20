@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 import openmdao.api as om
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.warnings import OMDeprecationWarning
 
@@ -25,8 +28,6 @@ class L2(om.ExplicitComponent):
 
 class TestAdder(unittest.TestCase):
     def test_adder(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -653,9 +654,6 @@ class DynPartialsComp(om.ExplicitComponent):
 
 class TestDynShapeFeature(unittest.TestCase):
     def test_feature_fwd(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones(5)))
@@ -671,9 +669,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'indeps.x'], np.eye(5)*3.)
 
     def test_feature_rev(sefl):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('comp', DynPartialsComp())
@@ -685,8 +680,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
 
     def test_feature_middle(self):
-        import numpy as np
-        import openmdao.api as om
 
         class PartialsComp(om.ExplicitComponent):
             def setup(self):
@@ -718,6 +711,7 @@ class DistCompDiffSizeKnownInput(om.ExplicitComponent):
         size = (self.comm.rank + 1) * 3
         self.add_input('x', val=np.random.random(size), distributed=True)
 
+
 class DistCompKnownInput(om.ExplicitComponent):
     def setup(self):
         size = 3
@@ -725,6 +719,7 @@ class DistCompKnownInput(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         pass
+
 
 class DistCompUnknownInput(om.ExplicitComponent):
     def setup(self):

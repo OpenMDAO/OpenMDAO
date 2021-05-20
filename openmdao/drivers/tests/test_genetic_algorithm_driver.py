@@ -1257,33 +1257,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         import os
         os.environ['SimpleGADriver_seed'] = '11'
 
-    def test_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(),
-                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'xC': 8}
-
-        prob.setup()
-
-        prob.set_val('xC', 7.5)
-        prob.set_val('xI', 0.0)
-
-        prob.run_driver()
-
     def test_basic_with_assert(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1311,8 +1285,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
 
     def test_option_max_gen(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1336,8 +1308,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
     def test_option_pop_size(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1361,7 +1331,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
-        import openmdao.api as om
 
         class Cylinder(om.ExplicitComponent):
             """Main class"""
@@ -1410,7 +1379,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         self.assertGreater(prob.get_val('height'), 1.)
 
     def test_pareto(self):
-        import openmdao.api as om
 
         class Box(om.ExplicitComponent):
 
@@ -1517,15 +1485,12 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        import numpy as np
         np.random.seed(1)
 
         import os
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_option_parallel(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model

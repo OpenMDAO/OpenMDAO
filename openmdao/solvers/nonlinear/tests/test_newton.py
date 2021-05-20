@@ -3,19 +3,14 @@
 import unittest
 import warnings
 
-
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.tests.test_discrete import InternalDiscreteGroup
-from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit, \
-     SubSellar
-from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
+from openmdao.test_suite.components.double_sellar import DoubleSellar, DoubleSellarImplicit
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
-from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_near_equal
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -892,10 +887,6 @@ class TestNewtonFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.0607416105, .00001)
 
     def test_feature_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model

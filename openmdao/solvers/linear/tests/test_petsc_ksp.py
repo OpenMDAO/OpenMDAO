@@ -15,7 +15,7 @@ except ImportError:
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 @unittest.skipUnless(PETScVector is not None, "PETSc is required.")
@@ -384,10 +384,6 @@ class TestPETScKrylov(unittest.TestCase):
 class TestPETScKrylovSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -589,11 +585,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_specify_precon_left(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model

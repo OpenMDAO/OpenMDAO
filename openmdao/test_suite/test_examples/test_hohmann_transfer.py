@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.test_suite.test_examples.test_hohmann_transfer import  VCircComp, TransferOrbitComp, DeltaVComp
 
 
 class VCircComp(om.ExplicitComponent):
@@ -129,8 +130,6 @@ class TransferOrbitComp(om.ExplicitComponent):
 class TestHohmannTransfer(unittest.TestCase):
 
     def test_dv_at_apogee(self):
-        import openmdao.api as om
-        from openmdao.test_suite.test_examples.test_hohmann_transfer import  VCircComp, TransferOrbitComp, DeltaVComp
 
         prob = om.Problem()
 

@@ -754,41 +754,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
-    def test_feature_scalar(self):
-        from numpy.testing import assert_almost_equal
-        import openmdao.api as om
-
-        prob = om.Problem()
-
-        bal = om.BalanceComp()
-        bal.add_balance('x', use_mult=True)
-
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
-
-        prob.model.add_subsystem(name='exec', subsys=exec_comp)
-        prob.model.add_subsystem(name='balance', subsys=bal)
-
-        prob.model.connect('balance.x', 'exec.x')
-        prob.model.connect('exec.y', 'balance.lhs:x')
-
-        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
-
-        prob.setup()
-
-        prob.set_val('balance.rhs:x', 4)
-        prob.set_val('balance.mult:x', 2.)
-
-        # A reasonable initial guess to find the positive root.
-        prob['balance.x'] = 1.0
-
-        prob.run_model()
-
-        assert_almost_equal(prob.get_val('balance.x'), np.sqrt(2), decimal=7)
-
     def test_feature_scalar_with_default_mult(self):
-        from numpy.testing import assert_almost_equal
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -818,10 +784,6 @@ class TestBalanceComp(unittest.TestCase):
         assert_almost_equal(prob.get_val('balance.x'), np.sqrt(2), decimal=7)
 
     def test_feature_vector(self):
-        import numpy as np
-        from numpy.testing import assert_almost_equal
-
-        import openmdao.api as om
 
         n = 100
 

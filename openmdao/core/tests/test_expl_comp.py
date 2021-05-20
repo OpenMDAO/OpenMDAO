@@ -8,15 +8,14 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
-from openmdao.utils.general_utils import printoptions, remove_whitespace
-from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
     TestExplCompSimpleDense
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
      SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.assert_utils import assert_warning, assert_near_equal
+from openmdao.utils.general_utils import printoptions, remove_whitespace
+from openmdao.utils.mpi import MPI
 
 # Note: The following class definitions are used in feature docs
 
@@ -94,8 +93,6 @@ class ExplCompTestCase(unittest.TestCase):
         prob.run_model()
 
     def test_feature_simple(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_expl_comp import RectangleComp
 
         prob = om.Problem(RectangleComp())
         prob.setup()
@@ -162,8 +159,6 @@ class ExplCompTestCase(unittest.TestCase):
             prob.model.list_outputs(explicit=False, implicit=False)
 
     def test_simple_list_vars_options(self):
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -336,8 +331,6 @@ class ExplCompTestCase(unittest.TestCase):
                 self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
 
     def test_for_feature_docs_list_vars_options(self):
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -683,11 +676,6 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_for_docs_array_list_vars_options(self):
 
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.general_utils import printoptions
-
         class ArrayAdder(om.ExplicitComponent):
             """
             Just a simple component that has array inputs and outputs
@@ -745,8 +733,6 @@ class ExplCompTestCase(unittest.TestCase):
                                     print_arrays=True)
 
     def test_list_residuals_tol(self):
-        import numpy as np
-        import openmdao.api as om
 
         class EComp(om.ExplicitComponent):
 

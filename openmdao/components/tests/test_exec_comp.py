@@ -1031,8 +1031,6 @@ class TestExecComp(unittest.TestCase):
         self.assertEqual(sorted(outputs), [])
 
     def test_feature_has_diag_partials(self):
-        import numpy as np
-        import openmdao.api as om
 
         p = om.Problem()
         model = p.model
@@ -1051,25 +1049,7 @@ class TestExecComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
-    def test_feature_simple(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', om.ExecComp('y=x+1.'))
-
-        model.set_input_defaults('comp.x', 2.0)
-
-        prob.setup()
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.y'), 3.0, 0.00001)
-
     def test_feature_multi_output(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1088,7 +1068,6 @@ class TestExecComp(unittest.TestCase):
 
     def test_feature_multi_output2(self):
         # verify that expressions can have multiple LHS variables.
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1106,9 +1085,6 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
 
     def test_feature_array(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1125,9 +1101,6 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.y'), 2.0, 0.00001)
 
     def test_feature_math(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1145,9 +1118,6 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.z'), 1.0, 0.00001)
 
     def test_feature_numpy(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1162,7 +1132,6 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob['comp.y'], 6.0, 0.00001)
 
     def test_feature_metadata(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1183,7 +1152,6 @@ class TestExecComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.z'), 24.0, 0.00001)
 
     def test_feature_options(self):
-        import openmdao.api as om
 
         model = om.Group()
 
@@ -1344,8 +1312,6 @@ class TestExecComp(unittest.TestCase):
                           "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
     def test_feature_add_expr(self):
-        import numpy as np
-        import openmdao.api as om
 
         class ConfigGroup(om.Group):
             def setup(self):
@@ -1375,7 +1341,6 @@ class TestFunctionRegistration(unittest.TestCase):
     # the _temporary_expr_dict contextmanager (to avoid user confusion)
     # which keeps the contents of the ExecComp _expr_dict clean
     def featuretest_register_simple(self):
-        import openmdao.api as om
 
         om.ExecComp.register("myfunc", lambda x: x * x, complex_safe=True)
         p = om.Problem()
@@ -1387,7 +1352,6 @@ class TestFunctionRegistration(unittest.TestCase):
         assert_near_equal(J['comp.y', 'comp.x'][0][0], 4., 1e-10)
 
     def featuretest_register_simple_unsafe(self):
-        import openmdao.api as om
 
         # the following function isn't really complex unsafe, but we'll call it unsafe anyway
         # for demonstration purposes

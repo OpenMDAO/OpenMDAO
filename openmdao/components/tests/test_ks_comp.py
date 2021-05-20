@@ -209,9 +209,6 @@ class TestKSFunction(unittest.TestCase):
 class TestKSFunctionFeatures(unittest.TestCase):
 
     def test_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -231,9 +228,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS'), [[15.0]])
 
     def test_vectorized(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -252,9 +246,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('ks.KS'), np.array([[15], [30]]))
 
     def test_upper(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -274,9 +265,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         assert_near_equal(prob['ks.KS'], np.array([[-1.0]]))
 
     def test_lower_flag(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -298,9 +286,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
 
     @unittest.skipIf(not plt, "requires matplotlib")
     def test_add_constraint(self):
-        import numpy as np
-        import openmdao.api as om
-        import matplotlib.pyplot as plt
 
         n = 50
         prob = om.Problem()
@@ -343,8 +328,6 @@ class TestKSFunctionFeatures(unittest.TestCase):
         plt.show()
 
     def test_units(self):
-        import openmdao.api as om
-        from openmdao.utils.units import convert_units
 
         n = 10
 

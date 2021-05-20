@@ -14,8 +14,6 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar, SubSellar
 class TestSolverFeatures(unittest.TestCase):
 
     def test_specify_solver(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         model = prob.model = SellarDerivatives()
@@ -35,8 +33,6 @@ class TestSolverFeatures(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_specify_subgroup_solvers(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import DoubleSellar
 
         prob = om.Problem()
         model = prob.model = DoubleSellar()
@@ -154,9 +150,6 @@ class TestSolverFeatures(unittest.TestCase):
             prob.run_model()
 
     def test_feature_stall_detection_newton(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
 
         prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 
@@ -178,9 +171,6 @@ class TestSolverFeatures(unittest.TestCase):
         prob.run_model()
 
     def test_feature_stall_detection_broyden(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
 
         prob.model.add_subsystem('comp', om.ExecComp('y=3*x+1'), promotes=['*'])
 

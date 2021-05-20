@@ -1,8 +1,6 @@
 from distutils.version import LooseVersion
 import unittest
 
-import scipy
-
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 
@@ -93,9 +91,6 @@ class ActuatorDisc(om.ExplicitComponent):
 class TestBetzLimit(unittest.TestCase):
 
     def test_betz(self):
-        from distutils.version import LooseVersion
-        import scipy
-        import openmdao.api as om
 
         class ActuatorDisc(om.ExplicitComponent):
             """Simple wind turbine model based on actuator disc theory"""
@@ -216,7 +211,6 @@ class TestBetzLimit(unittest.TestCase):
             assert_near_equal(prob['Area'], 1.0, 1e-4)
 
     def test_betz_with_var_tags(self):
-        import openmdao.api as om
 
         class ActuatorDiscWithTags(om.ExplicitComponent):
             """Simple wind turbine model based on actuator disc theory"""
@@ -332,9 +326,6 @@ class TestBetzLimit(unittest.TestCase):
         prob.model.list_outputs(tags=['basic','advanced'], units=False, shape=False)
 
     def test_betz_derivatives(self):
-        import openmdao.api as om
-
-        from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 
         prob = om.Problem()
 

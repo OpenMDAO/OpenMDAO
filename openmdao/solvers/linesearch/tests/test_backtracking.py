@@ -789,6 +789,166 @@ class CompAtan(om.ImplicitComponent):
 
 class TestFeatureLineSearch(unittest.TestCase):
 
+    def test_feature_specification(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', CompAtan(), promotes_inputs=['x'])
+
+        prob.setup()
+
+        prob.set_val('x', -100.0)
+
+        # Initial value for the state:
+        prob.set_val('comp.y', 12.0)
+
+        # You can change the om.NewtonSolver settings after setup is called
+        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.linear_solver = om.DirectSolver()
+        newton.options['iprint'] = 2
+        newton.options['rtol'] = 1e-8
+        newton.options['solve_subsystems'] = True
+
+        newton.linesearch = om.BoundsEnforceLS()
+        newton.linesearch.options['iprint'] = 2
+
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.y'), 19.68734033, 1e-6)
+
+    def test_feature_boundsenforcels_basic(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+
+        top.setup()
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
+
+    def test_feature_armijogoldsteinls_basic(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS()
+
+        top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+        # Test lower bounds: should go to the lower bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
+
+    def test_feature_boundscheck_basic(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+
+        top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+
+        # Test lower bounds: should go to the lower bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
+
+    def test_feature_boundscheck_vector(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
+
+        top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+
+        # Test lower bounds: should go to the lower bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
+
+    def test_feature_boundscheck_wall(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
+
+        top.setup()
+        top.set_val('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
+
+        # Test upper bounds: should go to the upper bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 2.4)
+        top.run_model()
+
+        assert_near_equal(top.get_val('comp.z', indices=0), [2.6], 1e-8)
+        assert_near_equal(top.get_val('comp.z', indices=1), [2.5], 1e-8)
+        assert_near_equal(top.get_val('comp.z', indices=2), [2.65], 1e-8)
+
+    def test_feature_boundscheck_scalar(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
+
+        top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+        top.run_model()
+
+        # Test lower bounds: should stop just short of the lower bound
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
+
     def test_feature_print_bound_enforce(self):
 
         top = om.Problem()
@@ -803,6 +963,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.set_solver_print(level=2)
 
+
         top.setup()
         top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
 
@@ -813,6 +974,73 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         for ind in range(3):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
+
+    def test_feature_armijo_boundscheck_vector(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+
+        top.setup()
+
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+
+        # Test lower bounds: should go to the lower bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
+
+    def test_feature_armijo_boundscheck_wall(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
+
+        top.setup()
+
+        top.set_val('x', np.array([0.5, 0.5, 0.5]).reshape(3, 1))
+
+        # Test upper bounds: should go to the upper bound and stall
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 2.4)
+        top.run_model()
+
+        assert_near_equal(top.get_val('comp.z', indices=0), [2.6], 1e-8)
+        assert_near_equal(top.get_val('comp.z', indices=1), [2.5], 1e-8)
+        assert_near_equal(top.get_val('comp.z', indices=2), [2.65], 1e-8)
+
+    def test_feature_armijo_boundscheck_scalar(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
+
+        top.setup()
+        top.set_val('x', np.array([2., 2, 2]).reshape(3, 1))
+        top.run_model()
+
+        # Test lower bounds: should stop just short of the lower bound
+        top.set_val('comp.y', 0.)
+        top.set_val('comp.z', 1.6)
+        top.run_model()
 
     def test_feature_armijo_print_bound_enforce(self):
 
@@ -829,6 +1057,31 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls.options['print_bound_enforce'] = True
 
         top.set_solver_print(level=2)
+        top.setup()
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        for ind in range(3):
+            assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
+
+    def test_feature_goldstein(self):
+
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['method'] = 'Goldstein'
+
         top.setup()
 
         # Test lower bounds: should go to the lower bound and stall

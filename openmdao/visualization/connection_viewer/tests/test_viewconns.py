@@ -1,5 +1,7 @@
 import unittest
+
 import openmdao.api as om
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_warning
 
@@ -10,8 +12,6 @@ class TestSellarFeature(unittest.TestCase):
     # no output checking, just make sure no exceptions raised
     # Just tests Newton on Sellar with FD derivs.
     def test_feature_sellar(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
         prob = om.Problem()
         prob.model = SellarNoDerivatives()
@@ -48,7 +48,6 @@ class TestDiscreteViewConns(unittest.TestCase):
         om.view_connections(p, show_browser=False)
 
     def test_no_setup_warning(self):
-        from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
         prob = om.Problem()
         prob.model = SellarNoDerivatives()

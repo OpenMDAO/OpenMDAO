@@ -1962,7 +1962,6 @@ class TestComponentComplexStep(unittest.TestCase):
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):
-        import openmdao.api as om
 
         class SimpleComp(om.ExplicitComponent):
 
@@ -2099,9 +2098,6 @@ class TestComponentComplexStep(unittest.TestCase):
 class ApproxTotalsFeature(unittest.TestCase):
 
     def test_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2149,9 +2145,6 @@ class ApproxTotalsFeature(unittest.TestCase):
         self.assertEqual(comp2._exec_count, 2)
 
     def test_basic_cs(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2197,9 +2190,6 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_near_equal(derivs['z', 'x'], [[300.0]], 1e-6)
 
     def test_arguments(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2244,8 +2234,6 @@ class ApproxTotalsFeature(unittest.TestCase):
 
     def test_sellarCS(self):
         # Just tests Newton on Sellar with FD derivs.
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 
         prob = om.Problem()
         prob.model = SellarNoDerivativesCS()
