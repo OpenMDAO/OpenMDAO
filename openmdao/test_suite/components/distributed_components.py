@@ -25,14 +25,10 @@ class DistribComp(om.ExplicitComponent):
 
         # if comm.size is 2 and size is 15, this results in
         # 8 entries for proc 0 and 7 entries for proc 1
-        sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        sizes, _ = evenly_distrib_idxs(comm.size, size)
         mysize = sizes[rank]
-        start = offsets[rank]
-        end = start + mysize
 
-        self.add_input('invec', np.ones(mysize, float), distributed=True,
-                       src_indices=np.arange(start, end, dtype=int))
-
+        self.add_input('invec', np.ones(mysize, float), distributed=True)
         self.add_output('outvec', np.ones(mysize, float), distributed=True,)
 
     def compute(self, inputs, outputs):

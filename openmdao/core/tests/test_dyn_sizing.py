@@ -298,27 +298,6 @@ class DistribDynShapeComp(om.ExplicitComponent):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
 
 
-class DistribComp(om.ExplicitComponent):
-    # a distributed component with inputs and outputs that are not dynamically shaped
-    def __init__(self, global_size, n_inputs=2):
-        super().__init__()
-        self.n_inputs = n_inputs
-        self.global_size = global_size
-
-    def setup(self):
-        # evenly distribute the variable over the procs
-        ave, res = divmod(self.global_size, self.comm.size)
-        sizes = [ave + 1 if p < res else ave for p in range(self.comm.size)]
-
-        for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]), distributed=True)
-            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]), distributed=True)
-
-    def compute(self, inputs, outputs):
-        for i in range(self.n_inputs):
-            outputs[f"y{i+1}"] = (self.comm.rank + 1)*inputs[f"x{i+1}"]
-
-
 class DynShapeGroupSeries(om.Group):
     # strings together some number of components in series.
     # component type is determined by comp_class
