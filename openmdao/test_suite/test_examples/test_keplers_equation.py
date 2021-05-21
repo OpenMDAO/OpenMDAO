@@ -9,10 +9,6 @@ import openmdao.api as om
 class TestKeplersEquation(unittest.TestCase):
 
     def test_result(self):
-        import numpy as np
-        from numpy.testing import assert_almost_equal
-
-        import openmdao.api as om
 
         prob = om.Problem()
 

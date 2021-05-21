@@ -790,8 +790,6 @@ class CompAtan(om.ImplicitComponent):
 class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
-        import openmdao.api as om
-        from openmdao.solvers.linesearch.tests.test_backtracking import CompAtan
 
         prob = om.Problem()
         model = prob.model
@@ -820,10 +818,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.y'), 19.68734033, 1e-6)
 
     def test_feature_boundsenforcels_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
@@ -848,10 +842,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijogoldsteinls_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -873,10 +863,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
 
     def test_feature_boundscheck_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -899,10 +885,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
 
     def test_feature_boundscheck_vector(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -925,10 +907,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
 
     def test_feature_boundscheck_wall(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -952,10 +930,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_near_equal(top.get_val('comp.z', indices=2), [2.65], 1e-8)
 
     def test_feature_boundscheck_scalar(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -976,10 +950,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
     def test_feature_print_bound_enforce(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -1006,10 +976,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_vector(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -1033,10 +999,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top.get_val('comp.z', indices=ind), [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_wall(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -1061,10 +1023,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         assert_near_equal(top.get_val('comp.z', indices=2), [2.65], 1e-8)
 
     def test_feature_armijo_boundscheck_scalar(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays(), promotes_inputs=['x'])
@@ -1085,10 +1043,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.run_model()
 
     def test_feature_armijo_print_bound_enforce(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
@@ -1115,10 +1069,6 @@ class TestFeatureLineSearch(unittest.TestCase):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_goldstein(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
         top = om.Problem()
         top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))

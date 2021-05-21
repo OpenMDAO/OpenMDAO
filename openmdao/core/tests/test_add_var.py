@@ -100,8 +100,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_val(self):
         """Test declaring only default value."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddWithDefault
 
         p = om.Problem(model=CompAddWithDefault())
         p.setup()
@@ -119,8 +117,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_shape(self):
         """Test declaring only shape."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddWithShape
 
         p = om.Problem(model=CompAddWithShape())
         p.setup()
@@ -134,8 +130,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_indices(self):
         """Test declaring only indices."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddWithIndices
 
         p = om.Problem(model=CompAddWithIndices())
         p.setup()
@@ -158,8 +152,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_scalar_array(self):
         """Test declaring a scalar val with an array variable."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddArrayWithScalar
 
         p = om.Problem(model=CompAddArrayWithScalar())
         p.setup()
@@ -173,8 +165,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_array_indices(self):
         """Test declaring with array val and array indices."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddWithArrayIndices
 
         p = om.Problem(model=CompAddWithArrayIndices())
         p.setup()
@@ -184,8 +174,6 @@ class TestAddVar(unittest.TestCase):
 
     def test_bounds(self):
         """Test declaring bounds."""
-        import openmdao.api as om
-        from openmdao.core.tests.test_add_var import CompAddWithBounds
 
         p = om.Problem(model=CompAddWithBounds())
         p.setup()

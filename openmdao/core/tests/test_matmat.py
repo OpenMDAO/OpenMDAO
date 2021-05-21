@@ -519,8 +519,6 @@ def phase_model(order, nphases, dvgroup='pardv', congroup='parc', vectorize=Fals
 class MatMatTestCase(unittest.TestCase):
 
     def test_feature_vectorized_derivs(self):
-        import numpy as np
-        import openmdao.api as om
 
         SIZE = 5
 

@@ -4,8 +4,6 @@ Test DOE Driver and Generators.
 import unittest
 
 import os
-import shutil
-import tempfile
 import csv
 import json
 
@@ -1384,7 +1382,7 @@ class TestDOEDriver(unittest.TestCase):
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
-class TestParallelDOE(unittest.TestCase):
+class TestParallelDOE4Proc(unittest.TestCase):
 
     N_PROCS = 4
 
@@ -1793,197 +1791,13 @@ class TestParallelDOE(unittest.TestCase):
         self.assertEqual(sum(num_cases), num_models*len(expected))
 
 
-@use_tempdirs
-class TestDOEDriverFeature(unittest.TestCase):
-
-    def setUp(self):
-        import json
-        import numpy as np
-
-        self.expected_csv = '\n'.join([
-            " x ,   y",
-            "0.0,  0.0",
-            "0.5,  0.0",
-            "1.0,  0.0",
-            "0.0,  0.5",
-            "0.5,  0.5",
-            "1.0,  0.5",
-            "0.0,  1.0",
-            "0.5,  1.0",
-            "1.0,  1.0",
-        ])
-
-        with open('cases.csv', 'w') as f:
-            f.write(self.expected_csv)
-
-        expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            {'x': np.array([.5]), 'y': np.array([0.]), 'f_xy': np.array([19.25])},
-            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            {'x': np.array([.5]), 'y': np.array([.5]), 'f_xy': np.array([23.75])},
-            {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            {'x': np.array([.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
-            {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        ]
-
-        values = []
-        cases = []
-
-        for case in expected:
-            values.append((case['x'], case['y'], case['f_xy']))
-            # converting ndarray to list enables JSON serialization
-            cases.append((('x', list(case['x'])), ('y', list(case['y']))))
-
-        self.expected_text = "\n".join([
-            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values
-        ])
-
-        self.expected_json = json.dumps(cases).replace(']]],', ']]],\n')
-        with open('cases.json', 'w') as f:
-            f.write(self.expected_json)
-
-    def test_uniform(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        model.add_design_var('x', lower=-10, upper=10)
-        model.add_design_var('y', lower=-10, upper=10)
-        model.add_objective('f_xy')
-
-        prob.driver = om.DOEDriver(om.UniformGenerator(num_samples=5))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.setup()
-
-        prob.set_val('x', 0.0)
-        prob.set_val('y', 0.0)
-
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
-
-        self.assertEqual(len(cases), 5)
-
-        values = []
-        for case in cases:
-            outputs = cr.get_case(case).outputs
-            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
-
-        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]))
-
-    def test_csv(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 0.0)
-        prob.set_val('y', 0.0)
-
-        # this file contains design variable inputs in CSV format
-        with open('cases.csv', 'r') as f:
-            self.assertEqual(f.read(), self.expected_csv)
-
-        # run problem with DOEDriver using the CSV file
-        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
-
-        values = []
-        for case in cases:
-            outputs = cr.get_case(case).outputs
-            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
-
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
-                         self.expected_text)
-
-    def test_list(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        import json
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 0.0)
-        prob.set_val('y', 0.0)
-
-        # load design variable inputs from JSON file and decode into list
-        with open('cases.json', 'r') as f:
-            json_data = f.read()
-
-        self.assertEqual(json_data, self.expected_json)
-
-        case_list = json.loads(json_data)
-
-        self.assertEqual(case_list, json.loads(json_data))
-
-        # create DOEDriver using provided list of cases
-        prob.driver = om.DOEDriver(case_list)
-
-        # a ListGenerator was created
-        self.assertEqual(type(prob.driver.options['generator']), om.ListGenerator)
-
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.run_driver()
-        prob.cleanup()
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
-
-        values = []
-        for case in cases:
-            outputs = cr.get_case(case).outputs
-            values.append((outputs['x'], outputs['y'], outputs['f_xy']))
-
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
-                         self.expected_text)
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
-class TestParallelDOEFeature(unittest.TestCase):
+class TestParallelDOE2proc(unittest.TestCase):
 
     N_PROCS = 2
 
     def setUp(self):
-        import numpy as np
-
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
@@ -2012,9 +1826,6 @@ class TestParallelDOEFeature(unittest.TestCase):
         ])
 
     def test_full_factorial(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         from mpi4py import MPI
 
         prob = om.Problem()
@@ -2066,85 +1877,6 @@ class TestParallelDOEFeature(unittest.TestCase):
             found_metadata = False
 
         self.assertFalse(found_metadata, "No error from SqliteCaseReader for missing metadata file.")
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@use_tempdirs
-class TestParallelDOEFeature2(unittest.TestCase):
-
-    N_PROCS = 4
-
-    def setUp(self):
-        from mpi4py import MPI
-        rank = MPI.COMM_WORLD.rank
-
-        expected = [
-            {'x1': np.array([0.]), 'x2': np.array([0.]), 'c3.y': np.array([0.00])},
-            {'x1': np.array([.5]), 'x2': np.array([0.]), 'c3.y': np.array([-3.00])},
-            {'x1': np.array([1.]), 'x2': np.array([0.]), 'c3.y': np.array([-6.00])},
-
-            {'x1': np.array([0.]), 'x2': np.array([.5]), 'c3.y': np.array([17.50])},
-            {'x1': np.array([.5]), 'x2': np.array([.5]), 'c3.y': np.array([14.50])},
-            {'x1': np.array([1.]), 'x2': np.array([.5]), 'c3.y': np.array([11.50])},
-
-            {'x1': np.array([0.]), 'x2': np.array([1.]), 'c3.y': np.array([35.00])},
-            {'x1': np.array([.5]), 'x2': np.array([1.]), 'c3.y': np.array([32.00])},
-            {'x1': np.array([1.]), 'x2': np.array([1.]), 'c3.y': np.array([29.00])},
-        ]
-
-        # expect odd cases on rank 0 and even cases on rank 1
-        values = []
-        for idx, case in enumerate(expected):
-            if idx % 2 == rank:
-                values.append((case['x1'], case['x2'], case['c3.y']))
-
-        self.expect_text = "\n"+"\n".join([
-            "x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % vals_i for vals_i in values
-        ])
-
-    def test_fan_in_grouped(self):
-        import openmdao.api as om
-        from openmdao.test_suite.groups.parallel_groups import FanInGrouped
-
-        from mpi4py import MPI
-
-        prob = om.Problem(FanInGrouped())
-
-        prob.model.add_design_var('x1', lower=0.0, upper=1.0)
-        prob.model.add_design_var('x2', lower=0.0, upper=1.0)
-        prob.model.add_objective('c3.y')
-
-        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        # the FanInGrouped model uses 2 processes, so we can run
-        # two instances of the model at a time, each using 2 of our 4 procs
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = procs_per_model = 2
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        # a separate case file will be written by rank 0 of each parallel model
-        # (the top two global ranks)
-        rank = prob.comm.rank
-
-        num_models = prob.comm.size // procs_per_model
-
-        if rank < num_models:
-            filename = "cases.sql_%d" % rank
-
-            cr = om.CaseReader(filename)
-            cases = cr.list_cases('driver')
-
-            values = []
-            for case in cases:
-                outputs = cr.get_case(case).outputs
-                values.append((outputs['x1'], outputs['x2'], outputs['c3.y']))
-
-            self.assertEqual("\n"+"\n".join(["x1: %5.2f, x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
-                self.expect_text)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

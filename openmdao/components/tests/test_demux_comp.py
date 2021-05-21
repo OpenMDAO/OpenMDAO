@@ -139,6 +139,7 @@ class TestDemuxComp2D(unittest.TestCase):
         cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
+
 class TestDemuxComp3D(unittest.TestCase):
 
     def setUp(self):
@@ -240,9 +241,6 @@ class TestFeature(unittest.TestCase):
         """
         An example demonstrating a trivial use case of DemuxComp
         """
-        import numpy as np
-
-        import openmdao.api as om
         # The number of elements to be demuxed
         n = 3
 

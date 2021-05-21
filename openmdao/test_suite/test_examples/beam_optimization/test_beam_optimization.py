@@ -15,10 +15,6 @@ except ImportError:
 class TestCase(unittest.TestCase):
 
     def test(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 
         E = 1.
         L = 1.
@@ -50,10 +46,6 @@ class TestCase(unittest.TestCase):
                           0.02620192,  0.01610863], 1e-4)
 
     def test_multipoint(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
         L = 1.
@@ -91,9 +83,6 @@ class TestCase(unittest.TestCase):
                            0.0150119,   0.01453876], 1e-4)
 
     def test_multipoint_stress(self):
-        import numpy as np
-
-        import openmdao.api as om
         from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_stress import MultipointBeamGroup
 
         E = 1.
@@ -197,10 +186,6 @@ class TestParallelGroups(unittest.TestCase):
     N_PROCS = 2
 
     def test_multipoint(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
         E = 1.
         L = 1.

@@ -10,6 +10,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import SubSellar
+from openmdao.test_suite.components.sellar import SellarDerivatives
 
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
@@ -24,8 +25,6 @@ except ImportError:
 class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_neg1(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -58,8 +57,6 @@ class TestSolverPrint(unittest.TestCase):
         self.assertEqual(str_out.getvalue().strip(), "")
 
     def test_feature_iprint_0(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -94,8 +91,6 @@ class TestSolverPrint(unittest.TestCase):
                          "1 iterations.")
 
     def test_feature_iprint_1(self, stdout=None):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -128,8 +123,6 @@ class TestSolverPrint(unittest.TestCase):
                          "NL: Newton Converged in 2 iterations")
 
     def test_feature_iprint_2(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -271,10 +264,6 @@ class TestSolverPrint(unittest.TestCase):
         self.assertGreaterEqual(output.count('NL: NLBJ'), 2)
 
     def test_feature_set_solver_print1(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = om.Problem()
         model = prob.model
@@ -327,10 +316,6 @@ class TestSolverPrint(unittest.TestCase):
 
 
     def test_feature_set_solver_print2(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = om.Problem()
         model = prob.model
@@ -380,10 +365,6 @@ class TestSolverPrint(unittest.TestCase):
         self.assertGreaterEqual(output.count('LS: BCHK'), 2)
 
     def test_feature_set_solver_print3(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = om.Problem()
         model = prob.model
@@ -435,10 +416,6 @@ class TestSolverPrint(unittest.TestCase):
         self.assertGreaterEqual(output.count('LN: SCIPY'), 2)
 
     def test_feature_set_solver_print4(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.double_sellar import SubSellar
 
         prob = om.Problem()
         model = prob.model

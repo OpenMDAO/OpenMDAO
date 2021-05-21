@@ -894,8 +894,6 @@ class TestScaling(unittest.TestCase):
         assert_near_equal(prob['comp.y'], 2.0)
 
     def test_feature1(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_scaling import ScalingExample1
 
         prob = om.Problem()
         model = prob.model
@@ -918,8 +916,6 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val, 6.0)
 
     def test_feature2(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_scaling import ScalingExample2
 
         prob = om.Problem()
         model = prob.model
@@ -942,8 +938,6 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val, 0.5)
 
     def test_feature3(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_scaling import ScalingExample3
 
         prob = om.Problem()
         model = prob.model
@@ -966,8 +960,6 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val, (1-6000.)/6000.)
 
     def test_feature_vector(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_scaling import ScalingExampleVector
 
         prob = om.Problem()
         model = prob.model
@@ -1005,6 +997,7 @@ class TestScaling(unittest.TestCase):
         assert_near_equal(p.get_val('sub1.sub2.sub3.tgt.x3'), 77.0)
         assert_near_equal(p.model.sub1.sub2._inputs._scaling[0],
                           np.array([0, 32]), tolerance=1e-12)
+
 
 class MyComp(om.ExplicitComponent):
 

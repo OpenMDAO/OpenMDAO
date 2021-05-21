@@ -187,10 +187,6 @@ class TestUserDefinedSolver(unittest.TestCase):
         assert_near_equal(15.0, jac['out_var']['a'][0][0])
 
     def test_feature(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.array_utils import evenly_distrib_idxs
 
         class CustomSolveImplicit(om.ImplicitComponent):
 

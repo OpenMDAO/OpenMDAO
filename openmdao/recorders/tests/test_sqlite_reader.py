@@ -6,33 +6,34 @@ import os
 import sys
 import unittest
 
-from shutil import rmtree
-from tempfile import mkdtemp, mkstemp
+from io import StringIO
+from tempfile import mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from io import StringIO
 
 import openmdao.api as om
 from openmdao import __version__ as openmdao_version
-import openmdao
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.tests.test_sqlite_recorder import ParaboloidProblem
 from openmdao.recorders.case import PromAbsDict
+from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+from openmdao.core.tests.test_expl_comp import RectangleComp, RectangleCompWithTags
 from openmdao.core.tests.test_units import SpeedComp
+from openmdao.test_suite.components.eggcrate import EggCrate
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
-from openmdao.test_suite.components.double_sellar import DoubleSellar
+    SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem, SellarDerivatives
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+from openmdao.utils.units import convert_units
 from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
@@ -58,6 +59,7 @@ def count_keys(d):
             count += count_keys(d[k])
 
     return count
+
 
 class SellarDerivativesGroupedPreAutoIVC(om.Group):
     """
@@ -1075,8 +1077,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text[i], line)
 
     def test_list_residuals_tol(self):
-        import numpy as np
-        import openmdao.api as om
 
         class EComp(om.ExplicitComponent):
 
@@ -1272,7 +1272,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text[i], line)
 
     def test_list_input_and_outputs_with_tags(self):
-        from openmdao.core.tests.test_expl_comp import RectangleCompWithTags
         prob = om.Problem(RectangleCompWithTags())
 
         recorder = om.SqliteRecorder("cases.sql")
@@ -1667,7 +1666,6 @@ class TestSqliteCaseReader(unittest.TestCase):
                 np.testing.assert_almost_equal(case[name], expected[name])
 
     def test_get_val_exhaustive(self):
-        import openmdao.api as om
 
         model = om.Group()
         model.add_subsystem('comp', om.ExecComp('y=x-25.',
@@ -1721,7 +1719,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
 
     def test_get_val_reducable_units(self):
-        import openmdao.api as om
 
         model = om.Group()
         model.add_subsystem('comp', om.ExecComp('y=x-25.',
@@ -2006,7 +2003,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
 
         # make sure the loaded unit strings are compatible with `convert_units`
-        from openmdao.utils.units import convert_units
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     units=True, shape=True, out_stream=None)
         meta = {}
@@ -3318,9 +3314,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 class TestFeatureSqliteReader(unittest.TestCase):
 
     def test_feature_list_cases(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = om.Problem(model=SellarMDA())
 
@@ -3354,10 +3347,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
-        import numpy as np
 
         prob = om.Problem(model=SellarMDA())
 
@@ -3387,10 +3376,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases_nested(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
-        import numpy as np
 
         # define Sellar MDA problem
         prob = om.Problem(model=SellarMDA())
@@ -3436,10 +3421,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
                     self.assertEqual(grandchild, grandchild)
 
     def test_feature_list_sources(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
-        import numpy as np
 
         # define Sellar MDA problem
         prob = om.Problem(model=SellarMDA())
@@ -3486,10 +3467,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_feature_reading_driver_derivatives(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
-        import numpy as np
 
         prob = om.Problem(model=SellarMDA())
 
@@ -3526,8 +3503,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(derivs['obj', 'z'], derivs['obj', 'z'])
 
     def test_feature_recording_option_precedence(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -3614,10 +3589,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted(case.outputs.keys()), ['c', 'f_xy', 'x', 'y'])
 
     def test_feature_driver_options_with_values(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        import numpy as np
 
         prob = om.Problem(model=SellarDerivatives())
 
@@ -3673,8 +3644,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual((case['x'], case['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
 
     def test_feature_list_inputs_and_outputs(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarProblem
 
         prob = SellarProblem()
 
@@ -3709,7 +3678,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
     def test_feature_list_inputs_and_outputs_with_tags(self):
-        import openmdao.api as om
 
         class RectangleCompWithTags(om.ExplicitComponent):
             """
@@ -3760,8 +3728,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
     def test_feature_list_inputs_and_outputs_with_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_expl_comp import RectangleComp
 
         model = om.Group()
         prob = om.Problem(model)
@@ -3800,7 +3766,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted(['rect.width']), sorted([inp[0] for inp in inputs]))
 
     def test_feature_get_val(self):
-        import openmdao.api as om
 
         model = om.Group()
         model.add_recorder(om.SqliteRecorder('cases.sql'))
@@ -3828,8 +3793,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
         assert_near_equal(case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
     def test_feature_sqlite_reader_read_problem_derivatives_multiple_recordings(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.eggcrate import EggCrate
 
         prob = om.Problem()
         model = prob.model
@@ -4271,10 +4234,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         # The case file was created with this code:
 
-        # import numpy as np
-        # import openmdao.api as om
-        # from openmdao.test_suite.components.sellar import SellarDerivatives
-        #
         # prob = om.Problem(model=SellarDerivatives())
         #
         # model = prob.model
@@ -4316,9 +4275,6 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
 
         # Case file created using this code
 
-        # import openmdao.api as om
-        # from openmdao.test_suite.components.paraboloid import Paraboloid
-        #
         # prob = om.Problem()
         #
         # model = prob.model

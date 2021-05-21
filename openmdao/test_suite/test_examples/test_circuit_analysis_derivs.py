@@ -9,9 +9,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 class TestNonlinearCircuit(unittest.TestCase):
 
     def test_nonlinear_circuit_analysis(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class Resistor(om.ExplicitComponent):
             """Computes current across a resistor using Ohm's law."""

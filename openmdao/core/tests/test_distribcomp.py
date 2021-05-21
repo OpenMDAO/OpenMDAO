@@ -5,6 +5,7 @@ import time
 import numpy as np
 
 import openmdao.api as om
+from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
@@ -1020,9 +1021,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
         size = 15
 
@@ -1056,9 +1054,6 @@ class TestGroupMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_promote_distrib(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):

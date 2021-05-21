@@ -6,10 +6,11 @@ import itertools
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid_distributed import DistParab
+from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
+from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 try:
     from pyoptsparse import Optimization as pyoptsparse_opt
@@ -1190,10 +1191,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_derivs_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
-        from openmdao.utils.assert_utils import assert_check_partials
 
         size = 15
 
@@ -1228,10 +1225,6 @@ class MPIFeatureTests(unittest.TestCase):
 
     @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
     def test_distributed_constraint(self):
-        import numpy as np
-        import openmdao.api as om
-
-        from openmdao.test_suite.components.paraboloid_distributed import DistParabFeature
 
         size = 7
 
@@ -1278,8 +1271,6 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
     # issue 1350
 
     def test_distribcomp_zerolengthinputsoutputs(self):
-        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
-        from openmdao.utils.assert_utils import assert_check_partials
 
         size = 3  # set to one less than number of procs, leave zero inputs/outputs on proc 3
 
