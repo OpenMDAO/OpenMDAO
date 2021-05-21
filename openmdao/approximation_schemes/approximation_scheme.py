@@ -207,7 +207,7 @@ class ApproximationScheme(object):
             if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
                 slc = out_slices[abs_of]
                 if abs_of in approx_of_idx:
-                    full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
+                    full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of].flat()])
                 else:
                     full_idxs.append(range(slc.start, slc.stop))
         if full_idxs:
@@ -569,8 +569,8 @@ def _get_wrt_subjacs(system, approxs):
         if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):
             J[wrt]['ofs'].add(of)
             if of in approx_of_idx:
-                out_idx = approx_of_idx[of]
-                out_size = len(out_idx)
+                out_size = len(approx_of_idx[of])
+                out_idx = approx_of_idx[of].flat()
             else:
                 out_size = abs2meta_out[of]['size']
                 out_idx = _full_slice

@@ -901,6 +901,8 @@ class MPITests3(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0, indices=[3])
 
+        #import wingdbstub
+
         prob.setup(force_alloc_complex=True, mode='fwd')
 
         prob.run_model()

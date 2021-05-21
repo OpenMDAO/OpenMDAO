@@ -333,7 +333,7 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
         end += size
         if size > 0 and (matching_names is None or name in matching_names):
             if name in idx_map:
-                global_idxs.append(np.arange(start, end)[idx_map[name]])
+                global_idxs.append(np.arange(start, end)[idx_map[name]()])
             else:
                 global_idxs.append(np.arange(start, end))
         start = end

@@ -537,9 +537,9 @@ class _TotalJacInfo(object):
                     # if the var is not distributed, global_size == local size
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
-                    irange = in_idxs.copy()
+                    irange = in_idxs.as_array()
                     # correct for any negative indices
-                    irange[in_idxs < 0] += in_var_meta['global_size']
+                    irange[irange < 0] += in_var_meta['global_size']
 
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']
@@ -733,7 +733,7 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE)
-                            inds.append(full_inds[local_idx])
+                            inds.append(full_inds[local_idx.flat()])
                             jac_inds.append(jstart + dist_offset +
                                             np.arange(len(local_idx), dtype=INT_DTYPE))
                             if fwd:
@@ -1717,7 +1717,7 @@ def _get_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
         if prom_out in of_idx:
             tot = tot[of_idx[prom_out].flat(), :]
         if prom_in in wrt_idx:
-            tot = tot[:, wrt_idx[prom_in]]
+            tot = tot[:, wrt_idx[prom_in].flat()]
     else:
         tot = jac_meta['value']
 

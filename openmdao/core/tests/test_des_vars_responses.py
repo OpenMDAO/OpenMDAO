@@ -548,29 +548,25 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
-                                      indices='foo')
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices='foo')
 
         self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
-                                      indices=1)
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=1)
 
         self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0,
-                                      indices=[1, 'k'])
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=[1, 'k'])
 
         self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         # passing an iterator for indices should be valid
-        prob.model.add_constraint('con1', lower=0.0, upper=5.0,
-                                          indices=range(2))
+        prob.model.add_constraint('con1', lower=0.0, upper=5.0, indices=range(2))
 
     def test_error_eq_ineq_con(self):
         prob = Problem()
@@ -579,8 +575,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.nonlinear_solver = NonlinearBlockGS()
 
         with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
-                                      indices='foo')
+            prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0, indices='foo')
 
         msg = "SellarDerivatives: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)

@@ -326,8 +326,7 @@ class ScipyOptimizeDriver(Driver):
                 if meta['indices'] is not None:
                     meta['size'] = size = np.product(meta['indices'].shape())
                 else:
-                    vmeta = varmeta[name]
-                    size = vmeta['global_size'] if vmeta['distributed'] else vmeta['size']
+                    size = meta['global_size'] if meta['distributed'] else meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']

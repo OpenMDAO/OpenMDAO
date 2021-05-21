@@ -309,10 +309,19 @@ class SqliteRecorder(CaseRecorder):
                     else:
                         objectives[name] = data
             else:
-                desvars = driver._designvars
-                constraints = driver._cons
-                objectives = driver._objs
-                responses = driver._responses
+                desvars = driver._designvars.copy()
+                constraints = driver._cons.copy()
+                objectives = driver._objs.copy()
+                responses = driver._responses.copy()
+
+            # convert Indexer objects to indices
+            for dct in (desvars, constraints, objectives):
+                for name, meta in dct.items():
+                    if 'indices' in meta:
+                        inds = meta['indices']
+                        if inds is not None:
+                            dct[name] = meta.copy()
+                            dct[name]['indices'] = inds.as_array()
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))

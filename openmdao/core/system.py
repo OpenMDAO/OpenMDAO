@@ -1827,6 +1827,7 @@ class System(object):
             dictionary mapping input/output variable names
             to promoted variable names.
         """
+        from openmdao.core.group import Group
         gname = self.name + '.' if self.name else ''
 
         def split_list(lst):
@@ -1958,7 +1959,7 @@ class System(object):
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
                 if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
-                        isinstance(self, openmdao.core.group.Group)):
+                        isinstance(self, Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -2462,15 +2463,15 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _check_indices(self, indices):
-        size = None
+    def _check_indices(self, indices, typename):
         if indices is None or _is_slicer_op(indices):
-            pass
+            size = None
+        else:
         # If given, indices must be a sequence
-        elif not (isinstance(indices, Iterable) and
+            if not (isinstance(indices, Iterable) and
                     all([isinstance(i, Integral) for i in indices])):
-            raise ValueError("{}: If specified, design var indices must be a sequence of "
-                                "integers.".format(self.msginfo))
+                raise ValueError(f"{self.msginfo}: If specified, {typename} indices must be a sequence "
+                                 "of integers.")
             size = np.asarray(indices).size
         return size
 
@@ -2582,7 +2583,7 @@ class System(object):
 
         if indices is not None:
 
-            size = self._check_indices(indices)
+            size = self._check_indices(indices, 'design var')
 
             if size is not None:
                 # All refs: check the shape if necessary
@@ -2685,7 +2686,10 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        size = self._check_indices(indices)
+        if indices is not None:
+            size = self._check_indices(indices, 'response')
+        else:
+            size = None
 
         if self._static_mode:
             responses = self._static_responses
@@ -2741,7 +2745,10 @@ class System(object):
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
-                resp['size'] = 1
+                if not isinstance(index, Integral):
+                    raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
+                                    f"{type(index).__name__}")
+                resp['size'] = size = 1
                 index = indexer[index]  # np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
@@ -3121,6 +3128,7 @@ class System(object):
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
+                    response['indices'].set_src_shape(meta['global_shape'])
                     # Index defined in this response.
                     response['global_size'] = len(response['indices']) if meta['distributed'] \
                         else meta['global_size']

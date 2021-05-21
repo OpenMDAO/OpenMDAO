@@ -2753,6 +2753,7 @@ class Group(System):
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
+                        sub_wrt_idx = sub_wrt_idx.flat()
                     else:
                         if wrt in abs2meta['input']:
                             size = abs2meta['input'][wrt]['size']

@@ -19,6 +19,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
+from openmdao.utils.indexer import indexer
 
 
 def _check_debug_print_opts_valid(name, opts):
@@ -290,7 +291,7 @@ class Driver(object):
         for name, meta in chain(self._designvars.items(), self._responses.items()):
             inds = meta['indices']
             if inds is not None:
-                inds.set_src_shape(varmeta[name]['global_shape'])
+                inds.set_src_shape(varmeta[meta['ivc_source']]['global_shape'])
                 meta['size'] = np.product(inds.shape())
 
         src_design_vars = prom2ivc_src_dict(self._designvars)
@@ -362,7 +363,9 @@ class Driver(object):
                     offsets = sizes2offsets(dist_sizes)
 
                     if indices is not None:
-                        indices = convert_neg(indices, total_dist_size)
+                        indices.set_src_shape(total_dist_size)
+                        # indices = convert_neg(indices, total_dist_size)
+                        indices = indices.shaped_array()
                         true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
                         for irank in range(nprocs):
                             dist_inds = indices[np.logical_and(indices >= offsets[irank],
@@ -373,7 +376,7 @@ class Driver(object):
                                 distrib_indices = dist_inds
 
                             true_sizes[irank] = dist_inds.size
-                        dist_dict[vname] = (local_indices, true_sizes, distrib_indices)
+                        dist_dict[vname] = (indexer(local_indices), true_sizes, distrib_indices)
                     else:
                         dist_dict[vname] = (_full_slice, dist_sizes,
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
@@ -530,11 +533,10 @@ class Driver(object):
         model = self._problem().model
         comm = model.comm
         get = model._outputs._abs_get_val
-        distributed_vars = self._dist_driver_vars
         indices = meta['indices']
         if indices is not None:
             shname = 'global_shape' if get_remote else 'shape'
-            indices.set_src_shape(model._var_allprocs_abs2meta['output'][name][shname])
+            indices.set_src_shape(model._var_allprocs_abs2meta['output'][meta['ivc_source']][shname])
 
         if meta.get('ivc_source') is not None:
             src_name = meta['ivc_source']
@@ -542,7 +544,7 @@ class Driver(object):
             src_name = name
 
         if MPI:
-            distributed = comm.size > 0 and src_name in distributed_vars
+            distributed = comm.size > 0 and src_name in self._dist_driver_vars
         else:
             distributed = False
 
@@ -553,13 +555,13 @@ class Driver(object):
             if owner is None or rank is not None:
                 val = model.get_val(src_name, get_remote=get_remote, rank=rank, flat=True)
                 if indices is not None:
-                    val = val[indices()]
+                    val = val[indices.flat()]
             else:
                 if owner == comm.rank:
                     if indices is None:
-                        val = get(name).copy()
+                        val = get(name, flat=True).copy()
                     else:
-                        val = get(name)[indices()]
+                        val = get(name, flat=True)[indices.flat()]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -570,9 +572,9 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, get_remote=False, flat=True)
-            local_indices, sizes, _ = distributed_vars[src_name]
-            if local_indices is not None:
-                local_val = local_val[local_indices]
+            local_indices, sizes, _ = self._dist_driver_vars[src_name]
+            if local_indices is not _full_slice:
+                local_val = local_val[local_indices()]
 
             if get_remote:
                 offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
@@ -598,9 +600,9 @@ class Driver(object):
                     raise ValueError(msg)
 
             elif indices is None:
-                val = get(src_name).copy()
+                val = get(src_name, flat=True).copy()
             else:
-                val = get(src_name)[indices.flat()]
+                val = get(src_name, flat=True)[indices.flat()]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values
@@ -662,6 +664,8 @@ class Driver(object):
         indices = meta['indices']
         if indices is None:
             indices = _full_slice
+        else:
+            indices = indices()
 
         if name in self._designvars_discrete:
 

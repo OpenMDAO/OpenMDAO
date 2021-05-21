@@ -694,7 +694,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
+        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']()], np.array([3., 4]))
 
     def test_om_slice_in_add_response(self):
 
@@ -710,8 +710,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+        assert_near_equal(arr_order_1x1[p.model._responses['indep.x']['indices']()], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'](), slice(2, None, None))
 
     def test_om_slice_in_add_constraint(self):
 
@@ -727,8 +727,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+        assert_near_equal(arr_order_1x1[p.model._responses['indep.x']['indices'].flat()], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'](), slice(2, None, None))
 
     def test_om_slice_in_add_input(self):
         class SlicerComp(om.ExplicitComponent):
@@ -849,7 +849,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']()], arr[1, ..., 1])
 
         # Response
         p = om.Problem()
@@ -864,7 +864,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._responses['indep.a']['indices']()], arr[1, ..., 1])
 
         # Constraint
         p = om.Problem()
@@ -879,7 +879,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._responses['indep.a']['indices']()], arr[1, ..., 1])
 
     def test_om_slice_with_ellipsis_in_promotes(self):
 
@@ -916,7 +916,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']][0], 10)
+        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']()][0], 10)
 
     def test_om_slice_with_ellipsis_in_add_response(self):
 
@@ -932,10 +932,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['indep.x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['indep.x']['indices']()[0], 1)
 
     def test_om_slice_with_ellipsis_in_add_constraint(self):
 
@@ -951,10 +950,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['indep.x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['indep.x']['indices']()[0], 1)
 
     def test_om_slice_with_ellipsis_auto_ivc(self):
 
@@ -970,10 +968,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['x']['indices']()[0], 1)
 
         # Add_response
         p = om.Problem()
@@ -987,10 +984,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['x']['indices']()[0], 1)
 
         # Add_design_var
         p = om.Problem()
@@ -1002,10 +998,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']],
+        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._design_vars['x']['indices'][0], 1)
-        self.assertTrue(p.model._design_vars['x']['indices'][1], ...)
+        self.assertTrue(p.model._design_vars['x']['indices']()[0], 1)
         self.assertTrue(p.driver.get_design_var_values()['x'], np.array(11.))
 
     def test_om_slice_with_indices_and_ellipsis_in_connect(self):
