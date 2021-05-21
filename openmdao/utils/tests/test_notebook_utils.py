@@ -1,7 +1,11 @@
 """ Unit tests for the notebook_utils."""
 
 import unittest
-import tabulate
+try:
+    from tabulate import tabulate
+except ImportError:
+    tabulate = None
+
 try:
     import IPython
 except ImportError:
