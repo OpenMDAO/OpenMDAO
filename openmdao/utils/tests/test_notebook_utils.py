@@ -16,7 +16,7 @@ class StandaloneOptionsDictionary(om.OptionsDictionary):
         self.declare('units', types=str, allow_none=True,
                      default='s', desc='Units for the integration variable')
 
-@unittest.skipUnless(tabulate and IPython, "Tabulate is required")
+@unittest.skipUnless(tabulate and IPython, "Tabulate and IPython are required")
 class TestNotebookUtils(unittest.TestCase):
 
     def test_show_options_wo_attr(self):
