@@ -10,12 +10,6 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_warning
 
-class StandaloneOptionsDictionary(om.OptionsDictionary):
-    def __init__(self, read_only=False):
-        super(StandaloneOptionsDictionary, self).__init__(read_only)
-        self.declare('units', types=str, allow_none=True,
-                     default='s', desc='Units for the integration variable')
-
 @unittest.skipUnless(tabulate and IPython, "Tabulate and IPython are required")
 class TestNotebookUtils(unittest.TestCase):
 
@@ -23,7 +17,7 @@ class TestNotebookUtils(unittest.TestCase):
         from openmdao.utils import notebook_utils
         notebook_utils.ipy = True
 
-        options = om.show_options_table("openmdao.utils.test_notebook_utils.StandaloneOptionsDictionary")
+        options = om.show_options_table("openmdao.components.cross_product_comp.CrossProductComp")
 
         self.assertEqual(options, None)
 
