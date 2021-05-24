@@ -1,3 +1,6 @@
+"""
+Classes that handle array indexing.
+"""
 
 import sys
 import numpy as np
@@ -6,6 +9,7 @@ from numbers import Integral
 
 from openmdao.utils.general_utils import _is_slicer_op
 from openmdao.core.constants import INT_DTYPE
+
 
 def array2slice(arr):
     """
@@ -25,7 +29,10 @@ def array2slice(arr):
     """
     if arr.ndim == 1:
         if arr.size > 1:  # see if 1D array will convert to slice
-            span = arr[1] - arr[0]
+            if arr[0] >= 0 and arr[1] >= 0:
+                span = arr[1] - arr[0]
+            else:
+                return None
             if np.all((arr[1:] - arr[:-1]) == span):
                 if span > 0:
                     # array is increasing with constant span
@@ -39,7 +46,6 @@ def array2slice(arr):
             return slice(arr[0], arr[0] - 1, -1)
         else:
             return slice(0, 0)
-
 
 
 class Indexer(object):
@@ -73,11 +79,6 @@ class Indexer(object):
     def flat(self):
         """
         Return index array or slice into a flat array.
-
-        Returns
-        -------
-        ndarray or slice
-            The index into a flat array.
         """
         raise NotImplementedError("No implementation of 'flat' found.")
 
@@ -179,6 +180,12 @@ class Indexer(object):
         self._src_shape = shape
         return self
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+        """
+        raise NotImplementedError("No implementation of 'json_compat' found.")
+
 
 class ShapedIntIndexer(Indexer):
     """
@@ -193,14 +200,35 @@ class ShapedIntIndexer(Indexer):
     def __init__(self, idx):
         """
         Initialize attributes.
+
+        Parameters
+        ----------
+        idx : int
+            The index.
         """
         super().__init__()
         self._idx = idx
 
     def __call__(self):
+        """
+        Return this index.
+
+        Returns
+        -------
+        int
+            This index.
+        """
         return self._idx
 
     def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
         return f"{self._idx}"
 
     def shape(self):
@@ -247,8 +275,22 @@ class ShapedIntIndexer(Indexer):
         """
         return np.array([self._idx])
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        int
+            int version of self.
+        """
+        return self._idx
+
 
 class IntIndexer(ShapedIntIndexer):
+    """
+    Int indexing class that may or may not be 'shaped'.
+    """
 
     def shaped_instance(self):
         """
@@ -267,21 +309,59 @@ class IntIndexer(ShapedIntIndexer):
         return ShapedIntIndexer(self._idx)
 
     def as_slice(self):
+        """
+        Return this index as a slice.
+
+        Returns
+        -------
+        slice
+            A slice that represents this index.
+        """
         return self.shaped_slice()
 
 
 class ShapedSliceIndexer(Indexer):
+    """
+    Abstract slice class that is 'shaped'.
+
+    Attributes
+    ----------
+    _slice : slice
+        The wrapped slice object.
+    """
+
     def __init__(self, slc):
         """
         Initialize attributes.
+
+        Parameters
+        ----------
+        slc : slice
+            The slice.
         """
         super().__init__()
         self._slice = slc
 
     def __call__(self):
+        """
+        Return this slice.
+
+        Returns
+        -------
+        slice
+            This slice.
+        """
         return self._slice
 
     def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
         return f"{self._slice}"
 
     def as_slice(self):
@@ -330,8 +410,23 @@ class ShapedSliceIndexer(Indexer):
         # use maxsize here since shaped slice always has positive int start and stop
         return len(range(*self._slice.indices(sys.maxsize)))
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        list of int or int
+            list or int version of self.
+        """
+        return self.as_array().tolist()
+
 
 class SliceIndexer(ShapedSliceIndexer):
+    """
+    Abstract slice class that may or may not be 'shaped'.
+    """
+
     def shaped_instance(self):
         """
         Return a 'shaped' version of this Indexer type.
@@ -373,18 +468,52 @@ class SliceIndexer(ShapedSliceIndexer):
 
 
 class ShapedArrayIndexer(Indexer):
+    """
+    Abstract index array class that is 'shaped'.
+
+    Attributes
+    ----------
+    _arr : ndarray
+        The wrapped index array object.
+    _multi : bool
+        If True, we are an inner Indexer inside of a MultiIndexer.
+    """
+
     def __init__(self, arr, multi=False):
         """
         Initialize attributes.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The index array.
+        multi : bool
+            If True,
         """
         super().__init__()
         self._arr = arr
         self._multi = multi
 
     def __call__(self):
+        """
+        Return this index array.
+
+        Returns
+        -------
+        int
+            This index array.
+        """
         return self._arr
 
     def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
         return f"{self._arr}"
 
     def shape(self):
@@ -415,11 +544,6 @@ class ShapedArrayIndexer(Indexer):
 
         This always fails because if it were possible, we would have already replaced this
         array indexer with a slice indexer.
-
-        Returns
-        -------
-        slice
-            The slice into a flat array.
         """
         raise ValueError(f"Can't convert {self} to a slice.")
 
@@ -434,8 +558,23 @@ class ShapedArrayIndexer(Indexer):
         """
         return self._arr
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        list of int or int
+            list or int version of self.
+        """
+        return self._arr.tolist()
+
 
 class ArrayIndexer(ShapedArrayIndexer):
+    """
+    Abstract index array class that may or may not be 'shaped'.
+    """
+
     def shaped_instance(self):
         """
         Return a 'shaped' version of this Indexer type.
@@ -476,18 +615,50 @@ class ArrayIndexer(ShapedArrayIndexer):
 
 
 class ShapedMultiIndexer(Indexer):
+    """
+    Abstract multi indexer class that is 'shaped'.
+
+    Attributes
+    ----------
+    _tup : tuple
+        The wrapped tuple of indices/slices.
+    _idx_list : list
+        List of Indexers.
+    """
+
     def __init__(self, tup):
         """
         Initialize attributes.
+
+        Parameters
+        ----------
+        tup : tuple
+            Tuple of indices/slices.
         """
         super().__init__()
         self._tup = tup
         self._idx_list = [indexer(i, multi=True) for i in tup]
 
     def __call__(self):
+        """
+        Return this mltidimensional index.
+
+        Returns
+        -------
+        int
+            This multidimensional index.
+        """
         return tuple(i() for i in self._idx_list)
 
     def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
         return f"{self._tup}"
 
     def shape(self):
@@ -541,14 +712,42 @@ class ShapedMultiIndexer(Indexer):
         return self.as_array()
 
     def set_src_shape(self, shape):
+        """
+        Set the shape of the 'source' array .
+
+        Parameters
+        ----------
+        shape : tuple or int
+            The shape of the 'source' array.
+
+        Returns
+        -------
+        Indexer
+            Self is returned to allow chaining.
+        """
         for i, s in zip(self._idx_list, shape):
             i.set_src_shape(s)
         self._src_shape = shape
 
         return self
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        list of int or int
+            list or int version of self.
+        """
+        return self.as_array().tolist()
+
 
 class MultiIndexer(ShapedMultiIndexer):
+    """
+    Abstract multi indexer class that may or may not be 'shaped'.
+    """
+
     def shaped_instance(self):
         """
         Return a 'shaped' version of this Indexer type.
@@ -566,17 +765,26 @@ class MultiIndexer(ShapedMultiIndexer):
 
 
 class EllipsisIndexer(Indexer):
+    """
+    Abstract multi indexer class that is 'shaped'.
+
+    Attributes
+    ----------
+    _tup : tuple
+        The wrapped tuple of indices/slices (it contains an ellipsis).
+    """
+
     def __init__(self, tup):
         """
         Initialize attributes.
+
+        Parameters
+        ----------
+        tup : tuple
+            Tuple of indices/slices.
         """
         super().__init__()
         self._tup = tup
-
-    def _shape_check(self):
-       if self._multi is None:
-            raise RuntimeError("Can't determine number of dimensions because source shape is "
-                               "not known.")
 
     def __call__(self):
         """
@@ -590,6 +798,14 @@ class EllipsisIndexer(Indexer):
         return self._tup
 
     def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
         return f"{self._tup}"
 
     def shaped_instance(self):
@@ -657,12 +873,39 @@ class EllipsisIndexer(Indexer):
         """
         return self.as_array()
 
+    def json_compat(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        list of int or int
+            list or int version of self.
+        """
+        return self.as_array().tolist()
+
 
 class IndexMaker(object):
     """
     A Factory for Indexer objects.
     """
+
     def _get_indexer(self, idx, multi=False):
+        """
+        Return an Indexer instance based on the passed indices/slices.
+
+        Parameters
+        ----------
+        idx : int, ndarray, slice, or tuple
+            Some sort of index/indices/slice.
+        multi : bool
+            If True, we are an inner Indexer inside of a MultiIndexer.
+
+        Returns
+        -------
+        Indexer
+            The Indexer instance we created based on the args.
+        """
         if not multi and idx is ...:
             idxer = EllipsisIndexer((idx,))
         elif isinstance(idx, int):
@@ -696,9 +939,37 @@ class IndexMaker(object):
         return idxer
 
     def __getitem__(self, idx):
+        """
+        Return an Indexer based on idx.
+
+        Parameters
+        ----------
+        idx : int, ndarray, slice or tuple
+            The passed indices/slices.
+
+        Returns
+        -------
+        Indexer
+            The Indexer instance we created based on the args.
+        """
         return self._get_indexer(idx)
 
     def __call__(self, idx, multi=False):
+        """
+        Return an Indexer based on the args.
+
+        Parameters
+        ----------
+        idx : int, ndarray, slice or tuple
+            The passed indices/slices.
+        multi : bool
+            If True, we are an inner Indexer inside of a MultiIndexer.
+
+        Returns
+        -------
+        Indexer
+            The Indexer instance we created based on the args.
+        """
         return self._get_indexer(idx, multi)
 
 

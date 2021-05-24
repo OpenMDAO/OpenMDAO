@@ -314,23 +314,10 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs.copy()
                 responses = driver._responses.copy()
 
-            # convert Indexer objects to indices
-            for dct in (desvars, constraints, objectives):
-                for name, meta in dct.items():
-                    if 'indices' in meta:
-                        inds = meta['indices']
-                        if inds is not None:
-                            dct[name] = meta.copy()
-                            dct[name]['indices'] = inds.as_array()
-
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
             var_order = system._get_vars_exec_order(inputs=True, outputs=True)
-
-            full_var_set = [(outputs, 'output'),
-                            (desvars, 'desvar'), (responses, 'response'),
-                            (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
@@ -352,6 +339,23 @@ class SqliteRecorder(CaseRecorder):
             real_meta_out = system._var_allprocs_abs2meta['output']
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
+
+            # convert Indexer objects to indices
+            for dct in (desvars, constraints, objectives):
+                for name, meta in dct.items():
+                    if 'indices' in meta:
+                        inds = meta['indices']
+                        if inds is not None:
+                            dct[name] = meta.copy()
+                            try:
+                                dct[name]['indices'] = inds.json_compat()
+                            except ValueError:
+                                inds.set_src_shape(real_meta_out[meta['ivc_source']]['shape'])
+                                dct[name]['indices'] = inds.json_compat()
+
+            full_var_set = [(outputs, 'output'),
+                            (desvars, 'desvar'), (responses, 'response'),
+                            (objectives, 'objective'), (constraints, 'constraint')]
 
             for var_set, var_type in full_var_set:
                 for name in var_set:

@@ -535,8 +535,8 @@ class Driver(object):
         get = model._outputs._abs_get_val
         indices = meta['indices']
         if indices is not None:
-            shname = 'global_shape' if get_remote else 'shape'
-            indices.set_src_shape(model._var_allprocs_abs2meta['output'][meta['ivc_source']][shname])
+            sh = 'global_shape' if get_remote else 'shape'
+            indices.set_src_shape(model._var_allprocs_abs2meta['output'][meta['ivc_source']][sh])
 
         if meta.get('ivc_source') is not None:
             src_name = meta['ivc_source']

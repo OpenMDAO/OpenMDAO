@@ -901,8 +901,6 @@ class MPITests3(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0, indices=[3])
 
-        #import wingdbstub
-
         prob.setup(force_alloc_complex=True, mode='fwd')
 
         prob.run_model()
@@ -1005,9 +1003,7 @@ class MPITests3(unittest.TestCase):
         prob.run_model()
 
         con = prob.driver.get_constraint_values()
-        assert_near_equal(con['parab.f_xy'],
-                          np.array([ 8.88, 31.92]),
-                          1e-6)
+        assert_near_equal(con['parab.f_xy'], np.array([ 8.88, 31.92]), 1e-6)
 
         totals = prob.check_totals(method='cs')
         for key, val in totals.items():

@@ -2467,11 +2467,11 @@ class System(object):
         if indices is None or _is_slicer_op(indices):
             size = None
         else:
-        # If given, indices must be a sequence
+            # If given, indices must be a sequence
             if not (isinstance(indices, Iterable) and
                     all([isinstance(i, Integral) for i in indices])):
-                raise ValueError(f"{self.msginfo}: If specified, {typename} indices must be a sequence "
-                                 "of integers.")
+                raise ValueError(f"{self.msginfo}: If specified, {typename} indices must be a "
+                                 "sequence of integers.")
             size = np.asarray(indices).size
         return size
 
@@ -2588,13 +2588,13 @@ class System(object):
             if size is not None:
                 # All refs: check the shape if necessary
                 for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
-                                        ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
+                                           ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
                     if isinstance(item, np.ndarray):
                         if item.size != size:
                             raise ValueError("%s: When adding design var '%s', %s should have size "
-                                            "%d but instead has size %d." % (self.msginfo, name,
-                                                                            item_name, size,
-                                                                            item.size))
+                                             "%d but instead has size %d." % (self.msginfo, name,
+                                                                              item_name, size,
+                                                                              item.size))
             indices = indexer[indices]
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color

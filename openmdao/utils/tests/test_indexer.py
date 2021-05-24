@@ -85,18 +85,17 @@ class IndexerTestCase(unittest.TestCase):
         ind = indexer[[-1, -3, -5]]
         src = np.arange(10)
 
-        slc = ind.as_slice()
-        assert_equal(slc, slice(-1, -6, -2))
-
         try:
             ind.shaped()
         except Exception as err:
-            self.assertEqual(str(err), "Can't get shaped version of slice(-1, -6, -2) because it has no source shape.")
+            self.assertEqual(str(err), "Can't get shaped version of [-1 -3 -5] because it has no source shape.")
         else:
             self.fail("Exception expected")
 
         ind.set_src_shape(10)
-        assert_equal(ind.shape(), 3)
+        slc = ind.as_slice()
+        assert_equal(ind.shape(), (3,))
+        assert_equal(slc, slice(9, 4, -2))
         assert_equal(ind.shaped(), slice(9, 4, -2))
         assert_equal(src[ind.as_array()], [9, 7, 5])
 
