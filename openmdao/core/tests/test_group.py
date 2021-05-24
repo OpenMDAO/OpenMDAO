@@ -18,7 +18,8 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context, reset_warning_registry
+from openmdao.utils.general_utils import ignore_errors_context
+from openmdao.warnings import reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -117,7 +118,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp', om.IndepVarComp)
         except TypeError as err:
-            self.assertEqual(str(err), "Group: Subsystem 'comp' should be an instance, "
+            self.assertEqual(str(err), "<class Group>: Subsystem 'comp' should be an instance, "
                                        "but a IndepVarComp class object was found.")
         else:
             self.fail('Exception expected.')
@@ -131,7 +132,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp2', om.ExecComp('b=2*a'))
         except Exception as err:
-            self.assertEqual(str(err), "Group: Subsystem name 'comp2' is already used.")
+            self.assertEqual(str(err), "<class Group>: Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
 
@@ -250,7 +251,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "Group: '_bad_name' is not a valid sub-system name.")
+                         "<class Group>: '_bad_name' is not a valid sub-system name.")
 
     def test_subsys_attributes(self):
         p = om.Problem()
@@ -282,7 +283,7 @@ class TestGroup(unittest.TestCase):
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group: Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "<class Group>: Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_promotes(self):
@@ -323,7 +324,7 @@ class TestGroup(unittest.TestCase):
             p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
         self.assertEqual(str(err.exception),
-                         "Group: promotes must be an iterator of strings and/or tuples.")
+                         "<class Group>: promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
         p = om.Problem()
@@ -335,7 +336,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "'comp1' <class IndepVarComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: [('xx', 'foo')].")
 
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
@@ -347,7 +348,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
-                         "is not a string or tuple of size 2")
+                         "is not a string or tuple of size 2.")
 
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
@@ -595,12 +596,12 @@ class TestGroup(unittest.TestCase):
 
         idxs = np.array([0, 2, 3], dtype=int)
 
-        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
-                        flat_src_indices=True)
-
-        msg = "<model> <class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        msg = "<class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
         with assert_warning(UserWarning, msg):
-            p.setup()
+            p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                            flat_src_indices=True)
+
+        p.setup()
         p.run_model()
 
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
@@ -647,7 +648,7 @@ class TestGroup(unittest.TestCase):
 
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_order_4x4))
         p.model.add_subsystem('C1', SlicerComp())
-        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1], flat_src_indices=True)
+        p.model.connect('indep.x', 'C1.x', src_indices=om.slicer[:, 1])
 
         p.setup()
         p.run_model()
@@ -668,6 +669,7 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['comp1.a'], [2, 2, 2])
 
+    def test_om_slice_in_promotes_flat(self):
         p = om.Problem()
 
         model = p.model
@@ -1038,7 +1040,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'C2' <class ExecComp>: 'promotes_outputs' failed to find any matches for the "
-                         "following pattern: 'x*'.")
+                         "following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1100,7 +1102,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "'d1' <class ExecComp>: 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo'].")
+                         "the following names or patterns: [('bar', 'blah'), 'blammo'].")
 
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
@@ -1288,7 +1290,7 @@ class TestGroup(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, residuals):
 
-                if outputs._data.dtype == np.complex:
+                if outputs.asarray().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # inputs are addressed using full path name, regardless of promotion
@@ -1396,6 +1398,20 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+    def test_promote_units_and_none(self):
+        p = om.Problem()
+
+        p.model.add_subsystem('c1', om.ExecComp('y1=x', x={'units': None}),
+                              promotes=['*'])
+        p.model.add_subsystem('c2', om.ExecComp('y2=x', x={'units': 's'}),
+                              promotes=['*'])
+
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
@@ -1403,12 +1419,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_2d_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 2], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1429,12 +1442,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_3d_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:, 1, 2], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1450,7 +1460,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([6, 22, 38, 54]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([6, 22, 38, 54]))
 
     def test_om_slice_4D_with_ellipsis_mpi(self):
 
@@ -1478,12 +1488,9 @@ class TestGroupMPISlice(unittest.TestCase):
 
     def test_om_slice_negative_stop_mpi(self):
         class MyComp1(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
-                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1])
-                self.add_output('y', 1.0)
+                self.add_input('x', np.ones(4), src_indices=om.slicer[:,-1], distributed=True)
+                self.add_output('y', 1.0, distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
@@ -1499,7 +1506,7 @@ class TestGroupMPISlice(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['C1.x'], np.array([4, 4, 4, 4]))
+        assert_near_equal(p.get_val('C1.x', get_remote=False), np.array([4, 4, 4, 4]))
 
 class TestGroupPromotes(unittest.TestCase):
 
@@ -1645,12 +1652,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        with self.assertRaises(RuntimeError) as context:
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using ('bb', 'xx'), was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
             top.setup()
-
-        self.assertEqual(str(context.exception),
-                         "'sub.comp1' <class ExecComp>: promotes_inputs 'b*' matched 'bb' but 'bb' has been "
-                         "aliased to 'xx'.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -1669,7 +1673,9 @@ class TestGroupPromotes(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        top.setup()
+        msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
+        with assert_warning(UserWarning, msg):
+            top.setup()
 
     def test_multiple_promotes(self):
 
@@ -1794,7 +1800,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "<model> <class SimpleGroup>: The src_indices argument should be an int, list, "
-            "tuple, ndarray or Iterable, but src_indices for promotes from 'comp2' are "
+            "tuple, ndarray, slice or Iterable, but src_indices for promotes from 'comp2' are "
             "<class 'float'>.")
 
     def test_promotes_src_indices_bad_dtype(self):
@@ -1824,7 +1830,7 @@ class TestGroupPromotes(unittest.TestCase):
 
             def configure(self):
                 self.indep.add_output('a1', np.ones(3))
-                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2])
+                self.promotes('comp1', inputs=['a'], src_indices=[0, 1, 2], src_shape=3)
 
         p = om.Problem(model=SimpleGroup())
 
@@ -1832,7 +1838,7 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "Shape of indices does not match shape for 'a': Expected (5,) but got (3,).")
+            "<model> <class SimpleGroup>: The source indices [0 1 2] do not specify a valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. The target shape is (5,) but indices have shape (3,).")
 
     def test_promotes_src_indices_different(self):
 
@@ -1956,10 +1962,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=SimpleGroup())
 
-        with assert_warning(UserWarning,
-                            "<model> <class SimpleGroup>: src_indices have been specified with promotes 'any'. "
-                            "Note that src_indices only apply to matching inputs."):
-            p.setup()
+        p.setup()
 
         p.run_model()
 
@@ -2020,8 +2023,35 @@ class TestGroupPromotes(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(cm.exception),
-            "'sub' <class SubGroup>: Trying to promote input 'a' with src_indices [0 1 2], "
-            "but src_indices have already been specified as [0 2 4].")
+            "In connection from 'ind.a' to 'sub.comp.a', input 'sub.a' src_indices are [0 1 2] and indexing into those failed using src_indices [0 2 4] from input 'sub.comp.a'. Error was: index 4 is out of bounds for axis 0 with size 3.")
+
+    def test_promotes_list_order(self):
+        # This test verifies that the order we promote in the arguments to add_subsystem doesn't
+        # trigger any of our exceptions when we have wildcards with promote_as.
+        class AllPatterns(om.Group):
+            def setup(self):
+                comp = om.ExecComp(['a1=b1+c1', 'g1=b1-c1'])
+                self.add_subsystem('comp1', comp,
+                                   promotes_inputs=['*',('c1','ialias1')],
+                                   promotes_outputs=['*',('g1','oalias1')])
+
+                comp = om.ExecComp(['a2=b2+c2', 'g2=b2-c2'])
+                self.add_subsystem('comp2', comp,
+                                   promotes_inputs=[('c2','ialias2'), '*'],
+                                   promotes_outputs=[('g2','oalias2'), '*'])
+
+                comp = om.ExecComp(['a3=b3+c3', 'g3=b3-c3'])
+                self.add_subsystem('comp3', comp,
+                                   promotes=[('c3','ialias3'), ('g3','oalias3'), '*'])
+
+                comp = om.ExecComp(['a4=b4+c4', 'g4=b4-c4'])
+                self.add_subsystem('comp4', comp,
+                                   promotes=['*', ('c4','ialias4'), ('g4','oalias4')])
+
+        p = om.Problem(model=AllPatterns())
+        p.setup()
+        p.run_model()
+        # If working correctly, no exception raised.
 
 
 class MyComp(om.ExplicitComponent):
@@ -2218,8 +2248,6 @@ class TestConnect(unittest.TestCase):
         with assert_warning(UserWarning, msg):
             prob.setup()
 
-        self.prob.model._raise_connection_errors = False
-
         with assert_warning(UserWarning, msg):
             prob.setup()
 
@@ -2372,10 +2400,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
-               "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
-               "The source has 2 dimensions but the indices expect 3.")
-
+        msg = "'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a valid shape for the connection 'sub.src.x' to 'sub.arr.x'. The source has 2 dimensions but the indices expect 3."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2492,6 +2517,27 @@ class TestSrcIndices(unittest.TestCase):
                                 src_indices=[[-10, 5], [7, 8]],
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
+
+    def test_om_slice_with_ellipsis_error_in_connect(self):
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
+        p.model.add_subsystem('row4_comp', SlicerComp())
+
+        # the 4 should be a 3
+        p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
+
+        with self.assertRaises(IndexError) as err:
+            p.setup()
+
+        expected_error_msg = ( "'row4_comp' <class SlicerComp>:\n"
+                               "Error 'index 4 is out of bounds for axis 0 with size 4'\n"
+                               "  in resolving source indices in connection between"
+                               " source='indep.x' and target='row4_comp.x'\n"
+                               "  with src_indices='(4, Ellipsis)'" )
+        self.assertEqual(str(err.exception), expected_error_msg)
+
 
 class TestGroupAddInput(unittest.TestCase):
 
@@ -2651,6 +2697,28 @@ class TestGroupAddInput(unittest.TestCase):
         p.final_setup()
 
         self.assertEqual(testlogger.get('warning')[1], msg)
+
+    def test_units_checking(self):
+        p = om.Problem()
+        model = p.model
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
+
+        with self.assertRaises(ValueError) as cm:
+            G1.set_input_defaults('x', units='junk')
+
+        msg = "'G1' <class Group>: The units 'junk' are invalid."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(TypeError) as cm:
+            G1.set_input_defaults('x', units=3)
+
+        msg = "'G1' <class Group>: The units argument should be a str or None"
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # Simplification
+        G1.set_input_defaults('x', units='ft*ft/ft')
+        self.assertEqual(G1._static_group_inputs['x'][0]['units'], 'ft')
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -3032,6 +3100,8 @@ class Test3Deep(unittest.TestCase):
         p.model.cfg.sub.add_config_prom('C4', ['y'])
         p.setup()
 
+        p.model._raise_connection_errors = False
+
         names = self.get_matching_var_setup_counts(p, 1)
         expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
         self.assertEqual(names, sorted(expected))
@@ -3086,6 +3156,7 @@ class Test3Deep(unittest.TestCase):
         p = self.build_model()
         p.model.cfg.add_var_output('sub.C3.ovar0', 3.0, units='ft')
         p.model.add_var_output('cfg.sub.C3.ovar1', 4.0, units='inch')
+
         p.setup()
 
         names = self.get_matching_var_setup_counts(p, 1)
@@ -3141,7 +3212,6 @@ class TestInConfigMPIparpar(Test3Deep):
 class TestFeatureAddSubsystem(unittest.TestCase):
 
     def test_group_simple(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
@@ -3152,7 +3222,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_simple_promoted(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('a', 3.0),
@@ -3167,7 +3236,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_nested(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('G1', om.Group())
@@ -3182,7 +3250,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
     def test_group_nested_promoted1(self):
-        import openmdao.api as om
 
         # promotes from bottom level up 1
         p = om.Problem()
@@ -3204,7 +3271,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 3.5)
 
     def test_group_nested_promoted2(self):
-        import openmdao.api as om
 
         # promotes up from G1 level
         p = om.Problem()
@@ -3229,7 +3295,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
 
     def test_group_rename_connect(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('aa', 3.0),
@@ -3249,7 +3314,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp2.b'), 9.0)
 
     def test_promotes_any(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3266,7 +3330,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(top.get_val('x'), 5)
 
     def test_promotes_inputs_and_outputs(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3287,9 +3350,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 class TestFeatureConnect(unittest.TestCase):
 
     def test_basic_connect_units(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3309,9 +3369,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('comp1.y'), 60.)
 
     def test_connect_1_to_many(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3328,9 +3385,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('C3.y'), 30.)
 
     def test_connect_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3354,9 +3408,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3385,9 +3436,6 @@ class TestFeatureConnect(unittest.TestCase):
 class TestFeatureSrcIndices(unittest.TestCase):
 
     def test_promote_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -3425,9 +3473,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_promote_src_indices_nonflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -3466,8 +3511,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C1.y'), 21.)
 
     def test_group_promotes_src_indices(self):
-        import numpy as np
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             """ multiplies input array by 2. """
@@ -3499,14 +3542,12 @@ class TestFeatureSrcIndices(unittest.TestCase):
 
         p = om.Problem()
 
-        # p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
-        #                       promotes_outputs=['x'])
         p.model.set_input_defaults('x', np.ones(5))
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
-        p.set_val('x', np.array(range(5)))
-        inp = np.array(range(5))
+        inp = np.random.random(5)
+        p.set_val('x', inp)
         p.run_model()
 
         assert_near_equal(p.get_val('G1.comp1.x'), inp[:3])
@@ -3518,7 +3559,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
 class TestFeatureSetOrder(unittest.TestCase):
 
     def test_set_order(self):
-        import openmdao.api as om
 
         class ReportOrderComp(om.ExplicitComponent):
             """Adds name to list."""
@@ -3562,8 +3602,6 @@ class TestFeatureSetOrder(unittest.TestCase):
 class TestFeatureGetSubsystem(unittest.TestCase):
 
     def test_group_getsystem_top(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_group import BranchGroup
 
         p = om.Problem(model=BranchGroup())
         p.setup()
@@ -3578,7 +3616,6 @@ class TestFeatureGetSubsystem(unittest.TestCase):
 class TestFeatureConfigure(unittest.TestCase):
 
     def test_system_configure(self):
-        import openmdao.api as om
 
         class ImplSimple(om.ImplicitComponent):
 
@@ -3637,8 +3674,6 @@ class TestFeatureConfigure(unittest.TestCase):
         A simple example to compute the resultant force on an aircraft using data
         from an external source. Demonstrates adding I/O in the 'configure' method.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3699,8 +3734,6 @@ class TestFeatureConfigure(unittest.TestCase):
         """
         Like the example above but system we're calling list_outputs on is a Group.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3789,11 +3822,62 @@ class TestFeatureConfigure(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestConfigureMPI(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_sorting_bug(self):
+        class MyComp(om.ExplicitComponent):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_input(f"x{i+1}", np.ones(i + 1))
+                    self.add_output(f"y{i+1}", np.ones(i + 1))
+
+            def compute(self, inputs, outputs):
+                pass
+
+        class MyGroup(om.Group):
+            def __init__(self, count, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.count = count
+
+            def setup(self):
+                for i in range(self.count):
+                    self.add_subsystem(f"C{i+1}", MyComp(i + 1, distributed=True), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.add_output('b')
+
+        class MyGroupUpper(om.Group):
+            def setup(self):
+                self.add_subsystem("G1", MyGroup(1), promotes_inputs=['*'])
+                self.add_subsystem("G2", MyGroup(2), promotes_inputs=['*'])
+
+            def configure(self):
+                for s in self._subsystems_myproc:
+                    s.promotes('C1', inputs=['*'])
+
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp(distributed=True))
+        indep.add_output("x1", np.ones(1))
+        indep.add_output("x2", np.ones(2))
+
+        p.model.add_subsystem('G', MyGroupUpper())
+
+        p.model.connect("indep.x1", "G.x1")
+        p.model.connect("indep.x2", "G.x2")
+
+        p.setup()
+
+
 class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
-        import openmdao.api as om
-        import numpy as np
 
         class Discipline(om.Group):
 
@@ -3839,6 +3923,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
 
 class TestNaturalNaming(unittest.TestCase):
+
     def test_buried_proms(self):
         p = om.Problem()
         model = p.model

@@ -6,12 +6,12 @@ ArmijoGoldsteinLS -- Like above, but terminates with the ArmijoGoldsteinLS condi
 
 """
 
-import sys
 import numpy as np
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.warnings import issue_warning, SolverWarning
 
 
 def _print_violations(outputs, lower, upper):
@@ -31,14 +31,12 @@ def _print_violations(outputs, lower, upper):
     for name, val in outputs._abs_item_iter():
         end += val.size
         if upper is not None and any(val > upper[start:end]):
-            print("'%s' exceeds upper bounds" % name)
-            print("  Val:", val)
-            print("  Upper:", upper[start:end], '\n')
+            msg = (f"'{name}' exceeds upper bounds\n  Val: {val}\n  Upper: {upper[start:end]}\n")
+            issue_warning(msg, category=SolverWarning)
 
         if lower is not None and any(val < lower[start:end]):
-            print("'%s' exceeds lower bounds" % name)
-            print("  Val:", val)
-            print("  Lower:", lower[start:end], '\n')
+            msg = (f"'{name}' exceeds lower bounds\n  Val: {val}\n  Lower: {lower[start:end]}\n")
+            issue_warning(msg, category=SolverWarning)
 
         start = end
 
@@ -550,7 +548,7 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
+    u_data = u.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.
@@ -564,9 +562,8 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     change_upper = 0. if upper_bounds is None else np.minimum(u_data, upper_bounds) - u_data
 
     change = change_lower + change_upper
-
     u_data += change
-    du._data += change / alpha
+    du += change / alpha
 
 
 def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
@@ -595,8 +592,8 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     # the step vector directly.
 
     # enforce bounds on step in-place.
-    u_data = u._data
-    du_data = du._data
+    u_data = u.asarray()
+    du_data = du.asarray()
 
     # If u > lower, we're just adding zero. Otherwise, we're adding
     # the step required to get up to the lower bound.

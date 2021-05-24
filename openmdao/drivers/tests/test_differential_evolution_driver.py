@@ -6,8 +6,7 @@ import os
 import numpy as np
 
 import openmdao.api as om
-from openmdao.drivers.differential_evolution_driver import DifferentialEvolution
-from openmdao.test_suite.components.branin import Branin, BraninDiscrete
+from openmdao.test_suite.components.branin import Branin
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar_feature import SellarMDA
@@ -23,14 +22,32 @@ except ImportError:
 
 extra_prints = False  # enable printing results
 
+
 class TestDifferentialEvolution(unittest.TestCase):
+
     def setUp(self):
         import os  # import needed in setup for tests in documentation
         os.environ['DifferentialEvolutionDriver_seed'] = '11'  # make RNG repeatable
 
+    def test_basic_with_assert(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
+
+        model.add_design_var('xI', lower=-5.0, upper=10.0)
+        model.add_design_var('xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = om.DifferentialEvolutionDriver()
+
+        prob.setup()
+        prob.run_driver()
+
+        # Optimal solution (actual optimum, not the optimal with integer inputs as found by SimpleGA)
+        assert_near_equal(prob['comp.f'], 0.397887, 1e-4)
+
     def test_rastrigin(self):
-        import openmdao.api as om
-        import numpy as np
 
         ORDER = 6  # dimension of problem
         span = 5   # upper and lower limits
@@ -264,6 +281,7 @@ class TestDifferentialEvolution(unittest.TestCase):
 
 
 class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
+
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
@@ -292,6 +310,7 @@ class TestDriverOptionsDifferentialEvolution(unittest.TestCase):
 
 
 class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
+
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
@@ -400,6 +419,7 @@ class TestMultiObjectiveDifferentialEvolution(unittest.TestCase):
 
 
 class TestConstrainedDifferentialEvolution(unittest.TestCase):
+
     def setUp(self):
         os.environ['DifferentialEvolutionDriver_seed'] = '11'
 
@@ -601,9 +621,6 @@ class MPITestDifferentialEvolution(unittest.TestCase):
 
 
 class D1(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -615,11 +632,11 @@ class D1(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y2', np.ones((1, ), float),
+        self.add_input('y2', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('x', np.ones((1, ), float))
+        self.add_input('x', np.ones((1, ), float), distributed=True)
 
-        self.add_output('y1', np.ones((1, ), float))
+        self.add_output('y1', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y1', ['y2', 'x'])
 
@@ -644,9 +661,6 @@ class D1(om.ExplicitComponent):
 
 
 class D2(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -658,10 +672,10 @@ class D2(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y1', np.ones((1, ), float),
+        self.add_input('y1', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('y2', np.ones((1, ), float))
+        self.add_output('y2', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y2', ['y1'])
 
@@ -757,7 +771,8 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_subsystem('d1', D1(), promotes=['*'])
         model.add_subsystem('d2', D2(), promotes=['*'])
 
-        model.add_subsystem('obj_comp', Summer(), promotes=['*'])
+        model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
+        model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
         model.linear_solver = om.LinearBlockGS()
 
@@ -791,7 +806,8 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -814,208 +830,6 @@ class MPITestDifferentialEvolution4Procs(unittest.TestCase):
         assert_near_equal(prob.get_val('y', get_remote=True),    [-7.33333, -6.93333, -6.53333], 1e-3)
         assert_near_equal(prob.get_val('f_xy', get_remote=True), [-27.3333, -23.0533, -19.0133], 1e-3)
         assert_near_equal(np.sum(prob.get_val('f_xy', get_remote=True))/3, -23.1333, 1e-4)
-
-
-class TestFeatureDifferentialEvolution(unittest.TestCase):
-    def setUp(self):
-        import os  # import needed in setup for tests in documentation
-        os.environ['DifferentialEvolutionDriver_seed'] = '11'
-
-    def test_basic(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-
-        prob.setup()
-        prob.run_driver()
-
-    def test_basic_with_assert(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-
-        prob.setup()
-        prob.run_driver()
-
-        # Optimal solution (actual optimum, not the optimal with integer inputs as found by SimpleGA)
-        assert_near_equal(prob['comp.f'], 0.397887, 1e-4)
-
-    def test_option_max_gen(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['max_gen'] = 5
-
-        prob.setup()
-        prob.run_driver()
-
-    def test_option_pop_size(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(), promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['pop_size'] = 10
-
-        prob.setup()
-        prob.run_driver()
-
-    def test_constrained_with_penalty(self):
-        class Cylinder(om.ExplicitComponent):
-            """Main class"""
-
-            def setup(self):
-                self.add_input('radius', val=1.0)
-                self.add_input('height', val=1.0)
-
-                self.add_output('Area', val=1.0)
-                self.add_output('Volume', val=1.0)
-
-            def compute(self, inputs, outputs):
-                radius = inputs['radius']
-                height = inputs['height']
-
-                area = height * radius * 2 * 3.14 + 3.14 * radius ** 2 * 2
-                volume = 3.14 * radius ** 2 * height
-                outputs['Area'] = area
-                outputs['Volume'] = volume
-
-        prob = om.Problem()
-        prob.model.add_subsystem('cylinder', Cylinder(), promotes=['*'])
-
-        # setup the optimization
-        prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['penalty_parameter'] = 3.
-        prob.driver.options['penalty_exponent'] = 1.
-        prob.driver.options['max_gen'] = 50
-
-        prob.model.add_design_var('radius', lower=0.5, upper=5.)
-        prob.model.add_design_var('height', lower=0.5, upper=5.)
-        prob.model.add_objective('Area')
-        prob.model.add_constraint('Volume', lower=10.)
-
-        prob.setup()
-        prob.run_driver()
-
-        # These go to 0.5 for unconstrained problem. With constraint and penalty, they
-        # will be above 1.0 (actual values will vary.)
-        self.assertGreater(prob['radius'], 1.)
-        self.assertGreater(prob['height'], 1.)
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MPIFeatureTests(unittest.TestCase):
-    N_PROCS = 2
-
-    def setUp(self):
-        os.environ['DifferentialEvolutionDriver_seed'] = '11'
-
-    def test_option_parallel(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
-
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['max_gen'] = 10
-        prob.driver.options['run_parallel'] = True
-
-        prob.setup()
-        prob.run_driver()
-
-        # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MPIFeatureTests4(unittest.TestCase):
-    N_PROCS = 4
-
-    def setUp(self):
-        os.environ['DifferentialEvolutionDriver_seed'] = '11'
-
-    def test_option_procs_per_model(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', om.IndepVarComp('xI', 0.0))
-        par = model.add_subsystem('par', om.ParallelGroup())
-
-        par.add_subsystem('comp1', Branin())
-        par.add_subsystem('comp2', Branin())
-
-        model.connect('p2.xI', 'par.comp1.x0')
-        model.connect('p1.xC', 'par.comp1.x1')
-        model.connect('p2.xI', 'par.comp2.x0')
-        model.connect('p1.xC', 'par.comp2.x1')
-
-        model.add_subsystem('comp', om.ExecComp('f = f1 + f2'))
-        model.connect('par.comp1.f', 'comp.f1')
-        model.connect('par.comp2.f', 'comp.f2')
-
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.DifferentialEvolutionDriver()
-        prob.driver.options['max_gen'] = 10
-        prob.driver.options['pop_size'] = 25
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = 2
-
-        prob.setup()
-        prob.run_driver()
-
-        # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
 
 
 if __name__ == "__main__":

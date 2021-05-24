@@ -184,7 +184,7 @@ class NewtonSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -265,22 +265,6 @@ class NewtonSolver(NonlinearSolver):
             self.linear_solver._set_complex_step_mode(active)
             if self.linear_solver._assembled_jac is not None:
                 self.linear_solver._assembled_jac.set_complex_step_mode(active)
-
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
 
     def cleanup(self):
         """

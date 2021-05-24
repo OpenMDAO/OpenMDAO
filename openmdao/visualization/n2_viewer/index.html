@@ -1,8 +1,5 @@
-<div id="all_pt_n2_content_div" class="non-embedded-n2">
+<div id="all_pt_n2_content_div" class="non-embedded-n2" data-openmdao-version="{{om_version}}">
     <div id="ptN2ContentDivId">
-        <!-- The Model -->
-        {{help}}
-
         <!-- Toolbar -->
         <div id="toolbarLoc">
             <div class="searchbar-container" id="searchbar-container">
@@ -12,7 +9,7 @@
                 <div id='searchbar-and-label' class='searchbar-hidden'>
                     <label id='searchCountId' for='awesompleteId'>0 matches</label>
                     <input type="text" tabindex="-1" size="80" placeholder="Search" id="awesompleteId"
-                        class="searchbar" />
+                        class="searchbar" autocomplete="off"/>
                 </div>
             </div>
             <div class="toolbar" id="true-toolbar">
@@ -42,8 +39,20 @@
                             <i class="fas icon-bezier-curve" id="show-all-connections"></i>
                         </div>
                     </div>
-                    <i class="fas icon-linear-solver solver-button" id="linear-solver-button"></i>
+
                     <i class="fas icon-key" id="legend-button"></i>
+
+                    <div class="expandable">
+                        <i class="fas icon-linear-solver solver-button" id="linear-solver-button"></i>
+                        <i class="fas icon-caret-right caret"></i>
+                        <div class="toolbar-group-expandable" id="solvers-expandable">
+                            <i class="fas icon-linear-solver solver-button" id="linear-solver-button-2"></i>
+                            <i class="fas icon-nonlinear-solver solver-button" id="non-linear-solver-button"></i>
+                            <i class="fas icon-no-solver solver-button" id="no-solver-button"></i>
+                        </div>
+                    </div>
+
+                    <i class="fas icon-fx-2" id="desvars-button"></i>
                 </div>
                 <div class="toolbar-group group-4">
                     <div class="expandable">
@@ -58,42 +67,42 @@
                         <i class="fas icon-collapse-depth" id="depth-slider-button"></i>
                         <i class="fas icon-caret-right caret"></i>
                         <div class="toolbar-group-expandable" id="model-depth-expandable">
-                            <input type="range" min="0" max="10" value="0" class="slider" id="depth-slider" />
+                            <input type="range" min="2" max="10" value="0" class="slider" id="depth-slider" />
+                            <p id='depth-slider-label'>10</p>
                         </div>
                     </div>
                     <div class="expandable">
                         <i class="fas icon-model-height" id="model-slider-button"></i>
                         <i class="fas icon-caret-right caret"></i>
                         <div class="toolbar-group-expandable" id="model-height-expandable">
-                            <input type="range" class="slider" id="model-slider" list="model-slider-data" min='50'
-                                max='200' value='95' />
-                            <datalist id="model-slider-data">
-                                <option value='50'></option>
-                                <option value='75'></option>
-                                <option value='95'></option>
-                                <option value='100'></option>
-                                <option value='125'></option>
-                                <option value='150'></option>
-                                <option value='175'></option>
-                                <option value='200'></option>
-                            </datalist>
+                            <input type="range" min='50' max='200' value='95' class="slider" id="model-slider" />
                             <p id='model-slider-label'>95%</p>
                             <button id='model-slider-fit'>Fit</button>
                         </div>
                     </div>
-                    <i class="fas icon-save" id="save-button"></i>
+                    <div class="expandable">
+                        <i class="fas icon-save" id="save-load-button"></i>
+                        <i class="fas icon-caret-right caret"></i>
+                        <div class="toolbar-group-expandable" id="text-width-expandable">
+                            <i class="fas icon-savesvg" id="save-button"></i>
+                            <i class="fas icon-saveview" id="save-state-button"></i>
+                            <i class="fas icon-loadview" id="load-state-button"></i>
+                            <input id="state-file-input" type="file" name="name" style="display: none;" />
+                        </div>
+                    </div>
                 </div>
                 <div class="toolbar-group group-5">
                     <i class="fas icon-info-circle" id="info-button"></i>
                     <i class="fas icon-question-circle" id="question-button"></i>
                 </div>
             </div>
+            <!-- Hide toolbar button -->
+            <div class="toolbar-hide-container" id="hide-toolbar">
+                <i class="fas icon-chevron-left hide-toolbar-button"></i>
+            </div>
         </div>
 
-        <!-- Hide toolbar button -->
-        <div class="toolbar-hide-container" id="hide-toolbar">
-            <i class="fas icon-chevron-left hide-toolbar-button"></i>
-        </div>
+
 
         <div id="d3_content_div">
             <!-- 2D Matrix Showing All Inputs/Outputs and Functions -->
@@ -151,7 +160,7 @@
             </div>
 
             <!-- Legend to show all symbols -->
-            <div class="legend" id="legend-div">
+            <div class="legend" id="legend-div" style="visibility: hidden">
                 <div class="sys-var-container">
                     <div class="legend-title-container">
                         <p class="legend-title">Systems &amp;&nbsp;Variables</p>
@@ -189,61 +198,68 @@
                     </div>
                     <div id="solvers-legend"></div>
                 </div>
-                <div class="draggable">
-                    <div class='draggable-legend-dots'>
-                        <p class="legend-dots"></p>
+            </div>
+        </div>
+
+        <div id="connectionId"></div>
+
+        <div id='n2-windows'>
+            <div class='n2-windows-modal-bg window-inactive'></div>
+            <!-- Window template for all N2 windows -->
+            <div id='window-template' class='window-inactive' style='z-index: 100'>
+                <div class='main-window'>
+                    <div class='window-contents window-theme-default'>
+                        <div class='window-header'>
+                            <span class='window-title'>N2 Information</span>
+                        </div>
+                        <!-- Close button outside of header so it doesn't affect title alignment -->
+                        <span class='window-close-button'></span>
+                        <div class='window-body'></div>
+                        <div class='window-footer'>
+                            <span></span>
+                        </div>
                     </div>
-                    <div class="icon-key"></div>
-                    <div class='draggable-legend-dots'>
-                        <p class="legend-dots"></p>
-                    </div>
-                </div>
-                <div id="close-legend">
-                    <p></p>
                 </div>
             </div>
         </div>
-        <div id="connectionId"></div>
     </div>
-</div>
 
-<div id="node-info-container" class='info-hidden'>
-    <table id="node-info-table" cellpadding='0' cellspacing='0'>
-        <thead>
-            <tr>
-                <th scope='col' colspan='2'>Name</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-        <tfoot>
-            <tr>
-                <th scope='col' colspan='2'>&nbsp;</th>
-            </tr>
-        </tfoot>
-    </table>
-    <p id='node-info-pin' class='info-hidden'>&#x1F4CC;</p>
-</div>
+    <!-- Need this off window element to put values that can then be put on the pastebuffer -->
+    <textarea id="input-for-pastebuffer"></textarea>
 
-<!-- all the node value containers and tables will be put inside this div -->
-<div class="node-value" id="node-value-containers">
-</div>
+    <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
+    <div id="top" class="offgrid" style="visibility: hidden;"></div>
+    <div id="left" class="offgrid" style="visibility: hidden;"></div>
+    <div id="right" class="offgrid" style="visibility: hidden;"></div>
+    <div id="bottom" class="offgrid" style="visibility: hidden;"></div>
 
-<!-- Need this off window element to put values that can then be put on the pastebuffer -->
-<textarea id="input-for-pastebuffer"></textarea>
+    <div id="logo-container">
+        <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
+    </div>
 
-<div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
-<div id="top" class="offgrid" style="visibility: hidden;"></div>
-<div id="left" class="offgrid" style="visibility: hidden;"></div>
-<div id="right" class="offgrid" style="visibility: hidden;"></div>
-<div id="bottom" class="offgrid" style="visibility: hidden;"></div>
+    <div id="show-error-button-container">
+        <button id="show-error-button">
+            <i class="fas icon-notification"></i> Show N2 Error
+        </button>
+    </div>
 
-<div id="logo-container">
-    <img id="company-logo" alt="OpenMDAO" src="data:image/png;base64,{{logo_png}}" />
-</div>
+    <div id="toolbar-help-container" class='window-inactive'>
+        <p>Left clicking on a node in the model hierarchy will navigate to that node.<br>
+            Right clicking on a node in the model hierarchy will collapse/expand it.<br>
+            Hovering over any cell in the matrix will display its connections
+            as arrows. Clicking that cell will cause those arrows to persist.
+        </p>
+        <h1>Toolbar Help</h1>
+        <div class='help-graphic'>
+            <img id="toolbar-snapshot" alt="Snapshot of toolbar buttons"
+                src="data:image/png;base64,{{n2toolbar_png}}" />
+            <svg id='help-graphic-svg'></svg>
+        </div>
+    </div>
 
-{d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib}
-{{model_data}} {modal_lib}
-{utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
-{n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib} {n2arrow_lib}
-{n2search_lib} {n2toolbar_lib} {n2diagram_lib}
-{nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}
+    {d3_lib} {awesomplete_lib} {vk_beautify_lib} {pako_inflate_lib} {json5_lib}
+    {{model_data}}
+    {utils_lib} {symboltype_lib} {n2treenode_lib} {modeldata_lib} {n2style_lib}
+    {n2window_lib} {n2layout_lib} {n2matrixcell_lib} {n2legend_lib} {n2matrix_lib}
+    {n2arrow_lib} {n2search_lib} {n2toolbar_lib} {n2diagram_lib}
+    {nodeinfo_lib} {n2userinterface_lib} {defaults_lib} {ptn2_lib}

@@ -9,7 +9,7 @@ import openmdao.api as om
 from openmdao.components.spline_comp import SPLINE_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.spline_distributions import cell_centered
+from openmdao.utils.spline_distributions import cell_centered, sine_distribution
 from openmdao.components.interp_util.interp import InterpND
 
 
@@ -370,12 +370,10 @@ class SplineCompTestCase(unittest.TestCase):
         output = sorted(prob.model.list_inputs(units=True))
         self.assertEqual(output[0][1]['units'], 'kft')
 
+
 class SplineCompFeatureTestCase(unittest.TestCase):
 
     def test_basic_example(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -395,24 +393,20 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
-                            12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
-                            13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
-                            14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
-                            15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
-                            16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
-                            17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
-                            19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
-                            20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
-                            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
-
-        assert_near_equal(akima_y.flatten(), prob.get_val('akima1.y_val').flatten(), tolerance=1e-8)
+        assert_near_equal(prob.get_val('akima1.y_val'),
+                          np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
+                                      12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
+                                      13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
+                                      14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
+                                      15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
+                                      16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
+                                      17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
+                                      19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
+                                      20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+                                      24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]]),
+                          tolerance=1e-8)
 
     def test_multi_splines(self):
-
-        import numpy as np
-
-        import openmdao.api as om
 
         x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -433,11 +427,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
     def test_spline_distribution_example(self):
 
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.spline_distributions import sine_distribution
-
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 20
@@ -453,17 +442,14 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        akima_y = np.array([[5.         , 5.32381994,  6.28062691 , 7.79410646 , 9.64169506, 11.35166363,
-                             12.26525921, 12.99152288, 13.77257256, 14.58710327, 15.41289673, 16.28341046,
-                             17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
-                             28.67782484, 29.        ]])
-
-        assert_near_equal(akima_y.flatten(), prob.get_val('akima1.y_val').flatten(), tolerance=1e-8)
+        assert_near_equal(prob.get_val('akima1.y_val'),
+                          np.array([[5.         , 5.32381994,  6.28062691 , 7.79410646 , 9.64169506, 11.35166363,
+                                     12.26525921, 12.99152288, 13.77257256, 14.58710327, 15.41289673, 16.28341046,
+                                     17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
+                                     28.67782484, 29.        ]]),
+                          tolerance=1e-8)
 
     def test_akima_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -488,9 +474,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
     def test_bspline_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -541,7 +524,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob['comp1.chord'], y, 1e-6)
 
     def test_bsplines_2to3doc(self):
-        from openmdao.utils.spline_distributions import sine_distribution
 
         prob = om.Problem()
         model = prob.model

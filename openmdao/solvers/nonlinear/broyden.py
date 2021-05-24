@@ -9,7 +9,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import issue_warning, SetupWarning
 from openmdao.utils.mpi import MPI
 
 
@@ -238,7 +238,7 @@ class BroydenSolver(NonlinearSolver):
             msg = "The following states are not covered by a solver, and may have been " + \
                   "omitted from the BroydenSolver 'state_vars': "
             msg += ', '.join(sorted(missing))
-            simple_warning(msg)
+            issue_warning(msg, category=SetupWarning)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -315,7 +315,7 @@ class BroydenSolver(NonlinearSolver):
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Broyden.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
+            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
 
         # Start with initial states.
         self.xm = self.get_vector(system._outputs)
@@ -347,7 +347,7 @@ class BroydenSolver(NonlinearSolver):
         self.fxm = fxm = self.get_vector(self._system()._residuals)
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self._system()._residuals._data
+            fxm = self._system()._residuals.asarray()
 
         return self.compute_norm(fxm)
 
@@ -547,9 +547,9 @@ class BroydenSolver(NonlinearSolver):
         ndarray
             New inverse Jacobian.
         """
-        # TODO : Consider promoting this capability out into OpenMDAO so other solvers can use the
+        # TODO: Consider promoting this capability out into OpenMDAO so other solvers can use the
         # same code.
-        # TODO : Can do each state in parallel if procs are available.
+        # TODO: Can do each state in parallel if procs are available.
         system = self._system()
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']
@@ -629,22 +629,6 @@ class BroydenSolver(NonlinearSolver):
         system._owns_approx_jac = approx_status
 
         return inv_jac
-
-    def _mpi_print_header(self):
-        """
-        Print header text before solving.
-        """
-        if self.options['iprint'] > 0 and self._system().comm.rank == 0:
-
-            pathname = self._system().pathname
-            if pathname:
-                nchar = len(pathname)
-                prefix = self._solver_info.prefix
-                header = prefix + "\n"
-                header += prefix + nchar * "=" + "\n"
-                header += prefix + pathname + "\n"
-                header += prefix + nchar * "="
-                print(header)
 
     def cleanup(self):
         """

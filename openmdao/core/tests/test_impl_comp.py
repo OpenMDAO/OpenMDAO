@@ -1,4 +1,5 @@
 """Simple example demonstrating how to implement an implicit component."""
+import sys
 import unittest
 
 from io import StringIO
@@ -7,6 +8,8 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import remove_whitespace
+from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
 
 # Note: The following class definitions are used in feature docs
@@ -67,6 +70,9 @@ class QuadraticLinearize(QuadraticComp):
 
 
 class QuadraticJacVec(QuadraticComp):
+
+    def setup_partials(self):
+        pass  # prevent declaration of partials from base class
 
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
@@ -200,7 +206,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
         expected = {
-            'x': {'value': [0.]}
+            'x': {'value': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
@@ -216,8 +222,11 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(dict(c2_outputs), {})
 
         # specifying residuals_tol should not cause an error
+        # there are no residuals yet, so nothing should be filtered
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-        self.assertEqual(dict(c2_outputs), expected)
+        self.assertEqual(dict(c2_outputs), {
+            'x': {'value': 0.}
+        })
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
@@ -283,7 +292,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('  c  '), 4)
 
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 12)
+        self.assertEqual(num_non_empty_lines, 11)
 
     def test_list_explicit_outputs(self):
         self.prob.run_model()
@@ -343,7 +352,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 8)
+        self.assertEqual(num_non_empty_lines, 7)
 
     def test_list_residuals(self):
         self.prob.run_model()
@@ -362,6 +371,56 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('varname'), 1)
         self.assertEqual(text.count('value'), 0)
         self.assertEqual(text.count('resids'), 1)
+
+    def test_list_residuals_with_tol(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('d1', SellarImplicitDis1())
+        model.add_subsystem('d2', SellarImplicitDis2())
+        model.connect('d1.y1', 'd2.y1')
+        model.connect('d2.y2', 'd1.y2')
+
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        model.nonlinear_solver.options['maxiter'] = 5
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
+
+        prob.setup()
+        prob.set_solver_print(level=-1)
+
+        prob.run_model()
+
+        # list outputs with residuals, p1 and d1 should not appear
+        sysout = sys.stdout
+        try:
+            stdout = StringIO()
+            sys.stdout = stdout
+            outputs = model.list_outputs(residuals_tol=0.01, residuals=True, out_stream=stdout)
+        finally:
+            sys.stdout = sysout
+
+        expected_text = [
+            "0 Explicit Output(s) in 'model'",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "",
+            "varname  value         resids     ",
+            "-------  ------------  -----------",
+            "d2",
+            "  y2",  # values removed from comparison
+            "",
+            "",
+            ""
+        ]
+        captured_output = stdout.getvalue()
+
+        for i, line in enumerate(captured_output.split('\n')):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(line.split('[')[0]),
+                                 remove_whitespace(expected_text[i]))
 
 
 class ImplicitCompGuessTestCase(unittest.TestCase):
@@ -443,7 +502,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, resids):
 
-                if outputs._data.dtype == np.complex:
+                if outputs.asarray().dtype == np.complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # Default initial state of zero for x takes us to x=1 solution.
@@ -719,8 +778,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         assert_near_equal(prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
-        import openmdao.api as om
-        import numpy as np
 
         class ImpWithInitial(om.ImplicitComponent):
             """
@@ -1202,8 +1259,6 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_impl_comp import QuadraticComp
 
         group = om.Group()
 
@@ -1280,42 +1335,6 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_simple_list_vars_options(self):
-        import openmdao.api as om
-
-        class QuadraticComp(om.ImplicitComponent):
-            """
-            A Simple Implicit Component representing a Quadratic Equation.
-
-            R(a, b, c, x) = ax^2 + bx + c
-
-            Solution via Quadratic Formula:
-            x = (-b + sqrt(b^2 - 4ac)) / 2a
-            """
-
-            def setup(self):
-                self.add_input('a', val=1., units='ft')
-                self.add_input('b', val=1., units='inch')
-                self.add_input('c', val=1., units='ft')
-                self.add_output('x', val=0.,
-                                lower=1.0, upper=100.0,
-                                ref=1.1, ref0=2.1,
-                                units='inch')
-
-            def setup_partials(self):
-                self.declare_partials(of='*', wrt='*')
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
-                x = outputs['x']
-                residuals['x'] = a * x ** 2 + b * x + c
-
-            def solve_nonlinear(self, inputs, outputs):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
-                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
 
         group = om.Group()
 
@@ -1361,7 +1380,7 @@ class ListFeatureTestCase(unittest.TestCase):
         self.assertEqual(1, text.count("\n  comp2"))
         self.assertEqual(2, text.count("\n    a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 13)
+        self.assertEqual(num_non_empty_lines, 12)
 
         # list_outputs tests
         # list implicit outputs
@@ -1381,8 +1400,6 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_list_residuals_with_tol(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
         prob = om.Problem()
         model = prob.model
 
@@ -1403,7 +1420,6 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
-        print(outputs)
 
 
 class CacheUsingComp(om.ImplicitComponent):

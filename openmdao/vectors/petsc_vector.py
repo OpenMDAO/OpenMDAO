@@ -75,7 +75,7 @@ class PETScVector(DefaultVector):
 
         self._petsc = {}
         self._imag_petsc = {}
-        data = self._data
+        data = self._data.real
 
         if self._ncol == 1:
             if self._alloc_complex:
@@ -93,7 +93,7 @@ class PETScVector(DefaultVector):
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
-            data = self._cplx_data.imag
+            data = self._data.imag
             if self._ncol == 1:
                 self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
             else:
@@ -125,9 +125,9 @@ class PETScVector(DefaultVector):
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
                         dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
-                self._dup_inds = np.array(dup_inds, dtype=int)
+                self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
             else:
-                self._dup_inds = np.array([], dtype=int)
+                self._dup_inds = np.array([], dtype=INT_DTYPE)
 
         return self._dup_inds
 
@@ -150,18 +150,18 @@ class PETScVector(DefaultVector):
                 data_cache = self.asarray(copy=True)
                 data_cache[dup_inds] = 0.0
             else:
-                data_cache = self._data
+                data_cache = self._get_data()
         else:
             # With Vectorized derivative solves, data contains multiple columns.
             icol = self._icol
             if icol is None:
                 icol = 0
             if has_dups:
-                data_cache = self._data.flatten()
+                data_cache = self._get_data().flatten()
                 data_cache[dup_inds] = 0.0
-                data_cache = data_cache.reshape(self._data.shape)[:, icol]
+                data_cache = data_cache.reshape(self._get_data().shape)[:, icol]
             else:
-                data_cache = self._data[:, icol]
+                data_cache = self._get_data()[:, icol]
 
         return data_cache
 
@@ -173,13 +173,13 @@ class PETScVector(DefaultVector):
         values.
         """
         if self._ncol == 1:
-            self._petsc.array = self._data
+            self._petsc.array = self._get_data()
         else:
             # With Vectorized derivative solves, data contains multiple columns.
             icol = self._icol
             if icol is None:
                 icol = 0
-            self._petsc.array = self._data[:, icol]
+            self._petsc.array = self._get_data()[:, icol]
 
     def get_norm(self):
         """
@@ -212,4 +212,4 @@ class PETScVector(DefaultVector):
         """
         nodup = self._get_nodup()
         # we don't need to _resore_dups here since we don't modify _petsc.array.
-        return self._system().comm.allreduce(np.dot(nodup, vec._data))
+        return self._system().comm.allreduce(np.dot(nodup, vec._get_data()))

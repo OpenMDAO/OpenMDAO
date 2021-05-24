@@ -183,11 +183,11 @@ class MultiFiCoKriging(object):
 
     Attributes
     ----------
-    corr : Object
+    corr : object
         Correlation function to use, default is squared_exponential_correlation.
-    n_features : ndarry
+    n_features : ndarray
         Number of features for each fidelity level.
-    n_samples : ndarry
+    n_samples : ndarray
         Number of samples for each fidelity level.
     nlevel : int
         Number of fidelity levels.
@@ -382,7 +382,7 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : Integer
+        lvl : integer
             Level of fidelity
         theta : array_like
             An array containing the autocorrelation parameters at which the
@@ -528,7 +528,7 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : Integer
+        lvl : integer
             Level of fidelity
         theta : array_like, optional
             An array containing the autocorrelation parameters at which the

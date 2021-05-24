@@ -11,6 +11,7 @@ from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 
 try:
@@ -778,28 +779,7 @@ class TestBryoden(unittest.TestCase):
 
 class TestBryodenFeature(unittest.TestCase):
 
-    def test_sellar(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarStateConnection
-
-        prob = om.Problem()
-        model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
-                                                   linear_solver=om.LinearRunOnce())
-
-        prob.setup()
-
-        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
-        model.nonlinear_solver.options['compute_jacobian'] = False
-
-        prob.set_solver_print(level=2)
-        prob.run_model()
-
-        assert_near_equal(prob['y1'], 25.58830273, .00001)
-        assert_near_equal(prob['state_eq.y2_command'], 12.05848819, .00001)
-
     def test_circuit(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = om.Problem()
         model = p.model
@@ -833,8 +813,6 @@ class TestBryodenFeature(unittest.TestCase):
         assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
     def test_circuit_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = om.Problem()
         model = p.model
@@ -868,8 +846,6 @@ class TestBryodenFeature(unittest.TestCase):
         assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
     def test_circuit_full(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = om.Problem()
         model = p.model

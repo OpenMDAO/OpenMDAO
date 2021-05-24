@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
-from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
+from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
@@ -117,7 +117,6 @@ class MyComp(om.ExplicitComponent):
         J = partials
         J['y', 'x1'] = np.array([4.0])
         J['y', 'x2'] = np.array([40])
-
 
 class TestProblemCheckPartials(unittest.TestCase):
 
@@ -963,7 +962,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
-        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
@@ -1539,7 +1537,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True, method='fd')
 
             def compute(self, inputs, outputs):
@@ -1602,7 +1599,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True, method='fd', form='central')
 
             def compute(self, inputs, outputs):
@@ -1681,7 +1677,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_check_partials(J)
 
     def test_directional_mixed_error_message(self):
-        import openmdao.api as om
 
         class ArrayCompMatrixFree(om.ExplicitComponent):
 
@@ -1704,7 +1699,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('x*', directional=True, method='fd')
 
             def compute(self, inputs, outputs):
@@ -1915,13 +1909,49 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(partials)
 
+    def test_no_linsolve_during_check(self):
+        # ensure that solve_linear is not called during check partials
+        from openmdao.solvers.solver import LinearSolver
+
+        class ErrSolver(LinearSolver):
+            def _linearize(self):
+                raise RuntimeError("_linearize called")
+
+            def solve(self, vec_names, mode, rel_systems=None):
+                raise RuntimeError("solve called")
+
+            def _run_apply(self):
+                raise RuntimeError("_run_apply called")
+
+        class SingularImplicitComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_input('lhs', shape=10)
+                self.add_input('rhs', shape=10)
+
+                self.add_output('resid', shape=10)
+
+                self.declare_partials('*', '*', method='cs')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+
+                residuals['resid'] = inputs['lhs'] - inputs['rhs']
+
+
+        p = om.Problem()
+
+        p.model.add_subsystem('sing_check', SingularImplicitComp())
+        p.model.sing_check.linear_solver = ErrSolver()
+        p.setup()
+
+        p.run_model()
+
+        p.check_partials(out_stream=None)
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -1961,9 +1991,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         assert_near_equal(x2_error.forward, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -1996,9 +2023,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         print(data)
 
     def test_set_step_on_comp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2017,9 +2041,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_step_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2036,9 +2057,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step=1e-2, compact_print=True)
 
     def test_set_method_on_comp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2057,9 +2075,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_method_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2076,9 +2091,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(method='cs', compact_print=True)
 
     def test_set_form_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2095,8 +2107,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(form='central', compact_print=True)
 
     def test_set_step_calc_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
 
         prob = om.Problem()
 
@@ -2110,8 +2120,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step_calc='rel', compact_print=True)
 
     def test_feature_check_partials_show_only_incorrect(self):
-        import numpy as np
-        import openmdao.api as om
 
         class MyCompGoodPartials(om.ExplicitComponent):
             def setup(self):
@@ -2158,8 +2166,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=False, show_only_incorrect=True)
 
     def test_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -2187,8 +2193,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
     def test_directional(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.array_comp import ArrayComp
 
         prob = om.Problem()
         model = prob.model
@@ -2200,9 +2204,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         data = prob.check_partials()
 
     def test_directional_matrix_free(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class ArrayCompMatrixFree(om.ExplicitComponent):
 
@@ -2225,7 +2226,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 # Outputs
                 self.add_output('y1', np.zeros([4]))
 
-                self.declare_partials(of='*', wrt='*')
                 self.set_check_partial_options('*', directional=True)
 
             def compute(self, inputs, outputs):
@@ -2286,6 +2286,210 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 
+
+class DistribParaboloid(om.ExplicitComponent):
+
+    def setup(self):
+        if self.comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+
+        self.add_input('w', val=1., distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=ndvs, distributed=True) # this will connect to a distributed IVC
+
+        self.add_output('y', shape=2, distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=ndvs, distributed=True) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        val = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['y'] = np.array([val, val*3.])
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x']
+        J['y', 'x'] = np.array([2*(x-5), 6*(x-5)])
+        J['y', 'w'] = np.array([2*(inputs['w']-10), 6*(inputs['w']-10)])
+        J['z', 'x'] = np.diag(2*x)
+
+
+class DistribParaboloid2D(om.ExplicitComponent):
+
+    def setup(self):
+
+        comm = self.comm
+        rank = comm.rank
+
+        if rank == 0:
+            vshape = (3,2)
+        else:
+            vshape = (2,2)
+
+        self.add_input('w', val=1., src_indices=np.array([1]), distributed=True) # this will connect to a non-distributed IVC
+        self.add_input('x', shape=vshape, distributed=True) # this will connect to a distributed IVC
+
+        self.add_output('y', distributed=True) # all-gathered output, duplicated on all procs
+        self.add_output('z', shape=vshape, distributed=True) # distributed output
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'w')
+        self.declare_partials('z', 'x')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        local_y = np.sum((x-5)**2)
+        y_g = np.zeros(self.comm.size)
+        self.comm.Allgather(local_y, y_g)
+        outputs['y'] = np.sum(y_g) + (inputs['w']-10)**2
+        outputs['z'] = x**2
+
+    def compute_partials(self, inputs, J):
+        x = inputs['x'].flatten()
+        J['y', 'x'] = 2*(x-5)
+        J['y', 'w'] = 2*(inputs['w']-10)
+        J['z', 'x'] = np.diag(2*x)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def _do_compute_totals(self, mode):
+        comm = MPI.COMM_WORLD
+
+        p = om.Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                    om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+        if comm.rank == 0:
+            ndvs = 3
+        else:
+            ndvs = 2
+        d_ivc.add_output('x', 2*np.ones(ndvs))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    om.IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DistribParaboloid(), promotes=['*'])
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode=mode)
+        p.run_model()
+
+        dv_vals = p.driver.get_design_var_values(get_remote=False)
+
+        # Compute totals and check the length of the gradient array on each proc
+        objcongrad = p.compute_totals(get_remote=False)
+
+        # Check the values of the gradient array
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][1], -18.0*np.ones(ndvs))
+
+    def test_distrib_compute_totals_fwd(self):
+        self._do_compute_totals('fwd')
+
+    def test_distrib_compute_totals_rev(self):
+        self._do_compute_totals('rev')
+
+    def _do_compute_totals_2D(self, mode):
+        # this test has some non-flat variables
+        comm = MPI.COMM_WORLD
+
+        p = om.Problem()
+        d_ivc = p.model.add_subsystem('distrib_ivc',
+                                    om.IndepVarComp(distributed=True),
+                                    promotes=['*'])
+        if comm.rank == 0:
+            ndvs = 6
+            two_d = (3,2)
+        else:
+            ndvs = 4
+            two_d = (2,2)
+
+        d_ivc.add_output('x', 2*np.ones(two_d))
+
+        ivc = p.model.add_subsystem('ivc',
+                                    om.IndepVarComp(distributed=False),
+                                    promotes=['*'])
+        ivc.add_output('w', 2.0)
+        p.model.add_subsystem('dp', DistribParaboloid2D(), promotes=['*'])
+
+        p.model.add_design_var('x', lower=-100, upper=100)
+        p.model.add_objective('y')
+
+        p.setup(mode=mode)
+        p.run_model()
+
+        dv_vals = p.driver.get_design_var_values(get_remote=False)
+
+        # Compute totals and check the length of the gradient array on each proc
+        objcongrad = p.compute_totals(get_remote=False)
+
+        # Check the values of the gradient array
+        assert_near_equal(objcongrad[('dp.y', 'distrib_ivc.x')][0], -6.0*np.ones(ndvs))
+
+    def test_distrib_compute_totals_2D_fwd(self):
+        self._do_compute_totals_2D('fwd')
+
+    def test_distrib_compute_totals_2D_rev(self):
+        self._do_compute_totals_2D('rev')
+
+    def _remotevar_compute_totals(self, mode):
+        indep_list = ['iv.x']
+        unknown_list = [
+            'c1.y1',
+            'c1.y2',
+            'sub.c2.y1',
+            'sub.c3.y1',
+            'c4.y1',
+            'c4.y2',
+        ]
+
+        full_expected = {
+            ('c1.y1', 'iv.x'): [[8.]],
+            ('c1.y2', 'iv.x'): [[3.]],
+            ('sub.c2.y1', 'iv.x'): [[4.]],
+            ('sub.c3.y1', 'iv.x'): [[10.5]],
+            ('c4.y1', 'iv.x'): [[25.]],
+            ('c4.y2', 'iv.x'): [[-40.5]],
+        }
+
+        prob = om.Problem()
+        prob.model = Diamond()
+
+        prob.setup(mode=mode)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob['c4.y1'], 46.0, 1e-6)
+        assert_near_equal(prob['c4.y2'], -93.0, 1e-6)
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        for key, val in full_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+
+        reduced_expected = {key: v for key, v in full_expected.items() if key[0] in prob.model._var_abs2meta['output']}
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list, get_remote=False)
+        for key, val in reduced_expected.items():
+            assert_near_equal(J[key], val, 1e-6)
+        self.assertEqual(len(J), len(reduced_expected))
+
+    def test_remotevar_compute_totals_fwd(self):
+        self._remotevar_compute_totals('fwd')
+
+    def test_remotevar_compute_totals_rev(self):
+        self._remotevar_compute_totals('rev')
 
 class TestProblemCheckTotals(unittest.TestCase):
 
@@ -2366,9 +2570,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         totals = prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[0])
-        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[1])
-        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[2])
+        self.assertTrue("1/3: Checking derivatives with respect to: 'd1.x [2]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: 'd1.z [0]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: 'd1.z [1]' ..." in lines[2])
 
         prob.run_model()
 
@@ -2378,6 +2582,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue()
         self.assertFalse("Checking derivatives with respect to" in lines)
+
+        prob.check_totals(method='fd', show_progress=True)
 
     def test_desvar_as_obj(self):
         prob = om.Problem()
@@ -3035,6 +3241,43 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCheckPartialsDistrib(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_check_size_0(self):
+        # this test passes if it doesn't raise an exception.  The actual partials are not
+        # correct because compute_jacvec_product does nothing.
+        class DistributedConverter(om.ExplicitComponent):
+            "takes a serial input and converts it to a distributed output that is only on rank 0"
+            def setup(self):
+
+                shape_switch = 1 if self.comm.rank == 0 else 0
+                self.add_input('in1_serial', shape=5)
+                self.add_output('out1', shape=5*shape_switch, tags=['mphys_coupling'], distributed=True)
+
+                self.add_input('in2_serial', shape=15)
+                self.add_output('out2', shape=15*shape_switch, tags=['mphys_result'], distributed=True)
+
+            def compute(self,inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs["out1"] = inputs["in1_serial"]
+                    outputs["out2"] = inputs["in2_serial"]
+
+            # this was broken
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                pass # intentionally left empty because presence of this method triggers bug in check_partials
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('converter', DistributedConverter())
+
+        prob.setup(force_alloc_complex=True)
+
+        partials = prob.check_partials(compact_print=True, method='cs')
 
 
 if __name__ == "__main__":

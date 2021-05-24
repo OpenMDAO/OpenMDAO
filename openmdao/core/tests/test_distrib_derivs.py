@@ -6,10 +6,11 @@ import itertools
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.paraboloid_distributed import DistParab
+from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
+from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 try:
     from pyoptsparse import Optimization as pyoptsparse_opt
@@ -67,7 +68,8 @@ class DistribExecComp(om.ExecComp):
         for expr in exprs:
             lhs, _ = expr.split('=', 1)
             outs.update(self._parse_for_out_vars(lhs))
-            allvars.update(self._parse_for_vars(expr))
+            v, _ = self._parse_for_names(expr)
+            allvars.update(v)
 
         sizes, offsets = evenly_distrib_idxs(comm.size, self.arr_size)
         start = offsets[rank]
@@ -90,32 +92,28 @@ class DistribExecComp(om.ExecComp):
 
 
 class DistribCoordComp(om.ExplicitComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.options['distributed'] = True
 
     def setup(self):
         comm = self.comm
         rank = comm.rank
 
         if rank == 0:
-            self.add_input('invec', np.zeros((5, 3)),
+            self.add_input('invec', np.zeros((5, 3)), distributed=True,
                            src_indices=[[(0, 0), (0, 1), (0, 2)],
                                         [(1, 0), (1, 1), (1, 2)],
                                         [(2, 0), (2, 1), (2, 2)],
                                         [(3, 0), (3, 1), (3, 2)],
                                         [(4, 0), (4, 1), (4, 2)]])
-            self.add_output('outvec', np.zeros((5, 3)))
+            self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
-            self.add_input('invec', np.zeros((4, 3)),
+            self.add_input('invec', np.zeros((4, 3)), distributed=True,
                            src_indices=[[(5, 0), (5, 1), (5, 2)],
                                         [(6, 0), (6, 1), (6, 2)],
                                         [(7, 0), (7, 1), (7, 2)],
                                         # use some negative indices here to
                                         # make sure they work
                                         [(-1, 0), (8, 1), (-1, 2)]])
-            self.add_output('outvec', np.zeros((4, 3)))
+            self.add_output('outvec', np.zeros((4, 3)), distributed=True)
 
     def compute(self, inputs, outputs):
         if self.comm.rank == 0:
@@ -162,7 +160,7 @@ class MPITests2(unittest.TestCase):
                                                    x=np.zeros((9, 3)),
                                                    y=np.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
-        prob.model.connect('comp.outvec', 'total.x')
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -190,7 +188,7 @@ class MPITests2(unittest.TestCase):
         prob = om.Problem()
         prob.model = group
         prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.connect('C1.y', 'C2.y')
+        prob.model.connect('C1.y', 'C2.y', src_indices=om.slicer[:])
 
 
         prob.setup(check=False, mode='fwd')
@@ -232,8 +230,8 @@ class MPITests2(unittest.TestCase):
         root.connect('sub.C2.y', 'C2.x')
         root.connect('sub.C3.y', 'C3.x')
 
-        root.connect("C1.y", "sub.C2.x")
-        root.connect("C1.y", "sub.C3.x")
+        root.connect("C1.y", "sub.C2.x", src_indices=om.slicer[:])
+        root.connect("C1.y", "sub.C3.x", src_indices=om.slicer[:])
         root.connect("P.x", "C1.x")
 
         root.nonlinear_solver = nlsolver()
@@ -292,7 +290,7 @@ class MPITests2(unittest.TestCase):
         root.connect("sub.C2.y", "C3.x2")
         root.connect("P1.x", "sub.C1.x")
         root.connect("P2.x", "sub.C2.x")
-        root.connect("C3.y", "C4.x")
+        root.connect("C3.y", "C4.x", src_indices=om.slicer[:])
 
         root.nonlinear_solver = nlsolver()
 
@@ -331,7 +329,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -404,7 +404,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -477,7 +479,9 @@ class MPITests2(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -550,7 +554,9 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
-                          promotes=['*'])
+                          promotes_outputs=['*'])
+
+        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         sub.connect('dummy.xd', 'parab.x')
         sub.connect('dummy.yd', 'parab.y')
@@ -618,7 +624,9 @@ class MPITests2(unittest.TestCase):
         sub.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                              f_sum=np.ones((size, )),
                                              f_xy=np.ones((size, ))),
-                          promotes=['*'])
+                          promotes_outputs=['*'])
+
+        sub.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -632,7 +640,7 @@ class MPITests2(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.run_model()
 
-        msg = "'sub' <class Group> : Approx_totals is not supported on a group with a distributed "
+        msg = "'sub' <class Group>: Approx_totals is not supported on a group with a distributed "
         msg += "component whose input 'sub.parab.x' is distributed using src_indices. "
         self.assertEqual(str(context.exception), msg)
 
@@ -675,19 +683,22 @@ class MPITests2(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['*'])
         model.add_subsystem("parab", DistParab(arr_size=size), promotes=['*'])
-        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes=['*'])
+        model.add_subsystem("ndp", NonDistComp(arr_size=size), promotes_outputs=['*'])
+        model.promotes('ndp', inputs=['f_xy'], src_indices=om.slicer[:])
         model.add_subsystem("parab2", DistParab(arr_size=size2))
         model.add_subsystem("ndp2", NonDistComp(arr_size=size2))
 
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.connect('x2', 'parab2.x')
         model.connect('y2', 'parab2.y')
         model.connect('a2', 'parab2.a')
-        model.connect('parab2.f_xy', 'ndp2.f_xy')
+        model.connect('parab2.f_xy', 'ndp2.f_xy', src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -738,18 +749,16 @@ class DistribStateImplicit(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.options['distributed'] = True
-
-        self.add_input('a', val=10., units='m', src_indices=[0])
+        self.add_input('a', val=10., units='m', src_indices=[0], distributed=True)
 
         rank = self.comm.rank
 
         GLOBAL_SIZE = 5
         sizes, offsets = evenly_distrib_idxs(self.comm.size, GLOBAL_SIZE)
 
-        self.add_output('states', shape=int(sizes[rank]))
+        self.add_output('states', shape=int(sizes[rank]), distributed=True)
 
-        self.add_output('out_var', shape=1)
+        self.add_output('out_var', shape=1, distributed=True)
 
         self.local_size = sizes[rank]
 
@@ -812,8 +821,6 @@ class DistribStateImplicit(om.ImplicitComponent):
 class DistParab2(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('arr_size', types=int, default=10,
                              desc="Size of input and output vectors.")
 
@@ -828,14 +835,14 @@ class DistParab2(om.ExplicitComponent):
         self.offset = offsets[rank]
         end = start + self.io_size
 
-        self.add_input('x', val=np.ones(self.io_size),
+        self.add_input('x', val=np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('y', val=np.ones(self.io_size),
+        self.add_input('y', val=np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('a', val=-3.0 * np.ones(self.io_size),
+        self.add_input('a', val=-3.0 * np.ones(self.io_size), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('f_xy', val=np.ones(self.io_size))
+        self.add_output('f_xy', val=np.ones(self.io_size), distributed=True)
 
         self.declare_partials('f_xy', ['x', 'y'])
 
@@ -895,7 +902,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -953,7 +962,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -991,7 +1002,9 @@ class MPITests3(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1095,13 +1108,13 @@ class MPITestsBug(unittest.TestCase):
                                    subsys=vanderpol_ode_rate_collect(num_nodes=nn),
                                    promotes_outputs=['x0dot'])
 
-                self.connect('vanderpol_ode_delay.x0dot', 'vanderpol_ode_rate_collect.partx0dot')
+                self.connect('vanderpol_ode_delay.x0dot', 'vanderpol_ode_rate_collect.partx0dot',
+                             src_indices=om.slicer[:])
 
         class vanderpol_ode_delay(om.ExplicitComponent):
 
             def initialize(self):
                 self.options.declare('num_nodes', types=int)
-                self.options['distributed'] = True
 
             def setup(self):
                 nn = self.options['num_nodes']
@@ -1112,10 +1125,10 @@ class MPITestsBug(unittest.TestCase):
                 start = offsets[rank]
                 end = start + sizes[rank]
 
-                self.add_input('x1', val=np.ones(sizes[rank]),
+                self.add_input('x1', val=np.ones(sizes[rank]), distributed=True,
                                src_indices=np.arange(start, end, dtype=int))
 
-                self.add_output('x0dot', val=np.ones(sizes[rank]))
+                self.add_output('x0dot', val=np.ones(sizes[rank]), distributed=True)
 
                 r = c = np.arange(sizes[rank])
                 self.declare_partials(of='x0dot', wrt='x1',  rows=r, cols=c)
@@ -1176,10 +1189,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_derivs_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
-        from openmdao.utils.assert_utils import assert_check_partials
 
         size = 15
 
@@ -1191,9 +1200,10 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", SummerDerivs(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob.set_val('indep.x', np.ones(size))
@@ -1213,10 +1223,6 @@ class MPIFeatureTests(unittest.TestCase):
 
     @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
     def test_distributed_constraint(self):
-        import numpy as np
-        import openmdao.api as om
-
-        from openmdao.test_suite.components.paraboloid_distributed import DistParabFeature
 
         size = 7
 
@@ -1234,7 +1240,8 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
                                                f_xy=np.ones(size)),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0)
@@ -1262,8 +1269,6 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
     # issue 1350
 
     def test_distribcomp_zerolengthinputsoutputs(self):
-        from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
-        from openmdao.utils.assert_utils import assert_check_partials
 
         size = 3  # set to one less than number of procs, leave zero inputs/outputs on proc 3
 
@@ -1273,9 +1278,10 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         model.add_subsystem("C3", SummerDerivs(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
+
         prob.setup()
 
         prob['indep.x'] = np.ones(size)
@@ -1298,15 +1304,14 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
 class DistribCompDenseJac(om.ExplicitComponent):
 
     def initialize(self):
-        self.options['distributed'] = True
         self.options.declare('size', default=7)
 
     def setup(self):
         N = self.options['size']
         rank = self.comm.rank
-        self.add_input('x', shape=1, src_indices=rank)
+        self.add_input('x', shape=1, src_indices=rank, distributed=True)
         sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
-        self.add_output('y', shape=sizes[rank])
+        self.add_output('y', shape=sizes[rank], distributed=True)
         # automatically infer dimensions without specifying rows, cols
         self.declare_partials('y', 'x')
 
@@ -1338,7 +1343,7 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         model.add_subsystem('dvs', dvs, promotes_outputs=['*'])
         model.add_subsystem('distcomp',DistribCompDenseJac(size=size), promotes_inputs=['*'])
         model.add_subsystem('execcomp',om.ExecComp('z = 2.2 * y', y=np.zeros((size,)), z=np.zeros((size,))))
-        model.connect('distcomp.y', 'execcomp.y')
+        model.connect('distcomp.y', 'execcomp.y', src_indices=om.slicer[:])
         model.add_design_var('x', lower=0.0, upper=10.0, scaler=1.0)
         model.add_constraint('execcomp.z', lower=4.2, scaler=1.0)
         model.add_objective('x')
@@ -1353,6 +1358,36 @@ class DeclarePartialsWithoutRowCol(unittest.TestCase):
         data = prob.check_totals(out_stream=None)
         assert_near_equal(data[('execcomp.z', 'dvs.x')]['abs error'][0], 0.0, 1e-6)
 
+
+class TestBugs(unittest.TestCase):
+
+    def test_distributed_ivc_as_desvar(self):
+        # Covers a case where a distributed IVC output is used as a desvar with indices.
+
+        class DVS(om.IndepVarComp):
+            def setup(self):
+                self.add_output('state', np.ones(4), distributed=True)
+
+        class SolverComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('state',shape_by_conn=True, distributed=True)
+                self.add_output('func', distributed=True)
+                self.declare_partials('func','state',method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['func'] += np.sum(inputs['state'])
+
+        prob = om.Problem()
+        dvs = prob.model.add_subsystem('dvs',DVS())
+        prob.model.add_subsystem('solver', SolverComp())
+        prob.model.connect('dvs.state','solver.state')
+        prob.model.add_design_var('dvs.state', indices=[0,2])
+        prob.model.add_objective('solver.func')
+
+        prob.setup()
+        prob.run_model()
+        totals = prob.check_totals(wrt='dvs.state')
+        assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

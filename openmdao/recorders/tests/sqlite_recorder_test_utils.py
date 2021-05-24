@@ -1,6 +1,7 @@
 import sqlite3
 import numpy as np
 import json
+import zlib
 
 from contextlib import contextmanager
 
@@ -19,9 +20,17 @@ def database_cursor(filename):
     con = sqlite3.connect(filename)
     cur = con.cursor()
 
-    yield cur
+    try:
+        yield cur
+    finally:
+        con.close()
 
-    con.close()
+
+def zlib_blob_to_json(blob):
+    """
+    Given a BLOB value loaded from sql, uncompress and return a JSON object.
+    """
+    return json.loads(zlib.decompress(blob).decode())
 
 
 def get_format_version_abs2meta(db_cur):
@@ -39,11 +48,17 @@ def get_format_version_abs2meta(db_cur):
         db_cur.execute("SELECT prom2abs, conns FROM metadata")
         row2 = db_cur.fetchone()
         # Auto-IVC
-        prom2abs = json.loads(row2[0])
-        conns = json.loads(row2[1])
+        if f_version >= 14:
+            prom2abs = zlib_blob_to_json(row2[0])
+            conns = zlib_blob_to_json(row2[1])
+        else:
+            prom2abs = json.loads(row2[0])
+            conns = json.loads(row2[1])
 
     # Need to also get abs2meta so that we can pass it to deserialize
-    if f_version >= 3:
+    if f_version >= 14:
+        abs2meta = json.loads(zlib.decompress(row[1]).decode())
+    elif f_version >= 3:
         abs2meta = json.loads(row[1])
     elif f_version in (1, 2):
         try:
@@ -191,8 +206,9 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
                            {"iteration_coordinate": iter_coord})
             row_actual = db_cur.fetchone()
 
-            db_cur.execute("SELECT abs2meta FROM metadata")
+            db_cur.execute("SELECT abs2meta, format_version FROM metadata")
             row_abs2meta = db_cur.fetchone()
+            f_version = row_abs2meta[1]
 
             test.assertTrue(row_actual,
                             'Driver iterations table does not contain the requested '
@@ -200,7 +216,15 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
 
             counter, global_counter, iteration_coordinate, timestamp, success, msg,\
                 totals_blob = row_actual
-            abs2meta = json.loads(row_abs2meta[0]) if row_abs2meta[0] is not None else None
+            
+            if row_abs2meta[0] is None:
+                abs2meta = None
+            else:
+                if f_version >= 14:
+                    abs2meta = zlib_blob_to_json(row_abs2meta[0])
+                else:
+                    abs2meta = json.loads(row_abs2meta[0])
+
             test.assertTrue(isinstance(abs2meta, dict))
 
             totals_actual = blob_to_array(totals_blob)
@@ -408,8 +432,12 @@ def assertMetadataRecorded(test, expected_prom2abs, expected_abs2prom):
         format_version_actual = row[0]
         format_version_expected = format_version
 
-        prom2abs = json.loads(str(row[1]))
-        abs2prom = json.loads(str(row[2]))
+        if format_version_actual >= 14:
+            prom2abs = zlib_blob_to_json(row[1])
+            abs2prom = zlib_blob_to_json(row[2])
+        else:
+            prom2abs = json.loads(str(row[1]))
+            abs2prom = json.loads(str(row[2]))
 
         if prom2abs is None:
             test.assertIsNone(expected_prom2abs)
@@ -450,7 +478,8 @@ def assertViewerDataRecorded(test, expected):
         if f_version >= 6:
             test.assertEqual(set(model_viewer_data.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list',
-            'driver', 'design_vars', 'responses', 'declare_partials_list'
+            'driver', 'design_vars', 'responses', 'declare_partials_list',
+            'md5_hash'
             })
         else:
             test.assertEqual(set(model_viewer_data.keys()), {

@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_prom_or_abs
-from openmdao.utils.units import unit_conversion
+from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
 _AMBIGOUS_PROM_NAME = object()
@@ -123,7 +123,7 @@ class Case(object):
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
-        self.rel_err = data['abs_err'] if 'rel_err' in data.keys() else None
+        self.rel_err = data['rel_err'] if 'rel_err' in data.keys() else None
 
         # rename solver keys
         if 'solver_inputs' in data.keys():
@@ -266,16 +266,17 @@ class Case(object):
 
         if units is not None:
             base_units = self._get_units(name)
+            simp_units = simplify_unit(units)
 
             if base_units is None:
                 msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(name, units))
+                raise TypeError(msg.format(name, simp_units))
 
             try:
-                scale, offset = unit_conversion(base_units, units)
+                scale, offset = unit_conversion(base_units, simp_units)
             except TypeError:
                 msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                raise TypeError(msg.format(name, base_units, simp_units))
 
             val = (val + offset) * scale
 
@@ -475,15 +476,13 @@ class Case(object):
 
                 inputs.append((var_name, var_meta))
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if self.inputs is None or len(self.inputs) == 0:
-                out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
-                                 'settings have record_inputs set to True\n')
-
-            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            if self.inputs:
+                self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            else:
+                ostream = sys.stdout if out_stream is _DEFAULT_OUT_STREAM else out_stream
+                ostream.write('WARNING: Inputs not recorded. Make sure your recording ' +
+                              'settings have record_inputs set to True\n')
 
         return inputs
 
@@ -616,13 +615,11 @@ class Case(object):
             else:
                 impl_outputs.append((var_name, var_meta))
 
-        if out_stream is _DEFAULT_OUT_STREAM:
-            out_stream = sys.stdout
-
         if out_stream:
-            if self.outputs is None or len(self.outputs) == 0:
-                out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
-                                 'settings have record_outputs set to True\n')
+            if not self.outputs:
+                ostream = sys.stdout if out_stream is _DEFAULT_OUT_STREAM else out_stream
+                ostream.write('WARNING: Outputs not recorded. Make sure your recording ' +
+                              'settings have record_outputs set to True\n')
             if explicit:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:
@@ -733,7 +730,7 @@ class Case(object):
                     return_name = auto_ivc_map[name]
                 else:
                     return_name = name
-                ret_vars[return_name] = val = self.outputs[name]
+                ret_vars[return_name] = val = self.outputs[name].copy()
                 if update_vals and name in self._var_info:
                     meta = self._var_info[name]
                     if use_indices and meta['indices'] is not None:

@@ -1,0 +1,15 @@
+<svg width="851.4mm" height="740.3mm" version="1.1" viewBox="0 0 851.4 740.3" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(326.97 146.38)">
+  <style>
+    path {
+      fill: black;
+    }
+    @media (prefers-color-scheme: dark) {
+      path {
+        fill: white;
+      }
+    }
+  </style>
+  <path d="m-220.87 22.583c1.5766 0 2.1866-0.55929 2.1866-2.3903v-7.932c0-1.831-0.55929-2.3903-2.1866-2.3903h-8.0341c-1.6273 0-2.1866 0.55929-2.1866 2.3903v7.932c0 1.831 0.61023 2.3903 2.1866 2.3903zm-8.2375 7.9323c-7.5258 0-10.526-3.9154-10.526-11.288v-6.1528c0-7.1699 3.0002-11.136 10.526-11.136h8.441c7.5258 0 10.526 3.966 10.526 11.136v6.1528c0 7.373-2.9999 11.288-10.526 11.288z"/>
+  <text x="-228.96175" y="0.17639081" style="fill:#2445ac;font-family:sans-serif;font-size:53.887px;line-height:1.25;paint-order:stroke markers fill;stroke-width:4;stroke:#2445ac" xml:space="preserve"><tspan x="-228.96175" y="0.17639081" style="fill:#2445ac;font-family:Nasalization;font-size:53.887px;paint-order:stroke markers fill;stroke-width:4;stroke:#2445ac">M</tspan></text>
+</svg>

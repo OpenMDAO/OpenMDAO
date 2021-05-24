@@ -204,6 +204,8 @@ class N2OffGridArrow extends N2Arrow {
         super(attribs, n2Groups, nodeSize);
 
         this.cell = attribs.cell;
+        this.direction = attribs.direction;
+        this.cellId = attribs.cellId;
 
         this.label = {
             'text': attribs.label,
@@ -226,9 +228,9 @@ class N2OffGridArrow extends N2Arrow {
 
     }
 
-    /** 
+    /**
      * Add the pathname of the offscreen node to the label, if it's not
-     * already in there. 
+     * already in there.
      * @returns {Boolean} True if the label didn't already contain the pathname.
     */
     _addToLabel() {
@@ -290,7 +292,7 @@ class N2OffGridArrow extends N2Arrow {
         this.path
             .attr('marker-end', 'url(#arrow)')
             .attr('stroke-dasharray', '5,5')
-            .attr('d', `M${this.pts.start.x},${this.pts.start.y} 
+            .attr('d', `M${this.pts.start.x},${this.pts.start.y}
                  L${mid.x},${mid.y} L${this.pts.end.x},${this.pts.end.y}`)
             .attr('fill', 'none')
             .style('stroke-width', this.width)
@@ -312,6 +314,7 @@ class N2OffGridUpArrow extends N2OffGridArrow {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'up',
+            'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : N2Style.color.inputArrow
         }), n2Groups, nodeSize);
 
@@ -356,6 +359,7 @@ class N2OffGridDownArrow extends N2OffGridArrow {
             'start': { 'id': attribs.offscreenId },
             'end': { 'id': attribs.cell.tgtId },
             'direction': 'down',
+            'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : N2Style.color.inputArrow
         }), n2Groups, nodeSize);
 
@@ -399,6 +403,7 @@ class N2OffGridLeftArrow extends N2OffGridArrow {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'left',
+            'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : N2Style.color.outputArrow
         }), n2Groups, nodeSize);
 
@@ -443,6 +448,7 @@ class N2OffGridRightArrow extends N2OffGridArrow {
             'start': { 'id': attribs.cell.srcId },
             'end': { 'id': attribs.offscreenId },
             'direction': 'right',
+            'cellId': attribs.cellId,
             'color': attribs.color ? attribs.color : N2Style.color.outputArrow
         }), n2Groups, nodeSize);
 
@@ -522,6 +528,8 @@ class N2ArrowCache {
      * @param {Boolean} [allowReplace = true] Replacing an existing arrow is OK.
      */
     add(cellId, arrow, allowReplace = true) {
+        arrow.cellId = cellId;
+
         if (this.hasArrow(arrow.id) && !allowReplace) {
             console.warn(`N2ArrowCache.add(): Not adding arrow ${arrow.id} to cache
                     since it already exists.`)
@@ -673,7 +681,7 @@ class N2ArrowCache {
 
 /**
  * Manage all connection arrow operations. Create new arrows, maintain
- * caches of hovered/pinned arrows, move arrows between them, and 
+ * caches of hovered/pinned arrows, move arrows between them, and
  * transition on updates.
  * @typedef N2ArrowManager
  * @prop {Object} n2Groups DOM elements referenced by N2Diagram
@@ -766,6 +774,7 @@ class N2ArrowManager {
      */
     addOffGridArrow(cellId, side, dir, attribs) {
         attribs.width = this.lineWidth;
+        attribs.cellId = cellId;
         debugInfo("addOffGridArrow(): ", side, dir, attribs)
         const newArrow = new (this.arrowDirClasses[side][dir])(attribs,
             this.n2Groups, this.nodeSize);
@@ -773,6 +782,7 @@ class N2ArrowManager {
         // Add or replace the cache entry with the new arrow
         if (this.pinnedArrows.hasArrow(newArrow.id)) {
             this.pinnedArrows.add(cellId, newArrow);
+            this.pinnedArrows.arrows[newArrow.id].cellId = cellId;
         }
         else {
             this.hoverArrows.add(cellId, newArrow);
@@ -781,7 +791,7 @@ class N2ArrowManager {
         return newArrow;
     }
 
-    /** 
+    /**
      * Both endpoints are visible, so draw a full arrow between them.
      * @param {N2Arrow} arrow The arrow object to transition.
      * @param {N2MatrixCell} startCell Cell at the beginning of the arrow.
@@ -818,6 +828,7 @@ class N2ArrowManager {
                 'tgtId': startCell.tgtObj.id
             },
             'width': this.lineWidth,
+            'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.end.id,
             'label': matrix.model.nodeIds[arrow.attribs.end.id].absPathName,
@@ -847,6 +858,7 @@ class N2ArrowManager {
                 'tgtId': endCell.tgtObj.id
             },
             'width': this.lineWidth,
+            'cellId': arrow.cellId,
             'matrixSize': matrix.diagNodes.length,
             'offscreenId': arrow.attribs.start.id,
             'label': matrix.model.nodeIds[arrow.attribs.start.id].absPathName,
@@ -854,7 +866,7 @@ class N2ArrowManager {
         }
         this.pinnedArrows.arrows[arrow.id] =
             new (this.arrowDirClasses[side]['incoming'])(attribs,
-                this.n2Groups, this.nodeSize);       
+                this.n2Groups, this.nodeSize);
     }
 
     /**
@@ -912,7 +924,7 @@ class N2ArrowManager {
                 this.pinnedArrows.removeArrowFromScreen(arrowId);
                 this.pinnedArrows.removeArrowFromCache(arrowId);
             }
-            else if ((startCellInfo.exactMatch || startCellInfo.parentMatch) && 
+            else if ((startCellInfo.exactMatch || startCellInfo.parentMatch) &&
                 (endCellInfo.exactMatch || endCellInfo.parentMatch)) {
                 // Both endpoint cells are visible
                 this._transitionFullArrow(arrow, startCell, endCell);
@@ -967,5 +979,87 @@ class N2ArrowManager {
         const removedArrowIds = Object.keys(this.pinnedArrows.arrows);
         this.pinnedArrows.removeAll();
         debugInfo(`removeAllPinned(): Removed ${removedArrowIds.length} arrows`)
+    }
+
+    /* Save all pinnedArrows to a dictionary for saving the view. */
+    savePinnedArrows() {
+        let pinned = this.pinnedArrows;
+        let data = {};
+
+        for (const arrowId in pinned.arrows) {
+            const arrow = pinned.arrows[arrowId];
+
+            if (arrow.cell !== undefined) {
+                // Off screen connection.
+                data[arrowId] = [arrow.cellId, arrow.direction,
+                                 arrow.cell.col, arrow.cell.row,
+                                 arrow.cell.srcId, arrow.cell.tgtId,
+                                 arrow.attribs.matrixSize, arrow.attribs.label, arrow.attribs.offscreenId];
+            }
+            else {
+                // On screen connection.
+                data[arrowId] = [arrow.cellId,
+                                 arrow.start.col, arrow.start.row, arrow.start.id,
+                                 arrow.end.col, arrow.end.row, arrow.end.id,
+                                 arrow.color];
+            }
+
+        }
+        return data;
+    }
+
+    /* Restore all pinnedArrows that were saved in a view. */
+    loadPinnedArrows(arrows) {
+        this.pinnedArrows.removeAll();
+
+        for(const arrowID in arrows) {
+            const arrow = arrows[arrowID];
+
+            if (arrow.length == 9) {
+                // Off screen arrow.
+                let arrowClasses = {
+                    'down': N2OffGridDownArrow,
+                    'up': N2OffGridUpArrow,
+                    'left': N2OffGridLeftArrow,
+                    'right': N2OffGridRightArrow,
+                };
+
+                let attribs = {
+                    'cell': {
+                        'col': arrow[2],
+                        'row': arrow[3],
+                        'srcId': arrow[4],
+                        'tgtId': arrow[5],
+                    },
+                    'matrixSize': arrow[6],
+                    'label': arrow[7],
+                    'offscreenId': arrow[8],
+                };
+
+                attribs.width = this.lineWidth;
+                const newArrow = new (arrowClasses[arrow[1]])(attribs,
+                    this.n2Groups, this.nodeSize);
+                this.pinnedArrows.add(arrow[0], newArrow);
+            }
+            else {
+                // On screen arrow.
+                let attribs = {
+                    'start': {
+                        'col': arrow[1],
+                        'row': arrow[2],
+                        'id': arrow[3]
+                    },
+                    'end': {
+                        'col': arrow[4],
+                        'row': arrow[5],
+                        'id': arrow[6]
+                    },
+                    'color': arrow[7],
+                };
+                attribs.width = this.lineWidth;
+                const newArrow = new N2BentArrow(attribs, this.n2Groups, this.nodeSize);
+                this.pinnedArrows.add(arrow[0], newArrow);
+            }
+        }
     }
 }

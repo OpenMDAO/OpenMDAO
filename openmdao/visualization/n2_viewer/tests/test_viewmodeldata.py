@@ -12,16 +12,24 @@ import errno
 from shutil import rmtree
 from tempfile import mkdtemp
 
-import numpy
+import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, ScipyOptimizeDriver, ExplicitComponent
+import openmdao.api as om
+
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
+from openmdao.utils.mpi import MPI
 from openmdao.utils.shell_proc import check_call
 from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 # Whether to pop up a browser window for each N2
 DEBUG_BROWSER = False
@@ -134,7 +142,7 @@ class TestViewModelData(unittest.TestCase):
                                 expected_responses_names
                                 ):
 
-        numpy.testing.assert_equal(model_viewer_data['tree'], expected_tree, err_msg='', verbose=True)
+        np.testing.assert_equal(model_viewer_data['tree'], expected_tree, err_msg='', verbose=True)
 
         # check expected system pathnames
         pathnames = model_viewer_data['sys_pathnames_list']
@@ -176,7 +184,7 @@ class TestViewModelData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
         """
-        p = Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection())
         p.setup()
         p.final_setup()
 
@@ -204,7 +212,7 @@ class TestViewModelData(unittest.TestCase):
         and then pulled out of a sqlite db file and compared to the expected
         structure.  Uses the SellarStateConnection model.
         """
-        p = Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection())
 
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)
@@ -238,8 +246,8 @@ class TestViewModelData(unittest.TestCase):
         """
 
         # build the model
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         indeps.add_output('a', .5)
         indeps.add_output('Area', 10.0, units='m**2')
         indeps.add_output('rho', 1.225, units='kg/m**3')
@@ -249,7 +257,7 @@ class TestViewModelData(unittest.TestCase):
                                  promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('a', lower=0., upper=1.)
@@ -308,7 +316,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test error message when asking for viewer data for a subgroup.
         """
-        p = Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection())
         p.setup()
 
         msg = "Viewer data is not available for sub-Group 'sub'."
@@ -319,7 +327,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test error message when asking for viewer data for an invalid source.
         """
-        p = Problem(model=SellarStateConnection())
+        p = om.Problem(model=SellarStateConnection())
         p.setup()
 
         msg = "Viewer data is not available for 'None'." + \
@@ -331,9 +339,9 @@ class TestViewModelData(unittest.TestCase):
         self.assertEquals(str(cm.exception), msg)
 
     def test_handle_ndarray_system_option(self):
-        class SystemWithNdArrayOption(ExplicitComponent):
+        class SystemWithNdArrayOption(om.ExplicitComponent):
             def initialize(self):
-                self.options.declare('arr', types=(numpy.ndarray,))
+                self.options.declare('arr', types=(np.ndarray,))
 
             def setup(self):
                 self.add_input('x', val=0.0)
@@ -343,18 +351,18 @@ class TestViewModelData(unittest.TestCase):
                 x = inputs['x']
                 outputs['f_x'] = (x - 3.0) ** 2
 
-        prob = Problem()
-        prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=numpy.ones(2)))
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', SystemWithNdArrayOption(arr=np.ones(2)))
         prob.setup()
         model_viewer_data = _get_viewer_data(prob)
-        numpy.testing.assert_equal(model_viewer_data['tree']['children'][1]['options']['arr'],
-                                   numpy.ones(2))
+        np.testing.assert_equal(model_viewer_data['tree']['children'][1]['options']['arr'],
+                                np.ones(2))
 
     def test_n2_from_problem(self):
         """
         Test that an n2 html file is generated from a Problem.
         """
-        p = Problem()
+        p = om.Problem()
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
@@ -368,7 +376,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a model.
         """
-        p = Problem()
+        p = om.Problem()
         p.model = SellarStateConnection()
         p.setup()
         n2(p.model, outfile=self.problem_html_filename, show_browser=DEBUG_BROWSER)
@@ -382,7 +390,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Load an N2 html, find the compressed data string, uncompress and decode it.
         """
-        file = open(filename, 'r')
+        file = open(filename, 'r', encoding='utf-8')
         for line in file:
             if re.search('var compressedModel', line):
                 b64_data = line.replace('var compressedModel = "', '').replace('";', '')
@@ -398,7 +406,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a sqlite file.
         """
-        p = Problem()
+        p = om.Problem()
         p.model = SellarStateConnection()
         r = SqliteRecorder(self.sqlite_db_filename2)
         p.driver.add_recorder(r)
@@ -435,7 +443,7 @@ class TestViewModelData(unittest.TestCase):
         """
         Test that an n2 html file is generated from a Problem.
         """
-        p = Problem()
+        p = om.Problem()
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.title_html_filename, show_browser=DEBUG_BROWSER,
@@ -445,7 +453,7 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.title_html_filename),
                         (self.title_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
-                        in open(self.title_html_filename).read())
+                        in open(self.title_html_filename, 'r', encoding='utf-8').read())
 
     def test_n2_connection_error(self):
         """
@@ -453,7 +461,7 @@ class TestViewModelData(unittest.TestCase):
         """
         from openmdao.test_suite.scripts.bad_connection import BadConnectionModel
 
-        p = Problem(BadConnectionModel())
+        p = om.Problem(BadConnectionModel())
 
         # this would be set by the command line hook
         p.model._raise_connection_errors = False
@@ -471,29 +479,29 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.conn_html_filename),
                         (self.conn_html_filename + " is not a valid file."))
         self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Bad Connection'
-                        in open(self.conn_html_filename).read())
+                        in open(self.conn_html_filename, 'r', encoding='utf-8').read())
 
 
-class TestN2UnderMPI(unittest.TestCase):
+@use_tempdirs
+class TestUnderMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_non_recordable(self):
         dummyModule = types.ModuleType('dummyModule', 'The dummyModule module')
 
-        class myComp(ExplicitComponent):
+        class myComp(om.ExplicitComponent):
             def initialize(self):
-                self.options['distributed'] = True
                 self.options.declare('foo', recordable=False)
 
             def setup(self):
-                self.add_input('x2')
-                self.add_output('x3')
+                self.add_input('x2', distributed=True)
+                self.add_output('x3', distributed=True)
 
             def compute(self, inputs, outputs):
                 outputs['x3'] = inputs['x2'] + 1
 
-        p = Problem()
-        ivc = p.model.add_subsystem('ivc', IndepVarComp())
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp())
         ivc.add_output('x1')
         p.model.add_subsystem('myComp', myComp(foo=dummyModule))
 
@@ -503,6 +511,58 @@ class TestN2UnderMPI(unittest.TestCase):
         # Test for bug where assembling the options metadata under MPI caused a lockup when
         # they were gathered.
         n2(p, show_browser=False)
+
+    @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+    def test_initial_value(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+
+        num_cp = 5
+        num_elements = 50
+        num_load_cases = 2
+
+        prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                                    num_elements=num_elements, num_cp=num_cp,
+                                                    num_load_cases=num_load_cases))
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+        prob.setup()
+        prob.run_driver()
+
+        h = prob['interp.h']
+        expected = np.array([ 0.14122705,  0.14130706,  0.14154096,  0.1419107,   0.14238706,  0.14293095,
+                              0.14349514,  0.14402636,  0.1444677,   0.14476123,  0.14485062,  0.14468388,
+                              0.14421589,  0.1434107,   0.14224356,  0.14070252,  0.13878952,  0.13652104,
+                              0.13392808,  0.13105565,  0.1279617,   0.12471547,  0.1213954,   0.11808665,
+                              0.11487828,  0.11185599,  0.10900669,  0.10621949,  0.10338308,  0.10039485,
+                              0.09716531,  0.09362202,  0.08971275,  0.08540785,  0.08070168,  0.07561313,
+                              0.0701851,   0.06448311,  0.05859294,  0.05261756,  0.0466733,   0.04088557,
+                              0.03538417,  0.03029845,  0.02575245,  0.02186027,  0.01872173,  0.01641869,
+                              0.0150119,   0.01453876])
+
+        assert np.linalg.norm(h - expected) < 1e-6
+
+        def check_initial_value(subsys, parallel=False):
+            """
+            check that 'initial_value' is indicated for variables under a parallel group
+            """
+            if subsys['type'] == 'subsystem':
+                # Group or Component, recurse to children
+                parallel = parallel or subsys['class'] == 'ParallelGroup'
+                for child in subsys['children']:
+                    check_initial_value(child, parallel)
+            else:
+                # input or output, check for 'initial_value' flag
+                if parallel:
+                    assert('initial_value' in subsys and subsys['initial_value'] is True)
+                else:
+                    assert('initial_value' not in subsys)
+
+        model_data = _get_viewer_data(prob)
+        for subsys in model_data['tree']['children']:
+            check_initial_value(subsys)
 
 
 if __name__ == "__main__":

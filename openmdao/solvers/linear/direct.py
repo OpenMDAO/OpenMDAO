@@ -232,7 +232,7 @@ class DirectSolver(LinearSolver):
         x_data = xvec.asarray(copy=True)
 
         nmtx = x_data.size
-        eye = np.eye(nmtx)
+        seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_scope()
         vnames = ['linear']
@@ -240,14 +240,16 @@ class DirectSolver(LinearSolver):
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
             # set value of x vector to provided value
-            xvec.set_val(eye[:, i])
+            seed[i - 1] = 0.
+            seed[i] = 1.
+            xvec.set_val(seed)
 
             # apply linear
             system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
                                  scope_out, scope_in)
 
             # put new value in out_vec
-            mtx[:, i] = bvec._data
+            mtx[:, i] = bvec.asarray()
 
         # Restore the backed-up vectors
         bvec.set_val(b_data)
@@ -430,13 +432,13 @@ class DirectSolver(LinearSolver):
 
         # assign x and b vectors based on mode
         if mode == 'fwd':
-            x_vec = d_outputs._data
-            b_vec = d_residuals._data
+            x_vec = d_outputs.asarray()
+            b_vec = d_residuals.asarray()
             trans_lu = 0
             trans_splu = 'N'
         else:  # rev
-            x_vec = d_residuals._data
-            b_vec = d_outputs._data
+            x_vec = d_residuals.asarray()
+            b_vec = d_outputs.asarray()
             trans_lu = 1
             trans_splu = 'T'
 

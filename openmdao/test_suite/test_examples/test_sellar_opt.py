@@ -1,14 +1,13 @@
 import unittest
 
 import openmdao.api as om
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestSellarOpt(unittest.TestCase):
 
     def test_sellar_opt(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = om.Problem()
         prob.model = SellarMDA()

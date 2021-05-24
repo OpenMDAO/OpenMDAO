@@ -987,9 +987,6 @@ class MPITestSimpleGA(unittest.TestCase):
 
 
 class D1(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -1001,11 +998,11 @@ class D1(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y2', np.ones((1, ), float),
+        self.add_input('y2', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_input('x', np.ones((1, ), float))
+        self.add_input('x', np.ones((1, ), float), distributed=True)
 
-        self.add_output('y1', np.ones((1, ), float))
+        self.add_output('y1', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y1', ['y2', 'x'])
 
@@ -1030,9 +1027,6 @@ class D1(om.ExplicitComponent):
 
 
 class D2(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         comm = self.comm
         rank = comm.rank
@@ -1044,10 +1038,10 @@ class D2(om.ExplicitComponent):
             start = 0
             end = 1
 
-        self.add_input('y1', np.ones((1, ), float),
+        self.add_input('y1', np.ones((1, ), float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
 
-        self.add_output('y2', np.ones((1, ), float))
+        self.add_output('y2', np.ones((1, ), float), distributed=True)
 
         self.declare_partials('y2', ['y1'])
 
@@ -1127,8 +1121,9 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
-        assert_near_equal(prob['comp.f'], 0.98799098, 1e-4)
+        assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        assert_near_equal(prob.get_val('p1.xC'), 11.94117647, 1e-6)
 
     def test_indivisible_error(self):
         prob = om.Problem()
@@ -1190,7 +1185,8 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         model.add_subsystem('d1', D1(), promotes=['*'])
         model.add_subsystem('d2', D2(), promotes=['*'])
 
-        model.add_subsystem('obj_comp', Summer(), promotes=['*'])
+        model.add_subsystem('obj_comp', Summer(), promotes_outputs=['*'])
+        model.promotes('obj_comp', inputs=['*'], src_indices=om.slicer[:])
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
         model.linear_solver = om.LinearBlockGS()
 
@@ -1224,7 +1220,8 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1260,33 +1257,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         import os
         os.environ['SimpleGADriver_seed'] = '11'
 
-    def test_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Branin(),
-                            promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'xC': 8}
-
-        prob.setup()
-
-        prob.set_val('xC', 7.5)
-        prob.set_val('xI', 0.0)
-
-        prob.run_driver()
-
     def test_basic_with_assert(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1314,8 +1285,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
 
     def test_option_max_gen(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1339,8 +1308,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
     def test_option_pop_size(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1364,7 +1331,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
     def test_constrained_with_penalty(self):
-        import openmdao.api as om
 
         class Cylinder(om.ExplicitComponent):
             """Main class"""
@@ -1413,7 +1379,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         self.assertGreater(prob.get_val('height'), 1.)
 
     def test_pareto(self):
-        import openmdao.api as om
 
         class Box(om.ExplicitComponent):
 
@@ -1520,15 +1485,12 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        import numpy as np
         np.random.seed(1)
 
         import os
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_option_parallel(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
 
         prob = om.Problem()
         model = prob.model
@@ -1556,62 +1518,6 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.f'), 1.25172426, 1e-6)
         assert_near_equal(prob.get_val('xI'), 9.0, 1e-6)
         assert_near_equal(prob.get_val('xC'), 2.11764706, 1e-6)
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MPIFeatureTests4(unittest.TestCase):
-    N_PROCS = 4
-
-    def setUp(self):
-        import numpy as np
-        np.random.seed(1)
-
-        import os
-        os.environ['SimpleGADriver_seed'] = '11'
-
-    def test_option_procs_per_model(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.branin import Branin
-
-        prob = om.Problem()
-        model = prob.model
-
-        par = model.add_subsystem('par', om.ParallelGroup(),
-                                  promotes_inputs=['*'])
-
-        par.add_subsystem('comp1', Branin(),
-                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-        par.add_subsystem('comp2', Branin(),
-                          promotes_inputs=[('x0', 'xI'), ('x1', 'xC')])
-
-        model.add_subsystem('comp', om.ExecComp('f = f1 + f2'))
-        model.connect('par.comp1.f', 'comp.f1')
-        model.connect('par.comp2.f', 'comp.f2')
-
-        model.add_design_var('xI', lower=-5.0, upper=10.0)
-        model.add_design_var('xC', lower=0.0, upper=15.0)
-        model.add_objective('comp.f')
-
-        prob.driver = om.SimpleGADriver()
-        prob.driver.options['bits'] = {'xC': 8}
-        prob.driver.options['max_gen'] = 10
-        prob.driver.options['pop_size'] = 25
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['procs_per_model'] = 2
-
-        prob.driver._randomstate = 1
-
-        prob.setup()
-
-        prob.set_val('xC', 7.5)
-        prob.set_val('xI', 0.0)
-
-        prob.run_driver()
-
-        # Optimal solution
-        assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
-        assert_near_equal(prob.get_val('xI'),-3.0, 1e-6)
-        assert_near_equal(prob.get_val('xC'), 11.94117647, 1e-6)
 
 
 if __name__ == "__main__":

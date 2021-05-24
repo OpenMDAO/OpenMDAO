@@ -28,8 +28,6 @@ class DistributedAdder(om.ExplicitComponent):
     """
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('size', types=int, default=1,
                              desc="Size of input and output vectors.")
 
@@ -50,9 +48,9 @@ class DistributedAdder(om.ExplicitComponent):
         start = local_offset
         end = local_offset + local_size
 
-        self.add_input('x', val=np.zeros(local_size, float),
+        self.add_input('x', val=np.zeros(local_size, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('y', val=np.zeros(local_size, float))
+        self.add_output('y', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
 
@@ -75,9 +73,10 @@ class DistributedListVarsTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size=size), promotes=[('invec', 'y'), 'sum'])
+        prob.model.add_subsystem('summer', Summer(size=size), promotes_outputs=['sum'])
+        prob.model.promotes('summer', inputs=[('invec', 'y')], src_indices=om.slicer[:])
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)  # force complex array storage to detect mpi bug
 
         prob['x'] = np.arange(size)
 
@@ -280,7 +279,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "6 Input(s) in 'model'",
-                    '---------------------',
                     '',
                     'varname   value',
                     '--------  -----',
@@ -310,7 +308,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "6 Input(s) in 'model'",
-                    '---------------------',
                     '',
                     'varname  value',
                     '-------  -----',
@@ -347,7 +344,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "7 Explicit Output(s) in 'model'",
-                    '-------------------------------',
                     '',
                     'varname   value   resids',
                     '--------  -----   ------',
@@ -361,7 +357,6 @@ class DistributedListVarsTest(unittest.TestCase):
                     '',
                     '',
                     "0 Implicit Output(s) in 'model'",
-                    '-------------------------------',
                 ]
 
                 for i, line in enumerate(expected):
@@ -382,7 +377,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
                 expected = [
                     "7 Explicit Output(s) in 'model'",
-                    '-------------------------------',
                     '',
                     'varname  value   resids',
                     '-------  -----   ------',
@@ -404,7 +398,6 @@ class DistributedListVarsTest(unittest.TestCase):
                     '',
                     '',
                     "0 Implicit Output(s) in 'model'",
-                    '-------------------------------',
                 ]
 
                 for i, line in enumerate(expected):
@@ -426,7 +419,7 @@ class DistributedListVarsTest(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()
@@ -443,7 +436,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Input(s) in 'C2'",
-                '------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -467,7 +459,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Explicit Output(s) in 'C2'",
-                '----------------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -497,7 +488,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Input(s) in 'C2'",
-                '------------------',
                 '',
                 'varname  value            shape  global_shape',
                 '-------  ---------------  -----  ------------',
@@ -520,7 +510,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
             expected = [
                 "1 Explicit Output(s) in 'C2'",
-                '----------------------------',
                 '',
                 'varname  value           shape  global_shape',
                 '-------  --------------  -----  ------------',
@@ -548,7 +537,6 @@ class DistributedListVarsTest(unittest.TestCase):
 
         expected = [
             "1 Input(s) in 'C3'",
-            '------------------',
             '',
             'varname  value                shape  global_shape',
             '-------  -------------------  -----  ------------',
@@ -572,9 +560,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_list_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
         size = 15
 
@@ -584,7 +569,7 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem("C3", Summer(size=size))
 
         model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
+        model.connect('C2.outvec', 'C3.invec', src_indices=om.slicer[:])
 
         prob = om.Problem(model)
         prob.setup()

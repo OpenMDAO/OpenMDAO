@@ -1133,8 +1133,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
-        import numpy as np
-        import openmdao.api as om
 
         # Create regular grid interpolator instance
         xor_interp = om.MetaModelStructuredComp(method='scipy_slinear')
@@ -1170,8 +1168,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_shape(self):
-        import numpy as np
-        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1216,8 +1212,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_vectorized(self):
-        import numpy as np
-        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1256,8 +1250,6 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_training_derivatives(self):
-        import numpy as np
-        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1310,7 +1302,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             comp.add_input('x1', np.array([1.0, 2.0]))
 
-        msg = "MetaModelStructuredComp: Input x1 must either be scalar, or of length equal to vec_size."
+        msg = "<class MetaModelStructuredComp>: Input x1 must either be scalar, or of length equal to vec_size."
         self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(ValueError) as cm:
@@ -1321,7 +1313,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             comp.add_output('x1', np.array([1.0, 2.0]))
 
-        msg = "MetaModelStructuredComp: Output x1 must either be scalar, or of length equal to vec_size."
+        msg = "<class MetaModelStructuredComp>: Output x1 must either be scalar, or of length equal to vec_size."
         self.assertEqual(str(cm.exception), msg)
 
         with self.assertRaises(ValueError) as cm:

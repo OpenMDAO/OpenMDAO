@@ -3,11 +3,11 @@ from contextlib import contextmanager
 import os
 import re
 import sys
-import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
 from io import StringIO
+from numbers import Number
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:
@@ -16,12 +16,11 @@ except ImportError:
     from collections import Iterable
 
 import numbers
-import json
-import importlib
 
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE, INF_BOUND
+from openmdao.warnings import issue_warning, _warn_simple_format, warn_deprecation
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.
@@ -77,13 +76,13 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning):
     ----------
     msg : str
         The error/warning message.
-    exc : exception class
+    exc : Exception class
         This exception class is used to create the exception to be raised.
     category : warning class
         This category is the class of warning to be issued.
     """
     if ignore_errors():
-        simple_warning(msg, category=category)
+        issue_warning(msg, category=category)
     else:
         raise exc(msg)
 
@@ -100,29 +99,10 @@ def ignore_errors_context(flag=True):
     """
     save = ignore_errors()
     ignore_errors(flag)
-    yield
-    ignore_errors(save)
-
-
-def warn_deprecation(msg):
-    """
-    Raise a warning and prints a deprecation message to stdout.
-
-    Parameters
-    ----------
-    msg : str
-        Message that will be printed to stdout.
-    """
-    # Deprecation warnings need to be printed regardless of debug level
-    warnings.simplefilter('always', DeprecationWarning)
-
-    # note, stack level 3 should take us back to original caller.
-    simple_warning(msg, DeprecationWarning, stacklevel=3)
-    warnings.simplefilter('ignore', DeprecationWarning)
-
-
-def _warn_simple_format(message, category, filename, lineno, file=None, line=None):
-    return '%s:%s: %s:%s\n' % (filename, lineno, category.__name__, message)
+    try:
+        yield
+    finally:
+        ignore_errors(save)
 
 
 def simple_warning(msg, category=UserWarning, stacklevel=2):
@@ -138,99 +118,13 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
     stacklevel : int
         Number of levels up the stack to identify as the warning location.
     """
+    warn_deprecation('simple_warning is deprecated.  Use openmdao.warnings.issue_warning instead.')
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
     try:
         warnings.warn(msg, category, stacklevel)
     finally:
         warnings.formatwarning = old_format
-
-
-class reset_warning_registry(object):
-    """
-    Context manager which archives & clears warning registry for duration of context.
-
-    From https://bugs.python.org/file40031/reset_warning_registry.py
-
-    Attributes
-    ----------
-    _pattern : regex pattern
-        Causes manager to only reset modules whose names match this pattern. defaults to ``".*"``.
-    """
-
-    #: regexp for filtering which modules are reset
-    _pattern = None
-
-    #: dict mapping module name -> old registry contents
-    _backup = None
-
-    def __init__(self, pattern=None):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        pattern : regex pattern
-            Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
-        """
-        self._pattern = re.compile(pattern or ".*")
-
-    def __enter__(self):
-        """
-        Enter the runtime context related to this object.
-
-        Returns
-        -------
-        reset_warning_registry
-            This context manager.
-
-        """
-        # archive and clear the __warningregistry__ key for all modules
-        # that match the 'reset' pattern.
-        pattern = self._pattern
-        backup = self._backup = {}
-        for name, mod in list(sys.modules.items()):
-            if pattern.match(name):
-                reg = getattr(mod, "__warningregistry__", None)
-                if reg:
-                    backup[name] = reg.copy()
-                    reg.clear()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Exit the runtime context related to this object.
-
-        Parameters
-        ----------
-        exc_type : Exception class
-            The type of the exception.
-        exc_value : Exception instance
-            The exception instance raised.
-        traceback : regex pattern
-            Traceback object.
-        """
-        # restore warning registry from backup
-        modules = sys.modules
-        backup = self._backup
-        for name, content in backup.items():
-            mod = modules.get(name)
-            if mod is None:
-                continue
-            reg = getattr(mod, "__warningregistry__", None)
-            if reg is None:
-                setattr(mod, "__warningregistry__", content)
-            else:
-                reg.clear()
-                reg.update(content)
-
-        # clear all registry entries that we didn't archive
-        pattern = self._pattern
-        for name, mod in list(modules.items()):
-            if pattern.match(name) and name not in backup:
-                reg = getattr(mod, "__warningregistry__", None)
-                if reg:
-                    reg.clear()
 
 
 def ensure_compatible(name, value, shape=None, indices=None):
@@ -405,10 +299,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     if force:
         optname = force
 
-    try:
-        from mock import Mock
-    except ImportError:
-        Mock = None
+    from unittest.mock import Mock
 
     try:
         from pyoptsparse import OPT
@@ -424,7 +315,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
                 except Exception:
                     pass
         else:
-            if fallback and Mock and isinstance(opt, Mock):
+            if fallback and isinstance(opt, Mock):
                 try:
                     opt = OPT('SLSQP')
                     OPTIMIZER = 'SLSQP'
@@ -433,7 +324,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
     except Exception:
         pass
 
-    if Mock and isinstance(opt, Mock):
+    if isinstance(opt, Mock):
         OPT = OPTIMIZER = None
 
     if not fallback and OPTIMIZER != optname:
@@ -715,84 +606,6 @@ def do_nothing_context():
     return contextmanager(nothing)()
 
 
-def _byteify(data, ignore_dicts=False):
-    """
-    Convert any unicode items in a data structure to bytes (object_hook for json load/loads).
-
-    Credit: Mirec Miskuf
-    stackoverflow.com/questions/956867/how-to-get-string-objects-instead-of-unicode-from-json
-
-    Parameters
-    ----------
-    data : any data item or structure
-        the data to be converted
-    ignore_dicts : bool
-        a flag to prevent recursion on dicts that have already been byteified.
-        False when object_hook passes a new dict to byteify, True at all other times.
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    # if this is a unicode string, return its string representation
-    if isinstance(data, unicode):
-        return data.encode('utf-8')
-
-    # if this is a list of values, return list of byteified values
-    if isinstance(data, list):
-        return [_byteify(item, ignore_dicts=True) for item in data]
-
-    # if this is a dictionary, return dictionary of byteified keys and values
-    # but only if we haven't already byteified it
-    if isinstance(data, dict) and not ignore_dicts:
-        return {
-            _byteify(key, ignore_dicts=True): _byteify(value, ignore_dicts=True)
-            for key, value in data.iteritems()
-        }
-
-    # if it's anything else, return it in its original form
-    return data
-
-
-def json_load_byteified(file_handle):
-    """
-    Load data from a JSON file, converting unicode to bytes if Python version is 2.x.
-
-    Intended for use only with Python 2.x, behaves the same as json.load() under Python 3.x.
-
-    Parameters
-    ----------
-    file_handle : file
-        file containing the data to be converted
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    return json.load(file_handle)
-
-
-def json_loads_byteified(json_str):
-    """
-    Load data from a JSON string, converting unicode to bytes if Python version is 2.x.
-
-    Intended for use only with Python 2.x, behaves the same as json.loads() under Python 3.x.
-
-    Parameters
-    ----------
-    json_str : str
-        text string containing json encoded data
-
-    Returns
-    -------
-    data item or structure
-        data item or structure with unicode converted to bytes
-    """
-    return json.loads(json_str)
-
-
 def remove_whitespace(s, right=False, left=False):
     """
     Remove white-space characters from the given string.
@@ -876,7 +689,7 @@ def make_serializable(o):
         return o.item()
     elif isinstance(o, (str, float, int)):
         return o
-    elif isinstance(o, bool) or np.iscomplex(o):
+    elif isinstance(o, bool) or isinstance(o, complex):
         return str(o)
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
@@ -941,7 +754,7 @@ def default_noraise(o):
         return o.item()
     elif isinstance(o, (str, float, int)):
         return o
-    elif isinstance(o, bool) or np.iscomplex(o):
+    elif isinstance(o, bool) or isinstance(o, complex):
         return str(o)
     elif hasattr(o, '__dict__'):
         return o.__class__.__name__
@@ -1159,10 +972,65 @@ def _slice_indices(slicer, arr_size, arr_shape):
     array
         Returns the sliced indices.
     """
-    return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
+    if isinstance(slicer, slice):
+        # for a simple slice we can use less memory
+        start, stop, step = slicer.start, slicer.stop, slicer.step
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = arr_size
+        if step is None:
+            step = 1
+        return np.arange(start, stop, step, dtype=INT_DTYPE).reshape(arr_shape)
+    else:
+        return np.arange(arr_size, dtype=INT_DTYPE).reshape(arr_shape)[slicer]
 
 
-def prom2ivc_src_dict(prom_dict):
+def _prom2ivc_src_name_iter(prom_dict):
+    """
+    Yield keys from prom_dict with promoted input names converted to ivc source names.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Yields
+    ------
+    str
+        name
+    """
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            yield meta['ivc_source']
+        else:
+            yield name
+
+
+def _prom2ivc_src_item_iter(prom_dict):
+    """
+    Yield items from prom_dict with promoted input names converted to ivc source names.
+
+    The result is that all names are absolute.
+
+    Parameters
+    ----------
+    prom_dict : dict
+        Original dict with some promoted paths.
+
+    Yields
+    ------
+    tuple
+        name, metadata
+    """
+    for name, meta in prom_dict.items():
+        if meta['ivc_source'] is not None:
+            yield meta['ivc_source'], meta
+        else:
+            yield name, meta
+
+
+def _prom2ivc_src_dict(prom_dict):
     """
     Convert a dictionary with promoted input names into one with ivc source names.
 
@@ -1176,12 +1044,168 @@ def prom2ivc_src_dict(prom_dict):
     dict
         New dict with ivc source pathnames.
     """
-    src_dict = {}
-    for name, meta in prom_dict.items():
-        if meta['ivc_source'] is not None:
-            src_name = meta['ivc_source']
-            src_dict[src_name] = meta
-        else:
-            src_dict[name] = meta
+    return {name: meta for name, meta in _prom2ivc_src_item_iter(prom_dict)}
 
-    return src_dict
+
+def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
+    """
+    Compute lower level src_indices based on parent src_indices.
+
+    Parameters
+    ----------
+    parent_src_inds : ndarray
+        Parent src_indices.
+    parent_src_shape : tuple
+        Shape of source expected by parent.
+    my_src_inds : ndarray or fancy index
+        src_indices at the current system level, before conversion.
+    my_src_shape : tuple
+        Expected source shape at the current system level.
+
+    Returns
+    -------
+    ndarray
+        Final src_indices based on those of the parent.
+    """
+    if parent_src_inds is None:
+        return my_src_inds
+    elif my_src_inds is None:
+        return parent_src_inds
+    if isinstance(my_src_inds, tuple):
+        ndims = len(my_src_inds)
+    elif isinstance(my_src_inds, np.ndarray):
+        ndims = my_src_inds.ndim
+    else:  # slice
+        ndims = 1
+    if _is_slicer_op(parent_src_inds):
+        parent_src_inds = _slice_indices(parent_src_inds, np.prod(parent_src_shape),
+                                         parent_src_shape)
+    if ndims == 1:
+        return parent_src_inds.ravel()[my_src_inds]
+    else:
+        return parent_src_inds.reshape(my_src_shape)[my_src_inds]
+
+
+def shape_from_idx(src_shape, src_inds, flat_src_inds):
+    """
+    Get the shape of the result if the given src_inds were applied to an array of the given shape.
+
+    Parameters
+    ----------
+    src_shape : tuple
+        Expected shape of source variable.
+    src_inds : ndarray or fancy index
+        Indices into the source variable.
+    flat_src_inds : bool
+        If True, src_inds index into a flat array.
+
+    Returns
+    -------
+    tuple
+        Shape of the input.
+    """
+    if _is_slicer_op(src_inds):
+        if isinstance(src_inds, slice):
+            src_inds = [src_inds]
+
+        for entry in src_inds:
+            if entry is Ellipsis:
+                shp = np.empty(src_shape, dtype=bool)[src_inds].shape
+                if flat_src_inds:
+                    return (np.product(shp),)
+                return shp
+
+        if len(src_inds) != len(src_shape):
+            raise ValueError(f"src_indices {src_inds} have the wrong number of dimensions, "
+                             f"{len(src_inds)}, to index into an array of shape {src_shape}")
+
+        ret = []
+        full_slice = slice(None)
+        for i, dimsize in enumerate(src_shape):
+            slc = src_inds[i]
+            if isinstance(slc, slice):
+                if slc == full_slice:
+                    ret.append(dimsize)
+                elif (slc.start is None or slc.start < 0 or slc.stop is None or
+                      slc.stop < 0 or (slc.step is not None and slc.step < 0)):
+                    ret.append(np.empty(dimsize, dtype=bool)[slc].size)
+                else:
+                    step = slc.step
+                    if step in (None, 1):
+                        ret.append(slc.stop - slc.start)
+                    else:
+                        ret.append(1 + (slc.stop - slc.start - 1) // slc.step)
+            elif isinstance(slc, Number):
+                ret.append(1)
+            else:  # list/tuple/array
+                ret.append(len(slc))
+        return tuple(ret)
+    else:
+        if src_inds.ndim == 1:
+            flat_src_inds = True
+        if flat_src_inds:
+            return src_inds.shape
+        elif src_inds.size > 0:
+            dims = src_inds.shape[-1]
+        else:
+            return (0,)
+
+        if len(src_shape) != dims:
+            raise ValueError(f"non-flat src_indices {src_inds} have the wrong number of dimensions,"
+                             f" {dims}, to index into an array of shape {src_shape}")
+        return tuple(src_inds.shape[:-1])
+
+
+def shape2tuple(shape):
+    """
+    Return shape as a tuple.
+
+    Parameters
+    ----------
+    shape : int or tuple
+        The given shape.
+
+    Returns
+    -------
+    tuple
+        The shape as a tuple.
+    """
+    if isinstance(shape, Number):
+        return (shape,)
+    elif shape is None:
+        return shape
+    return tuple(shape)
+
+
+def get_connection_owner(system, tgt):
+    """
+    Return (owner, promoted_src, promoted_tgt) for the given connected target.
+
+    Note : this is not speedy.  It's intended for use only in error messages.
+
+    Parameters
+    ----------
+    system : System
+        Any System.  The search always goes from the model level down.
+    tgt : str
+        Absolute pathname of the target variable.
+
+    Returns
+    -------
+    tuple
+        (owning group, promoted source name, promoted target name)
+    """
+    from openmdao.core.group import Group
+
+    model = system._problem_meta['model_ref']()
+    src = model._conn_global_abs_in2out[tgt]
+
+    if model._var_allprocs_abs2prom['input'][tgt] != model._var_allprocs_abs2prom['output'][src]:
+        # connection is explicit
+        for g in model.system_iter(include_self=True, recurse=True, typ=Group):
+            if g._manual_connections:
+                tprom = g._var_allprocs_abs2prom['input'][tgt]
+                if tprom in g._manual_connections:
+                    return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
+
+    return None, None, None

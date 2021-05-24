@@ -4,6 +4,7 @@ RecordingManager class definition.
 import time
 
 from openmdao.utils.general_utils import simple_warning
+from openmdao.warnings import warn_deprecation
 
 try:
     from openmdao.utils.mpi import MPI
@@ -21,7 +22,7 @@ class RecordingManager(object):
         All of the recorders attached to the current object.
     rank : int
         Rank of the iteration coordinate.
-    _has_serial_recorders: bool
+    _has_serial_recorders : bool
         True if any of the recorders managed by this object are serial recorders.
     """
 
@@ -149,11 +150,8 @@ class RecordingManager(object):
             The object that needs its metadata recorded.
 
         """
-        for recorder in self._recorders:
-            # If the recorder does not support parallel recording
-            # we need to make sure we only record on rank 0.
-            if recorder._parallel or self.rank == 0:
-                recorder.record_metadata(recording_requester)
+        warn_deprecation("The 'record_metadata' function is deprecated. "
+                         "All system and solver options are recorded automatically.")
 
     def record_derivatives(self, recording_requester, data, metadata):
         """
@@ -184,7 +182,7 @@ class RecordingManager(object):
 
         Returns
         -------
-        True/False : bool
+        True/False: bool
             True if RecordingManager is managing at least one recorder
         """
         return True if self._recorders else False
@@ -245,6 +243,7 @@ def record_viewer_data(problem):
     if recorders:
         from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
         viewer_data = _get_viewer_data(problem)
+        viewer_data['md5_hash'] = problem.model._generate_md5_hash()
         viewer_data.pop('abs2prom', None)  # abs2prom already recorded in metadata table
         for recorder in recorders:
             recorder.record_viewer_data(viewer_data)
@@ -259,18 +258,41 @@ def record_system_options(problem):
     problem : Problem
         The problem for which all its systems' options are to be recorded.
     """
-    # get all recorders in the problem
-    recorders = set(_get_all_recorders(problem))
-    if recorders:
-        if problem._system_options_recorded:
-            simple_warning("The model is being run again, if the options or scaling of any "
-                           "components has changed then only their new values will be recorded.")
-        else:
-            problem._system_options_recorded = True
+    warn_deprecation("The 'record_system_options' function is deprecated. "
+                     "Use 'record_model_options' instead.")
+    record_model_options(problem)
 
+
+def record_model_options(problem, run_number):
+    """
+    Record the options for all systems and solvers in the model.
+
+    Parameters
+    ----------
+    problem : Problem
+        The problem for which all its system and solver options are to be recorded.
+    run_number : int or None
+        Number indicating which run the metadata is associated with.
+        Zero or None for the first run, 1 for the second, etc.
+    """
+    # for backward compatibility, the first run does not have a run number
+    if run_number is not None and run_number < 1:
+        run_number = None
+
+    recorders = set(_get_all_recorders(problem))
+
+    for system in problem.model.system_iter(recurse=True, include_self=True):
         for recorder in recorders:
-            for sub in problem.model.system_iter(recurse=True, include_self=True):
-                if problem._run_counter >= 1:
-                    recorder.record_metadata_system(sub, problem._run_counter)
-                else:
-                    recorder.record_metadata_system(sub)
+            # record system metadata (options)
+            recorder.record_metadata_system(system, run_number)
+
+            # record solver metadata (options) for this system's solvers
+            nl = system._nonlinear_solver
+            if nl:
+                recorder.record_metadata_solver(nl, run_number)
+                if hasattr(nl, 'linesearch') and nl.linesearch:
+                    recorder.record_metadata_solver(nl.linesearch, run_number)
+
+            ln = system._linear_solver
+            if ln:
+                recorder.record_metadata_solver(ln, run_number)

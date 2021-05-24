@@ -4,8 +4,6 @@ import inspect
 import json
 import os
 import zlib
-from collections import OrderedDict
-from itertools import chain
 import networkx as nx
 
 import numpy as np
@@ -24,11 +22,13 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning, default_noraise
+from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
+from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
+from openmdao import __version__ as openmdao_version
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -82,7 +82,7 @@ def _convert_ndarray_to_support_nans_in_json(val):
     return(val_as_list)
 
 
-def _get_var_dict(system, typ, name):
+def _get_var_dict(system, typ, name, is_parallel):
     if name in system._var_discrete[typ]:
         meta = system._var_discrete[typ][name]
         is_discrete = True
@@ -94,7 +94,7 @@ def _get_var_dict(system, typ, name):
         name = system._var_abs2prom[typ][name]
         is_discrete = False
 
-    var_dict = OrderedDict()
+    var_dict = {}
 
     var_dict['name'] = name
     var_dict['type'] = typ
@@ -114,18 +114,34 @@ def _get_var_dict(system, typ, name):
         var_dict['shape'] = str(meta['shape'])
 
     if 'distributed' in meta:
-        var_dict['distributed'] = meta['distributed']
+        var_dict['distributed'] = is_distributed = meta['distributed']
+    else:
+        is_distributed = False
+
+    if 'surrogate_name' in meta:
+        var_dict['surrogate_name'] = meta['surrogate_name']
 
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)):
-            var_dict['value'] = default_noraise(meta['value'])
+        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
+            var_dict['value'] = default_noraise(system.get_val(name))
         else:
             var_dict['value'] = type(meta['value']).__name__
     else:
         if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
-            var_dict['value'] = _convert_ndarray_to_support_nans_in_json(meta['value'])
+            if not MPI:
+                # get the current value
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
+            elif is_parallel or is_distributed:
+                # we can't access non-local values, so just get the initial value
+                var_dict['value'] = meta['value']
+                var_dict['initial_value'] = True
+            else:
+                # get the current value but don't try to get it from the source,
+                # which could be remote under MPI
+                val = system.get_val(name, from_src=False)
+                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(val)
         else:
             var_dict['value'] = None
 
@@ -163,7 +179,7 @@ def _serialize_single_option(option):
 def _get_tree_dict(system, component_execution_orders, component_execution_index,
                    is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
-    tree_dict = OrderedDict()
+    tree_dict = {}
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
@@ -192,10 +208,10 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name))
+                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name))
+                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
 
     else:
         if isinstance(system, ParallelGroup):
@@ -317,14 +333,19 @@ def _get_declare_partials(system):
     return declare_partials_list
 
 
-def _get_viewer_data(data_source):
+def _get_viewer_data(data_source, case_id=None):
     """
     Get the data needed by the N2 viewer as a dictionary.
 
     Parameters
     ----------
     data_source : <Problem> or <Group> or str
-        A Problem or Group or case recorder file name containing the model or model data.
+        A Problem or Group or case recorder filename containing the model or model data.
+        If the case recorder file from a parallel run has separate metadata, the
+        filenames can be specified with a comma, e.g.: case.sql_0,case.sql_meta
+
+    case_id : int or str or None
+        Case name or index of case in SQL file.
 
     Returns
     -------
@@ -335,7 +356,7 @@ def _get_viewer_data(data_source):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning("The model is not a Group, viewer data is unavailable.")
+            issue_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
@@ -359,15 +380,53 @@ def _get_viewer_data(data_source):
             driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
-            simple_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
+            issue_warning(f"Viewer data is not available for sub-Group '{data_source.pathname}'.")
             return {}
 
     elif isinstance(data_source, str):
-        data_dict = CaseReader(data_source, pre_load=False).problem_metadata
+        if ',' in data_source:
+            filenames = data_source.split(',')
+            cr = CaseReader(filenames[0], metadata_filename=filenames[1])
+        else:
+            cr = CaseReader(data_source)
+
+        data_dict = cr.problem_metadata
+
+        if case_id is not None:
+            cases = cr.get_case(case_id)
+            print(f"Using source: {cases.source}\nCase: {cases.name}")
+
+            def recurse(children, stack):
+                for child in children:
+                    if child['type'] == 'subsystem':
+                        if child['name'] != '_auto_ivc':
+                            stack.append(child['name'])
+                            recurse(child['children'], stack)
+                            stack.pop()
+                    elif child['type'] == 'input':
+                        if cases.inputs is None:
+                            child['value'] = 'N/A'
+                        else:
+                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                            child['value'] = cases.inputs[path]
+                    elif child['type'] == 'output':
+                        if cases.outputs is None:
+                            child['value'] = 'N/A'
+                        else:
+                            path = child['name'] if not stack else '.'.join(stack + [child['name']])
+                            try:
+                                child['value'] = cases.outputs[path]
+                            except KeyError:
+                                child['value'] = 'N/A'
+            recurse(data_dict['tree']['children'], [])
 
         # Delete the variables key since it's not used in N2
         if 'variables' in data_dict:
             del data_dict['variables']
+
+        # Older recordings might not have this.
+        if 'md5_hash' not in data_dict:
+            data_dict['md5_hash'] = None
 
         return data_dict
 
@@ -379,6 +438,7 @@ def _get_viewer_data(data_source):
     comp_exec_idx = [0]  # list so pass by ref
     orders = {}
     data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
+    data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
 
@@ -447,7 +507,7 @@ def _get_viewer_data(data_source):
     return data_dict
 
 
-def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+def n2(data_source, outfile='n2.html', case_id=None, show_browser=True, embeddable=False,
        title=None, use_declare_partial_info=False):
     """
     Generate an HTML file containing a tree viewer.
@@ -458,6 +518,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     ----------
     data_source : <Problem> or str
         The Problem or case recorder database containing the model or model data.
+
+    case_id : int, str, or None
+        Case name or index of case in SQL file if data_source is a database.
 
     outfile : str, optional
         The name of the final output file
@@ -479,7 +542,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     """
     # grab the model viewer data
-    model_data = _get_viewer_data(data_source)
+    model_data = _get_viewer_data(data_source, case_id=case_id)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
@@ -509,16 +572,17 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'd3': 'd3.v5.min',
         'awesomplete': 'awesomplete',
         'vk_beautify': 'vkBeautify',
-        'pako_inflate': 'pako_inflate.min'
+        'pako_inflate': 'pako_inflate.min',
+        'json5': 'json5_2.2.0.min'
     }
     libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
-        'modal', \
         'utils', \
         'SymbolType', \
         'N2TreeNode', \
         'ModelData', \
         'N2Style', \
+        'N2Window', \
         'N2Layout', \
         'N2MatrixCell', \
         'N2Legend', \
@@ -535,16 +599,16 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     srcs = read_files(src_names, src_dir, 'js')
 
     style_names = \
+        'window', \
         'partition_tree', \
-        'icon', \
+        'n2toolbar-icons', \
         'toolbar', \
-        'nodedata', \
         'legend', \
         'awesomplete'
 
     styles = read_files((style_names), style_dir, 'css')
 
-    with open(os.path.join(style_dir, "icomoon.woff"), "rb") as f:
+    with open(os.path.join(style_dir, "n2toolbar-icons-font.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
     with open(os.path.join(style_dir, "logo_png.b64"), "r") as f:
@@ -553,22 +617,30 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     with open(os.path.join(assets_dir, "spinner.png"), "rb") as f:
         waiting_icon = str(base64.b64encode(f.read()).decode("ascii"))
 
+    with open(os.path.join(assets_dir, "n2toolbar_screenshot_png.b64"), "r") as f:
+        n2toolbar_png = str(f.read())
+
     if title:
         title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
     else:
         title = "OpenMDAO Model Hierarchy and N2 diagram"
 
+    src_names = ('N2ErrorHandling',)
+    head_srcs = read_files(src_names, src_dir, 'js')
+
     h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
                       title=title,
-                      styles=styles, embeddable=embeddable)
+                      styles=styles, embeddable=embeddable, head_srcs=head_srcs)
 
     if (embeddable):
         h.insert("non-embedded-n2", "embedded-n2")
 
     # put all style and JS into index
-    h.insert('{{fontello}}', encoded_font)
+    h.insert('{{n2toolbar-icons}}', encoded_font)
     h.insert('{{logo_png}}', logo_png)
     h.insert('{{waiting_icon}}', waiting_icon)
+    h.insert('{{n2toolbar_png}}', n2toolbar_png)
+    h.insert('{{om_version}}', openmdao_version)
 
     for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
@@ -579,18 +651,17 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
-    # Help
-    help_txt = ('Left clicking on a node in the partition tree will navigate to that node. '
-                'Right clicking on a node in the model hierarchy will collapse/expand it. '
-                'A click on any element in the N2 diagram will allow those arrows to persist.')
-    help_diagram_svg_filepath = os.path.join(assets_dir, "toolbar_help.svg")
-    h.add_help(help_txt, help_diagram_svg_filepath,
-               footer="OpenMDAO Model Hierarchy and N2 diagram")
-
     # Write output file
     h.write(outfile)
 
-    # open it up in the browser
-    if show_browser:
+    if notebook:
+        # display in Jupyter Notebook
+        outfile = os.path.relpath(outfile)
+        if not colab:
+            display(IFrame(src=outfile, width="100%", height=700))
+        else:
+            display(HTML(outfile))
+    elif show_browser:
+        # open it up in the browser
         from openmdao.utils.webview import webview
         webview(outfile)

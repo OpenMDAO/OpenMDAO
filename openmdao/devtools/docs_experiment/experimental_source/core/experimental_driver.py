@@ -44,7 +44,7 @@ class ExperimentalDriver(object):
         Contains all response info.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
-    _vars_to_record: dict
+    _vars_to_record : dict
         Dict of lists of var names indicating what to record
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.

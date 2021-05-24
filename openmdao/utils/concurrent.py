@@ -178,7 +178,7 @@ def concurrent_eval(func, cases, comm, allgather=False, model_mpi=None):
     """
     Run the given function concurrently on all procs in the communicator.
 
-    NOTE: This function should NOT be used if the concurrent function makes
+    NOTE : This function should NOT be used if the concurrent function makes
     any internal collective MPI calls.
 
     Parameters

@@ -4,6 +4,8 @@ from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
 from collections import OrderedDict
 
+from openmdao.core.constants import INT_DTYPE
+
 # scipy sparse types allowed to be subjacs
 sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
@@ -24,8 +26,6 @@ class Matrix(object):
         dictionary of sub-jacobian data keyed by (out_name, in_name).
     _metadata : dict
         implementation-specific data for the sub-jacobians.
-    _is_internal : bool
-        If True, this is the int_mtx of an AssembledJacobian.
     """
 
     def __init__(self, comm, is_internal):
@@ -43,7 +43,6 @@ class Matrix(object):
         self._matrix = None
         self._submats = OrderedDict()
         self._metadata = OrderedDict()
-        self._is_internal = is_internal
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
@@ -175,7 +174,7 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
         # pull out columns that match each index
         idxarr = np.nonzero(jcols == i)[0]
         idxs.append(idxarr)
-        icols.append(np.full(idxarr.shape, idx, dtype=int))
+        icols.append(np.full(idxarr.shape, idx, dtype=INT_DTYPE))
 
     idxs = np.hstack(idxs)
     icols = np.hstack(icols) + icol

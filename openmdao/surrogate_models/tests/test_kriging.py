@@ -4,6 +4,7 @@
 import unittest
 import itertools
 import numpy as np
+import os
 
 from openmdao.api import KrigingSurrogate
 from openmdao.utils.assert_utils import assert_near_equal
@@ -141,12 +142,37 @@ class TestKrigingSurrogate(unittest.TestCase):
         surrogate = KrigingSurrogate()
         n = 15
         x = np.array([[a, b] for a, b in
-                   itertools.product(np.linspace(0, 1, n), repeat=2)])
+                      itertools.product(np.linspace(0, 1, n), repeat=2)])
         y = np.array([[a+b, a-b, a+2*b] for a, b in x])
 
         surrogate.train(x, y)
         jac = surrogate.linearize(np.array([[0.5, 0.5]]))
-        assert_near_equal(jac, np.array([[1, 1], [1, -1], [1, 2]]), 5e-4)
+        assert_near_equal(jac, np.array([[1, 1], [1, -1], [1, 2]]), 6e-4)
+
+    def test_cache(self):
+        x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5],
+                      [-3.5, 6.], [4., 7.5], [-5., 9.], [5.5, 10.5],
+                      [10., 12.], [7., 13.5], [2.5, 15.]])
+        y = np.array([[branin(case)] for case in x])
+
+        surrogate_before = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache='test_cache.npz')
+        surrogate_before.train(x, y)
+
+        surrogate = KrigingSurrogate(nugget=0., eval_rmse=True, training_cache='test_cache.npz')
+        surrogate.train(x, y)
+
+        for x0, y0 in zip(x, y):
+            mu, sigma = surrogate.predict(x0)
+            assert_near_equal(mu, [y0], 1e-9)
+            assert_near_equal(sigma, [[0]], 1e-4)
+
+        mu, sigma = surrogate.predict([5., 5.])
+
+        assert_near_equal(mu, [[16.72]], 1e-1)
+        assert_near_equal(sigma, [[15.27]], 1e-2)
+
+        os.unlink('test_cache.npz')
+
 
 if __name__ == "__main__":
     unittest.main()

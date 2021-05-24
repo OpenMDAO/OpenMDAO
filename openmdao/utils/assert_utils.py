@@ -13,8 +13,8 @@ from functools import wraps
 from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import pad_name, reset_warning_registry
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import pad_name
+from openmdao.warnings import warn_deprecation, reset_warning_registry
 
 
 @contextmanager
@@ -43,7 +43,12 @@ def assert_warning(category, msg):
         if (issubclass(warn.category, category) and str(warn.message) == msg):
             break
     else:
-        raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
+        msg = f"Did not see expected {category.__name__}:\n{msg}"
+        if w:
+            ws = '\n'.join([str(ww.message) for ww in w])
+            categories = '\n'.join([str(ww.category.__name__) for ww in w])
+            msg += f"\nDid see warnings [{categories}]:\n{ws}"
+        raise AssertionError(msg)
 
 
 @contextmanager
@@ -290,7 +295,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
 
     Parameters
     ----------
-    test_case : :class:`unittest.TestCase`
+    test_case : class:`unittest.TestCase`
         TestCase instance used for assertions.
     actual : float, array-like, dict
         The value from the test.

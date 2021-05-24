@@ -1,9 +1,15 @@
 """
 Utility functions and constants related to writing a table of variable metadata.
 """
+import sys
 import pprint
 
+from io import TextIOBase
+
 import numpy as np
+
+from openmdao.core.constants import _DEFAULT_OUT_STREAM
+from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
 
 column_widths = {
     'value': 20,
@@ -22,7 +28,8 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical=True, top_name='model', print_arrays=False, out_stream=None):
+                    hierarchical=True, top_name='model', print_arrays=False,
+                    out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -50,6 +57,19 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         Where to send human readable output.
         Set to None to suppress.
     """
+    if out_stream is None:
+        return
+
+    if notebook and tabulate and not hierarchical and out_stream is _DEFAULT_OUT_STREAM:
+        use_tabulate = True
+    else:
+        use_tabulate = False
+
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+    elif not isinstance(out_stream, TextIOBase):
+        raise TypeError("Invalid output stream specified for 'out_stream'.")
+
     count = len(var_dict)
 
     # Write header
@@ -62,9 +82,9 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
 
     out_stream.write(header + '\n')
-    out_stream.write('-' * len(header) + '\n' + '\n')
 
     if not count:
+        out_stream.write('\n\n')
         return
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs
@@ -80,6 +100,16 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     for outputs in var_dict.values():
         column_names = [out_type for out_type in out_types if out_type in outputs]
         break
+
+    if use_tabulate and var_list:
+        rows = []
+        for name in var_list:
+            rows.append([name] + [var_dict[name][field] for field in column_names])
+
+        hdrs = ['varname'] + column_names
+        algn = ["center"] * len(hdrs)  # colalign "left" is currently broken
+        display(HTML(tabulate(rows, headers=hdrs, colalign=algn, tablefmt='html')))
+        return
 
     # Find with width of the first column in the table
     #    Need to look through all the possible varnames to find the max width
@@ -115,6 +145,8 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_header += '{:{align}{width}}'.format(column_name, align=align,
                                                     width=column_widths[column_name])
         column_dashes += column_spacing * ' ' + column_widths[column_name] * '-'
+
+    out_stream.write('\n')
     out_stream.write(column_header + '\n')
     out_stream.write(column_dashes + '\n')
 
@@ -159,24 +191,48 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     out_stream.write('\n\n')
 
 
-def write_source_table(source_dict, out_stream):
+def write_source_table(source_dicts, out_stream):
     """
-    Write table of cases and their respective sources.
+    Write tables of cases and their respective sources.
 
     Parameters
     ----------
-    source_dict : dict
+    source_dicts : dict or list of dicts
         Dict of source and cases
     out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
 
     """
-    for key, value in source_dict.items():
-        if value:
-            out_stream.write(f'{key}\n')
-            for i in value:
-                out_stream.write(f'    {i}\n')
+    if out_stream is None:
+        return
+
+    # use tabulate if we are in a notebook, have tabulate and are using the default out_stream
+    if notebook and tabulate and out_stream is _DEFAULT_OUT_STREAM:
+        use_tabulate = True
+    else:
+        use_tabulate = False
+
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+    elif not isinstance(out_stream, TextIOBase):
+        raise TypeError("Invalid output stream specified for 'out_stream'.")
+
+    if not isinstance(source_dicts, list):
+        source_dicts = [source_dicts]
+
+    for source_dict in source_dicts:
+        if use_tabulate:
+            display(HTML(tabulate(source_dict,
+                                  disable_numparse=True,
+                                  colalign=["center"] * len(source_dict),
+                                  headers="keys", tablefmt='html')))
+        else:
+            for key, value in source_dict.items():
+                if value:
+                    out_stream.write(f'{key}\n')
+                    for val in value:
+                        out_stream.write(f'    {val}\n')
 
 
 def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
@@ -208,6 +264,9 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     """
     if out_stream is None:
         return
+    elif out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
     for column_name in column_names:

@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
+import openmdao.api as om
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
 
 
@@ -47,11 +48,6 @@ class SplineDistributionFeatureTestCase(unittest.TestCase):
 
     def test_spline_distribution_example(self):
 
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
-
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 20
@@ -67,12 +63,11 @@ class SplineDistributionFeatureTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        akima_y = np.array([[5.         , 5.32381994,  6.28062691 , 7.79410646 , 9.64169506, 11.35166363,
-                             12.26525921, 12.99152288, 13.77257256, 14.58710327, 15.41289673, 16.28341046,
-                             17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
-                             28.67782484, 29.        ]])
-
-        assert_array_almost_equal(akima_y.flatten(), prob['akima1.y_val'].flatten())
+        assert_array_almost_equal(prob['akima1.y_val'],
+                                  np.array([[5.         , 5.32381994,  6.28062691 , 7.79410646 , 9.64169506, 11.35166363,
+                                             12.26525921, 12.99152288, 13.77257256, 14.58710327, 15.41289673, 16.28341046,
+                                             17.96032258, 20.14140712, 22.31181718, 24.40891577, 26.27368825, 27.74068235,
+                                             28.67782484, 29.        ]])                                  )
 
 
 if __name__ == '__main__':

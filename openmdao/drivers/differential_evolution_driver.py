@@ -414,7 +414,7 @@ class DifferentialEvolution(object):
     """
     Differential Evolution Genetic Algorithm.
 
-    TODO: add better references than: https://en.wikipedia.org/wiki/Differential_evolution
+    TODO : add better references than: https://en.wikipedia.org/wiki/Differential_evolution
 
     Attributes
     ----------

@@ -17,6 +17,8 @@ from itertools import chain
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
+    _scaling_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
 try:
@@ -46,7 +48,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.core.component import Component
-from openmdao.utils.general_utils import ignore_errors, warn_deprecation
+from openmdao.utils.general_utils import ignore_errors
+from openmdao.warnings import warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -58,7 +61,10 @@ def _n2_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
+    parser.add_argument('file', nargs=1,
+                        help='Python script or recording containing the model. '
+                        'If metadata from a parallel run was recorded in a separate file, '
+                        'specify both database filenames delimited with a comma.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
@@ -223,6 +229,10 @@ def _meta_model_cmd(options, user_args):
         mm_names = list(metamodels.keys())
         mm_count = len(mm_names)
 
+        def _mm_list(mm_names, options):
+            for mm in mm_names:
+                print("openmdao view_mm -m {} {}".format(mm, options.file[0]))
+
         if mm_count == 0:
             print("No Metamodel components found in model.")
 
@@ -231,14 +241,24 @@ def _meta_model_cmd(options, user_args):
             view_metamodel(comp, resolution, port_number, browser)
 
         else:
-            try_str = "Try one of the following: {}.".format(mm_names)
-
             if not pathname:
-                print("\nMetamodel not specified. {}".format(try_str))
+                print("\nMetamodel not specified. Try one of the following:\n")
+                _mm_list(mm_names, options)
             elif not comp:
-                print("\nMetamodel '{}' not found.\n {}".format(pathname, try_str))
+                if len(mm_names) > 1:
+                    print("\nMetamodel '{}' not found. Try one of the "
+                          "following:\n".format(pathname))
+                else:
+                    print("\nMetamodel '{}' not found. Try the "
+                          "following:\n".format(pathname))
+                _mm_list(mm_names, options)
             else:
-                print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+                if len(mm_names) > 1:
+                    print("\n'{}' is not a Metamodel. Try one of the "
+                          "following:\n".format(pathname))
+                else:
+                    print("\n'{}' is not a Metamodel. Try the following:\n".format(pathname))
+                _mm_list(mm_names, options)
         exit()
 
     hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
@@ -474,7 +494,8 @@ _command_map = {
                          'View connections showing values and source/target units.'),
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
-    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel.")
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 
 
@@ -492,6 +513,8 @@ def openmdao_cmd():
         user_args = []
 
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
+                                     usage='openmdao [-h] [--version] command [command_options] '
+                                     'filename',
                                      epilog='Use -h after any sub-command for sub-command help.'
                                      ' If using a tool on a script that takes its own command line'
                                      ' arguments, place those arguments after a "--". For example:'
@@ -535,7 +558,8 @@ def openmdao_cmd():
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
-    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
+    cmdargs = [a for a in sys.argv[1:] if a not in ('-h', '--version')]
+    if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(cmdargs[0]):
         _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True

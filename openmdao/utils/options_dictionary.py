@@ -1,6 +1,6 @@
 """Define the OptionsDictionary class."""
 
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 
 
@@ -105,15 +105,39 @@ class OptionsDictionary(object):
         list of str
             A rendition of the options as an rST table.
         """
-        outputs = []
-        for option_name, option_data in sorted(self._dict.items()):
-            name = option_name
-            default = option_data['value'] if option_data['value'] is not _UNDEFINED \
-                else '**Required**'
-            values = option_data['values']
-            types = option_data['types']
-            desc = option_data['desc']
+        lines = self.to_table(fmt='rst').split('\n')
+        return lines
 
+    def to_table(self, fmt='github', missingval='N/A'):
+        """
+        Get a table representation of this OptionsDictionary as a table in the requested format.
+
+        Parameters
+        ----------
+        fmt : str
+            The formatting of the requested table.  Options are the same as those available
+            to the tabulate package.  See tabulate.tabulate_formats for a complete list.
+            Default value of 'github' produces a table in GitHub-flavored markdown.
+        missingval : str
+            The value to be displayed in place of None.
+
+        Returns
+        -------
+        str
+            A string representation of the table in the requested format.
+        """
+        try:
+            from tabulate import tabulate
+        except ImportError as e:
+            msg = "'to_table' requires the tabulate package but it is not currently installed." \
+                  " Use `pip install tablulate` or install openmdao with" \
+                  " `pip install openmdao[notebooks]`."
+            raise ImportError(msg)
+
+        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']]
+        for key in sorted(self._dict.keys()):
+            options = self._dict[key]
+            default = options['value'] if options['value'] is not _UNDEFINED else '**Required**'
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
@@ -121,72 +145,21 @@ class OptionsDictionary(object):
                 parts = default_str[:idx].split('.')
                 default = parts[-1]
 
-            if types is None:
-                types = "N/A"
+            acceptable_values = options['values']
+            if acceptable_values is not None:
+                if not isinstance(acceptable_values, (set, tuple, list)):
+                    acceptable_values = (acceptable_values,)
+                acceptable_values = [value for value in acceptable_values]
 
-            elif types is not None:
-                if not isinstance(types, (set, tuple, list)):
-                    types = (types,)
+            acceptable_types = options['types']
+            if acceptable_types is not None:
+                if not isinstance(acceptable_types, (set, tuple, list)):
+                    acceptable_types = (acceptable_types,)
+                acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
-                types = [type_.__name__ for type_ in types]
-
-            if values is None:
-                values = "N/A"
-
-            elif values is not None:
-                if not isinstance(values, (set, tuple, list)):
-                    values = (values,)
-
-                values = [value for value in values]
-
-            outputs.append([name, default, values, types, desc])
-
-        lines = []
-
-        col_heads = ['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']
-
-        max_sizes = {}
-        for j, col in enumerate(col_heads):
-            max_sizes[j] = len(col)
-
-        for output in outputs:
-            for j, item in enumerate(output):
-                length = len(str(item))
-                if max_sizes[j] < length:
-                    max_sizes[j] = length
-
-        header = ""
-        titles = ""
-        for key, val in max_sizes.items():
-            header += '=' * val + ' '
-
-        for j, head in enumerate(col_heads):
-            titles += "%s " % head
-            size = max_sizes[j]
-            space = size - len(head)
-            if space > 0:
-                titles += space * ' '
-
-        lines.append(header)
-        lines.append(titles)
-        lines.append(header)
-
-        n = 3
-        for output in outputs:
-            line = ""
-            for j, item in enumerate(output):
-                line += "%s " % str(item)
-                size = max_sizes[j]
-                space = size - len(str(item))
-                if space > 0:
-                    line += space * ' '
-
-            lines.append(line)
-            n += 1
-
-        lines.append(header)
-
-        return lines
+            desc = options['desc']
+            tlist.append([key, default, acceptable_values, acceptable_types, desc])
+        return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
         """
@@ -202,9 +175,9 @@ class OptionsDictionary(object):
         str
             A text representation of the options table.
         """
-        rst = self.__rst__()
+        rst = self.to_table(fmt='rst').split('\n')
         cols = [len(header) for header in rst[0].split()]
-        desc_col = sum(cols[:-1]) + len(cols) - 1
+        desc_col = sum(cols[:-1]) + 2 * (len(cols) - 1)
         desc_len = width - desc_col
 
         # if it won't fit in allowed width, just return the rST

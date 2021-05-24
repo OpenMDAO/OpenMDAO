@@ -1,12 +1,7 @@
 """Test for a feature doc showing how to use cache_linear_solution"""
-from distutils.version import LooseVersion
 import unittest
-from copy import deepcopy
-from io import StringIO
-
 
 import numpy as np
-import scipy
 from scipy.sparse.linalg import gmres
 
 import openmdao.api as om
@@ -16,14 +11,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 class CacheLinearTestCase(unittest.TestCase):
 
     def test_feature_cache_linear(self):
-
-        from distutils.version import LooseVersion
-        import numpy as np
-        import scipy
-        from scipy.sparse.linalg import gmres
-
-        import openmdao.api as om
-
 
         class QuadraticComp(om.ImplicitComponent):
             """
@@ -79,15 +66,10 @@ class CacheLinearTestCase(unittest.TestCase):
 
                 if mode == 'fwd':
                     print("incoming initial guess", d_outputs['states'])
-                    if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                        d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
-                    else:
-                        d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'], atol='legacy')[0]
+                    d_outputs['states'] = gmres(self.state_jac, d_residuals['states'], x0=d_outputs['states'])[0]
+
                 elif mode == 'rev':
-                    if LooseVersion(scipy.__version__) < LooseVersion("1.1"):
-                        d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
-                    else:
-                        d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol='legacy')[0]
+                    d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'])[0]
 
         p = om.Problem()
         p.driver = om.ScipyOptimizeDriver()

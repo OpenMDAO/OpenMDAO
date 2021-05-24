@@ -126,15 +126,12 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         class DistribComp(om.ExplicitComponent):
 
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
                 rank = self.comm.rank
                 sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
 
-                self.add_input('x', shape=1, src_indices=[0])
-                self.add_output('y', shape=sizes[rank])
+                self.add_input('x', shape=1, src_indices=[0], distributed=True)
+                self.add_output('y', shape=sizes[rank], distributed=True)
 
             def compute(self, inputs, outputs):
                 rank = self.comm.rank
@@ -150,7 +147,7 @@ class ProbRemoteTestCase(unittest.TestCase):
                 self.add_subsystem('ivc', om.IndepVarComp('x', 0.), promotes_outputs=['*'])
                 self.add_subsystem('dst', DistribComp(), promotes_inputs=['*'])
                 self.add_subsystem('sum', om.ExecComp('z = sum(y)', y=np.zeros((N,)), z=0.0))
-                self.connect('dst.y', 'sum.y')
+                self.connect('dst.y', 'sum.y', src_indices=om.slicer[:])
 
                 self.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['*'])
                 self.par.add_subsystem('c1', om.ExecComp(['y=2.0*x']), promotes_inputs=['*'])
@@ -212,11 +209,12 @@ class ProbRemoteTestCase(unittest.TestCase):
             # get_remote=None
             #
 
-            # distributed should raise exception, except for input with from_src=True (the default)
-            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+            with self.assertRaises(RuntimeError) as cm:
+                prob['dst.x']
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
 
             with self.assertRaises(RuntimeError) as cm:
-                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+                prob.model.get_val('dst.x', get_remote=None, from_src=False)
             self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
 
             with self.assertRaises(RuntimeError) as cm:
@@ -269,11 +267,12 @@ class ProbRemoteTestCase(unittest.TestCase):
             # get_remote=None
             #
 
-            # distributed should raise exception, except for input with from_src=True (the default)
-            assert_near_equal(prob['dst.x'], [7.])  # from src ('ivc.x')
+            with self.assertRaises(RuntimeError) as cm:
+                prob['dst.x']
+            self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
 
             with self.assertRaises(RuntimeError) as cm:
-                assert_near_equal(prob.model.get_val('dst.x', get_remote=None, from_src=False), [7.])
+                prob.model.get_val('dst.x', get_remote=None, from_src=False)
             self.assertEqual(str(cm.exception), distrib_msg.format(name='dst.x'))
 
             with self.assertRaises(RuntimeError) as cm:

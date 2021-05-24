@@ -57,6 +57,8 @@ class Indexer(object):
     _src_shape : tuple or None
         Shape of the 'source'.  Used to determine actual index or slice values when indices are
         negative or slice contains negative start or stop values or ':' or '...'.
+    _shaped_inst : Indexer or None
+        Cached shaped_instance if we've computed it before.
     """
 
     def __init__(self):
@@ -64,6 +66,7 @@ class Indexer(object):
         Initialize attributes.
         """
         self._src_shape = None
+        self._shaped_inst = None
 
     def __len__(self):
         """
@@ -178,6 +181,7 @@ class Indexer(object):
         if isinstance(shape, Integral):
             shape = (shape,)
         self._src_shape = shape
+        self._shaped_inst = None
         return self
 
     def json_compat(self):
@@ -301,11 +305,16 @@ class IntIndexer(ShapedIntIndexer):
         ShapedIntIndexer or None
             Will return a ShapedIntIndexer if possible, else None.
         """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
         if self._idx < 0:
             if self._src_shape is None:
                 return None
             else:
-                return ShapedIntIndexer(self._idx + self._src_shape[0])
+                self._shaped_inst = ShapedIntIndexer(self._idx + self._src_shape[0])
+            return self._shaped_inst
+
         return ShapedIntIndexer(self._idx)
 
     def as_slice(self):
@@ -436,12 +445,18 @@ class SliceIndexer(ShapedSliceIndexer):
         ShapedSliceIndexer or None
             Will return a ShapedSliceIndexer if possible, else None.
         """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
         slc = self._slice
         if (slc.start is not None and slc.start < 0) or slc.stop is None or slc.stop < 0:
             if self._src_shape is None:
                 return None
             else:
-                return ShapedSliceIndexer(slice(*self._slice.indices(self._src_shape[0])))
+                self._shaped_inst = \
+                    ShapedSliceIndexer(slice(*self._slice.indices(self._src_shape[0])))
+                return self._shaped_inst
+
         return ShapedSliceIndexer(slc)
 
     def shape(self):
@@ -584,23 +599,29 @@ class ArrayIndexer(ShapedArrayIndexer):
         ShapedArrayIndexer or None
             Will return a ShapedArrayIndexer if possible, else None.
         """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
         negs = self._arr < 0
         if np.any(negs):
             if self._src_shape is None:
                 return None
             else:
-                arr = self._arr.copy()
-                arr[negs] += self._src_shape[0]
-                sharr = arr
+                sharr = self._arr.copy()
+                sharr[negs] += self._src_shape[0]
         else:
             sharr = self._arr
 
-        if not self._multi:
+        if self._multi:
+            self._shaped_inst = ShapedArrayIndexer(sharr)
+        else:
             slc = array2slice(sharr)
             if slc is not None:
-                return ShapedSliceIndexer(slc)
+                self._shaped_inst = ShapedSliceIndexer(slc)
+            else:
+                self._shaped_inst = ShapedArrayIndexer(sharr)
 
-        return ShapedArrayIndexer(sharr)
+        return self._shaped_inst
 
     def as_slice(self):
         """
@@ -725,9 +746,9 @@ class ShapedMultiIndexer(Indexer):
         Indexer
             Self is returned to allow chaining.
         """
+        super().set_src_shape(shape)
         for i, s in zip(self._idx_list, shape):
             i.set_src_shape(s)
-        self._src_shape = shape
 
         return self
 
@@ -757,11 +778,16 @@ class MultiIndexer(ShapedMultiIndexer):
         ShapedMultiIndexer or None
             Will return a ShapedMultiIndexer if possible, else None.
         """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
         try:
-            return ShapedMultiIndexer(tuple(idxer.shaped_instance()() for idxer in self._idx_list))
+            self._shaped_inst = ShapedMultiIndexer(tuple(idxer.shaped_instance()()
+                                                         for idxer in self._idx_list))
         except Exception:
-            pass
-        return None
+            self._shaped_inst = None
+
+        return self._shaped_inst
 
 
 class EllipsisIndexer(Indexer):
@@ -817,6 +843,9 @@ class EllipsisIndexer(Indexer):
         A shaped Indexer or None
             Will return some kind of shaped Indexer if possible, else None.
         """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
         if self._src_shape is None:
             return None
 
@@ -837,7 +866,8 @@ class EllipsisIndexer(Indexer):
         else:
             idxer = indexer(tuple(lst))
         idxer.set_src_shape(self._src_shape)
-        return idxer.shaped_instance()
+        self._shaped_inst = idxer.shaped_instance()
+        return self._shaped_inst
 
     def as_slice(self):
         """

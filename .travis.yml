@@ -1,7 +1,6 @@
 branches:
   only:
   - master
-  - auto_ivc
 
 group: deprecated-2017Q4
 
@@ -17,13 +16,15 @@ env:
     # latest versions
     - PY=3   NUMPY=1    SCIPY=1   PYOPTSPARSE=v2.1.5 SNOPT=7.7 PETSc=3
     # baseline versions
-    - PY=3.8 NUMPY=1.18 SCIPY=1.4 PYOPTSPARSE=v2.1.5 SNOPT=7.7 PETSc=3.12 UPLOAD_DOCS=1
+    - PY=3.8 NUMPY=1.18 SCIPY=1.4 PYOPTSPARSE=v2.1.5 SNOPT=7.7 PETSc=3.12
     # older versions
     - PY=3.7 NUMPY=1.17 SCIPY=1.3 PYOPTSPARSE=v2.1.5 SNOPT=7.7
     - PY=3.6 NUMPY=1.16 SCIPY=1.2 PYOPTSPARSE=v1.2   SNOPT=7.2 PETSc=3.10.2
 
 git:
   depth: 99999
+
+dist: bionic
 
 addons:
   apt:
@@ -138,8 +139,9 @@ install:
 # NOTE: not using -e on purpose here, to catch packaging errors
 - echo ">>> Installing OpenMDAO";
   pip install .[all];
-  pyppeteer-install;
-
+# Don't want old versions of Pyppeteer's Chromium in the cache:
+- rm -fr /home/travis/.local/share/pyppeteer
+- pyppeteer-install
 # display summary of installed packages and their versions
 - conda list
 
@@ -154,37 +156,8 @@ script:
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
-    make travis;
+    make strict;
   fi
 
 # run the tests from down here to see if it can work without being at top level
-# only do coverage on the upload machine (and show skipped tests).
-- if [ "$UPLOAD_DOCS" ]; then
-    testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
-  else
-    testflo -n 1 openmdao --timeout=120 --show_skipped;
-  fi
-
-after_success:
-# again, only run coverage operations on the upload machine after success.
-# strip the site-package path so that links works on coveralls.io
-- if [ "$UPLOAD_DOCS" ]; then
-    echo " >> Installing forked version of coveralls";
-    pip install git+https://github.com/swryan/coveralls-python@work;
-
-    coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
-    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
-    coveralls --upload=coveralls-upd.json;
-  fi
-
-deploy:
-  provider: script
-  skip_cleanup: true
-  script:
-  # only deploy docs in a build after a PR or merge is accepted
-  - if [ "$MASTER_BUILD" ] && [ "$UPLOAD_DOCS" ]; then
-      python _utils/upload_doc_version.py;
-    fi
-  on:
-    branch: master
+- testflo -n 1 openmdao --timeout=120 --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;

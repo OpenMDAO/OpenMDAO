@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
@@ -16,7 +15,7 @@ except ImportError:
 
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 @unittest.skipUnless(PETScVector is not None, "PETSc is required.")
@@ -49,7 +48,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
@@ -57,7 +56,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_gmres(self):
@@ -80,7 +79,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
@@ -88,7 +87,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_ksp_maxiter(self):
@@ -140,7 +139,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         self.assertTrue(precon._iter_count > 0)
@@ -150,7 +149,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
 
         self.assertTrue(precon._iter_count > 0)
@@ -170,7 +169,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver._linearize()
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
@@ -179,7 +178,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver._linearize()
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
 
     def test_solve_linear_ksp_precon_left(self):
@@ -205,7 +204,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_linearize()
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
@@ -214,7 +213,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.run_linearize()
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
@@ -235,7 +234,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver._linearize()
         group.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
@@ -244,7 +243,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver._linearize()
         group.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
 
     def test_solve_on_subsystem(self):
@@ -272,7 +271,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(0.0)
         g1.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
@@ -283,7 +282,7 @@ class TestPETScKrylov(unittest.TestCase):
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_linear_solution_cache(self):
@@ -385,10 +384,6 @@ class TestPETScKrylov(unittest.TestCase):
 class TestPETScKrylovSolverFeature(unittest.TestCase):
 
     def test_specify_solver(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -422,11 +417,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_specify_ksp_type(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -461,10 +451,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -499,10 +485,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.73406455, .00001)
 
     def test_feature_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -537,10 +519,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_feature_rtol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -576,11 +554,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -612,11 +585,6 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 12.05848819, .00001)
 
     def test_specify_precon_left(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model

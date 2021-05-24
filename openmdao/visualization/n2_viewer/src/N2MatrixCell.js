@@ -629,7 +629,7 @@ class N2MatrixCell {
     highlight(varType = 'self', direction = 'self') {
 
         const obj = (varType == 'target') ? this.tgtObj : this.srcObj;
-        const treeId = obj.absPathName.replace(/[\.:]/g, '_');
+        const treeId = N2TreeNode.absPathToId(obj.absPathName);
         const treeNode = d3.select('rect#' + treeId);
 
         let fill = treeNode.style('fill');

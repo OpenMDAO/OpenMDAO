@@ -9,7 +9,7 @@
     flex-direction: row;
     margin-left: 12px;
     margin-bottom: 20px;
-    z-index: 20;
+    z-index: 50;
     overflow: visible;
     height: 40px;
 }
@@ -77,7 +77,7 @@
     border-color: #03793f;
 }
 
-.searchbar-container label { 
+.searchbar-container label {
     font-size: 10pt;
     color: black;
     margin-left: 8px;
@@ -91,7 +91,7 @@
 #toolbarLoc {
     margin: 0;
     padding: 0;
-    height: 615px;
+    height: 660px;
     width: 65px;
     border-bottom-right-radius: 15px;
     position: relative;
@@ -100,10 +100,9 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    left: -65px;
-    /* Start hidden */
+    left: -65px;  /* Start hidden */
     transition: left 0.5s;
-    z-index: 5;
+    z-index: 24;
     border-right: 1px solid gray;
     border-bottom: 1px solid gray;
 }
@@ -124,20 +123,19 @@
 .toolbar-hide-container {
     background-color: white;
     width: 15px;
-    height: 35px;
+    height: 33px;
     border-top-right-radius: 25%;
     border-bottom-right-radius: 25%;
 
     position: absolute;
-    top: 270px;
+    top: 275px;
     margin-left: 20px;
-    left: -20px;
-    /* Start hidden */
+    left: 45px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     cursor: pointer;
-    z-index: 30;
+    z-index: 24;
     transition: left 0.5s, transform 0.5s;
     border-top: 1px solid gray;
     border-right: 1px solid gray;
@@ -222,14 +220,14 @@
 .group-1 {
     background-color: #98daba;
     padding: 10px 0;
-    z-index: 5;
+    z-index: 36;
 }
 
 .group-2 {
     background-color: #7dcda6;
     padding: 20px 0 5px 0;
     margin-top: -20px;
-    z-index: 4;
+    z-index: 35;
     flex-direction: row;
     align-items: center;
 }
@@ -238,22 +236,22 @@
     background-color: #66b48e;
     padding: 20px 0 5px 0;
     margin-top: -20px;
-    z-index: 3;
-    height: 120px;
+    z-index: 34;
+    height: 155px;
 }
 
 .group-4 {
     background-color: #42926b;
     padding: 20px 0 5px 0;
     margin-top: -20px;
-    z-index: 2;
+    z-index: 33;
 }
 
 .group-5 {
     background-color: #30684d;
     padding: 20px 0 7px 0;
     margin-top: -20px;
-    z-index: 1;
+    z-index: 32;
 }
 
 #collapse-expandable {
@@ -324,16 +322,20 @@
     font-size: 24px;
 }
 
+.icon-backward {
+    font-size: 13px !important;
+}
+
+.icon-forward {
+	font-size: 13px !important;
+}
+
 .toolbar .fas {
     margin: 7px 0;
     color: white;
     font-size: 20px;
     cursor: pointer;
     transition: color 0.2s;
-}
-
-.solver-button {
-    font-size: 25px !important;
 }
 
 .active-tab-icon {
@@ -413,9 +415,13 @@
     cursor: pointer;
 }
 
-.slider datalist {
+#depth-slider-label {
+    min-width: 30px;
+    text-align: center;
+    font-size: 18px;
+    border-radius: 50%;
+    border: 1px solid white;
     color: white;
-    display: flex;
 }
 
 #model-slider-label {

@@ -12,9 +12,9 @@ from openmdao.core.driver import Driver
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_no_warning
 from openmdao.utils.general_utils import remove_whitespace
-from openmdao.utils.logger_utils import TestLogger
+from openmdao.warnings import OMDeprecationWarning
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -352,7 +352,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "3 Input(s) in 'model'",
-            "---------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -376,7 +375,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         expected = [
             "4 Explicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -389,7 +387,6 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "",
             "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
@@ -676,6 +673,35 @@ class DiscreteTestCase(unittest.TestCase):
                "compute() takes 3 positional arguments but 5 were given")
         self.assertEqual(str(cm.exception), msg)
 
+    def test_discrete_input_dataframe(self):
+        class OMDataFrame:
+            def __dict__(self):
+                pass
+
+        class ModCompEx2(ModCompEx):
+            def setup(self):
+                super().setup()
+                self.add_discrete_input('test', OMDataFrame())
+
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+        indep.add_discrete_output('x', 11)
+        model.add_subsystem('comp', ModCompEx2(3), promotes=['*'])
+
+        rec = om.SqliteRecorder('test.db')
+        prob.driver.add_recorder(rec)
+        prob.add_recorder(rec)
+
+        prob.setup()
+        msg = ("DeprecationWarning: The truth value of an empty array is ambiguous. Returning"
+               "False, but in future this will result in an error. Use `array.size > 0` to check "
+               "that an array is not empty.")
+
+        with assert_no_warning(OMDeprecationWarning, msg):
+            prob.run_model()
+
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
         prob = om.Problem()
@@ -841,8 +867,6 @@ class DiscretePromTestCase(unittest.TestCase):
 class DiscreteFeatureTestCase(unittest.TestCase):
 
     def test_feature_discrete(self):
-        import numpy as np
-        import openmdao.api as om
 
         class BladeSolidity(om.ExplicitComponent):
             def setup(self):
@@ -883,7 +907,6 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
 
     def test_feature_discrete_implicit(self):
-        import openmdao.api as om
 
         class ImpWithInitial(om.ImplicitComponent):
             """

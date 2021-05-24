@@ -3,7 +3,7 @@ import os
 import unittest
 import numpy as np
 
-from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
+from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp, slicer
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI
@@ -22,8 +22,6 @@ class DistributedAdder(ExplicitComponent):
     """
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('size', types=int, default=1,
                              desc="Size of input and output vectors.")
 
@@ -44,9 +42,9 @@ class DistributedAdder(ExplicitComponent):
         start = local_offset
         end = local_offset + local_size
 
-        self.add_input('x', val=np.zeros(local_size, float),
+        self.add_input('x', val=np.zeros(local_size, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('y', val=np.zeros(local_size, float))
+        self.add_output('y', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
 
@@ -89,7 +87,8 @@ class DistributedAdderTest(unittest.TestCase):
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
-        summer = prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
+        summer = prob.model.add_subsystem('summer', Summer(size=size), promotes_outputs=['sum'])
+        prob.model.promotes('summer', inputs=['y'], src_indices=slicer[:])
 
         prob.setup()
 

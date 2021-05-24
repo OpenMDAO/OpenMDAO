@@ -1,9 +1,6 @@
 import re
-import sys
 
 from setuptools import setup
-from subprocess import check_call
-import distutils.spawn
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.\-dev]*)["']+""",
@@ -13,14 +10,22 @@ __version__ = re.findall(
 optional_dependencies = {
     'docs': [
         'matplotlib',
-        'mock',
+        'jupyter',
+        'nbconvert',
+        'testflo',
+        'ipyparallel',
         'numpydoc>=0.9.1',
-        'redbaron',
-        'sphinx>=1.8.5',
+        'tabulate',
+        'jupyter-book',
+    ],
+    'notebooks': [
+        'notebook',
+        'tabulate',
+        'ipython'
     ],
     'visualization': [
         'bokeh>=1.3.4',
-        'colorama',
+        'colorama'
     ],
     'test': [
         'parameterized',
@@ -29,7 +34,8 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'pyppeteer'
+        'pyppeteer',
+        'aiounittest'
     ]
 }
 
@@ -79,8 +85,6 @@ setup(
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
         'openmdao.docs',
-        'openmdao.docs._exts',
-        'openmdao.docs._utils',
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',
@@ -99,18 +103,24 @@ setup(
         'openmdao.test_suite.test_examples',
         'openmdao.test_suite.test_examples.beam_optimization',
         'openmdao.test_suite.test_examples.beam_optimization.components',
+        'openmdao.test_suite.test_examples.cannonball',
         'openmdao.test_suite.test_examples.meta_model_examples',
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.scaling_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
         'openmdao.devtools': ['*.wpr', ],
+        'openmdao.visualization': [
+            'common/libs/*.js',
+            'common/style/*.css'
+        ],
         'openmdao.visualization.n2_viewer': [
-            'assets/*',
+            'assets/*png*',
             'libs/*.js',
             'src/*.js',
             'style/*',
@@ -121,8 +131,9 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
-            'libs/*.js',
-            'style/*.css'
+        ],
+        'openmdao.visualization.scaling_viewer': [
+            '*.html',
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
@@ -131,7 +142,7 @@ setup(
             'static/*.html',
             'templates/*.html'
         ],
-        'openmdao.docs': ['*.py', '_utils/*.py'],
+        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py'],
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini', 'scaffolding_templates/*'],
         'openmdao.test_suite': [
@@ -155,6 +166,7 @@ setup(
             'wingproj=openmdao.devtools.wingproj:run_wing',
             'webview=openmdao.utils.webview:webview_argv',
             'run_om_test=openmdao.devtools.run_test:run_test',
+            'reset_notebook=openmdao.devtools.docutils:reset_notebook_cmd',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_case_reader': [

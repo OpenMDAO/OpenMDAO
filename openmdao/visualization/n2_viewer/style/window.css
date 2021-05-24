@@ -1,0 +1,803 @@
+#n2-windows {
+    position: absolute;
+    width: 100vw;
+    height: 100vw;
+}
+
+#n2-windows div {
+    position: absolute;
+}
+
+.n2-windows-modal-bg {
+    width: 100vw;
+    height: 100vw;
+    opacity: 0.6;
+    background-color: black;
+}
+
+.main-window {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.window-contents {
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Use "visibility:hidden" instead of "display: none" here
+   because "display: none" will caused certain operations
+   and calculations on the window to fail. */
+.window-inactive {
+    visibility: hidden;
+}
+
+/* For when the window or window component will not be used
+   or manipulated at all. */
+.window-unused {
+    display: none;
+}
+
+.window-draggable-header {
+    cursor: grab;
+}
+
+/* vvvvvvvvvv Begin N2 Window resizing styles vvvvvvvvvv */
+:root {
+    --resize-overflow: -2px;
+    --resize-edge-size: 5px;
+    --resize-corner-size: 10px;
+}
+
+.resize {
+    top: var(--resize-overflow);
+    left: var(--resize-overflow);
+    right: var(--resize-overflow);
+    bottom: var(--resize-overflow);
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    background-color:none;
+}
+
+.resize>div {
+    pointer-events: auto;
+}
+
+.rsz-horizontal {
+    height: var(--resize-edge-size);
+    left: var(--resize-corner-size);
+    right: var(--resize-corner-size);
+}
+.rsz-horizontal:hover { cursor: ns-resize; }
+
+.rsz-top { top: 0; }
+.rsz-bottom { bottom: 0; }
+
+.rsz-vertical {
+    width: var(--resize-edge-size);
+    top: var(--resize-corner-size);
+    bottom: var(--resize-corner-size);
+}
+.rsz-vertical:hover { cursor: ew-resize; }
+
+.rsz-right { right: 0; }
+.rsz-left { left: 0; }
+
+.rsz-corner {
+    height: var(--resize-corner-size);
+    width: var(--resize-corner-size);
+}
+
+.rsz-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.rsz-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.rsz-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.rsz-top-left { top: 0; left: 0; cursor: nwse-resize; }
+
+/* ^^^^^^^^^^ End N2 Window resizing styles ^^^^^^^^^^ */
+
+
+/* vvvvvvvvvv Begin Default N2 Window theme vvvvvvvvvv */
+.window-theme-default {
+    --header-height: 30px;
+    --ribbon-color: #42926b;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.window-theme-default .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-default .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-default .window-close-button {
+    color: none;
+    opacity: 0.4;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-default .window-close-button:hover,
+.window-theme-default .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-default .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 25px;
+}
+
+.window-theme-default .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+}
+
+.window-theme-default .window-footer {
+    display: none;
+}
+
+/* ^^^^^^^^^^ End Default N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Node Info N2 Window theme vvvvvvvvvv */
+.window-theme-node-info {
+    --header-height: 26px;
+    --footer-height: 15px;
+    --ribbon-color: #42926b;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.window-theme-node-info .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-node-info .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-node-info .window-close-button {
+    color: none;
+    opacity: 0.4;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-node-info .window-close-button:hover,
+.window-theme-node-info .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-node-info .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 25px;
+}
+
+.window-theme-node-info .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+}
+
+.window-theme-node-info .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.window-theme-node-info table {
+	overflow: hidden;
+	background-color: white;
+    min-width: 200px;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: fit-content;
+    height: fit-content;
+}
+
+.window-theme-node-info table tbody th {
+    text-align: right;
+    font-size: 9pt;
+    margin-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.window-theme-node-info table tbody .options-header {
+    background-color: #eeeeee;
+    text-align: center;
+}
+
+.window-theme-node-info table tbody td {
+    text-align: left;
+    font-size: 9pt;
+    margin-top: 0;
+    margin-left: 0;
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.caps {
+    text-transform: capitalize;
+}
+
+.node-info-data {
+    display: none;
+}
+
+.info-header {
+	background-color: #42926b;
+}
+
+.info-header p {
+	color: white;
+	text-align: center;
+}
+
+.node-data-cursor {
+    cursor: context-menu;
+}
+
+/* ^^^^^^^^^^ End Node Info N2 Window theme ^^^^^^^^^^ */
+
+
+/* vvvvvvvvvv Begin Value Info N2 Window theme vvvvvvvvvv */
+.window-theme-value-info {
+    --header-height: 26px;
+    --footer-height: 15px;
+    --ribbon-color: #42926b;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    /* transition: opacity 0.25s; */
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    
+    overflow: hidden;
+}
+
+.window-theme-value-info .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-value-info .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-value-info .window-close-button {
+    color: none;
+    opacity: 0.4;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 11pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-value-info .window-close-button:hover,
+.window-theme-value-info .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-value-info .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    width: auto;
+    direction: rtl;
+    text-align: center;
+    margin-left: 15px;
+    margin-right: 25px;
+}
+
+.window-theme-value-info .window-header .window-title::after {
+    content: ' Value';
+}
+
+.window-theme-value-info .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+    overflow: scroll;
+    visibility: visible;
+    border: 1px solid gray;
+
+}
+
+.window-theme-value-info .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* Value window table */
+.window-theme-value-info .window-body table {
+	overflow: hidden;
+	background-color: white;
+    min-width: 200px;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.window-theme-value-info .window-body table tbody tr th {
+    text-align: center;
+    font-size: 8pt;
+    margin: 0;
+    border-top: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    background-color: #c0c0c0;
+    padding: 3px;
+    white-space: nowrap;
+
+    color: #202020;
+    min-width: 30px;
+    font-weight: 300;
+}
+
+.window-theme-value-info .window-body table tbody tr th:last-child,
+.window-theme-value-info .window-body table tbody tr td:last-child {
+    border-right: 0;
+}
+
+.window-theme-value-info .window-body table tbody tr:last-child th,
+.window-theme-value-info .window-body table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.window-theme-value-info .window-body table tbody tr td {
+    text-align: left;
+    font-size: 9pt;
+    margin: 0;    
+    border-top: 0;
+    border-left: 0;
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #a0a0a0;
+    padding: 3px;
+    white-space: nowrap;
+}
+
+.window-theme-value-info .window-body table tbody tr.even td {
+    background-color:white;
+}
+
+.window-theme-value-info .window-body table tbody tr.odd td {
+    background-color: #e8ffe8;
+}
+
+.show_value_button {
+    background-color: #c1c1c1;
+ }
+ 
+ .copy_value_button {
+    background-color: #c1c1c1;
+ }
+
+ /* this is an off screen element that is used in the strange way you
+   need to put content on the clipboard.
+   It has to have visibility of visible to work
+ */
+#input-for-pastebuffer {
+    visibility: visible;
+    position: absolute;
+    left: -999em;
+}
+
+/* ^^^^^^^^^^ End Node Value N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Help N2 Window theme vvvvvvvvvv */
+.window-theme-help {
+    --header-height: 42px;
+    --footer-height: 32px;
+    --ribbon-color: steelblue;
+
+    background-color: white;
+    border: 1px solid #a0a0a0;
+    transition: opacity 0.25s;
+    box-shadow: 3px 3px 3px 1px rgba(0, 0, 0, 0.2);
+
+    border: 2px solid white;
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.window-theme-help .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+}
+
+.window-theme-help .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-help .window-close-button {
+    color: none;
+    opacity: 0.5;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-help .window-close-button:hover,
+.window-theme-help .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-help .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: normal;
+    line-height: var(--header-height);
+    position: relative;
+
+    /* Stuff to prevent title bar from being too long */
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: auto;
+    text-align: left;
+    font-size: 20px;
+    padding-left: 10px;
+}
+
+.window-theme-help .window-body {
+    color: black;
+    border: 0;
+    margin: 0 0 0 15px;
+    padding: 0;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+
+    font-family: helvetica, sans-serif;
+    font-size: 11pt;
+}
+
+.window-theme-help .window-body > svg {
+    width: 100%;
+    height: 100%;
+}
+
+.window-theme-help .window-body h1 {
+    padding: 0;
+    margin: 0;
+}
+
+.window-theme-help .window-footer {
+    background-color: var(--ribbon-color);
+    color: white;
+
+    height: var(--footer-height);
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.window-theme-help .window-footer span {
+    color: white;
+    display: block;
+    line-height: var(--footer-height);
+    position: relative;
+    overflow: hidden;
+    width: auto;
+    text-align: left;
+    font-family: helvetica, sans-serif;
+    font-size: 12px;
+    padding-left: 10px;
+}
+
+div#help-svg {
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+div.help-graphic {
+    position: absolute;
+    height: auto;
+    width: 100%;
+}
+
+div.help-graphic > p {
+    position: absolute;
+    font: Helvetica;
+    font-size: 15pt;
+    padding: 2px 0 2px 5px;
+    margin: 0;
+    z-index: 2;
+}
+
+div.help-button-group {
+    position: absolute;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 0;
+    border-color: green;
+    border-style: solid;
+    left: 640px;
+    border-radius: 0px 10px 10px 0px;
+    background-color: #e0e0e0;
+}
+
+div.help-button-group > p {
+    font: Helvetica;
+    font-size: 15pt;
+    padding: 0;
+    margin: 12px 10px 14px 10px;
+}
+
+i.help-text-icon {
+    color: white;
+    background-color: #42926b;
+    padding: 5px;
+    margin-right: 5px;
+}
+
+#help-graphic-svg {
+    top: 0;
+    left: 0;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#help-graphic-svg .help-line {
+    stroke: green;
+    fill: #e0e0e0;
+    stroke-width: 1;
+}
+
+/* ^^^^^^^^^^ End Help N2 Window theme ^^^^^^^^^^ */
+
+/* vvvvvvvvvv Begin Legend N2 Window theme vvvvvvvvvv */
+.window-theme-legend {
+    --header-height: 20px;
+    --ribbon-color: #42926b;
+
+    background-color: none;
+    border: 0;
+    transition: opacity 0.25s;
+    overflow: visible;
+}
+
+.window-theme-legend .window-header {
+    background-color: var(--ribbon-color);
+    margin: 0;
+    font-size: 11pt;
+    text-align: right;
+    white-space: nowrap;
+    height: var(--header-height);
+    top: 0;
+    bottom: auto;
+    width: 100px;
+    left: 50%;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transform: translate(-50%, 0px);
+}
+
+.window-theme-legend .window-close-button::before {
+    content: '\2715'
+}
+
+.window-theme-legend .window-close-button {
+    color: none;
+    opacity: 0.4;
+    text-shadow: -0.5px -0.5px 0.5px black, 0.5px 0.5px 0.5px white;
+    position: absolute;
+    top: 0px;
+    right: 8px;
+    cursor: pointer;
+    margin: 0;
+    font-size: 12pt;
+    font-weight: bold;
+    line-height: var(--header-height);
+    padding: 0;
+}
+
+.window-theme-legend .window-close-button:hover,
+.window-theme-legend .window-close-button:focus {
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.window-theme-legend .window-header .window-title {
+    color: white;
+    display: block;
+    font-weight: bold;
+    line-height: var(--header-height);
+    position: relative;
+
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.window-theme-legend .window-header .window-title::before {
+    content: ':::::: ';
+}
+
+.window-theme-legend .window-header .window-title::after {
+    content: ' ::::::';
+}
+
+.window-theme-legend .window-body {
+    color: black;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    background-color: none;
+
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: var(--footer-height);
+    overflow: visible;
+}
+
+.window-theme-legend .window-footer {
+    display: none;
+}
+
+/* ^^^^^^^^^^ End Legend N2 Window theme ^^^^^^^^^^ */

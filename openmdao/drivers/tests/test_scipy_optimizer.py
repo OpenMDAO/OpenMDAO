@@ -8,7 +8,7 @@ import numpy as np
 from scipy import __version__ as scipy_version
 
 import openmdao.api as om
-from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
+from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense, TestExplCompArraySparse, TestExplCompArrayJacVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarDerivatives
@@ -41,7 +41,7 @@ def rastrigin(x):
     return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
 
-class DummyComp(om.ExecComp):
+class DummyComp(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -52,7 +52,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -128,7 +128,8 @@ class TestMPIScatter(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -619,6 +620,68 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        obj = prob['o']
+        assert_near_equal(obj, 41.5, 1e-6)
+
+    def test_simple_array_comp2D_sparse_eq_con(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArraySparse(), promotes=['*'])
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('widths', lower=-50.0, upper=50.0)
+        model.add_objective('o')
+        model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
+
+        prob.setup()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        obj = prob['o']
+        assert_near_equal(obj, 41.5, 1e-6)
+
+    def test_simple_array_comp2D_jacvec_eq_con(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('comp', TestExplCompArrayJacVec(), promotes=['*'])
         model.add_subsystem('obj', om.ExecComp('o = areas[0, 0] + areas[1, 1]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 
@@ -1338,7 +1401,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1370,11 +1433,11 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p1.x', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
-    def test_debug_print_option(self):
+    def test_debug_print_all_options(self):
 
         prob = om.Problem()
         model = prob.model
@@ -1518,9 +1581,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_multiple_objectives_error(self):
 
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = om.Problem()
         model = prob.model
 
@@ -1552,8 +1612,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
     def test_basinhopping(self):
-
-        import openmdao.api as om
 
         class Func2d(om.ExplicitComponent):
 
@@ -1595,8 +1653,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_basinhopping_bounded(self):
         # It should find the local minimum, which is inside the bounds
 
-        import openmdao.api as om
-
         class Func2d(om.ExplicitComponent):
 
             def setup(self):
@@ -1633,37 +1689,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.run_driver()
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
-    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
-                         "scipy >= 1.2 is required.")
-    def test_dual_annealing(self):
-
-        import openmdao.api as om
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
-        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
-
-        prob.driver = driver = om.ScipyOptimizeDriver()
-        driver.options['optimizer'] = 'dual_annealing'
-        driver.options['disp'] = False
-        driver.options['tol'] = 1e-9
-        driver.options['maxiter'] = 2000
-        driver.opt_settings['seed'] = 1234
-        driver.opt_settings['initial_temp'] = 5230
-
-        model.add_design_var('x', lower=-2*np.ones(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
-        model.add_objective('f')
-        prob.setup()
-        prob.run_driver()
-        assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
-        assert_near_equal(prob['f'], 0.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
-        import openmdao.api as om
         # Example from the Scipy documentation
 
         size = 3  # size of the design variable
@@ -1702,8 +1731,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_differential_evolution(self):
         # Source of example:
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
-
-        import openmdao.api as om
         np.random.seed(6)
 
         size = 3  # size of the design variable
@@ -1741,8 +1768,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
         # In this example the minimum is not the unbounded global minimum.
 
-        import openmdao.api as om
-
         size = 3  # size of the design variable
 
         class Rastrigin(om.ExplicitComponent):
@@ -1778,7 +1803,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_shgo_rosenbrock(self):
         # Source of example:
         # https://stefan-endres.github.io/shgo/
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -1798,185 +1822,208 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.ones(rosenbrock_size), 1e-2)
         assert_near_equal(prob['f'], 0.0, 1e-2)
 
-
-class TestScipyOptimizeDriverFeatures(unittest.TestCase):
-
-    def test_feature_basic(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
+    def test_singular_jac_error_responses(self):
         prob = om.Problem()
-        model = prob.model
+        size = 3
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'], shape=(size,)),
+                                 promotes_inputs=['x', 'y'])
 
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(size,)),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0 * np.ones(size))
+        prob.model.set_input_defaults('y', -4.0 * np.ones(size))
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = True
+        prob.driver.options['singular_jac_behavior'] = 'error'
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy', index=1)
 
-        prob.setup()
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
 
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_optimizer(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA')
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
-        prob.run_driver()
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives [('parab.z', inds=[0, 1, 2])] cannot be impacted by the design " + \
+                         "variables of the problem.")
 
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_maxiter(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
+    def test_singular_jac_error_desvars(self):
         prob = om.Problem()
-        model = prob.model
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
+                                                  ]),
+                                     promotes_inputs=['x', 'y', 'z'])
 
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['maxiter'] = 20
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_tol(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['tol'] = 1.0e-9
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-
-        prob.setup()
-
-        prob.set_val('x', 50.0)
-        prob.set_val('y', 50.0)
-
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 6.66666667, 1e-6)
-        assert_near_equal(prob.get_val('y'), -7.3333333, 1e-6)
-
-    def test_feature_debug_print_option(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
-        prob.set_solver_print(level=0)
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver.options['singular_jac_behavior'] = 'error'
 
-        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
 
         prob.setup()
 
-        prob.run_driver()
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
-    def test_feature_debug_print_option_totals(self):
+        self.assertEqual(str(msg.exception),
+                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
 
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
+    def test_singular_jac_ignore(self):
         prob = om.Problem()
-        model = prob.model
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
 
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
 
-        model.set_input_defaults('x', 50.0)
-        model.set_input_defaults('y', 50.0)
-
-        prob.set_solver_print(level=0)
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
 
         prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
 
-        prob.driver.options['debug_print'] = ['totals']
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
 
         prob.setup()
 
+        # Will not raise an exception.
         prob.run_driver()
+
+    def test_singular_jac_warn(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # Default behavior is 'warn'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
+
+    def test_singular_jac_error_desvars_multidim_indices_dv(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z'], shape=(3,2,2)),
+                                 promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
+        prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50, indices=[2,5,6])
+
+        prob.model.add_objective('parab.f_xy', index=6)
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] have no impact on the constraints or objective.")
+
+    def test_singular_jac_error_desvars_multidim_indices_con(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - z',
+                                              'f_z = z * 0.0'], shape=(3,2,2)),
+                                 promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y', shape=(3,2,2)), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', np.ones((3,2,2)) * 3.0)
+        prob.model.set_input_defaults('y', np.ones((3,2,2)) * -4.0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        # objective parab.f_z is not impacted by any quantities.
+        prob.model.add_objective('parab.f_z', index=6)
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/
-
-        import numpy as np
-        import openmdao.api as om
 
         size = 3  # size of the design variable
 

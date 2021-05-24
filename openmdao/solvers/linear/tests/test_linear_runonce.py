@@ -52,8 +52,6 @@ class TestLinearRunOnceSolver(unittest.TestCase):
             self.assertEqual(str(context.exception), msg % option)
 
     def test_feature_solver(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model

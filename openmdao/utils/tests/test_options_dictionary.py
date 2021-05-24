@@ -3,8 +3,14 @@ from openmdao.api import OptionsDictionary
 import unittest
 
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
+from openmdao.warnings import OMDeprecationWarning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+
+try:
+    import tabulate
+except ImportError:
+    tabulate = None
 
 
 def check_even(name, value):
@@ -17,6 +23,7 @@ class TestOptionsDict(unittest.TestCase):
     def setUp(self):
         self.dict = OptionsDictionary()
 
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_reprs(self):
         class MyComp(ExplicitComponent):
             pass
@@ -32,40 +39,71 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(repr(self.dict), repr(self.dict._dict))
 
-        self.assertEqual(self.dict.__str__(width=83), '\n'.join([
-            "========= ============ ================= ===================== ====================",
-            "Option    Default      Acceptable Values Acceptable Types      Description         ",
-            "========= ============ ================= ===================== ====================",
-            "comp      MyComp       N/A               ['ExplicitComponent']                     ",
-            "flag      False        [True, False]     ['bool']                                  ",
-            "long_desc **Required** N/A               ['str']               This description is ",
-            "                                                               long and verbose, so",
-            "                                                                it takes up multipl",
-            "                                                               e lines in the optio",
-            "                                                               ns table.",
-            "test      **Required** ['a', 'b']        N/A                   Test integer value  ",
-            "========= ============ ================= ===================== ====================",
+        self.assertEqual(self.dict.__str__(width=89), '\n'.join([
+            "=========  ============  ===================  =====================  ====================",
+            "Option     Default       Acceptable Values    Acceptable Types       Description",
+            "=========  ============  ===================  =====================  ====================",
+            "comp       MyComp        N/A                  ['ExplicitComponent']",
+            "flag       False         [True, False]        ['bool']",
+            "long_desc  **Required**  N/A                  ['str']                This description is ",
+            "                                                                     long and verbose, so",
+            "                                                                      it takes up multipl",
+            "                                                                     e lines in the optio",
+            "                                                                     ns table.",
+            "test       **Required**  ['a', 'b']           N/A                    Test integer value",
+            "=========  ============  ===================  =====================  ====================",
         ]))
 
         # if the table can't be represented in specified width, then we get the full width version
         self.assertEqual(self.dict.__str__(width=40), '\n'.join([
-            "========= ============ ================= ===================== ====================="
-            "==================================================================== ",
-            "Option    Default      Acceptable Values Acceptable Types      Description          "
-            "                                                                     ",
-            "========= ============ ================= ===================== ====================="
-            "==================================================================== ",
-            "comp      MyComp       N/A               ['ExplicitComponent']                      "
-            "                                                                     ",
-            "flag      False        [True, False]     ['bool']                                   "
-            "                                                                     ",
-            "long_desc **Required** N/A               ['str']               This description is l"
-            "ong and verbose, so it takes up multiple lines in the options table. ",
-            "test      **Required** ['a', 'b']        N/A                   Test integer value   "
-            "                                                                     ",
-            "========= ============ ================= ===================== ====================="
-            "==================================================================== ",
+            "=========  ============  ===================  =====================  ====================="
+            "====================================================================",
+            "Option     Default       Acceptable Values    Acceptable Types       Description",
+            "=========  ============  ===================  =====================  ====================="
+            "====================================================================",
+            "comp       MyComp        N/A                  ['ExplicitComponent']",
+            "flag       False         [True, False]        ['bool']",
+            "long_desc  **Required**  N/A                  ['str']                This description is l"
+            "ong and verbose, so it takes up multiple lines in the options table.",
+            "test       **Required**  ['a', 'b']           N/A                    Test integer value",
+            "=========  ============  ===================  =====================  ====================="
+            "====================================================================",
         ]))
+
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
+    def test_to_table(self):
+        class MyComp(ExplicitComponent):
+            pass
+
+        my_comp = MyComp()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
+        self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
+        self.dict.declare('long_desc', types=str,
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.')
+
+        expected = "| Option    | Default      | Acceptable Values   | Acceptable Types      " \
+                   "| Description                                                            " \
+                   "                   |\n" \
+                   "|-----------|--------------|---------------------|-----------------------|--" \
+                   "----------------------------------------------------------------------------" \
+                   "-------------|\n" \
+                   "| comp      | MyComp       | N/A                 | ['ExplicitComponent'] |   " \
+                   "                                                                             " \
+                   "           |\n" \
+                   "| flag      | False        | [True, False]       | ['bool']              |   " \
+                   "                                                                             " \
+                   "           |\n" \
+                   "| long_desc | **Required** | N/A                 | ['str']               | Th" \
+                   "is description is long and verbose, so it takes up multiple lines in the opti" \
+                   "ons table. |\n" \
+                   "| test      | **Required** | ['a', 'b']          | N/A                   | Te" \
+                   "st integer value                                                             " \
+                   "           |"
+
+        self.assertEqual(self.dict.to_table(fmt='github'), expected)
 
     def test_type_checking(self):
         self.dict.declare('test', types=int, desc='Test integer value')
@@ -264,20 +302,20 @@ class TestOptionsDict(unittest.TestCase):
         self.dict.declare('test1', deprecation=msg)
 
         # test double set
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             self.dict['test1'] = None
         # Should only generate warning first time
-        with assert_no_warning(DeprecationWarning, msg):
+        with assert_no_warning(OMDeprecationWarning, msg):
             self.dict['test1'] = None
 
         # Also test set and then get
         msg = 'Option "test2" is deprecated.'
         self.dict.declare('test2', deprecation=msg)
 
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             self.dict['test2'] = None
         # Should only generate warning first time
-        with assert_no_warning(DeprecationWarning, msg):
+        with assert_no_warning(OMDeprecationWarning, msg):
             option = self.dict['test2']
 
 

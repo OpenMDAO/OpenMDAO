@@ -83,8 +83,7 @@ class DynPartialsComp(om.ExplicitComponent):
         self.add_output('g', np.ones(self.size))
 
         # turn on dynamic partial coloring
-        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
-                              orders=20)
+        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20)
 
     def compute(self, inputs, outputs):
         outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
@@ -123,10 +122,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         indeps.add_output('r', r_init)
 
     if partial_coloring:
-        arctan_yox = DynPartialsComp(SIZE)
+        arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE)
+        arctan_yox.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20)
     else:
-        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=has_diag_partials,
-                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
+        arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE, has_diag_partials=has_diag_partials)
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
@@ -172,7 +171,6 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
-    p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
     if use_vois:
@@ -270,8 +268,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
         expected = [
+            "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
-            "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])"
         ]
         decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
         for i, d in enumerate(decl_partials_calls.split('\n')):
@@ -330,7 +328,6 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
-
 
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
         # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
@@ -476,11 +473,14 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
         self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
@@ -491,7 +491,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True)
+                          dynamic_total_coloring=True, debug_print=['totals'])
 
         failed, output = run_driver(p_color)
 
@@ -628,9 +628,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_simul_coloring_example(self):
 
-        import numpy as np
-        import openmdao.api as om
-
         SIZE = 10
 
         p = om.Problem()
@@ -704,9 +701,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
     def test_total_and_partial_coloring_example(self):
-
-        import numpy as np
-        import openmdao.api as om
 
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
@@ -917,8 +911,6 @@ class BidirectionalTestCase(unittest.TestCase):
             builder = TotJacBuilder.eisenstat(n)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
-            if tot_colors == n // 2 + 3:
-                raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
             self.assertLessEqual(tot_colors, n // 2 + 2,
                                  "Eisenstat's example of size %d required %d colors but shouldn't "
                                  "need more than %d." % (n, tot_colors, n // 2 + 2))
@@ -945,7 +937,7 @@ class BidirectionalTestCase(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
         [('n4c6-b15', 3), ('can_715', 21), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
-         ('D_6', 28), ('Harvard500', 26), ('illc1033', 5)],
+         ('D_6', 27), ('Harvard500', 26), ('illc1033', 5)],
         ), name_func=_test_func_name
     )
     @unittest.skipIf(load_npz is None, "scipy version too old")
@@ -958,8 +950,8 @@ class BidirectionalTestCase(unittest.TestCase):
         if not os.path.exists(matfile):
             raise unittest.SkipTest("Matrix test file were not included.")
 
-        mat = load_npz(matfile).toarray()
-        mat = np.asarray(mat, dtype=bool)
+        mat = load_npz(matfile).tocoo()
+        mat.data = np.asarray(mat.data, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
         mat = None
 

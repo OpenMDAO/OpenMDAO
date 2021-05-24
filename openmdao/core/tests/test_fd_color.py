@@ -13,13 +13,11 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver
+    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring, Coloring
-
-from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 
@@ -45,25 +43,54 @@ else:
     pyOptSparseDriver = None
 
 
-def setup_vars(self, ofs, wrts):
-    matrix = self.sparsity
-    isplit = self.isplit
-    osplit = self.osplit
+def setup_vars(comp, ofs, wrts, sparse_partials=False, bad_sparsity=False):
+    matrix = comp.sparsity
+    isplit = comp.isplit
+    osplit = comp.osplit
 
+    slices = {}
     isizes, _ = evenly_distrib_idxs(isplit, matrix.shape[1])
+    start = end = 0
     for i, sz in enumerate(isizes):
-        self.add_input('x%d' % i, np.zeros(sz))
+        end += sz
+        wrt = f"x{i}"
+        comp.add_input(wrt, np.zeros(sz))
+        slices[wrt] = slice(start, end)
+        start = end
 
     osizes, _ = evenly_distrib_idxs(osplit, matrix.shape[0])
+    start = end = 0
     for i, sz in enumerate(osizes):
-        self.add_output('y%d' % i, np.zeros(sz))
+        end += sz
+        of = f"y{i}"
+        comp.add_output(of, np.zeros(sz))
+        slices[of] = slice(start, end)
+        start = end
 
-    self.declare_partials(of=ofs, wrt=wrts, method=self.method)
+    if sparse_partials:
+        nbad = 0
+        for i in range(len(osizes)):
+            of = f"y{i}"
+            for j in range(len(isizes)):
+                wrt = f"x{j}"
+                subjac = comp.sparsity[slices[of], slices[wrt]]
+                if np.any(subjac):
+                    rows, cols = np.nonzero(subjac)
+                    if bad_sparsity and rows.size > 1 and nbad < 5:
+                        rows[rows.size // 2] = -1  # remove one row/col pair
+                        mask = rows != -1
+                        rows = rows[mask]
+                        cols = cols[mask]
+                        nbad += 1
+                    comp.declare_partials(of=of, wrt=wrt, rows=rows, cols=cols, method=comp.method)
+                else:
+                    comp.declare_partials(of=of, wrt=wrt, method=comp.method, dependent=False)
+    else:
+        comp.declare_partials(of=ofs, wrt=wrts, method=comp.method)
 
 
 def setup_sparsity(mask):
-    sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
-    return sparsity * mask
+    return np.random.random(mask.shape) * mask
 
 
 def setup_indeps(isplit, ninputs, indeps_name, comp_name):
@@ -103,7 +130,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined for easier testing of coloring of approx partials
     def apply_nonlinear(self, inputs, outputs, residuals):
-        prod = self.sparsity.dot(inputs._data) - outputs._data
+        prod = self.sparsity.dot(inputs.asarray()) - outputs.asarray()
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -114,7 +141,7 @@ class SparseCompImplicit(ImplicitComponent):
 
     # this is defined so we can more easily test coloring of approx totals in a Group above this comp
     def solve_nonlinear(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -126,19 +153,21 @@ class SparseCompImplicit(ImplicitComponent):
 
 class SparseCompExplicit(ExplicitComponent):
 
-    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
+    def __init__(self, sparsity, method='fd', isplit=1, osplit=1, sparse_partials=False, bad_sparsity=False, **kwargs):
         super().__init__(**kwargs)
         self.sparsity = sparsity
         self.isplit = isplit
         self.osplit = osplit
         self.method = method
+        self.sparse_partials = sparse_partials
+        self.bad_sparsity = bad_sparsity
         self._nruns = 0
 
     def setup(self):
-        setup_vars(self, ofs='*', wrts='*')
+        setup_vars(self, ofs='*', wrts='*', sparse_partials=self.sparse_partials, bad_sparsity=self.bad_sparsity)
 
     def compute(self, inputs, outputs):
-        prod = self.sparsity.dot(inputs._data)
+        prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
             outname = 'y%d' % i
@@ -156,12 +185,23 @@ _TOLS = {
 
 def _check_partial_matrix(system, jac, expected, method):
     blocks = []
-    for of in system._var_allprocs_abs2meta['output']:
+    for of, ofmeta in system._var_allprocs_abs2meta['output'].items():
         cblocks = []
-        for wrt in system._var_allprocs_abs2meta['input']:
+        for wrt, wrtmeta in system._var_allprocs_abs2meta['input'].items():
             key = (of, wrt)
             if key in jac:
-                cblocks.append(jac[key]['value'])
+                meta = jac[key]
+                if meta['rows'] is not None:
+                    cblocks.append(coo_matrix((meta['value'], (meta['rows'], meta['cols'])), shape=meta['shape']).toarray())
+                elif meta['dependent']:
+                    cblocks.append(meta['value'])
+                else:
+                    cblocks.append(np.zeros(meta['shape']))
+            else: # sparsity was all zeros so we declared this subjac as not dependent
+                relof = of.rsplit('.', 1)[-1]
+                relwrt = wrt.rsplit('.', 1)[-1]
+                if (relof, relwrt) in system._declared_partials and not system._declared_partials[(relof, relwrt)].get('dependent'):
+                    cblocks.append(np.zeros((ofmeta['size'], wrtmeta['size'])))
         if cblocks:
             blocks.append(np.hstack(cblocks))
     fullJ = np.vstack(blocks)
@@ -262,7 +302,7 @@ class TestColoringExplicit(unittest.TestCase):
         for conn in conns:
             model.connect(*conn)
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -511,8 +551,8 @@ class TestColoringSemitotals(unittest.TestCase):
 
         start_nruns = sub._nruns
         derivs = prob.driver._compute_totals()
-        self.assertEqual(sub._nruns - start_nruns, 10)
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+        self.assertEqual(sub._nruns - start_nruns, 10)
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
@@ -914,6 +954,50 @@ class TestColoring(unittest.TestCase):
         cols = [0,2,3,4]
         rows = [1,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :][:, cols], method)
+
+    def test_no_solver_linearize(self):
+        # this raised a singularity error before the fix
+        class Get_val_imp(ImplicitComponent):
+            def initialize(self):
+                self.options.declare('size',default=1)
+            def setup(self):
+                size = self.options['size']
+                self.add_output('state',val=5.0*np.ones(size))
+                self.add_input('bar',val=1.4*np.ones(size))
+                self.add_input('foobar')
+
+                self.nonlinear_solver = NewtonSolver()
+                self.linear_solver = DirectSolver()
+
+                self.nonlinear_solver.options['iprint'] = 2
+                self.nonlinear_solver.options['maxiter']=1
+                self.nonlinear_solver.options['solve_subsystems']=False
+
+                self.declare_partials(of="*", wrt="*", method="fd")
+
+                self.declare_coloring(method="fd", num_full_jacs=2)
+
+            def apply_nonlinear(self,inputs,outputs,residuals):
+                foo = outputs['state']
+                bar = inputs['bar']
+
+                area_ratio = 1 / foo * np.sqrt(1/(bar+1)* (1/foo**2))
+
+                residuals['state']=inputs['foobar']-area_ratio
+
+        size = 3
+
+        ivc = IndepVarComp()
+        ivc.add_output('bar',val=1.4*np.ones(size))
+        ivc.add_output('foobar',val=40)
+
+
+        p = Problem()
+        p.model.add_subsystem('ivc',ivc,promotes=['*'])
+        p.model.add_subsystem('comp_check', Get_val_imp(size=size))
+        p.model.connect('bar','comp_check.bar')
+        p.setup()
+        p.run_model()
 
 
 class TestStaticColoring(unittest.TestCase):

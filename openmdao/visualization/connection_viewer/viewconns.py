@@ -8,11 +8,19 @@ from collections import defaultdict
 
 import numpy as np
 
+try:
+    from IPython.display import IFrame, display, HTML
+except ImportError:
+    IFrame = display = None
+
+import openmdao
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
+from openmdao.utils.notebook_utils import notebook, colab
+from openmdao.warnings import issue_warning
 
 
 def _val2str(val):
@@ -34,7 +42,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     Parameters
     ----------
-    root : system or Problem
+    root : System or Problem
         The root for the desired tree.
 
     outfile : str, optional
@@ -81,26 +89,27 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         all_vars[io] = chain(system._var_abs2meta[io].items(),
                              [(prefix + n, m) for n, m in system._var_discrete[io].items()])
 
+    if show_values and system._outputs is None:
+        issue_warning("Values will not be shown because final_setup has not been called yet.",
+                      prefix=system.msginfo)
+
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
         for t, meta in all_vars['input']:
-            if t in system._var_abs2meta['input']:
-                idxs = meta['src_indices']
-            else:
-                idxs = None
-
             s = connections[t]
-            if show_values:
+            if show_values and system._outputs is not None:
                 if s.startswith('_auto_ivc.'):
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True,
+                    val = system.get_val(t, flat=True, get_remote=True,
                                          from_src=False)
                 else:
-                    val = system.get_val(t, indices=idxs, flat=True, get_remote=True)
+                    val = system.get_val(t, flat=True, get_remote=True)
 
                     # if there's a unit conversion, express the value in the
                     # units of the target
                     if units[t] and s in system._outputs:
-                        val = convert_units(val, units[s], units[t])
+                        val = system.get_val(t, flat=True, units=units[t], get_remote=True)
+                    else:
+                        val = system.get_val(t, flat=True, get_remote=True)
             else:
                 val = ''
 
@@ -173,8 +182,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     viewer = 'connect_table.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
-    libs_dir = os.path.join(code_dir, 'libs')
-    style_dir = os.path.join(code_dir, 'style')
+    libs_dir = os.path.join(os.path.dirname(code_dir), 'common', 'libs')
+    style_dir = os.path.join(os.path.dirname(code_dir), 'common', 'style')
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
@@ -193,5 +202,14 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
-    if show_browser:
+    if notebook:
+        # display in Jupyter Notebook
+        if not colab:
+            display(IFrame(src=outfile, width=1000, height=1000))
+        else:
+            display(HTML(outfile))
+
+    elif show_browser:
+        # open it up in the browser
+        from openmdao.utils.webview import webview
         webview(outfile)

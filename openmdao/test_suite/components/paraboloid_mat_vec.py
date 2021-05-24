@@ -4,6 +4,9 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 class ParaboloidMatVec(Paraboloid):
     """ Use matrix-vector product."""
 
+    def setup_partials(self):
+        pass
+
     def compute_partials(self, inputs, partials):
         """Analytical derivatives."""
         pass

@@ -26,6 +26,8 @@ class ModelData {
         this._setParentsAndDepth(this.root, null, 1);
         stopTimer('ModelData._setParentsAndDepth');
 
+        this.md5_hash = modelJSON.md5_hash;
+
         if (this.unconnectedInputs > 0)
             console.info("Unconnected nodes: ", this.unconnectedInputs);
 
@@ -46,10 +48,13 @@ class ModelData {
     static uncompressModel(b64str) {
         const compressedData = atob(b64str);
         const jsonStr = window.pako.inflate(compressedData, { to: 'string' });
+            
         /* for ( let pos = 0; pos < jsonStr.length; pos += 100) {
             console.log(pos, jsonStr.substring(pos, pos+99));
         } */
-        return JSON.parse(jsonStr);
+
+        // JSON5 can handle Inf and NaN
+        return JSON5.parse(jsonStr); 
     }
 
     /**
@@ -73,7 +78,7 @@ class ModelData {
     }
 
     /**
-     * Recurse over the tree and replace the JSON objects 
+     * Recurse over the tree and replace the JSON objects
      * provided by n2_viewer.py with N2TreeNodes.
      * @param {Object} element The current element being updated.
      */
@@ -158,7 +163,7 @@ class ModelData {
                 node.numDescendants += child.numDescendants;
 
                 // Add absolute pathnames of children to a set for quick searching
-                if (!node.isRoot()) { // All nodes are children of the model root 
+                if (!node.isRoot()) { // All nodes are children of the model root
                     node.childNames.add(child.absPathName);
                     for (let childName of child.childNames) {
                         node.childNames.add(childName);
@@ -286,7 +291,7 @@ class ModelData {
         return this.declarePartialsList.includes(partialsStr);
     }
 
-    /** 
+    /**
      * Add all leaf descendents of specified node to the array.
      * @param {N2TreeNode} node Current node to work on.
      * @param {N2TreeNode[]} objArray Array to add to.
@@ -425,7 +430,7 @@ class ModelData {
     }
 
     /**
-     * 
+     *
      */
     _updateAutoIvcNames() {
         const aivc = this.nodePaths['_auto_ivc'];
@@ -457,5 +462,4 @@ class ModelData {
             }
         }
     }
-
 }

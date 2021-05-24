@@ -26,11 +26,12 @@ class N2UserInterface {
         this.leftClickIsForward = true;
         this.findRootOfChangeFunction = null;
         this.callSearchFromEnterKeyPressed = false;
+        this.desVars = true;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
 
-        this._setupCollapseDepthElement();
+        this._setupCollapseDepthSlider();
         this.updateClickedIndices();
         this._setupSearch();
         this._setupResizerDrag();
@@ -38,27 +39,105 @@ class N2UserInterface {
 
         this.legend = new N2Legend(this.n2Diag.modelData);
         this.nodeInfoBox = new NodeInfo(this);
-
-        this.valueInfoManager = new ValueInfoManager(this);
-
         this.toolbar = new N2Toolbar(this);
+
+        // Add listener for reading in a saved view.
+        let self = this;
+        let n2diag = this.n2Diag;
+        document.getElementById('state-file-input').addEventListener('change', function () {
+
+            var fr = new FileReader();
+            fr.onload = function () {
+                let dataDict = false;
+
+                try {
+                    dataDict = JSON.parse(fr.result);
+                }
+                catch (error) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                if (!dataDict.md5_hash) {
+                    alert("Cannot load view. The file does not appear to be a valid view file.");
+                    return;
+                }
+
+                // Make sure model didn't change.
+                if (dataDict.md5_hash != n2diag.model.md5_hash) {
+                    alert("Cannot load view. Current model structure is different than in saved view.")
+                    return;
+                }
+
+                self.addBackButtonHistory();
+
+                // Solver toggle state.
+                n2diag.showLinearSolverNames = dataDict.showLinearSolverNames;
+                n2diag.ui.setSolvers(dataDict.showLinearSolverNames);
+                n2diag.showSolvers = dataDict.showSolvers;
+
+                // Zoomed node (subsystem).
+                n2diag.zoomedElement = n2diag.findNodeById(dataDict.zoomedElement);
+
+                // Expand/Collapse state of all nodes (subsystems) in model.
+                n2diag.setSubState(dataDict.expandCollapse.reverse());
+
+                // Force an immediate display update.
+                // Needed to do this so that the arrows don't slip in before the element zoom.
+                n2diag.layout = new N2Layout(n2diag.model, n2diag.zoomedElement,
+                    n2diag.showLinearSolverNames, n2diag.showSolvers, n2diag.dims);
+                n2diag.ui.updateClickedIndices();
+                n2diag.matrix = new N2Matrix(n2diag.model, n2diag.layout,
+                    n2diag.dom.n2Groups, n2diag.arrowMgr, n2diag.ui.lastClickWasLeft,
+                    n2diag.ui.findRootOfChangeFunction, n2diag.matrix.nodeSize);
+                n2diag._updateScale();
+                n2diag.layout.updateTransitionInfo(n2diag.dom, n2diag.transitionStartDelay, n2diag.manuallyResized);
+
+                // Arrow State
+                n2diag.arrowMgr.loadPinnedArrows(dataDict.arrowState);
+            }
+            fr.readAsText(this.files[0]);
+        })
     }
 
+    /**
+     * Set the range and current value of the collapse depth slider.
+     * @param {Number} opts.min The shallowest elements to allow to collapse via slider.
+     * @param {Number} opts.max The deepest elements to allow to collapse via slider.
+     * @param {Number} opts.val The current slider collapse depth value.
+     */
+    setCollapseDepthSlider(opts = {}) {
+        const min = opts.min ? opts.min : 2;
+        const max = opts.max ? opts.max : this.n2Diag.model.maxDepth;
+        const val = opts.val ? opts.val : max;
+
+        this.collapseDepthSlider
+            .property('min', min)
+            .property('max', max)
+            .property('value', val);
+
+        this.collapseDepthLabel.text(val);
+    }
+
+    get collapseDepthSliderVal() { return Number(this.collapseDepthSlider.property('value')); }
+
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
-    _setupCollapseDepthElement() {
-        let self = this;
+    _setupCollapseDepthSlider() {
+        const self = this;
 
-        let collapseDepthElement = this.n2Diag.dom.parentDiv.querySelector(
-            '#depth-slider'
-        );
+        this.collapseDepthSlider = d3.select('input#depth-slider'),
+            this.collapseDepthLabel = d3.select('p#depth-slider-label');
 
-        collapseDepthElement.max = this.n2Diag.model.maxDepth - 1;
-        collapseDepthElement.value = collapseDepthElement.max;
+        this.setCollapseDepthSlider();
 
-        collapseDepthElement.onmouseup = function (e) {
-            const modelDepth = parseInt(e.target.value);
-            self.collapseToDepthSelectChange(modelDepth);
-        };
+        this.collapseDepthSlider
+            .on('mouseup', e => {
+                const val = self.collapseDepthSlider.property('value');
+                self.collapseToDepth(val);
+            })
+            .on('input', e => {
+                self.collapseDepthLabel.text(self.collapseDepthSliderVal);
+            });
     }
 
     /** Set up event handlers for grabbing the bottom corner and dragging */
@@ -110,7 +189,11 @@ class N2UserInterface {
                     box.style('width', null).style('height', null);
 
                     // Turn off the resizing box border and handle
-                    handle.attr('class', 'inactive-resizer-handle');
+                    if (n2Diag.showSolvers) {
+                        handle.attr('class', 'inactive-resizer-handle');
+                    } else {
+                        handle.attr('class', 'inactive-resizer-handle-without-solvers');
+                    }
                     box.attr('class', 'inactive-resizer-box');
 
                     // Get rid of the drag event handlers
@@ -118,7 +201,7 @@ class N2UserInterface {
                         .on('mousemove', null)
                         .on('mouseup', null);
                 })
-                .on('mousemove', e => {
+                .on('input', e => {
                     const newHeight = d3.event.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = {
@@ -306,7 +389,9 @@ class N2UserInterface {
 
         this.backButtonHistory.push({
             'node': this.n2Diag.zoomedElement,
-            'hidden': formerHidden
+            'hidden': formerHidden,
+            'search': this.toolbar.getSearchState(),
+            'collapseDepth': this.currentCollapseDepth
         });
 
         if (clearForward) this.forwardButtonHistory = [];
@@ -323,7 +408,9 @@ class N2UserInterface {
 
         this.forwardButtonHistory.push({
             'node': node,
-            'hidden': formerHidden
+            'hidden': formerHidden,
+            'search': this.toolbar.getSearchState(),
+            'collapseDepth': this.currentCollapseDepth
         });
     }
 
@@ -346,6 +433,9 @@ class N2UserInterface {
 
         const history = this.backButtonHistory.pop();
         const node = history.node;
+
+        this.toolbar.setSearchState(history.search);
+        this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
@@ -386,6 +476,9 @@ class N2UserInterface {
 
         const history = this.forwardButtonHistory.pop();
         const node = history.node;
+
+        this.toolbar.setSearchState(history.search);
+        this.setCollapseDepthSlider({ 'val': history.collapseDepth });
 
         d3.select('#redo-graph').classed('disabled-button',
             (this.forwardButtonHistory.length == 0));
@@ -449,6 +542,7 @@ class N2UserInterface {
         this.leftClickIsForward = false;
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseUncollapseOutputs;
         this.addBackButtonHistory();
+        this.setCollapseDepthSlider();
 
         this.n2Diag.reset();
     }
@@ -543,14 +637,14 @@ class N2UserInterface {
     }
 
     /**
-     * React to a new selection in the collapse-to-depth drop-down.
-     * @param {Number} newChosenCollapseDepth Selected depth to collapse to.
+     * React to a new selection in the collapse-to-depth toolbar slider.
+     * @param {Number} depth Selected depth to collapse to.
      */
-    collapseToDepthSelectChange(newChosenCollapseDepth) {
-        testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
+    collapseToDepth(depth) {
+        testThis(this, 'N2UserInterface', 'collapseToDepth');
 
         this.addBackButtonHistory();
-        this.n2Diag.minimizeToDepth(newChosenCollapseDepth);
+        this.n2Diag.minimizeToDepth(depth);
         this.findRootOfChangeFunction = this.findRootOfChangeForCollapseDepth.bind(
             this
         );
@@ -560,19 +654,15 @@ class N2UserInterface {
     }
 
     /**
-     * React to the toggle-solver-name button press and show non-linear if linear
-     * is currently shown, and vice-versa.
+     * Wipe the current solvers legend area and populate with the other type.
+     * @param {Boolean} linear True to use linear solvers, false for non-linear.
      */
-    toggleSolverNamesCheckboxChange() {
-        testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+    setSolvers(linear) {
 
-        this.n2Diag.toggleSolverNameType();
-        this.n2Diag.dom.parentDiv.querySelector(
-            '#linear-solver-button'
-        ).className = !this.n2Diag.showLinearSolverNames ?
-                'fas icon-nonlinear-solver solver-button' :
-                'fas icon-linear-solver solver-button';
+        // Update the diagram
+        this.n2Diag.showLinearSolverNames = linear;
 
+        // update the legend
         this.legend.toggleSolvers(this.n2Diag.showLinearSolverNames);
 
         if (this.legend.shown)
@@ -583,6 +673,26 @@ class N2UserInterface {
         this.n2Diag.update();
     }
 
+    /**
+     * React to the toggle-solver-name button press and show non-linear if linear
+     * is currently shown, and vice-versa.
+     */
+    showSolvers() {
+        // d3.select('#solver_tree').style('display','block');
+        n2Diag.showSolvers = true;
+        this.n2Diag.update();
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle')
+    }
+    hideSolvers() {
+        // d3.select('#solver_tree').style('display','none');
+        // d3.select('#solver_tree').attr('width',0);
+        n2Diag.showSolvers = false;
+        this.n2Diag.update();
+        // const handle = d3.select('#n2-resizer-handle');
+        d3.select('#n2-resizer-handle').attr('class', 'inactive-resizer-handle-without-solvers')
+        // n2-resizer-handle
+    }
+
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
@@ -590,6 +700,21 @@ class N2UserInterface {
 
         d3.select('#legend-button').attr('class',
             this.legend.hidden ? 'fas icon-key' : 'fas icon-key active-tab-icon');
+    }
+
+    toggleDesVars() {
+        testThis(this, 'N2UserInterface', 'toggleDesVars');
+
+        if (this.desVars) {
+            this.n2Diag.showDesignVars();
+            this.desVars = false;
+        } else {
+            this.n2Diag.hideDesignVars();
+            this.desVars = true;
+        }
+
+        d3.select('#desvars-button').attr('class',
+            this.desVars ? 'fas icon-fx-2' : 'fas icon-fx-2 active-tab-icon');
     }
 
     /** Show or hide the node info panel button */
@@ -630,6 +755,8 @@ class N2UserInterface {
     /** Make sure UI controls reflect history and current reality. */
     update() {
         testThis(this, 'N2UserInterface', 'update');
+
+        this.currentCollapseDepth = this.collapseDepthSliderVal;
 
         d3.select('#undo-graph').classed('disabled-button',
             (this.backButtonHistory.length == 0));
@@ -681,4 +808,60 @@ class N2UserInterface {
             }
         }
     }
+
+    /** Save the model state to a file. */
+    saveState() {
+        const stateFileName = prompt("Filename to save view state as", 'saved.n2view');
+
+        // Solver toggle state.
+        let showLinearSolverNames = this.n2Diag.showLinearSolverNames;
+        let showSolvers = this.n2Diag.showSolvers;
+
+        // Zoomed node (subsystem).
+        let zoomedElement = this.n2Diag.zoomedElement.id;
+
+        // Expand/Collapse state of all nodes (subsystems) in model.
+        let expandCollapse = Array()
+        this.n2Diag.getSubState(expandCollapse);
+
+        // Arrow State
+        let arrowState = this.n2Diag.arrowMgr.savePinnedArrows();
+
+        let dataDict = {
+            'showLinearSolverNames': showLinearSolverNames,
+            'showSolvers': showSolvers,
+            'zoomedElement': zoomedElement,
+            'expandCollapse': expandCollapse,
+            'arrowState': arrowState,
+            'md5_hash': this.n2Diag.model.md5_hash,
+        };
+
+        let link = document.createElement('a');
+        link.setAttribute('download', stateFileName);
+        let data_blob = new Blob([JSON.stringify(dataDict)],
+            { type: 'text/plain' });
+
+        // If we are replacing a previously generated file we need to
+        // manually revoke the object URL to avoid memory leaks.
+        if (stateFileName !== null) {
+            window.URL.revokeObjectURL(stateFileName);
+        }
+
+        link.href = window.URL.createObjectURL(data_blob);
+        document.body.appendChild(link);
+
+        // wait for the link to be added to the document
+        window.requestAnimationFrame(function () {
+            var event = new MouseEvent('click');
+            link.dispatchEvent(event);
+            document.body.removeChild(link);
+        })
+    }
+
+    /** Load the model state to a file. */
+    loadState() {
+        document.getElementById('state-file-input').click();
+    }
+
+
 }

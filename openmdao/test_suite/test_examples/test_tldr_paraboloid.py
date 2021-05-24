@@ -1,5 +1,6 @@
 import unittest
 
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 
 # If the code in this test must be changed, please go change the
@@ -8,7 +9,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 class TestParaboloidTLDR(unittest.TestCase):
 
     def test_tldr(self):
-        import openmdao.api as om
 
         # build the model
         prob = om.Problem()

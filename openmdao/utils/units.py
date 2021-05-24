@@ -16,7 +16,7 @@ import os.path
 from collections import OrderedDict
 
 from configparser import RawConfigParser as ConfigParser
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.warnings import warn_deprecation
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -65,7 +65,7 @@ class NumberDict(OrderedDict):
 
         Parameters
         ----------
-        other : Dict
+        other : dict
             the dict instance to be coerced
 
         Returns
@@ -869,6 +869,11 @@ def _find_unit(unit, error=False):
         The actual unit object
     """
     if isinstance(unit, str):
+
+        # Deal with 'as' for attoseconds
+        reg1 = re.compile(r'\bas\b')
+        unit = re.sub(reg1, 'as_', unit)
+
         name = unit.strip()
         try:
             unit = _UNIT_CACHE[name]
@@ -886,17 +891,22 @@ def _find_unit(unit, error=False):
                 regex = re.compile('[A-Z,a-z]{1}[A-Z,a-z,0-9]*')
 
                 for item in regex.findall(name):
+                    item = re.sub(reg1, 'as_', item)
+
                     # check if this was a compound unit, so each
                     # substring might be a unit
                     try:
                         eval(item, {'__builtins__': None},
                              _UNIT_LIB.unit_table)
+
                     except Exception:  # maybe is a prefixed unit then
+                        base_unit = item[1:].rstrip('_')
+
                         # check for single letter prefix before unit
                         if(item[0] in _UNIT_LIB.prefixes and
-                           item[1:] in _UNIT_LIB.unit_table):
+                           base_unit in _UNIT_LIB.unit_table):
                             add_unit(item, _UNIT_LIB.prefixes[item[0]] *
-                                     _UNIT_LIB.unit_table[item[1:]])
+                                     _UNIT_LIB.unit_table[base_unit])
 
                         # check for double letter prefix before unit
                         elif(item[0:2] in _UNIT_LIB.prefixes and
@@ -1094,6 +1104,44 @@ def _has_val_mismatch(units1, val1, units2, val2):
         return np.linalg.norm(val2) > rtol
     else:
         return np.linalg.norm(val2 - val1) / norm1 > rtol
+
+
+def simplify_unit(old_unit_str, msginfo=''):
+    """
+    Simplify unit string using built-in naming method.
+
+    Unit string 'ft*s/s' becomes 'ft'.
+
+    Parameters
+    ----------
+    old_unit_str : str
+        Unit string to simplify.
+    msginfo : str
+        A string prepended to the ValueError which is raised if the units are invalid.
+
+    Returns
+    -------
+    str
+        Simplified unit string.
+    """
+    if old_unit_str is None:
+        return None
+
+    found_unit = _find_unit(old_unit_str)
+    if found_unit is None:
+        _msginfo = f'{msginfo}: ' if msginfo else ''
+        raise ValueError(f"{_msginfo}The units '{old_unit_str}' are invalid.")
+
+    new_str = found_unit.name()
+    if new_str == '1':
+        # Special Case. Unity always becomes None.
+        new_str = None
+
+    # Restore units 'as' (attoseconds).
+    if new_str:
+        reg1 = re.compile(r'\bas_\b')
+        new_str = reg1.sub('as', new_str)
+    return new_str
 
 
 # Load in the default unit library

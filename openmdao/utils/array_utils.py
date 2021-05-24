@@ -6,6 +6,9 @@ from itertools import product
 from copy import copy
 
 import numpy as np
+from scipy.sparse import coo_matrix
+
+from openmdao.core.constants import INT_DTYPE
 
 
 def shape_to_len(shape):
@@ -56,13 +59,13 @@ def evenly_distrib_idxs(num_divisions, arr_size):
         divisions.
     """
     base, leftover = divmod(arr_size, num_divisions)
-    sizes = np.full(num_divisions, base, dtype=int)
+    sizes = np.full(num_divisions, base, dtype=INT_DTYPE)
 
     # evenly distribute the remainder across size-leftover procs,
     # instead of giving the whole remainder to one proc
     sizes[:leftover] += 1
 
-    offsets = np.zeros(num_divisions, dtype=int)
+    offsets = np.zeros(num_divisions, dtype=INT_DTYPE)
     offsets[1:] = np.cumsum(sizes)[:-1]
 
     return sizes, offsets
@@ -204,8 +207,8 @@ def array_connection_compatible(shape1, shape2):
     bool
         True if the two shapes are compatible for connection, else False.
     """
-    ashape1 = np.asarray(shape1, dtype=int)
-    ashape2 = np.asarray(shape2, dtype=int)
+    ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
+    ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
 
     size1 = shape_to_len(ashape1)
     size2 = shape_to_len(ashape2)
@@ -304,44 +307,6 @@ def _global2local_offsets(global_offsets):
     return offsets
 
 
-def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
-    """
-    Return the given indices converted into indices into the full vector.
-
-    This routine is used to compute how column indices computed during coloring of a subset
-    of the jacobian map to column indices corresponding to the full jacobian.
-
-    Parameters
-    ----------
-    all_names : ordered iter of str
-        An ordered list of variable names containing all variables of the appropriate type.
-    matching_names : set of str
-        Subset of all_names that make up the reduced index set.
-    sizes : ndarray of int
-        Array of variable sizes.
-    idx_map : dict
-        Mapping of var name to some subset of its full indices.
-
-    Returns
-    -------
-    ndarray
-        Full array indices that map to the provided subset of variables.
-    """
-    global_idxs = []
-    start = end = 0
-    for name, size in zip(all_names, sizes):
-        end += size
-        if size > 0 and (matching_names is None or name in matching_names):
-            if name in idx_map:
-                global_idxs.append(np.arange(start, end)[idx_map[name]()])
-            else:
-                global_idxs.append(np.arange(start, end))
-        start = end
-
-    if global_idxs:
-        return np.hstack(global_idxs)
-
-
 def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
@@ -370,12 +335,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         out_size = len(outputs)
         out_idxs = full_idxs[full_idxs < out_size]
         in_idxs = full_idxs[full_idxs >= out_size] - out_size
-        if in_idxs.size > 0:
-            if out_idxs.size > 0:
-                return [(inputs, in_idxs), (outputs, out_idxs)]
-            else:
-                return [(inputs, in_idxs)]
-        return [(outputs, out_idxs)]
+        full = [(outputs, out_idxs), (inputs, in_idxs)]
+        return [(vec, inds) for vec, inds in full if inds.size > 0]
     elif is_total:
         return [(outputs, full_idxs)]
     else:
@@ -483,3 +444,76 @@ def dv_abs_complex(x, x_deriv):
     x_deriv[idx_neg] = -x_deriv[idx_neg]
 
     return x, x_deriv
+
+
+def rand_sparsity(shape, density_ratio, dtype=bool):
+    """
+    Return a random boolean COO matrix of the given shape with given percent density.
+
+    Row and column indices are generated using random integers so some duplication
+    is possible, resulting in a matrix with somewhat lower density than specified.
+
+    Parameters
+    ----------
+    shape : tuple
+        Desired shape of the matrix.
+    density_ratio : float
+        Approximate ratio of nonzero to zero entries in the desired matrix.
+    dtype : type
+        Specifies type of the values in the returned matrix.
+
+    Returns
+    -------
+    coo_matrix
+        A COO matrix with approximately the nonzero density desired.
+
+    """
+    assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
+
+    nrows, ncols = shape
+
+    nnz = int(nrows * ncols * density_ratio)
+
+    data = np.ones(nnz, dtype=dtype)
+    rows = np.random.randint(0, nrows, nnz)
+    cols = np.random.randint(0, ncols, nnz)
+
+    coo = coo_matrix((data, (rows, cols)), shape=shape)
+
+    # get rid of dup rows/cols
+    coo.sum_duplicates()
+
+    return coo
+
+
+def sparse_subinds(orig, inds):
+    """
+    Compute new rows or cols resulting from applying inds on top of an existing sparsity pattern.
+
+    This only comes into play when we have an approx total jacobian where some dv/resp have
+    indices.
+
+    Parameters
+    ----------
+    orig : ndarray
+        Either row or col indices (part of a subjac sparsity pattern).
+    inds : ndarray or list
+        Sub-indices introduced when adding a desvar or response.
+
+    Returns
+    -------
+    ndarray
+        New compressed rows or cols.
+    ndarray
+        Mask array that can be used to update subjac value and corresponding index array to orig.
+    """
+    mask = np.zeros(orig.size, dtype=bool)
+    for i in inds:
+        mask |= orig == i
+    newsp = orig[mask]
+
+    # replace the index with the 'compressed' index after we've masked out entries
+    for r, i in enumerate(np.sort(inds)):
+        newsp[newsp == i] = r
+
+    return newsp, mask

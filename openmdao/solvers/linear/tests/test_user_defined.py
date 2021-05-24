@@ -99,11 +99,11 @@ class DistribStateImplicit(om.ImplicitComponent):
 
         Parameters
         ----------
-        d_outputs : Vector
+        d_outputs: Vector
             unscaled, dimensional quantities read via d_outputs[key]
-        d_residuals : Vector
+        d_residuals: Vector
             unscaled, dimensional quantities read via d_residuals[key]
-        mode : str
+        mode: str
             either 'fwd' or 'rev'
         """
         # Note: we are just preconditioning with Identity as a proof of concept.
@@ -187,10 +187,6 @@ class TestUserDefinedSolver(unittest.TestCase):
         assert_near_equal(15.0, jac['out_var']['a'][0][0])
 
     def test_feature(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.array_utils import evenly_distrib_idxs
 
         class CustomSolveImplicit(om.ImplicitComponent):
 
@@ -272,11 +268,11 @@ class TestUserDefinedSolver(unittest.TestCase):
 
                 Parameters
                 ----------
-                d_outputs : Vector
+                d_outputs: Vector
                     unscaled, dimensional quantities read via d_outputs[key]
-                d_residuals : Vector
+                d_residuals: Vector
                     unscaled, dimensional quantities read via d_residuals[key]
-                mode : str
+                mode: str
                     either 'fwd' or 'rev'
                 """
                 # Note: we are just preconditioning with Identity as a proof of concept.

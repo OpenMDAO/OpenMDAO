@@ -12,6 +12,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
 
@@ -292,7 +293,7 @@ class TestJacobian(unittest.TestCase):
         # fwd apply_linear test
         d_outputs.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'fwd')
-        d_residuals.set_val(d_residuals._data - check_vec)
+        d_residuals.set_val(d_residuals.asarray() - check_vec)
         self.assertAlmostEqual(d_residuals.get_norm(), 0)
 
         # fwd solve_linear test
@@ -312,7 +313,7 @@ class TestJacobian(unittest.TestCase):
         # rev apply_linear test
         d_residuals.set_val(1.0)
         prob.model.run_apply_linear(['linear'], 'rev')
-        d_outputs.set_val(d_outputs._data - check_vec)
+        d_outputs.set_val(d_outputs.asarray() - check_vec)
         self.assertAlmostEqual(d_outputs.get_norm(), 0)
 
         # rev solve_linear test
@@ -709,14 +710,16 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        class ParaboloidJacVec(Paraboloid):
+        class JacVecComp(Paraboloid):
+
+            def setup_partials(self):
+                pass
 
             def linearize(self, inputs, outputs, jacobian):
                 return
 
-            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, d_residuals, mode):
-                d_residuals['x'] += (np.exp(outputs['x']) - 2*inputs['a']**2 * outputs['x'])*d_outputs['x']
-                d_residuals['x'] += (-2 * inputs['a'] * outputs['x']**2)*d_inputs['a']
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                pass
 
         # One level deep
 
@@ -726,7 +729,7 @@ class TestJacobian(unittest.TestCase):
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('p2', IndepVarComp('y', val=1.0))
-        model.add_subsystem('comp', ParaboloidJacVec())
+        model.add_subsystem('comp', JacVecComp())
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -901,6 +904,112 @@ class TestJacobian(unittest.TestCase):
         J = p.compute_totals(of=['y', 'z'], wrt=['w', 'x'])
 
         assert(J['y','w'][0,0] == -16)
+
+    def test_wildcard_partials_bug(self):
+        # Test for a bug where using wildcards when declaring partials resulted in extra
+        # derivatives of an output wrt other outputs.
+
+        class ODE(ExplicitComponent):
+
+            def setup(self):
+
+                self.add_input('a', 1.0)
+                self.add_output('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials(of='*', wrt='*', method='cs')
+
+            def compute(self, inputs, outputs):
+                a = inputs['a']
+                outputs['x'] = 3.0 * a
+                outputs['y'] = 7.0 * a
+
+        p = Problem()
+
+        p.model.add_subsystem('ode', ODE())
+
+        p.model.linear_solver = DirectSolver()
+        p.model.add_design_var('ode.a')
+        p.model.add_constraint('ode.x', lower=0.0)
+        p.model.add_constraint('ode.y', lower=0.0)
+
+        p.setup()
+        p.run_model()
+
+        p.compute_totals()
+        keys = p.model.ode._jacobian._subjacs_info
+        self.assertTrue(('ode.x', 'ode.y') not in keys)
+        self.assertTrue(('ode.y', 'ode.x') not in keys)
+
+    def test_set_col(self):
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.ofsizes = [3, 5, 2]
+                self.wrtsizes = [4, 1, 3]
+                for i, sz in enumerate(self.wrtsizes):
+                    self.add_input(f"x{i}", val=np.ones(sz))
+                for i, sz in enumerate(self.ofsizes):
+                    self.add_output(f"y{i}", val=np.ones(sz))
+
+                boolarr = rand_sparsity((sum(self.ofsizes), sum(self.wrtsizes)), .3, dtype=bool)
+                self.sparsity = np.asarray(boolarr.toarray(), dtype=float)
+                ofstart = ofend = 0
+                for i, ofsz in enumerate(self.ofsizes):
+                    wrtstart = wrtend = 0
+                    ofend += ofsz
+                    for j, wrtsz in enumerate(self.wrtsizes):
+                        wrtend += wrtsz
+                        sub = self.sparsity[ofstart:ofend, wrtstart:wrtend]
+                        rows, cols = np.nonzero(sub)
+                        self.declare_partials([f"y{i}"], [f"x{j}"], rows=rows, cols=cols)
+                        wrtstart = wrtend
+                    ofstart = ofend
+
+            def compute(self, inputs, outputs):
+                outputs.set_val(self.sparsity.dot(inputs.asarray()) * 2.)
+
+            def compute_partials(self, inputs, partials):
+                # these partials are actually constant, but...
+                ofstart = ofend = 0
+                for i, ofsz in enumerate(self.ofsizes):
+                    wrtstart = wrtend = 0
+                    ofend += ofsz
+                    for j, wrtsz in enumerate(self.wrtsizes):
+                        wrtend += wrtsz
+                        sub = self.sparsity[ofstart:ofend, wrtstart:wrtend]
+                        subinfo = self._subjacs_info[(f'comp.y{i}', f'comp.x{j}')]
+                        partials[f'y{i}', f'x{j}'] = sub[subinfo['rows'], subinfo['cols']] * 2.
+                        wrtstart = wrtend
+                    ofstart = ofend
+
+        p = Problem()
+        comp = p.model.add_subsystem('comp', MyComp())
+        p.setup()
+        for i, sz in enumerate(comp.wrtsizes):
+            p[f'comp.x{i}'] = np.random.random(sz)
+        p.run_model()
+        ofs = [f'comp.y{i}' for i in range(len(comp.ofsizes))]
+        wrts = [f'comp.x{i}' for i in range(len(comp.wrtsizes))]
+        p.check_partials(out_stream=None, show_only_incorrect=True)
+        p.model.comp._jacobian.set_col(p.model.comp, 5, comp.sparsity[:, 5] * 99)
+        
+        # check dy0/dx2 (3x3)
+        subinfo = comp._subjacs_info['comp.y0', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[0:3, 5] * 99)
+        
+        # check dy1/dx2 (5x3)
+        subinfo = comp._subjacs_info['comp.y1', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[3:8, 5] * 99)
+        
+        # check dy2/dx2 (2x3)
+        subinfo = comp._subjacs_info['comp.y2', 'comp.x2']
+        arr = np.zeros(subinfo['shape'])
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        assert_near_equal(arr[:, 0], comp.sparsity[8:, 5] * 99)
 
 
 class MySparseComp(ExplicitComponent):

@@ -1,13 +1,12 @@
 """
 Case generators for Design-of-Experiments Driver.
 """
+import csv
+import os.path
+import re
+from collections import OrderedDict
 
 import numpy as np
-
-import os.path
-import csv
-import re
-
 import pyDOE2
 
 from openmdao.utils.name_maps import prom_name2abs_name
@@ -90,15 +89,15 @@ class ListGenerator(DOEGenerator):
         """
         for case in self._data:
             if not isinstance(case, list):
-                msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
-                raise RuntimeError(msg % str(case))
+                msg = "Invalid DOE case found, expecting a list of name/value pairs:\n{}"
+                raise RuntimeError(msg.format(case))
 
             name_map = {}
 
             for tup in case:
-                if type(tup) not in (tuple, list) or len(tup) != 2:
-                    msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
-                    raise RuntimeError(msg % str(case))
+                if not isinstance(tup, (tuple, list)) or len(tup) != 2:
+                    msg = "Invalid DOE case found, expecting a list of name/value pairs:\n{}"
+                    raise RuntimeError(msg.format(case))
 
                 name = tup[0]
                 if name in design_vars:
@@ -112,11 +111,11 @@ class ListGenerator(DOEGenerator):
             invalid_desvars = [name for name, _ in case if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
-                    msg = "Invalid DOE case found, %s are not valid design variables:\n%s"
-                    raise RuntimeError(msg % (str(invalid_desvars), str(case)))
+                    msg = "Invalid DOE case found, {} are not valid design variables:\n{}"
+                    raise RuntimeError(msg.format(invalid_desvars, case))
                 else:
-                    msg = "Invalid DOE case found, '%s' is not a valid design variable:\n%s"
-                    raise RuntimeError(msg % (str(invalid_desvars[0]), str(case)))
+                    msg = "Invalid DOE case found, '{}' is not a valid design variable:\n{}"
+                    raise RuntimeError(msg.format(invalid_desvars[0], case))
 
             yield [(name_map[name], val) for name, val in case]
 
@@ -148,10 +147,10 @@ class CSVGenerator(DOEGenerator):
         super().__init__()
 
         if not isinstance(filename, str):
-            raise RuntimeError("'%s' is not a valid file name." % str(filename))
+            raise RuntimeError("'{}' is not a valid file name.".format(filename))
 
         if not os.path.isfile(filename):
-            raise RuntimeError("File not found: %s" % filename)
+            raise RuntimeError("File not found: {}".format(filename))
 
         self._filename = filename
 
@@ -189,11 +188,11 @@ class CSVGenerator(DOEGenerator):
             invalid_desvars = [name for name in names if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
-                    msg = "Invalid DOE case file, %s are not valid design variables."
-                    raise RuntimeError(msg % str(invalid_desvars))
+                    msg = "Invalid DOE case file, {} are not valid design variables."
+                    raise RuntimeError(msg.format(invalid_desvars))
                 else:
-                    msg = "Invalid DOE case file, '%s' is not a valid design variable."
-                    raise RuntimeError(msg % str(invalid_desvars[0]))
+                    msg = "Invalid DOE case file, '{}' is not a valid design variable."
+                    raise RuntimeError(msg.format(invalid_desvars[0]))
 
         # read cases from file, parse values into numpy arrays
         with open(self._filename, 'r') as f:
@@ -281,7 +280,8 @@ class _pyDOE_Generator(DOEGenerator):
     ----------
     _levels : int or dict(str, int)
         The number of evenly spaced levels between each design variable
-        lower and upper bound.
+        lower and upper bound. Dictionary input is supported by Full Factorial or
+        Generalized Subset Design.
     """
 
     def __init__(self, levels=_LEVELS):
@@ -290,12 +290,47 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        levels : int, optional
+        levels : int or dict, optional
             The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 2.
+            lower and upper bound.  Dictionary input is supported by Full Factorial or
+            Generalized Subset Design.
+            Defaults to 2.
         """
         super().__init__()
         self._levels = levels
+        self._sizes = None
+
+    def _get_dv_levels(self, name):
+        """
+        Get the number of levels of a design variable.
+
+        If the name is not given, it looks for a "default" key in the dictionary. If this is also
+        missing, it uses the default number of levels (2).
+
+        Parameters
+        ----------
+        name : str
+            Design variable name
+
+        Returns
+        -------
+            int
+        """
+        levels = self._levels
+        if isinstance(levels, int):
+            return levels
+        else:
+            return levels.get(name, levels.get("default", _LEVELS))
+
+    def _get_all_levels(self):
+        """Return the levels of all factors."""
+        sizes = self._sizes
+        if isinstance(self._levels, int):  # All have the same number of levels
+            return [self._levels] * sum(self._sizes.values())
+        elif isinstance(self._levels, dict):  # Different DVs have different number of levels
+            return sum([v * [self._get_dv_levels(k)] for k, v in sizes.items()], [])
+        else:
+            raise ValueError(f"Levels should be an int or dictionary, not '{type(self._levels)}'")
 
     def __call__(self, design_vars, model=None):
         """
@@ -314,19 +349,27 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['global_size'] for name, meta in design_vars.items()])
+        self._sizes = OrderedDict([(name, _get_size(meta))
+                                   for name, meta in design_vars.items()])
+        size = sum(self._sizes.values())
+        doe = self._generate_design(size).astype('int')
 
-        doe = self._generate_design(size)
+        # Maximum number of levels, or the default if the maximum is smaller than the default.
+        # This is to ensure that the array will be big enough even if some keys are missing
+        # from levels (defaulted).
+        levels_max = self._levels if isinstance(self._levels, int) else \
+            max(max(self._levels.values()), _LEVELS)
 
-        # generate values for each level for each design variable
+        # Generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
 
         # rows = vars (# rows/var = var size), cols = levels
-        values = np.empty((size, self._levels))
+        values = np.empty((size, levels_max))  # Initialize array for the largest number of levels
+        values[:] = np.nan  # and fill with NaNs.
 
         row = 0
         for name, meta in design_vars.items():
-            size = meta['global_size']
+            size = _get_size(meta)
 
             for k in range(size):
                 lower = meta['lower']
@@ -337,21 +380,23 @@ class _pyDOE_Generator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[row][:] = np.linspace(lower, upper, num=self._levels)
+                levels = self._get_dv_levels(name)
+                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+
                 row += 1
 
         # yield values for doe generated indices
-        for idxs in doe.astype('int'):
+        for idxs in doe:
             retval = []
             row = 0
             for name, meta in design_vars.items():
-                size = meta['global_size']
-                val = np.empty(size)
-                for k in range(size):
+                size_i = _get_size(meta)
+                val = np.empty(size_i)
+                for k in range(size_i):
                     idx = idxs[row + k]
                     val[k] = values[row + k][idx]
                 retval.append((name, val))
-                row += size
+                row += size_i
             yield retval
 
     def _generate_design(self, size):
@@ -390,7 +435,62 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.fullfact([self._levels] * size)
+        return pyDOE2.fullfact(self._get_all_levels())
+
+
+class GeneralizedSubsetGenerator(_pyDOE_Generator):
+    """
+    DOE case generator implementing the General Subset Design Factorial method.
+
+    Attributes
+    ----------
+    _reduction : int
+        Reduction factor (bigger than 1). Larger `reduction` means fewer
+        experiments in the design and more possible complementary designs.
+    _n : int, optional
+        Number of complementary GSD-designs. The complementary
+        designs are balanced analogous to fold-over in two-level fractional
+        factorial designs.
+        Defaults to 1.
+    """
+
+    def __init__(self, levels, reduction, n=1):
+        """
+        Initialize the GeneralizedSubsetGenerator.
+
+        Parameters
+        ----------
+        levels : int or dict
+            The number of evenly spaced levels between each design variable
+            lower and upper bound. Defaults to 2.
+        reduction : int
+            Reduction factor (bigger than 1). Larger `reduction` means fewer
+            experiments in the design and more possible complementary designs.
+        n : int, optional
+            Number of complementary GSD-designs. The complementary
+            designs are balanced analogous to fold-over in two-level fractional
+            factorial designs.
+            Defaults to 1.
+        """
+        super().__init__(levels=levels)
+        self._reduction = reduction
+        self._n = n
+
+    def _generate_design(self, size):
+        """
+        Generate a general subset DOE design.
+
+        Parameters
+        ----------
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
+        """
+        return pyDOE2.gsd(levels=self._get_all_levels(), reduction=self._reduction, n=self._n)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
@@ -501,7 +601,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         """
         Initialize the LatinHypercubeGenerator.
 
-        See: https://pythonhosted.org/pyDOE/randomized.html
+        See : https://pythonhosted.org/pyDOE/randomized.html
 
         Parameters
         ----------
@@ -583,3 +683,8 @@ class LatinHypercubeGenerator(DOEGenerator):
                 col += size
 
             yield retval
+
+
+def _get_size(dct):
+    # Returns global size of the variable if it is distributed, size otherwise.
+    return dct['global_size'] if dct['distributed'] else dct['size']

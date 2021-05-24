@@ -8,9 +8,10 @@ import openmdao.api as om
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 from openmdao.test_suite.components.misc_components import Comp4LinearCacheTest
+from openmdao.test_suite.components.quad_implicit import QuadraticComp
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 # use this to fake out the TestImplicitGroup so it'll use the solver we want.
@@ -50,14 +51,14 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
         group.run_solve_linear(['linear'], 'fwd')
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         group.run_solve_linear(['linear'], 'rev')
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
     def test_solve_linear_scipy_maxiter(self):
@@ -115,7 +116,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_val(0.0)
         g1.run_solve_linear(['linear'], 'fwd')
 
-        output = d_outputs._data
+        output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
 
         # reverse
@@ -126,7 +127,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         g1.linear_solver._linearize()
         g1.run_solve_linear(['linear'], 'rev')
 
-        output = d_residuals._data
+        output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)
 
     def test_linear_solution_cache(self):
@@ -192,8 +193,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
     def test_feature_simple(self):
         """Tests feature for adding a Scipy GMRES solver and calculating the
         derivatives."""
-        import openmdao.api as om
-        from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleDense
 
         # Tests derivatives on a simple comp that defines compute_jacvec.
         prob = om.Problem()
@@ -217,11 +216,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(J['area', 'length'][0][0], 2.0, 1e-6)
 
     def test_specify_solver(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-             SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -255,10 +249,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_feature_maxiter(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -293,10 +283,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 0.0, .00001)
 
     def test_feature_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = om.Problem()
         model = prob.model
@@ -331,10 +317,6 @@ class TestScipyKrylovFeature(unittest.TestCase):
         assert_near_equal(J['obj', 'z'][0][1], 1.78448533563, .00001)
 
     def test_specify_precon(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.quad_implicit import QuadraticComp
 
         prob = om.Problem()
         model = prob.model

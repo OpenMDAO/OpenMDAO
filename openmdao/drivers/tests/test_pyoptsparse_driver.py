@@ -1,7 +1,6 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import copy
-import sys
 import unittest
 
 from distutils.version import LooseVersion
@@ -15,8 +14,9 @@ from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.mpi import MPI
+from openmdao.warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -86,7 +86,7 @@ class ParaboloidAE(om.ExplicitComponent):
         self.grad_iter_count += 1
 
 
-class DummyComp(om.ExecComp):
+class DummyComp(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -96,7 +96,7 @@ class DummyComp(om.ExecComp):
 
         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*')
+        self.declare_partials('*', '*', method='cs')
 
     def compute(self, inputs, outputs):
         """
@@ -160,11 +160,11 @@ class TestNotInstalled(unittest.TestCase):
                          'pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
 
-@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
+    @require_pyoptsparse(OPTIMIZER)
     def test_design_vars_on_all_procs_pyopt(self):
 
         prob = om.Problem()
@@ -190,6 +190,7 @@ class TestMPIScatter(unittest.TestCase):
         proc_vals = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
+    @require_pyoptsparse(OPTIMIZER)
     def test_opt_distcomp(self):
         size = 7
 
@@ -206,7 +207,8 @@ class TestMPIScatter(unittest.TestCase):
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones((size, )),
                                                f_xy=np.ones((size, ))),
-                            promotes=['*'])
+                            promotes_outputs=['*'])
+        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -228,10 +230,8 @@ class TestMPIScatter(unittest.TestCase):
                           np.zeros(7),
                           1e-5)
 
+    @require_pyoptsparse('ParOpt')
     def test_paropt_distcomp(self):
-        _, local_opt = set_pyoptsparse_opt('ParOpt')
-        if local_opt != 'ParOpt':
-            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
         size = 7
 
         prob = om.Problem()
@@ -270,7 +270,7 @@ class TestMPIScatter(unittest.TestCase):
                           1e-5)
 
 
-@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@require_pyoptsparse(OPTIMIZER)
 @use_tempdirs
 class TestPyoptSparse(unittest.TestCase):
 
@@ -1554,7 +1554,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1588,7 +1588,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1625,7 +1625,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                                  str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: rev, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: rev.' in output)
         self.assertTrue("('comp.f_xy', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -1659,7 +1659,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed, info = " +
                              str(prob.driver.pyopt_solution.optInform))
 
-        self.assertTrue('In mode: fwd, Solving variable(s) using simul coloring:' in output)
+        self.assertTrue('In mode: fwd.' in output)
         self.assertTrue("('p2.y', [1])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
@@ -2024,10 +2024,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
+    @require_pyoptsparse('ParOpt')
     def test_ParOpt_basic(self):
-        _, local_opt = set_pyoptsparse_opt('ParOpt')
-        if local_opt != 'ParOpt':
-            raise unittest.SkipTest("pyoptsparse is not providing ParOpt")
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2049,6 +2047,230 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
+    def test_error_objfun_reraise(self):
+        # Tests that we re-raise any unclassified error encountered during callback eval.
+
+        class EComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+                self.declare_partials('*', '*', method='fd')
+
+            def compute(self, inputs, outputs):
+                raise RuntimeError('This comp will fail.')
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', EComp())
+
+        p.model.add_objective('comp.y')
+        p.model.add_design_var('comp.x')
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            p.run_driver()
+
+        self.assertTrue("This comp will fail." in msg.exception.args[0])
+
+    def test_error_gradfun_reraise(self):
+        # Tests that we re-raise any unclassified error encountered during callback eval.
+
+        class EComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 4.8 * inputs['x'] - 3.0
+
+            def compute_partials(self, inputs, partials):
+                raise RuntimeError('This gradient will fail.')
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', EComp())
+
+        p.model.add_objective('comp.y')
+        p.model.add_design_var('comp.x')
+
+        p.driver = om.pyOptSparseDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            p.run_driver()
+
+        self.assertTrue("This gradient will fail." in msg.exception.args[0])
+
+    def test_singular_jac_error_responses(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design " + \
+                         "variables of the problem.")
+
+    def test_singular_jac_error_desvars(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 0*z',
+                                                  ]), #'foo = 0.0 * z'],),
+                                     promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'error'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
+
+        self.assertEqual(str(msg.exception),
+                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+
+    def test_singular_jac_ignore(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['singular_jac_behavior'] = 'ignore'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        # Will not raise an exception.
+        prob.run_driver()
+
+    def test_singular_jac_warn(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                 om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                              'z = 12.0'],),
+                                 promotes_inputs=['x', 'y'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        # Default behavior is 'warn'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # This constraint produces a zero row.
+        prob.model.add_constraint('parab.z', equals=12.)
+
+        prob.setup()
+
+        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+
+        with assert_warning(UserWarning, msg):
+            prob.run_driver()
+
+    def test_singular_jac_tol(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('parab',
+                                     om.ExecComp(['f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 - 1e-20*z',
+                                                  ]), #'foo = 0.0 * z'],),
+                                     promotes_inputs=['x', 'y', 'z'])
+
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
+
+        prob.model.set_input_defaults('x', 3.0)
+        prob.model.set_input_defaults('y', -4.0)
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+
+        # Design var z does not affect any quantities.
+        prob.model.add_design_var('z', lower=-50, upper=50)
+
+        prob.model.add_objective('parab.f_xy')
+
+        prob.model.add_constraint('const.g', lower=0, upper=10.)
+
+        # Set a very low tolerance to accept '-1e-20*z' as nonzero.
+        prob.driver.options['singular_jac_tol'] = 1e-25
+
+        prob.setup()
+
+        prob.run_driver()
+
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -2063,10 +2285,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not installed")
 
     def test_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2088,10 +2306,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_settings_print(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2114,10 +2328,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2141,10 +2351,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_slsqp_maxit(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2169,18 +2375,12 @@ class TestPyoptSparseFeature(unittest.TestCase):
 
 
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
-    # all of these tests require SNOPT
+    # All of these tests require SNOPT
 
     def setUp(self):
-        from openmdao.utils.general_utils import set_pyoptsparse_opt
-
         OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
 
     def test_snopt_atol(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2204,10 +2404,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.9776, 1e-3)
 
     def test_snopt_maxit(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
@@ -2434,7 +2630,6 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
     def test_signal_set(self):
-        import openmdao.api as om
         import signal
 
         prob = om.Problem()
@@ -2442,7 +2637,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
-        prob.driver.options['user_terminate_signal'] = signal.SIGUSR2
+        prob.driver.options['user_terminate_signal'] = signal.SIGUSR1
 
     def test_options_deprecated(self):
         # Not a feature test.
@@ -2453,7 +2648,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver.options['optimizer'] = "SNOPT"
 
         msg = "The option 'user_teriminate_signal' was misspelled and will be deprecated. Please use 'user_terminate_signal' instead."
-        with assert_warning(DeprecationWarning, msg):
+        with assert_warning(OMDeprecationWarning, msg):
             prob.driver.options['user_teriminate_signal'] = None
 
 
@@ -2484,9 +2679,9 @@ class MatMultCompExact(om.ExplicitComponent):
 
         Parameters
         ----------
-        inputs : Vector
+        inputs: Vector
             unscaled, dimensional input variables read via inputs[key]
-        partials : Jacobian
+        partials: Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
         if self.sparse:

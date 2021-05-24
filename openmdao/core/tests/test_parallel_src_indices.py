@@ -15,7 +15,6 @@ except ImportError:
 
 class Comp(ExplicitComponent):
     def initialize(self):
-        self.options['distributed'] = True
         self.options.declare('flat', False)
 
     def setup(self):
@@ -30,8 +29,8 @@ class Comp(ExplicitComponent):
         n2 = np.sum(n_list[:irank+1])
 
         self.add_input( 'x',shape=node_size, src_indices=np.arange(n1, n2, dtype=int),
-                        flat_src_indices=self.options['flat'])
-        self.add_output('y',shape=node_size)
+                        flat_src_indices=self.options['flat'], distributed=True)
+        self.add_output('y',shape=node_size, distributed=True)
 
     def compute(self,inputs,outputs):
         outputs['y'] = inputs['x'] + 1.0
