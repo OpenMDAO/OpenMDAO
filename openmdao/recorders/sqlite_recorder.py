@@ -171,7 +171,6 @@ class SqliteRecorder(CaseRecorder):
         self.metadata_connection = None
         self._record_metadata = True
         self._record_viewer_data = record_viewer_data
-        print("__init__")
 
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
