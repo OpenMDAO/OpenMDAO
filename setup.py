@@ -85,6 +85,7 @@ setup(
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
         'openmdao.docs',
+        'openmdao.docs.openmdao_book',
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',
