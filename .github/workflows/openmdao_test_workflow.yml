@@ -198,14 +198,7 @@ jobs:
         id: build_docs
         shell: bash -l {0}
         run: |
-          cd openmdao/docs/openmdao_book/tests
-
-          echo "============================================================="
-          echo "Run doc linting tests"
-          echo "============================================================="
-          testflo
-          cd ../..
-
+          cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
             echo "Build docs with SNOPT examples."

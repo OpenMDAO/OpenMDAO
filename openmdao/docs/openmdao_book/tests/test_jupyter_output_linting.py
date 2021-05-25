@@ -31,6 +31,12 @@ def _get_files():
             if not file_name.startswith('_') and file_name[-6:] == '.ipynb':
                 yield dirpath + "/" + file_name
 
+
+FILES = list(_get_files())
+if len(FILES) < 1:
+    raise RuntimeError(f"No notebooks found. Top directory is {top}")
+
+
 class LintJupyterOutputsTestCase(unittest.TestCase):
     """
     Check Jupyter Notebooks for outputs through execution count and recommend to remove output.
@@ -40,7 +46,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         this_file = pathlib.PurePath(__file__)
         book_dir = this_file.parent.parent
 
-        for file in _get_files():
+        for file in FILES:
             print(file)
             with self.subTest(file):
                 with open(file) as f:
@@ -69,7 +75,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                       '\n']
         mpi_header.extend(header)
 
-        for file in _get_files():
+        for file in FILES:
             with open(file) as f:
 
                 # This one is exempt from these lint rules.
@@ -113,7 +119,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         """
         Make sure any code cells with asserts are hidden.
         """
-        for file in _get_files():
+        for file in FILES:
             with open(file) as f:
                 json_data = json.load(f)
                 blocks = json_data['cells']
