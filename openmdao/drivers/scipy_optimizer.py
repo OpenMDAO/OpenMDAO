@@ -2,7 +2,6 @@
 OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
-
 import sys
 from collections import OrderedDict
 from distutils.version import LooseVersion
@@ -452,6 +451,9 @@ class ScipyOptimizeDriver(Driver):
         # optimize
         try:
             if opt in _optimizers:
+                if self._problem().comm.rank != 0:
+                    self.opt_settings['disp'] = False
+
                 result = minimize(self._objfunc, x_init,
                                   # args=(),
                                   method=opt,
@@ -547,18 +549,21 @@ class ScipyOptimizeDriver(Driver):
         if hasattr(result, 'success'):
             self.fail = False if result.success else True
             if self.fail:
-                print('Optimization FAILED.')
-                print(result.message)
-                print('-' * 35)
+                if self._problem().comm.rank == 0:
+                    print('Optimization FAILED.')
+                    print(result.message)
+                    print('-' * 35)
 
             elif self.options['disp']:
-                print('Optimization Complete')
-                print('-' * 35)
+                if self._problem().comm.rank == 0:
+                    print('Optimization Complete')
+                    print('-' * 35)
         else:
             self.fail = True  # It is not known, so the worst option is assumed
-            print('Optimization Complete (success not known)')
-            print(result.message)
-            print('-' * 35)
+            if self._problem().comm.rank == 0:
+                print('Optimization Complete (success not known)')
+                print(result.message)
+                print('-' * 35)
 
         return self.fail
 
