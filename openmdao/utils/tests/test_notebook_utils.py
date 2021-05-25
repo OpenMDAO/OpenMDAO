@@ -17,14 +17,6 @@ from openmdao.utils.assert_utils import assert_warning
 @unittest.skipUnless(tabulate and IPython, "Tabulate and IPython are required")
 class TestNotebookUtils(unittest.TestCase):
 
-    def test_show_options_wo_attr(self):
-        from openmdao.utils import notebook_utils
-        notebook_utils.ipy = True
-
-        options = om.show_options_table("openmdao.components.cross_product_comp.CrossProductComp")
-
-        self.assertEqual(options, None)
-
     def test_show_options_w_attr(self):
         from openmdao.utils import notebook_utils
         notebook_utils.ipy = True
