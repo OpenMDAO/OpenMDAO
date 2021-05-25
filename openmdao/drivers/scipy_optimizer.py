@@ -14,7 +14,7 @@ import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import weak_method_wrapper
-from openmdao.utils.mpi import MPI, FakeComm
+from openmdao.utils.mpi import MPI
 from openmdao.warnings import issue_warning, DerivativesWarning
 
 # Optimizers in scipy.minimize
