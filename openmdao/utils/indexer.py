@@ -79,6 +79,17 @@ class Indexer(object):
         """
         return self.size()
 
+    def __call__(self):
+        """
+        Return the indices in their most efficient form.
+
+        For example, if the original indices were an index array that is convertable to a slice,
+        then a slice would be returned.
+
+        This could be either an int, a slice, an index array, or a multidimensional 'fancy' index.
+        """
+        raise NotImplementedError("No implementation of '__call__' found.")
+
     def size(self):
         """
         Return the size of the flattened indices.
@@ -103,7 +114,7 @@ class Indexer(object):
 
     def shape(self):
         """
-        Return the shape of the indices.
+        Return the shape of the result if the indices were applied to a source array.
 
         Returns
         -------
