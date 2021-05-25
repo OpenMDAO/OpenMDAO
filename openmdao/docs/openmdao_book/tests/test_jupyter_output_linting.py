@@ -8,7 +8,8 @@ exclude = [
     'test',
     '_build',
     '.ipynb_checkpoints',
-    '_srcdocs'
+    '_srcdocs',
+    '__pycache__'
 ]
 
 directories = []

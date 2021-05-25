@@ -143,7 +143,13 @@ setup(
             'static/*.html',
             'templates/*.html'
         ],
-        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py'],
+        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py',
+                          'openmdao_book/*.md',
+                          'openmdao_book/*/*.md',
+                          'openmdao_book/*.ipynb',
+                          'openmdao_book/*/*.ipynb',
+                          'openmdao_book/*/*/*.ipynb',
+                          'openmdao_book/*/*/*/*.ipynb'],
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini', 'scaffolding_templates/*'],
         'openmdao.test_suite': [
