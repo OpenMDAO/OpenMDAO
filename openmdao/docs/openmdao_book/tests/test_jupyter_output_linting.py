@@ -2,6 +2,7 @@ import unittest
 import os.path
 import pathlib
 import json
+import sys
 
 exclude = [
     'tests',
@@ -38,6 +39,7 @@ if len(FILES) < 1:
     raise RuntimeError(f"No notebooks found. Top directory is {top}. {directories}")
 
 
+@unittest.skipIf(sys.platform =='win32', "Tests don't work in Windows")
 class LintJupyterOutputsTestCase(unittest.TestCase):
     """
     Check Jupyter Notebooks for outputs through execution count and recommend to remove output.
