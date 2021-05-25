@@ -36,7 +36,7 @@ def _get_files():
 
 FILES = list(_get_files())
 if len(FILES) < 1:
-    raise RuntimeError(f"No notebooks found. Top directory is {top}. {directories}")
+    raise RuntimeError(f"No notebooks found. Top directory is {top}.")
 
 
 @unittest.skipIf(sys.platform =='win32', "Tests don't work in Windows")
