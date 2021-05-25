@@ -19,7 +19,7 @@ for root, dirs, files in os.walk(top, topdown=True):
     # do not bother looking further down in excluded dirs
     dirs[:] = [d for d in dirs if d not in exclude]
     for di in dirs:
-            directories.append(os.path.join(root, di))
+        directories.append(os.path.join(root, di))
 
 def _get_files():
 
@@ -34,7 +34,7 @@ def _get_files():
 
 FILES = list(_get_files())
 if len(FILES) < 1:
-    raise RuntimeError(f"No notebooks found. Top directory is {top}")
+    raise RuntimeError(f"No notebooks found. Top directory is {top}. {directories}")
 
 
 class LintJupyterOutputsTestCase(unittest.TestCase):
@@ -43,11 +43,10 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
     """
 
     def test_output(self):
-        this_file = pathlib.PurePath(__file__)
-        book_dir = this_file.parent.parent
-
+        """
+        Check that output has been cleaned out of all cells.
+        """
         for file in FILES:
-            print(file)
             with self.subTest(file):
                 with open(file) as f:
                     json_data = json.load(f)
