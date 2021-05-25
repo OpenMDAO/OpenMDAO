@@ -171,6 +171,7 @@ class SqliteRecorder(CaseRecorder):
         self.metadata_connection = None
         self._record_metadata = True
         self._record_viewer_data = record_viewer_data
+        print("__init__")
 
         self._abs2prom = {'input': {}, 'output': {}}
         self._prom2abs = {'input': {}, 'output': {}}
@@ -198,6 +199,10 @@ class SqliteRecorder(CaseRecorder):
                 if rank == 0:
                     metadata_filepath = f'{self._filepath}_meta'
                     print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
+                    try:
+                        os.remove(metadata_filepath)
+                    except OSError:
+                        pass
                     self.metadata_connection = sqlite3.connect(metadata_filepath)
                 else:
                     self._record_metadata = False
