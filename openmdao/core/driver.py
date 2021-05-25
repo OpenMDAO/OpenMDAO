@@ -287,22 +287,10 @@ class Driver(object):
             msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
-        con_set = set()
-        obj_set = set()
-        dv_set = set()
-
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
         self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
-
-        # update src shapes for Indexer objects
-        varmeta = model._var_allprocs_abs2meta['output']
-        for meta in chain(self._designvars.values(), self._responses.values()):
-            inds = meta['indices']
-            if inds is not None:
-                inds.set_src_shape(varmeta[meta['ivc_source']]['global_shape'])
-                meta['size'] = np.product(inds.shape())
 
         # Only allow distributed design variables on drivers that support it.
         if self.supports['distributed_design_vars'] is False:
@@ -332,6 +320,10 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
+            con_set = set()
+            obj_set = set()
+            dv_set = set()
+
             src_design_vars = _prom2ivc_src_dict(self._designvars)
             responses = _prom2ivc_src_dict(self._responses)
 
@@ -363,8 +355,7 @@ class Driver(object):
 
                 if meta['distributed']:
 
-                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
-                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
+                    dist_sizes = sizes[:, i]
                     total_dist_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
@@ -372,7 +363,6 @@ class Driver(object):
 
                     if indices is not None:
                         indices.set_src_shape(total_dist_size)
-                        # indices = convert_neg(indices, total_dist_size)
                         indices = indices.shaped_array()
                         true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
                         for irank in range(nprocs):

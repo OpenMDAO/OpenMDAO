@@ -27,7 +27,7 @@ def array2slice(arr):
     slice or None
         If slice conversion is possible, return the slice, else return None
     """
-    if arr.ndim == 1:
+    if arr.ndim == 1 and arr.dtype.kind in ('i', 'u'):
         if arr.size > 1:  # see if 1D array will convert to slice
             if arr[0] >= 0 and arr[1] >= 0:
                 span = arr[1] - arr[0]
@@ -77,7 +77,23 @@ class Indexer(object):
         int
             Length of flattened indices.
         """
-        return np.product(self.shape())
+        return self.size()
+
+    def size(self):
+        """
+        Return the size of the flattened indices.
+
+        Returns
+        -------
+        int
+            Size of flattened indices.
+        """
+        return np.product(self.shape(), dtype=int)
+
+    def _check_ind_type(self, ind, types):
+        if not isinstance(ind, types):
+            raise TypeError(f"Can't create {type(self).__name__} using this "
+                            f"kind of index: {ind}.")
 
     def flat(self):
         """
@@ -211,6 +227,7 @@ class ShapedIntIndexer(Indexer):
             The index.
         """
         super().__init__()
+        self._check_ind_type(idx, Integral)
         self._idx = idx
 
     def __call__(self):
@@ -235,16 +252,27 @@ class ShapedIntIndexer(Indexer):
         """
         return f"{self._idx}"
 
-    def shape(self):
+    def size(self):
         """
-        Return the shape of the index (1).
+        Return the size of the flattened indices.
 
         Returns
         -------
         int
-            The shape of the index.
+            Size of flattened indices.
         """
         return 1
+
+    def shape(self):
+        """
+        Return the shape of the index ().
+
+        Returns
+        -------
+        tuple
+            The shape of the index.
+        """
+        return ()
 
     def as_slice(self):
         """
@@ -349,6 +377,7 @@ class ShapedSliceIndexer(Indexer):
             The slice.
         """
         super().__init__()
+        self._check_ind_type(slc, slice)
         self._slice = slc
 
     def __call__(self):
@@ -490,11 +519,11 @@ class ShapedArrayIndexer(Indexer):
     ----------
     _arr : ndarray
         The wrapped index array object.
-    _multi : bool
-        If True, we are an inner Indexer inside of a MultiIndexer.
+    _convert : bool
+        If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
     """
 
-    def __init__(self, arr, multi=False):
+    def __init__(self, arr, convert=True):
         """
         Initialize attributes.
 
@@ -502,12 +531,20 @@ class ShapedArrayIndexer(Indexer):
         ----------
         arr : ndarray
             The index array.
-        multi : bool
-            If True,
+        convert : bool
+            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
         """
         super().__init__()
-        self._arr = arr
-        self._multi = multi
+
+        ndarr = np.asarray(arr)
+
+        # check type
+        if ndarr.dtype.kind not in ('i', 'u'):
+            raise TypeError(f"Can't create an index array using the following indices of "
+                            f"non-integral type: {arr}.")
+
+        self._arr = ndarr
+        self._convert = convert
 
     def __call__(self):
         """
@@ -612,14 +649,14 @@ class ArrayIndexer(ShapedArrayIndexer):
         else:
             sharr = self._arr
 
-        if self._multi:
-            self._shaped_inst = ShapedArrayIndexer(sharr)
-        else:
+        if self._convert:
             slc = array2slice(sharr)
             if slc is not None:
                 self._shaped_inst = ShapedSliceIndexer(slc)
             else:
                 self._shaped_inst = ShapedArrayIndexer(sharr)
+        else:
+            self._shaped_inst = ShapedArrayIndexer(sharr)
 
         return self._shaped_inst
 
@@ -658,7 +695,7 @@ class ShapedMultiIndexer(Indexer):
         """
         super().__init__()
         self._tup = tup
-        self._idx_list = [indexer(i, multi=True) for i in tup]
+        self._idx_list = [indexer(i, convert=False) for i in tup]
 
     def __call__(self):
         """
@@ -691,7 +728,18 @@ class ShapedMultiIndexer(Indexer):
         tuple
             The shape of the indices.
         """
-        return tuple(len(i) for i in self._idx_list)
+        lens = []
+        seen_num = False
+        for i in self._idx_list:
+            if isinstance(i, ShapedSliceIndexer):
+                lens.append(len(i))
+            elif isinstance(i, ShapedArrayIndexer) and not seen_num:
+                # only first array idx counts toward shape
+                lens.append(len(i))
+                seen_num = True
+            # int indexers don't count toward shape (scalar array has shape ())
+
+        return tuple(lens)
 
     def as_slice(self):
         """
@@ -920,7 +968,7 @@ class IndexMaker(object):
     A Factory for Indexer objects.
     """
 
-    def _get_indexer(self, idx, multi=False):
+    def _get_indexer(self, idx, convert):
         """
         Return an Indexer instance based on the passed indices/slices.
 
@@ -928,22 +976,22 @@ class IndexMaker(object):
         ----------
         idx : int, ndarray, slice, or tuple
             Some sort of index/indices/slice.
-        multi : bool
-            If True, we are an inner Indexer inside of a MultiIndexer.
+        convert : bool
+            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
 
         Returns
         -------
         Indexer
             The Indexer instance we created based on the args.
         """
-        if not multi and idx is ...:
+        if convert and idx is ...:
             idxer = EllipsisIndexer((idx,))
         elif isinstance(idx, int):
             idxer = IntIndexer(idx)
         elif isinstance(idx, slice):
             idxer = SliceIndexer(idx)
 
-        elif not multi and isinstance(idx, tuple):
+        elif convert and isinstance(idx, tuple):
             if ... in idx:
                 idxer = EllipsisIndexer(idx)
             else:
@@ -951,17 +999,23 @@ class IndexMaker(object):
         else:
             idx = np.atleast_1d(idx)
 
-            if multi:
-                # can't convert sub-index arrays into sub slices because that can change
-                # the result
-                idxer = ArrayIndexer(idx, multi)
-            else:
+            if convert:
                 # if array is convertable to a slice, store it as a slice
                 slc = array2slice(idx)
                 if slc is None:
-                    idxer = ArrayIndexer(idx)
+                    if idx.ndim == 1:
+                        idxer = ArrayIndexer(idx)
+                    else:
+                        idxer = MultiIndexer(tuple(idx))
                 else:
                     idxer = SliceIndexer(slc)
+            else:
+                # can't convert sub-index arrays into sub slices because that can change
+                # the result
+                if idx.ndim == 1:
+                    idxer = ArrayIndexer(idx, False)
+                else:
+                    idxer = MultiIndexer(tuple(idx))
 
         shaped = idxer.shaped_instance()
         if shaped is not None:
@@ -982,9 +1036,9 @@ class IndexMaker(object):
         Indexer
             The Indexer instance we created based on the args.
         """
-        return self._get_indexer(idx)
+        return self._get_indexer(idx, convert=True)
 
-    def __call__(self, idx, multi=False):
+    def __call__(self, idx, convert=True):
         """
         Return an Indexer based on the args.
 
@@ -992,15 +1046,15 @@ class IndexMaker(object):
         ----------
         idx : int, ndarray, slice or tuple
             The passed indices/slices.
-        multi : bool
-            If True, we are an inner Indexer inside of a MultiIndexer.
+        convert : bool
+            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
 
         Returns
         -------
         Indexer
             The Indexer instance we created based on the args.
         """
-        return self._get_indexer(idx, multi)
+        return self._get_indexer(idx, convert)
 
 
 indexer = IndexMaker()

@@ -97,6 +97,12 @@ allowed_meta_names = {
 allowed_meta_names.update(global_meta_names['input'])
 allowed_meta_names.update(global_meta_names['output'])
 
+resp_size_checks = {
+    'con': ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower', 'equals'],
+    'obj': ['ref', 'ref0', 'scaler', 'adder']
+}
+resp_types = {'con': 'constraint', 'obj': 'objective'}
+
 
 class _MatchType(IntEnum):
     """
@@ -2495,17 +2501,45 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _check_indices(self, indices, typename):
-        if indices is None or _is_slicer_op(indices):
+    def _create_indexer(self, indices, typename, vname):
+        """
+        Return an Indexer instance and it's size if possible.
+
+        Parameters
+        ----------
+        indices : ndarray or sequence of ints
+            The indices used to create the Indexer.
+        typename : str
+            Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
+        vname : str
+            Name of the variable.
+
+        Returns
+        -------
+        Indexer
+            The newly created Indexer
+        int or None
+            The size of the indices, if known.
+        """
+        if not (indices is None or _is_slicer_op(indices)):
+            arr = np.asarray(indices)
+            if arr.dtype.kind not in ('i', 'u') or len(arr.shape) == 0:
+                raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
+                                 "must be a sequence of integers.")
+        try:
+            idxer = indexer[indices]
+        except Exception as err:
+            raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
+                                f"'{vname}'.")
+
+        # size may not be available at this point, but get it if we can in order to allow
+        # some earlier error checking
+        try:
+            size = idxer.size()
+        except Exception:
             size = None
-        else:
-            # If given, indices must be a sequence
-            if not (isinstance(indices, Iterable) and
-                    all([isinstance(i, Integral) for i in indices])):
-                raise ValueError(f"{self.msginfo}: If specified, {typename} indices must be a "
-                                 "sequence of integers.")
-            size = np.asarray(indices).size
-        return size
+
+        return idxer, size
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
@@ -2604,54 +2638,47 @@ class System(object):
         else:
             design_vars = self._design_vars
 
-        dvs = OrderedDict()
+        dv = OrderedDict()
 
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
                 scaler = None
         elif scaler == 1.0:
             scaler = None
-        dvs['scaler'] = scaler
+        dv['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
-        dvs['adder'] = adder
+        dv['adder'] = adder
 
-        dvs['name'] = name
-        dvs['upper'] = upper
-        dvs['lower'] = lower
-        dvs['ref'] = ref
-        dvs['ref0'] = ref0
-        dvs['units'] = units
-        dvs['cache_linear_solution'] = cache_linear_solution
+        dv['name'] = name
+        dv['upper'] = upper
+        dv['lower'] = lower
+        dv['ref'] = ref
+        dv['ref0'] = ref0
+        dv['units'] = units
+        dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
-
-            size = self._check_indices(indices, 'design var')
-
+            indices, size = self._create_indexer(indices, 'design var', name)
             if size is not None:
-                # All refs: check the shape if necessary
-                for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
-                                           ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
-                    if isinstance(item, np.ndarray):
-                        if item.size != size:
-                            raise ValueError("%s: When adding design var '%s', %s should have size "
-                                             "%d but instead has size %d." % (self.msginfo, name,
-                                                                              item_name, size,
-                                                                              item.size))
-            indices = indexer[indices]
-        dvs['indices'] = indices
-        dvs['parallel_deriv_color'] = parallel_deriv_color
-        dvs['vectorize_derivs'] = vectorize_derivs
+                dv['size'] = size
+
+        dv['indices'] = indices
+        dv['parallel_deriv_color'] = parallel_deriv_color
+        dv['vectorize_derivs'] = vectorize_derivs
         if vectorize_derivs:
             warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding design "
                              f"variable '{name}' is deprecated and will be removed in a future "
                              "release.")
 
-        design_vars[name] = dvs
+        self._check_voi_meta_sizes('design var', dv,
+                                   ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
+
+        design_vars[name] = dv
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
@@ -2729,8 +2756,8 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
+        typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if name in self._responses or name in self._static_responses:
-            typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
             raise RuntimeError(msg.format(name))
 
@@ -2745,11 +2772,6 @@ class System(object):
         if equals is not None and (lower is not None or upper is not None):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
-
-        if indices is not None:
-            size = self._check_indices(indices, 'response')
-        else:
-            size = None
 
         if self._static_mode:
             responses = self._static_responses
@@ -2800,15 +2822,17 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                indices = indexer[indices]
+                indices, size = self._create_indexer(indices, resp_types[type_], name)
+                if size is not None:
+                    resp['size'] = size
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                resp['size'] = size = 1
-                index = indexer[index]  # np.array([index], dtype=INT_DTYPE)
+                index = indexer[index]
+                resp['size'] = 1
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
@@ -2825,28 +2849,10 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        if size is not None:
-            vlist = [ref, ref0, scaler, adder]
-            nlist = ['ref', 'ref0', 'scaler', 'adder']
-            if type_ == 'con':
-                tname = 'constraint'
-                vlist.extend([upper, lower, equals])
-                nlist.extend(['upper', 'lower', 'equals'])
-            else:
-                tname = 'objective'
-
-            # All refs: check the shape if necessary
-            for item, item_name in zip(vlist, nlist):
-                if isinstance(item, np.ndarray):
-                    if item.size != size:
-                        raise ValueError("%s: When adding %s '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.msginfo, tname,
-                                                                          name, item_name, size,
-                                                                          item.size))
         resp['name'] = name
+        resp['type'] = type_
         resp['ref'] = ref
         resp['ref0'] = ref0
-        resp['type'] = type_
         resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
 
@@ -2855,6 +2861,8 @@ class System(object):
         if vectorize_derivs:
             warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding response "
                              f"'{name}' is deprecated and will be removed in a future release.")
+
+        self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
 
         responses[name] = resp
 
@@ -2992,6 +3000,16 @@ class System(object):
                           vectorize_derivs=vectorize_derivs,
                           cache_linear_solution=cache_linear_solution)
 
+    def _check_voi_meta_sizes(self, typename, meta, names):
+        if 'size' in meta and meta['size'] is not None:
+            size = meta['size']
+            for mname in names:
+                val = meta[mname]
+                if isinstance(val, np.ndarray) and size != val.size:
+                    raise ValueError(f"{self.msginfo}: When adding {typename} '{meta['name']}',"
+                                     f" {mname} should have size {size} but instead has size "
+                                     f"{val.size}.")
+
     def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the DesignVariable settings from this system.
@@ -3076,18 +3094,25 @@ class System(object):
                         meta['size'] = 0  # discrete var, don't know size
                 meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
-                if src_name in abs2idx:
+                if src_name in abs2idx:  # var is continuous
                     indices = meta['indices']
-                    meta = abs2meta_out[src_name]
-                    out[name]['distributed'] = meta['distributed']
+                    vmeta = abs2meta_out[src_name]
+                    meta['distributed'] = vmeta['distributed']
                     if indices is not None:
                         # Index defined in this response.
-                        out[name]['global_size'] = len(indices) if meta['distributed'] \
-                            else meta['global_size']
+                        # update src shapes for Indexer objects
+                        indices.set_src_shape(vmeta['global_shape'])
+                        indices = indices.shaped_instance()
+                        meta['size'] = len(indices)
+                        meta['global_size'] = len(indices) if vmeta['distributed'] \
+                            else vmeta['global_size']
                     else:
-                        out[name]['global_size'] = meta['global_size']
+                        meta['global_size'] = vmeta['global_size']
+
+                    self._check_voi_meta_sizes('design var', meta,
+                                               ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
                 else:
-                    out[name]['global_size'] = 0  # discrete var
+                    meta['global_size'] = 0  # discrete var
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -3185,7 +3210,7 @@ class System(object):
             sizes = model._var_sizes['nonlinear']['output']
             abs2idx = model._var_allprocs_abs2idx['nonlinear']
             owning_rank = model._owning_rank
-            for prom_name, response in out.items():
+            for response in out.values():
                 name = response['ivc_source']
 
                 # Discrete vars
@@ -3197,14 +3222,17 @@ class System(object):
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
-                    response['indices'].set_src_shape(meta['global_shape'])
-                    # Index defined in this response.
-                    response['global_size'] = len(response['indices']) if meta['distributed'] \
-                        else meta['global_size']
-
+                    indices = response['indices']
+                    indices.set_src_shape(meta['global_shape'])
+                    indices = indices.shaped_instance()
+                    response['size'] = sz = len(indices)
+                    response['global_size'] = sz if meta['distributed'] else meta['global_size']
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
+
+                self._check_voi_meta_sizes(resp_types[response['type']], response,
+                                           resp_size_checks[response['type']])
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']

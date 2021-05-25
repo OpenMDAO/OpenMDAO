@@ -12,7 +12,7 @@ class IndexerTestCase(unittest.TestCase):
         src = np.arange(10)
         assert_equal(ind(), 4)
         assert_equal(ind.as_array(), np.array([4]))
-        assert_equal(ind.shape(), 1)
+        assert_equal(ind.shape(), ())
         assert_equal(ind.shaped(), 4)
         assert_equal(ind.as_slice(), slice(4, 5))
 
@@ -21,7 +21,7 @@ class IndexerTestCase(unittest.TestCase):
         src = np.arange(10)
         assert_equal(ind(), np.array([-4]))
         assert_equal(ind.as_array(), np.array([-4]))
-        assert_equal(ind.shape(), 1)
+        assert_equal(ind.shape(), ())
 
         with self.assertRaises(ValueError) as cm:
             ind.shaped()
@@ -204,7 +204,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
         ind.set_src_shape(src.shape)
-        assert_equal(ind.shape(), (2,3,2))
+        assert_equal(ind.shape(), (2,3))
         assert_equal(ind.shaped(), ([0, 2], slice(0, 3, 1), [1, 2]))
         assert_equal(ind.as_array(), np.arange(27, dtype=np.int32).reshape((3,3,3))[[0,2], :, [1,2]].ravel())
 
