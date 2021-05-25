@@ -634,6 +634,106 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
 
+class exampleComp(om.ExplicitComponent):
+    """
+    This is an example OpenMDAO explicit component which taks in inputs x, y
+    and outputs a scalar f(x,y) and a square matrix (2x2) c(x,y) according to:
+
+        f = (x-3)^2 + xy + (y+4)^2 - 3
+
+        c[1,1] = x + y
+        c[2,1] = x^2 + y^2
+        c[1,2] = 2*x + y^2
+        c[2,2] = x^2 + 2*y
+
+    Partial derivatives are computed using finite-difference.
+    """
+
+    def setup(self):
+        # Declare Inputs
+        self.add_input("x", shape=(1), val=0.0)
+        self.add_input("y", shape=(1), val=0.0)
+
+        # Declare Outputs
+        self.add_output("f_xy", shape=(1))
+        self.add_output("c_xy", shape=(2, 2))
+
+    def setup_partials(self):
+        # Finite difference all partials.
+        self.declare_partials("*", "*", method="fd")
+
+    def compute(self, inputs, outputs):
+        # Retrieve Inputs
+        x = inputs["x"]
+        y = inputs["y"]
+
+        # Compute Values
+        f_xy = (x - 3.0) ** 2 + x * y + (y + 4.0) ** 2 - 3.0
+
+        c_xy = np.zeros((2, 2))
+        c_xy[0, 0] = x + y
+        c_xy[1, 0] = x ** 2 + y ** 2
+        c_xy[0, 1] = 2.0 * x + y ** 2
+        c_xy[1, 1] = x ** 2 + 2.0 * y
+
+        # Set Outputs
+        outputs["f_xy"] = f_xy
+        outputs["c_xy"] = c_xy
+
+
+def constraintExample(inds):
+    """
+    This function is an example for trying to implement constraints on unique
+    elements of multidimensional arrays. The system consists of:
+        Design Variables: x, y
+        Constraints: c_xy[:,1]
+        Objective: f_xy
+    """
+    # Initialize OM Problem and Add Component
+    prob = om.Problem()
+    prob.model.add_subsystem("exampleComp", exampleComp())
+
+    # Set Optimizer
+    prob.driver = om.ScipyOptimizeDriver()
+    prob.driver.options["optimizer"] = "SLSQP"
+
+    # Declare Design Variables
+    prob.model.add_design_var("exampleComp.x")
+    prob.model.add_design_var("exampleComp.y")
+
+    # Declaring Constraints by Using True Dimensioned Array Indices
+    prob.model.add_constraint("exampleComp.c_xy", indices=inds, lower=[0.0, 75.0], upper=[25.0, 100.0])
+
+    # Declare Objective
+    prob.model.add_objective("exampleComp.f_xy")
+
+    # Finalize Setup
+    prob.setup()
+
+    # Define Initial Conditions
+    prob.set_val("exampleComp.x", 3.0)
+    prob.set_val("exampleComp.y", -4.0)
+
+    # Run Optimization
+    prob.run_driver()
+
+    return prob
+
+
+class TestConstraintFancyIndex(unittest.TestCase):
+
+    def test_fancy_index_arr(self):
+        prob = constraintExample([[0,1], [1,1]])
+        np.testing.assert_allclose(prob.get_val("exampleComp.f_xy"), [10.50322551])
+        np.testing.assert_allclose(prob.get_val("exampleComp.c_xy")[:, 1], [25.00000002, 75.00000024])
+
+    def test_fancy_index_slice(self):
+        prob = constraintExample(om.slicer[:, 1])
+        np.testing.assert_allclose(prob.get_val("exampleComp.f_xy"), [10.50322551])
+        np.testing.assert_allclose(prob.get_val("exampleComp.c_xy")[:, 1], [25.00000002, 75.00000024])
+
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestAddConstraintMPI(unittest.TestCase):
 
