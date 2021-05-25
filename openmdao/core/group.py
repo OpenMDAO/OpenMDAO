@@ -2971,7 +2971,7 @@ class Group(System):
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, start, end, np.atleast_1d(approx_of_idx[of].shaped_array())
+                    yield of, start, end, approx_of_idx[of].flat()
                 else:
                     end += abs2meta[of]['size']
                     yield of, start, end, _full_slice

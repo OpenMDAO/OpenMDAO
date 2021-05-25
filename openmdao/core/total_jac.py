@@ -608,7 +608,7 @@ class _TotalJacInfo(object):
                     # if the var is not distributed, global_size == local size
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
-                    irange = in_idxs.as_array()
+                    irange = in_idxs.shaped_array(copy=True)
                     # correct for any negative indices
                     irange[irange < 0] += in_var_meta['global_size']
 
@@ -809,7 +809,7 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE)
-                            inds.append(full_inds[local_idx.flat()])
+                            inds.append(full_inds[local_idx.as_array()])
                             jac_inds.append(jstart + dist_offset +
                                             np.arange(len(local_idx), dtype=INT_DTYPE))
                             if fwd or not self.get_remote:
@@ -885,7 +885,7 @@ class _TotalJacInfo(object):
                     size = voi['size']
                 indices = vois[name]['indices']
                 if indices is not None:
-                    indices = indices.as_array()
+                    indices = indices.flat()
             else:
                 size = abs2meta_out[name]['global_size']
                 indices = None

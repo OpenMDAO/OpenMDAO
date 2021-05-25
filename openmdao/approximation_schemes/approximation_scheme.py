@@ -241,7 +241,7 @@ class ApproximationScheme(object):
                         vec_idx = None
                     else:
                         # local index into var
-                        vec_idx = np.atleast_1d(approx_wrt_idx[wrt].shaped_array()).copy()
+                        vec_idx = approx_wrt_idx[wrt].shaped_array(copy=True)
                         # convert into index into input or output vector
                         vec_idx += slices[wrt].start
                         # Directional derivatives for quick partial checking.

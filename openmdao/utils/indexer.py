@@ -106,9 +106,14 @@ class Indexer(object):
             raise TypeError(f"Can't create {type(self).__name__} using this "
                             f"kind of index: {ind}.")
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return index array or slice into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
         """
         raise NotImplementedError("No implementation of 'flat' found.")
 
@@ -159,9 +164,14 @@ class Indexer(object):
                              "no source shape.")
         return s()
 
-    def shaped_array(self):
+    def shaped_array(self, copy=False):
         """
         Return an index array version of the indices that index into a flattened array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -172,7 +182,7 @@ class Indexer(object):
         if s is None:
             raise ValueError(f"Can't get shaped array of {self} because it has "
                              "no source shape.")
-        return s.as_array()
+        return s.as_array(copy=copy)
 
     def shaped_slice(self):
         """
@@ -296,9 +306,14 @@ class ShapedIntIndexer(Indexer):
         """
         return slice(self._idx, self._idx + 1)
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -307,9 +322,14 @@ class ShapedIntIndexer(Indexer):
         """
         return np.array([self._idx])
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -424,9 +444,14 @@ class ShapedSliceIndexer(Indexer):
         """
         return self._slice
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -436,15 +461,21 @@ class ShapedSliceIndexer(Indexer):
         # use maxsize here since _shaped_slice always has positive int start and stop
         return np.arange(*self._slice.indices(sys.maxsize), dtype=int)
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return a slice into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         slice
             The slice into a flat array.
         """
+        # slices are immutable, so ignore copy arg
         return self._slice
 
     def shape(self):
@@ -510,16 +541,21 @@ class SliceIndexer(ShapedSliceIndexer):
         """
         return Indexer.shape(self)
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         ndarray
             The index array into a flat array.
         """
-        return self.shaped_array()
+        return self.shaped_array(copy=copy)
 
 
 class ShapedArrayIndexer(Indexer):
@@ -590,15 +626,22 @@ class ShapedArrayIndexer(Indexer):
         """
         return self._arr.shape
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         ndarray
             The index array into a flat array.
         """
+        if copy:
+            return self._arr.copy()
         return self._arr
 
     def as_slice(self):
@@ -610,15 +653,22 @@ class ShapedArrayIndexer(Indexer):
         """
         raise ValueError(f"Can't convert {self} to a slice.")
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         ndarray
             The index into a flat array.
         """
+        if copy:
+            return self._arr.copy()
         return self._arr
 
     def json_compat(self):
@@ -763,9 +813,14 @@ class ShapedMultiIndexer(Indexer):
         """
         return tuple(i.as_slice() for i in self._idx_list)
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -780,16 +835,21 @@ class ShapedMultiIndexer(Indexer):
 
         return idxs[self()].ravel()
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         ndarray
             An index array into a flat array.
         """
-        return self.as_array()
+        return self.as_array(copy=copy)
 
     def set_src_shape(self, shape):
         """
@@ -939,9 +999,14 @@ class EllipsisIndexer(Indexer):
         """
         return self.shaped_slice()
 
-    def as_array(self):
+    def as_array(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
@@ -949,18 +1014,23 @@ class EllipsisIndexer(Indexer):
             The index array into a flat array.
         """
         # return as a flattened index array into a flat source
-        return self.shaped_array()
+        return self.shaped_array(copy=copy)
 
-    def flat(self):
+    def flat(self, copy=False):
         """
         Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
 
         Returns
         -------
         ndarray
             An index array into a flat array.
         """
-        return self.as_array()
+        return self.as_array(copy=copy)
 
     def json_compat(self):
         """

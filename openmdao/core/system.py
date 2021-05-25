@@ -123,25 +123,6 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
-class _MatchType(IntEnum):
-    """
-    Class used to define different types of promoted name matches.
-
-    Attributes
-    ----------
-    NAME : int
-        Literal name match.
-    RENAME : int
-        Rename match.
-    PATTERN : int
-        Glob pattern match.
-    """
-
-    NAME = 0
-    RENAME = 1
-    PATTERN = 2
-
-
 class System(object):
     """
     Base class for all systems in OpenMDAO.
@@ -2869,9 +2850,9 @@ class System(object):
         resp['adder'] = adder
 
         resp['name'] = name
-        resp['type'] = type_
         resp['ref'] = ref
         resp['ref0'] = ref0
+        resp['type'] = type_
         resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
 
