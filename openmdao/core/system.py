@@ -3001,6 +3001,18 @@ class System(object):
                           cache_linear_solution=cache_linear_solution)
 
     def _check_voi_meta_sizes(self, typename, meta, names):
+        """
+        Check that sizes of named metadata agree with meta['size'].
+
+        Parameters
+        ----------
+        typename : str
+            'design var', 'objective', or 'constraint'
+        meta : dict
+            Metadata dictionary.
+        names : list of str
+            The metadata entries at each of these names must match meta['size'].
+        """
         if 'size' in meta and meta['size'] is not None:
             size = meta['size']
             for mname in names:
