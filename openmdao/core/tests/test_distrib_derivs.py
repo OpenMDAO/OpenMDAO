@@ -1016,7 +1016,9 @@ class MPITests3(unittest.TestCase):
         prob.run_model()
 
         con = prob.driver.get_constraint_values()
-        assert_near_equal(con['parab.f_xy'], np.array([ 8.88, 31.92]), 1e-6)
+        assert_near_equal(con['parab.f_xy'],
+                          np.array([ 8.88, 31.92]),
+                          1e-6)
 
         totals = prob.check_totals(method='cs')
         for key, val in totals.items():

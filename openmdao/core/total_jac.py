@@ -609,8 +609,6 @@ class _TotalJacInfo(object):
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
                     irange = in_idxs.shaped_array(copy=True)
-                    # correct for any negative indices
-                    irange[irange < 0] += in_var_meta['global_size']
 
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']

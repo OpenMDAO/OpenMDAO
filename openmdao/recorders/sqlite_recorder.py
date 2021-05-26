@@ -371,14 +371,6 @@ class SqliteRecorder(CaseRecorder):
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
 
-            # convert Indexer objects to indices
-            for dct in (desvars, constraints, objectives):
-                for name, meta in dct.items():
-                    if 'indices' in meta:
-                        inds = meta['indices']
-                        if inds is not None:
-                            dct[name] = meta.copy()
-
             full_var_set = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
