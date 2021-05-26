@@ -378,11 +378,6 @@ class SqliteRecorder(CaseRecorder):
                         inds = meta['indices']
                         if inds is not None:
                             dct[name] = meta.copy()
-                            try:
-                                dct[name]['indices'] = inds.json_compat()
-                            except ValueError:
-                                inds.set_src_shape(real_meta_out[meta['ivc_source']]['shape'])
-                                dct[name]['indices'] = inds.json_compat()
 
             full_var_set = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),

@@ -355,24 +355,22 @@ class Driver(object):
                 if meta['distributed']:
 
                     dist_sizes = sizes[:, i]
-                    total_dist_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
                     offsets = sizes2offsets(dist_sizes)
 
                     if indices is not None:
-                        indices.set_src_shape(total_dist_size)
                         indices = indices.shaped_array()
                         true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
                         for irank in range(nprocs):
                             dist_inds = indices[np.logical_and(indices >= offsets[irank],
                                                                indices < (offsets[irank] +
                                                                           dist_sizes[irank]))]
+                            true_sizes[irank] = dist_inds.size
                             if irank == rank:
                                 local_indices = dist_inds - offsets[rank]
                                 distrib_indices = dist_inds
 
-                            true_sizes[irank] = dist_inds.size
                         dist_dict[vname] = (indexer(local_indices), true_sizes, distrib_indices)
                     else:
                         dist_dict[vname] = (_full_slice, dist_sizes,
@@ -531,9 +529,6 @@ class Driver(object):
         comm = model.comm
         get = model._outputs._abs_get_val
         indices = meta['indices']
-        if indices is not None:
-            sh = 'global_shape' if get_remote else 'shape'
-            indices.set_src_shape(model._var_allprocs_abs2meta['output'][meta['ivc_source']][sh])
 
         if meta.get('ivc_source') is not None:
             src_name = meta['ivc_source']
@@ -558,7 +553,7 @@ class Driver(object):
                     if indices is None:
                         val = get(name, flat=True).copy()
                     else:
-                        val = get(name, flat=True)[indices.flat()]
+                        val = get(name, flat=True)[indices.as_array()]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -600,7 +595,7 @@ class Driver(object):
             elif indices is None:
                 val = get(src_name, flat=True).copy()
             else:
-                val = get(src_name, flat=True)[indices.flat()]
+                val = get(src_name, flat=True)[indices.as_array()]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values
@@ -664,12 +659,6 @@ class Driver(object):
                 problem.model._owning_rank[src_name] != problem.comm.rank):
             return
 
-        indices = meta['indices']
-        if indices is None:
-            indices = _full_slice
-        else:
-            indices = indices()
-
         if name in self._designvars_discrete:
 
             # Note, drivers set values here and generally should know it is setting an integer.
@@ -691,7 +680,11 @@ class Driver(object):
             if src_name in self._dist_driver_vars:
                 loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
             else:
-                loc_idxs = indices
+                loc_idxs = meta['indices']
+                if loc_idxs is None:
+                    loc_idxs = _full_slice
+                else:
+                    loc_idxs = loc_idxs()
                 dist_idxs = _full_slice
 
             if set_remote:

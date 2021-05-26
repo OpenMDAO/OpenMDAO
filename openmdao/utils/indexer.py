@@ -221,11 +221,11 @@ class Indexer(object):
         self._shaped_inst = None
         return self
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
         """
-        raise NotImplementedError("No implementation of 'json_compat' found.")
+        raise NotImplementedError("No implementation of 'to_json' found.")
 
 
 class ShapedIntIndexer(Indexer):
@@ -338,7 +338,7 @@ class ShapedIntIndexer(Indexer):
         """
         return np.array([self._idx])
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
 
@@ -490,7 +490,7 @@ class ShapedSliceIndexer(Indexer):
         # use maxsize here since shaped slice always has positive int start and stop
         return len(range(*self._slice.indices(sys.maxsize)))
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
 
@@ -671,7 +671,7 @@ class ShapedArrayIndexer(Indexer):
             return self._arr.copy()
         return self._arr
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
 
@@ -871,7 +871,7 @@ class ShapedMultiIndexer(Indexer):
 
         return self
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
 
@@ -1032,7 +1032,7 @@ class EllipsisIndexer(Indexer):
         """
         return self.as_array(copy=copy)
 
-    def json_compat(self):
+    def to_json(self):
         """
         Return a JSON serializable version of self.
 

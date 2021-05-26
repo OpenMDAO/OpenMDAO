@@ -692,7 +692,10 @@ def make_serializable(o):
     elif isinstance(o, bool) or isinstance(o, complex):
         return str(o)
     elif hasattr(o, '__dict__'):
-        return o.__class__.__name__
+        try:
+            return o.to_json()
+        except AttributeError:
+            return o.__class__.__name__
     else:
         return o
 
