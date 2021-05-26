@@ -15,6 +15,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+from openmdao.utils.assert_utils import assert_warnings
 
 if MPI:
     from openmdao.api import PETScVector
@@ -334,8 +335,27 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
-        prob.run_driver()
+
+        if prob.comm.rank == 0:
+            expected_warnings = [
+                                 (UserWarning,
+                                  'The existing case recorder metadata file, cases.sql_meta, '
+                                  'is being overwritten.'),
+                                 (UserWarning,
+                                  'The existing case recorder file, cases.sql_0, is being '
+                                  'overwritten.'),
+                                 ]
+        else:
+            expected_warnings = [
+                                (UserWarning,
+                                  'The existing case recorder file, cases.sql_1, is being '
+                                  'overwritten.'),
+                                 ]
+        with assert_warnings(expected_warnings):
+            prob.run_driver()
+
         prob.cleanup()
+
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

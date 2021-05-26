@@ -200,6 +200,9 @@ class SqliteRecorder(CaseRecorder):
                     print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
                     try:
                         os.remove(metadata_filepath)
+                        issue_warning('The existing case recorder metadata file, '
+                                      f'{metadata_filepath}, is being overwritten.',
+                                      category=UserWarning)
                     except OSError:
                         pass
                     self.metadata_connection = sqlite3.connect(metadata_filepath)
@@ -215,6 +218,10 @@ class SqliteRecorder(CaseRecorder):
         if filepath:
             try:
                 os.remove(filepath)
+                issue_warning(
+                    f'The existing case recorder file, {filepath}, is being '
+                    'overwritten.',
+                    category=UserWarning)
             except OSError:
                 pass
 
