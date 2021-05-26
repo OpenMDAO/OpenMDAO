@@ -884,8 +884,6 @@ class _TotalJacInfo(object):
                 else:
                     size = voi['size']
                 indices = vois[name]['indices']
-                if indices is not None:
-                    indices = indices.flat()
             else:
                 size = abs2meta_out[name]['global_size']
                 indices = None
@@ -1710,7 +1708,7 @@ class _TotalJacInfo(object):
             if zero_idxs[0].size == 0:
                 return zero_idxs
             varr = np.zeros(shape, dtype=bool)
-            varr.flat[inds[zero_idxs]] = True
+            varr.flat[inds.as_array()[zero_idxs]] = True
             zero_idxs = np.nonzero(varr)
 
         return zero_idxs
