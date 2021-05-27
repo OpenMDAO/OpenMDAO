@@ -15,6 +15,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+from openmdao.utils.assert_utils import assert_warnings
 
 if MPI:
     from openmdao.api import PETScVector
@@ -296,6 +297,64 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.run_model()
         prob.record('final')
+
+    def test_regression_bug_fix_issue_2062_sql_meta_file_running_parallel(self):
+
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        prob.model.add_design_var('x', lower=0.0, upper=1.0)
+        prob.model.add_design_var('y', lower=0.0, upper=1.0)
+        prob.model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 1
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        # Run this again. Because of the bug fix for issue 2062, this code should NOT
+        #   throw an exception
+        prob = om.Problem()
+
+        prob.model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        prob.model.add_design_var('x', lower=0.0, upper=1.0)
+        prob.model.add_design_var('y', lower=0.0, upper=1.0)
+        prob.model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 1
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+
+        if prob.comm.rank == 0:
+            expected_warnings = [
+                                 (UserWarning,
+                                  'The existing case recorder metadata file, cases.sql_meta, '
+                                  'is being overwritten.'),
+                                 (UserWarning,
+                                  'The existing case recorder file, cases.sql_0, is being '
+                                  'overwritten.'),
+                                 ]
+        else:
+            expected_warnings = [
+                                (UserWarning,
+                                  'The existing case recorder file, cases.sql_1, is being '
+                                  'overwritten.'),
+                                 ]
+        with assert_warnings(expected_warnings):
+            prob.run_driver()
+
+        prob.cleanup()
 
 
 if __name__ == "__main__":
