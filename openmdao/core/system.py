@@ -3379,7 +3379,7 @@ class System(object):
                 if self._subsystems_allprocs:
                     for s in conf_info._modified_system_iter(self):
                         s._setup_var_data()
-                    conf_info._reset
+                    conf_info._reset()
                 self._setup_var_data()
 
         if isinstance(iotypes, str):
