@@ -328,12 +328,16 @@ class Jacobian(object):
                     ridxs = system._owns_approx_of_idx[key[0]]
                     if len(ridxs) == nrows:
                         ridxs = _full_slice  # value was already changed
+                    else:
+                        ridxs = ridxs.shaped_array()
                 else:
                     ridxs = _full_slice
                 if key[1] in system._owns_approx_wrt_idx:
                     cidxs = system._owns_approx_wrt_idx[key[1]]
                     if len(cidxs) == ncols:
                         cidxs = _full_slice  # value was already changed
+                    else:
+                        cidxs = cidxs.shaped_array()
                 else:
                     cidxs = _full_slice
 

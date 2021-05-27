@@ -19,6 +19,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets, convert_neg
 from openmdao.vectors.vector import _full_slice
+from openmdao.utils.indexer import indexer
 from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 
@@ -285,10 +286,6 @@ class Driver(object):
             msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
-        con_set = set()
-        obj_set = set()
-        dv_set = set()
-
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
         self._dist_driver_vars = dist_dict = {}
@@ -322,6 +319,10 @@ class Driver(object):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1 and model._subsystems_allprocs:
+            con_set = set()
+            obj_set = set()
+            dv_set = set()
+
             src_design_vars = _prom2ivc_src_dict(self._designvars)
             responses = _prom2ivc_src_dict(self._responses)
 
@@ -353,26 +354,24 @@ class Driver(object):
 
                 if meta['distributed']:
 
-                    idx = model._var_allprocs_abs2idx['nonlinear'][vname]
-                    dist_sizes = model._var_sizes['nonlinear']['output'][:, idx]
-                    total_dist_size = np.sum(dist_sizes)
+                    dist_sizes = sizes[:, i]
 
                     # Determine which indices are on our proc.
                     offsets = sizes2offsets(dist_sizes)
 
                     if indices is not None:
-                        indices = convert_neg(indices, total_dist_size)
+                        indices = indices.shaped_array()
                         true_sizes = np.zeros(nprocs, dtype=INT_DTYPE)
                         for irank in range(nprocs):
                             dist_inds = indices[np.logical_and(indices >= offsets[irank],
                                                                indices < (offsets[irank] +
                                                                           dist_sizes[irank]))]
+                            true_sizes[irank] = dist_inds.size
                             if irank == rank:
                                 local_indices = dist_inds - offsets[rank]
                                 distrib_indices = dist_inds
 
-                            true_sizes[irank] = dist_inds.size
-                        dist_dict[vname] = (local_indices, true_sizes, distrib_indices)
+                        dist_dict[vname] = (indexer(local_indices), true_sizes, distrib_indices)
                     else:
                         dist_dict[vname] = (_full_slice, dist_sizes,
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
@@ -529,7 +528,6 @@ class Driver(object):
         model = self._problem().model
         comm = model.comm
         get = model._outputs._abs_get_val
-        distributed_vars = self._dist_driver_vars
         indices = meta['indices']
 
         if meta.get('ivc_source') is not None:
@@ -538,7 +536,7 @@ class Driver(object):
             src_name = name
 
         if MPI:
-            distributed = comm.size > 0 and src_name in distributed_vars
+            distributed = comm.size > 0 and src_name in self._dist_driver_vars
         else:
             distributed = False
 
@@ -549,13 +547,13 @@ class Driver(object):
             if owner is None or rank is not None:
                 val = model.get_val(src_name, get_remote=get_remote, rank=rank, flat=True)
                 if indices is not None:
-                    val = val[indices]
+                    val = val[indices.flat()]
             else:
                 if owner == comm.rank:
                     if indices is None:
-                        val = get(name).copy()
+                        val = get(name, flat=True).copy()
                     else:
-                        val = get(name)[indices]
+                        val = get(name, flat=True)[indices.as_array()]
                 else:
                     if indices is not None:
                         size = len(indices)
@@ -566,9 +564,9 @@ class Driver(object):
 
         elif distributed:
             local_val = model.get_val(src_name, get_remote=False, flat=True)
-            local_indices, sizes, _ = distributed_vars[src_name]
-            if local_indices is not None:
-                local_val = local_val[local_indices]
+            local_indices, sizes, _ = self._dist_driver_vars[src_name]
+            if local_indices is not _full_slice:
+                local_val = local_val[local_indices()]
 
             if get_remote:
                 local_val = np.ascontiguousarray(local_val)
@@ -595,9 +593,9 @@ class Driver(object):
                     raise ValueError(msg)
 
             elif indices is None:
-                val = get(src_name).copy()
+                val = get(src_name, flat=True).copy()
             else:
-                val = get(src_name)[indices]
+                val = get(src_name, flat=True)[indices.as_array()]
 
         if self._has_scaling and driver_scaling:
             # Scale design variable values
@@ -661,10 +659,6 @@ class Driver(object):
                 problem.model._owning_rank[src_name] != problem.comm.rank):
             return
 
-        indices = meta['indices']
-        if indices is None:
-            indices = _full_slice
-
         if name in self._designvars_discrete:
 
             # Note, drivers set values here and generally should know it is setting an integer.
@@ -686,7 +680,11 @@ class Driver(object):
             if src_name in self._dist_driver_vars:
                 loc_idxs, _, dist_idxs = self._dist_driver_vars[src_name]
             else:
-                loc_idxs = indices
+                loc_idxs = meta['indices']
+                if loc_idxs is None:
+                    loc_idxs = _full_slice
+                else:
+                    loc_idxs = loc_idxs()
                 dist_idxs = _full_slice
 
             if set_remote:

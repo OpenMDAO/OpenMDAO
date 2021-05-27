@@ -18,9 +18,8 @@ except ImportError:
 import numbers
 
 import numpy as np
-import openmdao
 
-from openmdao.core.constants import INT_DTYPE
+from openmdao.core.constants import INT_DTYPE, INF_BOUND
 from openmdao.warnings import issue_warning, _warn_simple_format, warn_deprecation
 
 # Certain command line tools can make use of this to allow visualization of models when errors
@@ -378,9 +377,9 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     elif values is None:
         values = val_if_none
     elif values == float('inf'):
-        values = openmdao.INF_BOUND
+        values = INF_BOUND
     elif values == -float('inf'):
-        values = -openmdao.INF_BOUND
+        values = -INF_BOUND
     elif isinstance(values, numbers.Number):
         values = float(values)
     else:
@@ -693,7 +692,10 @@ def make_serializable(o):
     elif isinstance(o, bool) or isinstance(o, complex):
         return str(o)
     elif hasattr(o, '__dict__'):
-        return o.__class__.__name__
+        try:
+            return o.to_json()
+        except AttributeError:
+            return o.__class__.__name__
     else:
         return o
 

@@ -285,10 +285,11 @@ class TestColoringExplicit(unittest.TestCase):
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
         [1,2,7,19],
-        [1,2,5,11]
+        [1,2,5,11],
+        [True, False]
         ), name_func=_test_func_name
     )
-    def test_partials_explicit(self, method, isplit, osplit):
+    def test_partials_explicit(self, method, isplit, osplit, sparse_partials):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
@@ -296,7 +297,8 @@ class TestColoringExplicit(unittest.TestCase):
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                              isplit=isplit, osplit=osplit))
+                                                              isplit=isplit, osplit=osplit,
+                                                              sparse_partials=sparse_partials))
         comp.declare_coloring('x*', method=method)
 
         for conn in conns:
@@ -519,10 +521,11 @@ class TestColoringSemitotals(unittest.TestCase):
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
         [1,2,19],
-        [1,2,11]
+        [1,2,11],
+        [True, False]
         ), name_func=_test_func_name
     )
-    def test_simple_semitotals(self, method, isplit, osplit):
+    def test_simple_semitotals(self, method, isplit, osplit, sparse_partials):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
@@ -532,7 +535,8 @@ class TestColoringSemitotals(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
         sub.declare_coloring('*', method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit))
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit, 
+                                                            sparse_partials=sparse_partials))
 
         for conn in conns:
             model.connect(*conn)
@@ -906,10 +910,11 @@ class TestColoring(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
+        [True, False]
         ), name_func=_test_func_name
     )
     @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
-    def test_totals_of_wrt_indices(self, method):
+    def test_totals_of_wrt_indices(self, method, sparse_partials):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
@@ -929,7 +934,8 @@ class TestColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                              isplit=isplit, osplit=2))
+                                                              isplit=isplit, osplit=2,
+                                                              sparse_partials=sparse_partials))
 
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')

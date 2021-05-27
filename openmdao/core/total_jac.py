@@ -608,9 +608,7 @@ class _TotalJacInfo(object):
                     # if the var is not distributed, global_size == local size
                     irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
                 else:
-                    irange = in_idxs.copy()
-                    # correct for any negative indices
-                    irange[in_idxs < 0] += in_var_meta['global_size']
+                    irange = in_idxs.shaped_array(copy=True)
 
             else:  # name is not a design var or response  (should only happen during testing)
                 end += in_var_meta['global_size']
@@ -809,7 +807,7 @@ class _TotalJacInfo(object):
                             dist_offset = np.sum(sizes_idx[:myproc])
                             full_inds = np.arange(slc.start / ncols, slc.stop / ncols,
                                                   dtype=INT_DTYPE)
-                            inds.append(full_inds[local_idx])
+                            inds.append(full_inds[local_idx.as_array()])
                             jac_inds.append(jstart + dist_offset +
                                             np.arange(len(local_idx), dtype=INT_DTYPE))
                             if fwd or not self.get_remote:
@@ -827,7 +825,7 @@ class _TotalJacInfo(object):
                         idx_array = np.arange(slc.start // ncols, slc.stop // ncols,
                                               dtype=INT_DTYPE)
                         if indices is not None:
-                            idx_array = idx_array[indices]
+                            idx_array = idx_array[indices.flat()]
                         inds.append(idx_array)
                         jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
                         if fwd or not self.get_remote:
@@ -1619,8 +1617,8 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
-                    ofidx = of_idx[output_name] if output_name in of_idx else _full_slice
-                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else _full_slice
+                    ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
+                    wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
 
                     approxJ = approx_jac[output_name, input_name]
 
@@ -1645,8 +1643,8 @@ class _TotalJacInfo(object):
                         # constraint wrt all other inputs.
                         continue
 
-                    ofidx = of_idx[output_name] if output_name in of_idx else _full_slice
-                    wrtidx = wrt_idx[input_name] if input_name in wrt_idx else _full_slice
+                    ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
+                    wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
 
                     if prom_out == prom_in and isinstance(tot[prom_in], dict):
                         rows, cols, data = tot[prom_in]['coo']
@@ -1708,7 +1706,7 @@ class _TotalJacInfo(object):
             if zero_idxs[0].size == 0:
                 return zero_idxs
             varr = np.zeros(shape, dtype=bool)
-            varr.flat[inds[zero_idxs]] = True
+            varr.flat[inds.as_array()[zero_idxs]] = True
             zero_idxs = np.nonzero(varr)
 
         return zero_idxs
