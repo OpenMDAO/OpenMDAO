@@ -3284,7 +3284,7 @@ class System(object):
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
                         includes=None, excludes=None, tags=(), get_remote=False, rank=None,
-                        return_rel_names=True, include_post_configure=True):
+                        return_rel_names=True):
         """
         Retrieve metdata for a filtered list of variables.
 
@@ -3315,9 +3315,6 @@ class System(object):
         return_rel_names : bool
             If True, the names returned will be relative to the scope of this System. Otherwise
             they will be absolute names.
-        include_post_configure : bool
-            Include variables that have been added to child components during configure stack
-            traversal. Default is True.
 
         Returns
         -------
@@ -3332,12 +3329,13 @@ class System(object):
         rel_idx = len(prefix)
 
         # Setup any modified subsystems so the metadata dicts are up-to-date.
-        if include_post_configure and self._problem_meta:
+        if self._problem_meta:
             conf_info = self._problem_meta['config_info']
             if conf_info:
                 if self._subsystems_allprocs:
                     for s in conf_info._modified_system_iter(self):
                         s._setup_var_data()
+                    conf_info._reset
                 self._setup_var_data()
 
         if isinstance(iotypes, str):
@@ -3534,7 +3532,7 @@ class System(object):
         inputs = self.get_io_metadata(('input',), keys, includes, excludes, tags,
                                       get_remote=True,
                                       rank=None if all_procs or values else 0,
-                                      return_rel_names=False, include_post_configure=False)
+                                      return_rel_names=False)
 
         if inputs:
             to_remove = ['discrete']
@@ -3664,7 +3662,7 @@ class System(object):
         outputs = self.get_io_metadata(('output',), keys, includes, excludes, tags,
                                        get_remote=True,
                                        rank=None if all_procs or values or residuals else 0,
-                                       return_rel_names=False, include_post_configure=False)
+                                       return_rel_names=False)
 
         # filter auto_ivcs if requested
         if outputs and not list_autoivcs:

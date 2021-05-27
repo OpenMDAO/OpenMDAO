@@ -3050,9 +3050,9 @@ class Test3Deep(unittest.TestCase):
 
     def test_io_meta(self):
         p = self.build_model()
-        p.model.cfg.add_get_io('C1', return_rel_names=False, include_post_configure=False)
-        p.model.cfg.add_get_io('C2', include_post_configure=False)
-        p.model.cfg.add_get_io('sub', include_post_configure=False)
+        p.model.cfg.add_get_io('C1', return_rel_names=False)
+        p.model.cfg.add_get_io('C2')
+        p.model.cfg.add_get_io('sub')
 
         p.setup()
 
@@ -3072,7 +3072,12 @@ class Test3Deep(unittest.TestCase):
         self.check_vs_meta(p, 'cfg', res)
 
         names = self.get_matching_var_setup_counts(p, 1)
-        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
+        expected = {'', 'cfg', 'cfg.sub.C3', 'cfg.sub.C4'}
+        self.assertEqual(names, sorted(expected))
+
+        # These systems have 1 additional setup count during get_io_metadata.
+        names = self.get_matching_var_setup_counts(p, 2)
+        expected = {'cfg.C1', 'cfg.C2', 'cfg.sub'}
         self.assertEqual(names, sorted(expected))
 
     def test_io_meta_local_bad_meta_key(self):
@@ -4091,6 +4096,60 @@ class TestNaturalNamingMPI(unittest.TestCase):
 
         self.assertEqual(set(p.model._vars_to_gather),
                          {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
+
+
+class TestConfigureUpdate(unittest.TestCase):
+
+    def setUp(self):
+
+        class Middle(om.ParallelGroup):
+
+            def setup(self):
+                b = self.add_subsystem("bottom1", om.ExplicitComponent())
+                b.add_output("a", val=1, tags=["my_tag"])
+                b = self.add_subsystem("bottom2", om.ExplicitComponent())
+                b.add_output("a", val=1, tags=["my_tag"])
+
+            def configure(self):
+                self.bottom1.add_output("b", val=1, tags=["my_tag"])
+                self.bottom2.add_output("b", val=1, tags=["my_tag"])
+
+            def nom_get_metadata(self):
+                for system in self._subsystems_myproc:
+                    metadata = system.get_io_metadata(iotypes=["output"], metadata_keys=["tags"], tags="my_tag", get_remote=True)
+                    assert(list(metadata.keys()) == ['a', 'b', 'c'])
+
+                metadata = self.get_io_metadata(iotypes=["output"], metadata_keys=["tags"], tags="my_tag", get_remote=True)
+                assert(list(metadata.keys()) == ['bottom1.a', 'bottom1.b', 'bottom1.c',
+                                                 'bottom2.a', 'bottom2.b', 'bottom2.c'])
+
+            def nom_add_output(self):
+                self.bottom1.add_output("c", val=1, tags=["my_tag"])
+                self.bottom2.add_output("c", val=1, tags=["my_tag"])
+
+        class Top(om.Group):
+
+            def setup(self):
+                self.add_subsystem("middle", Middle())
+
+            def configure(self):
+                self.middle.nom_add_output()
+                self.middle.nom_get_metadata()
+
+        p = om.Problem()
+        p.model = Top()
+        self.problem = p
+
+    def test_config_update(self):
+        p = self.problem
+        p.setup()
+
+
+class TestConfigureUpdateMPI(TestConfigureUpdate):
+    """
+    Runs test in TestConfigureUpdate with 2 procs to make sure the metadata is gathered correctly.
+    """
+    N_PROCS = 2
 
 
 if __name__ == "__main__":
