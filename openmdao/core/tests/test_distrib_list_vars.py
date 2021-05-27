@@ -12,6 +12,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
+from openmdao.utils.testing_utils import use_tempdirs
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
 from openmdao.test_suite.components.distributed_components import DistribComp, Summer
@@ -60,6 +61,7 @@ class DistributedAdder(om.ExplicitComponent):
         outputs['y'] = inputs['x'] + 10.
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedListVarsTest(unittest.TestCase):
 
@@ -553,6 +555,7 @@ class DistributedListVarsTest(unittest.TestCase):
         assert_near_equal(prob['C3.sum'], -5.)
 
 
+@use_tempdirs
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class MPIFeatureTests(unittest.TestCase):

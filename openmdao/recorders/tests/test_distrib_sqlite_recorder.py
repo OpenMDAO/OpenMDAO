@@ -7,15 +7,15 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
-from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_warnings
+from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
@@ -93,6 +93,7 @@ class Mygroup(om.Group):
         self.add_constraint('c', lower=-3.)
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedRecorderTest(unittest.TestCase):
 

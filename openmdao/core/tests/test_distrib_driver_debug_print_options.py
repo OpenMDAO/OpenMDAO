@@ -6,6 +6,7 @@ from io import StringIO
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ParallelGroup
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -13,6 +14,7 @@ except ImportError:
     PETScVector = None
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):

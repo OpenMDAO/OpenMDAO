@@ -1,10 +1,11 @@
 """Test N2 with MPI and more than one process."""
-
 import os
 import unittest
+
 import openmdao.api as om
-from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.visualization.n2_viewer.n2_viewer import n2
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -15,6 +16,7 @@ except ImportError:
 DEBUG = False
 OUTFILE = 'n2test.html'
 
+
 # Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
 class myComp(om.ExplicitComponent):
     def setup(self):
@@ -23,6 +25,7 @@ class myComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         outputs['x3'] = inputs['x2'] + 1
+
 
 class Top(om.Group):
     def setup(self):
@@ -34,6 +37,8 @@ class Top(om.Group):
 
         self.connect('indep_var.x1', 'myComp.x2')
 
+
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2

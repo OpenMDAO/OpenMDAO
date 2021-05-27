@@ -38,6 +38,7 @@ DEBUG_BROWSER = False
 DEBUG_FILES = False
 
 
+@use_tempdirs
 class TestViewModelData(unittest.TestCase):
 
     def setUp(self):

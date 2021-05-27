@@ -6,6 +6,7 @@ import openmdao.api as om
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 # check that pyoptsparse is installed
@@ -470,6 +471,7 @@ def make_traj():
     return traj
 
 
+@use_tempdirs
 @unittest.skipUnless(OPTIMIZER, "This test requires pyOptSparseDriver.")
 class TestMPIColoringBug(unittest.TestCase):
     N_PROCS = 2
