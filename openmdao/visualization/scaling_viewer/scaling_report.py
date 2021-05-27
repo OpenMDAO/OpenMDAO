@@ -9,7 +9,7 @@ from collections import defaultdict
 import numpy as np
 
 import openmdao
-from openmdao.core.constants import _SetupStatus
+from openmdao.core.constants import _SetupStatus, INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
@@ -52,7 +52,7 @@ def _scale(val, scaler, adder, unset=''):
 def _getdef(val, unset):
     if val is None:
         return unset
-    if np.isscalar(val) and (val == openmdao.INF_BOUND or val == -openmdao.INF_BOUND):
+    if np.isscalar(val) and (val == INF_BOUND or val == -INF_BOUND):
         return unset
     return val
 
@@ -69,7 +69,7 @@ def _get_flat(val, size, unset=''):
     if val is None:
         return val
     if np.isscalar(val):
-        if (val == openmdao.INF_BOUND or val == -openmdao.INF_BOUND):
+        if (val == INF_BOUND or val == -INF_BOUND):
             val = unset
         return np.full(size, val)
     if val.size > 1:

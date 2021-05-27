@@ -92,11 +92,44 @@ class ExplCompTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-    def test_feature_simple(self):
+    def test_add_input_output_retval(self):
+        # check basic metadata expected in return value
+        expected = {
+            'value': 3,
+            'shape': (1,),
+            'size': 1,
+            'units': 'ft',
+            'desc': '',
+            'tags': set(),
+        }
+        expected_discrete = {
+            'value': 3,
+            'type': int,
+            'desc': '',
+            'tags': set(),
+        }
 
-        prob = om.Problem(RectangleComp())
+        class Comp(om.ExplicitComponent):
+            def setup(self):
+                meta = self.add_input('x', val=3.0, units='ft')
+                for key, val in expected.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_discrete_input('x_disc', val=3)
+                for key, val in expected_discrete.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_output('y', val=3.0, units='ft')
+                for key, val in expected.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_discrete_output('y_disc', val=3)
+                for key, val in expected_discrete.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', Comp())
         prob.setup()
-        prob.run_model()
 
     def test_compute_and_list(self):
         prob = om.Problem(RectangleGroup())
