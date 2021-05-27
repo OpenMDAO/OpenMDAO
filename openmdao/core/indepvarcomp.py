@@ -151,6 +151,12 @@ class IndepVarComp(ExplicitComponent):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
+
         """
         if res_units is not None:
             warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
@@ -193,7 +199,7 @@ class IndepVarComp(ExplicitComponent):
                   'res_ref': res_ref, 'tags': tags, 'shape_by_conn': shape_by_conn,
                   'copy_shape': copy_shape, 'distributed': distributed,
                   }
-        super().add_output(name, val, **kwargs)
+        return super().add_output(name, val, **kwargs)
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
@@ -210,6 +216,12 @@ class IndepVarComp(ExplicitComponent):
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
+
         """
         if tags is None:
             tags = {'indep_var'}
@@ -217,7 +229,7 @@ class IndepVarComp(ExplicitComponent):
             tags = make_set(tags, name='tags') | {'indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
-        super().add_discrete_output(name, val, **kwargs)
+        return super().add_discrete_output(name, val, **kwargs)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
@@ -294,6 +306,12 @@ class _AutoIndepVarComp(IndepVarComp):
         units : str or None
             Units in which the output variables will be provided to the component during execution.
             Default is None, which means it has no units.
+
+        Returns
+        -------
+        dict
+            metadata for added variable
+
         """
         # Add the output quickly.
         # We don't need to check for errors because we get the value straight from a
@@ -320,3 +338,4 @@ class _AutoIndepVarComp(IndepVarComp):
         self._static_var_rel2meta[name] = metadata
         self._static_var_rel_names['output'].append(name)
         self._var_added(name)
+        return metadata
