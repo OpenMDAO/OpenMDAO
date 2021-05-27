@@ -3050,9 +3050,9 @@ class Test3Deep(unittest.TestCase):
 
     def test_io_meta(self):
         p = self.build_model()
-        p.model.cfg.add_get_io('C1', return_rel_names=False)
-        p.model.cfg.add_get_io('C2')
-        p.model.cfg.add_get_io('sub')
+        p.model.cfg.add_get_io('C1', return_rel_names=False, include_post_configure=False)
+        p.model.cfg.add_get_io('C2', include_post_configure=False)
+        p.model.cfg.add_get_io('sub', include_post_configure=False)
 
         p.setup()
 
