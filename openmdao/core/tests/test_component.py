@@ -362,8 +362,8 @@ class TestRangePartials(unittest.TestCase):
         prob = Problem(model=comp)
 
         with assert_warning(OMDeprecationWarning,
-                            f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input` is"
-                            "deprecated and will become an error in a future release.  Add "
+                            f"<model> <class RangePartialsComp>: Passing `src_indices` as an arg to `add_input('v1', ...` is"
+                            " deprecated and will become an error in a future release.  Add "
                             "`src_indices` to a `promotes` or `connect` call instead."):
             prob.setup()
 

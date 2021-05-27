@@ -1,12 +1,7 @@
 """Test for a feature doc showing how to use cache_linear_solution"""
-from distutils.version import LooseVersion
 import unittest
-from copy import deepcopy
-from io import StringIO
-
 
 import numpy as np
-import scipy
 from scipy.sparse.linalg import gmres
 
 import openmdao.api as om
@@ -16,14 +11,6 @@ from openmdao.utils.assert_utils import assert_near_equal
 class CacheLinearTestCase(unittest.TestCase):
 
     def test_feature_cache_linear(self):
-
-        from distutils.version import LooseVersion
-        import numpy as np
-        import scipy
-        from scipy.sparse.linalg import gmres
-
-        import openmdao.api as om
-
 
         class QuadraticComp(om.ImplicitComponent):
             """

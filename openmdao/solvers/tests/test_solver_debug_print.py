@@ -148,12 +148,6 @@ class TestNonlinearSolvers(unittest.TestCase):
             run_model(p, ignore_exception=False)
 
     def test_solver_debug_print_feature(self):
-        from distutils.version import LooseVersion
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
-        from openmdao.utils.general_utils import printoptions
 
         p = om.Problem()
         model = p.model

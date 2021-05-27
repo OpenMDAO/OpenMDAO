@@ -553,9 +553,6 @@ class TestMultipleErrors(unittest.TestCase):
 class TestFeature(unittest.TestCase):
 
     def test(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         n = 24
 
@@ -588,9 +585,6 @@ class TestFeature(unittest.TestCase):
         assert_near_equal(p.get_val('cross_prod_comp.torque', units='ft*lbf'), np.array(expected), tolerance=1e-8)
 
     def test_multiple(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         n = 24
 

@@ -867,8 +867,6 @@ class DiscretePromTestCase(unittest.TestCase):
 class DiscreteFeatureTestCase(unittest.TestCase):
 
     def test_feature_discrete(self):
-        import numpy as np
-        import openmdao.api as om
 
         class BladeSolidity(om.ExplicitComponent):
             def setup(self):
@@ -909,7 +907,6 @@ class DiscreteFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
 
     def test_feature_discrete_implicit(self):
-        import openmdao.api as om
 
         class ImpWithInitial(om.ImplicitComponent):
             """

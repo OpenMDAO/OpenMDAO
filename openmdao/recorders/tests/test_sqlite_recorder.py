@@ -7,14 +7,13 @@ import numpy as np
 
 import sqlite3
 
-from shutil import rmtree
-from tempfile import mkdtemp
-
 import openmdao.api as om
 
+from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
     SellarProblem, SellarStateConnection, SellarProblemWithArrays, SellarDis1, SellarDis2
+from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits, SellarMDA
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoStates
@@ -38,13 +37,6 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-try:
-    # do not show matplotlib plots
-    import matplotlib.pyplot as plt
-    plt.switch_backend('Agg')
-except ImportError:
-    plt = None
 
 
 class Cycle(om.Group):
@@ -2536,8 +2528,6 @@ class TestSqliteRecorder(unittest.TestCase):
 class TestFeatureSqliteRecorder(unittest.TestCase):
 
     def test_feature_simple_driver_recording(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
 
@@ -2576,8 +2566,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(case.outputs['y'], -7.83333333, 1e-6)
 
     def test_feature_problem_metadata(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(SellarDerivatives())
 
@@ -2617,8 +2605,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                          ['_auto_ivc', 'con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp'])
 
     def test_feature_problem_metadata_with_driver_information(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(SellarDerivatives())
         model = prob.model
@@ -2666,8 +2652,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
     def test_feature_solver_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         # configure a Newton solver with linesearch for the Sellar MDA Group
         newton = om.NewtonSolver(solve_subsystems=True, max_sub_solves=4)
@@ -2712,8 +2696,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(options['mda.BoundsEnforceLS']['bound_enforcement'], 'wall')
 
     def test_feature_system_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
         prob = om.Problem(model=SellarDerivativesGrouped())
         prob.add_recorder(om.SqliteRecorder("cases.sql"))
@@ -2750,8 +2732,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(options['root']['nl_maxiter'], 9)
 
     def test_feature_system_recording_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
@@ -2779,9 +2759,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(sorted(case.inputs.keys()), ['y1', 'y2', 'z'])
 
     def test_feature_basic_case_recording(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
-        import numpy as np
 
         # build the model
         prob = om.Problem(model=SellarMDAWithUnits())
@@ -2838,10 +2815,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(constraints['con1'], -1.68550507e-10, 1e-4)
 
     def test_feature_driver_recording_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        import numpy as np
 
         prob = om.Problem(model=SellarDerivatives())
 
@@ -2892,8 +2865,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(last_case['y1'], prob['y1'], 1e-10)
 
     def test_feature_solver_recording_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
@@ -2919,8 +2890,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertAlmostEqual(case.abs_err, 2.2545141)
 
     def test_feature_circuit_with_recorder(self):
-        import openmdao.api as om
-        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
         class Circuit(om.Group):
 
@@ -2983,10 +2952,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         #######################################################################
         # Do the initial optimization run
         #######################################################################
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        import numpy as np
 
         prob = om.Problem(model=SellarDerivatives())
 
@@ -3020,8 +2985,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # To debug the problem, we can run the script again, but this time using
         # the last recorded case as a starting point.
         #######################################################################
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         model = prob.model
@@ -3055,8 +3018,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         prob.cleanup()
 
     def test_feature_record_with_prefix(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.setup()
@@ -3094,10 +3055,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         ]))
 
     def test_feature_problem_record(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        import numpy as np
 
         prob = om.Problem(model=SellarDerivatives())
 
@@ -3146,10 +3103,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(constraints, case.get_constraints(), 1e-1)
 
     def test_scaling_multiple_calls(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        import numpy as np
 
         scaler = 2.
 
@@ -3269,9 +3222,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDAWithUnits
 
         # build the model
         prob = om.Problem(model=SellarMDAWithUnits())
@@ -3315,8 +3265,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         prob.cleanup()
 
     def test_feature_system_recorder(self):
-        import numpy as np
-        import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -3335,11 +3283,7 @@ class TestFeatureAdvancedExample(unittest.TestCase):
                            3.16, 3.16, 3.16, 3.16, 3.16, 3.16, 3.16],
                           tolerance=1e-1)
 
-    @unittest.skipIf(not plt, "requires matplotlib")
     def test_feature_solver_recorder(self):
-        import numpy as np
-        import matplotlib.pyplot as plt
-        import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -3349,36 +3293,12 @@ class TestFeatureAdvancedExample(unittest.TestCase):
 
         self.assertEqual(f"Number of cases: {len(solver_cases)}", "Number of cases: 76")
 
-        # Plot the convergence of the two coupling variables (last 35 iterations)
-        y1_history = []
-        y2_history = []
-
-        for case_id in solver_cases[-35:]:
-            case = cr.get_case(case_id)
-            y1_history.append(case['y1'])
-            y2_history.append(case['y2'])
-
-        iterations = np.arange(-len(y1_history), 0, 1)
-
-        fig, (ax1, ax2) = plt.subplots(2, 1)
-
-        ax1.plot(iterations, np.array(y1_history))
-        ax1.set(ylabel='Coupling Output: y1', title='Solver History')
-        ax1.grid()
-
-        ax2.plot(iterations, np.array(y2_history))
-        ax2.set(ylabel='Coupling Parameter: y2', xlabel='Iterations')
-        ax2.grid()
-
-        plt.show()
-
         # Get the final values
         case = cr.get_case(solver_cases[-1])
         assert_near_equal(case['y1'], 3.16, 1e-8)
         assert_near_equal(case['y2'], 3.75527777, 1e-8)
 
     def test_feature_driver_recorder(self):
-        import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -3399,7 +3319,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(constraints['con2'], -20.24472223, 1e-8)
 
     def test_feature_problem_recorder(self):
-        import openmdao.api as om
 
         # Instantiate your CaseReader
         cr = om.CaseReader("cases.sql")
@@ -3420,43 +3339,6 @@ class TestFeatureAdvancedExample(unittest.TestCase):
         assert_near_equal(case.get_constraints(), {'con1': 0., 'con2': -20.2447}, tolerance=1e-4)
         assert_near_equal(case.get_objectives(), {'obj': 3.18339395}, tolerance=1e-4)
 
-    @unittest.skipIf(not plt, "requires matplotlib")
-    def test_feature_plot_des_vars(self):
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import openmdao.api as om
-
-        # Instantiate your CaseReader
-        cr = om.CaseReader("cases.sql")
-
-        # List driver cases (do not recurse to system/solver cases, suppress display)
-        driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
-
-        # Plot the path the design variables took to convergence
-        # Note that there are two lines in the right plot because "Z"
-        # contains two variables that are being optimized
-        dv_x_values = []
-        dv_z_values = []
-        for case_id in driver_cases:
-            case = cr.get_case(case_id)
-            design_vars = case.get_design_vars()
-            dv_x_values.append(design_vars['x'])
-            dv_z_values.append(design_vars['z'])
-
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
-        ax1.plot(np.arange(len(dv_x_values)), np.array(dv_x_values))
-
-        ax1.set(xlabel='Iterations', ylabel='Design Var: X', title='Optimization History')
-        ax1.grid()
-
-        ax2.plot(np.arange(len(dv_z_values)), np.array(dv_z_values))
-
-        ax2.set(xlabel='Iterations', ylabel='Design Var: Z', title='Optimization History')
-        ax2.grid()
-
-        plt.show()
-
 
 @use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):
@@ -3465,10 +3347,6 @@ class TestFeatureBasicRecording(unittest.TestCase):
         self.record_cases()
 
     def record_cases(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
-        import numpy as np
 
         # create our Sellar problem
         prob = om.Problem(model=SellarMDA())
@@ -3504,7 +3382,6 @@ class TestFeatureBasicRecording(unittest.TestCase):
         prob.cleanup()
 
     def test_read_cases(self):
-        import openmdao.api as om
 
         # open database of previously saved cases
         cr = om.CaseReader("cases.sql")

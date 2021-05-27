@@ -314,9 +314,6 @@ class TestLinearSystemComp(unittest.TestCase):
         self.assertTrue(abs_errors[0] < 1.e-6)
 
     def test_feature_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         model = om.Group()
 
@@ -339,9 +336,6 @@ class TestLinearSystemComp(unittest.TestCase):
         assert_near_equal(prob.get_val('lin.x'), np.array([0.36423841, -0.00662252, -0.4205298 ]), .0001)
 
     def test_feature_vectorized(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         model = om.Group()
 
@@ -366,9 +360,6 @@ class TestLinearSystemComp(unittest.TestCase):
                          .0001)
 
     def test_feature_vectorized_A(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         model = om.Group()
 

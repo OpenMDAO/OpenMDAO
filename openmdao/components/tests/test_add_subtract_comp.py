@@ -424,10 +424,6 @@ class TestFeature(unittest.TestCase):
         """
         A simple example to compute the resultant force on an aircraft and demonstrate the AddSubtract component
         """
-        import numpy as np
-
-        import openmdao.api as om
-
         n = 3
 
         p = om.Problem()

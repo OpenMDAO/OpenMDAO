@@ -2,16 +2,14 @@ import unittest
 
 import numpy as np
 
+import openmdao.api as om
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 from openmdao.utils.assert_utils import assert_near_equal
 
 
 class TestSellarMDAPromoteConnect(unittest.TestCase):
 
     def test_sellar_mda_promote(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
         class SellarMDA(om.Group):
             """
@@ -57,10 +55,6 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                          (2.10951651, -0.54758253,  6.8385845,  1.05048349, -24.54758253), 1e-5)
 
     def test_sellar_mda_promote_in_configure(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
         class SellarMDA(om.Group):
             """
@@ -107,10 +101,6 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                          (2.10951651, -0.54758253,  6.8385845,  1.05048349, -24.54758253), 1e-5)
 
     def test_sellar_mda_connect(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
         class SellarMDAConnect(om.Group):
             """
@@ -158,10 +148,6 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
 
     def test_sellar_mda_promote_connect(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
 
         class SellarMDAPromoteConnect(om.Group):
             """

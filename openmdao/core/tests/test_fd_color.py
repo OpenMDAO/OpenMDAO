@@ -13,7 +13,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver
+    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs, rand_sparsity
 from openmdao.utils.mpi import MPI
@@ -954,6 +954,50 @@ class TestColoring(unittest.TestCase):
         cols = [0,2,3,4]
         rows = [1,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :][:, cols], method)
+
+    def test_no_solver_linearize(self):
+        # this raised a singularity error before the fix
+        class Get_val_imp(ImplicitComponent):
+            def initialize(self):
+                self.options.declare('size',default=1)
+            def setup(self):
+                size = self.options['size']
+                self.add_output('state',val=5.0*np.ones(size))
+                self.add_input('bar',val=1.4*np.ones(size))
+                self.add_input('foobar')
+
+                self.nonlinear_solver = NewtonSolver()
+                self.linear_solver = DirectSolver()
+
+                self.nonlinear_solver.options['iprint'] = 2
+                self.nonlinear_solver.options['maxiter']=1
+                self.nonlinear_solver.options['solve_subsystems']=False
+
+                self.declare_partials(of="*", wrt="*", method="fd")
+
+                self.declare_coloring(method="fd", num_full_jacs=2)
+
+            def apply_nonlinear(self,inputs,outputs,residuals):
+                foo = outputs['state']
+                bar = inputs['bar']
+
+                area_ratio = 1 / foo * np.sqrt(1/(bar+1)* (1/foo**2))
+
+                residuals['state']=inputs['foobar']-area_ratio
+
+        size = 3
+
+        ivc = IndepVarComp()
+        ivc.add_output('bar',val=1.4*np.ones(size))
+        ivc.add_output('foobar',val=40)
+
+
+        p = Problem()
+        p.model.add_subsystem('ivc',ivc,promotes=['*'])
+        p.model.add_subsystem('comp_check', Get_val_imp(size=size))
+        p.model.connect('bar','comp_check.bar')
+        p.setup()
+        p.run_model()
 
 
 class TestStaticColoring(unittest.TestCase):

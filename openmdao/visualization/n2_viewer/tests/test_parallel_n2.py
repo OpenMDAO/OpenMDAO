@@ -17,12 +17,9 @@ OUTFILE = 'n2test.html'
 
 # Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
 class myComp(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
-        self.add_input('x2')
-        self.add_output('x3', shape=MPI.COMM_WORLD.rank)
+        self.add_input('x2', distributed=True)
+        self.add_output('x3', shape=MPI.COMM_WORLD.rank, distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['x3'] = inputs['x2'] + 1

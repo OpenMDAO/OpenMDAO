@@ -8,12 +8,7 @@ from openmdao.test_suite.components.quad_implicit import QuadraticComp
 
 class TestQuadImplicit(unittest.TestCase):
 
-
-
     def test_check_partials_for_docs(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.quad_implicit import QuadraticComp
 
         p = om.Problem()
 

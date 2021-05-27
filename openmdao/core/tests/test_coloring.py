@@ -628,9 +628,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_simul_coloring_example(self):
 
-        import numpy as np
-        import openmdao.api as om
-
         SIZE = 10
 
         p = om.Problem()
@@ -704,9 +701,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
 
     def test_total_and_partial_coloring_example(self):
-
-        import numpy as np
-        import openmdao.api as om
 
         class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):

@@ -541,26 +541,5 @@ class TestEQConstraintComp(unittest.TestCase):
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
 
-class TestFeatureEQConstraintComp(unittest.TestCase):
-
-    def test_feature_sellar_idf(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarIDF
-
-        prob = om.Problem(model=SellarIDF())
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=True)
-        prob.setup()
-        prob.run_driver()
-
-        assert_near_equal(prob.get_val('x'), 0., 1e-5)
-
-        assert_near_equal([prob.get_val('y1'), prob.get_val('d1.y1')], [[3.16], [3.16]], 1e-5)
-        assert_near_equal([prob.get_val('y2'), prob.get_val('y2')], [[3.7552778], [3.7552778]], 1e-5)
-
-        assert_near_equal(prob.get_val('z'), [1.977639, 0.], 1e-5)
-
-        assert_near_equal(prob.get_val('obj_cmp.obj'), 3.18339395045, 1e-5)
-
-
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()

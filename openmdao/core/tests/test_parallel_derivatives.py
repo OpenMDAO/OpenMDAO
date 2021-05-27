@@ -5,14 +5,11 @@ from io import StringIO
 import sys
 import unittest
 import time
-import random
 from distutils.version import LooseVersion
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.components.sellar import SellarDerivatives, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
@@ -663,12 +660,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_feature_rev(self):
-        import time
-
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
 
@@ -685,12 +676,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
     def test_feature_fwd(self):
-        import time
-
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
 
@@ -707,12 +692,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         assert_near_equal(J['ParallelGroup1.Con2.y']['Comp1.x'][0], np.ones(size)*-3., 1e-6)
 
     def test_fwd_vs_rev(self):
-        import time
-
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
 

@@ -229,6 +229,10 @@ def _meta_model_cmd(options, user_args):
         mm_names = list(metamodels.keys())
         mm_count = len(mm_names)
 
+        def _mm_list(mm_names, options):
+            for mm in mm_names:
+                print("openmdao view_mm -m {} {}".format(mm, options.file[0]))
+
         if mm_count == 0:
             print("No Metamodel components found in model.")
 
@@ -237,14 +241,24 @@ def _meta_model_cmd(options, user_args):
             view_metamodel(comp, resolution, port_number, browser)
 
         else:
-            try_str = "Try one of the following: {}.".format(mm_names)
-
             if not pathname:
-                print("\nMetamodel not specified. {}".format(try_str))
+                print("\nMetamodel not specified. Try one of the following:\n")
+                _mm_list(mm_names, options)
             elif not comp:
-                print("\nMetamodel '{}' not found.\n {}".format(pathname, try_str))
+                if len(mm_names) > 1:
+                    print("\nMetamodel '{}' not found. Try one of the "
+                          "following:\n".format(pathname))
+                else:
+                    print("\nMetamodel '{}' not found. Try the "
+                          "following:\n".format(pathname))
+                _mm_list(mm_names, options)
             else:
-                print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+                if len(mm_names) > 1:
+                    print("\n'{}' is not a Metamodel. Try one of the "
+                          "following:\n".format(pathname))
+                else:
+                    print("\n'{}' is not a Metamodel. Try the following:\n".format(pathname))
+                _mm_list(mm_names, options)
         exit()
 
     hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)

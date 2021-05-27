@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 import openmdao.api as om
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.warnings import OMDeprecationWarning
 
@@ -25,8 +28,6 @@ class L2(om.ExplicitComponent):
 
 class TestAdder(unittest.TestCase):
     def test_adder(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -109,42 +110,33 @@ class E(om.ExplicitComponent):
 
 
 class B_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
-        self.add_input('in', copy_shape='out')
-        self.add_output('out', shape_by_conn=True)
+        self.add_input('in', copy_shape='out', distributed=True)
+        self.add_output('out', shape_by_conn=True, distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = inputs['in']
 
 
 class C_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
         if self.comm.rank == 0:
-            self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int))
+            self.add_input('in', shape=1, src_indices=np.arange(0,1, dtype=int), distributed=True)
         elif self.comm.rank == 1:
-            self.add_input('in', shape=2, src_indices=np.arange(1,3, dtype=int))
+            self.add_input('in', shape=2, src_indices=np.arange(1,3, dtype=int), distributed=True)
         else:
-            self.add_input('in', shape=0, src_indices=np.arange(3,3, dtype=int))
+            self.add_input('in', shape=0, src_indices=np.arange(3,3, dtype=int), distributed=True)
 
-        self.add_output('out', shape=3)
+        self.add_output('out', shape=3, distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = np.sum(inputs['in']) * (self.comm.rank + 1)
 
 
 class D_distrib(om.ExplicitComponent):
-    def initialize(self):
-        self.options['distributed'] = True
-
     def setup(self):
-        self.add_input('in', shape_by_conn=True)
-        self.add_output('out', copy_shape='in')
+        self.add_input('in', shape_by_conn=True, distributed=True)
+        self.add_output('out', copy_shape='in', distributed=True)
 
     def compute(self, inputs, outputs):
         outputs['out'] = inputs['in']
@@ -296,38 +288,15 @@ class DistribDynShapeComp(om.ExplicitComponent):
     def __init__(self, n_inputs=1):
         super().__init__()
         self.n_inputs = n_inputs
-        self.options['distributed'] = True
 
     def setup(self):
         for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
-            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
+            self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}", distributed=True)
+            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}", distributed=True)
 
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
-
-
-class DistribComp(om.ExplicitComponent):
-    # a distributed component with inputs and outputs that are not dynamically shaped
-    def __init__(self, global_size, n_inputs=2):
-        super().__init__()
-        self.n_inputs = n_inputs
-        self.global_size = global_size
-        self.options['distributed'] = True
-
-    def setup(self):
-        # evenly distribute the variable over the procs
-        ave, res = divmod(self.global_size, self.comm.size)
-        sizes = [ave + 1 if p < res else ave for p in range(self.comm.size)]
-
-        for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]))
-            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]))
-
-    def compute(self, inputs, outputs):
-        for i in range(self.n_inputs):
-            outputs[f"y{i+1}"] = (self.comm.rank + 1)*inputs[f"x{i+1}"]
 
 
 class DynShapeGroupSeries(om.Group):
@@ -664,9 +633,6 @@ class DynPartialsComp(om.ExplicitComponent):
 
 class TestDynShapeFeature(unittest.TestCase):
     def test_feature_fwd(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones(5)))
@@ -682,9 +648,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'indeps.x'], np.eye(5)*3.)
 
     def test_feature_rev(sefl):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('comp', DynPartialsComp())
@@ -696,8 +659,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
 
     def test_feature_middle(self):
-        import numpy as np
-        import openmdao.api as om
 
         class PartialsComp(om.ExplicitComponent):
             def setup(self):
@@ -729,6 +690,7 @@ class DistCompDiffSizeKnownInput(om.ExplicitComponent):
         size = (self.comm.rank + 1) * 3
         self.add_input('x', val=np.random.random(size), distributed=True)
 
+
 class DistCompKnownInput(om.ExplicitComponent):
     def setup(self):
         size = 3
@@ -736,6 +698,7 @@ class DistCompKnownInput(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         pass
+
 
 class DistCompUnknownInput(om.ExplicitComponent):
     def setup(self):

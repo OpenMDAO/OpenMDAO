@@ -588,8 +588,6 @@ class TestMultipleErrors(unittest.TestCase):
 class TestFeature(unittest.TestCase):
 
     def test(self):
-        import numpy as np
-        import openmdao.api as om
 
         nn = 2
 
@@ -617,8 +615,6 @@ class TestFeature(unittest.TestCase):
                           tolerance=1.0E-8)
 
     def test_multiple(self):
-        import numpy as np
-        import openmdao.api as om
 
         nn = 2
 

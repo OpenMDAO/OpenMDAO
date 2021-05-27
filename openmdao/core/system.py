@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning
+    UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
@@ -148,6 +148,8 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_finite_difference : bool
+        When True, this system is undergoing finite differencing.
     under_approx : bool
         When True, this system is undergoing approximation.
     iter_count : int
@@ -448,6 +450,7 @@ class System(object):
         self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
+        self.under_finite_difference = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -722,17 +725,18 @@ class System(object):
         str
             The absolute name of the source variable.
         """
-        if self._problem_meta is None or 'prom2abs' not in self._problem_meta:
+        try:
+            prom2abs = self._problem_meta['prom2abs']
+        except StandardError:
             raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
-                               "before Problem.setup is complete.")
+                               "before Problem.setup has been called.")
 
-        model = self._problem_meta['model_ref']()
-        prom2abs = self._problem_meta['prom2abs']
-        if name in prom2abs['input']:
-            name = prom2abs['input'][name][0]
-        elif name in prom2abs['output']:
+        if name in prom2abs['output']:
             return prom2abs['output'][name][0]
 
+        if name in prom2abs['input']:
+            name = prom2abs['input'][name][0]
+        model = self._problem_meta['model_ref']()
         if name in model._conn_global_abs_in2out:
             return model._conn_global_abs_in2out[name]
 
@@ -1133,7 +1137,7 @@ class System(object):
                     scheme._reset()  # force a re-initialization of approx
                     approx_scheme._during_sparsity_comp = True
 
-            self.run_linearize()
+            self.run_linearize(sub_do_ln=False)
 
         sparsity, sp_info = self._jacobian.get_sparsity()
 
@@ -2637,6 +2641,10 @@ class System(object):
         dvs['indices'] = indices
         dvs['parallel_deriv_color'] = parallel_deriv_color
         dvs['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs:
+            warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding design "
+                             f"variable '{name}' is deprecated and will be removed in a future "
+                             "release.")
 
         design_vars[name] = dvs
 
@@ -2841,6 +2849,9 @@ class System(object):
 
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['vectorize_derivs'] = vectorize_derivs
+        if vectorize_derivs:
+            warn_deprecation(f"{self.msginfo}: The 'vectorize_derivs' arg when adding response "
+                             f"'{name}' is deprecated and will be removed in a future release.")
 
         responses[name] = resp
 
@@ -3877,7 +3888,7 @@ class System(object):
         with self._scaled_context_all():
             do_ln = self._linear_solver is not None and self._linear_solver._linearize_children()
             self._linearize(self._assembled_jac, sub_do_ln=do_ln)
-            if self._linear_solver is not None:
+            if self._linear_solver is not None and sub_do_ln:
                 self._linear_solver._linearize()
 
     def _apply_nonlinear(self):
@@ -4073,6 +4084,20 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_finite_difference_mode(self, active):
+        """
+        Turn on or off finite difference mode.
+
+        Recurses to turn on or off finite difference mode in all subsystems.
+
+        Parameters
+        ----------
+        active : bool
+            Finite difference flag; set to True prior to commencing finite difference.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_finite_difference = active
 
     def _set_complex_step_mode(self, active):
         """

@@ -126,15 +126,12 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         class DistribComp(om.ExplicitComponent):
 
-            def initialize(self):
-                self.options['distributed'] = True
-
             def setup(self):
                 rank = self.comm.rank
                 sizes, offsets = evenly_distrib_idxs(self.comm.size, N)
 
-                self.add_input('x', shape=1, src_indices=[0])
-                self.add_output('y', shape=sizes[rank])
+                self.add_input('x', shape=1, src_indices=[0], distributed=True)
+                self.add_output('y', shape=sizes[rank], distributed=True)
 
             def compute(self, inputs, outputs):
                 rank = self.comm.rank

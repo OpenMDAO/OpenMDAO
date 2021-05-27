@@ -23,9 +23,6 @@ except ImportError:
 class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
     def test_interp_spline_akima(self):
-        import numpy as np
-
-        from openmdao.components.interp_util.interp import InterpND
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -49,9 +46,6 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                           tolerance=1e-6)
 
     def test_interp_spline_akima_derivs(self):
-        import numpy as np
-
-        from openmdao.components.interp_util.interp import InterpND
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -75,9 +69,6 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                           tolerance=1e-6)
 
     def test_interp_spline_bsplines(self):
-        import numpy as np
-
-        from openmdao.components.interp_util.interp import InterpND
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -102,9 +93,6 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
                           tolerance=1e-6)
 
     def test_table_interp(self):
-        import numpy as np
-
-        from openmdao.components.interp_util.interp import InterpND
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -447,9 +435,6 @@ class TestInterpNDPython(unittest.TestCase):
             self.assertLess(max(delta), .25)
 
     def test_interp_akima_derivs(self):
-        import numpy as np
-
-        from openmdao.components.interp_util.interp import InterpND
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])

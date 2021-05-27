@@ -28,8 +28,6 @@ class DistributedAdder(om.ExplicitComponent):
     """
 
     def initialize(self):
-        self.options['distributed'] = True
-
         self.options.declare('size', types=int, default=1,
                              desc="Size of input and output vectors.")
 
@@ -50,9 +48,9 @@ class DistributedAdder(om.ExplicitComponent):
         start = local_offset
         end = local_offset + local_size
 
-        self.add_input('x', val=np.zeros(local_size, float),
+        self.add_input('x', val=np.zeros(local_size, float), distributed=True,
                        src_indices=np.arange(start, end, dtype=int))
-        self.add_output('y', val=np.zeros(local_size, float))
+        self.add_output('y', val=np.zeros(local_size, float), distributed=True)
 
     def compute(self, inputs, outputs):
 
@@ -562,9 +560,6 @@ class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
     def test_distribcomp_list_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
         size = 15
 

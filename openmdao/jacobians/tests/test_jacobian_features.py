@@ -413,10 +413,6 @@ class TestJacobianFeatures(unittest.TestCase):
 
 class TestJacobianForDocs(unittest.TestCase):
     def test_const_jacobian(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.jacobians.tests.test_jacobian_features import SimpleCompConst
 
         model = om.Group(assembled_jac_type='dense')
         problem = om.Problem(model=model)
@@ -442,9 +438,6 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_near_equal(totals['g', 'x'], [[1], [0], [0], [1]])
 
     def test_sparse_jacobian_in_place(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
@@ -483,9 +476,6 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
@@ -512,10 +502,6 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_near_equal(totals['example.f', 'example.x'], [[1., 0., 0., 0.], [0., 2., 3., 4.]])
 
     def test_sparse_jacobian_const(self):
-        import numpy as np
-        import scipy as sp
-
-        import openmdao.api as om
 
         class SparsePartialComp(om.ExplicitComponent):
             def setup(self):
@@ -545,9 +531,6 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_near_equal(totals['example.f', 'example.y'], [[1., 0.], [0., 1.]])
 
     def test_fd_glob(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class FDPartialComp(om.ExplicitComponent):
             def setup(self):
@@ -582,9 +565,6 @@ class TestJacobianForDocs(unittest.TestCase):
         assert_near_equal(totals['example.f', 'example.y'], [[1., 0.], [0., 1.]], tolerance=1e-8)
 
     def test_fd_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class FDPartialComp(om.ExplicitComponent):
 

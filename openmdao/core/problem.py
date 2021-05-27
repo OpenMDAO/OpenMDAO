@@ -531,13 +531,14 @@ class Problem(object):
                                 sshape, inds, flat = model._var_prom2inds[name]
                                 if inds is not None:
                                     if _is_slicer_op(inds):
-                                        inds = _slice_indices(inds, np.prod(sshape), sshape).ravel()
-                                        value = value.ravel()
+                                        inds = _slice_indices(inds, np.prod(sshape), sshape)
                                         flat = True
                                 src_indices = inds
                             if src_indices is None:
                                 model._outputs.set_var(src, value, None, flat)
                             else:
+                                if flat:
+                                    src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
                                     ssizes = model._var_sizes['nonlinear']['output']
                                     sidx = model._var_allprocs_abs2idx['nonlinear'][src]
@@ -1127,7 +1128,7 @@ class Problem(object):
 
                 # Only really need to linearize once.
                 if mode == 'fwd':
-                    comp.run_linearize()
+                    comp.run_linearize(sub_do_ln=False)
 
                 explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
@@ -2068,6 +2069,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write(header + '\n')
                     out_buffer.write('-' * len(header) + '\n' + '\n')
 
+        def safe_norm(arr):
+            return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
+
         for of, wrt in sorted_keys:
 
             if totals:
@@ -2091,20 +2095,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             if do_rev:
                 reverse = derivative_info.get('J_rev')
 
-            fwd_error = np.linalg.norm(forward - fd)
+            fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
                 fwd_rev_error = derivative_info['directional_fwd_rev']
                 rev_error = derivative_info['directional_fd_rev']
             elif do_rev:
-                rev_error = np.linalg.norm(reverse - fd)
-                fwd_rev_error = np.linalg.norm(forward - reverse)
+                rev_error = safe_norm(reverse - fd)
+                fwd_rev_error = safe_norm(forward - reverse)
             else:
                 rev_error = fwd_rev_error = None
 
-            fwd_norm = np.linalg.norm(forward)
-            fd_norm = np.linalg.norm(fd)
+            fwd_norm = safe_norm(forward)
+            fd_norm = safe_norm(fd)
             if do_rev:
-                rev_norm = np.linalg.norm(reverse)
+                rev_norm = safe_norm(reverse)
             else:
                 rev_norm = None
 

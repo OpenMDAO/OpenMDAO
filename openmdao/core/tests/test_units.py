@@ -64,8 +64,6 @@ class TestUnitConversion(unittest.TestCase):
         # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_units import SpeedComp
 
         prob = om.Problem()
         prob.model.add_subsystem('c1', SpeedComp())

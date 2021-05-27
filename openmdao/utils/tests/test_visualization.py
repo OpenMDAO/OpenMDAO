@@ -138,8 +138,6 @@ class TestFeatureVisualization(unittest.TestCase):
         matplotlib.use('Agg') # so no plots are actually drawn in interactive mode
 
     def test_partial_deriv_plot(self):
-        import numpy as np
-        import openmdao.api as om
 
         class ArrayComp2D(om.ExplicitComponent):
             """
@@ -183,8 +181,6 @@ class TestFeatureVisualization(unittest.TestCase):
         om.partial_deriv_plot('y1', 'x1', check_partials_data)
 
     def test_partial_deriv_non_binary_plot(self):
-        import numpy as np
-        import openmdao.api as om
 
         class ArrayComp2D(om.ExplicitComponent):
             """

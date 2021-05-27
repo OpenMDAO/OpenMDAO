@@ -312,8 +312,6 @@ class TestFeature(unittest.TestCase):
         """
         A simple example to compute the magnitude of 3-vectors at at 100 points simultaneously.
         """
-        import numpy as np
-        import openmdao.api as om
 
         n = 100
 
@@ -347,8 +345,6 @@ class TestFeature(unittest.TestCase):
         """
         A simple example to compute the magnitude of 3-vectors at at 100 points simultaneously.
         """
-        import numpy as np
-        import openmdao.api as om
 
         n = 100
 

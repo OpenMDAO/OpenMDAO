@@ -28,7 +28,8 @@ jobs:
             PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.7
             OPTIONAL: '[all]'
-            UPLOAD_DOCS: True
+            BUILD_DOCS: True
+            PUBLISH_DOCS: True
 
           # try latest versions
           - NAME: Latest
@@ -188,28 +189,68 @@ jobs:
           echo "Submit coverage"
           echo "============================================================="
           cp $HOME/.coverage .
-          pip install git+https://github.com/swryan/coveralls-python
+          pip install coveralls
           SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --base_dir $SITE_DIR
-          
-      - name: Make docs
+          coveralls --basedir $SITE_DIR
+
+      - name: Build docs
+        if: matrix.BUILD_DOCS
+        id: build_docs
         shell: bash -l {0}
         run: |
-          if [[ "${{ matrix.PETSc }}" && "${{ matrix.OPTIONAL }}" == "[all]" ]]; then
+          cd openmdao/docs
+          if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
-            echo "Make docs"
+            echo "Build docs with SNOPT examples."
+            echo "============================================================="
+          else
+            echo "============================================================="
+            echo "Disabling SNOPT cells in notebooks."
+            echo "============================================================="
+            python openmdao_book/other/disable_snopt_cells.py
+          fi
+
+          # Temporary: Install the latest jupyter-book which isn't on pypi
+          git clone -q https://github.com/executablebooks/jupyter-book
+          cd jupyter-book
+          pip install -e .
+          cd ..
+
+          echo "============================================================="
+          echo "Final additional setup to run MPI under notebooks"
+          echo "============================================================="
+          export OMPI_MCA_rmaps_base_oversubscribe=1
+          jupyter serverextension enable --py ipyparallel
+          ipython profile create --parallel --profile=mpi
+          echo "c.IPClusterEngines.engine_launcher_class = 'MPIEngineSetLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py
+          echo "c.IPClusterStart.controller_launcher_class = 'MPIControllerLauncher'" >> ~/.ipython/profile_mpi/ipcluster_config.py
+          ipcluster start -n 4 --profile=mpi &
+          sleep 12
+
+          echo "============================================================="
+          echo "Build the docs"
+          echo "============================================================="
+          python build_source_docs.py
+          jupyter-book build -W --keep-going openmdao_book
+          python copy_build_artifacts.py
+
+      - name: Display doc build reports
+        if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
+        run: |
+          cat /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*
+
+      - name: Publish docs
+        if: ${{ github.event_name == 'push' && matrix.PUBLISH_DOCS }}
+        shell: bash -l {0}
+        run: |
+          if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
+            echo "============================================================="
+            echo "Publish docs"
             echo "============================================================="
             cd openmdao/docs
-            make strict
-
-            if [[ "${GITHUB_EVENT_NAME}" == "push" && "${{ matrix.UPLOAD_DOCS }}" ]]; then
-              if [[ "${{ secrets.DOCS_LOCATION }}" ]]; then
-                echo "============================================================="
-                echo "Upload docs"
-                echo "============================================================="
-                python _utils/upload_doc_version.py ${{ secrets.DOCS_LOCATION }}
-              fi
-            fi
+            python upload_doc_version.py openmdao_book/_build/html/ ${{ secrets.DOCS_LOCATION }}
+          else
+            echo "Docs destination not available."
           fi
 
       - name: Notify slack
@@ -307,9 +348,9 @@ jobs:
           echo "Submit coverage"
           echo "============================================================="
           copy $HOME\.coverage .
-          pip install git+https://github.com/swryan/coveralls-python
+          pip install coveralls
           $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
-          coveralls --base_dir $SITE_DIR
+          coveralls --basedir $SITE_DIR
 
       - name: Notify slack
         uses: act10ns/slack@v1

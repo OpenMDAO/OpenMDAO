@@ -144,8 +144,8 @@ browser.
 [0]: http://openmdao.org/ "OpenMDAO"
 [1]: https://pypi.org/project/openmdao/ "OpenMDAO @PyPI"
 
-[2]: http://openmdao.org/twodocs/versions/latest "Latest Docs"
-[3]: http://openmdao.org/twodocs "Archived Docs"
+[2]: http://openmdao.org/newdocs/versions/latest "Latest Docs"
+[3]: http://openmdao.org/docs "Archived Docs"
 
 [4]: https://github.com/OpenMDAO/OpenMDAO "OpenMDAO Git Repo"
 [5]: https://github.com/OpenMDAO/OpenMDAO1 "OpenMDAO 1.x Git Repo"
