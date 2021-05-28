@@ -757,7 +757,7 @@ class System(object):
 
         self._setup_var_data()
 
-        self._setup_vec_names(mode)
+        self._setup_vec_names()
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
@@ -1488,59 +1488,16 @@ class System(object):
         """
         pass
 
-    def _setup_vec_names(self, mode):
+    def _setup_vec_names(self):
         """
-        Compute the list of vec_names and the vois dict.
+        Compute the list of vec_names.
 
         This is only called on the top level System during initial setup.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
         """
-        vois = set()
-
         if self._use_derivatives:
-            vec_names = ['nonlinear', 'linear']
-            # Now that connections are setup, we need to convert relevant vector names into their
-            # auto_ivc source where applicable.
-            for system in self.system_iter(include_self=True, recurse=True):
-                for name, meta in system._get_vec_names_from_vois(mode):
-                    vois.add(system.get_source(name))
-
-            vec_names.extend(sorted(vois))
+            self._problem_meta['vec_names'] = ['nonlinear', 'linear']
         else:
-            vec_names = ['nonlinear']
-
-        self._problem_meta['vec_names'] = vec_names
-        self._problem_meta['lin_vec_names'] = vec_names[1:]
-
-    def _get_vec_names_from_vois(self, mode):
-        """
-        Compute the list of vec_names and the vois dict.
-
-        This is only called on the top level System during initial setup.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd' or 'rev'.
-        """
-        vois = self._design_vars if mode == 'fwd' else self._responses
-
-        pro2abs = self._var_allprocs_prom2abs_list
-        try:
-            for prom_name, data in vois.items():
-                if data['parallel_deriv_color'] is not None:
-                    if prom_name in pro2abs['output']:
-                        yield pro2abs['output'][prom_name][0], data
-                    else:
-                        yield pro2abs['input'][prom_name][0], data
-
-        except KeyError as err:
-            typ = 'design variable' if mode == 'fwd' else 'response'
-            raise RuntimeError(f"{self.msginfo}: Output not found for {typ} {str(err)}.")
+            self._problem_meta['vec_names'] = ['nonlinear']
 
     def _init_relevance(self, mode):
         """
@@ -2909,6 +2866,9 @@ class System(object):
         out = OrderedDict()
         try:
             for name, data in self._design_vars.items():
+                if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
+                    self._problem_meta['using_par_deriv_color'] = True
+
                 if name in pro2abs_out:
 
                     # This is an output name, most likely a manual indepvarcomp.
@@ -3037,6 +2997,9 @@ class System(object):
         try:
             out = {}
             for name, data in self._responses.items():
+                if 'parallel_deriv_color' in data and data['parallel_deriv_color'] is not None:
+                    self._problem_meta['using_par_deriv_color'] = True
+
                 if name in prom2abs_out:
                     abs_name = prom2abs_out[name][0]
                     out[abs_name] = data

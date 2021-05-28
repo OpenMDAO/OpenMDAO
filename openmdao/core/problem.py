@@ -895,7 +895,7 @@ class Problem(object):
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
-            'force_alloc_complex': force_alloc_complex,
+            'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
@@ -908,9 +908,9 @@ class Problem(object):
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
-            'lin_vec_names': None,  # names of linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
+            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
         }
         model._setup(model_comm, mode, self._metadata)
 
