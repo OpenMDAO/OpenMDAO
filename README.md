@@ -115,30 +115,8 @@ and include the error message.
 
 ## Build the Documentation for OpenMDAO
 
-> You will need **make** to build the documentation.  If you are using Windows,
-you can install [Anaconda](https://www.anaconda.com/download/) and install
-**make** by running: `conda install make`.
+Documentation for the latest version can always be found [here][2], but if you would like to build a local copy you can find instructions to do so [here][19].
 
-1. Make sure you have cloned the repository with the source code:
-    > Follow the [instructions](#install-from-a-cloned-repository) for
-    installing **OpenMDAO** from a cloned repository.
-
-2. Install **OpenMDAO** and the dependencies required to build the
-   documentation:
-
-    `pip install OpenMDAO[docs]`
-
-3. Change to the docs directory:
-
-    `cd OpenMDAO/openmdao/docs`
-
-4. Run the command to auto-generate the documentation.
-
-    `make clean; make all`
-
-This will build the docs into `openmdao/docs/_build/html`.  You can browse the
-documentation by opening `openmdao/docs/_build/html/index.html` with your web
-browser.
 
 
 [0]: http://openmdao.org/ "OpenMDAO"
@@ -165,3 +143,4 @@ browser.
 [17]: https://github.com/OpenMDAO/OpenMDAO/actions/workflows/openmdao_test_workflow.yml/badge.svg "Github Actions Badge"
 [18]: https://github.com/OpenMDAO/OpenMDAO/actions "Github Actions"
 
+[19]: http://openmdao.org/newdocs/versions/latest/other_useful_docs/developer_docs/doc_build.html
