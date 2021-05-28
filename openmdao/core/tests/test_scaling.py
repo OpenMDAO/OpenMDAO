@@ -1262,7 +1262,7 @@ class _Obj(object):
         self.objs = []
 
 
-# @use_tempdirs
+@use_tempdirs
 class TestDriverScalingReport(unittest.TestCase):
 
     def setup_model(self, mult_exp_range=(-10, 4), nins=1, nouts=1, ncomps=10, shape=1):
