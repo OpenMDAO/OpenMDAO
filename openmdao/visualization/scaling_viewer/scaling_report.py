@@ -239,10 +239,10 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
     for name, meta in driver._designvars.items():
         scaler = meta['total_scaler']
         adder = meta['total_adder']
-        ref = meta.get('ref', None)
-        ref0 = meta.get('ref0', None)
-        lower = meta.get('lower', None)
-        upper = meta.get('upper', None)
+        ref = meta.get('ref')
+        ref0 = meta.get('ref0')
+        lower = meta.get('lower')
+        upper = meta.get('upper')
 
         dval = dv_vals[name]
         mval = _unscale(dval, scaler, adder, default)
