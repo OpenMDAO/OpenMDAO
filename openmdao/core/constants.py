@@ -6,6 +6,10 @@ import os
 from enum import IntEnum
 import numpy as np
 
+
+INF_BOUND = 1.0E30
+
+
 # This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
 if os.environ.get('OPENMDAO_USE_BIG_INTS'):
     INT_DTYPE = np.dtype(np.int64)

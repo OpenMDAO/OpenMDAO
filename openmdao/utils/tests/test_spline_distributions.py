@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
+import openmdao.api as om
 from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
 
 
@@ -46,11 +47,6 @@ class SplineDistributionsTestCase(unittest.TestCase):
 class SplineDistributionFeatureTestCase(unittest.TestCase):
 
     def test_spline_distribution_example(self):
-
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
 
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])

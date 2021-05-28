@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 import openmdao.api as om
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.warnings import OMDeprecationWarning
 
@@ -25,8 +28,6 @@ class L2(om.ExplicitComponent):
 
 class TestAdder(unittest.TestCase):
     def test_adder(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = om.Problem()
         prob.model = om.Group()
@@ -296,27 +297,6 @@ class DistribDynShapeComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
-
-
-class DistribComp(om.ExplicitComponent):
-    # a distributed component with inputs and outputs that are not dynamically shaped
-    def __init__(self, global_size, n_inputs=2):
-        super().__init__()
-        self.n_inputs = n_inputs
-        self.global_size = global_size
-
-    def setup(self):
-        # evenly distribute the variable over the procs
-        ave, res = divmod(self.global_size, self.comm.size)
-        sizes = [ave + 1 if p < res else ave for p in range(self.comm.size)]
-
-        for i in range(self.n_inputs):
-            self.add_input(f"x{i+1}", val=np.ones(sizes[rank]), distributed=True)
-            self.add_output(f"y{i+1}", val=np.ones(sizes[rank]), distributed=True)
-
-    def compute(self, inputs, outputs):
-        for i in range(self.n_inputs):
-            outputs[f"y{i+1}"] = (self.comm.rank + 1)*inputs[f"x{i+1}"]
 
 
 class DynShapeGroupSeries(om.Group):
@@ -653,9 +633,6 @@ class DynPartialsComp(om.ExplicitComponent):
 
 class TestDynShapeFeature(unittest.TestCase):
     def test_feature_fwd(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones(5)))
@@ -671,9 +648,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'indeps.x'], np.eye(5)*3.)
 
     def test_feature_rev(sefl):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.core.tests.test_dyn_sizing import DynPartialsComp
 
         p = om.Problem()
         p.model.add_subsystem('comp', DynPartialsComp())
@@ -685,8 +659,6 @@ class TestDynShapeFeature(unittest.TestCase):
         assert_near_equal(J['sink.y', 'comp.x'], np.eye(5)*3.)
 
     def test_feature_middle(self):
-        import numpy as np
-        import openmdao.api as om
 
         class PartialsComp(om.ExplicitComponent):
             def setup(self):
@@ -718,6 +690,7 @@ class DistCompDiffSizeKnownInput(om.ExplicitComponent):
         size = (self.comm.rank + 1) * 3
         self.add_input('x', val=np.random.random(size), distributed=True)
 
+
 class DistCompKnownInput(om.ExplicitComponent):
     def setup(self):
         size = 3
@@ -725,6 +698,7 @@ class DistCompKnownInput(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         pass
+
 
 class DistCompUnknownInput(om.ExplicitComponent):
     def setup(self):

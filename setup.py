@@ -85,6 +85,7 @@ setup(
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
         'openmdao.docs',
+        'openmdao.docs.openmdao_book',
         'openmdao.drivers',
         'openmdao.error_checking',
         'openmdao.jacobians',
@@ -142,7 +143,13 @@ setup(
             'static/*.html',
             'templates/*.html'
         ],
-        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py'],
+        'openmdao.docs': ['*.py', 'openmdao_book/test/*.py', 'openmdao_book/other/*.py',
+                          'openmdao_book/*.md',
+                          'openmdao_book/*/*.md',
+                          'openmdao_book/*.ipynb',
+                          'openmdao_book/*/*.ipynb',
+                          'openmdao_book/*/*/*.ipynb',
+                          'openmdao_book/*/*/*/*.ipynb'],
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
         'openmdao.utils': ['unit_library.ini', 'scaffolding_templates/*'],
         'openmdao.test_suite': [
@@ -166,6 +173,7 @@ setup(
             'wingproj=openmdao.devtools.wingproj:run_wing',
             'webview=openmdao.utils.webview:webview_argv',
             'run_om_test=openmdao.devtools.run_test:run_test',
+            'reset_notebook=openmdao.devtools.docutils:reset_notebook_cmd',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_case_reader': [

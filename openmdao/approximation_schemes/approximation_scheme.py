@@ -240,7 +240,8 @@ class ApproximationScheme(object):
                     if vec is None:
                         vec_idx = None
                     else:
-                        vec_idx = np.atleast_1d(approx_wrt_idx[wrt]).copy()  # local index into var
+                        # local index into var
+                        vec_idx = approx_wrt_idx[wrt].shaped_array(copy=True)
                         # convert into index into input or output vector
                         vec_idx += slices[wrt].start
                         # Directional derivatives for quick partial checking.
@@ -555,7 +556,7 @@ class ApproximationScheme(object):
             for n in my_rem_out_vars:
                 val = outarr[out_slices[n]]
                 if n in system._owns_approx_of_idx:
-                    val = val[system._owns_approx_of_idx[n]]
+                    val = val[system._owns_approx_of_idx[n]()]
                 myvars[n] = val
             allremvars = system.comm.allgather(myvars)
 

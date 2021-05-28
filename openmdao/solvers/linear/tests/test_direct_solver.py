@@ -87,6 +87,23 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     linear_solver_class = om.DirectSolver
 
+    def test_specify_solver(self):
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivatives()
+
+        model.linear_solver = om.DirectSolver()
+
+        prob.setup()
+        prob.run_model()
+
+        wrt = ['z']
+        of = ['obj']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
+        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
+
     # DirectSolver doesn't iterate.
     def test_solve_linear_maxiter(self):
         # Test that using options that should not exist in class cause an error
@@ -943,30 +960,6 @@ class TestDirectSolverRemoteErrors(unittest.TestCase):
         msg = "DirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
             "distributed component."
         self.assertEqual(str(cm.exception), msg)
-
-
-
-class TestDirectSolverFeature(unittest.TestCase):
-
-    def test_specify_solver(self):
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = om.Problem()
-        model = prob.model = SellarDerivatives()
-
-        model.linear_solver = om.DirectSolver()
-
-        prob.setup()
-        prob.run_model()
-
-        wrt = ['z']
-        of = ['obj']
-
-        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-        assert_near_equal(J['obj', 'z'][0][0], 9.61001056, .00001)
-        assert_near_equal(J['obj', 'z'][0][1], 1.78448534, .00001)
 
 
 class TestDirectSolverMPI(unittest.TestCase):

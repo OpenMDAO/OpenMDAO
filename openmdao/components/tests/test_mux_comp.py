@@ -223,9 +223,6 @@ class TestFeature(unittest.TestCase):
         """
         An example demonstrating a trivial use case of MuxComp
         """
-        import numpy as np
-
-        import openmdao.api as om
 
         # The number of elements to be muxed
         n = 3

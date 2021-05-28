@@ -2069,6 +2069,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     out_buffer.write(header + '\n')
                     out_buffer.write('-' * len(header) + '\n' + '\n')
 
+        def safe_norm(arr):
+            return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
+
         for of, wrt in sorted_keys:
 
             if totals:
@@ -2092,20 +2095,20 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             if do_rev:
                 reverse = derivative_info.get('J_rev')
 
-            fwd_error = np.linalg.norm(forward - fd)
+            fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
                 fwd_rev_error = derivative_info['directional_fwd_rev']
                 rev_error = derivative_info['directional_fd_rev']
             elif do_rev:
-                rev_error = np.linalg.norm(reverse - fd)
-                fwd_rev_error = np.linalg.norm(forward - reverse)
+                rev_error = safe_norm(reverse - fd)
+                fwd_rev_error = safe_norm(forward - reverse)
             else:
                 rev_error = fwd_rev_error = None
 
-            fwd_norm = np.linalg.norm(forward)
-            fd_norm = np.linalg.norm(fd)
+            fwd_norm = safe_norm(forward)
+            fd_norm = safe_norm(fd)
             if do_rev:
-                rev_norm = np.linalg.norm(reverse)
+                rev_norm = safe_norm(reverse)
             else:
                 rev_norm = None
 
@@ -2409,29 +2412,3 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
-
-
-class Slicer(object):
-    """
-    Helper class that can be used with the indices argument for Problem set_val and get_val.
-    """
-
-    def __getitem__(self, val):
-        """
-        Pass through indices or slice.
-
-        Parameters
-        ----------
-        val : int or slice object or tuples of slice objects
-            Indices or slice to return.
-
-        Returns
-        -------
-        indices : int or slice object or tuples of slice objects
-            Indices or slice to return.
-        """
-        return val
-
-
-# instance of the Slicer class to be used by users for the set_val and get_val methods of Problem
-slicer = Slicer()

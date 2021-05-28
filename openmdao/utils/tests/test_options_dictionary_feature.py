@@ -3,15 +3,16 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.test_suite.components.options_feature_array import ArrayMultiplyComp
+from openmdao.test_suite.components.options_feature_function import UnitaryFunctionComp
+from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 from openmdao.utils.assert_utils import assert_near_equal
 
 
-class TestOptionsDictionaryFeature(unittest.TestCase):
+class TestOptionsDictionary(unittest.TestCase):
 
     def test_simple(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
-
         prob = om.Problem()
         prob.model.add_subsystem('double', VectorDoublingComp(size=3))  # 'size' is an option
 
@@ -23,9 +24,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('double.y'), [2., 4., 6.])
 
     def test_simple_fail(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
-
         prob = om.Problem()
         prob.model.add_subsystem('double', VectorDoublingComp())  # 'size' not specified
 
@@ -35,9 +33,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
             self.assertEqual(str(err), "'double' <class VectorDoublingComp>: Option 'size' is required but has not been set.")
 
     def test_with_default(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
-
         prob = om.Problem()
         prob.model.add_subsystem('linear', LinearCombinationComp(a=2.))  # 'b' not specified
 
@@ -49,11 +44,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         self.assertEqual(prob.get_val('linear.y'), 7.)
 
     def test_simple_array(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_array import ArrayMultiplyComp
-
         prob = om.Problem()
         prob.model.add_subsystem('a_comp', ArrayMultiplyComp(array=np.array([1, 2, 3])))
 
@@ -65,8 +55,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('a_comp.y'), [5., 10., 15.])
 
     def test_simple_function(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_function import UnitaryFunctionComp
 
         def my_func(x):
             return x*2
@@ -82,8 +70,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('f_comp.y'), 10.)
 
     def test_simple_values(self):
-        import numpy as np
-        import openmdao.api as om
 
         class VectorDoublingComp(om.ExplicitComponent):
 
@@ -113,8 +99,6 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('double.y'), [2., 4., 6., 8.])
 
     def test_simple_bounds_valid(self):
-        import numpy as np
-        import openmdao.api as om
 
         def check_even(name, value):
             if value % 2 != 0:

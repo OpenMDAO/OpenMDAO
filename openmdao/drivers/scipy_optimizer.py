@@ -2,7 +2,6 @@
 OpenMDAO Wrapper for the scipy.optimize.minimize family of local optimizers.
 """
 
-
 import sys
 from collections import OrderedDict
 from distutils.version import LooseVersion
@@ -11,7 +10,7 @@ import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 
-import openmdao
+from openmdao.core.constants import INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.class_util import weak_method_wrapper
@@ -222,8 +221,8 @@ class ScipyOptimizeDriver(Driver):
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
-                if isinstance(lower, np.ndarray) or lower >= -openmdao.INF_BOUND \
-                        or isinstance(upper, np.ndarray) or upper <= openmdao.INF_BOUND:
+                if isinstance(lower, np.ndarray) or lower >= -INF_BOUND \
+                        or isinstance(upper, np.ndarray) or upper <= INF_BOUND:
                     d = OrderedDict()
                     d['lower'] = lower
                     d['upper'] = upper
@@ -334,7 +333,10 @@ class ScipyOptimizeDriver(Driver):
 
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
-                size = meta['global_size'] if meta['distributed'] else meta['size']
+                if meta['indices'] is not None:
+                    meta['size'] = size = meta['indices'].size()
+                else:
+                    size = meta['global_size'] if meta['distributed'] else meta['size']
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
@@ -397,7 +399,7 @@ class ScipyOptimizeDriver(Driver):
                         if isinstance(lower, np.ndarray):
                             lower = lower[j]
 
-                        dblcon = (upper < openmdao.INF_BOUND) and (lower > -openmdao.INF_BOUND)
+                        dblcon = (upper < INF_BOUND) and (lower > -INF_BOUND)
 
                         # Add extra constraint if double-sided
                         if dblcon:
@@ -452,6 +454,9 @@ class ScipyOptimizeDriver(Driver):
         # optimize
         try:
             if opt in _optimizers:
+                if self._problem().comm.rank != 0:
+                    self.opt_settings['disp'] = False
+
                 result = minimize(self._objfunc, x_init,
                                   # args=(),
                                   method=opt,
@@ -547,18 +552,21 @@ class ScipyOptimizeDriver(Driver):
         if hasattr(result, 'success'):
             self.fail = False if result.success else True
             if self.fail:
-                print('Optimization FAILED.')
-                print(result.message)
-                print('-' * 35)
+                if self._problem().comm.rank == 0:
+                    print('Optimization FAILED.')
+                    print(result.message)
+                    print('-' * 35)
 
             elif self.options['disp']:
-                print('Optimization Complete')
-                print('-' * 35)
+                if self._problem().comm.rank == 0:
+                    print('Optimization Complete')
+                    print('-' * 35)
         else:
             self.fail = True  # It is not known, so the worst option is assumed
-            print('Optimization Complete (success not known)')
-            print(result.message)
-            print('-' * 35)
+            if self._problem().comm.rank == 0:
+                print('Optimization Complete (success not known)')
+                print(result.message)
+                print('-' * 35)
 
         return self.fail
 
@@ -683,7 +691,7 @@ class ScipyOptimizeDriver(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if dbl or (lower <= -openmdao.INF_BOUND):
+        if dbl or (lower <= -INF_BOUND):
             return upper - cons[name][idx]
         else:
             return cons[name][idx] - lower
@@ -774,7 +782,7 @@ class ScipyOptimizeDriver(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if dbl or (lower <= -openmdao.INF_BOUND):
+        if dbl or (lower <= -INF_BOUND):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]

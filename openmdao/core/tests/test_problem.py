@@ -9,10 +9,10 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesConnected
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
-from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.utils.units import convert_units
 from openmdao.warnings import DerivativesWarning
 
@@ -142,8 +142,6 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(p.get_val('bar'), lbf_val)
 
     def test_feature_simple_run_once_no_promote(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -159,8 +157,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['comp.f_xy'], -15.0)
 
     def test_feature_simple_run_once_input_input(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -178,8 +174,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['comp2.f_xy'], 13.0)
 
     def test_feature_simple_run_once_compute_totals(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -202,8 +196,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(totals['comp.f_xy']['comp.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_compute_totals_scaled(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -226,8 +218,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(totals[('comp.f_xy', 'comp.y')][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -312,9 +302,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(J[('MP1.y', 'indeps2.x')], np.zeros((5, 3)), 1e-10)
 
     def test_set_2d_array(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -574,8 +561,6 @@ class TestProblem(unittest.TestCase):
         np.testing.assert_allclose(checkvec, result)
 
     def test_feature_set_indeps(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
 
@@ -592,8 +577,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_set_indeps_auto(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
 
@@ -607,8 +590,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('f_xy'), 214.0, 1e-6)
 
     def test_feature_basic_setup(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -635,8 +616,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('f_xy'), 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -653,8 +632,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_totals_manual(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -667,8 +644,6 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'])
 
     def test_feature_check_totals_from_driver_compact(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -690,8 +665,6 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(compact_print=True)
 
     def test_feature_check_totals_from_driver(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -713,8 +686,6 @@ class TestProblem(unittest.TestCase):
         prob.check_totals()
 
     def test_feature_check_totals_from_driver_scaled(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -736,8 +707,6 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(driver_scaling=True)
 
     def test_feature_check_totals_suppress(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -760,8 +729,6 @@ class TestProblem(unittest.TestCase):
         print(totals)
 
     def test_feature_check_totals_cs(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem()
         prob.model = SellarDerivatives()
@@ -825,7 +792,6 @@ class TestProblem(unittest.TestCase):
                          msg="The under_complex_step flag should be reset.")
 
     def test_feature_check_totals_user_detect_forced(self):
-        import openmdao.api as om
 
         class SimpleComp(om.ExplicitComponent):
 
@@ -877,10 +843,6 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_feature_run_driver(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         model = prob.model
@@ -906,8 +868,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('obj'), 3.18339395, 1e-2)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -921,8 +881,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('y1'), 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
         prob = om.Problem(model= SellarDerivativesConnected())
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -938,8 +896,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('d1.y1'), 27.3049178437, 1e-6)
 
     def test_feature_promoted_sellar_set_get_inputs(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -958,7 +914,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_get_set_with_units_exhaustive(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x-25.',
@@ -1073,7 +1028,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
     def test_feature_get_set_with_units_diff_err(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=x*2.',
@@ -1093,7 +1047,6 @@ class TestProblem(unittest.TestCase):
             self.fail("Exception expected.")
 
     def test_feature_get_set_with_units_diff(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         G1 = prob.model.add_subsystem('G1', om.Group())
@@ -1126,7 +1079,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('G1.C2.x'), 2000.0, 1e-6)
 
     def test_feature_get_set_with_src_indices_diff(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         G1 = prob.model.add_subsystem('G1', om.Group())
@@ -1167,7 +1119,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['G1.C2.y'], np.ones(2) * 6000.0, 1e-6)
 
     def test_feature_get_set_with_units_prom_plus_explicit(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
@@ -1209,7 +1160,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob['G1.C2.x'], 2000.0, 1e-6)
 
     def test_feature_get_set_with_units_prom_plus_explicit_err(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
@@ -1249,7 +1199,6 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
@@ -1275,7 +1224,6 @@ class TestProblem(unittest.TestCase):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
     def test_feature_get_set_with_units(self):
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
@@ -1292,8 +1240,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
 
     def test_feature_get_set_array_with_units(self):
-        import numpy as np
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
@@ -1316,8 +1262,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
 
     def test_feature_get_set_array_with_slicer(self):
-        import numpy as np
-        import openmdao.api as om
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
@@ -1337,10 +1281,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.y', indices=om.slicer[:, 0]), [6., 7.], 1e-6)
 
     def test_feature_set_get_array(self):
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -1371,8 +1311,6 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('y2'), 8.14191301549, 1e-6)
 
     def test_feature_residuals(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -1869,7 +1807,6 @@ class TestProblem(unittest.TestCase):
         ])
 
     def test_feature_post_setup_solver_configure(self):
-        import openmdao.api as om
 
         class ImplSimple(om.ImplicitComponent):
 
@@ -2096,9 +2033,6 @@ class TestProblem(unittest.TestCase):
         self.assertTrue('3.18' in output[21]) # obj
 
     def test_feature_list_problem_vars(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = om.Problem(model=SellarDerivatives())
         model = prob.model

@@ -147,8 +147,6 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_fan_in_grouped_feature(self):
 
-        import openmdao.api as om
-
         prob = om.Problem()
         model = prob.model
 

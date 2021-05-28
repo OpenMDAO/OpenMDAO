@@ -26,7 +26,7 @@ import copy
 import numpy as np
 from pyDOE2 import lhs
 
-import openmdao
+from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent import concurrent_eval
 from openmdao.utils.mpi import MPI
@@ -426,7 +426,7 @@ class SimpleGADriver(Driver):
             self.set_design_var(name, x[i:j])
 
         # a very large number, but smaller than the result of nan_to_num in Numpy
-        almost_inf = openmdao.INF_BOUND
+        almost_inf = INF_BOUND
 
         # Execute the model
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:

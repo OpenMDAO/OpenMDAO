@@ -14,6 +14,7 @@ from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, Te
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
     SellarDis2withDerivatives, SellarDis1CS, SellarDis2CS
+from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
@@ -1962,7 +1963,6 @@ class TestComponentComplexStep(unittest.TestCase):
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):
-        import openmdao.api as om
 
         class SimpleComp(om.ExplicitComponent):
 
@@ -2038,37 +2038,6 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.check_partials(method='cs', step=1e-14, out_stream=None)
 
-    def test_feature_under_complex_step(self):
-        import openmdao.api as om
-
-        class SimpleComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', val=1.0)
-                self.add_output('y', val=1.0)
-
-                self.declare_partials(of='y', wrt='x', method='cs')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 3.0*inputs['x']
-
-                if self.under_complex_step:
-                    print("Under complex step")
-                    print("x", inputs['x'])
-                    print("y", outputs['y'])
-
-        prob = om.Problem()
-        prob.model.add_subsystem('comp', SimpleComp())
-
-        prob.model.add_design_var('comp.x', lower=-100, upper=100)
-        prob.model.add_objective('comp.y')
-
-        prob.setup(force_alloc_complex=True)
-
-        prob.run_model()
-
-        prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
-
     def test_partials_bad_sparse_explicit(self):
         class BadSparsityComp(om.ExplicitComponent):
 
@@ -2130,9 +2099,6 @@ class TestComponentComplexStep(unittest.TestCase):
 class ApproxTotalsFeature(unittest.TestCase):
 
     def test_basic(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2180,9 +2146,6 @@ class ApproxTotalsFeature(unittest.TestCase):
         self.assertEqual(comp2._exec_count, 2)
 
     def test_basic_cs(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2228,9 +2191,6 @@ class ApproxTotalsFeature(unittest.TestCase):
         assert_near_equal(derivs['z', 'x'], [[300.0]], 1e-6)
 
     def test_arguments(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class CompOne(om.ExplicitComponent):
 
@@ -2275,8 +2235,6 @@ class ApproxTotalsFeature(unittest.TestCase):
 
     def test_sellarCS(self):
         # Just tests Newton on Sellar with FD derivs.
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 
         prob = om.Problem()
         prob.model = SellarNoDerivativesCS()

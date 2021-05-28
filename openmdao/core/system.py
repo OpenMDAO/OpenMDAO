@@ -18,9 +18,8 @@ from numbers import Integral
 import numpy as np
 import networkx as nx
 
-import openmdao
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -34,6 +33,7 @@ from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.indexer import indexer
 from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
@@ -96,6 +96,12 @@ allowed_meta_names = {
 allowed_meta_names.update(global_meta_names['input'])
 allowed_meta_names.update(global_meta_names['output'])
 
+resp_size_checks = {
+    'con': ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower', 'equals'],
+    'obj': ['ref', 'ref0', 'scaler', 'adder']
+}
+resp_types = {'con': 'constraint', 'obj': 'objective'}
+
 
 class _MatchType(IntEnum):
     """
@@ -147,6 +153,8 @@ class System(object):
         Problem level metadata.
     under_complex_step : bool
         When True, this system is undergoing complex step.
+    under_finite_difference : bool
+        When True, this system is undergoing finite differencing.
     under_approx : bool
         When True, this system is undergoing approximation.
     iter_count : int
@@ -444,6 +452,7 @@ class System(object):
         self._owns_approx_of_idx = {}
 
         self.under_complex_step = False
+        self.under_finite_difference = False
 
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
@@ -1779,6 +1788,7 @@ class System(object):
             dictionary mapping input/output variable names
             to (promoted name, promotion_info) tuple.
         """
+        from openmdao.core.group import Group
         prom_names = self._var_allprocs_prom2abs_list
         gname = self.name + '.' if self.name else ''
 
@@ -1911,7 +1921,7 @@ class System(object):
             not_found = set(n for n, _ in to_match) - found
             if not_found:
                 if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
-                        isinstance(self, openmdao.core.group.Group)):
+                        isinstance(self, Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -2357,6 +2367,46 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
+    def _create_indexer(self, indices, typename, vname):
+        """
+        Return an Indexer instance and it's size if possible.
+
+        Parameters
+        ----------
+        indices : ndarray or sequence of ints
+            The indices used to create the Indexer.
+        typename : str
+            Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
+        vname : str
+            Name of the variable.
+
+        Returns
+        -------
+        Indexer
+            The newly created Indexer
+        int or None
+            The size of the indices, if known.
+        """
+        if not (indices is None or _is_slicer_op(indices)):
+            arr = np.asarray(indices)
+            if arr.dtype.kind not in ('i', 'u') or len(arr.shape) == 0:
+                raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
+                                 "must be a sequence of integers.")
+        try:
+            idxer = indexer[indices]
+        except Exception as err:
+            raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
+                                f"'{vname}'.")
+
+        # size may not be available at this point, but get it if we can in order to allow
+        # some earlier error checking
+        try:
+            size = idxer.size()
+        except Exception:
+            size = None
+
+        return idxer, size
+
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
                        parallel_deriv_color=None, cache_linear_solution=False):
@@ -2430,7 +2480,7 @@ class System(object):
 
         if lower is None:
             # if not set, set lower to -INF_BOUND and don't apply adder/scaler
-            lower = -openmdao.INF_BOUND
+            lower = -INF_BOUND
         else:
             # Convert lower to ndarray/float as necessary
             lower = format_as_float_or_array('lower', lower, flatten=True)
@@ -2439,7 +2489,7 @@ class System(object):
 
         if upper is None:
             # if not set, set upper to INF_BOUND and don't apply adder/scaler
-            upper = openmdao.INF_BOUND
+            upper = INF_BOUND
         else:
             # Convert upper to ndarray/float as necessary
             upper = format_as_float_or_array('upper', upper, flatten=True)
@@ -2451,57 +2501,42 @@ class System(object):
         else:
             design_vars = self._design_vars
 
-        dvs = OrderedDict()
+        dv = OrderedDict()
 
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
                 scaler = None
         elif scaler == 1.0:
             scaler = None
-        dvs['scaler'] = scaler
+        dv['scaler'] = scaler
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
         elif adder == 0.0:
             adder = None
-        dvs['adder'] = adder
+        dv['adder'] = adder
 
-        dvs['name'] = name
-        dvs['upper'] = upper
-        dvs['lower'] = lower
-        dvs['ref'] = ref
-        dvs['ref0'] = ref0
-        dvs['units'] = units
-        dvs['cache_linear_solution'] = cache_linear_solution
+        dv['name'] = name
+        dv['upper'] = upper
+        dv['lower'] = lower
+        dv['ref'] = ref
+        dv['ref0'] = ref0
+        dv['units'] = units
+        dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
+            indices, size = self._create_indexer(indices, 'design var', name)
+            if size is not None:
+                dv['size'] = size
 
-            if _is_slicer_op(indices):
-                pass
-            # If given, indices must be a sequence
-            elif not (isinstance(indices, Iterable) and
-                      all([isinstance(i, Integral) for i in indices])):
-                raise ValueError("{}: If specified, design var indices must be a sequence of "
-                                 "integers.".format(self.msginfo))
-            else:
-                indices = np.atleast_1d(indices)
-                dvs['size'] = size = len(indices)
+        dv['indices'] = indices
+        dv['parallel_deriv_color'] = parallel_deriv_color
 
-            # All refs: check the shape if necessary
-            for item, item_name in zip([ref, ref0, scaler, adder, upper, lower],
-                                       ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
-                if isinstance(item, np.ndarray):
-                    if item.size != size:
-                        raise ValueError("%s: When adding design var '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.msginfo, name,
-                                                                          item_name, size,
-                                                                          item.size))
+        self._check_voi_meta_sizes('design var', dv,
+                                   ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
-        dvs['indices'] = indices
-        dvs['parallel_deriv_color'] = parallel_deriv_color
-
-        design_vars[name] = dvs
+        design_vars[name] = dv
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
@@ -2577,8 +2612,8 @@ class System(object):
             except ValueError as e:
                 raise(ValueError(f"{str(e)[:-1]} for response '{name}'."))
 
+        typemap = {'con': 'Constraint', 'obj': 'Objective'}
         if name in self._responses or name in self._static_responses:
-            typemap = {'con': 'Constraint', 'obj': 'Objective'}
             msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
             raise RuntimeError(msg.format(name))
 
@@ -2594,14 +2629,6 @@ class System(object):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
 
-        if _is_slicer_op(indices):
-            pass
-        # If given, indices must be a sequence
-        elif (indices is not None and not (
-                isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
-            raise ValueError("{}: If specified, response indices must be a sequence of "
-                             "integers.".format(self.msginfo))
-
         if self._static_mode:
             responses = self._static_responses
         else:
@@ -2615,7 +2642,7 @@ class System(object):
             try:
                 if lower is None:
                     # don't apply adder/scaler if lower not set
-                    lower = -openmdao.INF_BOUND
+                    lower = -INF_BOUND
                 else:
                     lower = format_as_float_or_array('lower', lower, flatten=True)
                     lower = (lower + adder) * scaler
@@ -2628,7 +2655,7 @@ class System(object):
             try:
                 if upper is None:
                     # don't apply adder/scaler if upper not set
-                    upper = openmdao.INF_BOUND
+                    upper = INF_BOUND
                 else:
                     upper = format_as_float_or_array('upper', upper, flatten=True)
                     upper = (upper + adder) * scaler
@@ -2651,13 +2678,17 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                indices = np.atleast_1d(indices)
-                resp['size'] = len(indices)
+                indices, size = self._create_indexer(indices, resp_types[type_], name)
+                if size is not None:
+                    resp['size'] = size
             resp['indices'] = indices
         else:  # 'obj'
             if index is not None:
+                if not isinstance(index, Integral):
+                    raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
+                                    f"{type(index).__name__}")
+                index = indexer[index]
                 resp['size'] = 1
-                index = np.array([index], dtype=INT_DTYPE)
             resp['indices'] = index
 
         if isinstance(scaler, np.ndarray):
@@ -2674,25 +2705,6 @@ class System(object):
             adder = None
         resp['adder'] = adder
 
-        if resp['indices'] is not None:
-            size = resp['indices'].size
-            vlist = [ref, ref0, scaler, adder]
-            nlist = ['ref', 'ref0', 'scaler', 'adder']
-            if type_ == 'con':
-                tname = 'constraint'
-                vlist.extend([upper, lower, equals])
-                nlist.extend(['upper', 'lower', 'equals'])
-            else:
-                tname = 'objective'
-
-            # All refs: check the shape if necessary
-            for item, item_name in zip(vlist, nlist):
-                if isinstance(item, np.ndarray):
-                    if item.size != size:
-                        raise ValueError("%s: When adding %s '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.msginfo, tname,
-                                                                          name, item_name, size,
-                                                                          item.size))
         resp['name'] = name
         resp['ref'] = ref
         resp['ref0'] = ref0
@@ -2701,6 +2713,8 @@ class System(object):
         resp['cache_linear_solution'] = cache_linear_solution
 
         resp['parallel_deriv_color'] = parallel_deriv_color
+
+        self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
 
         responses[name] = resp
 
@@ -2832,6 +2846,28 @@ class System(object):
                           parallel_deriv_color=parallel_deriv_color,
                           cache_linear_solution=cache_linear_solution)
 
+    def _check_voi_meta_sizes(self, typename, meta, names):
+        """
+        Check that sizes of named metadata agree with meta['size'].
+
+        Parameters
+        ----------
+        typename : str
+            'design var', 'objective', or 'constraint'
+        meta : dict
+            Metadata dictionary.
+        names : list of str
+            The metadata entries at each of these names must match meta['size'].
+        """
+        if 'size' in meta and meta['size'] is not None:
+            size = meta['size']
+            for mname in names:
+                val = meta[mname]
+                if isinstance(val, np.ndarray) and size != val.size:
+                    raise ValueError(f"{self.msginfo}: When adding {typename} '{meta['name']}',"
+                                     f" {mname} should have size {size} but instead has size "
+                                     f"{val.size}.")
+
     def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the DesignVariable settings from this system.
@@ -2919,18 +2955,25 @@ class System(object):
                         meta['size'] = 0  # discrete var, don't know size
                 meta['size'] = int(meta['size'])  # make default int so will be json serializable
 
-                if src_name in abs2idx:
+                if src_name in abs2idx:  # var is continuous
                     indices = meta['indices']
-                    meta = abs2meta_out[src_name]
-                    out[name]['distributed'] = meta['distributed']
+                    vmeta = abs2meta_out[src_name]
+                    meta['distributed'] = vmeta['distributed']
                     if indices is not None:
                         # Index defined in this response.
-                        out[name]['global_size'] = len(indices) if meta['distributed'] \
-                            else meta['global_size']
+                        # update src shapes for Indexer objects
+                        indices.set_src_shape(vmeta['global_shape'])
+                        indices = indices.shaped_instance()
+                        meta['size'] = len(indices)
+                        meta['global_size'] = len(indices) if vmeta['distributed'] \
+                            else vmeta['global_size']
                     else:
-                        out[name]['global_size'] = meta['global_size']
+                        meta['global_size'] = vmeta['global_size']
+
+                    self._check_voi_meta_sizes('design var', meta,
+                                               ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
                 else:
-                    out[name]['global_size'] = 0  # discrete var
+                    meta['global_size'] = 0  # discrete var
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -3031,7 +3074,7 @@ class System(object):
             sizes = model._var_sizes['output']
             abs2idx = model._var_allprocs_abs2idx
             owning_rank = model._owning_rank
-            for prom_name, response in out.items():
+            for response in out.values():
                 name = response['ivc_source']
 
                 # Discrete vars
@@ -3043,13 +3086,17 @@ class System(object):
                 response['distributed'] = meta['distributed']
 
                 if response['indices'] is not None:
-                    # Index defined in this response.
-                    response['global_size'] = len(response['indices']) if meta['distributed'] \
-                        else meta['global_size']
-
+                    indices = response['indices']
+                    indices.set_src_shape(meta['global_shape'])
+                    indices = indices.shaped_instance()
+                    response['size'] = sz = len(indices)
+                    response['global_size'] = sz if meta['distributed'] else meta['global_size']
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
+
+                self._check_voi_meta_sizes(resp_types[response['type']], response,
+                                           resp_size_checks[response['type']])
 
         if recurse:
             abs2prom_in = self._var_allprocs_abs2prom['input']
@@ -3925,6 +3972,20 @@ class System(object):
                 nl._iter_count = 0
                 if hasattr(nl, 'linesearch') and nl.linesearch:
                     nl.linesearch._iter_count = 0
+
+    def _set_finite_difference_mode(self, active):
+        """
+        Turn on or off finite difference mode.
+
+        Recurses to turn on or off finite difference mode in all subsystems.
+
+        Parameters
+        ----------
+        active : bool
+            Finite difference flag; set to True prior to commencing finite difference.
+        """
+        for sub in self.system_iter(include_self=True, recurse=True):
+            sub.under_finite_difference = active
 
     def _set_complex_step_mode(self, active):
         """

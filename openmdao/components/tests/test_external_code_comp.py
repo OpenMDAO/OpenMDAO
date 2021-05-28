@@ -424,8 +424,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
             pass
 
     def test_main(self):
-        import openmdao.api as om
-        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeComp
 
         prob = om.Problem()
         model = prob.model
@@ -445,8 +443,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         self.assertEqual(prob.get_val('p.f_xy'), -15.0)
 
     def test_optimize_fd(self):
-        import openmdao.api as om
-        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompFD
 
         prob = om.Problem()
         model = prob.model
@@ -478,8 +474,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('p.y'), -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
-        import openmdao.api as om
-        from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompDerivs
 
         prob = om.Problem()
         model = prob.model
@@ -514,9 +508,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
     def setUp(self):
-        import os
-        import shutil
-        import tempfile
 
         # get the directory where the needed support files are located
         import openmdao.components.tests.test_external_code_comp as extcode_test
@@ -542,8 +533,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
             pass
 
     def test_simple_external_code_implicit_comp(self):
-        import sys
-        import openmdao.api as om
 
         class MachExternalCodeComp(om.ExternalCodeImplicitComp):
 

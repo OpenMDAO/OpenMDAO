@@ -114,6 +114,48 @@ class QuadraticJacVec(QuadraticComp):
             d_residuals['x'] = self.inv_jac * d_outputs['x']
 
 
+class ImplCompTestCase(unittest.TestCase):
+
+    def test_add_input_output_retval(self):
+        # check basic metadata expected in return value
+        expected = {
+            'value': 3,
+            'shape': (1,),
+            'size': 1,
+            'units': 'ft',
+            'desc': '',
+            'tags': set(),
+        }
+        expected_discrete = {
+            'value': 3,
+            'type': int,
+            'desc': '',
+            'tags': set(),
+        }
+
+        class ImplComp(om.ImplicitComponent):
+            def setup(self):
+                meta = self.add_input('x', val=3.0, units='ft')
+                for key, val in expected.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_discrete_input('x_disc', val=3)
+                for key, val in expected_discrete.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_output('y', val=3.0, units='ft')
+                for key, val in expected.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+                meta = self.add_discrete_output('y_disc', val=3)
+                for key, val in expected_discrete.items():
+                    assert meta[key] == val, f'Expected {key}: {val} but got {key}: {meta[key]}'
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', ImplComp())
+        prob.setup()
+
+
 class ImplicitCompTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -778,8 +820,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         assert_near_equal(prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
-        import openmdao.api as om
-        import numpy as np
 
         class ImpWithInitial(om.ImplicitComponent):
             """
@@ -1261,8 +1301,6 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_impl_comp import QuadraticComp
 
         group = om.Group()
 
@@ -1339,42 +1377,6 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_simple_list_vars_options(self):
-        import openmdao.api as om
-
-        class QuadraticComp(om.ImplicitComponent):
-            """
-            A Simple Implicit Component representing a Quadratic Equation.
-
-            R(a, b, c, x) = ax^2 + bx + c
-
-            Solution via Quadratic Formula:
-            x = (-b + sqrt(b^2 - 4ac)) / 2a
-            """
-
-            def setup(self):
-                self.add_input('a', val=1., units='ft')
-                self.add_input('b', val=1., units='inch')
-                self.add_input('c', val=1., units='ft')
-                self.add_output('x', val=0.,
-                                lower=1.0, upper=100.0,
-                                ref=1.1, ref0=2.1,
-                                units='inch')
-
-            def setup_partials(self):
-                self.declare_partials(of='*', wrt='*')
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
-                x = outputs['x']
-                residuals['x'] = a * x ** 2 + b * x + c
-
-            def solve_nonlinear(self, inputs, outputs):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
-                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
 
         group = om.Group()
 
@@ -1440,8 +1442,6 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_list_residuals_with_tol(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
         prob = om.Problem()
         model = prob.model
 
@@ -1462,7 +1462,6 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
         outputs = model.list_outputs(residuals_tol=0.01, residuals=True)
-        print(outputs)
 
 
 class CacheUsingComp(om.ImplicitComponent):

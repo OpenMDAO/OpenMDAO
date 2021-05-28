@@ -9,7 +9,7 @@ import openmdao.api as om
 from openmdao.components.spline_comp import SPLINE_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_near_equal
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.spline_distributions import cell_centered
+from openmdao.utils.spline_distributions import cell_centered, sine_distribution
 from openmdao.components.interp_util.interp import InterpND
 
 
@@ -374,9 +374,6 @@ class SplineCompTestCase(unittest.TestCase):
 class SplineCompFeatureTestCase(unittest.TestCase):
 
     def test_basic_example(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -411,10 +408,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
     def test_multi_splines(self):
 
-        import numpy as np
-
-        import openmdao.api as om
-
         x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         y_cp2 = np.array([1.0, 5.0, 7.0, 8.0, 13.0, 16.0])
@@ -433,11 +426,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
     def test_spline_distribution_example(self):
-
-        import numpy as np
-
-        import openmdao.api as om
-        from openmdao.utils.spline_distributions import sine_distribution
 
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -462,9 +450,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                           tolerance=1e-8)
 
     def test_akima_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -489,9 +474,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.run_model()
 
     def test_bspline_options(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         prob = om.Problem()
         model = prob.model
@@ -542,7 +524,6 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         assert_near_equal(prob['comp1.chord'], y, 1e-6)
 
     def test_bsplines_2to3doc(self):
-        from openmdao.utils.spline_distributions import sine_distribution
 
         prob = om.Problem()
         model = prob.model

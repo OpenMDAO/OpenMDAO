@@ -17,8 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
-    assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
 
 try:
@@ -962,7 +961,6 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
-        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
@@ -1657,7 +1655,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_check_partials(J)
 
     def test_directional_mixed_error_message(self):
-        import openmdao.api as om
 
         class ArrayCompMatrixFree(om.ExplicitComponent):
 
@@ -1933,9 +1930,6 @@ class TestProblemCheckPartials(unittest.TestCase):
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -1975,9 +1969,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         assert_near_equal(x2_error.forward, 9., 1e-8)
 
     def test_feature_check_partials_suppress(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -2010,9 +2001,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         print(data)
 
     def test_set_step_on_comp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2031,9 +2019,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_step_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2050,9 +2035,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step=1e-2, compact_print=True)
 
     def test_set_method_on_comp(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2071,9 +2053,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_method_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2090,9 +2069,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(method='cs', compact_print=True)
 
     def test_set_form_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
-        from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
         prob = om.Problem()
 
@@ -2109,8 +2085,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(form='central', compact_print=True)
 
     def test_set_step_calc_global(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_check_derivs import ParaboloidTricky
 
         prob = om.Problem()
 
@@ -2124,8 +2098,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step_calc='rel', compact_print=True)
 
     def test_feature_check_partials_show_only_incorrect(self):
-        import numpy as np
-        import openmdao.api as om
 
         class MyCompGoodPartials(om.ExplicitComponent):
             def setup(self):
@@ -2172,8 +2144,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=False, show_only_incorrect=True)
 
     def test_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
         model = prob.model
@@ -2201,8 +2171,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
     def test_directional(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.array_comp import ArrayComp
 
         prob = om.Problem()
         model = prob.model
@@ -2214,9 +2182,6 @@ class TestCheckPartialsFeature(unittest.TestCase):
         data = prob.check_partials()
 
     def test_directional_matrix_free(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class ArrayCompMatrixFree(om.ExplicitComponent):
 
@@ -3254,6 +3219,43 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fwd'], [[4.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub1.p1.x']['J_fd'], [[2.0]], 1.0e-6)
         assert_near_equal(J['sum.y', 'sub.sub2.p2.x']['J_fd'], [[4.0]], 1.0e-6)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCheckPartialsDistrib(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_check_size_0(self):
+        # this test passes if it doesn't raise an exception.  The actual partials are not
+        # correct because compute_jacvec_product does nothing.
+        class DistributedConverter(om.ExplicitComponent):
+            "takes a serial input and converts it to a distributed output that is only on rank 0"
+            def setup(self):
+
+                shape_switch = 1 if self.comm.rank == 0 else 0
+                self.add_input('in1_serial', shape=5)
+                self.add_output('out1', shape=5*shape_switch, tags=['mphys_coupling'], distributed=True)
+
+                self.add_input('in2_serial', shape=15)
+                self.add_output('out2', shape=15*shape_switch, tags=['mphys_result'], distributed=True)
+
+            def compute(self,inputs, outputs):
+                if self.comm.rank == 0:
+                    outputs["out1"] = inputs["in1_serial"]
+                    outputs["out2"] = inputs["in2_serial"]
+
+            # this was broken
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                pass # intentionally left empty because presence of this method triggers bug in check_partials
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('converter', DistributedConverter())
+
+        prob.setup(force_alloc_complex=True)
+
+        partials = prob.check_partials(compact_print=True, method='cs')
 
 
 if __name__ == "__main__":

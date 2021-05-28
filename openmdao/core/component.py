@@ -527,9 +527,10 @@ class Component(System):
                 flat_src_indices = True
 
         if src_indices is not None:
-            warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to `add_input` is"
-                             "deprecated and will become an error in a future release.  Add "
-                             "`src_indices` to a `promotes` or `connect` call instead.")
+            warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to "
+                             f"`add_input('{name}', ...` is deprecated and will become an error "
+                             "in a future release.  Add `src_indices` to a `promotes` or `connect` "
+                             "call instead.")
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -913,7 +914,7 @@ class Component(System):
         sizes_in = self._var_sizes['input']
         sizes_out = all_sizes['output']
         added_src_inds = []
-        # loop over continuous inputs (all procs)
+        # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
             src = abs_in2out[iname]
             if meta_in['src_indices'] is None and (
@@ -940,11 +941,6 @@ class Component(System):
                 meta_in['src_indices'] = inds
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
-
-                issue_warning(f"Component is distributed but input '{iname}' was "
-                              "added without src_indices. Setting src_indices to "
-                              f"np.arange({offset}, {end}, dtype=int).reshape({inds.shape}).",
-                              prefix=self.msginfo, category=DistributedComponentWarning)
 
         return added_src_inds
 

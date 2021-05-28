@@ -822,50 +822,6 @@ class TestDriver(unittest.TestCase):
         assert_near_equal(totals['sub.comp.f_xy', 'sub.y']['J_fd'], [[1.58e2]], 1e-5)
 
 
-class TestDriverFeature(unittest.TestCase):
-
-    def test_specify_units(self):
-        import openmdao.api as om
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
-                            promotes=['x', 'y1'])
-
-        model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y2={'value': 2.0, 'units': 'degF'}),
-                            promotes=['x', 'y2'])
-
-        model.set_input_defaults('x', 35.0, units='degF')
-
-        model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
-        model.add_constraint('y1', units='degC', lower=0.0, upper=100.0)
-        model.add_objective('y2', units='degC')
-
-        prob.setup()
-        prob.run_driver()
-
-        print('Model variables')
-        assert_near_equal(prob.get_val('x', indices=[0]), 35.0, 1e-8)
-        assert_near_equal(prob.get_val('comp2.y2', indices=[0]), 105.0, 1e-8)
-        assert_near_equal(prob.get_val('comp1.y1', indices=[0]), 70.0, 1e-8)
-
-        print('')
-        print('Driver variables')
-        dv = prob.driver.get_design_var_values()
-        assert_near_equal(dv['x'][0], 3.0 * 5 / 9, 1e-8)
-
-        obj = prob.driver.get_objective_values(driver_scaling=True)
-        assert_near_equal(obj['comp2.y2'][0], 73.0 * 5 / 9, 1e-8)
-
-        con = prob.driver.get_constraint_values(driver_scaling=True)
-        assert_near_equal(con['comp1.y1'][0], 38.0 * 5 / 9, 1e-8)
-
-
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestDriverMPI(unittest.TestCase):
 

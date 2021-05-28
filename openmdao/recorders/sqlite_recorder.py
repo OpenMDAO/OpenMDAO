@@ -198,6 +198,13 @@ class SqliteRecorder(CaseRecorder):
                 if rank == 0:
                     metadata_filepath = f'{self._filepath}_meta'
                     print(f"Note: Metadata is being recorded separately as {metadata_filepath}.")
+                    try:
+                        os.remove(metadata_filepath)
+                        issue_warning('The existing case recorder metadata file, '
+                                      f'{metadata_filepath}, is being overwritten.',
+                                      category=UserWarning)
+                    except OSError:
+                        pass
                     self.metadata_connection = sqlite3.connect(metadata_filepath)
                 else:
                     self._record_metadata = False
@@ -211,6 +218,10 @@ class SqliteRecorder(CaseRecorder):
         if filepath:
             try:
                 os.remove(filepath)
+                issue_warning(
+                    f'The existing case recorder file, {filepath}, is being '
+                    'overwritten.',
+                    category=UserWarning)
             except OSError:
                 pass
 
@@ -340,19 +351,15 @@ class SqliteRecorder(CaseRecorder):
                     else:
                         objectives[name] = data
             else:
-                desvars = driver._designvars
-                constraints = driver._cons
-                objectives = driver._objs
-                responses = driver._responses
+                desvars = driver._designvars.copy()
+                constraints = driver._cons.copy()
+                objectives = driver._objs.copy()
+                responses = driver._responses.copy()
 
             inputs = list(system.abs_name_iter('input', local=False, discrete=True))
             outputs = list(system.abs_name_iter('output', local=False, discrete=True))
 
             var_order = system._get_vars_exec_order(inputs=True, outputs=True)
-
-            full_var_set = [(outputs, 'output'),
-                            (desvars, 'desvar'), (responses, 'response'),
-                            (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
@@ -374,6 +381,10 @@ class SqliteRecorder(CaseRecorder):
             real_meta_out = system._var_allprocs_abs2meta['output']
             disc_meta_in = system._var_allprocs_discrete['input']
             disc_meta_out = system._var_allprocs_discrete['output']
+
+            full_var_set = [(outputs, 'output'),
+                            (desvars, 'desvar'), (responses, 'response'),
+                            (objectives, 'objective'), (constraints, 'constraint')]
 
             for var_set, var_type in full_var_set:
                 for name in var_set:

@@ -696,7 +696,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']], np.array([3., 4]))
+        assert_near_equal(arr_order_1x1[p.model._design_vars['indep.x']['indices']()], np.array([3., 4]))
 
     def test_om_slice_in_add_response(self):
 
@@ -712,8 +712,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+        assert_near_equal(arr_order_1x1[p.model._responses['indep.x']['indices']()], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'](), slice(2, None, None))
 
     def test_om_slice_in_add_constraint(self):
 
@@ -729,8 +729,8 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_order_1x1[tuple(p.model._responses['indep.x']['indices'])], np.array([3, 4]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], slice(2, None, None))
+        assert_near_equal(arr_order_1x1[p.model._responses['indep.x']['indices'].flat()], np.array([3, 4]))
+        self.assertTrue(p.model._responses['indep.x']['indices'](), slice(2, None, None))
 
     def test_om_slice_in_add_input(self):
         class SlicerComp(om.ExplicitComponent):
@@ -851,7 +851,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._design_vars['indep.a']['indices']()], arr[1, ..., 1])
 
         # Response
         p = om.Problem()
@@ -866,7 +866,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._responses['indep.a']['indices']()], arr[1, ..., 1])
 
         # Constraint
         p = om.Problem()
@@ -881,7 +881,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr[tuple(p.model._responses['indep.a']['indices'])], arr[1, ..., 1])
+        assert_near_equal(arr[p.model._responses['indep.a']['indices']()], arr[1, ..., 1])
 
     def test_om_slice_with_ellipsis_in_promotes(self):
 
@@ -918,7 +918,7 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']][0], 10)
+        assert_near_equal(arr_2x4[p.model._design_vars['indep.x']['indices']()][0], 10)
 
     def test_om_slice_with_ellipsis_in_add_response(self):
 
@@ -934,10 +934,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['indep.x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['indep.x']['indices']()[0], 1)
 
     def test_om_slice_with_ellipsis_in_add_constraint(self):
 
@@ -953,10 +952,9 @@ class TestGroup(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['indep.x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['indep.x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['indep.x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['indep.x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['indep.x']['indices']()[0], 1)
 
     def test_om_slice_with_ellipsis_auto_ivc(self):
 
@@ -972,10 +970,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['x']['indices']()[0], 1)
 
         # Add_response
         p = om.Problem()
@@ -989,10 +986,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[tuple(p.model._responses['x']['indices'])],
+        assert_near_equal(arr_2x4[p.model._responses['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._responses['x']['indices'][0], 1)
-        self.assertTrue(p.model._responses['x']['indices'][1], ...)
+        self.assertTrue(p.model._responses['x']['indices']()[0], 1)
 
         # Add_design_var
         p = om.Problem()
@@ -1004,10 +1000,9 @@ class TestGroup(unittest.TestCase):
         p.set_val('x', arr_2x4, indices=om.slicer[1, ...])
         p.run_model()
 
-        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']],
+        assert_near_equal(arr_2x4[p.model._design_vars['x']['indices']()],
                           np.array([10, 11, 12, 13]))
-        self.assertTrue(p.model._design_vars['x']['indices'][0], 1)
-        self.assertTrue(p.model._design_vars['x']['indices'][1], ...)
+        self.assertTrue(p.model._design_vars['x']['indices']()[0], 1)
         self.assertTrue(p.driver.get_design_var_values()['x'], np.array(11.))
 
     def test_om_slice_with_indices_and_ellipsis_in_connect(self):
@@ -3217,7 +3212,6 @@ class TestInConfigMPIparpar(Test3Deep):
 class TestFeatureAddSubsystem(unittest.TestCase):
 
     def test_group_simple(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
@@ -3228,7 +3222,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_simple_promoted(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('a', 3.0),
@@ -3243,7 +3236,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp1.b'), 6.0)
 
     def test_group_nested(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('G1', om.Group())
@@ -3258,7 +3250,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.b'), 12.0)
 
     def test_group_nested_promoted1(self):
-        import openmdao.api as om
 
         # promotes from bottom level up 1
         p = om.Problem()
@@ -3280,7 +3271,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 3.5)
 
     def test_group_nested_promoted2(self):
-        import openmdao.api as om
 
         # promotes up from G1 level
         p = om.Problem()
@@ -3305,7 +3295,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('G1.comp2.a'), 4.0)
 
     def test_group_rename_connect(self):
-        import openmdao.api as om
 
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('aa', 3.0),
@@ -3325,7 +3314,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(p.get_val('comp2.b'), 9.0)
 
     def test_promotes_any(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3342,7 +3330,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
         self.assertEqual(top.get_val('x'), 5)
 
     def test_promotes_inputs_and_outputs(self):
-        import openmdao.api as om
 
         class SimpleGroup(om.Group):
 
@@ -3363,9 +3350,6 @@ class TestFeatureAddSubsystem(unittest.TestCase):
 class TestFeatureConnect(unittest.TestCase):
 
     def test_basic_connect_units(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3385,9 +3369,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('comp1.y'), 60.)
 
     def test_connect_1_to_many(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3404,9 +3385,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p.get_val('C3.y'), 30.)
 
     def test_connect_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3430,9 +3408,6 @@ class TestFeatureConnect(unittest.TestCase):
         assert_near_equal(p['C2.y'], 8.)
 
     def test_connect_src_indices_noflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         p = om.Problem()
 
@@ -3461,9 +3436,6 @@ class TestFeatureConnect(unittest.TestCase):
 class TestFeatureSrcIndices(unittest.TestCase):
 
     def test_promote_src_indices(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             def setup(self):
@@ -3501,9 +3473,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C2.y'), 8.)
 
     def test_promote_src_indices_nonflat(self):
-        import numpy as np
-
-        import openmdao.api as om
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -3542,8 +3511,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('C1.y'), 21.)
 
     def test_group_promotes_src_indices(self):
-        import numpy as np
-        import openmdao.api as om
 
         class MyComp1(om.ExplicitComponent):
             """ multiplies input array by 2. """
@@ -3592,7 +3559,6 @@ class TestFeatureSrcIndices(unittest.TestCase):
 class TestFeatureSetOrder(unittest.TestCase):
 
     def test_set_order(self):
-        import openmdao.api as om
 
         class ReportOrderComp(om.ExplicitComponent):
             """Adds name to list."""
@@ -3636,8 +3602,6 @@ class TestFeatureSetOrder(unittest.TestCase):
 class TestFeatureGetSubsystem(unittest.TestCase):
 
     def test_group_getsystem_top(self):
-        import openmdao.api as om
-        from openmdao.core.tests.test_group import BranchGroup
 
         p = om.Problem(model=BranchGroup())
         p.setup()
@@ -3652,7 +3616,6 @@ class TestFeatureGetSubsystem(unittest.TestCase):
 class TestFeatureConfigure(unittest.TestCase):
 
     def test_system_configure(self):
-        import openmdao.api as om
 
         class ImplSimple(om.ImplicitComponent):
 
@@ -3711,8 +3674,6 @@ class TestFeatureConfigure(unittest.TestCase):
         A simple example to compute the resultant force on an aircraft using data
         from an external source. Demonstrates adding I/O in the 'configure' method.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3773,8 +3734,6 @@ class TestFeatureConfigure(unittest.TestCase):
         """
         Like the example above but system we're calling list_outputs on is a Group.
         """
-        import numpy as np
-        import openmdao.api as om
 
         class FlightDataComp(om.ExplicitComponent):
             """
@@ -3919,8 +3878,6 @@ class TestConfigureMPI(unittest.TestCase):
 class TestFeatureGuessNonlinear(unittest.TestCase):
 
     def test_guess_nonlinear(self):
-        import openmdao.api as om
-        import numpy as np
 
         class Discipline(om.Group):
 
@@ -3966,6 +3923,7 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
 
 
 class TestNaturalNaming(unittest.TestCase):
+
     def test_buried_proms(self):
         p = om.Problem()
         model = p.model

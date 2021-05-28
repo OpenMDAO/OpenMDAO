@@ -396,8 +396,6 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
 
     def test_2_input_2_fidelity(self):
-        import numpy as np
-        import openmdao.api as om
 
         mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
         mm.add_input('x', np.zeros((1, 2)))

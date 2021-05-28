@@ -2922,7 +2922,7 @@ class Group(System):
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, start, end, np.atleast_1d(approx_of_idx[of])
+                    yield of, start, end, approx_of_idx[of].flat()
                 else:
                     end += abs2meta[of]['size']
                     yield of, start, end, _full_slice
@@ -2972,6 +2972,7 @@ class Group(System):
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
                         size = len(sub_wrt_idx)
+                        sub_wrt_idx = sub_wrt_idx.flat()
                     else:
                         sub_wrt_idx = _full_slice
                         if wrt in abs2meta['input']:
