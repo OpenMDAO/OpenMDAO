@@ -49,6 +49,9 @@ class TestNotebookUtils(unittest.TestCase):
         self.assertEqual(options, None)
 
     def test_show_options_table_warning(self):
+        from openmdao.utils import notebook_utils
+        notebook_utils.ipy = False
+
         msg = ("IPython is not installed. Run `pip install openmdao[notebooks]` or `pip install "
                "openmdao[docs]` to upgrade.")
 
