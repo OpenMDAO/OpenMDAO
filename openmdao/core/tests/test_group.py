@@ -3067,12 +3067,7 @@ class Test3Deep(unittest.TestCase):
         self.check_vs_meta(p, 'cfg', res)
 
         names = self.get_matching_var_setup_counts(p, 1)
-        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub.C3', 'cfg.sub.C4'}
-        self.assertEqual(names, sorted(expected))
-
-        # These systems have 1 additional setup count during get_io_metadata.
-        names = self.get_matching_var_setup_counts(p, 2)
-        expected = {'cfg.sub'}
+        expected = {'', 'cfg', 'cfg.C1', 'cfg.C2', 'cfg.sub', 'cfg.sub.C3', 'cfg.sub.C4'}
         self.assertEqual(names, sorted(expected))
 
     def test_io_meta_local_bad_meta_key(self):
