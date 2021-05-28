@@ -1375,7 +1375,7 @@ class TestDriverScalingReport(unittest.TestCase):
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
 
-    def test_unconstrainted(self):
+    def test_unconstrained(self):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         # build the model
