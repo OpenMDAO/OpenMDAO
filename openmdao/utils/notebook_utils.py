@@ -99,7 +99,9 @@ def show_options_table(reference, recording_options=False):
     obj = _get_object_from_reference(reference)()
 
     if ipy:
-        if not recording_options:
+        if not hasattr(obj, "options"):
+            return display(HTML(obj.to_table(fmt='html')))
+        elif not recording_options:
             return display(HTML(obj.options.to_table(fmt='html')))
         else:
             return display(HTML(obj.recording_options.to_table(fmt='html')))
