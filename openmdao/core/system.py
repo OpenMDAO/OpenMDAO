@@ -1459,6 +1459,10 @@ class System(object):
         self._var_allprocs_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
         self._var_relevant_names = defaultdict(lambda: {'input': [], 'output': []})
 
+        cfginfo = self._problem_meta['config_info']
+        if cfginfo and self.pathname in cfginfo._modified_systems:
+            cfginfo._modified_systems.remove(self.pathname)
+
     def _setup_var_index_maps(self, vec_name):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
@@ -3376,11 +3380,10 @@ class System(object):
         if self._problem_meta:
             conf_info = self._problem_meta['config_info']
             if conf_info:
-                for s in conf_info._modified_system_iter(self):
-                    s._setup_var_data()
-            if conf_info._modified_systems:
-                self._setup_var_data()
-            conf_info._reset()
+                if self._subsystems_allprocs:
+                    conf_info._update_modified_systems(self)
+                if self.pathname in conf_info._modified_systems:
+                    self._setup_var_data()
 
         if isinstance(iotypes, str):
             iotypes = (iotypes,)
