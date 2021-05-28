@@ -235,6 +235,14 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
 
     idx = 1  # unique ID for use by Tabulator
 
+    def get_inds(dval, meta):
+        inds = meta.get('indices')
+        if inds is not None:
+            inds = inds.as_array()
+            if dval.size == 1:
+                return inds[0], inds
+        return '', inds
+
     # set up design vars table data
     for name, meta in driver._designvars.items():
         scaler = meta['total_scaler']
@@ -247,13 +255,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         dval = dv_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
-        if dval.size == 1:
-            index = meta['indices']
-            if index is not None:
-                index = index.as_array()[0]
-            index = _getdef(index, '')
-        else:
-            index = ''
+        index, inds = get_inds(dval, meta)
 
         dct = {
             'id': idx,
@@ -273,10 +275,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         }
 
         dv_table.append(dct)
-
-        inds = meta['indices']
-        if inds is not None:
-            inds = inds.as_array()
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
                         lower=lower, upper=upper, inds=inds)
 
@@ -295,13 +293,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         dval = con_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
-        if dval.size == 1:
-            index = meta.get('indices')
-            if index is not None:
-                index = index.as_array()[0]
-            index = _getdef(index, '')
-        else:
-            index = ''
+        index, inds = get_inds(dval, meta)
 
         dct = {
             'id': idx,
@@ -323,9 +315,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         }
 
         con_table.append(dct)
-        inds = meta.get('indices')
-        if inds is not None:
-            inds = inds.as_array()
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
                         lower=lower, upper=upper, equals=equals, inds=inds)
 
@@ -341,13 +330,7 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         dval = obj_vals[name]
         mval = _unscale(dval, scaler, adder, default)
 
-        if dval.size == 1:
-            index = meta.get('indices')
-            if index is not None:
-                index = index.as_array()[0]
-            index = _getdef(index, '')
-        else:
-            index = ''
+        index, inds = get_inds(dval, meta)
 
         dct = {
             'id': idx,
@@ -365,9 +348,6 @@ def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_brows
         }
 
         obj_table.append(dct)
-        inds = meta.get('indices')
-        if inds is not None:
-            inds = inds.as_array()
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
                         inds=inds)
 
