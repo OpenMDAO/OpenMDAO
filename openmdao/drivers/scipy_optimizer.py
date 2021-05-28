@@ -223,7 +223,7 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower >= -INF_BOUND \
                         or isinstance(upper, np.ndarray) or upper <= INF_BOUND:
-                    d = OrderedDict()
+                    d = {}
                     d['lower'] = lower
                     d['upper'] = upper
                     d['equals'] = None

@@ -1262,7 +1262,7 @@ class _Obj(object):
         self.objs = []
 
 
-@use_tempdirs
+# @use_tempdirs
 class TestDriverScalingReport(unittest.TestCase):
 
     def setup_model(self, mult_exp_range=(-10, 4), nins=1, nouts=1, ncomps=10, shape=1):
@@ -1374,6 +1374,41 @@ class TestDriverScalingReport(unittest.TestCase):
         p.final_setup()
         data = p.driver.scaling_report(show_browser=False)
         self._check_data(data, expected)
+
+    def test_unconstrainted(self):
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        # build the model
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0)
+        indeps.add_output('y', -4.0)
+
+        prob.model.add_subsystem('paraboloid', Paraboloid())
+
+        prob.model.connect('indeps.x', 'paraboloid.x')
+        prob.model.connect('indeps.y', 'paraboloid.y')
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'COBYLA'
+
+        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
+        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
+        prob.model.add_objective('paraboloid.f_xy', index=0)
+
+        prob.setup()
+        prob.run_driver()
+
+        # minimum value
+        assert_near_equal(prob['paraboloid.f_xy'], -27.33333, 1e-6)
+
+        # location of the minimum
+        assert_near_equal(prob['indeps.x'], 6.6667, 1e-4)
+        assert_near_equal(prob['indeps.y'], -7.33333, 1e-4)
+
+        # just make sure this doesn't raise an exception
+        prob.driver.scaling_report(show_browser=False)
 
 if __name__ == '__main__':
     unittest.main()
