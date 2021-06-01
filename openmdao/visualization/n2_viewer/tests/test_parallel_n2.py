@@ -4,7 +4,6 @@ import unittest
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 
 try:
@@ -38,7 +37,6 @@ class Top(om.Group):
         self.connect('indep_var.x1', 'myComp.x2')
 
 
-@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2
@@ -54,6 +52,13 @@ class N2ParallelTestCase(unittest.TestCase):
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
 
+    def tearDown(self):
+        if not DEBUG:
+            try:
+                os.remove(OUTFILE)
+            except:
+                # Don't want the test to fail if the test file is already removed
+                pass
 
 if __name__ == "__main__":
     unittest.main()
