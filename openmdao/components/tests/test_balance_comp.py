@@ -8,9 +8,11 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_warning, assert_no_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_no_warning, assert_check_partials
+from openmdao.utils.testing_utils import use_tempdirs
 
 
+@use_tempdirs
 class TestBalanceComp(unittest.TestCase):
 
     def test_scalar_example(self):

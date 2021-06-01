@@ -10,6 +10,7 @@ from numpy.testing import assert_almost_equal
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.testing_utils import use_tempdirs
 
 scipy_gte_019 = True
 try:
@@ -384,6 +385,7 @@ class SampleMap(object):
                        'values': g})
 
 
+@use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestMetaModelStructuredScipy(unittest.TestCase):
     """
@@ -676,6 +678,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
+@use_tempdirs
 class TestMetaModelStructuredPython(unittest.TestCase):
     """
     Tests the regular grid map component. specifically the analytic derivatives
@@ -1128,6 +1131,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
             p.run_driver()
 
 
+@use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
