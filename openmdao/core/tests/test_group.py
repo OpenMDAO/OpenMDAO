@@ -1,7 +1,6 @@
 """
 Unit tests for Group.
 """
-
 import itertools
 import unittest
 import warnings
