@@ -1,10 +1,8 @@
-import os
-
-import unittest
-import numpy as np
 from io import StringIO
-
+import unittest
 from distutils.version import LooseVersion
+
+import numpy as np
 
 import openmdao.api as om
 
