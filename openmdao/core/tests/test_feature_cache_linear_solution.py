@@ -80,7 +80,7 @@ class CacheLinearTestCase(unittest.TestCase):
         p.model.add_subsystem('obj', om.ExecComp('y = (x[1]-x[0])**2', x=np.ones(2)))
         p.model.connect('states', 'obj.x')
 
-        p.model.add_design_var('a', cache_linear_solution=True)
+        p.model.add_design_var('a', cache_linear_solution=True, upper=4.)
         p.model.add_constraint('states', upper=10)
         p.model.add_objective('obj.y')
 
