@@ -160,7 +160,6 @@ class TestNotInstalled(unittest.TestCase):
                          'pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
 
-@use_tempdirs
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
@@ -2375,7 +2374,6 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.98337708, 1e-3)
 
 
-@use_tempdirs
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
     # All of these tests require SNOPT
 

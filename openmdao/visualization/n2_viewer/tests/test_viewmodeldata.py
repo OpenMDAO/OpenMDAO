@@ -23,6 +23,7 @@ from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 from openmdao.utils.mpi import MPI
 from openmdao.utils.shell_proc import check_call
 from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 try:
@@ -481,6 +482,7 @@ class TestViewModelData(unittest.TestCase):
                         in open(self.conn_html_filename, 'r', encoding='utf-8').read())
 
 
+@use_tempdirs
 class TestUnderMPI(unittest.TestCase):
     N_PROCS = 2
 

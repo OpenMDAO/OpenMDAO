@@ -1,6 +1,5 @@
 """ Testing for group finite differencing."""
 import itertools
-import time
 import unittest
 
 try:
@@ -22,8 +21,8 @@ from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
+import time
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -40,7 +39,6 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-@use_tempdirs
 class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_paraboloid(self):

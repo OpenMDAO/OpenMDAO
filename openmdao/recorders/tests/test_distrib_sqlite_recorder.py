@@ -7,15 +7,15 @@ from tempfile import mkdtemp
 
 import numpy as np
 
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_warnings
-from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.mpi import MPI
 
 if MPI:
     from openmdao.api import PETScVector
@@ -93,7 +93,6 @@ class Mygroup(om.Group):
         self.add_constraint('c', lower=-3.)
 
 
-@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedRecorderTest(unittest.TestCase):
 
@@ -104,6 +103,14 @@ class DistributedRecorderTest(unittest.TestCase):
         self.filename = os.path.join(self.dir, "sqlite_test")
         self.recorder = om.SqliteRecorder(self.filename)
         self.eps = 1e-5
+
+    def tearDown(self):
+        try:
+            rmtree(self.dir)
+        except OSError as e:
+            # If directory already deleted, keep going
+            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
+                raise e
 
     def test_distrib_record_system(self):
         prob = om.Problem()
