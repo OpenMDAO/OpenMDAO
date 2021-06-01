@@ -3218,10 +3218,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(y_recorded, y1)
 
 
-@use_tempdirs
 class TestFeatureAdvancedExample(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
 
         # build the model
         prob = om.Problem(model=SellarMDAWithUnits())
