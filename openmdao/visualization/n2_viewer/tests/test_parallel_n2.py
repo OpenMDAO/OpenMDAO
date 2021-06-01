@@ -54,13 +54,6 @@ class N2ParallelTestCase(unittest.TestCase):
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
 
-    def tearDown(self):
-        if not DEBUG:
-            try:
-                os.remove(OUTFILE)
-            except:
-                # Don't want the test to fail if the test file is already removed
-                pass
 
 if __name__ == "__main__":
     unittest.main()
