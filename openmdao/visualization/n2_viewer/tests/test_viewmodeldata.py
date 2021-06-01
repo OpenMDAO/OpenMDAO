@@ -123,15 +123,6 @@ class TestViewModelData(unittest.TestCase):
         self.expected_design_vars_names = []
         self.expected_responses_names = []
 
-    def tearDown(self):
-        if not DEBUG_FILES:
-            try:
-                rmtree(self.dir)
-            except OSError as e:
-                # If directory already deleted, keep going
-                if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                    raise e
-
     def check_model_viewer_data(self, model_viewer_data,
                                 expected_tree,
                                 expected_pathnames,

@@ -105,14 +105,6 @@ class DistributedRecorderTest(unittest.TestCase):
         self.recorder = om.SqliteRecorder(self.filename)
         self.eps = 1e-5
 
-    def tearDown(self):
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
-
     def test_distrib_record_system(self):
         prob = om.Problem()
 
