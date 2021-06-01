@@ -51,6 +51,7 @@ You have two options for installing **OpenMDAO**, (1) from the
 Specifying `all` will include all of the optional dependencies.
 
 ### Install from [PyPI][1]
+
 This is the easiest way to install **OpenMDAO**. To install only the runtime
 dependencies:
 
@@ -61,12 +62,14 @@ To install all the optional dependencies:
     pip install openmdao[all]
 
 ### Install from a Cloned Repository
+
 This allows you to install **OpenMDAO** from a local copy of the source code.
 
     git clone http://github.com/OpenMDAO/OpenMDAO
     pip install OpenMDAO
 
 #### Install for Development
+
 If you would like to make changes to **OpenMDAO** it is recommended you
 install it in *[editable][16]* mode (i.e., development mode) by adding the `-e`
 flag when calling `pip`, this way any changes you make to the source code will
@@ -116,8 +119,6 @@ and include the error message.
 ## Build the Documentation for OpenMDAO
 
 Documentation for the latest version can always be found [here][2], but if you would like to build a local copy you can find instructions to do so [here][19].
-
-
 
 [0]: http://openmdao.org/ "OpenMDAO"
 [1]: https://pypi.org/project/openmdao/ "OpenMDAO @PyPI"
