@@ -161,6 +161,7 @@ class TestNotInstalled(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
+@use_tempdirs
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
@@ -2374,6 +2375,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         assert_near_equal(prob.get_val('z', indices=0), 1.98337708, 1e-3)
 
 
+@use_tempdirs
 class TestPyoptSparseSnoptFeature(unittest.TestCase):
     # All of these tests require SNOPT
 

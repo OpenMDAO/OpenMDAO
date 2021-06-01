@@ -3,9 +3,9 @@ import errno
 import os
 import unittest
 from io import StringIO
-import numpy as np
-
 import sqlite3
+
+import numpy as np
 
 import openmdao.api as om
 
@@ -3218,10 +3218,10 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_near_equal(y_recorded, y1)
 
 
+@use_tempdirs
 class TestFeatureAdvancedExample(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
 
         # build the model
         prob = om.Problem(model=SellarMDAWithUnits())
