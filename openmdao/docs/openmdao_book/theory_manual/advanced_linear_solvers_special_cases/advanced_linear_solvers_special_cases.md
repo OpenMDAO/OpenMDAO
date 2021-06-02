@@ -4,4 +4,3 @@ There are certain cases where it is possible to further improve linear solver pe
 
 - [Solving for Derivatives of Multiple Separable Constraints Using a Single Linear Solve](separable.ipynb)
 - [Parallelizing Derivative Solves of Multipoint Models At a Small Memory Cost](fan_out.ipynb)
-- [Vectorizing Derivative Solves for Array Variables At a Larger Memory Cost](vectorized.ipynb)
