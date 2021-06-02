@@ -363,8 +363,8 @@ class System(object):
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
-                             desc='Linear solver(s) in this group, if using an assembled '
-                                  'jacobian, will use this type.')
+                             desc='Linear solver(s) in this group or implicit component, '
+                                  'if using an assembled jacobian, will use this type.')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
