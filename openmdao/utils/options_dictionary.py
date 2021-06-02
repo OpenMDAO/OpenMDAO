@@ -134,7 +134,7 @@ class OptionsDictionary(object):
                   " `pip install openmdao[notebooks]`."
             raise ImportError(msg)
 
-        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']]
+        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description', "Deprecation"]]
         for key in sorted(self._dict.keys()):
             options = self._dict[key]
             default = options['value'] if options['value'] is not _UNDEFINED else '**Required**'
@@ -157,8 +157,10 @@ class OptionsDictionary(object):
                     acceptable_types = (acceptable_types,)
                 acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
+            deprecation = options['deprecation']
+
             desc = options['desc']
-            tlist.append([key, default, acceptable_values, acceptable_types, desc])
+            tlist.append([key, default, acceptable_values, acceptable_types, desc, deprecation])
         return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
