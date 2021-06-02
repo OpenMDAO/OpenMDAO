@@ -6,7 +6,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 
 class BasicOptParaboloid(unittest.TestCase):
 
-    def test_unconstrainted(self):
+    def test_unconstrained(self):
         import openmdao.api as om
 
         # We'll use the component that was defined in the last tutorial

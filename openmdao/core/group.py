@@ -473,17 +473,13 @@ class Group(System):
             self._has_bounds |= subsys._has_bounds
             self.matrix_free |= subsys.matrix_free
 
-        conf_info = self._problem_meta['config_info']
-        conf_info._reset()
-
         self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
         # if our configure() has added or promoted any variables, we have to call
         # _setup_var_data again on any modified systems and their ancestors (only those that
         # are our descendents).
-        for s in conf_info._modified_system_iter(self):
-            s._setup_var_data()
+        self._problem_meta['config_info']._update_modified_systems(self)
 
     def _setup_procs(self, pathname, comm, mode, prob_meta):
         """

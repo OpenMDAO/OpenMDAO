@@ -1,8 +1,6 @@
 
 import os
 import sys
-import shutil
-import tempfile
 import itertools
 
 import unittest
@@ -11,8 +9,7 @@ import math
 
 from io import StringIO
 
-from distutils.version import LooseVersion
-from numpy.testing import assert_array_almost_equal, assert_almost_equal
+from numpy.testing import assert_almost_equal
 import scipy
 try:
     from scipy.sparse import load_npz
@@ -20,7 +17,6 @@ except ImportError:
     load_npz = None
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI
@@ -905,6 +901,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_'.join(args)
 
 
+@use_tempdirs
 class BidirectionalTestCase(unittest.TestCase):
     def test_eisenstat(self):
         for n in range(6, 20, 2):
@@ -1049,6 +1046,7 @@ class MatMultMultipointMPI4TestCase(MatMultMultipointTestCase):
     N_PROCS = 4
 
 
+@use_tempdirs
 class SimulColoringVarOutputTestClass(unittest.TestCase):
     def test_multi_variable_coloring_debug_print_totals(self):
         size = 10

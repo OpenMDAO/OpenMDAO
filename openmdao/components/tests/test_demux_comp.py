@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
+from openmdao.warnings import OMDeprecationWarning
 
 
 class TestDemuxCompOptions(unittest.TestCase):
@@ -90,6 +91,19 @@ class TestDemuxComp1D(unittest.TestCase):
         np.set_printoptions(linewidth=1024)
         cpd = self.p.check_partials(compact_print=False, method='cs', out_stream=None)
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
+
+
+class TestDemuxComp(unittest.TestCase):
+
+    def test_demux_deprecation(self):
+
+        p = om.Problem()
+
+        msg = ("DemuxComp is being deprecated. This same functionality can be achieved "
+               "directly in the connect/promotes indices arg using om.slicer.")
+
+        with assert_warning(OMDeprecationWarning, msg):
+            p.model.add_subsystem(name='demux', subsys=om.DemuxComp(vec_size=4))
 
 
 class TestDemuxComp2D(unittest.TestCase):

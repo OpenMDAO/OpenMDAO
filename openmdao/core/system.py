@@ -766,7 +766,10 @@ class System(object):
 
         self._setup_var_data()
 
-        self._setup_vec_names()
+        if self._use_derivatives:
+            self._problem_meta['vec_names'] = ['nonlinear', 'linear']
+        else:
+            self._problem_meta['vec_names'] = ['nonlinear']
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
@@ -1428,14 +1431,13 @@ class System(object):
         self._var_sizes = {}
         self._owned_sizes = None
 
+        cfginfo = self._problem_meta['config_info']
+        if cfginfo and self.pathname in cfginfo._modified_systems:
+            cfginfo._modified_systems.remove(self.pathname)
+
     def _setup_var_index_maps(self):
         """
         Compute maps from abs var names to their index among allprocs variables in this system.
-
-        Parameters
-        ----------
-        vec_name : str
-            Name of vector.
         """
         abs2idx = self._var_allprocs_abs2idx = {}
         for io in ['input', 'output']:
@@ -1496,17 +1498,6 @@ class System(object):
             Dictionary of connections passed down from parent group.
         """
         pass
-
-    def _setup_vec_names(self):
-        """
-        Compute the list of vec_names.
-
-        This is only called on the top level System during initial setup.
-        """
-        if self._use_derivatives:
-            self._problem_meta['vec_names'] = ['nonlinear', 'linear']
-        else:
-            self._problem_meta['vec_names'] = ['nonlinear']
 
     def _init_relevance(self, mode):
         """
@@ -3223,6 +3214,15 @@ class System(object):
         """
         prefix = self.pathname + '.' if self.pathname else ''
         rel_idx = len(prefix)
+
+        # Setup any modified subsystems so the metadata dicts are up-to-date.
+        if self._problem_meta:
+            conf_info = self._problem_meta['config_info']
+            if conf_info:
+                if self._subsystems_allprocs:
+                    conf_info._update_modified_systems(self)
+                if self.pathname in conf_info._modified_systems:
+                    self._setup_var_data()
 
         if isinstance(iotypes, str):
             iotypes = (iotypes,)

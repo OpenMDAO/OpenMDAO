@@ -986,12 +986,12 @@ class _TotalJacInfo(object):
         -------
         set
             Set of relevant system names.
-        tuple or None
-            vec_name corresponding to the given index (or None).
+        tuple of str or None
+            'linear' or None if linear solve caching is inactive.
         int or None
             key used for storage of cached linear solve (if active, else None).
         """
-        vecname, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
+        _, rel_systems, cache_lin_sol = self.in_idx_map[mode][idx]
 
         self._zero_vecs('linear', mode)
 
@@ -1000,7 +1000,7 @@ class _TotalJacInfo(object):
             self.input_vec[mode]['linear'].set_val(self.seeds[mode][idx], loc_idx)
 
         if cache_lin_sol:
-            return rel_systems, (vecname,), (idx, mode)
+            return rel_systems, ('linear',), (idx, mode)
         else:
             return rel_systems, None, None
 

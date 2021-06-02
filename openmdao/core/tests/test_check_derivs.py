@@ -2658,6 +2658,10 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_near_equal(jac[1][0], Jbase[2, 1], 1e-8)
         assert_near_equal(jac[1][1], Jbase[2, 3], 1e-8)
 
+        # just verify that this doesn't raise an exception
+        prob.driver.scaling_report(show_browser=False)
+
+
         # Objective instead
 
         prob = om.Problem()
@@ -2686,6 +2690,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         jac = totals[('mycomp.y1', 'x_param1.x1')]['J_fd']
         assert_near_equal(jac[0][0], Jbase[1, 1], 1e-8)
         assert_near_equal(jac[0][1], Jbase[1, 3], 1e-8)
+
+        # just verify that this doesn't raise an exception
+        prob.driver.scaling_report(show_browser=False)
 
     def test_cs_suppress(self):
         prob = om.Problem()
