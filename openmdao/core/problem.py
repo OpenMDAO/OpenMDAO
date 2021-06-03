@@ -310,9 +310,9 @@ class Problem(object):
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['value']
+                    val = meta['output'][conns[abs_name]]['val']
                 else:
-                    val = meta[io][abs_name]['value']
+                    val = meta[io][abs_name]['val']
 
             if get_remote and abs_name in vars_to_gather:
                 owner = vars_to_gather[abs_name]
@@ -408,7 +408,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val, units=None, indices=None):
+    def set_val(self, name, val=None, value=None, units=None, indices=None):
         """
         Set an output/input variable.
 
@@ -425,6 +425,13 @@ class Problem(object):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified val.
         """
+        if val is None and value is None:
+            raise RuntimeError("Val is required.")
+        elif value is not None:
+            val = value
+            warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' in the future.")
+
+
         model = self.model
         if self._metadata is not None:
             conns = model._conn_global_abs_in2out
@@ -1256,7 +1263,7 @@ class Problem(object):
 
                             # No need to calculate partials; they are already stored
                             try:
-                                deriv_value = subjacs[abs_key]['value']
+                                deriv_value = subjacs[abs_key]['val']
                                 rows = subjacs[abs_key]['rows']
                             except KeyError:
                                 deriv_value = rows = None
@@ -1707,7 +1714,7 @@ class Problem(object):
             'parallel_deriv_color', 'vectorize_derivs', 'cache_linear_solution']
 
         """
-        default_col_names = ['name', 'value', 'size']
+        default_col_names = ['name', 'val', 'size']
 
         # Design vars
         desvars = self.driver._designvars
@@ -1784,7 +1791,7 @@ class Problem(object):
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = name
 
-                elif col_name == 'value':
+                elif col_name == 'val':
                     row[col_name] = vals[name]
                 else:
                     row[col_name] = meta[col_name]

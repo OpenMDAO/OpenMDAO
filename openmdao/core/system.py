@@ -85,7 +85,7 @@ global_meta_names = {
 }
 
 allowed_meta_names = {
-    'value',
+    'val',
     'global_shape',
     'global_size',
     'src_indices',
@@ -1894,10 +1894,10 @@ class System(object):
         Set all input and output variables to their declared initial values.
         """
         for abs_name, meta in self._var_abs2meta['input'].items():
-            self._inputs.set_var(abs_name, meta['value'])
+            self._inputs.set_var(abs_name, meta['val'])
 
         for abs_name, meta in self._var_abs2meta['output'].items():
-            self._outputs.set_var(abs_name, meta['value'])
+            self._outputs.set_var(abs_name, meta['val'])
 
     def _get_promotion_maps(self):
         """
@@ -3395,8 +3395,8 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
-        dynset = set(('shape', 'size', 'value'))
-        gather_keys = {'value', 'src_indices'}
+        dynset = set(('shape', 'size', 'val'))
+        gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
@@ -3472,14 +3472,14 @@ class System(object):
                             if not ret_meta:
                                 ret_meta = {}
                             if distrib:
-                                if 'value' in metadata_keys:
+                                if 'val' in metadata_keys:
                                     # assemble the full distributed value
-                                    dist_vals = [m['value'] for m in allproc_metas
-                                                 if m is not None and m['value'].size > 0]
+                                    dist_vals = [m['val'] for m in allproc_metas
+                                                 if m is not None and m['val'].size > 0]
                                     if dist_vals:
-                                        ret_meta['value'] = np.concatenate(dist_vals)
+                                        ret_meta['val'] = np.concatenate(dist_vals)
                                     else:
-                                        ret_meta['value'] = np.zeros(0)
+                                        ret_meta['val'] = np.zeros(0)
                                 if 'src_indices' in metadata_keys:
                                     # assemble full src_indices
                                     dist_src_inds = [m['src_indices'] for m in allproc_metas
@@ -3572,7 +3572,7 @@ class System(object):
             List of input names and other optional information about those inputs.
         """
         metavalues = values and self._inputs is None
-        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
@@ -3595,8 +3595,8 @@ class System(object):
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
             for n, meta in inputs.items():
-                meta['value'] = self._abs_get_val(n, get_remote=True,
-                                                  rank=None if all_procs else 0, kind='input')
+                meta['val'] = self._abs_get_val(n, get_remote=True,
+                                                rank=None if all_procs else 0, kind='input')
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3696,7 +3696,7 @@ class System(object):
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
-        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [values, units, shape, global_shape, desc, tags]
 
         keys = [name for i, name in enumerate(keynames) if keyflags[i]]
@@ -3722,8 +3722,8 @@ class System(object):
             for name, meta in outputs.items():
                 if values:
                     # we want value from the input vector, not from the metadata
-                    meta['value'] = self._abs_get_val(name, get_remote=True,
-                                                      rank=None if all_procs else 0, kind='output')
+                    meta['val'] = self._abs_get_val(name, get_remote=True,
+                                                    rank=None if all_procs else 0, kind='output')
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -4373,7 +4373,7 @@ class System(object):
                         raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
                                          "because linear vectors are not available before "
                                          "final_setup.")
-                    val = my_meta[abs_name]['value']
+                    val = my_meta[abs_name]['val']
             else:
                 if from_root:
                     vec = vec._root_vector
@@ -4783,13 +4783,13 @@ class System(object):
                         if vec._contains_abs(n):
                             vdict[n] = get(n, False)
                         elif n[offset:] in discrete_vec:
-                            vdict[n] = discrete_vec[n[offset:]]['value']
+                            vdict[n] = discrete_vec[n[offset:]]['val']
                         else:
                             ivc_path = conns[prom2abs_in[n][0]]
                             if vec._contains_abs(ivc_path):
                                 vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
-                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
+                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
@@ -4806,7 +4806,7 @@ class System(object):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
                         elif name[offset:] in discrete_vec and self._owning_rank[name] == rank:
-                            vdict[name] = discrete_vec[name[offset:]]['value']
+                            vdict[name] = discrete_vec[name[offset:]]['val']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
@@ -4827,7 +4827,7 @@ class System(object):
                             if vec._contains_abs(name):
                                 vdict[name] = vec._abs_get_val(name, flat=False)
                             elif name[offset:] in discrete_vec:
-                                vdict[name] = discrete_vec[name[offset:]]['value']
+                                vdict[name] = discrete_vec[name[offset:]]['val']
                     else:
                         vdict[name] = self.get_val(name, get_remote=True, rank=0,
                                                    vec_name=vec_name, kind=kind, from_src=False)
@@ -4976,7 +4976,7 @@ class System(object):
                 return meta[key]
             else:
                 # key is either bogus or a key into the local metadata dict
-                # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
+                # (like 'val' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
                 if self.comm.size > 1 and abs_name in self._vars_to_gather:
                     # TODO: fix this

@@ -103,7 +103,7 @@ def _get_var_dict(system, typ, name, is_parallel):
         var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
-    var_dict['dtype'] = type(meta['value']).__name__
+    var_dict['dtype'] = type(meta['val']).__name__
     if 'units' in meta:
         if meta['units'] is None:
             var_dict['units'] = 'None'
@@ -124,26 +124,26 @@ def _get_var_dict(system, typ, name, is_parallel):
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
-            var_dict['value'] = default_noraise(system.get_val(name))
+        if isinstance(meta['val'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
+            var_dict['val'] = default_noraise(system.get_val(name))
         else:
-            var_dict['value'] = type(meta['value']).__name__
+            var_dict['val'] = type(meta['val']).__name__
     else:
-        if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+        if meta['val'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
             if not MPI:
                 # get the current value
-                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
+                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
             elif is_parallel or is_distributed:
                 # we can't access non-local values, so just get the initial value
-                var_dict['value'] = meta['value']
+                var_dict['val'] = meta['val']
                 var_dict['initial_value'] = True
             else:
                 # get the current value but don't try to get it from the source,
                 # which could be remote under MPI
                 val = system.get_val(name, from_src=False)
-                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(val)
+                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(val)
         else:
-            var_dict['value'] = None
+            var_dict['val'] = None
 
     return var_dict
 
@@ -165,7 +165,7 @@ def _serialize_single_option(option):
     object
        JSON-safe serialized object.
     """
-    val = option['value']
+    val = option['val']
     if not option['recordable']:
         serialized_option = 'Not Recordable'
     elif val is _UNDEFINED:

@@ -917,18 +917,18 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x-25.',
-                                                     x={'value': 77.0, 'units': 'degF'},
-                                                     y={'value': 0.0, 'units': 'degC'}))
+                                                     x={'val': 77.0, 'units': 'degF'},
+                                                     y={'val': 0.0, 'units': 'degC'}))
         prob.model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
-                                                     xx={'value': 77.0, 'units': 'degF'},
-                                                     yy={'value': 0.0, 'units': 'degC'}),
+                                                     xx={'val': 77.0, 'units': 'degF'},
+                                                     yy={'val': 0.0, 'units': 'degC'}),
                                  promotes=['xx', 'yy'])
         prob.model.add_subsystem('acomp', om.ExecComp('y=x-25.',
-                                                      x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      y={'value': 0.0, 'units': 'degC'}))
+                                                      x={'val': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                      y={'val': 0.0, 'units': 'degC'}))
         prob.model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
-                                                      axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      ayy={'value': 0.0, 'units': 'degC'}),
+                                                      axx={'val': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                      ayy={'val': 0.0, 'units': 'degC'}),
                                  promotes=['axx', 'ayy'])
 
         prob.setup()
@@ -1031,18 +1031,18 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                                     x={'value': 1.0, 'units': 'ft'},
-                                                     y={'value': 0.0, 'units': 'ft'}),
+                                                     x={'val': 1.0, 'units': 'ft'},
+                                                     y={'val': 0.0, 'units': 'ft'}),
                                  promotes=['x'])
         prob.model.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                                     x={'value': 1.0, 'units': 'inch'},
-                                                     y={'value': 0.0, 'units': 'inch'}),
+                                                     x={'val': 1.0, 'units': 'inch'},
+                                                     y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
         try:
             prob.setup()
         except RuntimeError as err:
-            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+            self.assertEqual(str(err), "<model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1051,12 +1051,12 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'value': 1.0, 'units': 'cm'},
-                                            y={'value': 0.0, 'units': 'cm'}),
+                                            x={'val': 1.0, 'units': 'cm'},
+                                            y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'value': 1.0, 'units': 'mm'},
-                                            y={'value': 0.0, 'units': 'mm'}),
+                                            x={'val': 1.0, 'units': 'mm'},
+                                            y={'val': 0.0, 'units': 'mm'}),
                          promotes=['x'])
 
         # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
@@ -1083,16 +1083,16 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'value': 1.0, 'units': 'cm', 'src_indices': [0]},
-                                            y={'value': 0.0, 'units': 'cm'}),
+                                            x={'val': 1.0, 'units': 'cm', 'src_indices': [0]},
+                                            y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'value': 1.0, 'units': 'mm', 'src_indices': [1,2]},
-                                            y={'value': np.zeros(2), 'units': 'mm'}),
+                                            x={'val': 1.0, 'units': 'mm', 'src_indices': [1,2]},
+                                            y={'val': np.zeros(2), 'units': 'mm'}),
                          promotes=['x'])
         G1.add_subsystem('C3', om.ExecComp('y=x*4.',
-                                            x={'value': np.ones(3), 'units': 'mm'},
-                                            y={'value': np.zeros(3), 'units': 'mm'}),
+                                            x={'val': np.ones(3), 'units': 'mm'},
+                                            y={'val': np.zeros(3), 'units': 'mm'}),
                          promotes=['x'])
 
         # units and value to use for the _auto_ivc output are ambiguous.  This fixes that.
@@ -1124,12 +1124,12 @@ class TestProblem(unittest.TestCase):
         prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'value': 1.0, 'units': 'cm'},
-                                            y={'value': 0.0, 'units': 'cm'}),
+                                            x={'val': 1.0, 'units': 'cm'},
+                                            y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'value': 1.0, 'units': 'mm'},
-                                            y={'value': 0.0, 'units': 'mm'}),
+                                            x={'val': 1.0, 'units': 'mm'},
+                                            y={'val': 0.0, 'units': 'mm'}),
                          promotes=['x'])
 
         # connect IVC to promoted inputs
@@ -1165,12 +1165,12 @@ class TestProblem(unittest.TestCase):
         prob.model.add_subsystem('indeps', om.IndepVarComp('x', val=1.0, units='m'))
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'value': 1.0, 'units': 'cm'},
-                                            y={'value': 0.0, 'units': 'cm'}),
+                                            x={'val': 1.0, 'units': 'cm'},
+                                            y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'value': 1.0, 'units': 'mm'},
-                                            y={'value': 0.0, 'units': 'mm'}),
+                                            x={'val': 1.0, 'units': 'mm'},
+                                            y={'val': 0.0, 'units': 'mm'}),
                          promotes=['x'])
 
         # connect IVC to promoted inputs
@@ -1202,9 +1202,9 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
-                                                     x={'value': 100.0, 'units': 'cm'},
+                                                     x={'val': 100.0, 'units': 'cm'},
                                                      y={'units': 'm'}))
-        prob.model.add_subsystem('no_unit', om.ExecComp('y=x+1.', x={'value': 100.0}))
+        prob.model.add_subsystem('no_unit', om.ExecComp('y=x+1.', x={'val': 100.0}))
 
         prob.setup()
         prob.run_model()
@@ -1227,7 +1227,7 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
-                                                     x={'value': 100.0, 'units': 'cm'},
+                                                     x={'val': 100.0, 'units': 'cm'},
                                                      y={'units': 'm'}))
 
         prob.setup()
@@ -1243,7 +1243,7 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
-                                                     x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
+                                                     x={'val': np.array([100.0, 33.3]), 'units': 'cm'},
                                                      y={'shape': (2, ), 'units': 'm'}))
 
         prob.setup()
@@ -1265,7 +1265,7 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
-                                                     x={'value': np.array([[1., 2.], [3., 4.]]), },
+                                                     x={'val': np.array([[1., 2.], [3., 4.]]), },
                                                      y={'shape': (2, 2), }))
 
         prob.setup()
@@ -1716,17 +1716,17 @@ class TestProblem(unittest.TestCase):
 
             inputs = p.model.list_inputs(out_stream=None)
             self.assertEqual(sorted(inputs), [
-                ('comp3.a', {'value': [2.]}),
-                ('comp3.b', {'value': [3.]})
+                ('comp3.a', {'val': [2.]}),
+                ('comp3.b', {'val': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
             outputs = p.model.list_outputs(out_stream=None)
             self.assertEqual(sorted(outputs), [
-                ('comp1.a',   {'value': [2.]}),
-                ('comp1.foo', {'value': [1.]}),
-                ('comp2.b',   {'value': [3.]}),
-                ('comp2.foo', {'value': [1.]}),
-                ('comp3.y',   {'value': [5.]})
+                ('comp1.a',   {'val': [2.]}),
+                ('comp1.foo', {'val': [1.]}),
+                ('comp2.b',   {'val': [3.]}),
+                ('comp2.foo', {'val': [1.]}),
+                ('comp3.y',   {'val': [5.]})
             ], "Outputs don't match when added in %s." % where)
 
     def test_configure_add_input_output(self):
@@ -1772,15 +1772,15 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a',     {'value': [2.]}),
-            ('sub.mcomp.a', {'value': [2.]}),
+            ('mcomp.a',     {'val': [2.]}),
+            ('sub.mcomp.a', {'val': [2.]}),
         ])
 
         outputs = p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',      {'value': [2.]}),
-            ('mcomp.a2',     {'value': [4.]}),
-            ('sub.mcomp.a2', {'value': [4.]}),
+            ('indep.a',      {'val': [2.]}),
+            ('mcomp.a2',     {'val': [4.]}),
+            ('sub.mcomp.a2', {'val': [4.]}),
         ])
 
         # add inputs/outputs in configure
@@ -1790,20 +1790,20 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a',     {'value': [2.]}),
-            ('mcomp.b',     {'value': [3.]}),
-            ('sub.mcomp.a', {'value': [2.]}),
-            ('sub.mcomp.b', {'value': [3.]}),
+            ('mcomp.a',     {'val': [2.]}),
+            ('mcomp.b',     {'val': [3.]}),
+            ('sub.mcomp.a', {'val': [2.]}),
+            ('sub.mcomp.b', {'val': [3.]}),
         ])
 
         outputs= p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',      {'value': [2.]}),
-            ('indep.b',      {'value': [3.]}),
-            ('mcomp.a2',     {'value': [4.]}),
-            ('mcomp.b2',     {'value': [6.]}),
-            ('sub.mcomp.a2', {'value': [4.]}),
-            ('sub.mcomp.b2', {'value': [6.]}),
+            ('indep.a',      {'val': [2.]}),
+            ('indep.b',      {'val': [3.]}),
+            ('mcomp.a2',     {'val': [4.]}),
+            ('mcomp.b2',     {'val': [6.]}),
+            ('sub.mcomp.a2', {'val': [4.]}),
+            ('sub.mcomp.b2', {'val': [6.]}),
         ])
 
     def test_feature_post_setup_solver_configure(self):

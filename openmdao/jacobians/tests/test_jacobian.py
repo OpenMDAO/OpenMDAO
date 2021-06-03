@@ -992,23 +992,23 @@ class TestJacobian(unittest.TestCase):
         wrts = [f'comp.x{i}' for i in range(len(comp.wrtsizes))]
         p.check_partials(out_stream=None, show_only_incorrect=True)
         p.model.comp._jacobian.set_col(p.model.comp, 5, comp.sparsity[:, 5] * 99)
-        
+
         # check dy0/dx2 (3x3)
         subinfo = comp._subjacs_info['comp.y0', 'comp.x2']
         arr = np.zeros(subinfo['shape'])
-        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['val']
         assert_near_equal(arr[:, 0], comp.sparsity[0:3, 5] * 99)
-        
+
         # check dy1/dx2 (5x3)
         subinfo = comp._subjacs_info['comp.y1', 'comp.x2']
         arr = np.zeros(subinfo['shape'])
-        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['val']
         assert_near_equal(arr[:, 0], comp.sparsity[3:8, 5] * 99)
-        
+
         # check dy2/dx2 (2x3)
         subinfo = comp._subjacs_info['comp.y2', 'comp.x2']
         arr = np.zeros(subinfo['shape'])
-        arr[subinfo['rows'], subinfo['cols']] = subinfo['value']
+        arr[subinfo['rows'], subinfo['cols']] = subinfo['val']
         assert_near_equal(arr[:, 0], comp.sparsity[8:, 5] * 99)
 
 

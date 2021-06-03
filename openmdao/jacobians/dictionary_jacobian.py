@@ -130,9 +130,9 @@ class DictionaryJacobian(Jacobian):
 
                     subjac_info = subjacs_info[abs_key]
                     if self._randomize:
-                        subjac = self._randomize_subjac(subjac_info['value'], abs_key)
+                        subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
-                        subjac = subjac_info['value']
+                        subjac = subjac_info['val']
                     rows = subjac_info['rows']
                     if rows is not None:  # our homegrown COO format
                         linds, rinds = rows, subjac_info['cols']
@@ -195,10 +195,10 @@ class _CheckingJacobian(DictionaryJacobian):
                 continue
             rows = meta['rows']
             if rows is None:
-                yield key, meta['value']
+                yield key, meta['val']
             else:
                 dense = np.zeros(meta['shape'])
-                dense[rows, meta['cols']] = meta['value']
+                dense[rows, meta['cols']] = meta['val']
                 yield key, dense
 
     def _setup_index_maps(self, system):
@@ -223,11 +223,11 @@ class _CheckingJacobian(DictionaryJacobian):
                     self._subjacs_info[key] = {
                         'rows': None,
                         'cols': None,
-                        'value': np.zeros((nrows, 1 if directional else ncols)),
+                        'val': np.zeros((nrows, 1 if directional else ncols)),
                     }
-                elif directional and self._subjacs_info[key]['value'].shape[1] != 1:
+                elif directional and self._subjacs_info[key]['val'].shape[1] != 1:
                     self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
-                    meta['value'] = np.atleast_2d(meta['value'][:, 0]).T
+                    meta['val'] = np.atleast_2d(meta['val'][:, 0]).T
 
     def set_col(self, system, icol, column):
         """
@@ -262,12 +262,12 @@ class _CheckingJacobian(DictionaryJacobian):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:
-                    subjac['value'][:, loc_idx] = column[start:end]
+                    subjac['val'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         row_inds = subjac['rows'][match_inds]
-                        subjac['value'][match_inds] = column[start:end][row_inds]
+                        subjac['val'][match_inds] = column[start:end][row_inds]
                     else:
                         row_inds = np.zeros(0, dtype=INT_DTYPE)
                     arr = scratch[start:end]

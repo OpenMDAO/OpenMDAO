@@ -344,7 +344,8 @@ class ExecComp(ExplicitComponent):
                 if 'val' in val and 'value' in val:
                     raise RuntimeError("Cannot use 'val' and 'value' at the same time, use 'val'.")
                 elif 'value' in val and not warned:
-                    warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' instead.")
+                    warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' in the"
+                                     "future.")
 
                 if 'value' in val:
                     val['val'] = val.pop('value')

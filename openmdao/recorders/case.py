@@ -464,7 +464,7 @@ class Case(object):
 
                 var_meta = {}
                 if values:
-                    var_meta['value'] = val
+                    var_meta['val'] = val
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
                 if units:
@@ -592,7 +592,7 @@ class Case(object):
 
             var_meta = {}
             if values:
-                var_meta['value'] = val
+                var_meta['val'] = val
             if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals:

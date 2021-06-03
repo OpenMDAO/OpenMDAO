@@ -340,17 +340,17 @@ class AssembledJacobian(Jacobian):
 
         if self._randomize:
             for key in iters:
-                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value'], key))
+                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
 
             for key in iters_in_ext:
-                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value'], key))
+                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
         else:
 
             for key in iters:
-                int_mtx._update_submat(key, subjacs[key]['value'])
+                int_mtx._update_submat(key, subjacs[key]['val'])
 
             for key in iters_in_ext:
-                ext_mtx._update_submat(key, subjacs[key]['value'])
+                ext_mtx._update_submat(key, subjacs[key]['val'])
 
         int_mtx._post_update()
 

@@ -259,9 +259,9 @@ class pyOptSparseDriver(Driver):
         self._setup_tot_jac_sparsity()
 
         # Handle deprecated option.
-        if self.options._dict['user_teriminate_signal']['value'] is not None:
+        if self.options._dict['user_teriminate_signal']['val'] is not None:
             self.options['user_terminate_signal'] = \
-                self.options._dict['user_teriminate_signal']['value']
+                self.options._dict['user_teriminate_signal']['val']
 
     def run(self):
         """

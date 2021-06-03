@@ -358,9 +358,9 @@ class TestShapes(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
                               om.ExecComp('y=dot(x, A)',
-                                          x={'value': np.zeros((1, 10))},
-                                          A={'value': np.eye(10)},
-                                          y={'value': np.zeros((1, 10))}))
+                                          x={'val': np.zeros((1, 10))},
+                                          A={'val': np.eye(10)},
+                                          y={'val': np.zeros((1, 10))}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -371,9 +371,9 @@ class TestShapes(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1',
                               om.ExecComp('y=dot(A, x)',
-                                          x={'value': np.zeros((10, 1))},
-                                          A={'value': np.eye(10)},
-                                          y={'value': np.zeros((10, 1))}))
+                                          x={'val': np.zeros((10, 1))},
+                                          A={'val': np.eye(10)},
+                                          y={'val': np.zeros((10, 1))}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -383,8 +383,8 @@ class TestShapes(unittest.TestCase):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)[np.newaxis, :]))
         p.model.add_subsystem('C1', om.ExecComp('y=5*x',
-                                                x={'value': np.zeros(10)},
-                                                y={'value': np.zeros(10)}))
+                                                x={'val': np.zeros(10)},
+                                                y={'val': np.zeros(10)}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -394,8 +394,8 @@ class TestShapes(unittest.TestCase):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)[:, np.newaxis]))
         p.model.add_subsystem('C1', om.ExecComp('y=5*x',
-                                                x={'value': np.zeros(10)},
-                                                y={'value': np.zeros(10)}))
+                                                x={'val': np.zeros(10)},
+                                                y={'val': np.zeros(10)}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -405,8 +405,8 @@ class TestShapes(unittest.TestCase):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)))
         p.model.add_subsystem('C1', om.ExecComp('y=5*x',
-                                                x={'value': np.zeros((1, 10, 1))},
-                                                y={'value': np.zeros((1, 10, 1))}))
+                                                x={'val': np.zeros((1, 10, 1))},
+                                                y={'val': np.zeros((1, 10, 1))}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -418,8 +418,8 @@ class TestShapes(unittest.TestCase):
                                                        val=np.arange(10)[np.newaxis, :, np.newaxis,
                                                                          np.newaxis]))
         p.model.add_subsystem('C1', om.ExecComp('y=5*x',
-                                                x={'value': np.zeros((1, 1, 1, 10))},
-                                                y={'value': np.zeros((1, 1, 1, 10))}))
+                                                x={'val': np.zeros((1, 1, 1, 10))},
+                                                y={'val': np.zeros((1, 1, 1, 10))}))
         p.model.connect('indep.x', 'C1.x')
         p.setup()
         p.run_model()
@@ -431,8 +431,8 @@ class TestShapes(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', val=np.arange(10)[np.newaxis, :,
                                                                               np.newaxis, np.newaxis]))
         p.model.add_subsystem('C1', om.ExecComp('y=5*x',
-                                                x={'value': np.zeros((5, 2))},
-                                                y={'value': np.zeros((5, 2))}))
+                                                x={'val': np.zeros((5, 2))},
+                                                y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
         expected = "<model> <class Group>: The source and target shapes do not match or are " + \
