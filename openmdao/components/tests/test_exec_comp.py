@@ -1311,6 +1311,29 @@ class TestExecComp(unittest.TestCase):
         self.assertEquals(cm.exception.args[0],
                           "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
+    def test_value_deprecation(self):
+        p = om.Problem()
+
+        msg = ("'value' will be deprecated in 4.0. Please use 'val' instead.")
+
+        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10)}, y={'val': np.ones(10)})
+
+        p.model.add_subsystem('zzz', excomp)
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_val_value_error(self):
+        p = om.Problem()
+
+        msg = ("Cannot use 'val' and 'value' at the same time, use 'val'.")
+
+        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10), 'val': np.ones(10)},
+                                       y={'val': np.ones(10)})
+
+        p.model.add_subsystem('zzz', excomp)
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
     def test_feature_add_expr(self):
 
         class ConfigGroup(om.Group):

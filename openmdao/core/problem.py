@@ -408,22 +408,22 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, value, units=None, indices=None):
+    def set_val(self, name, val, units=None, indices=None):
         """
         Set an output/input variable.
 
-        Function is used if you want to set a value using a different unit.
+        Function is used if you want to set a val using a different unit.
 
         Parameters
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list
-            Value to set this variable to.
+        val : float or ndarray or list
+            Val to set this variable to.
         units : str, optional
-            Units that value is defined in.
+            Units that val is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
-            Indices or slice to set to specified value.
+            Indices or slice to set to specified val.
         """
         model = self.model
         if self._metadata is not None:
@@ -453,7 +453,7 @@ class Problem(object):
         if abs_name in conns:
             src = conns[abs_name]
             if abs_name not in model._var_allprocs_discrete['input']:
-                value = np.asarray(value)
+                val = np.asarray(val)
                 tmeta = all_meta['input'][abs_name]
                 tunits = tmeta['units']
                 sunits = all_meta['output'][src]['units']
@@ -474,25 +474,25 @@ class Problem(object):
                 if units is None:
                     # avoids double unit conversion
                     if self._metadata['setup_status'] > _SetupStatus.POST_SETUP:
-                        ivalue = value
+                        ival = val
                         if sunits is not None:
                             if gunits is not None and gunits != tunits:
-                                value = model.convert_from_units(src, value, gunits)
+                                val = model.convert_from_units(src, val, gunits)
                             else:
-                                value = model.convert_from_units(src, value, tunits)
+                                val = model.convert_from_units(src, val, tunits)
                 else:
                     if gunits is None:
-                        ivalue = model.convert_from_units(abs_name, value, units)
+                        ival = model.convert_from_units(abs_name, val, units)
                     else:
-                        ivalue = model.convert_units(name, value, units, gunits)
+                        ival = model.convert_units(name, val, units, gunits)
                     if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-                        value = ivalue
+                        val = ival
                     else:
-                        value = model.convert_from_units(src, value, units)
+                        val = model.convert_from_units(src, val, units)
         else:
             src = abs_name
             if units is not None:
-                value = model.convert_from_units(abs_name, value, units)
+                val = model.convert_from_units(abs_name, val, units)
 
         # Caching only needed if vectors aren't allocated yet.
         if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
@@ -500,15 +500,15 @@ class Problem(object):
                 self._get_cached_val(name)
                 try:
                     if _is_slicer_op(indices):
-                        self._initial_condition_cache[name] = value[indices]
+                        self._initial_condition_cache[name] = val[indices]
                     else:
-                        self._initial_condition_cache[name][indices] = value
+                        self._initial_condition_cache[name][indices] = val
                 except IndexError:
-                    self._initial_condition_cache[name][indices] = value
+                    self._initial_condition_cache[name][indices] = val
                 except Exception as err:
-                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+                    raise RuntimeError(f"Failed to set val of '{name}': {str(err)}.")
             else:
-                self._initial_condition_cache[name] = value
+                self._initial_condition_cache[name] = val
         else:
             myrank = model.comm.rank
 
@@ -516,8 +516,8 @@ class Problem(object):
                 indices = _full_slice
 
             if model._outputs._contains_abs(abs_name):
-                model._outputs.set_var(abs_name, value, indices)
-            elif abs_name in conns:  # input name given. Set value into output
+                model._outputs.set_var(abs_name, val, indices)
+            elif abs_name in conns:  # input name given. Set val into output
                 if model._outputs._contains_abs(src):  # src is local
                     if (model._outputs._abs_get_val(src).size == 0 and
                             src.rsplit('.', 1)[0] == '_auto_ivc' and
@@ -535,7 +535,7 @@ class Problem(object):
                                         flat = True
                                 src_indices = inds
                             if src_indices is None:
-                                model._outputs.set_var(src, value, None, flat)
+                                model._outputs.set_var(src, val, None, flat)
                             else:
                                 if flat:
                                     src_indices = src_indices.ravel()
@@ -551,23 +551,23 @@ class Problem(object):
                                                            "to out-of-process array entries.")
                                     if start > 0:
                                         src_indices = src_indices - start
-                                model._outputs.set_var(src, value, src_indices[indices], flat)
+                                model._outputs.set_var(src, val, src_indices[indices], flat)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
-                        value = np.asarray(value)
-                        model._outputs.set_var(src, value, indices)
+                        val = np.asarray(val)
+                        model._outputs.set_var(src, val, indices)
                 elif src in model._discrete_outputs:
-                    model._discrete_outputs[src] = value
+                    model._discrete_outputs[src] = val
                 # also set the input
                 # TODO: maybe remove this if inputs are removed from case recording
                 if n_proms < 2:
                     if model._inputs._contains_abs(abs_name):
-                        model._inputs.set_var(abs_name, ivalue, indices)
+                        model._inputs.set_var(abs_name, ival, indices)
                     elif abs_name in model._discrete_inputs:
-                        model._discrete_inputs[abs_name] = value
+                        model._discrete_inputs[abs_name] = val
                     else:
                         # must be a remote var. so, just do nothing on this proc. We can't get here
                         # unless abs_name is found in connections, so the variable must exist.
@@ -575,11 +575,11 @@ class Problem(object):
                             print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
                                   "Local assignment ignored.")
             elif abs_name in model._discrete_outputs:
-                model._discrete_outputs[abs_name] = value
+                model._discrete_outputs[abs_name] = val
             elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
-                model._inputs.set_var(abs_name, value, indices)
+                model._inputs.set_var(abs_name, val, indices)
             elif abs_name in model._discrete_inputs:   # could happen if model is a component
-                model._discrete_inputs[abs_name] = value
+                model._discrete_inputs[abs_name] = val
 
     def _set_initial_conditions(self):
         """
