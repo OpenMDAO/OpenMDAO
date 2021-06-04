@@ -1950,7 +1950,7 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         self.assertRegex(output[3],
-                    r'^name\s+value\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
+                    r'^name\s+val\s+size\s+lower\s+upper\s+ref\s+ref0\s+'
                     r'indices\s+adder\s+scaler\s+parallel_deriv_color\s+'
                     r'vectorize_derivs\s+cache_linear_solution')
         self.assertRegex(output[5],
@@ -1982,7 +1982,7 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertRegex(output[6], r'^\s+value:')
+        self.assertRegex(output[6], r'^\s+val:')
         self.assertRegex(output[7], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         self.assertRegex(output[9], r'^\s+lower:')
         self.assertRegex(output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')

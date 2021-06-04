@@ -398,6 +398,7 @@ def _get_viewer_data(data_source, case_id=None):
 
             def recurse(children, stack):
                 for child in children:
+                    # if 'val' in child
                     if child['type'] == 'subsystem':
                         if child['name'] != '_auto_ivc':
                             stack.append(child['name'])
@@ -405,19 +406,19 @@ def _get_viewer_data(data_source, case_id=None):
                             stack.pop()
                     elif child['type'] == 'input':
                         if cases.inputs is None:
-                            child['value'] = 'N/A'
+                            child['val'] = 'N/A'
                         else:
                             path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            child['value'] = cases.inputs[path]
+                            child['val'] = cases.inputs[path]
                     elif child['type'] == 'output':
                         if cases.outputs is None:
-                            child['value'] = 'N/A'
+                            child['val'] = 'N/A'
                         else:
                             path = child['name'] if not stack else '.'.join(stack + [child['name']])
                             try:
-                                child['value'] = cases.outputs[path]
+                                child['val'] = cases.outputs[path]
                             except KeyError:
-                                child['value'] = 'N/A'
+                                child['val'] = 'N/A'
             recurse(data_dict['tree']['children'], [])
 
         # Delete the variables key since it's not used in N2

@@ -345,8 +345,8 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "7 Explicit Output(s) in 'model'",
                     '',
-                    'varname   val    resids',
-                    '--------  ----   ------',
+                    'varname   val     resids',
+                    '--------  ----    ------',
                     'iv.x',
                     'c1.y',
                     'sub.c2.y',
@@ -378,8 +378,8 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "7 Explicit Output(s) in 'model'",
                     '',
-                    'varname  val    resids',
-                    '-------  ----   ------',
+                    'varname  val     resids',
+                    '-------  -----   ------',
                     'iv',
                     '  x',
                     'c1',
@@ -440,7 +440,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'invec    |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
@@ -463,7 +463,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'outvec   |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
@@ -492,7 +492,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'invec    |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
             for i, line in enumerate(expected):
@@ -514,7 +514,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 'varname  val             shape  global_shape',
                 '-------  --------------  -----  ------------',
                 'outvec   |9.74679434481|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
             for i, line in enumerate(expected):
@@ -541,7 +541,7 @@ class DistributedListVarsTest(unittest.TestCase):
             'varname  val                  shape  global_shape',
             '-------  -------------------  -----  ------------',
             'invec  {}  {}   {}        '.format(norm, shape, shape),
-            '         value:',
+            '         val:',
             '         array({})'.format(value),
         ]
 

@@ -408,7 +408,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, val=None, value=None, units=None, indices=None):
+    def set_val(self, name, val, units=None, indices=None, value=None):
         """
         Set an output/input variable.
 
@@ -424,13 +424,14 @@ class Problem(object):
             Units that val is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified val.
+        value : float or ndarray or list or None
+            This argument is deprecated. Use 'val' instead.
         """
         if val is None and value is None:
             raise RuntimeError("Val is required.")
         elif value is not None:
             val = value
             warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' in the future.")
-
 
         model = self.model
         if self._metadata is not None:
