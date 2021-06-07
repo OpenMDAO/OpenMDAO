@@ -1273,7 +1273,6 @@ class TestExecComp(unittest.TestCase):
                                      y_constraint={'units': None},
                                      y={'units': 's'})
 
-
         p = om.Problem()
         p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
         p.setup()
