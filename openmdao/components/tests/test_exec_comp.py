@@ -311,14 +311,6 @@ class TestExecComp(unittest.TestCase):
         with assert_warning(UserWarning, "'comp' <class ExecComp>: The following partial derivatives have not been declared so they are assumed to be zero: ['z' wrt 'y']."):
             p.final_setup()
 
-    def test_no_expr(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('C1', om.ExecComp())
-        with self.assertRaises(Exception) as context:
-            prob.setup()
-        self.assertEqual(str(context.exception),
-                         "'C1' <class ExecComp>: No valid expressions provided to ExecComp(): [].")
-
     def test_colon_vars(self):
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=foo:bar+1.'))
