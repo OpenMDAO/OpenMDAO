@@ -206,7 +206,8 @@ class ExecComp(ExplicitComponent):
             exprs = [exprs]
 
         self._exprs = exprs[:]
-        self._codes = None
+        self._exprs_info = []
+        self._codes = []
         self._kwargs = kwargs
 
         self._manual_decl_partials = False
@@ -274,10 +275,8 @@ class ExecComp(ExplicitComponent):
         """
         Set up variable name and metadata lists.
         """
-        if not self._exprs:
-            raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
-                               % (self.msginfo, self._exprs))
-        self._setup_expressions()
+        if self._exprs:
+            self._setup_expressions()
 
     def _setup_expressions(self):
         """

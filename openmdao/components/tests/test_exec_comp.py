@@ -1283,6 +1283,43 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(p.get_val('x_constraint'), 3.0)
         assert_almost_equal(p.get_val('y_constraint'), 4.0)
 
+    def test_no_expressions_until_configure(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp()
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('y_constraint = y**2',
+                                     y_constraint={'units': None},
+                                     y={'units': 's'})
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.set_val('y', 4.0)
+        p.run_model()
+
+        assert_almost_equal(p.get_val('y_constraint'), 16.0)
+
+    def test_no_expressions(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp()
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                pass
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
     def test_add_expr_configure_delay_defaults(self):
 
         class ConfigGroup(om.Group):
