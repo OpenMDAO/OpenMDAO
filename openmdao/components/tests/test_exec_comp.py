@@ -1258,6 +1258,32 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(p.get_val('z'), 8.7, 1e-8)
         assert_almost_equal(p.get_val('y'), 3.0, 1e-8)
 
+    def test_add_expr_configure_no_shape_or_val(self):
+
+        class ConfigGroup(om.Group):
+            def setup(self):
+                excomp = om.ExecComp('x_constraint=x',
+                                     x_constraint={'units': None},
+                                     x={'units': 's'})
+
+                self.add_subsystem('excomp', excomp, promotes=['*'])
+
+            def configure(self):
+                self.excomp.add_expr('y_constraint = y',
+                                     y_constraint={'units': None},
+                                     y={'units': 's'})
+
+
+        p = om.Problem()
+        p.model.add_subsystem('sub', ConfigGroup(), promotes=['*'])
+        p.setup()
+        p.set_val('x', 3.0)
+        p.set_val('y', 4.0)
+        p.run_model()
+
+        assert_almost_equal(p.get_val('x_constraint'), 3.0)
+        assert_almost_equal(p.get_val('y_constraint'), 4.0)
+
     def test_add_expr_configure_delay_defaults(self):
 
         class ConfigGroup(om.Group):
