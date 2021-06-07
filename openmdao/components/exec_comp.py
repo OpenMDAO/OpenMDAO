@@ -344,8 +344,8 @@ class ExecComp(ExplicitComponent):
                 if 'val' in val and 'value' in val:
                     raise RuntimeError("Cannot use 'val' and 'value' at the same time, use 'val'.")
                 elif 'value' in val and not warned:
-                    warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' in the "
-                                     "future.")
+                    warn_deprecation(f"{self.msginfo}: 'value' will be deprecated in 4.0. Please "
+                                     "use 'val' in the future.")
 
                 if 'value' in val:
                     val['val'] = val.pop('value')
@@ -436,9 +436,6 @@ class ExecComp(ExplicitComponent):
                     dct = self.add_input(var, val, **meta)
 
             if var not in init_vals:
-                if 'value' in dct:
-                    dct['val'] = dct.pop('value')
-
                 init_vals[var] = dct['val']
 
         self._codes = self._compile_exprs(self._exprs)

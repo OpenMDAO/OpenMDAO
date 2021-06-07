@@ -3575,9 +3575,8 @@ class System(object):
             List of input names and other optional information about those inputs.
         """
         if values is not None:
-            # values = vals
-            warn_deprecation("'value' is deprecated and will be removed in 4.0. Please "
-                             "index in using 'val'")
+            warn_deprecation(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
+                             "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:
@@ -3718,9 +3717,8 @@ class System(object):
             List of output names and other optional information about those outputs.
         """
         if values is not None:
-            # values = vals
-            warn_deprecation("'value' is deprecated and will be removed in 4.0. Please "
-                             "index in using 'val'")
+            warn_deprecation(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
+                             "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:

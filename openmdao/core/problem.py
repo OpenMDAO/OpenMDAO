@@ -432,7 +432,8 @@ class Problem(object):
         """
         if value is not None and not self._warned:
             self._warned = True
-            warn_deprecation("'value' will be deprecated in 4.0. Please use 'val' in the future.")
+            warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
+                             "in the future.")
         elif val is not None and value is None:
             self._warned = True
             value = val
