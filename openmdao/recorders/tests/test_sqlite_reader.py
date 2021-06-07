@@ -1757,7 +1757,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 datasrc.get_val('acomp.tin', units='not_a_unit')
             self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
 
-        prob.set_val('comp.x', value=100.0, units='s*ft/s')
+        prob.set_val('comp.x', val=100.0, units='s*ft/s')
         prob.run_model()
         prob.cleanup()
         cr = om.CaseReader(self.filename)

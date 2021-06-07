@@ -246,29 +246,30 @@ class DiscreteTestCase(unittest.TestCase):
         #
         # list vars before model has been run (relative names)
         #
+        # expl_inputs = prob.model.expl.list_inputs(values=True, out_stream=None)
         expl_inputs = prob.model.expl.list_inputs(out_stream=None)
         expected = {
-            'a': {'val': [10.]},
-            'x': {'val': 10}
+            'a': {'val': [10.], 'value': [10.]},
+            'x': {'val': 10, 'value': 10}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
         impl_inputs = prob.model.impl.list_inputs(out_stream=None)
         expected = {
-            'x': {'val': 10}
+            'x': {'val': 10, 'value': 10}
         }
         self.assertEqual(dict(impl_inputs), expected)
 
         expl_outputs = prob.model.expl.list_outputs(out_stream=None)
         expected = {
-            'b': {'val': [0.]},
-            'y': {'val': 0}
+            'b': {'val': [0.], 'value': [0.]},
+            'y': {'val': 0, 'value': 0}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
         impl_outputs = prob.model.impl.list_outputs(out_stream=None)
         expected = {
-            'y': {'val': 0}
+            'y': {'val': 0, 'value': 0}
         }
         self.assertEqual(dict(impl_outputs), expected)
 

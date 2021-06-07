@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning, warn_deprecation
+    UnusedOptionWarning, warn_deprecation, issue_warning
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
@@ -3511,7 +3511,7 @@ class System(object):
         return result
 
     def list_inputs(self,
-                    values=True,
+                    vals=True,
                     prom_name=False,
                     units=False,
                     shape=False,
@@ -3523,13 +3523,14 @@ class System(object):
                     includes=None,
                     excludes=None,
                     all_procs=False,
-                    out_stream=_DEFAULT_OUT_STREAM):
+                    out_stream=_DEFAULT_OUT_STREAM,
+                    values=None):
         """
         Write a list of input names and other optional information to a specified stream.
 
         Parameters
         ----------
-        values : bool, optional
+        vals : bool, optional
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -3565,13 +3566,25 @@ class System(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
+        if values is not None:
+            # values = vals
+            warn_deprecation("'value' is deprecated and will be removed in 4.0. Please "
+                             "index in using 'val'")
+        elif not vals and values:
+            values = True
+        else:
+            values = vals
+
         metavalues = values and self._inputs is None
+
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
@@ -3587,6 +3600,10 @@ class System(object):
                 to_remove.append('tags')
             if not prom_name:
                 to_remove.append('prom_name')
+            if metavalues:
+                for key, val in inputs.items():
+                    if 'val' in val:
+                        val['value'] = val['val']
 
             for _, meta in inputs.items():
                 for key in to_remove:
@@ -3597,6 +3614,7 @@ class System(object):
             for n, meta in inputs.items():
                 meta['val'] = self._abs_get_val(n, get_remote=True,
                                                 rank=None if all_procs else 0, kind='input')
+                meta['value'] = meta['val']
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3616,7 +3634,7 @@ class System(object):
 
     def list_outputs(self,
                      explicit=True, implicit=True,
-                     values=True,
+                     vals=True,
                      prom_name=False,
                      residuals=False,
                      residuals_tol=None,
@@ -3633,7 +3651,8 @@ class System(object):
                      excludes=None,
                      all_procs=False,
                      list_autoivcs=False,
-                     out_stream=_DEFAULT_OUT_STREAM):
+                     out_stream=_DEFAULT_OUT_STREAM,
+                     values=None):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -3643,7 +3662,7 @@ class System(object):
             include outputs from explicit components. Default is True.
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-        values : bool, optional
+        vals : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
             When True, display the promoted name of the variable.
@@ -3690,12 +3709,23 @@ class System(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
+        if values is not None:
+            # values = vals
+            warn_deprecation("'value' is deprecated and will be removed in 4.0. Please "
+                             "index in using 'val'")
+        elif not vals and values:
+            values = True
+        else:
+            values = vals
+
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [values, units, shape, global_shape, desc, tags]
 
@@ -3724,6 +3754,7 @@ class System(object):
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
+                    meta['value'] = meta['val']
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -3747,6 +3778,10 @@ class System(object):
             to_remove.append('tags')
         if not prom_name:
             to_remove.append('prom_name')
+        if values:
+            for key, val in outputs.items():
+                if 'val' in val and ('value' not in val):
+                    val['value'] = val['val']
 
         for _, meta in outputs.items():
             for key in to_remove:

@@ -138,8 +138,8 @@ class ExplCompTestCase(unittest.TestCase):
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         expected = {
-            'comp1.area': {'val': np.array([1.])},
-            'comp2.area': {'val': np.array([1.])}
+            'comp1.area': {'val': np.array([1.]), 'value': np.array([1.])},
+            'comp2.area': {'val': np.array([1.]), 'value': np.array([1.])}
         }
         self.assertEqual(dict(outputs), expected)
 
@@ -168,17 +168,17 @@ class ExplCompTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp1.length', {'val': [3.]}),
-            ('comp1.width',  {'val': [2.]}),
-            ('comp2.length', {'val': [3.]}),
-            ('comp2.width',  {'val': [2.]}),
+            ('comp1.length', {'val': [3.], 'value': [3.]}),
+            ('comp1.width',  {'val': [2.], 'value': [2.]}),
+            ('comp2.length', {'val': [3.], 'value': [3.]}),
+            ('comp2.width',  {'val': [2.], 'value': [2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.area',   {'val': [6.]}),
-            ('comp2.area',   {'val': [6.]}),
+            ('comp1.area',   {'val': [6.], 'value': [6.]}),
+            ('comp2.area',   {'val': [6.], 'value': [6.]}),
         ])
 
         # list states
@@ -218,38 +218,38 @@ class ExplCompTestCase(unittest.TestCase):
         # list outputs before model has been run will raise an exception
         outputs = dict(prob.model.list_outputs(out_stream=None))
         expected = {
-            'p1.x': {'val': 12.},
-            'p2.y': {'val': 1.},
-            'comp.z': {'val': 0.},
+            'p1.x': {'val': 12., 'value': 12.},
+            'p2.y': {'val': 1., 'value': 1.},
+            'comp.z': {'val': 0., 'value': 0.},
         }
         self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
         expected = {
-            'x': {'val': 0.},
-            'y': {'val': 0.}
+            'x': {'val': 0., 'value': 0.},
+            'y': {'val': 0., 'value': 0.}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
         expl_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'x': {'val': 0.}})
+        self.assertEqual(dict(expl_inputs), {'x': {'val': 0., 'value': 0.}})
 
         expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'y': {'val': 0.}})
+        self.assertEqual(dict(expl_inputs), {'y': {'val': 0., 'value': 0.}})
 
         # specifying prom_name should not cause an error
         expl_inputs = prob.model.comp.list_inputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(expl_inputs), {
-            'x': {'val': 0., 'prom_name': 'x'},
-            'y': {'val': 0., 'prom_name': 'y'},
+            'x': {'val': 0., 'value': 0., 'prom_name': 'x'},
+            'y': {'val': 0., 'value': 0., 'prom_name': 'y'},
         })
 
         # list_outputs on a component before run is okay, using relative names
         stream = StringIO()
         expl_outputs = prob.model.p1.list_outputs(out_stream=stream)
         expected = {
-            'x': {'val': 12.}
+            'x': {'val': 12., 'value': 12.}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
@@ -281,7 +281,7 @@ class ExplCompTestCase(unittest.TestCase):
         # specifying prom_name should not cause an error
         expl_outputs = prob.model.p1.list_outputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(expl_outputs), {
-            'x': {'val': 12., 'prom_name': 'x'}
+            'x': {'val': 12., 'value': 12., 'prom_name': 'x'}
         })
 
         # run model
@@ -294,8 +294,8 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
-            ('comp.x', {'val': [12.], 'shape': (1,), 'units': 'inch'}),
-            ('comp.y', {'val': [12.], 'shape': (1,), 'units': 'inch'})
+            ('comp.x', {'val': [12.], 'value': [12.], 'shape': (1,), 'units': 'inch'}),
+            ('comp.y', {'val': [12.], 'value': [12.], 'shape': (1,), 'units': 'inch'})
         ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
@@ -335,11 +335,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
+            ('comp.z', {'val': [24.], 'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
+            ('p1.x', {'val': [12.], 'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
+            ('p2.y', {'val': [1.], 'value': [1.], 'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
@@ -403,11 +403,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False)
 
         self.assertEqual(sorted(outputs), [
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('comp.z', {'val': [24.], 'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('p1.x', {'val': [12.], 'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+            ('p2.y', {'val': [1.], 'value': [1.], 'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ])
 
@@ -876,25 +876,25 @@ class ExplCompTestCase(unittest.TestCase):
         # Inputs no tags
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
+            ('width', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
         ])
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'val': [1.]}),
-            ('width', {'val': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
+            ('width', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with tag that does not match
@@ -904,19 +904,19 @@ class ExplCompTestCase(unittest.TestCase):
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
-            ('area', {'val': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with tag that does not match

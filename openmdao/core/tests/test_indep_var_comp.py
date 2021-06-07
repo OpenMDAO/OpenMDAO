@@ -154,28 +154,28 @@ class TestIndepVarComp(unittest.TestCase):
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep_var_1', {'val': [1.], 'value': [1.]}),
+            ('indep_var_2', {'val': [2.], 'value': [2.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
+            ('indep_var_1', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with the indep_var tags
         outputs = prob.model.list_outputs(out_stream=None, tags="indep_var")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep_var_1', {'val': [1.], 'value': [1.]}),
+            ('indep_var_2', {'val': [2.], 'value': [2.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.]}),
-            ('indep_var_2', {'val': [2.]}),
+            ('indep_var_1', {'val': [1.], 'value': [1.]}),
+            ('indep_var_2', {'val': [2.], 'value': [2.]}),
         ])
 
         # Outputs with tag that does not match
