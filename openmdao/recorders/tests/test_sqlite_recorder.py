@@ -217,6 +217,114 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_derivs),)
         assertDriverDerivDataRecorded(self, expected_data, self.eps)
 
+    def test_recorder_setup_timing(self):
+        prob = ParaboloidProblem(driver=om.ScipyOptimizeDriver(disp=False))
+        prob.setup()
+
+        # no problem adding recorder after setup()
+        prob.driver.add_recorder(om.SqliteRecorder('cases1.sql'))
+
+        # but you can't record before final_setup() starts up the recorder
+        with self.assertRaises(RuntimeError) as cm:
+            prob.driver.record_iteration()
+        self.assertEqual(str(cm.exception),
+                         "ScipyOptimizeDriver attempted to record iteration but driver "
+                         "has not been initialized; `run_model()`, `run_driver()`, or "
+                         "`final_setup()` must be called before recording.")
+
+        # no problem recording an iteration before a run
+        prob.final_setup()
+        prob.driver.record_iteration()
+
+        # no problem recording an iteration during a run        
+        prob.run_driver()
+
+        # no problem adding a recorder after a run
+        prob.driver.add_recorder(om.SqliteRecorder('cases2.sql'))
+
+        # but you can't record before final_setup() starts up the new recorder
+        with self.assertRaises(RuntimeError) as cm:
+            prob.driver.record_iteration()
+        self.assertEqual(str(cm.exception),
+                         "ScipyOptimizeDriver attempted to record iteration to 'cases2.sql', "
+                         "but database is not initialized; `run_model()`, `run_driver()`, "
+                         "or `final_setup()` must be called after adding a recorder.")
+
+        # no problem recording an iteration after calling final_setup() to start up the new recorder
+        prob.final_setup()
+        prob.driver.record_iteration()
+
+        # no problem recording an iteration on both recorders during a run        
+        prob.run_driver()
+
+        # no problem recording an iteration after a run that initializes the new recorder
+        prob.driver.record_iteration()
+
+        prob.cleanup()
+
+        expected = [
+            # first recorder will have all cases
+            'rank0:',                         # after final_setup()
+            'rank0:ScipyOptimize_SLSQP|0',    # from run_driver()
+            'rank0:ScipyOptimize_SLSQP|1',
+            'rank0:ScipyOptimize_SLSQP|2',
+            'rank0:ScipyOptimize_SLSQP|3',
+            'rank0:',                         # after adding second recorder
+            # second recorder will have the following cases
+            'rank0:',                         # after second final_setup()
+            'rank0:ScipyOptimize_SLSQP|0',    # from second run_driver()
+            'rank0:ScipyOptimize_SLSQP|1',
+            'rank0:ScipyOptimize_SLSQP|2',
+            'rank0:ScipyOptimize_SLSQP|3',
+            'rank0:'                          # after second run_driver
+        ]
+
+        cr = om.CaseReader('cases1.sql')
+        for i, case_id in enumerate(cr.list_cases(out_stream=None)):
+            self.assertEqual(case_id, expected[i])
+
+        cr = om.CaseReader('cases2.sql')
+        for i, case_id in enumerate(cr.list_cases(out_stream=None)):
+            self.assertEqual(case_id, expected[i+6])
+
+    def test_database_not_initialized(self):
+        prob = ParaboloidProblem(driver=om.ScipyOptimizeDriver(disp=False))
+        prob.setup()
+        prob.final_setup()
+
+        # adding recorder after final_setup() has already been called
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+        prob.model.add_recorder(self.recorder)
+        prob.model.nonlinear_solver.add_recorder(self.recorder)
+
+        # you can't record before final_setup() starts up the recorder
+        with self.assertRaises(RuntimeError) as cm:
+            prob.driver.record_iteration()
+        self.assertEqual(str(cm.exception),
+                         "ScipyOptimizeDriver attempted to record iteration to 'sqlite_test', "
+                         "but database is not initialized; `run_model()`, `run_driver()`, or "
+                         "`final_setup()` must be called after adding a recorder.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.model.record_iteration()
+        self.assertEqual(str(cm.exception),
+                         "<model> <class Group> attempted to record iteration to 'sqlite_test', "
+                         "but database is not initialized; `run_model()`, `run_driver()`, or "
+                         "`final_setup()` must be called after adding a recorder.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.model.nonlinear_solver.record_iteration()
+        self.assertEqual(str(cm.exception),
+                         "NonlinearRunOnce in <model> <class Group> attempted to record iteration "
+                         "to 'sqlite_test', but database is not initialized; `run_model()`, "
+                         "`run_driver()`, or `final_setup()` must be called after adding a recorder.")
+
+        # no problem recording an iteration after final_setup() has been called
+        prob.final_setup()
+        prob.model.record_iteration()
+        prob.model.nonlinear_solver.record_iteration()
+
     def test_driver_recording_ndarray_var_settings(self):
         prob = SellarProblemWithArrays()
 

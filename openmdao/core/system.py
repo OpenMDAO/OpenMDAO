@@ -4071,19 +4071,24 @@ class System(object):
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
-            stack_top = self._recording_iter.stack[-1][0]
-            method = stack_top.rsplit('.', 1)[-1]
+            if self._recording_iter.stack:
+                stack_top = self._recording_iter.stack[-1][0]
+                method = stack_top.rsplit('.', 1)[-1]
 
-            if method not in _recordable_funcs:
-                raise ValueError("{}: {} must be one of: {}".format(self.msginfo, method,
-                                                                    sorted(_recordable_funcs)))
-
-            if 'nonlinear' in method:
+                if method not in _recordable_funcs:
+                    raise ValueError(f"{self.msginfo}: {method} must be one of: "
+                                     f"{sorted(_recordable_funcs)}")
+                                     
+                if 'nonlinear' in method:
+                    inputs, outputs, residuals = self.get_nonlinear_vectors()
+                    vec_name = 'nonlinear'
+                else:
+                    inputs, outputs, residuals = self.get_linear_vectors()
+                    vec_name = 'linear'
+            else:
+                # outside of a run, just record nonlinear vectors
                 inputs, outputs, residuals = self.get_nonlinear_vectors()
                 vec_name = 'nonlinear'
-            else:
-                inputs, outputs, residuals = self.get_linear_vectors()
-                vec_name = 'linear'
 
             discrete_inputs = self._discrete_inputs
             discrete_outputs = self._discrete_outputs
