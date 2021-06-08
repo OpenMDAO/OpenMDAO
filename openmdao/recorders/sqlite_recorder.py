@@ -324,19 +324,19 @@ class SqliteRecorder(CaseRecorder):
         if not self._database_initialized:
             self._initialize_database()
 
-        driver = None
-
-        # grab the system
+        # grab the system and driver
         if isinstance(recording_requester, Driver):
             system = recording_requester._problem().model
             driver = recording_requester
         elif isinstance(recording_requester, System):
             system = recording_requester
+            driver = None
         elif isinstance(recording_requester, Problem):
             system = recording_requester.model
             driver = recording_requester.driver
         elif isinstance(recording_requester, Solver):
             system = recording_requester._system()
+            driver = None
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
@@ -469,7 +469,6 @@ class SqliteRecorder(CaseRecorder):
                                " `run_model()`, `run_driver()`, or `final_setup()` "
                                "must be called after adding a recorder.")
 
-
         if self.connection:
             outputs = data['output']
             inputs = data['input']
@@ -579,7 +578,6 @@ class SqliteRecorder(CaseRecorder):
                                f"'{self._filepath}', but database is not initialized;"
                                " `run_model()`, `run_driver()`, or `final_setup()` "
                                "must be called after adding a recorder.")
-
 
         if self.connection:
             inputs = data['input']
