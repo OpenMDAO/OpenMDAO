@@ -36,7 +36,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
 from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
-    UnusedOptionWarning, warn_deprecation, issue_warning
+    UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
     make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
@@ -3575,7 +3575,7 @@ class System(object):
             List of input names and other optional information about those inputs.
         """
         if values is not None:
-            warn_deprecation(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
+            issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
                              "Please index in using 'val'")
         elif not vals and values:
             values = True
@@ -3717,7 +3717,7 @@ class System(object):
             List of output names and other optional information about those outputs.
         """
         if values is not None:
-            warn_deprecation(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
+            issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
                              "Please index in using 'val'")
         elif not vals and values:
             values = True
