@@ -14,6 +14,7 @@ from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_near_equal, assert_no_warning
 from openmdao.utils.general_utils import remove_whitespace
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.warnings import OMDeprecationWarning
 
 
@@ -182,6 +183,7 @@ class ObjAdderCompEx(om.ExplicitComponent):
         discrete_outputs['y'].setval(discrete_inputs['x'].getval() + self.val.getval())
 
 
+@use_tempdirs
 class DiscreteTestCase(unittest.TestCase):
 
     def test_simple_run_once(self):

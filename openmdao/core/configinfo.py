@@ -57,10 +57,11 @@ class _ConfigInfo(object):
                         break
             all_mods = group.comm.allgather(mod_pars)
             for mods in all_mods:
-                self._modified_systems.update(mods)
+                for mod in mods:
+                    self._modified_systems.update(all_ancestors(mod))
 
     def _var_added(self, comp_path, vname):
-        self._modified_systems.add(comp_path)
+        self._modified_systems.update(all_ancestors(comp_path))
 
     def _prom_added(self, group_path, any=None, inputs=None, outputs=None):
         # don't update for top level group because we always call _setup_var_data on the
@@ -84,15 +85,17 @@ class _ConfigInfo(object):
         """
         self._add_mod_parallel_groups(group)
 
-        allpaths = set()
-        for path in self._modified_systems:
-            allpaths.update(all_ancestors(path))
-
         len_prefix = len(group.pathname) + 1 if group.pathname else 0
 
         # sort into longest first order so the systems will get updated bottom up
-        for path, _ in sorted(_descendents(group, allpaths), key=lambda t: (t[1], t[0]),
-                              reverse=True):
+        for path, _ in sorted(_descendents(group, self._modified_systems),
+                              key=lambda t: (t[1], t[0]), reverse=True):
             s = group._get_subsystem(path[len_prefix:])
+            if s is group:
+                continue  # don't update this group because that will happen later
             if s is not None and s._is_local:
                 yield s
+
+    def _update_modified_systems(self, group):
+        for s in self._modified_system_iter(group):
+            s._setup_var_data()

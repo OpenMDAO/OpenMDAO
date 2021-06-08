@@ -7,7 +7,6 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 
 import openmdao.api as om

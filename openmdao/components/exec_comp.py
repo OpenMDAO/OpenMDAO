@@ -68,6 +68,8 @@ class ExecComp(ExplicitComponent):
         List of expressions.
     _codes : list
         List of code objects.
+    _exprs_info : list
+        List of tuples containing output and inputs for each expression.
     _has_diag_partials : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
@@ -206,7 +208,8 @@ class ExecComp(ExplicitComponent):
             exprs = [exprs]
 
         self._exprs = exprs[:]
-        self._codes = None
+        self._exprs_info = []
+        self._codes = []
         self._kwargs = kwargs
 
         self._manual_decl_partials = False
@@ -274,10 +277,8 @@ class ExecComp(ExplicitComponent):
         """
         Set up variable name and metadata lists.
         """
-        if not self._exprs:
-            raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
-                               % (self.msginfo, self._exprs))
-        self._setup_expressions()
+        if self._exprs:
+            self._setup_expressions()
 
     def _setup_expressions(self):
         """
@@ -419,12 +420,12 @@ class ExecComp(ExplicitComponent):
             else:
                 # new input and/or output.
                 if var in outs:
-                    dct = self.add_output(var, val, **meta)
+                    current_meta = self.add_output(var, val, **meta)
                 else:
-                    dct = self.add_input(var, val, **meta)
+                    current_meta = self.add_input(var, val, **meta)
 
             if var not in init_vals:
-                init_vals[var] = dct['value']
+                init_vals[var] = current_meta['value']
 
         self._codes = self._compile_exprs(self._exprs)
 
