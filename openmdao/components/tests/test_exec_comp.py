@@ -1339,7 +1339,7 @@ class TestExecComp(unittest.TestCase):
     def test_value_deprecation(self):
         p = om.Problem()
 
-        msg = ("'value' will be deprecated in 4.0. Please use 'val' in the future.")
+        msg = ("'zzz' <class ExecComp>: 'value' will be deprecated in 4.0. Please use 'val' in the future.")
 
         excomp = om.ExecComp('y=x**2', x={'value': np.ones(10)}, y={'val': np.ones(10)})
 

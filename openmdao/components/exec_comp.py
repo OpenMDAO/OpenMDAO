@@ -432,12 +432,12 @@ class ExecComp(ExplicitComponent):
             else:
                 # new input and/or output.
                 if var in outs:
-                    dct = self.add_output(var, val, **meta)
+                    current_meta = self.add_output(var, val, **meta)
                 else:
-                    dct = self.add_input(var, val, **meta)
+                    current_meta = self.add_input(var, val, **meta)
 
             if var not in init_vals:
-                init_vals[var] = dct['val']
+                init_vals[var] = current_meta['val']
 
         self._codes = self._compile_exprs(self._exprs)
 
