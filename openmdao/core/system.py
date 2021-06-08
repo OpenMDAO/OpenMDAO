@@ -4078,7 +4078,7 @@ class System(object):
                 if method not in _recordable_funcs:
                     raise ValueError(f"{self.msginfo}: {method} must be one of: "
                                      f"{sorted(_recordable_funcs)}")
-                                     
+
                 if 'nonlinear' in method:
                     inputs, outputs, residuals = self.get_nonlinear_vectors()
                     vec_name = 'nonlinear'
