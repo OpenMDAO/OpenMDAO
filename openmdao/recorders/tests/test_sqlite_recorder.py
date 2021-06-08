@@ -322,6 +322,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # no problem recording an iteration after final_setup() has been called
         prob.final_setup()
+        prob.driver.record_iteration()
         prob.model.record_iteration()
         prob.model.nonlinear_solver.record_iteration()
 

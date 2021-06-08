@@ -140,7 +140,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
-        # there should be no warnings wrt unpicklable 'guess_func',
+        # there should be no warnings wrt unpicklable 'guess_func' option,
         # since 'recordable' has been set to False
         with assert_no_warning(UserWarning):
             prob.run_model()
