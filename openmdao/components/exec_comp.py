@@ -68,6 +68,8 @@ class ExecComp(ExplicitComponent):
         List of expressions.
     _codes : list
         List of code objects.
+    _exprs_info : list
+        List of tuples containing output and inputs for each expression.
     _has_diag_partials : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
