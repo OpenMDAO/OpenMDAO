@@ -458,7 +458,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Display Value Info window",
             "test": "click",
-            "selector": '[id^="persistentNodeInfo"] button#value',
+            "selector": '[id^="persistentNodeInfo"] button#val',
             "button": "left"
         },
         {
