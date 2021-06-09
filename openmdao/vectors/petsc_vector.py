@@ -37,6 +37,7 @@ class PETScVector(DefaultVector):
 
     TRANSFER = PETScTransfer
     cite = CITATION
+    distributed = True
 
     def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """

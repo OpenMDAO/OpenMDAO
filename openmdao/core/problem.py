@@ -868,16 +868,17 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
-        # PETScVector is required for MPI
+        # A distributed vector type is required for MPI
         if comm.size > 1:
-            if PETScVector is None:
+            if distributed_vector_class is PETScVector and PETScVector is None:
                 raise ValueError(self.msginfo +
                                  ": Attempting to run in parallel under MPI but PETScVector "
                                  "could not be imported.")
-            elif distributed_vector_class is not PETScVector:
-                raise ValueError("%s: The `distributed_vector_class` argument must be "
-                                 "`PETScVector` when running in parallel under MPI but '%s' was "
-                                 "specified." % (self.msginfo, distributed_vector_class.__name__))
+            elif not distributed_vector_class.distributed:
+                raise ValueError("%s: The `distributed_vector_class` argument must be a "
+                                 "distributed vector class like `PETScVector` when running in "
+                                 "parallel under MPI but '%s' was specified which is not "
+                                 "distributed." % (self.msginfo, distributed_vector_class.__name__))
 
         if mode not in ['fwd', 'rev', 'auto']:
             msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)

@@ -72,8 +72,10 @@ class Vector(object):
         Total length of data vector (including shared memory parts).
     """
 
-    # Listing of relevant citations that should be referenced when
+    # Listing of relevant citations
     cite = ""
+    # Indicator whether a vector class is MPI-distributed
+    distributed = False
 
     def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
