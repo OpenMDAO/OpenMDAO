@@ -145,6 +145,8 @@ class SqliteRecorder(CaseRecorder):
         Path to the recorder file.
     _database_initialized : bool
         Flag indicating whether or not the database has been initialized.
+    _started : set
+        set of recording requesters for which this recorder has been started.
     _record_on_proc : bool
         Flag indicating whether to record on this processor when running in parallel.
     """
@@ -178,6 +180,7 @@ class SqliteRecorder(CaseRecorder):
         self._pickle_version = pickle_version
         self._filepath = filepath
         self._database_initialized = False
+        self._started = set()
 
         # default to record on all procs when running in parallel
         self._record_on_proc = True
@@ -218,10 +221,8 @@ class SqliteRecorder(CaseRecorder):
         if filepath:
             try:
                 os.remove(filepath)
-                issue_warning(
-                    f'The existing case recorder file, {filepath}, is being '
-                    'overwritten.',
-                    category=UserWarning)
+                issue_warning(f'The existing case recorder file, {filepath},'
+                              ' is being overwritten.', category=UserWarning)
             except OSError:
                 pass
 
@@ -314,24 +315,28 @@ class SqliteRecorder(CaseRecorder):
         recording_requester : object
             Object to which this recorder is attached.
         """
+        # we only want to set up recording once for each recording_requester
+        if recording_requester in self._started:
+            return
+
         super().startup(recording_requester)
 
         if not self._database_initialized:
             self._initialize_database()
 
-        driver = None
-
-        # grab the system
+        # grab the system and driver
         if isinstance(recording_requester, Driver):
             system = recording_requester._problem().model
             driver = recording_requester
         elif isinstance(recording_requester, System):
             system = recording_requester
+            driver = None
         elif isinstance(recording_requester, Problem):
             system = recording_requester.model
             driver = recording_requester.driver
         elif isinstance(recording_requester, Solver):
             system = recording_requester._system()
+            driver = None
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
@@ -443,6 +448,8 @@ class SqliteRecorder(CaseRecorder):
                               "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
                               (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 
+        self._started.add(recording_requester)
+
     def record_iteration_driver(self, driver, data, metadata):
         """
         Record data and metadata from a Driver.
@@ -456,6 +463,12 @@ class SqliteRecorder(CaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
+        if not self._database_initialized:
+            raise RuntimeError(f"{driver.msginfo} attempted to record iteration to "
+                               f"'{self._filepath}', but database is not initialized;"
+                               " `run_model()`, `run_driver()`, or `final_setup()` "
+                               "must be called after adding a recorder.")
+
         if self.connection:
             outputs = data['output']
             inputs = data['input']
@@ -498,6 +511,12 @@ class SqliteRecorder(CaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
+        if not self._database_initialized:
+            raise RuntimeError(f"{problem.msginfo} attempted to record iteration to "
+                               f"'{self._filepath}', but database is not initialized;"
+                               " `run_model()`, `run_driver()`, or `final_setup()` "
+                               "must be called after adding a recorder.")
+
         if self.connection:
             outputs = data['output']
             inputs = data['input']
@@ -554,6 +573,12 @@ class SqliteRecorder(CaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
+        if not self._database_initialized:
+            raise RuntimeError(f"{system.msginfo} attempted to record iteration to "
+                               f"'{self._filepath}', but database is not initialized;"
+                               " `run_model()`, `run_driver()`, or `final_setup()` "
+                               "must be called after adding a recorder.")
+
         if self.connection:
             inputs = data['input']
             outputs = data['output']
@@ -599,6 +624,12 @@ class SqliteRecorder(CaseRecorder):
         metadata : dict
             Dictionary containing execution metadata.
         """
+        if not self._database_initialized:
+            raise RuntimeError(f"{solver.msginfo} attempted to record iteration to "
+                               f"'{self._filepath}', but database is not initialized;"
+                               " `run_model()`, `run_driver()`, or `final_setup()` "
+                               "must be called after adding a recorder.")
+
         if self.connection:
             abs = data['abs']
             rel = data['rel']

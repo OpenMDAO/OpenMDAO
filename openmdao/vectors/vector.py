@@ -77,6 +77,9 @@ class Vector(object):
     # Listing of relevant citations that should be referenced when
     cite = ""
 
+    """Indicator whether a vector class is MPI-distributed"""
+    distributed = False
+
     def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
         """
         Initialize all attributes.

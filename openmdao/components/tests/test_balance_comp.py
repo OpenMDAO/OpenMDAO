@@ -121,7 +121,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
-    def test_balance_comp_options_exclude_no_error(self):
+    def test_balance_comp_record_options(self):
 
         prob = om.Problem()
 
@@ -140,28 +140,9 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.setup()
 
-        msg = ("Trying to record option 'guess_func' which cannot be pickled on system BalanceComp "
-               "(balance). Set 'recordable' to False. Skipping recording options for this system.")
-
-        with assert_no_warning(UserWarning, msg):
-            prob.run_model()
-
-        prob = om.Problem()
-
-        bal = om.BalanceComp()
-        bal.add_balance('x', val=1.0)
-
-        prob.model.add_subsystem(name='balance', subsys=bal)
-
-        recorder = om.SqliteRecorder('cases.sql')
-
-        prob.model.add_recorder(recorder)
-
-        bal.recording_options['options_excludes'] = ['guess_func']
-
-        prob.setup()
-
-        with assert_no_warning(UserWarning, msg):
+        # there should be no warnings wrt unpicklable 'guess_func' option,
+        # since 'recordable' has been set to False
+        with assert_no_warning(UserWarning):
             prob.run_model()
 
     def test_create_on_init_no_normalization(self):

@@ -308,8 +308,9 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         if MPI:
-            msg = ("Problem: The `distributed_vector_class` argument must be `PETScVector` when "
-                   "running in parallel under MPI but 'DefaultVector' was specified.")
+            msg = ("Problem: The `distributed_vector_class` argument must be a distributed vector "
+                   "class like `PETScVector` when running in parallel under MPI but 'DefaultVector' "
+                   "was specified which is not distributed.")
             with self.assertRaises(ValueError) as cm:
                 prob.setup(check=False, mode='fwd', distributed_vector_class=om.DefaultVector)
 
