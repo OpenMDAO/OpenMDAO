@@ -928,7 +928,13 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        record_iteration(self, self._problem(), self._get_name())
+        if self._problem:
+            record_iteration(self, self._problem(), self._get_name())
+        else:
+            raise RuntimeError(f'{self.msginfo} attempted to record iteration but '
+                               'driver has not been initialized; `run_model()`, '
+                               '`run_driver()`, or `final_setup()` must be called '
+                               'before recording.')
 
     def _get_recorder_metadata(self, case_name):
         """

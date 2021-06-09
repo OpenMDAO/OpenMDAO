@@ -979,8 +979,8 @@ class Problem(object):
             raise RuntimeError("%s: Cannot call set_order without calling "
                                "setup after" % (self.msginfo))
 
-        # we only want to set up recording once, after problem setup
-        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
+        # set up recording, including any new recorders since last setup
+        if self._metadata['setup_status'] >= _SetupStatus.POST_SETUP:
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
