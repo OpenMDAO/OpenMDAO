@@ -455,7 +455,7 @@ class Case(object):
 
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
-                             "Please index in using 'val'")
+                          "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:
@@ -585,7 +585,7 @@ class Case(object):
 
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
-                             "Please index in using 'val'")
+                          "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:

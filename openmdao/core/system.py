@@ -3576,7 +3576,7 @@ class System(object):
         """
         if values is not None:
             issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
-                             "Please index in using 'val'")
+                          "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:
@@ -3718,7 +3718,7 @@ class System(object):
         """
         if values is not None:
             issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
-                             "Please index in using 'val'")
+                          "Please index in using 'val'")
         elif not vals and values:
             values = True
         else:
