@@ -686,6 +686,9 @@ class System(object):
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex,
                                                                  ncol=ncol)
+
+        root_vectors['input']['linear']._scaling_fwd = root_vectors['input']['nonlinear']._scaling
+
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -1785,6 +1788,8 @@ class System(object):
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec,
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
+
+        vectors['input']['linear']._scaling_fwd = root_vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']

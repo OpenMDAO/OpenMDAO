@@ -149,7 +149,22 @@ class DefaultVector(Vector):
             views[abs_name] = v
 
             if do_scaling:
-                scale0, scale1 = factors[abs_name][kind]
+                factor_tuple = factors[abs_name][kind]
+
+                if len(factor_tuple) == 4:
+                    # Input vector unit conversion.
+                    a0, a1, factor, offset = factors[abs_name][kind]
+
+                    if self._name == 'linear':
+                        scale0 = None
+                        scale1 = a1 / factor
+
+                    else:
+                        scale0 = (a0 + offset) * factor
+                        scale1 = a1 * factor
+                else:
+                    scale0, scale1 = factor_tuple
+
                 if scaling[0] is not None:
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
@@ -273,11 +288,16 @@ class DefaultVector(Vector):
         data = self.asarray()
         data[idxs] = val
 
-    def scale_to_norm(self):
+    def scale_to_norm(self, use_nonlinear_scaling=False):
         """
         Scale this vector to normalized form.
         """
-        adder, scaler = self._scaling
+        if use_nonlinear_scaling:
+            scaler = self._scaling_fwd[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
         data = self.asarray()
         if self._ncol == 1:
             if adder is not None:  # nonlinear only
@@ -288,11 +308,16 @@ class DefaultVector(Vector):
                 data -= adder
             data /= scaler[:, np.newaxis]
 
-    def scale_to_phys(self):
+    def scale_to_phys(self, use_nonlinear_scaling=False):
         """
         Scale this vector to physical form.
         """
-        adder, scaler = self._scaling
+        if use_nonlinear_scaling:
+            scaler = self._scaling_fwd[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
         data = self.asarray()
         if self._ncol == 1:
             data *= scaler

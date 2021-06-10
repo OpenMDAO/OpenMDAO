@@ -131,6 +131,7 @@ class Vector(object):
                           (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = None
+        self._scaling_fwd = None
 
         if root_vector is None:
             self._root_vector = self
