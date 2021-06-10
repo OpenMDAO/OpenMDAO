@@ -3577,10 +3577,10 @@ class System(object):
         if values is not None:
             issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
-        elif not vals and values:
+        elif not val and values:
             values = True
         else:
-            values = vals
+            values = val
 
         metavalues = values and self._inputs is None
 
@@ -3719,10 +3719,10 @@ class System(object):
         if values is not None:
             issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
-        elif not vals and values:
+        elif not val and values:
             values = True
         else:
-            values = vals
+            values = val
 
         keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [values, units, shape, global_shape, desc, tags]

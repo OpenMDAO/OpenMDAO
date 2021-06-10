@@ -456,10 +456,10 @@ class Case(object):
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
-        elif not vals and values:
+        elif not val and values:
             values = True
         else:
-            values = vals
+            values = val
 
         if self.inputs is not None:
             for var_name in self.inputs.absolute_names():
