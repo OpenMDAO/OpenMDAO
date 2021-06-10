@@ -1153,6 +1153,197 @@ class EllipsisIndexer(Indexer):
         return self.as_array().tolist()
 
 
+# the following class will go away when we drop support for our custom non-flat indexing format
+class NonFlatArrayIndexer(Indexer):
+    """
+    Multi indexer using our custom 'list of tuples' format.
+    """
+
+    def __init__(self, tup, orig_shape=None, flat_src=False):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        tup : tuple
+            Tuple of indices/slices.
+        orig_shape : tuple or None
+            If this slice was created from an array, this is it's shape. This shape will
+            be used later if this slice is converted to an array.
+        flat_src : bool
+            True if our indices should be treated as indices into a flat source array.
+        """
+        super().__init__()
+        self._tup = tup
+        self._orig_shape = orig_shape
+        self._flat_src = flat_src
+        self._set_idx_list()
+
+    def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
+        return f"{self._tup}".strip('\n')
+
+    def copy(self):
+        return super().copy(self._tup)
+
+    def flat(self, copy=False):
+        """
+        Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
+
+        Returns
+        -------
+        ndarray
+            An index array into a flat array.
+        """
+        return self.shaped_array(copy=copy, flat=True)
+
+    def set_src_shape(self, shape):
+        """
+        Set the shape of the 'source' array .
+
+        Parameters
+        ----------
+        shape : tuple or int
+            The shape of the 'source' array.
+
+        Returns
+        -------
+        Indexer
+            Self is returned to allow chaining.
+        """
+        self._check_src_shape(shape)
+        super().set_src_shape(shape)
+        if shape is None:
+            return self
+
+        if self._flat_src:
+            shape = np.product(shape)
+            for i in self._idx_list:
+                i.set_src_shape(shape)
+        else:
+            for i, s in zip(self._idx_list, shape):
+                i.set_src_shape(s)
+
+        return self
+
+    def _check_bounds(self):
+        """
+        Check that indices are within the bounds of the source shape.
+        """
+        if self._src_shape is not None:
+            for i, s in zip(self._idx_list, self._src_shape):
+                i._check_bounds()
+
+    def to_json(self):
+        """
+        Return a JSON serializable version of self.
+
+        Returns
+        -------
+        list of int or int
+            list or int version of self.
+        """
+        return self.as_array().tolist()
+
+##################################
+
+    def __call__(self):
+        """
+        Return this multidimensional index.
+
+        Returns
+        -------
+        int
+            This multidimensional index.
+        """
+        arr = np.array(self._tup)
+        return [tuple(arr[i,:]) for i in range(arr.shape[0])]
+
+    @property
+    def src_ndim(self):
+        return len(self()[0])
+
+    @property
+    def shape(self):
+        """
+        Return the shape of the indices.
+
+        Returns
+        -------
+        tuple
+            The shape of the indices.
+        """
+        return tuple(self._tup.shape[:-1])
+
+    def _set_idx_list(self):
+        self._flat_src = False
+        orig_shape = tuple(self._tup.shape[:-1])
+        ndims = self._tup.shape[-1]
+        size = np.product(orig_shape)
+        totsize = size * ndims
+        parts = [self._tup.flat[i:totsize:ndims] for i in range(ndims)]
+        self._idx_list = [indexer(i, convert=False) for i in parts]
+
+    def _check_src_shape(self, shape):
+        if shape is not None and len(shape) != len(self._idx_list):
+            raise ValueError(f"Can't set source shape to {shape} because indexer {self} expects "
+                             f"{self.src_ndim} dimensions.")
+
+    def shaped_instance(self):
+        """
+        Return a 'shaped' version of this Indexer type.
+
+        Returns
+        -------
+        ShapedMultiIndexer or None
+            Will return a ShapedMultiIndexer if possible, else None.
+        """
+        if self._shaped_inst is not None:
+            return self._shaped_inst
+
+        try:
+            self._shaped_inst = ShapedMultiIndexer(tuple(idxer.shaped_instance()()
+                                                         for idxer in self._idx_list),
+                                                   self.shape)
+        except Exception:
+            self._shaped_inst = None
+
+        if self._src_shape is not None:
+            self._shaped_inst.set_src_shape(self._src_shape)
+
+        return self._shaped_inst
+
+    def as_array(self, copy=False, flat=True):
+        """
+        Return an index array into a flat array.
+
+        Parameters
+        ----------
+        copy : bool
+            If True, make sure the array returned is a copy.
+        flat : bool
+            If True, return a flat array.
+
+        Returns
+        -------
+        ndarray
+            The index array.
+        """
+        return self.shaped_array(copy=copy, flat=flat)
+
+
 class IndexMaker(object):
     """
     A Factory for Indexer objects.
