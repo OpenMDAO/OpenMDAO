@@ -566,11 +566,9 @@ class ShapedArrayIndexer(Indexer):
     ----------
     _arr : ndarray
         The wrapped index array object.
-    _convert : bool
-        If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
     """
 
-    def __init__(self, arr, convert=True):
+    def __init__(self, arr):
         """
         Initialize attributes.
 
@@ -578,8 +576,6 @@ class ShapedArrayIndexer(Indexer):
         ----------
         arr : ndarray
             The index array.
-        convert : bool
-            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
         """
         super().__init__()
 
@@ -591,7 +587,6 @@ class ShapedArrayIndexer(Indexer):
                             f"non-integral type: {arr}.")
 
         self._arr = ndarr
-        self._convert = convert
 
     def __call__(self):
         """
@@ -710,14 +705,7 @@ class ArrayIndexer(ShapedArrayIndexer):
         else:
             sharr = self._arr
 
-        if self._convert:
-            slc = array2slice(sharr)
-            if slc is not None:
-                self._shaped_inst = ShapedSliceIndexer(slc)
-            else:
-                self._shaped_inst = ShapedArrayIndexer(sharr)
-        else:
-            self._shaped_inst = ShapedArrayIndexer(sharr)
+        self._shaped_inst = ShapedArrayIndexer(sharr)
 
         return self._shaped_inst
 
@@ -756,7 +744,7 @@ class ShapedMultiIndexer(Indexer):
         """
         super().__init__()
         self._tup = tup
-        self._idx_list = [indexer(i, convert=False) for i in tup]
+        self._idx_list = [indexer(i) for i in tup]
 
     def __call__(self):
         """
@@ -1049,7 +1037,7 @@ class IndexMaker(object):
     A Factory for Indexer objects.
     """
 
-    def _get_indexer(self, idx, convert):
+    def __call__(self, idx):
         """
         Return an Indexer instance based on the passed indices/slices.
 
@@ -1057,46 +1045,25 @@ class IndexMaker(object):
         ----------
         idx : int, ndarray, slice, or tuple
             Some sort of index/indices/slice.
-        convert : bool
-            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
 
         Returns
         -------
         Indexer
             The Indexer instance we created based on the args.
         """
-        if convert and idx is ...:
-            idxer = EllipsisIndexer((idx,))
-        elif isinstance(idx, int):
-            idxer = IntIndexer(idx)
-        elif isinstance(idx, slice):
-            idxer = SliceIndexer(idx)
-
-        elif convert and isinstance(idx, tuple):
+        if isinstance(idx, tuple):
             if ... in idx:
                 idxer = EllipsisIndexer(idx)
             else:
                 idxer = MultiIndexer(idx)
-        else:
-            idx = np.atleast_1d(idx)
-
-            if convert:
-                # if array is convertable to a slice, store it as a slice
-                slc = array2slice(idx)
-                if slc is None:
-                    if idx.ndim == 1:
-                        idxer = ArrayIndexer(idx)
-                    else:
-                        idxer = MultiIndexer(tuple(idx))
-                else:
-                    idxer = SliceIndexer(slc)
-            else:
-                # can't convert sub-index arrays into sub slices because that can change
-                # the result
-                if idx.ndim == 1:
-                    idxer = ArrayIndexer(idx, False)
-                else:
-                    idxer = MultiIndexer(tuple(idx))
+        elif isinstance(idx, Integral):
+            idxer = IntIndexer(idx)
+        elif idx is ...:
+            idxer = EllipsisIndexer((idx,))
+        elif isinstance(idx, slice):
+            idxer = SliceIndexer(idx)
+        else:  # index array
+            idxer = ArrayIndexer(np.atleast_1d(idx), False)
 
         shaped = idxer.shaped_instance()
         if shaped is not None:
@@ -1117,25 +1084,7 @@ class IndexMaker(object):
         Indexer
             The Indexer instance we created based on the args.
         """
-        return self._get_indexer(idx, convert=True)
-
-    def __call__(self, idx, convert=True):
-        """
-        Return an Indexer based on the args.
-
-        Parameters
-        ----------
-        idx : int, ndarray, slice or tuple
-            The passed indices/slices.
-        convert : bool
-            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
-
-        Returns
-        -------
-        Indexer
-            The Indexer instance we created based on the args.
-        """
-        return self._get_indexer(idx, convert)
+        return self(idx)
 
 
 indexer = IndexMaker()
