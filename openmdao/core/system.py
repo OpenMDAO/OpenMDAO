@@ -3511,7 +3511,7 @@ class System(object):
         return result
 
     def list_inputs(self,
-                    vals=True,
+                    val=True,
                     prom_name=False,
                     units=False,
                     shape=False,
@@ -3633,7 +3633,7 @@ class System(object):
 
     def list_outputs(self,
                      explicit=True, implicit=True,
-                     vals=True,
+                     val=True,
                      prom_name=False,
                      residuals=False,
                      residuals_tol=None,

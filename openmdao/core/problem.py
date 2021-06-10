@@ -411,7 +411,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, value=None, units=None, indices=None, val=None):
+    def set_val(self, name, val=None, units=None, indices=None, **kwargs):
         """
         Set an output/input variable.
 
@@ -430,11 +430,14 @@ class Problem(object):
         val : float or ndarray or list or None
             Value to set this variable to.
         """
+        if 'value' not in kwargs:
+            value=None
+
         if value is not None and not self._warned:
             self._warned = True
             warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
                              "in the future.")
-        elif val is not None and value is None:
+        elif val is not None:
             self._warned = True
             value = val
 

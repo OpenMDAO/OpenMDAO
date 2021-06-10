@@ -393,7 +393,7 @@ class Case(object):
         return self._get_variables_of_type('response', scaled, use_indices)
 
     def list_inputs(self,
-                    vals=True,
+                    val=True,
                     prom_name=False,
                     units=False,
                     shape=False,
@@ -501,7 +501,7 @@ class Case(object):
 
     def list_outputs(self,
                      explicit=True, implicit=True,
-                     vals=True,
+                     val=True,
                      prom_name=False,
                      residuals=False,
                      residuals_tol=None,
