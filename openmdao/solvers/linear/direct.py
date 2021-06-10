@@ -235,7 +235,6 @@ class DirectSolver(LinearSolver):
         seed = np.zeros(x_data.size)
         mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
         scope_out, scope_in = system._get_scope()
-        vnames = ['linear']
 
         # Assemble the Jacobian by running the identity matrix through apply_linear
         for i in range(nmtx):
@@ -245,7 +244,7 @@ class DirectSolver(LinearSolver):
             xvec.set_val(seed)
 
             # apply linear
-            system._apply_linear(self._assembled_jac, vnames, self._rel_systems, 'fwd',
+            system._apply_linear(self._assembled_jac, self._rel_systems, 'fwd',
                                  scope_out, scope_in)
 
             # put new value in out_vec
@@ -405,24 +404,17 @@ class DirectSolver(LinearSolver):
 
         return inv_jac
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
         """
-        if len(vec_names) > 1 or vec_names[0] != 'linear':
-            raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
-
-        self._vec_names = vec_names
-
         system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size

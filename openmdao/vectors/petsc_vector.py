@@ -39,14 +39,14 @@ class PETScVector(DefaultVector):
     cite = CITATION
     distributed = True
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
 
         Parameters
         ----------
         name : str
-            The name of the vector: 'nonlinear', 'linear', or right-hand side name.
+            The name of the vector: 'nonlinear' or 'linear'.
         kind : str
             The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
@@ -55,11 +55,9 @@ class PETScVector(DefaultVector):
             Pointer to the vector owned by the root system.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
-        ncol : int
-            Number of columns for multi-vectors.
         """
         super().__init__(name, kind, system, root_vector=root_vector,
-                         alloc_complex=alloc_complex, ncol=ncol)
+                         alloc_complex=alloc_complex)
 
         self._dup_inds = None
 
@@ -78,32 +76,15 @@ class PETScVector(DefaultVector):
         self._imag_petsc = {}
         data = self._data.real
 
-        if self._ncol == 1:
-            if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
-            else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
+        if self._alloc_complex:
+            self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
         else:
-            # for now the petsc array is only the size of one column and we do separate
-            # transfers for each column.
-            if data.size == 0:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system().comm)
-            else:
-                self._petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                          comm=self._system().comm)
+            self._petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
 
         # Allocate imaginary for complex step
         if self._alloc_complex:
             data = self._data.imag
-            if self._ncol == 1:
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
-            else:
-                if data.size == 0:
-                    self._imag_petsc = PETSc.Vec().createWithArray(data.copy(),
-                                                                   comm=self._system().comm)
-                else:
-                    self._imag_petsc = PETSc.Vec().createWithArray(data[:, 0].copy(),
-                                                                   comm=self._system().comm)
+            self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system().comm)
 
     def _get_dup_inds(self):
         """
@@ -146,23 +127,11 @@ class PETScVector(DefaultVector):
         dup_inds = self._get_dup_inds()
         has_dups = dup_inds.size > 0
 
-        if self._ncol == 1:
-            if has_dups:
-                data_cache = self.asarray(copy=True)
-                data_cache[dup_inds] = 0.0
-            else:
-                data_cache = self._get_data()
+        if has_dups:
+            data_cache = self.asarray(copy=True)
+            data_cache[dup_inds] = 0.0
         else:
-            # With Vectorized derivative solves, data contains multiple columns.
-            icol = self._icol
-            if icol is None:
-                icol = 0
-            if has_dups:
-                data_cache = self._get_data().flatten()
-                data_cache[dup_inds] = 0.0
-                data_cache = data_cache.reshape(self._get_data().shape)[:, icol]
-            else:
-                data_cache = self._get_data()[:, icol]
+            data_cache = self._get_data()
 
         return data_cache
 
@@ -173,14 +142,7 @@ class PETScVector(DefaultVector):
         This is done to restore the petsc array after we previously zeroed out all duplicated
         values.
         """
-        if self._ncol == 1:
-            self._petsc.array = self._get_data()
-        else:
-            # With Vectorized derivative solves, data contains multiple columns.
-            icol = self._icol
-            if icol is None:
-                icol = 0
-            self._petsc.array = self._get_data()[:, icol]
+        self._petsc.array = self._get_data()
 
     def get_norm(self):
         """

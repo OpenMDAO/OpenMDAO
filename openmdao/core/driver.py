@@ -341,7 +341,7 @@ class Driver(object):
             # If we have remote VOIs, pick an owning rank for each and use that
             # to bcast to others later
             owning_ranks = model._owning_rank
-            sizes = model._var_sizes['nonlinear']['output']
+            sizes = model._var_sizes['output']
             rank = model.comm.rank
             nprocs = model.comm.size
             for i, (vname, meta) in enumerate(model._var_allprocs_abs2meta['output'].items()):

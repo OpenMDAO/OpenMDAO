@@ -12,24 +12,21 @@ class LinearRunOnce(LinearBlockGS):
 
     SOLVER = 'LN: RUNONCE'
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
-            List of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
         """
-        self._vec_names = vec_names
         self._mode = mode
         self._rel_systems = rel_systems
 
-        self._update_rhs_vecs()
+        self._update_rhs_vec()
 
         # Single iteration of GS
         self._single_iteration()

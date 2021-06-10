@@ -540,8 +540,8 @@ class Problem(object):
                                 if flat:
                                     src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
-                                    ssizes = model._var_sizes['nonlinear']['output']
-                                    sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                    ssizes = model._var_sizes['output']
+                                    sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
                                     start = np.sum(ssizes[:myrank, sidx])
                                     end = start + ssize
@@ -730,7 +730,7 @@ class Problem(object):
         data = rvec.asarray()
         data *= -1.
 
-        self.model.run_solve_linear(['linear'], mode)
+        self.model.run_solve_linear(mode)
 
         if mode == 'fwd':
             return {n: lvec[n].copy() for n in lnames}
@@ -896,7 +896,7 @@ class Problem(object):
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
-            'force_alloc_complex': force_alloc_complex,
+            'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
@@ -909,9 +909,9 @@ class Problem(object):
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
-            'lin_vec_names': None,  # names of linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
+            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1200,7 +1200,7 @@ class Problem(object):
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(None, ['linear'], _contains_all, mode)
+                                comp._apply_linear(None, _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -1694,18 +1694,18 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'vectorize_derivs', 'cache_linear_solution', 'units']
+            'cache_linear_solution', 'units']
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
-            'linear', 'parallel_deriv_color', 'vectorize_derivs',
+            'linear', 'parallel_deriv_color',
             'cache_linear_solution', 'units']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
-            'parallel_deriv_color', 'vectorize_derivs', 'cache_linear_solution']
+            'parallel_deriv_color', 'cache_linear_solution']
 
         """
         default_col_names = ['name', 'value', 'size']

@@ -111,32 +111,6 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
-    def test_fan_in_parallel_sets_fwd(self):
-
-        prob = om.Problem()
-        prob.model = FanInGrouped()
-
-        # An extra unconnected desvar was in the original test.
-        prob.model.add_subsystem('p', om.IndepVarComp('x3', 0.0), promotes=['x3'])
-
-        prob.model.linear_solver = om.LinearBlockGS()
-        prob.model.sub.linear_solver = om.LinearBlockGS()
-
-        prob.model.add_design_var('x1', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('x2', parallel_deriv_color='par_dv')
-        prob.model.add_design_var('x3')
-        prob.model.add_objective('c3.y')
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        indep_list = ['x1', 'x2']
-        unknown_list = ['c3.y']
-
-        J = prob.compute_totals(unknown_list, indep_list, return_format='flat_dict')
-        assert_near_equal(J['c3.y', 'x1'][0][0], -6.0, 1e-6)
-        assert_near_equal(J['c3.y', 'x2'][0][0], 35.0, 1e-6)
-
     def test_debug_print_option_totals_color(self):
 
         prob = om.Problem()
@@ -200,11 +174,11 @@ class ParDerivTestCase(unittest.TestCase):
         assert_near_equal(J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
         # Piggyback to make sure the distributed norm calculation is correct.
-        vec = prob.model._vectors['residual']['c2.y']
+        vec = prob.model._vectors['residual']['linear']
         norm_val = vec.get_norm()
-        # NOTE: BAN updated the norm value for the PR that added seed splitting, i.e.
-        # the seed, c2.y in this case, is half what it was before (-.5 vs. -1).
-        assert_near_equal(norm_val, 6.422616289332565, 1e-6)
+        # NOTE: BAN updated the norm value for the PR that removed vec_names vectors.
+        # the seeds for the constraints are now back to -1 instead of -.5
+        assert_near_equal(norm_val, 6.557438524302, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -265,26 +239,6 @@ class DecoupledTestCase(unittest.TestCase):
 
         prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv')
         prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv')
-        prob.model.add_constraint('Con1.y', upper=0.0)
-        prob.model.add_constraint('Con2.y', upper=0.0)
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        J = prob.compute_totals(['Con1.y', 'Con2.y'], ['Indep1.x', 'Indep2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['Con1.y', 'Indep1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.zeros((asize, asize+2))
-        expected[:,:asize] = np.eye(asize)*8.0
-        assert_near_equal(J['Con2.y', 'Indep2.x'], expected, 1e-6)
-
-    def test_parallel_fwd_multi(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('Indep1.x', parallel_deriv_color='pardv', vectorize_derivs=True)
-        prob.model.add_design_var('Indep2.x', parallel_deriv_color='pardv', vectorize_derivs=True)
         prob.model.add_constraint('Con1.y', upper=0.0)
         prob.model.add_constraint('Con2.y', upper=0.0)
 
@@ -470,115 +424,6 @@ class IndicesTestCase2(unittest.TestCase):
         assert_near_equal(J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MatMatTestCase(unittest.TestCase):
-    N_PROCS = 2
-    asize = 3
-
-    def setup_model(self):
-        asize = self.asize
-        prob = om.Problem()
-        root = prob.model
-        root.linear_solver = om.LinearBlockGS()
-
-        p1 = root.add_subsystem('p1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        p2 = root.add_subsystem('p2', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', om.ParallelGroup())
-        G1.linear_solver = om.LinearBlockGS()
-
-        c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                                x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
-                                                x=np.zeros(asize), y=np.zeros(asize)))
-
-        c3 = root.add_subsystem('c3', om.ExecComp('y = x * 5.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = root.add_subsystem('c4', om.ExecComp('y = x * 4.0',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        root.connect('p1.x', 'G1.c1.x')
-        root.connect('p2.x', 'G1.c2.x')
-        root.connect('G1.c1.y', 'c3.x')
-        root.connect('G1.c2.y', 'c4.x')
-
-        return prob
-
-    def test_parallel_fwd(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('p1.x', parallel_deriv_color='par')
-        prob.model.add_design_var('p2.x', parallel_deriv_color='par')
-        prob.model.add_constraint('c3.y', upper=0.0)
-        prob.model.add_constraint('c4.y', upper=0.0)
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.eye(asize)*8.0
-        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
-
-    def test_parallel_multi_fwd(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('p1.x', parallel_deriv_color='par', vectorize_derivs=True)
-        prob.model.add_design_var('p2.x', parallel_deriv_color='par', vectorize_derivs=True)
-        prob.model.add_constraint('c3.y', upper=0.0)
-        prob.model.add_constraint('c4.y', upper=0.0)
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.eye(asize)*8.0
-        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
-
-    def test_parallel_rev(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('p1.x')
-        prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par')
-        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par')
-
-        prob.setup(check=False, mode='rev')
-        prob.run_driver()
-
-        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.eye(asize)*8.0
-        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
-
-    def test_parallel_multi_rev(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('p1.x')
-        prob.model.add_design_var('p2.x')
-        prob.model.add_constraint('c3.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
-        prob.model.add_constraint('c4.y', upper=0.0, parallel_deriv_color='par', vectorize_derivs=True)
-
-        prob.setup(check=False, mode='rev')
-        prob.run_driver()
-
-        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                return_format='flat_dict')
-
-        assert_near_equal(J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.eye(asize)*8.0
-        assert_near_equal(J['c4.y', 'p2.x'], expected, 1e-6)
-
-
 class SumComp(om.ExplicitComponent):
     def __init__(self, size):
         super().__init__()
@@ -620,9 +465,9 @@ class SlowComp(om.ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['y', 'x'] = self.mult
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
-        super()._apply_linear(jac, vec_names, rel_systems, mode, scope_out, scope_in)
+        super()._apply_linear(jac, rel_systems, mode, scope_out, scope_in)
 
 
 class PartialDependGroup(om.Group):
@@ -667,6 +512,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         wrt = ['Comp1.x']
 
         p = om.Problem(model=PartialDependGroup())
+
         p.setup(mode='rev')
         p.run_model()
 
@@ -681,7 +527,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         of = ['ParallelGroup1.Con1.y', 'ParallelGroup1.Con2.y']
         wrt = ['Comp1.x']
-
+        
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()
@@ -849,11 +695,17 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model = self.setup_model(size=6)
         pdc = 'a'
         model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        # setting dc2.y2 to a parallel deriv color is no longer valid, i.e. setting multiple variables
+        # on the same component to the same parallel color makes no sense because they can't be solved
+        # in parallel.  In the past, we maintained separate vectors and rhs for each par deriv var
+        # so they *could* be solved for simultaneously, but we now just use a single linear vector and
+        # rhs so this isn't possible.
+        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0)
         model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
         model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
 
         prob = om.Problem(model=model)
+
         prob.setup(mode='rev', force_alloc_complex=True)
         prob.run_model()
         data = prob.check_totals(method='cs', out_stream=None)
@@ -879,10 +731,9 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         model = self.setup_model(size=5)
         pdc = 'a'
         model.add_constraint('dc1.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        model.add_constraint('dc2.y2', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', lower=-1.0, upper=1.0)
         model.add_constraint('dc2.y', lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
-        # objective is a scalar - gets its own color to avoid being called 10x
-        model.add_objective('dc3.y', index=2, parallel_deriv_color='b')
+        model.add_objective('dc3.y', index=2)
 
         prob = om.Problem(model=model)
         prob.setup(mode='rev', force_alloc_complex=True)
@@ -905,6 +756,19 @@ class CheckParallelDerivColoringEfficiency(unittest.TestCase):
         self.assertEqual(dc2count, 10)
         # one solve on proc 2
         self.assertEqual(dc3count, 1)
+
+    def test_parallel_deriv_coloring_overlap_err(self):
+        model = self.setup_model(size=6)
+        pdc = 'a'
+        model.add_constraint('dc1.y', indices=[0], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y2', indices=[1], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_constraint('dc2.y', indices=[3], lower=-1.0, upper=1.0, parallel_deriv_color=pdc)
+        model.add_objective('dc3.y', index=2, parallel_deriv_color=pdc)
+
+        prob = om.Problem(model=model)
+        with self.assertRaises(Exception) as ctx:
+            prob.setup(mode='rev')
+        self.assertEqual(str(ctx.exception), "<model> <class Group>: response 'pg.dc2.y' has overlapping dependencies on the same rank with other responses in parallel_deriv_color 'a'.")
 
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests

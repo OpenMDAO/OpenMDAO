@@ -297,9 +297,8 @@ class Component(System):
         iproc = self.comm.rank
 
         for io in ('input', 'output'):
-            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
-                                                                len(self._var_rel_names[io])),
-                                                                dtype=INT_DTYPE)
+            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
+                                                   dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']
@@ -308,46 +307,8 @@ class Component(System):
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        # all names are relevant for the 'nonlinear' and 'linear' vectors.  We
-        # can then use them to compute the size arrays of for all other vectors
-        # based on the nonlinear size array.
-        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
-        nl_relnames = self._var_relevant_names['nonlinear']
-        for io in ('input', 'output'):
-            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
-            nl_relnames[io] = list(self._var_abs2meta[io])
-
-        self._setup_var_index_maps('nonlinear')
-        self._owned_sizes = self._var_sizes['nonlinear']['output']
-
-        if self._use_derivatives:
-            sizes = self._var_sizes
-            nl_sizes = sizes['nonlinear']
-            nl_abs2idx = self._var_allprocs_abs2idx['nonlinear']
-
-            sizes['linear'] = nl_sizes
-            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
-            self._var_relevant_names['linear'] = nl_relnames
-            self._var_allprocs_abs2idx['linear'] = nl_abs2idx
-
-            # Initialize size arrays for other linear vecs besides 'linear'
-            # (which is the same as 'nonlinear')
-            for vec_name in self._lin_rel_vec_name_list[1:]:
-                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
-                # all procs for a given component, so we don't have to mess with figuring out what
-                # vars are local.
-                relnames = self._var_allprocs_relevant_names[vec_name]
-
-                sizes[vec_name] = {}
-                for io in ('input', 'output'):
-                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
-                                                        dtype=INT_DTYPE)
-                    # Variables for this vec_name are a subset of those for nonlinear, so just
-                    # take columns of the nonlinear sizes array
-                    for idx, abs_name in enumerate(relnames[io]):
-                        sz[:, idx] = nl_sizes[io][:, nl_abs2idx[abs_name]]
-
-                self._setup_var_index_maps(vec_name)
+        self._setup_var_index_maps()
+        self._owned_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """
@@ -405,7 +366,7 @@ class Component(System):
                 if self._num_par_fd > 1:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel FD.")
-                if len(self._vec_names) > 2:
+                if self._problem_meta['using_par_deriv_color']:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel_deriv_color.")
                 return True
@@ -938,7 +899,7 @@ class Component(System):
         all_abs2idx : dict
             Dictionary mapping an absolute name to its allprocs variable index.
         all_sizes : dict
-            Mapping of vec_names and types to sizes of each variable in all procs.
+            Mapping of types to sizes of each variable in all procs.
 
         Returns
         -------
@@ -950,8 +911,8 @@ class Component(System):
         all_abs2meta_in = all_abs2meta['input']
         all_abs2meta_out = all_abs2meta['output']
 
-        sizes_in = self._var_sizes['nonlinear']['input']
-        sizes_out = all_sizes['nonlinear']['output']
+        sizes_in = self._var_sizes['input']
+        sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):

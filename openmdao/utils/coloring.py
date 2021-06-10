@@ -906,30 +906,26 @@ class Coloring(object):
 
     def _local_indices(self, inds, mode):
         # this is currently only used when dumping debug info for coloring
-        if self._names_array[mode] is None and self._local_array[mode] is None:
-            col_names = self._col_vars
-            col_sizes = self._col_var_sizes
-            row_names = self._row_vars
-            row_sizes = self._row_var_sizes
-
+        if self._names_array[mode] is None:
             if mode == 'fwd':
-                col_info = zip(col_names, col_sizes)
+                col_info = zip(self._col_vars, self._col_var_sizes)
             else:
-                col_info = zip(row_names, row_sizes)
+                col_info = zip(self._row_vars, self._row_var_sizes)
 
             names = []
             indices = []
-            for i, j in col_info:
-                names.append(np.repeat(i, j))
-                indices.append(np.arange(j))
+            for name, size in col_info:
+                names.append(np.repeat(name, size))
+                indices.append(np.arange(size))
 
             self._names_array[mode] = np.concatenate(names)
             self._local_array[mode] = np.concatenate(indices)
 
         if isinstance(inds, list):
-            var_name_and_sub_indices = [(key, [x[1] for x in group]) for key, group in groupby(
-                zip(self._names_array[mode][inds],
-                    self._local_array[mode][inds]), key=lambda x: x[0])]
+            var_name_and_sub_indices = \
+                [(key, [x[1] for x in group]) for key, group in
+                 groupby(zip(self._names_array[mode][inds], self._local_array[mode][inds]),
+                         key=lambda x: x[0])]
         else:
             var_name_and_sub_indices = [(self._names_array[mode][inds],
                                          self._local_array[mode][inds])]

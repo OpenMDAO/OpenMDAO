@@ -115,8 +115,6 @@ class Solver(object):
         Pointer to the owning system.
     _depth : int
         How many subsolvers deep this solver is (0 means not a subsolver).
-    _vec_names : [str, ...]
-        List of right-hand-side (RHS) vector names.
     _mode : str
         'fwd' or 'rev', applicable to linear solvers only.
     _iter_count : int
@@ -155,7 +153,6 @@ class Solver(object):
         """
         self._system = None
         self._depth = 0
-        self._vec_names = None
         self._mode = 'fwd'
         self._iter_count = 0
         self._problem_meta = None
@@ -835,14 +832,12 @@ class LinearSolver(Solver):
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
@@ -933,7 +928,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
+            system._apply_linear(self._assembled_jac, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
@@ -964,24 +959,21 @@ class BlockLinearSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         if system._use_derivatives:
-            self._create_rhs_vecs()
+            self._create_rhs_vec()
 
-    def _create_rhs_vecs(self):
-        self._rhs_vecs = rhs = {}
+    def _create_rhs_vec(self):
         system = self._system()
-        for vec_name in system._lin_rel_vec_name_list:
-            if self._mode == 'fwd':
-                rhs[vec_name] = system._vectors['residual'][vec_name].asarray(True)
-            else:
-                rhs[vec_name] = system._vectors['output'][vec_name].asarray(True)
+        if self._mode == 'fwd':
+            self._rhs_vec = system._vectors['residual']['linear'].asarray(True)
+        else:
+            self._rhs_vec = system._vectors['output']['linear'].asarray(True)
 
-    def _update_rhs_vecs(self):
+    def _update_rhs_vec(self):
         system = self._system()
-        for vec_name in system._lin_rel_vec_name_list:
-            if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name].asarray()
-            else:
-                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name].asarray()
+        if self._mode == 'fwd':
+            self._rhs_vec[:] = system._vectors['residual']['linear'].asarray()
+        else:
+            self._rhs_vec[:] = system._vectors['output']['linear'].asarray()
 
     def _set_complex_step_mode(self, active):
         """
@@ -994,11 +986,10 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for vec_name in self._system()._lin_rel_vec_name_list:
-            if active:
-                self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].astype(np.complex)
-            else:
-                self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].real
+        if active:
+            self._rhs_vec = self._rhs_vec.astype(np.complex)
+        else:
+            self._rhs_vec = self._rhs_vec.real
 
     def _iter_initialize(self):
         """
@@ -1011,7 +1002,7 @@ class BlockLinearSolver(LinearSolver):
         float
             error at the first iteration.
         """
-        self._update_rhs_vecs()
+        self._update_rhs_vec()
         if self.options['maxiter'] > 1:
             self._run_apply()
             norm = self._iter_get_norm()
@@ -1035,31 +1026,24 @@ class BlockLinearSolver(LinearSolver):
         system = self._system()
 
         if self._mode == 'fwd':
-            b_vecs = system._vectors['residual']
+            b_vecs = system._vectors['residual']['linear']
         else:  # rev
-            b_vecs = system._vectors['output']
+            b_vecs = system._vectors['output']['linear']
 
-        norm = 0
-        for vec_name in system._lin_rel_vec_name_list:
-            b_vecs[vec_name] -= self._rhs_vecs[vec_name]
-            norm += b_vecs[vec_name].get_norm()**2
+        b_vecs -= self._rhs_vec
+        return b_vecs.get_norm()
 
-        return norm ** 0.5
-
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
         Parameters
         ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
-        self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
         self._solve()

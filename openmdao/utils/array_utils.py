@@ -295,14 +295,12 @@ def _global2local_offsets(global_offsets):
         Arrays of local offsets keyed by vec_name and deriv direction.
     """
     offsets = {}
-    for vec_name in global_offsets:
-        offsets[vec_name] = off_vn = {}
-        for type_ in global_offsets[vec_name]:
-            goff = global_offsets[vec_name][type_]
-            off_vn[type_] = goff.copy()
-            if goff[0].size > 0:
-                # adjust offsets to be local in each process
-                off_vn[type_] -= goff[:, 0].reshape((goff.shape[0], 1))
+    for type_ in global_offsets:
+        goff = global_offsets[type_]
+        offsets[type_] = goff.copy()
+        if goff[0].size > 0:
+            # adjust offsets to be local in each process
+            offsets[type_] -= goff[:, 0].reshape((goff.shape[0], 1))
 
     return offsets
 
