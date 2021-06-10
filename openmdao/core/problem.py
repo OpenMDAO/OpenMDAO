@@ -432,6 +432,8 @@ class Problem(object):
         """
         if 'value' not in kwargs:
             value = None
+        elif 'value' in kwargs:
+            value = kwargs['value']
 
         if value is not None and not self._warned:
             self._warned = True
