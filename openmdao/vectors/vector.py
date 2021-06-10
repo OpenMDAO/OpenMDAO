@@ -68,6 +68,9 @@ class Vector(object):
         True if this vector's scaling includes an additive term.
     _scaling : dict
         Contains scale factors to convert data arrays.
+    _scaling_fwd : dict
+        Reference to the scaling factors in the nonlinear vector. Only used for linear input
+        vectors.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int

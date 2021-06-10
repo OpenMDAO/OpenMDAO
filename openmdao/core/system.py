@@ -687,7 +687,9 @@ class System(object):
                                                                  alloc_complex=alloc_complex,
                                                                  ncol=ncol)
 
-        root_vectors['input']['linear']._scaling_fwd = root_vectors['input']['nonlinear']._scaling
+        if 'linear' in vec_names:
+            root_vectors['input']['linear']._scaling_fwd = \
+                root_vectors['input']['nonlinear']._scaling
 
         return root_vectors
 
@@ -1789,7 +1791,8 @@ class System(object):
                     vec_name, kind, self, rootvec,
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
-        vectors['input']['linear']._scaling_fwd = vectors['input']['nonlinear']._scaling
+        if 'linear' in vec_names:
+            vectors['input']['linear']._scaling_fwd = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']

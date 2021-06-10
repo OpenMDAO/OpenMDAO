@@ -290,6 +290,11 @@ class DefaultVector(Vector):
     def scale_to_norm(self, use_nonlinear_scaling=False):
         """
         Scale this vector to normalized form.
+
+        Parameters
+        ----------
+        use_nonlinear_scaling : bool
+            When True, pull scaling values from the nonlinear input vector.
         """
         if use_nonlinear_scaling:
             scaler = self._scaling_fwd[1]
@@ -310,6 +315,11 @@ class DefaultVector(Vector):
     def scale_to_phys(self, use_nonlinear_scaling=False):
         """
         Scale this vector to physical form.
+
+        Parameters
+        ----------
+        use_nonlinear_scaling : bool
+            When True, pull scaling values from the nonlinear input vector.
         """
         if use_nonlinear_scaling:
             scaler = self._scaling_fwd[1]
