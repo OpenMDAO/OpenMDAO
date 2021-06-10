@@ -421,17 +421,17 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list or None
-            This argument will be deprecated in 4.0. Use `val` instead
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
         val : float or ndarray or list or None
             Value to set this variable to.
+        **kwargs : dict
+            Additional keyword argument for deprecated `value` arg.
         """
         if 'value' not in kwargs:
-            value=None
+            value = None
 
         if value is not None and not self._warned:
             self._warned = True

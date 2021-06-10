@@ -410,7 +410,7 @@ class Case(object):
 
         Parameters
         ----------
-        vals : bool, optional
+        val : bool, optional
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -586,10 +586,10 @@ class Case(object):
         if values is not None:
             issue_warning("'value' is deprecated and will be removed in 4.0. "
                           "Please index in using 'val'")
-        elif not vals and values:
+        elif not val and values:
             values = True
         else:
-            values = vals
+            values = val
 
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
