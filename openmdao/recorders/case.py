@@ -527,7 +527,7 @@ class Case(object):
             include outputs from explicit components. Default is True.
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-        vals : bool, optional
+        val : bool, optional
             When True, display/return output values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.

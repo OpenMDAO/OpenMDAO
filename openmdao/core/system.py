@@ -3530,7 +3530,7 @@ class System(object):
 
         Parameters
         ----------
-        vals : bool, optional
+        val : bool, optional
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -3661,7 +3661,7 @@ class System(object):
             include outputs from explicit components. Default is True.
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-        vals : bool, optional
+        val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
             When True, display the promoted name of the variable.
