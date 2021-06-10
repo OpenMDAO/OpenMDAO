@@ -1,7 +1,7 @@
 """Define the Group class."""
 import os
 import sys
-from collections import Counter, OrderedDict, defaultdict, deque
+from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Iterable
 
 from itertools import product, chain
@@ -26,12 +26,12 @@ from openmdao.utils.array_utils import array_connection_compatible, _flatten_src
     shape_to_len
 from openmdao.utils.general_utils import common_subpath, \
     conditional_error, _is_slicer_op, _slice_indices, convert_src_inds, \
-    shape_from_idx, shape2tuple, get_connection_owner
+    shape2tuple, get_connection_owner, conditional_error
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.indexer import indexer, Indexer
 from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
@@ -58,15 +58,22 @@ class _SysInfo(object):
 
 
 class _PromotesInfo(object):
-    __slots__ = ['src_indices', 'flat', 'src_shape', 'parent', 'prom']
+    __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, parent=None, prom=None):
-        if not _is_slicer_op(src_indices) and src_indices is not None:
-            src_indices = np.asarray(src_indices)
-        self.src_indices = src_indices
+    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
+                 root_shape=None):
         self.flat = flat
         self.src_shape = src_shape
-        self.parent = None  # pathname of promoting system
+        self.root_shape = src_shape if root_shape is None else root_shape
+        if src_indices is not None:
+            if isinstance(src_indices, Indexer):
+                self.src_indices = src_indices.copy()
+                self.src_indices.set_src_shape(self.root_shape)
+            else:
+                self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat=flat)
+        else:
+            self.src_indices = None
+        self.parent_sys = None  # pathname of promoting system
         self.prom = None  # local promoted name of input
 
     def __iter__(self):
@@ -76,15 +83,16 @@ class _PromotesInfo(object):
 
     def __repr__(self):
         return (f"_PromotesInfo({self.src_indices}, {self.flat}, {self.src_shape}, "
-                f"{self.parent}, {self.prom})")
+                f"{self.parent_sys}, {self.prom})")
 
     def prom_path(self):
-        if self.parent is None or self.prom is None:
+        if self.parent_sys is None or self.prom is None:
             return ''
-        return '.'.join((self.parent, self.prom)) if self.parent else self.prom
+        return '.'.join((self.parent_sys, self.prom)) if self.parent_sys else self.prom
 
     def copy(self):
-        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.parent, self.prom)
+        return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.parent_sys,
+                             self.prom, self.root_shape)
 
     def convert_from(self, parent):
         # return a new _PromotesInfo that converts our src_indices based on the parent
@@ -94,8 +102,10 @@ class _PromotesInfo(object):
             return parent.copy()
 
         src_inds = convert_src_inds(parent.src_indices, parent.src_shape,
-                                    self.src_indices, self.src_shape)
-        return _PromotesInfo(src_inds, self.flat, self.src_shape, self.parent, self.prom)
+                                    self.src_indices, self.src_shape, flat=self.flat)
+
+        return _PromotesInfo(src_inds, self.flat, self.src_shape, self.parent_sys, self.prom,
+                             parent.root_shape)
 
     def compare(self, other):
         """
@@ -119,12 +129,12 @@ class _PromotesInfo(object):
             if self.src_shape is not None and other.src_shape is not None:
                 mismatches.append('src_shape')
 
-        if isinstance(self.src_indices, np.ndarray) and isinstance(other.src_indices, np.ndarray):
-            if (self.src_indices.shape != other.src_indices.shape or
-                    not np.all(self.src_indices == other.src_indices)):
-                mismatches.append('src_indices')
-        elif not (self.src_indices is None or other.src_indices is None):
-            if self.src_indices != other.src_indices:
+        self_srcinds = None if self.src_indices is None else self.src_indices.as_array()
+        other_srcinds = None if other.src_indices is None else other.src_indices.as_array()
+
+        if isinstance(self_srcinds, np.ndarray) and isinstance(other_srcinds, np.ndarray):
+            if (self_srcinds.shape != other_srcinds.shape or
+                    not np.all(self_srcinds == other_srcinds)):
                 mismatches.append('src_indices')
 
         return mismatches
@@ -411,7 +421,7 @@ class Group(System):
                             raise RuntimeError("{}: vector scalers with distrib vars "
                                                "not supported yet.".format(self.msginfo))
 
-                        if src_indices.ndim != 1:
+                        if src_indices.src_ndim != 1:
                             src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
@@ -754,11 +764,12 @@ class Group(System):
         self._resolve_ambiguous_input_meta()
 
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        conns = self._conn_global_abs_in2out
+
         if self.comm.size > 1:
             abs2idx = self._var_allprocs_abs2idx['nonlinear']
             all_abs2meta = self._var_allprocs_abs2meta
             all_abs2meta_in = all_abs2meta['input']
-            conns = self._conn_global_abs_in2out
 
             # the code below is to handle the case where src_indices were not specified
             # for a distributed input or an input connected to a distributed auto_ivc
@@ -784,10 +795,11 @@ class Group(System):
 
         self._resolve_src_indices()
 
+        abs2meta_in = self._var_abs2meta['input']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+
         if self.comm.size > 1:
-            allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-            allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-            abs2meta_in = self._var_abs2meta['input']
             for abs_in, abs_out in sorted(conns.items()):
                 if abs_out not in allprocs_abs2meta_out:
                     continue  # discrete var
@@ -797,15 +809,17 @@ class Group(System):
                 out_dist = all_meta_out['distributed']
 
                 # check that src_indices match for dist->serial connection
-                # FIXME: this transfers src_indices from all ranks to rank 0 so we could run into
-                # memory issues if src_indices are large.  Maybe try something like computing a hash
-                # in each rank and comparing those?
+                # FIXME: this transfers src_indices from all ranks to the owning rank so we could
+                # run into memory issues if src_indices are large.  Maybe try something like
+                # computing a hash in each rank and comparing those?
                 if out_dist and not in_dist:
                     # all serial inputs must have src_indices if they connect to a distributed
                     # output
                     owner = self._owning_rank[abs_in]
                     if abs_in in abs2meta_in:  # input is local
                         src_inds = abs2meta_in[abs_in]['src_indices']
+                        if src_inds is not None:
+                            src_inds = src_inds.shaped_instance()()
                     else:
                         src_inds = None
                     if self.comm.rank == owner:
@@ -814,9 +828,9 @@ class Group(System):
                         for sinds in self.comm.gather(src_inds, root=owner):
                             if sinds is not None:
                                 if baseline is None:
-                                    baseline = sinds
+                                    baseline = indexer(sinds).as_array()
                                 else:
-                                    if not np.all(sinds == baseline):
+                                    if not np.all(indexer(sinds).as_array() == baseline):
                                         err = 1
                                         break
                         if baseline is None:  # no src_indices were set
@@ -875,20 +889,29 @@ class Group(System):
                 src_inds = abs2meta_in[tgt]['src_indices']
                 flat_src_inds = abs2meta_in[tgt]['flat_src_indices']
 
-            tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, shape2tuple(src_shape)),
-                          shape2tuple(parent_src_shape), src, self.pathname)
+            try:
+                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, shape2tuple(src_shape)),
+                              shape2tuple(parent_src_shape), src, self.pathname)
+            except Exception as err:
+                s, sprom, tprom = get_connection_owner(self, tgt)
+                if s is not None:
+                    s = self._get_subsystem(s)
+                if s is None:
+                    s = self
+                else:
+                    src = sprom
+                    tgt = tprom
+                conditional_error(f"{s.msginfo}: When connecting '{src}' to '{tgt}': {str(err)}",
+                                  exc=err.__class__, category=SetupWarning,
+                                  err=s._raise_connection_errors)
 
         with multi_proc_exception_check(self.comm):
             self._resolve_src_inds(tdict, self)
 
     def _resolve_src_inds(self, my_tdict, top):
-        abs2meta_out = self._var_allprocs_abs2meta['output']
-        abs2meta_in = self._var_abs2meta['input']
         abs2prom = self._var_allprocs_abs2prom['input']
-
         tdict = {}  # maps subname to map of abs input to _PromotesInfo
         for tgt, (oldinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
-            src_inds, flat_src_inds, _ = oldinfo
             prom = abs2prom[tgt]
 
             subname, subprom, tup = self._get_promotes_call_info(tgt)
@@ -897,8 +920,7 @@ class Group(System):
                 if parent_src_shape is not None and pinfo.src_shape is not None:
                     if parent_src_shape != pinfo.src_shape:
                         if oldinfo.src_indices is not None:
-                            parent_src_shape = shape_from_idx(parent_src_shape, oldinfo.src_indices,
-                                                              oldinfo.flat)
+                            parent_src_shape = oldinfo.src_indices.shape
                             oldprom = prom
                             oldpath = self.pathname
                         if parent_src_shape != pinfo.src_shape:
@@ -919,7 +941,7 @@ class Group(System):
                         pinfo = pinfo.convert_from(oldinfo)
                     except Exception as err:
                         conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-                        parinput = prom if oldinfo.parent is None else oldinfo.prom_path()
+                        parinput = prom if oldinfo.parent_sys is None else oldinfo.prom_path()
                         if tgt in conns:
                             src = conns[tgt]
                             owner, sprom, tprom = get_connection_owner(self, tgt)
@@ -1033,7 +1055,7 @@ class Group(System):
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
                         if io == 'input' and pinfo is not None:
                             pinfo = pinfo.copy()
-                            pinfo.parent = subsys.pathname
+                            pinfo.parent_sys = subsys.pathname
                             pinfo.prom = sub_prom
                             promotes_src_indices[sub_prom] = (pinfo, sub_abs)
                     else:
@@ -1469,38 +1491,30 @@ class Group(System):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
-                    if self._raise_connection_errors:
-                        raise NameError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=NameError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist."
-                    if self._raise_connection_errors:
-                        raise NameError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=NameError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
 
             if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
                 if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
-                    if self._raise_connection_errors:
-                        raise NameError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=NameError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
                 else:
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist."
-                    if self._raise_connection_errors:
-                        raise NameError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=NameError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -1515,11 +1529,9 @@ class Group(System):
                 if out_subsys == in_subsys:
                     msg = f"{self.msginfo}: Output and input are in the same System for " + \
                           f"connection from '{prom_out}' to '{prom_in}'."
-                    if self._raise_connection_errors:
-                        raise RuntimeError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
 
                 if src_indices is not None:
                     a2m = allprocs_abs2meta_in[abs_in]
@@ -1534,27 +1546,23 @@ class Group(System):
                             msg = f"{self.msginfo}: src_indices has been defined in both " + \
                                   f"connect('{prom_out}', '{prom_in}') and " + \
                                   f"add_input('{prom_in}', ...)."
-                            if self._raise_connection_errors:
-                                raise RuntimeError(msg)
-                            else:
-                                issue_warning(msg, category=SetupWarning)
-                                continue
+                            conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                              err=self._raise_connection_errors)
+                            continue
                         meta['src_indices'] = src_indices
-                        if _is_slicer_op(src_indices):
-                            meta['src_slice'] = src_indices
-                        else:
-                            meta['flat_src_indices'] = flat
+                        # if _is_slicer_op(src_indices):
+                        #     meta['src_slice'] = src_indices
+                        # else:
+                        meta['flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
                 if abs_in in abs_in2out:
                     msg = f"{self.msginfo}: Input '{abs_in}' cannot be connected to " + \
                           f"'{abs_out}' because it's already connected to '{abs_in2out[abs_in]}'"
-                    if self._raise_connection_errors:
-                        raise RuntimeError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
-                        continue
+                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
+                    continue
 
                 abs_in2out[abs_in] = abs_out
 
@@ -1591,10 +1599,8 @@ class Group(System):
                 dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
                 msg = f"{self.msginfo}: The following inputs have multiple connections: " + \
                       f"{', '.join(dup)}"
-                if self._raise_connection_errors:
-                    raise RuntimeError(msg)
-                else:
-                    issue_warning(msg, category=SetupWarning)
+                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
@@ -1843,10 +1849,8 @@ class Group(System):
                 elif abs_out in allprocs_discrete_out:
                     msg = f"{self.msginfo}: Can't connect discrete output '{abs_out}' " + \
                           f"to continuous input '{abs_in}'."
-                    if self._raise_connection_errors:
-                        raise RuntimeError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
+                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
                 else:
                     abs_in2out[abs_in] = abs_out
 
@@ -1901,17 +1905,13 @@ class Group(System):
             except KeyError:
                 msg = f"{self.msginfo}: Can't connect continuous output '{abs_out}' " + \
                       f"to discrete input '{abs_in}'."
-                if self._raise_connection_errors:
-                    raise RuntimeError(msg)
-                else:
-                    issue_warning(msg, category=SetupWarning)
+                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                  err=self._raise_connection_errors)
             if not issubclass(in_type, out_type):
                 msg = f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is " + \
                       f"incompatible with type '{in_type.__name__}' of input '{abs_in}'."
-                if self._raise_connection_errors:
-                    raise RuntimeError(msg)
-                else:
-                    issue_warning(msg, category=SetupWarning)
+                conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                  err=self._raise_connection_errors)
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1934,10 +1934,8 @@ class Group(System):
                 elif not is_compatible(in_units, out_units):
                     msg = f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' " + \
                           f"are incompatible with input units of '{in_units}' for '{abs_in}'."
-                    if self._raise_connection_errors:
-                        raise RuntimeError(msg)
-                    else:
-                        issue_warning(msg, category=SetupWarning)
+                    conditional_error(msg, exc=RuntimeError, category=SetupWarning,
+                                      err=self._raise_connection_errors)
             elif in_units is not None:
                 if not _is_unitless(in_units):
                     msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
@@ -1961,9 +1959,8 @@ class Group(System):
                 else:
                     in_full_shape = meta_in['shape']
                 in_shape = meta_in['shape']
-                src_indices = self._get_src_inds_array(abs_in)
+                src_indices = meta_in['src_indices']
                 flat = meta_in['flat_src_indices']
-                has_slice = meta_in['src_slice'] is not None
 
                 if src_indices is None and out_shape != in_full_shape:
                     # out_shape != in_shape is allowed if
@@ -1973,19 +1970,23 @@ class Group(System):
                               f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. " + \
                               f"The source shape is {tuple([int(s) for s in out_shape])} " + \
                               f"but the target shape is {tuple([int(s) for s in in_shape])}."
-                        if self._raise_connection_errors:
-                            raise ValueError(msg)
-                        else:
-                            issue_warning(msg, category=SetupWarning)
-                            fail = True
+                        conditional_error(msg, exc=ValueError, category=SetupWarning,
+                                          err=self._raise_connection_errors)
+                        fail = True
 
                 elif src_indices is not None:
 
-                    if shape_to_len(src_indices.shape) == 0:
+                    try:
+                        src_indices.set_src_shape(out_shape)
+                        src_indices = src_indices.shaped_instance()
+                    except Exception as err:
+                        conditional_error(f"{self.msginfo}: When connecting '{abs_out}' to '{abs_in}': {err}",
+                                          exc=err.__class__, category=SetupWarning, err=self._raise_connection_errors)
+
+                    if src_indices.size == 0:
                         continue
 
-                    flat_array_slice_check = not (has_slice and
-                                                  src_indices.size == shape_to_len(in_shape))
+                    flat_array_slice_check = src_indices.size != shape_to_len(in_shape)
 
                     flat = meta_in['flat_src_indices']
 
@@ -1994,10 +1995,10 @@ class Group(System):
                         for idx_d, inp_d in zip(src_indices.shape, in_shape):
                             if idx_d != inp_d:
                                 msg = f"{self.msginfo}: The source indices " + \
-                                      f"{src_indices} do not specify a " + \
-                                      f"valid shape for the connection '{abs_out}' to " + \
-                                      f"'{abs_in}'. The target shape is " + \
-                                      f"{in_shape} but indices are {src_indices.shape}."
+                                        f"{meta_in['src_indices']} do not specify a " + \
+                                        f"valid shape for the connection '{abs_out}' to " + \
+                                        f"'{abs_in}'. The target shape is " + \
+                                        f"{in_shape} but indices are shape {src_indices.shape}."
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
@@ -2006,101 +2007,102 @@ class Group(System):
                                     continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.shape) > len(in_shape) and flat_array_slice_check:
-                        source_dimensions = src_indices.shape[len(in_shape)]
-                        if source_dimensions != len(out_shape):
-                            str_indices = str(src_indices).replace('\n', '')
-                            msg = f"{self.msginfo}: The source indices " + \
-                                  f"{str_indices} do not specify a " + \
-                                  f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
-                                  f"The source has {len(out_shape)} dimensions but the " + \
-                                  f"indices expect {source_dimensions}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                issue_warning(msg, category=SetupWarning)
-                                fail = True
-                                continue
+                    if src_indices.src_ndim > len(out_shape):
+                        #source_dimensions = src_indices.shape[len(in_shape)]
+                        #if source_dimensions != len(out_shape):
+                        #str_indices = str(src_indices).replace('\n', '')
+                        msg = f"{self.msginfo}: The source indices " + \
+                              f"{meta_in['src_indices']} do not specify a " + \
+                              f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \
+                              f"The source has {len(out_shape)} dimensions but the " + \
+                              f"indices expect {src_indices.src_ndim}."
+                        if self._raise_connection_errors:
+                            raise ValueError(msg)
+                        else:
+                            issue_warning(msg, category=SetupWarning)
+                            fail = True
+                            continue
                     else:
                         source_dimensions = 1
 
                     # check all indices are in range of the source dimensions
-                    if flat or src_indices.ndim == 1:
-                        if allprocs_abs2meta_in[abs_in]['distributed']:
-                            out_size = np.sum(sizes_out[:, out_idxs[abs_out]])
-                        else:
-                            out_size = shape_to_len(out_shape)
-                        if src_indices.size > 0:
-                            mx = np.max(src_indices)
-                            mn = np.min(src_indices)
-                            if mx >= out_size:
-                                bad_idx = mx
-                            elif mn < -out_size:
-                                bad_idx = mn
-                            else:
-                                bad_idx = None
-                            if bad_idx is not None:
-                                msg = f"{self.msginfo}: The source indices do not specify " + \
-                                      f"a valid index for the connection '{abs_out}' to " + \
-                                      f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
-                                      f"source dimension of size {out_size}."
-                                if self._raise_connection_errors:
-                                    raise ValueError(msg)
-                                else:
-                                    issue_warning(msg, category=SetupWarning)
-                                    fail = True
-                        if src_indices.ndim > 1:
-                            meta_in['src_indices'] = src_indices.ravel()
-                        else:
-                            meta_in['src_indices'] = src_indices
+                    #if flat or src_indices.src_ndim == 1:
+                        #pass
+                        # if allprocs_abs2meta_in[abs_in]['distributed']:
+                        #     out_size = np.sum(sizes_out[:, out_idxs[abs_out]])
+                        # else:
+                        #     out_size = shape_to_len(out_shape)
+                        # if src_indices.size > 0:
+                        #     mx = np.max(src_indices)
+                        #     mn = np.min(src_indices)
+                        #     if mx >= out_size:
+                        #         bad_idx = mx
+                        #     elif mn < -out_size:
+                        #         bad_idx = mn
+                        #     else:
+                        #         bad_idx = None
+                        #     if bad_idx is not None:
+                        #         msg = f"{self.msginfo}: The source indices do not specify " + \
+                        #               f"a valid index for the connection '{abs_out}' to " + \
+                        #               f"'{abs_in}'. Index '{bad_idx}' is out of range for " + \
+                        #               f"source dimension of size {out_size}."
+                        #         if self._raise_connection_errors:
+                        #             raise ValueError(msg)
+                        #         else:
+                        #             issue_warning(msg, category=SetupWarning)
+                        #             fail = True
+                        # if src_indices.src_ndim > 1:
+                        #     meta_in['src_indices'] = src_indices.ravel()
+                        # else:
+                        #     meta_in['src_indices'] = src_indices
 
-                        if src_indices.size != shape_to_len(in_shape) and flat_array_slice_check:
-                            msg = f"{self.msginfo}: src_indices shape " + \
-                                  f"{src_indices.shape} does not match {abs_in} shape " + \
-                                  f"{in_shape}."
-                            if self._raise_connection_errors:
-                                raise ValueError(msg)
-                            else:
-                                issue_warning(msg, category=SetupWarning)
-                                fail = True
-                    else:
-                        for d in range(source_dimensions):
-                            if all_meta_out['distributed'] or all_meta_in['distributed']:
-                                d_size = out_shape[d] * self.comm.size
-                            else:
-                                d_size = out_shape[d]
-                            arr = src_indices[..., d]
-                            if np.any(arr >= d_size) or np.any(arr <= -d_size):
-                                for i in arr.flat:
-                                    size_check = abs(i) >= d_size
-                                    if size_check:
-                                        msg = f"{self.msginfo}: The source indices " + \
-                                              f"do not specify a valid index for the " + \
-                                              f"connection '{abs_out}' to '{abs_in}'. " + \
-                                              f"Index '{i}' is out of range for source " + \
-                                              f"dimension of size {d_size}."
-                                        if self._raise_connection_errors:
-                                            raise ValueError(msg)
-                                        else:
-                                            issue_warning(msg, category=SetupWarning)
-                                            fail = True
+                    if src_indices.size != shape_to_len(in_shape):
+                        msg = f"{self.msginfo}: src_indices shape " + \
+                              f"{src_indices.shape} does not match {abs_in} shape " + \
+                              f"{in_shape}."
+                        if self._raise_connection_errors:
+                            raise ValueError(msg)
+                        else:
+                            issue_warning(msg, category=SetupWarning)
+                            # fail = True
+                    #else:
+                        # for d in range(source_dimensions):
+                        #     if all_meta_out['distributed'] or all_meta_in['distributed']:
+                        #         d_size = out_shape[d] * self.comm.size
+                        #     else:
+                        #         d_size = out_shape[d]
+                        #     arr = src_indices[..., d]
+                        #     if np.any(arr >= d_size) or np.any(arr <= -d_size):
+                        #         for i in arr.flat:
+                        #             size_check = abs(i) >= d_size
+                        #             if size_check:
+                        #                 msg = f"{self.msginfo}: The source indices " + \
+                        #                       f"do not specify a valid index for the " + \
+                        #                       f"connection '{abs_out}' to '{abs_in}'. " + \
+                        #                       f"Index '{i}' is out of range for source " + \
+                        #                       f"dimension of size {d_size}."
+                        #                 if self._raise_connection_errors:
+                        #                     raise ValueError(msg)
+                        #                 else:
+                        #                     issue_warning(msg, category=SetupWarning)
+                        #                     fail = True
 
-                        if not fail:
+                        #if True:  # not fail:
                             # now convert src_indices into a flat array
-                            meta_in['src_indices'] = \
-                                _flatten_src_indices(src_indices, in_shape,
-                                                     all_meta_out['global_shape'],
-                                                     all_meta_out['global_size'])
+                            #meta_in['src_indices'] = \
+                                #_flatten_src_indices(src_indices, in_shape,
+                                                     #all_meta_out['global_shape'],
+                                                     #all_meta_out['global_size'])
 
-            elif abs_in in abs2meta_in:
-                # Source is not local, but target is. We need to flatten the src_indices here too.
-                meta_in = abs2meta_in[abs_in]
-                src_indices = self._get_src_inds_array(abs_in)
-                if src_indices is not None:
-                    meta_in['src_indices'] = \
-                        _flatten_src_indices(src_indices, meta_in['shape'],
-                                             all_meta_out['global_shape'],
-                                             all_meta_out['global_size'])
+            #elif abs_in in abs2meta_in:
+                ## Source is not local, but target is. We need to flatten the src_indices here too.
+                #meta_in = abs2meta_in[abs_in]
+                #src_indices = meta_in['src_indices']
+                #if src_indices is not None:
+                    #meta_in['src_indices'] = \
+                        #_flatten_src_indices(src_indices, meta_in['shape'],
+                                             #all_meta_out['global_shape'],
+                                             #all_meta_out['global_size'])
 
     def _set_subsys_connection_errors(self, val=True):
         """
@@ -2295,7 +2297,15 @@ class Group(System):
                                 f"list, tuple, ndarray, slice or Iterable, but src_indices for "
                                 f"promotes from '{subsys_name}' are {type(src_indices)}.")
 
-            prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+            try:
+                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+            except Exception as err:
+                lst = []
+                if any is not None:
+                    lst.extend(any)
+                if inputs is not None:
+                    lst.extend(inputs)
+                raise err.__class__(f"{self.msginfo}: When promoting {sorted(lst)}: {err}")
 
             if flat_src_indices and _is_slicer_op(src_indices):
                 promoted = inputs if inputs else any
@@ -2471,14 +2481,14 @@ class Group(System):
                 self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
 
-        if src_indices is not None and not _is_slicer_op(src_indices):
-            src_indices = np.atleast_1d(src_indices)
-            if not np.issubdtype(src_indices.dtype, np.integer):
-                raise TypeError("%s: src_indices must contain integers, but src_indices for "
-                                "connection from '%s' to '%s' is %s." %
-                                (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
-            if src_indices.ndim == 1:
-                flat_src_indices = True
+        if src_indices is not None:
+            try:
+                src_indices = indexer(src_indices, flat=flat_src_indices)
+            except Exception as err:
+                raise err.__class__(f"{self.msginfo}: When connecting from '{src_name}' to '{tgt_name}': "
+                                    f"{err}")
+            #if src_indices.src_ndim == 1:
+                #flat_src_indices = True
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
@@ -2492,12 +2502,6 @@ class Group(System):
             raise RuntimeError("{}: Output and input are in the same System for "
                                "connection from '{}' to '{}'.".format(self.msginfo,
                                                                       src_name, tgt_name))
-
-        if flat_src_indices and _is_slicer_op(src_indices):
-            issue_warning(f"Connection from '{src_name}' to "
-                          f"'{tgt_name}' was added with slice src_indices, so "
-                          "flat_src_indices is ignored.", prefix=self.msginfo,
-                          category=UnusedOptionWarning)
 
         if self._static_mode:
             manual_connections = self._static_manual_connections
@@ -3374,7 +3378,7 @@ class Group(System):
             if not remote and 'value' in gmeta:
                 val = gmeta['value']
             relsrc = src.rsplit('.', 1)[-1]
-            auto_ivc.add_output(relsrc, val=val, units=units)
+            auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
             if remote:
                 auto_ivc._add_remote(relsrc)
 
@@ -3524,8 +3528,10 @@ class Group(System):
                                 metadata.add('value')
                         else:
                             if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
-                                s = sval.ravel() if abs2meta_in[tgt]['flat_src_indices'] else sval
-                                srcpart = s[abs2meta_in[tgt]['src_indices']]
+                                if abs2meta_in[tgt]['flat_src_indices']:
+                                    srcpart = sval.ravel()[abs2meta_in[tgt]['src_indices'].flat()]
+                                else:
+                                    srcpart = sval[abs2meta_in[tgt]['src_indices']()]
                                 if _has_val_mismatch(tunits, tval, sunits, srcpart):
                                     errs.add('val')
                                     metadata.add('value')

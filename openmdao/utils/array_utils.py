@@ -4,6 +4,7 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 from copy import copy
+from numbers import Integral
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -31,8 +32,9 @@ def shape_to_len(shape):
         return None
 
     length = 1
-    for dim in shape:
-        length *= dim
+    if not isinstance(shape, Integral):
+        for dim in shape:
+            length *= dim
 
     return length
 

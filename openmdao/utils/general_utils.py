@@ -68,7 +68,7 @@ def ignore_errors(flag=None):
     return _ignore_errors
 
 
-def conditional_error(msg, exc=RuntimeError, category=UserWarning):
+def conditional_error(msg, exc=RuntimeError, category=UserWarning, err=None):
     """
     Raise an exception or issue a warning, depending on the value of _ignore_errors.
 
@@ -80,8 +80,11 @@ def conditional_error(msg, exc=RuntimeError, category=UserWarning):
         This exception class is used to create the exception to be raised.
     category : warning class
         This category is the class of warning to be issued.
+    err : bool
+        If None, use ignore_errors(), otherwise use value of err to determine whether to
+        raise an exception (err=True) or issue a warning (err=False).
     """
-    if ignore_errors():
+    if (err is None and ignore_errors()) or err is False:
         issue_warning(msg, category=category)
     else:
         raise exc(msg)
@@ -159,14 +162,6 @@ def ensure_compatible(name, value, shape=None, indices=None):
     if isinstance(value, Iterable):
         value = np.asarray(value)
 
-    if indices is not None:
-        contains_slicer = _is_slicer_op(indices)
-        if not contains_slicer:
-            indices = np.atleast_1d(np.asarray(indices, dtype=INT_DTYPE))
-            ind_shape = indices.shape
-    else:
-        contains_slicer = False
-
     # if shape is not given, infer from value (if not scalar) or indices
     if shape is not None:
         if isinstance(shape, numbers.Integral):
@@ -175,14 +170,13 @@ def ensure_compatible(name, value, shape=None, indices=None):
             shape = tuple(shape)
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
-    elif indices is not None:
-        if len(ind_shape) > 1:
+    if indices is not None and indices.shaped_instance() is not None:
+        if indices.src_ndim > 1 and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
-                               "shape must be provided. src_indices may contain "
-                               "an extra dimension if the connected source is "
-                               "not flat, making the input shape ambiguous." %
-                               name)
-        shape = ind_shape
+                               "shape must be provided." % name)
+            if shape is None:
+                raise ValueError("Shape of indices does not match shape for '%s': "
+                                 (name, shape, indshape))
 
     if shape is None:
         # shape is not determined, assume the shape of value was intended
@@ -200,12 +194,12 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
 
-    if indices is not None and not contains_slicer and shape != ind_shape[:len(shape)]:
-        raise ValueError("Shape of indices does not match shape for '%s': "
-                         "Expected %s but got %s." %
-                         (name, shape, ind_shape[:len(shape)]))
+    # if indices is not None and shape != ind_shape[:len(shape)]:
+    #     raise ValueError("Shape of indices does not match shape for '%s': "
+    #                      "Expected %s but got %s." %
+    #                      (name, shape, ind_shape[:len(shape)]))
 
-    return value, shape, indices
+    return value, shape
 
 
 def determine_adder_scaler(ref0, ref, adder, scaler):

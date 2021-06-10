@@ -545,7 +545,7 @@ class TestGroup(unittest.TestCase):
 
         msg = "'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x shape (1, 2)."
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(Exception) as context:
             p.setup()
 
         self.assertEqual(str(context.exception), msg)
@@ -579,7 +579,7 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
         assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
 
-    def test_connect_to_flat_src_indices_with_slice_user_warning(self):
+    def test_connect_to_flat_src_indices_with_slice(self):
         class SlicerComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', np.ones((12,)))
@@ -593,18 +593,18 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('x', arr_large_4x4))
         p.model.add_subsystem('row123_comp', SlicerComp())
 
-        idxs = np.array([0, 2, 3], dtype=int)
+        idxs = np.array([0, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15], dtype=int)
 
-        msg = "<class Group>: Connection from 'indep.x' to 'row123_comp.x' was added with slice src_indices, so flat_src_indices is ignored."
+        # the ellipsis in this case is basically ignored
         with assert_warning(UserWarning, msg):
-            p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
-                            flat_src_indices=True)
+        p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
+                        flat_src_indices=True)
 
         p.setup()
         p.run_model()
 
-        assert_near_equal(p['row123_comp.x'], arr_large_4x4[(0, 2, 3), ...].ravel())
-        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...]) ** 2.0)
+        assert_near_equal(p['row123_comp.x'], arr_large_4x4.ravel()[idxs, ...])
+        assert_near_equal(p['row123_comp.y'], np.sum(arr_large_4x4.ravel()[idxs, ...]) ** 2.0)
 
     def test_connect_to_flat_array(self):
         class SlicerComp(om.ExplicitComponent):
@@ -674,12 +674,13 @@ class TestGroup(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
-        model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
+        
+        msg = "<class Group>: When promoting ['a']: Can't use multdimensional index into a flat source."
 
-        p.setup()
-        p.run_model()
+        with self.assertRaises(Exception) as context:
+            model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
 
-        assert_near_equal(p['comp1.a'], [2, 2, 2])
+        self.assertEqual(str(context.exception), msg)
 
     def test_desvar_indice_slice(self):
 
@@ -2018,7 +2019,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         p = om.Problem(model=TopGroup())
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             p.setup()
 
         self.assertEqual(str(cm.exception),

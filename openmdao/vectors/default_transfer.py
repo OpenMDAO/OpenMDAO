@@ -97,8 +97,7 @@ class DefaultTransfer(Transfer):
                     # Read in and process src_indices
                     src_indices = meta_in['src_indices']
                     if src_indices is not None:
-                        if src_indices.ndim == 1:
-                            src_indices = convert_neg(src_indices, meta_out['global_size'])
+                        src_indices = src_indices.shaped_array()
 
                     # 1. Compute the output indices
                     offset = offsets_out[idx_out]
@@ -270,7 +269,7 @@ class DefaultTransfer(Transfer):
         """
         if mode == 'fwd':
             # this works whether the vecs have multi columns or not due to broadcasting
-            in_vec.set_val(out_vec.asarray()[self._out_inds], self._in_inds)
+            in_vec.set_val(out_vec.asarray()[self._out_inds.flat], self._in_inds)
 
         else:  # rev
             if out_vec._ncol == 1:

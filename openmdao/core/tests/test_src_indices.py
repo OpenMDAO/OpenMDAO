@@ -69,6 +69,8 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(p.model.g1.get_val('a'), 4.)
         assert_near_equal(p['g1.y'], [5., 5., 5., 5.])
         assert_near_equal(p.model.g1.get_val('y'), [5., 5., 5., 5.])
+        assert_near_equal(p['g1.c2.y'], [5., 5., 5., 5.])
+        assert_near_equal(p['g1.c2.a'], [4., 4., 4., 4.])
         assert_near_equal(p['g1.c2.z'], [20., 20., 20., 20.])
 
     def test_multiple_inputs_different_src_indices(self):

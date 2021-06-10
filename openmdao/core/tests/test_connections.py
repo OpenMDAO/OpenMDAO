@@ -278,7 +278,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
@@ -291,11 +291,11 @@ class TestConnectionsIndices(unittest.TestCase):
     def test_bad_length(self):
         # Should not be allowed because the length of src_indices is greater than
         # the shape of arraycomp.inp
-        self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
+        self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: The source indices [0 1 0] do not specify a valid shape " + \
+        expected = "<model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
-                   "(2,) but indices are (3,)."
+                   "(2,) but indices are shape (3,)."
 
         try:
             self.prob.setup()
@@ -314,20 +314,18 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp1'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "<model> <class Group>: For connection 'idvp.arrout' --> 'arraycomp.inp1': slice(100000, 100001, None) is out of bounds of the source shape (5,)."
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
 
-        with assert_warning(UserWarning, expected):
+        with assert_warning(om.SetupWarning, expected):
             self.prob.setup()
 
     def test_bad_value_bug(self):
@@ -335,13 +333,11 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source.  A bug prevented this from being checked.
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "<model> <class Group>: For connection 'idvp.arrout' --> 'arraycomp.inp': slice(0, 100001, 100000) is out of bounds of the source shape (5,)."
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except IndexError as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')

@@ -170,7 +170,7 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     icols = []
     idxs = []
 
-    for i, idx in enumerate(src_indices):
+    for i, idx in enumerate(src_indices.shaped_array()):
         # pull out columns that match each index
         idxarr = np.nonzero(jcols == i)[0]
         idxs.append(idxarr)

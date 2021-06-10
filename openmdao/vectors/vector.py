@@ -535,6 +535,12 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
+        if idxs is not _full_slice:
+            if flat:
+                idxs = idxs.flat()
+            else:
+                idxs = idxs()
+
         if self._icol is not None:
             idxs = (idxs, self._icol)
 

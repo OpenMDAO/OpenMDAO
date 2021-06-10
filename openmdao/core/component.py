@@ -19,12 +19,13 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
+from openmdao.utils.indexer import indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
-_whitespace = set([' ', '\t', '\r', '\n'])
+_whitespace = {' ', '\t', '\r', '\n'}
 
 
 def _valid_var_name(name):
@@ -267,12 +268,6 @@ class Component(System):
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
                         metadata['src_indices'] is not None
 
-                    # ensure that if src_indices is a slice we reset it to that instead of
-                    # the converted array value (in case this is a re-setup), so that we can
-                    # re-convert using potentially different sizing information.
-                    if metadata['src_slice'] is not None:
-                        metadata['src_indices'] = metadata['src_slice']
-
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
 
@@ -481,15 +476,14 @@ class Component(System):
         shape : int or tuple or list or None
             Shape of this variable, only required if src_indices not provided and
             val is not an array. Default is None.
-        src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
+        src_indices : int or list or tuple or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
-            A value of None implies this input depends on all entries of source.
+            A value of None implies this input depends on all entries of the source array.
             Default is None. The shapes of the target and src_indices must match,
-            and form of the entries within is determined by the value of 'flat_src_indices'.
+            and the form of the entries within is determined by the value of 'flat_src_indices'.
         flat_src_indices : bool
-            If True, each entry of src_indices is assumed to be an index into the
-            flattened source.  Otherwise each entry must be a tuple or list of size equal
-            to the number of dimensions of the source.
+            If True and the source is non-flat, each entry of src_indices is assumed to be an index
+            into the flattened source.  Ignored if the source is flat.
         units : str or None
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
@@ -524,10 +518,12 @@ class Component(System):
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
-        if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
-                                                                    ndarray, Iterable)):
-            raise TypeError('%s: The src_indices argument should be an int, list, '
-                            'tuple, ndarray or Iterable' % self.msginfo)
+        if src_indices is not None:
+            try:
+                src_indices = indexer(src_indices, flat=flat_src_indices)
+            except:
+                raise TypeError('%s: The src_indices argument should be an int, list, '
+                                'tuple, ndarray or slice' % self.msginfo)
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
@@ -547,23 +543,10 @@ class Component(System):
                                  "'copy_shape' for variable '%s' is currently unsupported." %
                                  (self.msginfo, name))
 
-        src_slice = None
+        # src_slice = None
         if not (shape_by_conn or copy_shape):
-            if src_indices is not None:
-                if _is_slicer_op(src_indices):
-                    src_slice = src_indices
-                    if flat_src_indices is not None:
-                        issue_warning(f"Input '{name}' was added with slice "
-                                      "src_indices, so flat_src_indices is ignored.",
-                                      prefix=self.msginfo, category=UnusedOptionWarning)
-                else:
-                    src_indices = np.asarray(src_indices, dtype=INT_DTYPE)
-
             # value, shape: based on args, making sure they are compatible
-            val, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
-
-            if src_indices is not None and src_slice is None and src_indices.ndim == 1:
-                flat_src_indices = True
+            val, shape = ensure_compatible(name, val, shape, src_indices)
 
         if src_indices is not None:
             warn_deprecation(f"{self.msginfo}: Passing `src_indices` as an arg to "
@@ -584,10 +567,9 @@ class Component(System):
             'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
-            'src_indices': src_indices,  # these will ultimately be converted to a flat index array
+            'src_indices': src_indices,
             'flat_src_indices': flat_src_indices,
             'add_input_src_indices': src_indices is not None,
-            'src_slice': src_slice,  # store slice def here, if any.  This is never overwritten
             'units': units,
             'desc': desc,
             'distributed': distributed,
@@ -775,7 +757,7 @@ class Component(System):
 
         if not (copy_shape or shape_by_conn):
             # value, shape: based on args, making sure they are compatible
-            val, shape, _ = ensure_compatible(name, val, shape)
+            val, shape = ensure_compatible(name, val, shape)
 
             if lower is not None:
                 lower = ensure_compatible(name, lower, shape)[0]
@@ -977,7 +959,7 @@ class Component(System):
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
                 if meta_in['shape'] != inds.shape:
                     inds = inds.reshape(meta_in['shape'])
-                meta_in['src_indices'] = inds
+                meta_in['src_indices'] = indexer[inds]
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1595,26 +1577,28 @@ class Component(System):
             else:
                 all_abs2meta_in[tgt]['has_src_indices'] = True
                 meta = abs2meta_in[tgt]
+                if src_shape is None and parent_src_shape is not None:
+                    src_inds.set_src_shape(parent_src_shape)
                 meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
                                                 meta['src_indices'], src_shape)
-                elif _is_slicer_op(src_inds):
-                    meta['src_slice'] = src_inds
-                    try:
-                        src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
-                                                  parent_src_shape)
-                    except IndexError as err:
-                        raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
-                                         f"resolving source indices in connection "
-                                         f"between source='{oldprom}' "
-                                         f"and target='{tgt}'\n  with src_indices='{src_inds}'")
-                    meta['flat_src_indices'] = True
-                elif src_inds.ndim == 1:
+                # elif _is_slicer_op(src_inds):
+                #     meta['src_slice'] = src_inds
+                #     try:
+                #         src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
+                #                                   parent_src_shape)
+                #     except IndexError as err:
+                #         raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
+                #                          f"resolving source indices in connection "
+                #                          f"between source='{oldprom}' "
+                #                          f"and target='{tgt}'\n  with src_indices='{src_inds}'")
+                #     meta['flat_src_indices'] = True
+                elif src_inds.src_ndim == 1:
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
-                meta['src_indices'] = src_inds
+                meta['src_indices'] = src_inds.copy()  # indexer(src_inds, flat=flat_src_inds)
 
 
 class _DictValues(object):

@@ -89,7 +89,6 @@ allowed_meta_names = {
     'global_shape',
     'global_size',
     'src_indices',
-    'src_slice',
     'flat_src_indices',
     'type',
     'res_units',
@@ -2004,9 +2003,9 @@ class System(object):
             if not to_match:
                 return
 
-            # always add '*' and so we won't report if it matches nothing (in the case where the
+            # always add '*' so we won't report if it matches nothing (in the case where the
             # system has no variables of that io type)
-            found = set(('*',))
+            found = {'*'}
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
@@ -2505,7 +2504,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _create_indexer(self, indices, typename, vname):
+    def _create_indexer(self, indices, typename, vname, flat=False):
         """
         Return an Indexer instance and it's size if possible.
 
@@ -2517,6 +2516,8 @@ class System(object):
             Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
         vname : str
             Name of the variable.
+        flat : bool
+            If True, indices index into a flat array.
 
         Returns
         -------
@@ -2531,7 +2532,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer[indices]
+            idxer = indexer(indices, flat=flat)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -2539,7 +2540,7 @@ class System(object):
         # size may not be available at this point, but get it if we can in order to allow
         # some earlier error checking
         try:
-            size = idxer.size()
+            size = idxer.size
         except Exception:
             size = None
 
@@ -4576,13 +4577,13 @@ class System(object):
             vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
         else:
-            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            if 'src_slice' in vmeta:
-                smeta = self._var_allprocs_abs2meta['output'][src]
-                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
-                                             smeta['shape'])
-            else:
-                src_indices = None  # FIXME: remote var could have src_indices
+            # vmeta = self._var_allprocs_abs2meta['input'][abs_name]
+            # if 'src_slice' in vmeta:
+            #     smeta = self._var_allprocs_abs2meta['output'][src]
+            #     src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
+            #                                  smeta['shape'])
+            # else:
+            src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
@@ -4598,13 +4599,13 @@ class System(object):
                     src_indices = None
                     vshape = None
                     has_src_indices = False
-                is_slice = _is_slicer_op(src_indices)
+                # is_slice = _is_slicer_op(src_indices)
             else:
-                is_slice = _is_slicer_op(inds)
-                shp = shape_from_idx(src_shape, inds, flat)
-                if not flat and not _is_slicer_op(inds):
-                    inds = _flatten_src_indices(inds, shp,
-                                                src_shape, np.product(src_shape))
+                # is_slice = _is_slicer_op(inds)
+                shp = inds.shape  # shape_from_idx(src_shape, inds, flat)
+                #if not flat and not _is_slicer_op(inds):
+                    #inds = _flatten_src_indices(inds, shp,
+                                                #src_shape, np.product(src_shape))
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
@@ -4617,7 +4618,7 @@ class System(object):
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
         if name not in scope_sys._var_prom2inds:
-            is_slice = _is_slicer_op(src_indices)
+            #is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
             src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
@@ -4646,15 +4647,16 @@ class System(object):
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if is_slice:
-                    val.shape = src_shape
-                    val = val[tuple(src_indices)].ravel()
-                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
+                #if is_slice:
+                    #val.shape = src_shape
+                    #val = val[tuple(src_indices)].ravel()
+                if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes[vec_name]['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
+                    src_indices = src_indices.shaped_array(copy=True)
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
                             src_indices = src_indices - start
@@ -4669,7 +4671,7 @@ class System(object):
                                            "from all processes using "
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
-                    val = val.ravel()[src_indices]
+                    val = val.ravel()[src_indices.flat()]
 
             if get_remote and self.comm.size > 1:
                 if distrib:
@@ -4714,40 +4716,40 @@ class System(object):
 
         return val
 
-    def _get_src_inds_array(self, varname):
-        """
-        Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
+    # def _get_src_inds_array(self, varname):
+    #     """
+    #     Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
 
-        Parameters
-        ----------
-        varname : str
-            Absolute name of the input variable.
+    #     Parameters
+    #     ----------
+    #     varname : str
+    #         Absolute name of the input variable.
 
-        Returns
-        -------
-        ndarray or None
-            The value of src_indices for the given input variable.
-        """
-        meta = self._var_abs2meta['input'][varname]
-        src_indices = meta['src_indices']
-        if src_indices is not None:
-            src_slice = meta['src_slice']
-            # if src_indices is still a slice, update it to an array
-            if src_slice is src_indices:
-                model = self._problem_meta['model_ref']()
-                src = model._conn_global_abs_in2out[varname]
-                try:
-                    global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
-                    global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
-                except KeyError:
-                    raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
-                                       f"src_slice for input '{varname}' because we don't know "
-                                       "the global shape of its source yet.")
-                src_indices = _slice_indices(src_slice, global_size, global_shape)
+    #     Returns
+    #     -------
+    #     ndarray or None
+    #         The value of src_indices for the given input variable.
+    #     """
+    #     meta = self._var_abs2meta['input'][varname]
+    #     src_indices = meta['src_indices']
+    #     if src_indices is not None:
+    #         src_slice = meta['src_slice']
+    #         # if src_indices is still a slice, update it to an array
+    #         if src_slice is src_indices:
+    #             model = self._problem_meta['model_ref']()
+    #             src = model._conn_global_abs_in2out[varname]
+    #             try:
+    #                 global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
+    #                 global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
+    #             except KeyError:
+    #                 raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
+    #                                    f"src_slice for input '{varname}' because we don't know "
+    #                                    "the global shape of its source yet.")
+    #             src_indices = _slice_indices(src_slice, global_size, global_shape)
 
-                meta['src_indices'] = src_indices  # store converted value
+    #             meta['src_indices'] = src_indices  # store converted value
 
-        return src_indices
+    #     return src_indices
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """

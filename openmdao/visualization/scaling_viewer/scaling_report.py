@@ -191,7 +191,7 @@ def _compute_jac_view_info(totals, data, dv_vals, response_vals, coloring):
 def view_driver_scaling(driver, outfile='driver_scaling_report.html', show_browser=True,
                         title=None, jac=True):
     """
-    Generate a self-contained html file containing a detailed connection viewer.
+    Generate a self-contained html file containing a table of scaling data.
 
     Optionally pops up a web browser to view the file.
 
