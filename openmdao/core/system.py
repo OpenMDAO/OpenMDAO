@@ -1789,7 +1789,7 @@ class System(object):
                     vec_name, kind, self, rootvec,
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
-        vectors['input']['linear']._scaling_fwd = root_vectors['input']['nonlinear']._scaling
+        vectors['input']['linear']._scaling_fwd = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']

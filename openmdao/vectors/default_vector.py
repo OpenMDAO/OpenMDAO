@@ -102,9 +102,8 @@ class DefaultVector(Vector):
                     else:
                         self._scaling = (None, np.ones(data.size))
                 elif self._name == 'linear':
-                    # reuse the nonlinear scaling vecs since they're the same as ours
-                    nlvec = self._system()._root_vecs[self._kind]['nonlinear']
-                    self._scaling = (None, nlvec._scaling[1])
+                    # Sadly, we can no longer res-use the nl vector.
+                    self._scaling = (None, np.ones(data.size))
                 else:
                     self._scaling = (None, np.ones(data.size))
         else:
@@ -153,7 +152,7 @@ class DefaultVector(Vector):
 
                 if len(factor_tuple) == 4:
                     # Input vector unit conversion.
-                    a0, a1, factor, offset = factors[abs_name][kind]
+                    a0, a1, factor, offset = factor_tuple
 
                     if self._name == 'linear':
                         scale0 = None
