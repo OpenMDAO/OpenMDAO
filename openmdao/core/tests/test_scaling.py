@@ -998,6 +998,70 @@ class TestScaling(unittest.TestCase):
         assert_near_equal(p.model.sub1.sub2._inputs._scaling[0],
                           np.array([0, 32]), tolerance=1e-12)
 
+    def test_totals_with_solver_scaling(self):
+        ref = 1000.0
+
+        class comp_1(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('a1')
+                self.add_input('a2')
+                self.add_output('b', ref = ref)
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                b = 2*a1*a2
+                outputs['b'] = b
+
+            def compute_partials(self, inputs, partials):
+                a1 = inputs['a1']
+                a2 = inputs['a2']
+                partials['b', 'a1'] = 2*a2
+                partials['b', 'a2'] = 2*a1
+
+        class comp_2(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('b')
+                self.add_output('c')
+                self.declare_partials(['c'], ['b'])
+
+            def compute(self, inputs, outputs):
+                b = inputs['b']
+                c = 2*b
+                outputs['c'] = c
+
+            def compute_partials(self, inputs, partials):
+                partials['c', 'b'] = 2
+
+        model = om.Group()
+        model.add_subsystem('comp_1', comp_1(), promotes = ['*'])
+        model.add_subsystem('comp_2', comp_2(), promotes = ['*'])
+
+        model.add_design_var('a1', lower = 0.5, upper = 1.5)
+        model.add_design_var('a2', lower = 0.5, upper = 1.5)
+
+        model.set_input_defaults('a1', val = 1.)
+        model.set_input_defaults('a2', val = 1.)
+
+        model.add_objective('c')
+
+        problem = om.Problem()
+        problem.model = model
+
+        problem.driver = om.ScipyOptimizeDriver()
+        problem.driver.options['optimizer'] = 'SLSQP'
+
+        problem.setup(mode='rev')
+        problem.set_solver_print(level=0)
+        problem.run_model()
+
+        totals = problem.check_totals(out_stream=None)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=1e-7)
+
 
 class MyComp(om.ExplicitComponent):
 
