@@ -1,5 +1,7 @@
 [![GitHub Actions Test Badge][17]][18]
 [![Coveralls Badge][13]][14]
+[![PyPI version][10]][11]
+[![PyPI Monthly Downloads][12]][11]
 
 # [OpenMDAO][0]
 
@@ -133,6 +135,11 @@ Documentation for the latest version can always be found [here][2], but if you w
 [7]: https://github.com/OpenMDAO/OpenMDAO/issues/new "Make New OpenMDAO Issue"
 
 [8]: https://help.github.com/articles/changing-a-remote-s-url/ "Update Git Remote URL"
+
+[10]: https://badge.fury.io/py/openmdao.svg "PyPI Version"
+[11]: https://badge.fury.io/py/openmdao "OpenMDAO @PyPI"
+
+[12]: https://img.shields.io/pypi/dm/openmdao "PyPI Monthly Downloads"
 
 [13]: https://coveralls.io/repos/github/OpenMDAO/OpenMDAO/badge.svg?branch=master "Coverage Badge"
 [14]: https://coveralls.io/github/OpenMDAO/OpenMDAO?branch=master "OpenMDAO @Coveralls"

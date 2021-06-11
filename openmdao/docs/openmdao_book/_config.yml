@@ -50,8 +50,12 @@ launch_buttons:
 
 # Enable use of sphinx autodoc
 sphinx:
+  config:
+    html_baseurl: 'https://openmdao.org/newdocs/versions/latest/'
+    sitemap_filename: 'sitemap.xml'
   extra_extensions:
   - 'sphinx.ext.autodoc'
   - 'sphinx.ext.autosummary'
   - 'sphinx.ext.viewcode'
+  - 'sphinx_sitemap'
   - 'numpydoc'
