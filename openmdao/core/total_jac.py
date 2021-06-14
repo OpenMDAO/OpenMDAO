@@ -1740,9 +1740,9 @@ def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, 
             tot = np.eye(sz)[of_idx, wrt_idx]
         else:
             tot = np.zeros(jac_meta['shape'])
-            tot[jac_meta['rows'], jac_meta['cols']] = jac_meta['value']
+            tot[jac_meta['rows'], jac_meta['cols']] = jac_meta['val']
     else:
-        tot = jac_meta['value']
+        tot = jac_meta['val']
 
     if dist_resp:
         n_wrt = tot.shape[1]

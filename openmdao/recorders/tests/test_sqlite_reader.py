@@ -1056,7 +1056,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(vals['shape'], expected['shape'])
         self.assertEqual(vals['desc'], expected['desc'])
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
-        np.testing.assert_almost_equal(vals['value'], expected['values'])
+        np.testing.assert_almost_equal(vals['val'], expected['values'])
 
         # check implicit outputs, there should not be any
         impl_outputs_case = case.list_outputs(explicit=False, implicit=True,
@@ -1132,20 +1132,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_text = [
             "1 Explicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ec",
-            "  y      [2.]   [0.]  ",
+            "  y      [2.]  [0.]  ",
             "",
             "",
             "3 Implicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ic",
-            "  z1     [4.]   [0.]  ",
-            "  z2     [1.]   [-3.] ",
-            "  z3     [1.]   [3.]  ",
+            "  z1     [4.]  [0.]  ",
+            "  z2     [1.]  [-3.] ",
+            "  z3     [1.]  [3.]  ",
             "",
             "",
             "",
@@ -1172,11 +1172,11 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "2 Implicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ic",
-              "z2     [1.]   [-3.]",
-              "z3     [1.]   [3.]",
+              "z2     [1.]  [-3.]",
+              "z3     [1.]  [3.]",
             "",
             "",
             "",
@@ -1203,9 +1203,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         expected_inputs_case = {
-            'd1.z': {'value': [5., 2.], 'desc': ''},
-            'd1.x': {'value': [1.], 'desc': ''},
-            'd1.y2': {'value': [12.0584882], 'desc': ''}
+            'd1.z': {'val': [5., 2.], 'desc': ''},
+            'd1.x': {'val': [1.], 'desc': ''},
+            'd1.y2': {'val': [12.0584882], 'desc': ''}
         }
 
         system_cases = cr.list_cases('root.d1', out_stream=None)
@@ -1216,7 +1216,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
-            np.testing.assert_almost_equal(meta['value'], expected['value'])
+            np.testing.assert_almost_equal(meta['val'], expected['val'])
             self.assertEqual(meta['desc'], expected['desc'])
 
         # check that output from the Case method matches output from the System method
@@ -1427,7 +1427,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "2 Explicit Output(s) in 'model'",
             "",
-            "varname  value  resids      ",
+            "varname  val    resids      ",
             "-------  -----  ------------",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
@@ -1489,7 +1489,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "2 Input(s) in 'sub'",
             "",
-            "varname     value",
+            "varname     val",
             "----------  -----",
             "expl.a  [10.]",
             "expl.x  11   ",
@@ -1510,7 +1510,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected = [
             "1 Explicit Output(s) in 'sub'",
             "",
-            "varname   value",
+            "varname   val",
             "--------  -----",
             "expl",
             "  b   [20.]",
@@ -1519,7 +1519,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "1 Implicit Output(s) in 'sub'",
             "",
-            "varname   value",
+            "varname   val",
             "-------   -----",
             "impl",
             "  y   2    ",
@@ -1669,18 +1669,18 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model = om.Group()
         model.add_subsystem('comp', om.ExecComp('y=x-25.',
-                                                x={'value': 77.0, 'units': 'degF'},
-                                                y={'value': 0.0, 'units': 'degC'}))
+                                                x={'val': 77.0, 'units': 'degF'},
+                                                y={'val': 0.0, 'units': 'degC'}))
         model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
-                                                xx={'value': 77.0, 'units': 'degF'},
-                                                yy={'value': 0.0, 'units': 'degC'}),
+                                                xx={'val': 77.0, 'units': 'degF'},
+                                                yy={'val': 0.0, 'units': 'degC'}),
                             promotes=['xx', 'yy'])
         model.add_subsystem('acomp', om.ExecComp('y=x-25.',
-                                                 x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                 y={'value': np.array([0., 0.]), 'units': 'degC'}))
+                                                 x={'val': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 y={'val': np.array([0., 0.]), 'units': 'degC'}))
         model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
-                                                 axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                 ayy={'value': np.array([0., 0.]), 'units': 'degC'}),
+                                                 axx={'val': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 ayy={'val': np.array([0., 0.]), 'units': 'degC'}),
                             promotes=['axx', 'ayy'])
 
         model.add_recorder(self.recorder)
@@ -1722,11 +1722,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model = om.Group()
         model.add_subsystem('comp', om.ExecComp('y=x-25.',
-                                                x={'value': 77.0, 'units': 'm'},
-                                                y={'value': 0.0, 'units': 'm'}))
+                                                x={'val': 77.0, 'units': 'm'},
+                                                y={'val': 0.0, 'units': 'm'}))
         model.add_subsystem('acomp', om.ExecComp('tout=tin-25.',
-                                                 tin={'value': np.array([77.0, 95.0]), 'units': 'degC'},
-                                                 tout={'value': np.array([0., 0.]), 'units': 'degF'}))
+                                                 tin={'val': np.array([77.0, 95.0]), 'units': 'degC'},
+                                                 tout={'val': np.array([0., 0.]), 'units': 'degF'}))
 
         model.add_recorder(self.recorder)
 
@@ -1757,7 +1757,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 datasrc.get_val('acomp.tin', units='not_a_unit')
             self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
 
-        prob.set_val('comp.x', value=100.0, units='s*ft/s')
+        prob.set_val('comp.x', val=100.0, units='s*ft/s')
         prob.run_model()
         prob.cleanup()
         cr = om.CaseReader(self.filename)
@@ -2064,10 +2064,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         iter_count_after = driver.iter_count
 
         for before, after in zip(inputs_before, inputs_after):
-            np.testing.assert_almost_equal(before[1]['value'], after[1]['value'])
+            np.testing.assert_almost_equal(before[1]['val'], after[1]['val'])
 
         for before, after in zip(outputs_before, outputs_after):
-            np.testing.assert_almost_equal(before[1]['value'], after[1]['value'])
+            np.testing.assert_almost_equal(before[1]['val'], after[1]['val'])
 
         # Should take one less iteration since we gave it a head start in the second run
         self.assertEqual(iter_count_before, iter_count_after + 1)
@@ -3002,7 +3002,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                               out_stream=stream)
             text = stream.getvalue()
             self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('val:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
             # make sure they are in the correct order
@@ -3024,7 +3024,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                               out_stream=stream)
             text = stream.getvalue()
             self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('val:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
             self.assertEqual(text.count('\ndes_vars'), 1)
@@ -3669,13 +3669,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # list_inputs will print a report to the screen
         case_inputs = sorted(case.list_inputs())
 
-        assert_near_equal(case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
-        assert_near_equal(case_inputs[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
-        assert_near_equal(case_inputs[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
+        assert_near_equal(case_inputs[0][1]['val'], [1.], tolerance=1e-10) # d1.x
+        assert_near_equal(case_inputs[1][1]['val'], [12.27257053], tolerance=1e-10) # d1.y2
+        assert_near_equal(case_inputs[2][1]['val'], [5., 2.], tolerance=1e-10) # d1.z
 
         case_outputs = case.list_outputs(prom_name=True)
 
-        assert_near_equal(case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+        assert_near_equal(case_outputs[0][1]['val'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
     def test_feature_list_inputs_and_outputs_with_tags(self):
 

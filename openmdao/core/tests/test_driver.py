@@ -496,13 +496,13 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y2={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y2={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y2'])
 
         model.add_design_var('x', units='degC', lower=0.0, upper=100.0)
@@ -555,13 +555,13 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y2={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y2={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y2'])
 
         model.add_design_var('x', units='degF', lower=32.0, upper=212.0)
@@ -598,13 +598,13 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_subsystem('comp2', om.ExecComp('y2 = 3.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y2={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y2={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y2'])
 
         model.add_design_var('x', units='degC', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
@@ -706,8 +706,8 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
@@ -727,8 +727,8 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0, 'units': 'degF'},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0, 'units': 'degF'},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_constraint('x', units='ft', lower=0.0, upper=100.0)
@@ -748,8 +748,8 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_design_var('x', units='ft', lower=0.0, upper=100.0, scaler=3.5, adder=77.0)
@@ -769,8 +769,8 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('p', ivc, promotes=['x'])
         model.add_subsystem('comp1', om.ExecComp('y1 = 2.0*x',
-                                                 x={'value': 2.0},
-                                                 y1={'value': 2.0, 'units': 'degF'}),
+                                                 x={'val': 2.0},
+                                                 y1={'val': 2.0, 'units': 'degF'}),
                             promotes=['x', 'y1'])
 
         model.add_constraint('x', units='ft', lower=0.0, upper=100.0)

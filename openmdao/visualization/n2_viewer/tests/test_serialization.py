@@ -135,17 +135,17 @@ class TestSerialization(unittest.TestCase):
         self.assertEqual(cr.problem_metadata['tree']['children'][1]['options']['cx'],
                          '(3+7j)')
 
-        dval = cr.problem_metadata['tree']['children'][1]['children'][4]['value']
+        dval = cr.problem_metadata['tree']['children'][1]['children'][4]['val']
         key, val = [(k, v) for k, v in dval[0].items()][0]
         self.assertTrue("Discrete_o', <class" in key)
         self.assertEqual(val, [2, {'((1,), (2,))': 'stuff'}])
 
-        dval = cr.problem_metadata['tree']['children'][1]['children'][1]['value']
+        dval = cr.problem_metadata['tree']['children'][1]['children'][1]['val']
         key, val = [(k, v) for k, v in dval[0].items()][0]
         self.assertTrue("Discrete_i', <class" in key)
         self.assertEqual(val, [2, {'((1,), (2,))': 'stuff'}])
 
-        self.assertEqual(cr.problem_metadata['tree']['children'][1]['children'][2]['value'],
+        self.assertEqual(cr.problem_metadata['tree']['children'][1]['children'][2]['val'],
                          '(3+5j)')
 
 

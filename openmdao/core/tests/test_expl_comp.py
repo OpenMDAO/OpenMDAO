@@ -95,7 +95,7 @@ class ExplCompTestCase(unittest.TestCase):
     def test_add_input_output_retval(self):
         # check basic metadata expected in return value
         expected = {
-            'value': 3,
+            'val': 3,
             'shape': (1,),
             'size': 1,
             'units': 'ft',
@@ -103,7 +103,7 @@ class ExplCompTestCase(unittest.TestCase):
             'tags': set(),
         }
         expected_discrete = {
-            'value': 3,
+            'val': 3,
             'type': int,
             'desc': '',
             'tags': set(),
@@ -138,8 +138,8 @@ class ExplCompTestCase(unittest.TestCase):
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         expected = {
-            'comp1.area': {'value': np.array([1.])},
-            'comp2.area': {'value': np.array([1.])}
+            'comp1.area': {'val': np.array([1.]), 'value': np.array([1.])},
+            'comp2.area': {'val': np.array([1.]), 'value': np.array([1.])}
         }
         self.assertEqual(dict(outputs), expected)
 
@@ -168,17 +168,17 @@ class ExplCompTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp1.length', {'value': [3.]}),
-            ('comp1.width',  {'value': [2.]}),
-            ('comp2.length', {'value': [3.]}),
-            ('comp2.width',  {'value': [2.]}),
+            ('comp1.length', {'val': [3.], 'value': [3.]}),
+            ('comp1.width',  {'val': [2.], 'value': [2.]}),
+            ('comp2.length', {'val': [3.], 'value': [3.]}),
+            ('comp2.width',  {'val': [2.], 'value': [2.]}),
         ])
 
         # list explicit outputs
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.area',   {'value': [6.]}),
-            ('comp2.area',   {'value': [6.]}),
+            ('comp1.area',   {'val': [6.], 'value': [6.]}),
+            ('comp2.area',   {'val': [6.], 'value': [6.]}),
         ])
 
         # list states
@@ -207,9 +207,9 @@ class ExplCompTestCase(unittest.TestCase):
                                                   units='ft',
                                                   desc='indep y'))
         model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'value': 0.0, 'units': 'inch'},
-                                                y={'value': 0.0, 'units': 'inch'},
-                                                z={'value': 0.0, 'units': 'inch'}))
+                                                x={'val': 0.0, 'units': 'inch'},
+                                                y={'val': 0.0, 'units': 'inch'},
+                                                z={'val': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -218,38 +218,38 @@ class ExplCompTestCase(unittest.TestCase):
         # list outputs before model has been run will raise an exception
         outputs = dict(prob.model.list_outputs(out_stream=None))
         expected = {
-            'p1.x': {'value': 12.},
-            'p2.y': {'value': 1.},
-            'comp.z': {'value': 0.},
+            'p1.x': {'val': 12., 'value': 12.},
+            'p2.y': {'val': 1., 'value': 1.},
+            'comp.z': {'val': 0., 'value': 0.},
         }
         self.assertEqual(outputs, expected)
 
         # list_inputs on a component before run is okay, using relative names
         expl_inputs = prob.model.comp.list_inputs(out_stream=None)
         expected = {
-            'x': {'value': 0.},
-            'y': {'value': 0.}
+            'x': {'val': 0., 'value': 0.},
+            'y': {'val': 0., 'value': 0.}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
         expl_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'x': {'value': 0.}})
+        self.assertEqual(dict(expl_inputs), {'x': {'val': 0., 'value': 0.}})
 
         expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
-        self.assertEqual(dict(expl_inputs), {'y': {'value': 0.}})
+        self.assertEqual(dict(expl_inputs), {'y': {'val': 0., 'value': 0.}})
 
         # specifying prom_name should not cause an error
         expl_inputs = prob.model.comp.list_inputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(expl_inputs), {
-            'x': {'value': 0., 'prom_name': 'x'},
-            'y': {'value': 0., 'prom_name': 'y'},
+            'x': {'val': 0., 'value': 0., 'prom_name': 'x'},
+            'y': {'val': 0., 'value': 0., 'prom_name': 'y'},
         })
 
         # list_outputs on a component before run is okay, using relative names
         stream = StringIO()
         expl_outputs = prob.model.p1.list_outputs(out_stream=stream)
         expected = {
-            'x': {'value': 12.}
+            'x': {'val': 12., 'value': 12.}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
@@ -257,7 +257,7 @@ class ExplCompTestCase(unittest.TestCase):
         expected_text = [
             "1 Explicit Output(s) in 'p1'",
             "",
-            "varname  value",
+            "varname  val  ",
             "-------  -----",
             "x        [12.]",
             "",
@@ -281,7 +281,7 @@ class ExplCompTestCase(unittest.TestCase):
         # specifying prom_name should not cause an error
         expl_outputs = prob.model.p1.list_outputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(expl_outputs), {
-            'x': {'value': 12., 'prom_name': 'x'}
+            'x': {'val': 12., 'value': 12., 'prom_name': 'x'}
         })
 
         # run model
@@ -294,19 +294,19 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
-            ('comp.x', {'value': [12.], 'shape': (1,), 'units': 'inch'}),
-            ('comp.y', {'value': [12.], 'shape': (1,), 'units': 'inch'})
+            ('comp.x', {'val': [12.], 'value': [12.], 'shape': (1,), 'units': 'inch'}),
+            ('comp.y', {'val': [12.], 'value': [12.], 'shape': (1,), 'units': 'inch'})
         ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
             self.assertEqual(expected[1]['shape'], actual[1]['shape'])
-            assert_near_equal(expected[1]['value'], actual[1]['value'], tol)
+            assert_near_equal(expected[1]['val'], actual[1]['val'], tol)
 
         text = stream.getvalue().split('\n')
         expected_text = [
             "2 Input(s) in 'model'",
             "",
-            "varname  value  units  shape",
+            "varname  val    units  shape",
             "-------  -----  -----  -----",
             "comp",
             "  x    [12.]  inch   (1,)",
@@ -335,11 +335,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
+            ('comp.z', {'val': [24.], 'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
+            ('p1.x', {'val': [12.], 'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
+            ('p2.y', {'val': [1.], 'value': [1.], 'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
@@ -347,8 +347,8 @@ class ExplCompTestCase(unittest.TestCase):
         expected_text = [
             "3 Explicit Output(s) in 'model'",
             "",
-            "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
-            "-------  -----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
+            "varname  val   resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
+            "-------  ----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
             "p1",
             "  x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
             "p2",
@@ -379,9 +379,9 @@ class ExplCompTestCase(unittest.TestCase):
                                                   units='ft',
                                                   ))
         model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'value': 0.0, 'units': 'inch'},
-                                                y={'value': 0.0, 'units': 'inch'},
-                                                z={'value': 0.0, 'units': 'inch'}))
+                                                x={'val': 0.0, 'units': 'inch'},
+                                                y={'val': 0.0, 'units': 'inch'},
+                                                z={'val': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -403,11 +403,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False)
 
         self.assertEqual(sorted(outputs), [
-            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('comp.z', {'val': [24.], 'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('p1.x', {'val': [12.], 'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+            ('p2.y', {'val': [1.], 'value': [1.], 'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ])
 
@@ -676,7 +676,7 @@ class ExplCompTestCase(unittest.TestCase):
                                     out_stream=stream)
             text = stream.getvalue()
             self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('val:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
             # make sure they are in the correct order
@@ -697,7 +697,7 @@ class ExplCompTestCase(unittest.TestCase):
                                     out_stream=stream)
             text = stream.getvalue()
             self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('val:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
             self.assertEqual(text.count('\ndes_vars'), 1)
@@ -815,20 +815,20 @@ class ExplCompTestCase(unittest.TestCase):
         expected_text = [
             "1 Explicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ec",
-            "  y      [2.]   [0.]  ",
+            "  y      [2.]  [0.]  ",
             "",
             "",
             "3 Implicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ic",
-            "  z1     [4.]   [0.]  ",
-            "  z2     [1.]   [-3.] ",
-            "  z3     [1.]   [3.]  ",
+            "  z1     [4.]  [0.]  ",
+            "  z2     [1.]  [-3.] ",
+            "  z3     [1.]  [3.]  ",
             "",
             "",
             "",
@@ -855,11 +855,11 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "2 Implicit Output(s) in 'model'",
             "",
-            "varname  value  resids",
-            "-------  -----  ------",
+            "varname  val   resids",
+            "-------  ----  ------",
             "ic",
-              "z2     [1.]   [-3.]",
-              "z3     [1.]   [3.]",
+              "z2     [1.]  [-3.]",
+              "z3     [1.]  [3.]",
             "",
             "",
             "",
@@ -876,25 +876,25 @@ class ExplCompTestCase(unittest.TestCase):
         # Inputs no tags
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
-            ('width', {'value': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
+            ('width', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with tags
         inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with multiple tags
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
         ])
         inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
-            ('width', {'value': [1.]}),
+            ('length', {'val': [1.], 'value': [1.]}),
+            ('width', {'val': [1.], 'value': [1.]}),
         ])
 
         # Inputs with tag that does not match
@@ -904,19 +904,19 @@ class ExplCompTestCase(unittest.TestCase):
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {'val': [1.], 'value': [1.]}),
         ])
 
         # Outputs with tag that does not match
@@ -1194,7 +1194,7 @@ class TestMPIExplComp(unittest.TestCase):
             expected_text = [
                 "5 Explicit Output(s) in 'model'",
                 "",
-                "varname     value",
+                "varname     val",
                 "----------  -----",
                 "p1",
                 "  x       [1.]",
@@ -1224,7 +1224,7 @@ class TestMPIExplComp(unittest.TestCase):
             expected_text = [
                 "4 Input(s) in 'model'",
                 "",
-                "varname     value",
+                "varname     val",
                 "----------  -----",
                 "parallel",
                 "  c1",

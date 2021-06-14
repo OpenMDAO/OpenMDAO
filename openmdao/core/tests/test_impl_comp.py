@@ -119,7 +119,7 @@ class ImplCompTestCase(unittest.TestCase):
     def test_add_input_output_retval(self):
         # check basic metadata expected in return value
         expected = {
-            'value': 3,
+            'val': 3,
             'shape': (1,),
             'size': 1,
             'units': 'ft',
@@ -127,7 +127,7 @@ class ImplCompTestCase(unittest.TestCase):
             'tags': set(),
         }
         expected_discrete = {
-            'value': 3,
+            'val': 3,
             'type': int,
             'desc': '',
             'tags': set(),
@@ -195,60 +195,60 @@ class ImplicitCompTestCase(unittest.TestCase):
         # cannot list_inputs on a Group before running
         model_inputs = self.prob.model.list_inputs(desc=True, out_stream=None)
         expected = {
-            'comp1.a': {'value': [1.], 'desc': ''},
-            'comp1.b': {'value': [1.], 'desc': ''},
-            'comp1.c': {'value': [1.], 'desc': ''},
-            'comp2.a': {'value': [1.], 'desc': ''},
-            'comp2.b': {'value': [1.], 'desc': ''},
-            'comp2.c': {'value': [1.], 'desc': ''},
+            'comp1.a': {'val': [1.], 'value':  [1.], 'desc': ''},
+            'comp1.b': {'val': [1.], 'value':  [1.], 'desc': ''},
+            'comp1.c': {'val': [1.], 'value':  [1.], 'desc': ''},
+            'comp2.a': {'val': [1.], 'value':  [1.], 'desc': ''},
+            'comp2.b': {'val': [1.], 'value':  [1.], 'desc': ''},
+            'comp2.c': {'val': [1.], 'value':  [1.], 'desc': ''},
         }
         self.assertEqual(dict(model_inputs), expected)
 
         # list_inputs on a component before running is okay
         c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
         expected = {
-            'a': {'value': [1.], 'desc': ''},
-            'b': {'value': [1.], 'desc': ''},
-            'c': {'value': [1.], 'desc': ''}
+            'a': {'val': [1.], 'value': [1.], 'desc': ''},
+            'b': {'val': [1.], 'value': [1.], 'desc': ''},
+            'c': {'val': [1.], 'value': [1.], 'desc': ''}
         }
         self.assertEqual(dict(c2_inputs), expected)
 
         # listing component inputs based on tags should work
         c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', out_stream=None)
-        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
+        self.assertEqual(dict(c2_inputs), {'a': {'val': [1.], 'value': [1.]}})
 
         # includes and excludes based on relative names should work
         c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
-        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
+        self.assertEqual(dict(c2_inputs), {'a': {'val': [1.], 'value': [1.]}})
 
         c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', out_stream=None)
         expected = {
-            'a': {'value': [1.]},
-            'b': {'value': [1.]},
+            'a': {'val': [1.], 'value': [1.]},
+            'b': {'val': [1.], 'value': [1.]},
         }
         self.assertEqual(dict(c2_inputs), expected)
 
         # specifying prom_name should not cause an error
         c2_inputs = self.prob.model.comp2.list_inputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(c2_inputs), {
-            'a': {'value': [1.], 'prom_name': 'a'},
-            'b': {'value': [1.], 'prom_name': 'b'},
-            'c': {'value': [1.], 'prom_name': 'c'}
+            'a': {'val': [1.], 'value': [1.], 'prom_name': 'a'},
+            'b': {'val': [1.], 'value': [1.], 'prom_name': 'b'},
+            'c': {'val': [1.], 'value': [1.], 'prom_name': 'c'}
         })
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
         model_outputs = self.prob.model.list_outputs(out_stream=None)
         expected = {
-            'comp1.x': {'value': [0.]},
-            'comp2.x': {'value': [0.]},
+            'comp1.x': {'val': [0.], 'value': [0.]},
+            'comp2.x': {'val': [0.], 'value': [0.]},
         }
         self.assertEqual(dict(model_outputs), expected)
 
         # list_outputs on a component before running is okay
         c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
         expected = {
-            'x': {'value': np.array([0.])}
+            'x': {'val': np.array([0.]), 'value': np.array([0.])}
         }
         self.assertEqual(dict(c2_outputs), expected)
 
@@ -267,13 +267,13 @@ class ImplicitCompTestCase(unittest.TestCase):
         # there are no residuals yet, so nothing should be filtered
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
         self.assertEqual(dict(c2_outputs), {
-            'x': {'value': 0.}
+            'x': {'val': 0., 'value': 0.}
         })
 
         # specifying prom_name should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
         self.assertEqual(dict(c2_outputs), {
-            'x': {'value': 0., 'prom_name': 'x'}
+            'x': {'val': 0., 'value': 0., 'prom_name': 'x'}
         })
 
     def test_list_inputs(self):
@@ -282,17 +282,17 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
         self.assertEqual(sorted(inputs), [
-            ('comp1.a', {'value':  [1.], 'desc': ''}),
-            ('comp1.b', {'value': [-4.], 'desc': ''}),
-            ('comp1.c', {'value':  [3.], 'desc': ''}),
-            ('comp2.a', {'value':  [1.], 'desc': ''}),
-            ('comp2.b', {'value': [-4.], 'desc': ''}),
-            ('comp2.c', {'value':  [3.], 'desc': ''})
+            ('comp1.a', {'val':  [1.], 'value':  [1.], 'desc': ''}),
+            ('comp1.b', {'val': [-4.], 'value':  [-4.], 'desc': ''}),
+            ('comp1.c', {'val':  [3.], 'value':  [3.], 'desc': ''}),
+            ('comp2.a', {'val':  [1.], 'value':  [1.], 'desc': ''}),
+            ('comp2.b', {'val': [-4.], 'value':  [-4.], 'desc': ''}),
+            ('comp2.c', {'val':  [3.], 'value':  [3.], 'desc': ''})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp1.'), 3)
         self.assertEqual(text.count('comp2.'), 3)
-        self.assertEqual(text.count('value'), 1)
+        self.assertEqual(text.count('val'), 1)
 
     def test_list_inputs_with_tags(self):
         self.prob.run_model()
@@ -351,16 +351,16 @@ class ImplicitCompTestCase(unittest.TestCase):
         # No tags
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.x', {'value': [3.]}),
-            ('comp2.x', {'value': [3.]}),
+            ('comp1.x', {'val': [3.], 'value': [3.]}),
+            ('comp2.x', {'val': [3.], 'value': [3.]}),
         ])
 
         # With tag
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
                                                tags="tag_x")
         self.assertEqual(sorted(outputs), [
-            ('comp1.x', {'value': [3.]}),
-            ('comp2.x', {'value': [3.]}),
+            ('comp1.x', {'val': [3.], 'value': [3.]}),
+            ('comp2.x', {'val': [3.], 'value': [3.]}),
         ])
 
         # Wrong tag
@@ -374,12 +374,12 @@ class ImplicitCompTestCase(unittest.TestCase):
         stream = StringIO()
         states = self.prob.model.list_outputs(explicit=False, residuals=True,
                                               hierarchical=False, out_stream=stream)
-        self.assertEqual([('comp1.x', {'value': [3.], 'resids': [0.]}),
-                          ('comp2.x', {'value': [3.], 'resids': [0.]})], sorted(states))
+        self.assertEqual([('comp1.x', {'val': [3.], 'value': [3.], 'resids': [0.]}),
+                          ('comp2.x', {'val': [3.], 'value': [3.], 'resids': [0.]})], sorted(states))
         text = stream.getvalue()
         self.assertEqual(1, text.count('comp1.x'))
         self.assertEqual(1, text.count('comp2.x'))
-        self.assertEqual(1, text.count('value'))
+        self.assertEqual(1, text.count('val'))
         self.assertEqual(1, text.count('resids'))
 
     def test_list_outputs_prom_name(self):
@@ -411,7 +411,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp1.x'), 1)
         self.assertEqual(text.count('comp2.x'), 1)
         self.assertEqual(text.count('varname'), 1)
-        self.assertEqual(text.count('value'), 0)
+        self.assertEqual(text.count('val'), 0)
         self.assertEqual(text.count('resids'), 1)
 
     def test_list_residuals_with_tol(self):
@@ -449,7 +449,7 @@ class ImplicitCompTestCase(unittest.TestCase):
             "",
             "1 Implicit Output(s) in 'model'",
             "",
-            "varname  value         resids     ",
+            "varname  val           resids     ",
             "-------  ------------  -----------",
             "d2",
             "  y2",  # values removed from comparison
@@ -1340,12 +1340,12 @@ class ListFeatureTestCase(unittest.TestCase):
         # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('sub.comp1.a', {'value': [1.]}),
-            ('sub.comp1.b', {'value': [-4.]}),
-            ('sub.comp1.c', {'value': [3.]}),
-            ('sub.comp2.a', {'value': [1.]}),
-            ('sub.comp2.b', {'value': [-4.]}),
-            ('sub.comp2.c', {'value': [3.]})
+            ('sub.comp1.a', {'val': [1.], 'value': [1.]}),
+            ('sub.comp1.b', {'val': [-4.], 'value': [-4.]}),
+            ('sub.comp1.c', {'val': [3.], 'value': [3.]}),
+            ('sub.comp2.a', {'val': [1.], 'value': [1.]}),
+            ('sub.comp2.b', {'val': [-4.], 'value': [-4.]}),
+            ('sub.comp2.c', {'val': [3.], 'value': [3.]})
         ])
 
     def test_for_docs_list_no_values(self):
@@ -1429,16 +1429,16 @@ class ListFeatureTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(explicit=False, out_stream=None)
         text = stream.getvalue()
         self.assertEqual(sorted(outputs), [
-            ('sub.comp2.x', {'value': [3.]}),
-            ('sub.comp3.x', {'value': [3.]})
+            ('sub.comp2.x', {'val': [3.], 'value': [3.]}),
+            ('sub.comp3.x', {'val': [3.], 'value': [3.]})
         ])
         # list explicit outputs
         stream = StringIO()
         outputs = prob.model.list_outputs(implicit=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('comp1.a', {'value': [1.]}),
-            ('comp1.b', {'value': [-4.]}),
-            ('comp1.c', {'value': [3.]}),
+            ('comp1.a', {'val': [1.], 'value': [1.]}),
+            ('comp1.b', {'val': [-4.], 'value': [-4.]}),
+            ('comp1.c', {'val': [3.], 'value': [3.]}),
         ])
 
     def test_list_residuals_with_tol(self):

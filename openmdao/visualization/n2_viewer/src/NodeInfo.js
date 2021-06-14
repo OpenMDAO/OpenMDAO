@@ -79,7 +79,7 @@ class InfoPropYesNo extends InfoPropDefault {
 }
 
 /**
- * Output a message if the value is True. 
+ * Output a message if the value is True.
  * @typedef InfoPropMessage
  */
 class InfoPropMessage extends InfoPropYesNo {
@@ -89,8 +89,8 @@ class InfoPropMessage extends InfoPropYesNo {
     }
 
     /** Return message when value is True */
-    output(boolVal) { 
-        return boolVal ? this.message : ''; 
+    output(boolVal) {
+        return boolVal ? this.message : '';
     }
 }
 
@@ -435,7 +435,7 @@ class NodeInfo extends N2Window {
             new InfoPropMessage('initial_value', '** Note **',
                                 'Non-local values are not available under MPI, showing initial value.'),
             new InfoPropYesNo('distributed', 'Distributed'),
-            new InfoPropArray('value', 'Value', this.values),
+            new InfoPropArray('val', 'Val', this.values),
 
             new InfoPropDefault('subsystem_type', 'Subsystem Type', true),
             new InfoPropDefault('component_type', 'Component Type', true),
@@ -490,7 +490,7 @@ class NodeInfo extends N2Window {
     /** Toggle the active mode */
     toggle() {
         if (this.active) return this.deactivate();
-        
+
         return this.activate();
     }
 
@@ -570,7 +570,7 @@ class NodeInfo extends N2Window {
 class PersistentNodeInfo extends N2WindowDraggable {
     constructor(nodeInfo) {
         super('persistentNodeInfo-' + uuidv4(), '#' + nodeInfo.window.attr('id'));
-
+        console.log(nodeInfo.window.attr('id'))
         // Avoid just copying the reference because nodeInfo.values will be wiped:
         this.values = JSON.parse(JSON.stringify(nodeInfo.values));
         this.ui = nodeInfo.ui;

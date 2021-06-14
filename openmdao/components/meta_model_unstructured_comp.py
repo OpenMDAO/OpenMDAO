@@ -137,9 +137,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             if metadata['shape'][0] != vec_size:
                 raise RuntimeError(f"{self.msginfo}: First dimension of input '{name}' "
                                    f"must be {vec_size}")
-            input_size = metadata['value'][0].size
+            input_size = metadata['val'][0].size
         else:
-            input_size = metadata['value'].size
+            input_size = metadata['val'].size
 
         if self._static_mode:
             surrogate_input_names = self._static_surrogate_input_names
@@ -267,7 +267,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     self._declare_partials(of=of, wrt=wrt, dct=dct)
         else:
             dct = {
-                'value': None,
+                'val': None,
                 'dependent': True,
             }
             # Dense specification of partials for non-vectorized models.

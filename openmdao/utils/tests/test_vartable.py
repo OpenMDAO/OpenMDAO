@@ -73,23 +73,23 @@ class TestNotebookListIO(unittest.TestCase):
         self.prob = prob
 
         self.expected_inputs = [
-            ('g1.d1.x',  {'value': [0.80000]}),
-            ('g1.d1.y2', {'value': [0.80000]}),
-            ('g1.d1.z',  {'value': [0., 0.]}),
-            ('g1.d2.y1', {'value': [0.64000]}),
-            ('g1.d2.z',  {'value': [0., 0.]}),
-            ('g2.d1.x',  {'value': [0.80000]}),
-            ('g2.d1.y2', {'value': [0.80000]}),
-            ('g2.d1.z',  {'value': [0., 0.]}),
-            ('g2.d2.y1', {'value': [0.64000]}),
-            ('g2.d2.z',  {'value': [0., 0.]})
+            ('g1.d1.x',  {'val': [0.80000]}),
+            ('g1.d1.y2', {'val': [0.80000]}),
+            ('g1.d1.z',  {'val': [0., 0.]}),
+            ('g1.d2.y1', {'val': [0.64000]}),
+            ('g1.d2.z',  {'val': [0., 0.]}),
+            ('g2.d1.x',  {'val': [0.80000]}),
+            ('g2.d1.y2', {'val': [0.80000]}),
+            ('g2.d1.z',  {'val': [0., 0.]}),
+            ('g2.d2.y1', {'val': [0.64000]}),
+            ('g2.d2.z',  {'val': [0., 0.]})
         ]
 
         self.expected_outputs = [
-            ('g1.d1.y1', {'value': [0.64000]}),
-            ('g1.d2.y2', {'value': [0.80000]}),
-            ('g2.d1.y1', {'value': [0.64000]}),
-            ('g2.d2.y2', {'value': [0.80000]})
+            ('g1.d1.y1', {'val': [0.64000]}),
+            ('g1.d2.y2', {'val': [0.80000]}),
+            ('g2.d1.y1', {'val': [0.64000]}),
+            ('g2.d2.y2', {'val': [0.80000]})
         ]
 
     def test_invalid_stream(self):
@@ -115,7 +115,7 @@ class TestNotebookListIO(unittest.TestCase):
             name, meta = tup
             expected_name, expected_meta = self.expected_inputs[i]
             self.assertEqual(name, expected_name)
-            assert_near_equal(meta['value'], expected_meta['value'], 1e-5)
+            assert_near_equal(meta['val'], expected_meta['val'], 1e-5)
 
         # no results should have been written to stdout
         captured_output = capture_stdout.getvalue()
@@ -127,7 +127,7 @@ class TestNotebookListIO(unittest.TestCase):
         self.assertTrue(captured_HTML.startswith('<table>'))
         self.assertTrue(captured_HTML.endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_inputs))
-        for column in ['varname', 'value', 'units', 'shape', 'prom_name']:
+        for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
         for name, meta in self.expected_inputs:
             self.assertTrue(name in captured_HTML)
@@ -150,7 +150,7 @@ class TestNotebookListIO(unittest.TestCase):
             name, meta = tup
             expected_name, expected_meta = self.expected_outputs[i]
             self.assertEqual(name, expected_name)
-            assert_near_equal(meta['value'], expected_meta['value'], 1e-5)
+            assert_near_equal(meta['val'], expected_meta['val'], 1e-5)
 
         # no results should have been written to stdout
         captured_output = capture_stdout.getvalue()
@@ -162,7 +162,7 @@ class TestNotebookListIO(unittest.TestCase):
         self.assertTrue(captured_HTML.startswith('<table>'))
         self.assertTrue(captured_HTML.endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_outputs))
-        for column in ['varname', 'value', 'units', 'shape', 'prom_name']:
+        for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
         for name, meta in self.expected_outputs:
             self.assertTrue(name in captured_HTML)
@@ -186,7 +186,7 @@ class TestNotebookListIO(unittest.TestCase):
             name, meta = tup
             expected_name, expected_meta = self.expected_inputs[i]
             self.assertEqual(name, expected_name)
-            assert_near_equal(meta['value'], expected_meta['value'], 1e-5)
+            assert_near_equal(meta['val'], expected_meta['val'], 1e-5)
 
         # no results should have been written to stdout
         captured_output = capture_stdout.getvalue()
@@ -198,7 +198,7 @@ class TestNotebookListIO(unittest.TestCase):
         self.assertTrue(captured_HTML.startswith('<table>'))
         self.assertTrue(captured_HTML.endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_inputs))
-        for column in ['varname', 'value', 'units', 'shape', 'prom_name']:
+        for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
         for name, meta in self.expected_inputs:
             self.assertTrue(name in captured_HTML)
@@ -223,7 +223,7 @@ class TestNotebookListIO(unittest.TestCase):
             name, meta = tup
             expected_name, expected_meta = self.expected_outputs[i]
             self.assertEqual(name, expected_name)
-            assert_near_equal(meta['value'], expected_meta['value'], 1e-5)
+            assert_near_equal(meta['val'], expected_meta['val'], 1e-5)
 
         # no results should have been written to stdout
         captured_output = capture_stdout.getvalue()
@@ -235,7 +235,7 @@ class TestNotebookListIO(unittest.TestCase):
         self.assertTrue(captured_HTML.startswith('<table>'))
         self.assertTrue(captured_HTML.endswith('</table>'))
         self.assertEqual(captured_HTML.count('<tr><td'), len(self.expected_outputs))
-        for column in ['varname', 'value', 'units', 'shape', 'prom_name']:
+        for column in ['varname', 'val', 'units', 'shape', 'prom_name']:
             self.assertTrue(column in captured_HTML)
         for name, meta in self.expected_outputs:
             self.assertTrue(name in captured_HTML)

@@ -56,7 +56,7 @@
                     "shape": "(2,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         5.0,
                         2.0
                     ]
@@ -70,7 +70,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 }
@@ -161,7 +161,7 @@
                                     "shape": "(1,)",
                                     "distributed": false,
                                     "is_discrete": false,
-                                    "value": [
+                                    "val": [
                                         1.0
                                     ]
                                 },
@@ -174,7 +174,7 @@
                                     "shape": "(1,)",
                                     "distributed": false,
                                     "is_discrete": false,
-                                    "value": [
+                                    "val": [
                                         1.0
                                     ]
                                 }
@@ -211,7 +211,7 @@
                             "shape": "(2,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 5.0,
                                 2.0
                             ]
@@ -224,7 +224,7 @@
                             "shape": "(1,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 1.0
                             ]
                         },
@@ -236,7 +236,7 @@
                             "shape": "(1,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 1.0
                             ]
                         },
@@ -249,7 +249,7 @@
                             "shape": "(1,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 1.0
                             ]
                         }
@@ -280,7 +280,7 @@
                             "shape": "(2,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 5.0,
                                 2.0
                             ]
@@ -293,7 +293,7 @@
                             "shape": "(1,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 1.0
                             ]
                         },
@@ -306,7 +306,7 @@
                             "shape": "(1,)",
                             "distributed": false,
                             "is_discrete": false,
-                            "value": [
+                            "val": [
                                 1.0
                             ]
                         }
@@ -344,7 +344,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 },
@@ -356,7 +356,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 },
@@ -368,7 +368,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 },
@@ -380,7 +380,7 @@
                     "shape": "(2,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         5.0,
                         2.0
                     ]
@@ -394,7 +394,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 }
@@ -431,7 +431,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 },
@@ -444,7 +444,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 }
@@ -481,7 +481,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 },
@@ -494,7 +494,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.0
                     ]
                 }

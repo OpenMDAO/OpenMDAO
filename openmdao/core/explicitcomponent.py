@@ -121,7 +121,7 @@ class ExplicitComponent(Component):
                     'rows': arange,
                     'cols': arange,
                     'shape': (size, size),
-                    'value': np.full(size, -1.),
+                    'val': np.full(size, -1.),
                     'dependent': True,
                 }
 

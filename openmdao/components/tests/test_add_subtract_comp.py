@@ -414,8 +414,8 @@ class TestAddSubtractCompTags(unittest.TestCase):
         self.assertEqual(len(foo_outputs), 1)
         self.assertEqual(len(bar_outputs), 1)
 
-        assert_near_equal(foo_outputs[0][1]['value'], a + b)
-        assert_near_equal(bar_outputs[0][1]['value'], a + a)
+        assert_near_equal(foo_outputs[0][1]['val'], a + b)
+        assert_near_equal(bar_outputs[0][1]['val'], a + a)
 
 
 class TestFeature(unittest.TestCase):

@@ -207,8 +207,8 @@ class SellarMDAWithUnits(om.Group):
         cycle.nonlinear_solver = om.NonlinearBlockGS()
 
         self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                  z={'value': np.array([0.0, 0.0]), 'units': 'degC'},
-                                                  x={'value': 0.0, 'units': 'degC'},
+                                                  z={'val': np.array([0.0, 0.0]), 'units': 'degC'},
+                                                  x={'val': 0.0, 'units': 'degC'},
                                                   y1={'units': 'degC'},
                                                   y2={'units': 'degC'}),
                            promotes=['x', 'z', 'y1', 'y2', 'obj'])
