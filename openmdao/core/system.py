@@ -3736,7 +3736,7 @@ class System(object):
 
         outputs = self.get_io_metadata(('output',), keys, includes, excludes, tags,
                                        get_remote=True,
-                                       rank=None if all_procs or values or residuals else 0,
+                                       rank=None if all_procs or val or residuals else 0,
                                        return_rel_names=False)
 
         # filter auto_ivcs if requested
