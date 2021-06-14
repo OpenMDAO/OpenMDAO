@@ -3590,7 +3590,7 @@ class System(object):
 
         inputs = self.get_io_metadata(('input',), keys, includes, excludes, tags,
                                       get_remote=True,
-                                      rank=None if all_procs or values else 0,
+                                      rank=None if all_procs or val else 0,
                                       return_rel_names=False)
 
         if inputs:
