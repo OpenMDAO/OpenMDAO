@@ -582,6 +582,7 @@ class Component(System):
 
         metadata = {
             'val': val,
+            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
@@ -648,6 +649,7 @@ class Component(System):
 
         metadata = {
             'val': val,
+            'value': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
@@ -822,6 +824,7 @@ class Component(System):
 
         metadata = {
             'val': val,
+            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
@@ -890,6 +893,7 @@ class Component(System):
 
         metadata = {
             'val': val,
+            'value': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags)
