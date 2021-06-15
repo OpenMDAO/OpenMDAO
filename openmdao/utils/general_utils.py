@@ -177,7 +177,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
         indshape = shape2tuple(indices.shape)
         if shape is not None and indshape != shape:
             raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
-                                (indshape, shape, name))
+                             (indshape, shape, name))
         if shape is None:
             shape = indshape
 
@@ -196,11 +196,6 @@ def ensure_compatible(name, value, shape=None, indices=None):
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %
                                  (name, shape, value.shape))
-
-    # if indices is not None and shape != ind_shape[:len(shape)]:
-    #     raise ValueError("Shape of indices does not match shape for '%s': "
-    #                      "Expected %s but got %s." %
-    #                      (name, shape, ind_shape[:len(shape)]))
 
     return value, shape
 
@@ -1073,15 +1068,6 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return parent_src_inds
     ndims = my_src_inds.src_ndim
 
-    #if isinstance(my_src_inds, tuple):
-        #ndims = len(my_src_inds)
-    #elif isinstance(my_src_inds, np.ndarray):
-        #ndims = my_src_inds.ndim
-    #else:  # slice
-        #ndims = 1
-    #if _is_slicer_op(parent_src_inds):
-        #parent_src_inds = _slice_indices(parent_src_inds, np.prod(parent_src_shape),
-                                         #parent_src_shape)
     if ndims == 1:
         return parent_src_inds.shaped_array()[my_src_inds()]
     else:

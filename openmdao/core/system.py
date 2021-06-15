@@ -1494,17 +1494,6 @@ class System(object):
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
                     mymeta['global_shape'] = self._get_full_dist_shape(abs_name)
-                    # high_dims = local_shape[1:]
-                    # if high_dims:
-                    #     high_size = np.prod(high_dims)
-                    #     dim1 = global_size // high_size
-                    #     if global_size % high_size != 0:
-                    #         raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                    #                            "with local shape %s" % (self.msginfo, abs_name,
-                    #                                                     global_size, local_shape))
-                    #     mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                    # else:
-                    #     mymeta['global_shape'] = (global_size,)
 
                 else:
                     # not distributed, just use local shape and size
@@ -4579,11 +4568,6 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            # if 'src_slice' in vmeta:
-            #     smeta = self._var_allprocs_abs2meta['output'][src]
-            #     src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
-            #                                  smeta['shape'])
-            # else:
             src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
@@ -4600,13 +4584,8 @@ class System(object):
                     src_indices = None
                     vshape = None
                     has_src_indices = False
-                # is_slice = _is_slicer_op(src_indices)
             else:
-                # is_slice = _is_slicer_op(inds)
-                shp = inds.shape  # shape_from_idx(src_shape, inds, flat)
-                #if not flat and not _is_slicer_op(inds):
-                    #inds = _flatten_src_indices(inds, shp,
-                                                #src_shape, np.product(src_shape))
+                shp = inds.shape
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
@@ -4619,9 +4598,7 @@ class System(object):
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
         if name not in scope_sys._var_prom2inds:
-            #is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
-            src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
@@ -4648,9 +4625,6 @@ class System(object):
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                #if is_slice:
-                    #val.shape = src_shape
-                    #val = val[tuple(src_indices)].ravel()
                 if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[vec_name][src]
                     # sizes for src var in each proc

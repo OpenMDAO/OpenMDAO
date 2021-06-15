@@ -554,7 +554,8 @@ class Problem(object):
                                 if indices is _full_slice:
                                     model._outputs.set_var(src, value, src_indices, flat)
                                 else:
-                                    model._outputs.set_var(src, value, src_indices.apply(indices), True)
+                                    model._outputs.set_var(src, value, src_indices.apply(indices),
+                                                           True)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"

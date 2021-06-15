@@ -20,8 +20,6 @@ def array2slice(arr):
     ----------
     arr : ndarray
         The index array to be represented as a slice.
-    flat : bool
-        If True, indices are into a flat source.
 
     Returns
     -------
@@ -105,9 +103,35 @@ class Indexer(object):
         return f"{self.__class__.__name__}: {str(self)}"
 
     def __eq__(self, other):
+        """
+        Return True if this indexer is equivalent to other.
+
+        Parameters
+        ----------
+        other : Indexer
+            The other Indexer.
+
+        Returns
+        -------
+        bool
+            True if Indexers are equivalent.
+        """
         return np.all(self.as_array() == other.as_array())
 
     def copy(self, *args):
+        """
+        Copy this Indexer.
+
+        Parameters
+        ----------
+        *args : position args
+            Args that are specific to initialization of a derived Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
         inst = self.__class__(*args)
         inst.__dict__.update(self.__dict__)
         return inst
@@ -126,6 +150,14 @@ class Indexer(object):
 
     @property
     def src_ndim(self):
+        """
+        Return the number of source dimensions.
+
+        Returns
+        -------
+        int
+            The number of dimensions expected in the source array.
+        """
         return 1
 
     def _check_ind_type(self, ind, types):
@@ -222,6 +254,8 @@ class Indexer(object):
         ----------
         shape : tuple or int
             The shape of the 'source' array.
+        dist_shape : tuple or None
+            If not None, the full distributed shape of the source.
 
         Returns
         -------
@@ -306,6 +340,14 @@ class ShapedIntIndexer(Indexer):
         return f"{self._idx}"
 
     def copy(self):
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
         return super().copy(self._idx)
 
     @property
@@ -424,7 +466,7 @@ class ShapedSliceIndexer(Indexer):
         The wrapped slice object.
     """
 
-    def __init__(self, slc, orig_shape=None):
+    def __init__(self, slc):
         """
         Initialize attributes.
 
@@ -460,6 +502,14 @@ class ShapedSliceIndexer(Indexer):
         return f"{self._slice}"
 
     def copy(self):
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
         return super().copy(self._slice)
 
     def as_array(self, copy=False, flat=True):
@@ -645,10 +695,6 @@ class ShapedArrayIndexer(Indexer):
             raise TypeError(f"Can't create an index array using indices of "
                             f"non-integral type '{ndarr.dtype.type.__name__}'.")
 
-        #if len(ndarr.shape) > 2:
-            #raise TypeError("Can't create an index array with ndim > 2, but given array has "
-                            #f"shape {arr.shape}.")
-
         self._orig_shape = ndarr.shape if orig_shape is None else orig_shape
 
         self._arr = ndarr.flat[:]
@@ -678,6 +724,14 @@ class ShapedArrayIndexer(Indexer):
         return f"{self()}"
 
     def copy(self):
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
         return super().copy(self._arr)
 
     @property
@@ -805,6 +859,8 @@ class ShapedMultiIndexer(Indexer):
     ----------
     _tup : tuple
         The wrapped tuple of indices/slices.
+    _orig_shape : tuple
+        Original shape.
     _idx_list : list
         List of Indexers.
     """
@@ -818,8 +874,8 @@ class ShapedMultiIndexer(Indexer):
         tup : tuple
             Tuple of indices/slices.
         orig_shape : tuple or None
-            If this slice was created from an array, this is it's shape. This shape will
-            be used later if this slice is converted to an array.
+            If this indexer was created from an array, this is it's shape. This shape will
+            be used later if converted to an array.
         flat_src : bool
             True if our indices should be treated as indices into a flat source array.
         """
@@ -855,6 +911,14 @@ class ShapedMultiIndexer(Indexer):
         return f"{self._tup}".strip('\n')
 
     def copy(self):
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
         return super().copy(self._tup)
 
     @property
@@ -868,7 +932,7 @@ class ShapedMultiIndexer(Indexer):
             The shape of the indices.
         """
         lens = []
-        seen_arr= False
+        seen_arr = False
         for i in self._idx_list:
             if isinstance(i, ShapedSliceIndexer):
                 lens.append(len(i))
@@ -882,6 +946,14 @@ class ShapedMultiIndexer(Indexer):
 
     @property
     def src_ndim(self):
+        """
+        Return the number of source dimensions.
+
+        Returns
+        -------
+        int
+            The number of dimensions expected in the source array.
+        """
         return len(self._idx_list)
 
     def as_array(self, copy=False, flat=True):
@@ -939,6 +1011,8 @@ class ShapedMultiIndexer(Indexer):
         ----------
         shape : tuple or int
             The shape of the 'source' array.
+        dist_shape : tuple or None
+            If not None, the full distributed shape of the source.
 
         Returns
         -------
@@ -1062,18 +1136,33 @@ class EllipsisIndexer(Indexer):
         return f"{self._tup}"
 
     def copy(self):
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        EllipsisIndexer
+            A copy of this Indexer.
+        """
         return super().copy(self._tup)
 
     @property
     def src_ndim(self):
+        """
+        Return the number of source dimensions.
+
+        Returns
+        -------
+        int
+            The number of dimensions expected in the source array.
+        """
         if self._flat_src:
             return 1
 
         if self._shaped_inst is None:
             s = self.shaped_instance()
             if s is None:
-                raise ValueError(f"Can't get ndim of {self} because it has "
-                                "no source shape.")
+                raise ValueError(f"Can't get ndim of {self} because it has no source shape.")
 
         return self._shaped_inst.src_ndim
 
@@ -1170,6 +1259,15 @@ class EllipsisIndexer(Indexer):
 class ListOfTuplesArrayIndexer(Indexer):
     """
     Multi indexer using our custom 'list of tuples' format.
+
+    Attributes
+    ----------
+    _arr : ndarray
+        Multidimensional index array.
+    _flat_src : bool
+        If True, index is into a flat source array.
+    _npy_inds : tuple
+        Tuple containing the equivalent numpy compatible index arrays.
     """
 
     def __init__(self, tup):
@@ -1180,12 +1278,10 @@ class ListOfTuplesArrayIndexer(Indexer):
         ----------
         tup : tuple
             Tuple of indices/slices.
-        flat_src : bool
-            True if our indices should be treated as indices into a flat source array.
         """
         super().__init__()
         tup = np.atleast_1d(tup)
-        self._tup = tup
+        self._arr = tup
         self._flat_src = False
 
         orig_shape = tup.shape[:-1]
@@ -1203,7 +1299,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._tup}".strip('\n')
+        return f"{self._arr}".strip('\n')
 
     def __call__(self):
         """
@@ -1218,7 +1314,15 @@ class ListOfTuplesArrayIndexer(Indexer):
 
     @property
     def src_ndim(self):
-        return self._tup.shape[-1]
+        """
+        Return the number of source dimensions.
+
+        Returns
+        -------
+        int
+            The number of dimensions expected in the source array.
+        """
+        return self._arr.shape[-1]
 
     @property
     def shape(self):
@@ -1230,10 +1334,18 @@ class ListOfTuplesArrayIndexer(Indexer):
         tuple
             The shape of the indices.
         """
-        return self._tup.shape[:-1]
+        return self._arr.shape[:-1]
 
     def copy(self):
-        return super().copy(self._tup)
+        """
+        Copy this Indexer.
+
+        Returns
+        -------
+        Indexer
+            A copy of this Indexer.
+        """
+        return super().copy(self._arr)
 
     def flat(self, copy=False):
         """
@@ -1259,6 +1371,8 @@ class ListOfTuplesArrayIndexer(Indexer):
         ----------
         shape : tuple or int
             The shape of the 'source' array.
+        dist_shape : tuple or None
+            If not None, the full distributed shape of the source.
 
         Returns
         -------
@@ -1353,16 +1467,14 @@ class IndexMaker(object):
             Source shape if known.
         flat : bool
             If True, indices are into a flat source.
+        new_style : bool
+            If True, indexer follows behavior of numpy indexing.
 
         Returns
         -------
         Indexer
             The Indexer instance we created based on the args.
         """
-        #if isinstance(idx, Indexer):
-            #if src_shape is None:
-                #src_shape = idx._src_shape
-            #return self(idx(), src_shape, flat)
         if idx is ...:
             idxer = EllipsisIndexer((idx,), flat_src=flat)
         elif isinstance(idx, int):
