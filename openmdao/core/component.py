@@ -1588,17 +1588,6 @@ class Component(System):
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
                                                 meta['src_indices'], src_shape)
-                # elif _is_slicer_op(src_inds):
-                #     meta['src_slice'] = src_inds
-                #     try:
-                #         src_inds = _slice_indices(src_inds, np.prod(parent_src_shape),
-                #                                   parent_src_shape)
-                #     except IndexError as err:
-                #         raise IndexError(f"{self.msginfo}:\nError '{err}'\n  in "
-                #                          f"resolving source indices in connection "
-                #                          f"between source='{oldprom}' "
-                #                          f"and target='{tgt}'\n  with src_indices='{src_inds}'")
-                #     meta['flat_src_indices'] = True
                 elif src_inds.src_ndim == 1:
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:

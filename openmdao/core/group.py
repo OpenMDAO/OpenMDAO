@@ -3214,7 +3214,7 @@ class Group(System):
                 else:
                     try:
                         if meta['flat_src_indices']:
-                            val.ravel()[meta['src_indices']()] = value
+                            val.ravel()[meta['src_indices'].flat()] = value.flat
                         else:
                             val[meta['src_indices']()] = value
                     except ValueError as err:

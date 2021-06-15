@@ -46,6 +46,12 @@ def array2slice(arr):
             return slice(0, 0)
 
 
+def _truncate(s):
+    if len(s) > 40:
+        return s[:20] + ' ... ' + s[-20:]
+    return s
+
+
 class Indexer(object):
     """
     Abstract indexing class.
@@ -721,7 +727,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self()}"
+        return _truncate(f"{self()}".replace('\n', ' '))
 
     def copy(self):
         """
@@ -1299,7 +1305,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._arr}".strip('\n')
+        return _truncate(f"{self._arr}".replace('\n', ' '))
 
     def __call__(self):
         """
