@@ -52,22 +52,28 @@ def _valid_var_name(name):
             return False
     return name[0] not in _whitespace and name[-1] not in _whitespace
 
-class MetadataDict(dict):
+
+class _MetadataDict(dict):
+    """
+    A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
+    """
+
     def __init__(self, *args):
-      dict.__init__(self, args)
+        dict.__init__(self, args)
 
     def __getitem__(self, key):
         if key == 'value':
-          warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
-          key = 'val'
+            warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
         val = dict.__getitem__(self, key)
         return val
 
     def __setitem__(self, key, val):
         if key == 'value':
-          warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
-          key = 'val'
+            warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
         dict.__setitem__(self, key, val)
+
 
 class Component(System):
     """
@@ -596,9 +602,9 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = MetadataDict()
+        metadata = _MetadataDict()
 
-        metadata_dict = {
+        metadata.update({
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -612,12 +618,7 @@ class Component(System):
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
-        }
-
-        for key, val in metadata_dict.items():
-            metadata[key] = val
-
-        # metadata = metadata_dict
+        })
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -669,12 +670,14 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
 
-        metadata = {
+        metadata = _MetadataDict()
+
+        metadata.update({
             'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
-        }
+        })
 
         if metadata['type'] == np.ndarray:
             metadata.update({'shape': val.shape})
@@ -843,7 +846,9 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = {
+        metadata = _MetadataDict()
+
+        metadata.update({
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
@@ -859,7 +864,7 @@ class Component(System):
             'upper': upper,
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape
-        }
+        })
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -911,12 +916,14 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
 
-        metadata = {
+        metadata = _MetadataDict()
+
+        metadata.update({
             'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags)
-        }
+        })
 
         if metadata['type'] == np.ndarray:
             metadata.update({'shape': val.shape})

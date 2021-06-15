@@ -294,6 +294,17 @@ class TestExplicitComponent(unittest.TestCase):
         # pretend we reconfigured
         prob.setup()
 
+    def test_value_getitem_deprecation(self):
+        comp = TestExplCompSimple()
+        prob = Problem(comp).setup()
+
+        # check optional metadata (desc)
+        msg = ("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+
+        prob.setup()
+        with assert_warning(OMDeprecationWarning, msg):
+            comp._var_rel2meta['length']['value']
+
 
 class TestImplicitComponent(unittest.TestCase):
 
