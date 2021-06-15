@@ -270,9 +270,9 @@ class TestFeature(unittest.TestCase):
 
         p.model.add_subsystem(name='longitude_comp',
                               subsys=om.ExecComp('long = atan(y/x)',
-                                                 x={'value': np.ones(m), 'units': 'km'},
-                                                 y={'value': np.ones(m), 'units': 'km'},
-                                                 long={'value': np.ones(m), 'units': 'rad'}))
+                                                 x={'val': np.ones(m), 'units': 'km'},
+                                                 y={'val': np.ones(m), 'units': 'km'},
+                                                 long={'val': np.ones(m), 'units': 'rad'}))
 
         p.model.connect('demux.pos_ecef_0', 'longitude_comp.x')
         p.model.connect('demux.pos_ecef_1', 'longitude_comp.y')

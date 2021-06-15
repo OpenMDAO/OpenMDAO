@@ -192,9 +192,9 @@ def _check_partial_matrix(system, jac, expected, method):
             if key in jac:
                 meta = jac[key]
                 if meta['rows'] is not None:
-                    cblocks.append(coo_matrix((meta['value'], (meta['rows'], meta['cols'])), shape=meta['shape']).toarray())
+                    cblocks.append(coo_matrix((meta['val'], (meta['rows'], meta['cols'])), shape=meta['shape']).toarray())
                 elif meta['dependent']:
-                    cblocks.append(meta['value'])
+                    cblocks.append(meta['val'])
                 else:
                     cblocks.append(np.zeros(meta['shape']))
             else: # sparsity was all zeros so we declared this subjac as not dependent
@@ -232,9 +232,9 @@ def _check_semitotal_matrix(system, jac, expected, method):
                 rows = jac[key]['rows']
                 if rows is not None:
                     cols = jac[key]['cols']
-                    val = coo_matrix((jac[key]['value'], (rows, cols)), shape=jac[key]['shape']).toarray()
+                    val = coo_matrix((jac[key]['val'], (rows, cols)), shape=jac[key]['shape']).toarray()
                 else:
-                    val = jac[key]['value']
+                    val = jac[key]['val']
                 cblocks.append(val)
         if cblocks:
             blocks.append(np.hstack(cblocks))
@@ -535,7 +535,7 @@ class TestColoringSemitotals(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
         sub.declare_coloring('*', method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit, 
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
                                                             sparse_partials=sparse_partials))
 
         for conn in conns:

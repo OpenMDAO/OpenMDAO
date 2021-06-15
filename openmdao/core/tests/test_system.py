@@ -31,7 +31,7 @@ class TestSystem(unittest.TestCase):
                          "<class Group>: Cannot get vectors because setup has not yet been called.")
 
         with self.assertRaises(Exception) as cm:
-            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('vec')
+            d_inputs, d_outputs, d_residuals = model.get_linear_vectors()
         self.assertEqual(str(cm.exception),
                          "<class Group>: Cannot get vectors because setup has not yet been called.")
 
@@ -76,15 +76,9 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(residuals['G1.G2.C1.b'], 99.0)
 
         # Test linear
-        d_inputs, d_outputs, d_residuals = model.get_linear_vectors('linear')
+        d_inputs, d_outputs, d_residuals = model.get_linear_vectors()
         d_outputs['G1.G2.C1.b'] = 10.
         self.assertEqual(d_outputs['G1.G2.C1.b'], 10.)
-
-        # Test linear with invalid vec_name
-        with self.assertRaises(Exception) as cm:
-            d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
-        self.assertEqual(str(cm.exception),
-                         "<model> <class Group>: There is no linear vector named %s" % 'bad_name')
 
     def test_set_checks_shape(self):
         indep = IndepVarComp()

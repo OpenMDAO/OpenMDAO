@@ -499,7 +499,7 @@ class TestMPIColoringBug(unittest.TestCase):
         p.setup(mode='rev')
 
         # Set Initial Guesses
-        p.set_val('design_parameters:c', value=1.5)
+        p.set_val('design_parameters:c', val=1.5)
 
         of = ['phases.burn2.indep_states.states:deltav', 'phases.burn1.collocation_constraint.defects:deltav', 'phases.burn2.collocation_constraint.defects:deltav', ]
         wrt = ['phases.burn1.indep_states.states:deltav', 'phases.burn2.indep_states.states:deltav']

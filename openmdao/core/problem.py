@@ -119,6 +119,8 @@ class Problem(object):
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
+    _warned : bool
+        Bool to check if `value` deprecation warning has occured yet
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -141,6 +143,7 @@ class Problem(object):
         """
         self.cite = CITATION
         self._name = name
+        self._warned = False
 
         if comm is None:
             try:
@@ -310,9 +313,9 @@ class Problem(object):
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['value']
+                    val = meta['output'][conns[abs_name]]['val']
                 else:
-                    val = meta[io][abs_name]['value']
+                    val = meta[io][abs_name]['val']
 
             if get_remote and abs_name in vars_to_gather:
                 owner = vars_to_gather[abs_name]
@@ -408,7 +411,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, value, units=None, indices=None):
+    def set_val(self, name, val=None, units=None, indices=None, **kwargs):
         """
         Set an output/input variable.
 
@@ -418,13 +421,28 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list
-            Value to set this variable to.
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
+        val : float or ndarray or list or None
+            Value to set this variable to.
+        **kwargs : dict
+            Additional keyword argument for deprecated `value` arg.
         """
+        if 'value' not in kwargs:
+            value = None
+        elif 'value' in kwargs:
+            value = kwargs['value']
+
+        if value is not None and not self._warned:
+            self._warned = True
+            warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
+                             "in the future.")
+        elif val is not None:
+            self._warned = True
+            value = val
+
         model = self.model
         if self._metadata is not None:
             conns = model._conn_global_abs_in2out
@@ -540,8 +558,8 @@ class Problem(object):
                                 if flat:
                                     src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
-                                    ssizes = model._var_sizes['nonlinear']['output']
-                                    sidx = model._var_allprocs_abs2idx['nonlinear'][src]
+                                    ssizes = model._var_sizes['output']
+                                    sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
                                     start = np.sum(ssizes[:myrank, sidx])
                                     end = start + ssize
@@ -730,7 +748,7 @@ class Problem(object):
         data = rvec.asarray()
         data *= -1.
 
-        self.model.run_solve_linear(['linear'], mode)
+        self.model.run_solve_linear(mode)
 
         if mode == 'fwd':
             return {n: lvec[n].copy() for n in lnames}
@@ -896,7 +914,7 @@ class Problem(object):
             'distributed_vector_class': distributed_vector_class,
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
-            'force_alloc_complex': force_alloc_complex,
+            'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
             'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
@@ -909,9 +927,9 @@ class Problem(object):
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
             'vec_names': None,  # names of all nonlinear and linear vectors
-            'lin_vec_names': None,  # names of linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
+            'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
         }
         model._setup(model_comm, mode, self._metadata)
 
@@ -1200,7 +1218,7 @@ class Problem(object):
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
-                                comp._apply_linear(None, ['linear'], _contains_all, mode)
+                                comp._apply_linear(None, _contains_all, mode)
 
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
@@ -1257,7 +1275,7 @@ class Problem(object):
 
                             # No need to calculate partials; they are already stored
                             try:
-                                deriv_value = subjacs[abs_key]['value']
+                                deriv_value = subjacs[abs_key]['val']
                                 rows = subjacs[abs_key]['rows']
                             except KeyError:
                                 deriv_value = rows = None
@@ -1694,21 +1712,21 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'vectorize_derivs', 'cache_linear_solution', 'units']
+            'cache_linear_solution', 'units']
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
-            'linear', 'parallel_deriv_color', 'vectorize_derivs',
+            'linear', 'parallel_deriv_color',
             'cache_linear_solution', 'units']
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
-            'parallel_deriv_color', 'vectorize_derivs', 'cache_linear_solution']
+            'parallel_deriv_color', 'cache_linear_solution']
 
         """
-        default_col_names = ['name', 'value', 'size']
+        default_col_names = ['name', 'val', 'size']
 
         # Design vars
         desvars = self.driver._designvars
@@ -1785,7 +1803,7 @@ class Problem(object):
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = name
 
-                elif col_name == 'value':
+                elif col_name == 'val':
                     row[col_name] = vals[name]
                 else:
                     row[col_name] = meta[col_name]

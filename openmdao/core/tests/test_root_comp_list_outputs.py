@@ -21,9 +21,9 @@ class TestRootComponentListOutputs(unittest.TestCase):
         outputs = prob.model.list_outputs(hierarchical=False, out_stream=stream)
 
         self.assertEqual(sorted(outputs), [
-            ('comp1_a', {'value': [1.]}),
-            ('comp1_b', {'value': [2.]}),
-            ('comp1_c', {'value': [3.]})
+            ('comp1_a', {'val': [1.], 'value': [1.]}),
+            ('comp1_b', {'val': [2.], 'value': [2.]}),
+            ('comp1_c', {'val': [3.], 'value': [3.]})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp1_'), 3)

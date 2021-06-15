@@ -52,9 +52,9 @@ class DictionaryJacobian(Jacobian):
         if entry not in self._iter_keys:
             subjacs = self._subjacs_info
             keys = []
-            for res_name in system._var_relevant_names[vec_name]['output']:
+            for res_name in system._var_abs2meta['output']:
                 for type_ in ('output', 'input'):
-                    for name in system._var_relevant_names[vec_name][type_]:
+                    for name in system._var_abs2meta[type_]:
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
@@ -94,7 +94,6 @@ class DictionaryJacobian(Jacobian):
         rflat = d_residuals._abs_get_val
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
-        ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
         is_explicit = isinstance(system, ExplicitComponent)
 
@@ -130,9 +129,9 @@ class DictionaryJacobian(Jacobian):
 
                     subjac_info = subjacs_info[abs_key]
                     if self._randomize:
-                        subjac = self._randomize_subjac(subjac_info['value'], abs_key)
+                        subjac = self._randomize_subjac(subjac_info['val'], abs_key)
                     else:
-                        subjac = subjac_info['value']
+                        subjac = subjac_info['val']
                     rows = subjac_info['rows']
                     if rows is not None:  # our homegrown COO format
                         linds, rinds = rows, subjac_info['cols']
@@ -140,28 +139,14 @@ class DictionaryJacobian(Jacobian):
                             linds, rinds = rinds, linds
                         if self._under_complex_step:
                             # bincount only works with float, so split into parts
-                            if ncol > 1:
-                                for i in range(ncol):
-                                    prod = right_vec[:, i][rinds] * subjac
-                                    left_vec[:, i].real += np.bincount(linds, prod.real,
-                                                                       minlength=left_vec.shape[0])
-                                    left_vec[:, i].imag += np.bincount(linds, prod.imag,
-                                                                       minlength=left_vec.shape[0])
-                            else:
-                                prod = right_vec[rinds] * subjac
-                                left_vec[:].real += np.bincount(linds, prod.real,
-                                                                minlength=left_vec.size)
-                                left_vec[:].imag += np.bincount(linds, prod.imag,
-                                                                minlength=left_vec.size)
+                            prod = right_vec[rinds] * subjac
+                            left_vec[:].real += np.bincount(linds, prod.real,
+                                                            minlength=left_vec.size)
+                            left_vec[:].imag += np.bincount(linds, prod.imag,
+                                                            minlength=left_vec.size)
                         else:
-                            if ncol > 1:
-                                for i in range(ncol):
-                                    left_vec[:, i] += np.bincount(linds,
-                                                                  right_vec[:, i][rinds] * subjac,
-                                                                  minlength=left_vec.shape[0])
-                            else:
-                                left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
-                                                           minlength=left_vec.size)
+                            left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                                                       minlength=left_vec.size)
 
                     else:
                         if not fwd:
@@ -195,10 +180,10 @@ class _CheckingJacobian(DictionaryJacobian):
                 continue
             rows = meta['rows']
             if rows is None:
-                yield key, meta['value']
+                yield key, meta['val']
             else:
                 dense = np.zeros(meta['shape'])
-                dense[rows, meta['cols']] = meta['value']
+                dense[rows, meta['cols']] = meta['val']
                 yield key, dense
 
     def _setup_index_maps(self, system):
@@ -223,11 +208,11 @@ class _CheckingJacobian(DictionaryJacobian):
                     self._subjacs_info[key] = {
                         'rows': None,
                         'cols': None,
-                        'value': np.zeros((nrows, 1 if directional else ncols)),
+                        'val': np.zeros((nrows, 1 if directional else ncols)),
                     }
-                elif directional and self._subjacs_info[key]['value'].shape[1] != 1:
+                elif directional and self._subjacs_info[key]['val'].shape[1] != 1:
                     self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
-                    meta['value'] = np.atleast_2d(meta['value'][:, 0]).T
+                    meta['val'] = np.atleast_2d(meta['val'][:, 0]).T
 
     def set_col(self, system, icol, column):
         """
@@ -262,12 +247,12 @@ class _CheckingJacobian(DictionaryJacobian):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:
-                    subjac['value'][:, loc_idx] = column[start:end]
+                    subjac['val'][:, loc_idx] = column[start:end]
                 else:
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         row_inds = subjac['rows'][match_inds]
-                        subjac['value'][match_inds] = column[start:end][row_inds]
+                        subjac['val'][match_inds] = column[start:end][row_inds]
                     else:
                         row_inds = np.zeros(0, dtype=INT_DTYPE)
                     arr = scratch[start:end]

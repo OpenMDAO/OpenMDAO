@@ -44,9 +44,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(self.filename, case_id=self.driver_case)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
@@ -74,9 +74,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(self.filename, case_id=self.driver_case)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, "N/A")
         self.assertEqual(y_val, "N/A")
@@ -104,9 +104,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(self.filename, case_id=3)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, "N/A")
         self.assertEqual(y_val, "N/A")
@@ -137,9 +137,9 @@ class TestN2Viewer(unittest.TestCase):
                                     case_id=self.problem_case)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
@@ -169,9 +169,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data("cases.sql", case_id=6)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
@@ -200,9 +200,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data("cases.sql", case_id=3)
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))
@@ -224,8 +224,8 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(self.filename, case_id=first_case)
 
         vals = data_dict['tree']['children'][0]['children']
-        ivc_0_val = vals[0]['value']
-        ivc_1_val = vals[1]['value']
+        ivc_0_val = vals[0]['val']
+        ivc_1_val = vals[1]['val']
 
         self.assertEqual(ivc_0_val, [5., 2])
         self.assertEqual(ivc_1_val, np.array([1.]))
@@ -254,9 +254,9 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(self.filename, case_id='final')
 
         vals = data_dict['tree']['children'][2]['children']
-        x_val = vals[0]['value']
-        y_val = vals[1]['value']
-        f_xy_val = vals[2]['value']
+        x_val = vals[0]['val']
+        y_val = vals[1]['val']
+        f_xy_val = vals[2]['val']
 
         self.assertEqual(x_val, np.array([1.]))
         self.assertEqual(y_val, np.array([1.]))

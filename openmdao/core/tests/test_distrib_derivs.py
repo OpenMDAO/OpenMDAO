@@ -78,14 +78,14 @@ class DistribExecComp(om.ExecComp):
         for name in outs:
             if name not in kwargs or not isinstance(kwargs[name], dict):
                 kwargs[name] = {}
-            kwargs[name]['value'] = np.ones(sizes[rank], float)
+            kwargs[name]['val'] = np.ones(sizes[rank], float)
 
         for name in allvars:
             if name not in outs:
                 if name not in kwargs or not isinstance(kwargs[name], dict):
                     kwargs[name] = {}
                 meta = kwargs[name]
-                meta['value'] = np.ones(sizes[rank], float)
+                meta['val'] = np.ones(sizes[rank], float)
                 meta['src_indices'] = np.arange(start, end, dtype=int)
 
         super().setup()

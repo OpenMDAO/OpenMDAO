@@ -168,9 +168,9 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                                      flat_src_indices=flat_src_indices, units=units,
                                      desc=desc)
         if self.options['vec_size'] > 1:
-            input_size = metadata['value'][0].size
+            input_size = metadata['val'][0].size
         else:
-            input_size = metadata['value'].size
+            input_size = metadata['val'].size
 
         if self._static_mode:
             self._static_input_sizes[0] += input_size

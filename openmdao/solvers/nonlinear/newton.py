@@ -80,7 +80,7 @@ class NewtonSolver(NonlinearSolver):
 
         self._disallow_discrete_outputs()
 
-        if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
+        if not isinstance(self.options._dict['solve_subsystems']['val'], bool):
             msg = '{}: solve_subsystems must be set by the user.'
             raise ValueError(msg.format(self.msginfo))
 
@@ -230,7 +230,7 @@ class NewtonSolver(NonlinearSolver):
 
         self._linearize()
 
-        self.linear_solver.solve(['linear'], 'fwd')
+        self.linear_solver.solve('fwd')
 
         if self.linesearch:
             self.linesearch._do_subsolve = do_subsolve

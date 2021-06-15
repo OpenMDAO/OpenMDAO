@@ -192,7 +192,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=4*np.ones(n))
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(n)}, y={'value': np.ones(n)})
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones(n)}, y={'val': np.ones(n)})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
 
@@ -232,7 +232,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=1.7*np.ones(n))
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(n)}, y={'value': np.ones(n)})
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones(n)}, y={'val': np.ones(n)})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
 
@@ -274,7 +274,7 @@ class TestBalanceComp(unittest.TestCase):
 
         mult_ivc = om.IndepVarComp(name='mult', val=2.0*np.ones(n))
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(n)}, y={'value': np.ones(n)})
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones(n)}, y={'val': np.ones(n)})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
@@ -318,7 +318,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=4 * np.ones(n))
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(n)}, y={'value': np.ones(n)})
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones(n)}, y={'val': np.ones(n)})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
 
@@ -390,7 +390,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=4)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
 
@@ -430,7 +430,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=4)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
 
@@ -471,7 +471,7 @@ class TestBalanceComp(unittest.TestCase):
 
         tgt = om.IndepVarComp(name='y_tgt', val=4)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         model.add_subsystem(name='exec', subsys=exec_comp)
@@ -510,7 +510,7 @@ class TestBalanceComp(unittest.TestCase):
         ivc.add_output(name='y_tgt', val=4)
         ivc.add_output(name='guess_x', val=2.5)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['y_tgt', 'guess_x'])
         model.add_subsystem(name='exec', subsys=exec_comp)
@@ -624,7 +624,7 @@ class TestBalanceComp(unittest.TestCase):
 
         bal = om.BalanceComp('x', rhs_val=4.0)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
 
@@ -663,7 +663,7 @@ class TestBalanceComp(unittest.TestCase):
 
         mult_ivc = om.IndepVarComp(name='mult', val=2.0)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
@@ -707,7 +707,7 @@ class TestBalanceComp(unittest.TestCase):
 
         mult_ivc = om.IndepVarComp(name='mult', val=2.0)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
@@ -744,7 +744,7 @@ class TestBalanceComp(unittest.TestCase):
         bal = om.BalanceComp()
         bal.add_balance('x', use_mult=True, mult_val=2.0)
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+        exec_comp = om.ExecComp('y=x**2', x={'val': 1}, y={'val': 1})
 
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=bal)
@@ -773,10 +773,10 @@ class TestBalanceComp(unittest.TestCase):
         prob = om.Problem()
 
         exec_comp = om.ExecComp('y=b*x+c',
-                                b={'value': np.random.uniform(0.01, 100, size=n)},
-                                c={'value': np.random.rand(n)},
-                                x={'value': np.zeros(n)},
-                                y={'value': np.ones(n)})
+                                b={'val': np.random.uniform(0.01, 100, size=n)},
+                                c={'val': np.random.rand(n)},
+                                x={'val': np.zeros(n)},
+                                y={'val': np.ones(n)})
 
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
         prob.model.add_subsystem(name='balance', subsys=om.BalanceComp('x', val=np.ones(n)))
@@ -812,7 +812,7 @@ class TestBalanceComp(unittest.TestCase):
 
         mult_ivc = om.IndepVarComp(name='mult', val=2.0*np.ones(shape))
 
-        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(shape)}, y={'value': np.ones(shape)})
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones(shape)}, y={'val': np.ones(shape)})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])

@@ -90,14 +90,14 @@ class DistributedListVarsTest(unittest.TestCase):
             else:
                 self.assertEqual(inputs[0][0], 'plus.x')
                 self.assertEqual(inputs[1][0], 'summer.invec')
-                self.assertEqual(inputs[0][1]['value'].size, 100)
-                self.assertEqual(inputs[1][1]['value'].size, 100)
+                self.assertEqual(inputs[0][1]['val'].size, 100)
+                self.assertEqual(inputs[1][1]['val'].size, 100)
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
                 self.assertEqual(len(text), 0)
             else:
-                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('val'), 3)
                 self.assertEqual(text.count('\nplus'), 1)
                 self.assertEqual(text.count('\n  x'), 1)
                 self.assertEqual(text.count('\nsummer'), 1)
@@ -123,15 +123,15 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(outputs[0][0], 'des_vars.x')
                 self.assertEqual(outputs[1][0], 'plus.y')
                 self.assertEqual(outputs[2][0], 'summer.sum')
-                self.assertEqual(outputs[0][1]['value'].size, 100)
-                self.assertEqual(outputs[1][1]['value'].size, 100)
-                self.assertEqual(outputs[2][1]['value'].size, 1)
+                self.assertEqual(outputs[0][1]['val'].size, 100)
+                self.assertEqual(outputs[1][1]['val'].size, 100)
+                self.assertEqual(outputs[2][1]['val'].size, 1)
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
                 self.assertEqual(len(text), 0)
             else:
-                self.assertEqual(text.count('value'), 3)
+                self.assertEqual(text.count('val'), 3)
                 self.assertEqual(text.count('\ndes_vars'), 1)
                 self.assertEqual(text.count('\n  x'), 1)
                 self.assertEqual(text.count('\nplus'), 1)
@@ -195,14 +195,14 @@ class DistributedListVarsTest(unittest.TestCase):
             else:
                 inames = [t[0] for t in inputs]
                 self.assertEqual(inames, ['Obj.y1', 'Obj.y2', 'par.G1.Cc.x', 'par.G1.Cy.x', 'par.G2.Cc.x', 'par.G2.Cy.x'])
-                self.assertTrue('value' in inputs[0][1])
+                self.assertTrue('val' in inputs[0][1])
 
             text = stream.getvalue()
             if prob.comm.rank:  # Only rank 0 prints
                 self.assertEqual(len(text), 0)
             else:
                 self.assertEqual(1, text.count("6 Input(s) in 'model'"), 1)
-                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('val'))
                 self.assertEqual(1, text.count('par'))
                 self.assertEqual(1, text.count('  G1'))
                 self.assertEqual(1, text.count('  G2'))
@@ -227,7 +227,7 @@ class DistributedListVarsTest(unittest.TestCase):
             onames = [t[0] for t in outputs]
             if prob.comm.rank == 0:
                 self.assertEqual(onames, ['Obj.obj', 'par.G1.Cc.c', 'par.G1.Cy.y', 'par.G1.indep_var_comp.x', 'par.G2.Cc.c', 'par.G2.Cy.y', 'par.G2.indep_var_comp.x'])
-                self.assertTrue('value' in outputs[0][1])
+                self.assertTrue('val' in outputs[0][1])
                 self.assertTrue('units' in outputs[0][1])
             else:
                 self.assertEqual(onames, [])
@@ -237,7 +237,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 self.assertEqual(len(text), 0)
             else:
                 self.assertEqual(1, text.count("7 Explicit Output(s) in 'model'"))
-                self.assertEqual(1, text.count('value'))
+                self.assertEqual(1, text.count('val'))
                 self.assertEqual(1, text.count('units'))
                 self.assertEqual(1, text.count('par'))
                 self.assertEqual(1, text.count('  G1'))
@@ -280,7 +280,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "6 Input(s) in 'model'",
                     '',
-                    'varname   value',
+                    'varname   val',
                     '--------  -----',
                     'c1.x',
                     'sub.c2.x',
@@ -309,7 +309,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "6 Input(s) in 'model'",
                     '',
-                    'varname  value',
+                    'varname  val',
                     '-------  -----',
                     'c1',
                     '  x',
@@ -345,8 +345,8 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "7 Explicit Output(s) in 'model'",
                     '',
-                    'varname   value   resids',
-                    '--------  -----   ------',
+                    'varname   val     resids',
+                    '--------  ----    ------',
                     'iv.x',
                     'c1.y',
                     'sub.c2.y',
@@ -378,7 +378,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 expected = [
                     "7 Explicit Output(s) in 'model'",
                     '',
-                    'varname  value   resids',
+                    'varname  val     resids',
                     '-------  -----   ------',
                     'iv',
                     '  x',
@@ -437,10 +437,10 @@ class DistributedListVarsTest(unittest.TestCase):
             expected = [
                 "1 Input(s) in 'C2'",
                 '',
-                'varname  value            shape  global_shape',
+                'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'invec    |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
@@ -460,10 +460,10 @@ class DistributedListVarsTest(unittest.TestCase):
             expected = [
                 "1 Explicit Output(s) in 'C2'",
                 '',
-                'varname  value            shape  global_shape',
+                'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'outvec   |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.,  1.])'
             ]
 
@@ -489,10 +489,10 @@ class DistributedListVarsTest(unittest.TestCase):
             expected = [
                 "1 Input(s) in 'C2'",
                 '',
-                'varname  value            shape  global_shape',
+                'varname  val              shape  global_shape',
                 '-------  ---------------  -----  ------------',
                 'invec    |3.87298334621|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
             for i, line in enumerate(expected):
@@ -511,10 +511,10 @@ class DistributedListVarsTest(unittest.TestCase):
             expected = [
                 "1 Explicit Output(s) in 'C2'",
                 '',
-                'varname  value           shape  global_shape',
+                'varname  val             shape  global_shape',
                 '-------  --------------  -----  ------------',
                 'outvec   |9.74679434481|  (8,)   (15,)',
-                '         value:',
+                '         val:',
                 '         array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
             for i, line in enumerate(expected):
@@ -538,10 +538,10 @@ class DistributedListVarsTest(unittest.TestCase):
         expected = [
             "1 Input(s) in 'C3'",
             '',
-            'varname  value                shape  global_shape',
+            'varname  val                  shape  global_shape',
             '-------  -------------------  -----  ------------',
             'invec  {}  {}   {}        '.format(norm, shape, shape),
-            '         value:',
+            '         val:',
             '         array({})'.format(value),
         ]
 

@@ -50,14 +50,14 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
@@ -79,14 +79,14 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
 
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         self.assertTrue(group.linear_solver._iter_count == 2)
 
@@ -114,7 +114,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
 
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        g1.run_solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
@@ -125,7 +125,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
-        g1.run_solve_linear(['linear'], 'rev')
+        g1.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)

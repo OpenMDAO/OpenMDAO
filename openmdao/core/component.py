@@ -180,11 +180,11 @@ class Component(System):
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
-                if not np.isscalar(meta['value']):
-                    if meta['value'].size > 0:
-                        meta['value'] = meta['value'].flatten()[0]
+                if not np.isscalar(meta['val']):
+                    if meta['val'].size > 0:
+                        meta['val'] = meta['val'].flatten()[0]
                     else:
-                        meta['value'] = 1.0
+                        meta['val'] = 1.0
 
         self._var_rel2meta.update(self._static_var_rel2meta)
         for io in ['input', 'output']:
@@ -282,7 +282,7 @@ class Component(System):
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
-                del v['value']
+                del v['val']
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -297,9 +297,8 @@ class Component(System):
         iproc = self.comm.rank
 
         for io in ('input', 'output'):
-            sizes = self._var_sizes['nonlinear'][io] = np.zeros((self.comm.size,
-                                                                len(self._var_rel_names[io])),
-                                                                dtype=INT_DTYPE)
+            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
+                                                   dtype=INT_DTYPE)
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']
@@ -308,46 +307,8 @@ class Component(System):
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        # all names are relevant for the 'nonlinear' and 'linear' vectors.  We
-        # can then use them to compute the size arrays of for all other vectors
-        # based on the nonlinear size array.
-        nl_allprocs_relnames = self._var_allprocs_relevant_names['nonlinear']
-        nl_relnames = self._var_relevant_names['nonlinear']
-        for io in ('input', 'output'):
-            nl_allprocs_relnames[io] = list(self._var_allprocs_abs2meta[io])
-            nl_relnames[io] = list(self._var_abs2meta[io])
-
-        self._setup_var_index_maps('nonlinear')
-        self._owned_sizes = self._var_sizes['nonlinear']['output']
-
-        if self._use_derivatives:
-            sizes = self._var_sizes
-            nl_sizes = sizes['nonlinear']
-            nl_abs2idx = self._var_allprocs_abs2idx['nonlinear']
-
-            sizes['linear'] = nl_sizes
-            self._var_allprocs_relevant_names['linear'] = nl_allprocs_relnames
-            self._var_relevant_names['linear'] = nl_relnames
-            self._var_allprocs_abs2idx['linear'] = nl_abs2idx
-
-            # Initialize size arrays for other linear vecs besides 'linear'
-            # (which is the same as 'nonlinear')
-            for vec_name in self._lin_rel_vec_name_list[1:]:
-                # at component level, _var_allprocs_* is the same as var_* since all vars exist in
-                # all procs for a given component, so we don't have to mess with figuring out what
-                # vars are local.
-                relnames = self._var_allprocs_relevant_names[vec_name]
-
-                sizes[vec_name] = {}
-                for io in ('input', 'output'):
-                    sizes[vec_name][io] = sz = np.zeros((self.comm.size, len(relnames[io])),
-                                                        dtype=INT_DTYPE)
-                    # Variables for this vec_name are a subset of those for nonlinear, so just
-                    # take columns of the nonlinear sizes array
-                    for idx, abs_name in enumerate(relnames[io]):
-                        sz[:, idx] = nl_sizes[io][:, nl_abs2idx[abs_name]]
-
-                self._setup_var_index_maps(vec_name)
+        self._setup_var_index_maps()
+        self._owned_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """
@@ -405,7 +366,7 @@ class Component(System):
                 if self._num_par_fd > 1:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel FD.")
-                if len(self._vec_names) > 2:
+                if self._problem_meta['using_par_deriv_color']:
                     raise RuntimeError(f"{self.msginfo}: Can't set 'run_root_only' option when "
                                        "using parallel_deriv_color.")
                 return True
@@ -578,10 +539,10 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['value']
+            distributed = distributed or self.options._dict['distributed']['val']
 
         metadata = {
-            'value': val,
+            'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
@@ -647,7 +608,7 @@ class Component(System):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
 
         metadata = {
-            'value': val,
+            'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
@@ -818,10 +779,10 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['value']
+            distributed = distributed or self.options._dict['distributed']['val']
 
         metadata = {
-            'value': val,
+            'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
@@ -889,7 +850,7 @@ class Component(System):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
 
         metadata = {
-            'value': val,
+            'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags)
@@ -938,7 +899,7 @@ class Component(System):
         all_abs2idx : dict
             Dictionary mapping an absolute name to its allprocs variable index.
         all_sizes : dict
-            Mapping of vec_names and types to sizes of each variable in all procs.
+            Mapping of types to sizes of each variable in all procs.
 
         Returns
         -------
@@ -950,8 +911,8 @@ class Component(System):
         all_abs2meta_in = all_abs2meta['input']
         all_abs2meta_out = all_abs2meta['output']
 
-        sizes_in = self._var_sizes['nonlinear']['input']
-        sizes_out = all_sizes['nonlinear']['output']
+        sizes_in = self._var_sizes['input']
+        sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
         for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
@@ -1093,7 +1054,7 @@ class Component(System):
                              'both must be specified.'.format(self.msginfo, of, wrt))
 
         if dependent:
-            meta['value'] = val
+            meta['val'] = val
             if rows is not None:
                 rows = np.array(rows, dtype=INT_DTYPE, copy=False)
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
@@ -1353,7 +1314,7 @@ class Component(System):
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
         """
-        val = dct['value'] if 'value' in dct else None
+        val = dct['val'] if 'val' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
 
@@ -1453,16 +1414,16 @@ class Component(System):
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)
-                    meta['value'] = np.zeros(shape)
+                    meta['val'] = np.zeros(shape)
                 elif is_array:
                     if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['value'] = val = val.copy().reshape(shape)
+                        meta['val'] = val = val.copy().reshape(shape)
                     else:
-                        meta['value'] = val.copy()
+                        meta['val'] = val.copy()
                 elif is_scalar:
-                    meta['value'] = np.full(shape, val, dtype=float)
+                    meta['val'] = np.full(shape, val, dtype=float)
                 else:
-                    meta['value'] = val
+                    meta['val'] = val
 
                 if rows_max >= shape[0] or cols_max >= shape[1]:
                     of, wrt = rel_key
@@ -1470,7 +1431,7 @@ class Component(System):
                     raise ValueError(msg.format(self.msginfo, of, wrt, shape[0], shape[1],
                                                 rows_max + 1, cols_max + 1))
 
-                self._check_partials_meta(abs_key, meta['value'],
+                self._check_partials_meta(abs_key, meta['val'],
                                           shape if rows is None else (rows.shape[0], 1))
 
                 self._subjacs_info[abs_key] = meta
@@ -1619,17 +1580,17 @@ class Component(System):
 
 class _DictValues(object):
     """
-    A dict-like wrapper for a dict of metadata, where getitem returns 'value' from metadata.
+    A dict-like wrapper for a dict of metadata, where getitem returns 'val' from metadata.
     """
 
     def __init__(self, dct):
         self._dict = dct
 
     def __getitem__(self, key):
-        return self._dict[key]['value']
+        return self._dict[key]['val']
 
     def __setitem__(self, key, value):
-        self._dict[key]['value'] = value
+        self._dict[key]['val'] = value
 
     def __contains__(self, key):
         return key in self._dict
@@ -1638,4 +1599,4 @@ class _DictValues(object):
         return len(self._dict)
 
     def items(self):
-        return [(key, self._dict[key]['value']) for key in self._dict]
+        return [(key, self._dict[key]['val']) for key in self._dict]

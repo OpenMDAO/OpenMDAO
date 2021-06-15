@@ -194,7 +194,7 @@ class PETScKrylov(LinearSolver):
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
         # initialize dictionary of KSP instances (keyed on vector name)
-        self._ksp = {}
+        self._ksp = None
 
         # initialize preconditioner to None
         self.precon = None
@@ -287,21 +287,20 @@ class PETScKrylov(LinearSolver):
         """
         # assign x and b vectors based on mode
         system = self._system()
-        vec_name = self._vec_name
 
         if self._mode == 'fwd':
-            x_vec = system._vectors['output'][vec_name]
-            b_vec = system._vectors['residual'][vec_name]
+            x_vec = system._vectors['output']['linear']
+            b_vec = system._vectors['residual']['linear']
         else:  # rev
-            x_vec = system._vectors['residual'][vec_name]
-            b_vec = system._vectors['output'][vec_name]
+            x_vec = system._vectors['residual']['linear']
+            b_vec = system._vectors['output']['linear']
 
         # set value of x vector to KSP provided value
         x_vec.set_val(_get_petsc_vec_array(in_vec))
 
         # apply linear
         scope_out, scope_in = system._get_scope()
-        system._apply_linear(self._assembled_jac, [vec_name], self._rel_systems, self._mode,
+        system._apply_linear(self._assembled_jac, self._rel_systems, self._mode,
                              scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
@@ -326,7 +325,7 @@ class PETScKrylov(LinearSolver):
         if self.precon is not None:
             self.precon._linearize()
 
-    def solve(self, vec_names, mode, rel_systems=None):
+    def solve(self, mode, rel_systems=None):
         """
         Solve the linear system for the problem in self._system().
 
@@ -334,14 +333,11 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        vec_names : list
-            list of vector names.
         mode : string
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.
         """
-        self._vec_names = vec_names
         self._rel_systems = rel_systems
         self._mode = mode
 
@@ -356,36 +352,32 @@ class PETScKrylov(LinearSolver):
         atol = options['atol']
         rtol = options['rtol']
 
-        for vec_name in vec_names:
+        # assign x and b vectors based on mode
+        if self._mode == 'fwd':
+            x_vec = system._vectors['output']['linear']
+            b_vec = system._vectors['residual']['linear']
+        else:  # rev
+            x_vec = system._vectors['residual']['linear']
+            b_vec = system._vectors['output']['linear']
 
-            self._vec_name = vec_name
+        # create numpy arrays to interface with PETSc
+        sol_array = x_vec.asarray(copy=True)
+        rhs_array = b_vec.asarray(copy=True)
 
-            # assign x and b vectors based on mode
-            if self._mode == 'fwd':
-                x_vec = system._vectors['output'][vec_name]
-                b_vec = system._vectors['residual'][vec_name]
-            else:  # rev
-                x_vec = system._vectors['residual'][vec_name]
-                b_vec = system._vectors['output'][vec_name]
+        # create PETSc vectors from numpy arrays
+        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
+        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
 
-            # create numpy arrays to interface with PETSc
-            sol_array = x_vec.asarray(copy=True)
-            rhs_array = b_vec.asarray(copy=True)
+        # run PETSc solver
+        self._iter_count = 0
+        ksp = self._get_ksp_solver(system)
+        ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
+        ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
-            # create PETSc vectors from numpy arrays
-            sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system.comm)
-            rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system.comm)
+        # stuff the result into the x vector
+        x_vec.set_val(sol_array)
 
-            # run PETSc solver
-            self._iter_count = 0
-            ksp = self._get_ksp_solver(system, vec_name)
-            ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
-            ksp.solve(rhs_petsc_vec, sol_petsc_vec)
-
-            # stuff the result into the x vector
-            x_vec.set_val(sol_array)
-
-            sol_petsc_vec = rhs_petsc_vec = None
+        sol_petsc_vec = rhs_petsc_vec = None
 
     def apply(self, mat, in_vec, result):
         """
@@ -402,26 +394,25 @@ class PETScKrylov(LinearSolver):
         """
         if self.precon:
             system = self._system()
-            vec_name = self._vec_name
             mode = self._mode
 
             # Need to clear out any junk from the inputs.
-            system._vectors['input'][vec_name].set_val(0.0)
+            system._vectors['input']['linear'].set_val(0.0)
 
             # assign x and b vectors based on mode
             if mode == 'fwd':
-                x_vec = system._vectors['output'][vec_name]
-                b_vec = system._vectors['residual'][vec_name]
+                x_vec = system._vectors['output']['linear']
+                b_vec = system._vectors['residual']['linear']
             else:  # rev
-                x_vec = system._vectors['residual'][vec_name]
-                b_vec = system._vectors['output'][vec_name]
+                x_vec = system._vectors['residual']['linear']
+                b_vec = system._vectors['output']['linear']
 
             # set value of b vector to KSP provided value
             b_vec.set_val(_get_petsc_vec_array(in_vec))
 
             # call the preconditioner
             self._solver_info.append_precon()
-            self.precon.solve([vec_name], mode)
+            self.precon.solve(mode)
             self._solver_info.pop()
 
             # stuff resulting value of x vector into result for KSP
@@ -430,9 +421,9 @@ class PETScKrylov(LinearSolver):
             # no preconditioner, just pass back the incoming vector
             result.array[:] = _get_petsc_vec_array(in_vec)
 
-    def _get_ksp_solver(self, system, vec_name):
+    def _get_ksp_solver(self, system):
         """
-        Get an instance of the KSP solver for `vec_name` in `system`.
+        Get an instance of the KSP solver in `system`.
 
         Instances will be created on first request and cached for future use.
 
@@ -440,8 +431,6 @@ class PETScKrylov(LinearSolver):
         ----------
         system : `System`
             Parent `System` object.
-        vec_name : string
-            name of vector.
 
         Returns
         -------
@@ -449,19 +438,19 @@ class PETScKrylov(LinearSolver):
             the KSP solver instance.
         """
         # use cached instance if available
-        if vec_name in self._ksp:
-            return self._ksp[vec_name]
+        if self._ksp:
+            return self._ksp
 
         iproc = system.comm.rank
-        lsize = np.sum(system._var_sizes[vec_name]['output'][iproc, :])
-        size = np.sum(system._var_sizes[vec_name]['output'])
+        lsize = np.sum(system._var_sizes['output'][iproc, :])
+        size = np.sum(system._var_sizes['output'])
 
         jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
                                            comm=system.comm)
         jac_mat.setPythonContext(self)
         jac_mat.setUp()
 
-        ksp = self._ksp[vec_name] = PETSc.KSP().create(comm=system.comm)
+        ksp = self._ksp = PETSc.KSP().create(comm=system.comm)
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
