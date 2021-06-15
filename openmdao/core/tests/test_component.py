@@ -305,6 +305,14 @@ class TestExplicitComponent(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             comp._var_rel2meta['length']['value']
 
+    def test_return_metadata_value_deprecation(self):
+        prob = Problem()
+        idv = prob.model.add_subsystem('idv', IndepVarComp())
+        meta = idv.add_output('x', 1.0)
+
+        msg = ("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+        with assert_warning(OMDeprecationWarning, msg):
+            meta['value']
 
 class TestImplicitComponent(unittest.TestCase):
 
