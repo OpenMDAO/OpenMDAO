@@ -445,17 +445,30 @@ class Group(System):
 
                 else:
                     factor, offset = unit_conversion(units_out, units_in)
-
-                    # Unit conversion must be handled differently in the linear vector depending
-                    # on mode, so save the unit conversion for processing in the root vectors.
                     a0 = ref0
                     a1 = ref - ref0
-                    scale_factors[abs_in] = {
-                        'input': (a0, a1, factor, offset),
-                    }
 
-                    # For adder allocation check.
-                    a0 = (ref0 + offset) * factor
+                    if a1 == 1.0:
+                        # No solver scaling, just unit conversion.
+                        # Note: a case like ref=3, ref0=2 is safe to treat as unscaled for the
+                        # linear vectors because the "scaler" is 1.0.
+                        a0 = (ref0 + offset) * factor
+                        a1 = (ref - ref0) * factor
+
+                        scale_factors[abs_in] = {
+                            'input': (a0, a1),
+                        }
+
+                    else:
+                        # When we have unit conversion and solver scaling, we need to track them
+                        # independently during reverse mode linear solves, so save the unit
+                        # conversion factors too, and let the root vector sort it out.
+                        scale_factors[abs_in] = {
+                            'input': (a0, a1, factor, offset),
+                        }
+
+                        # For adder allocation check.
+                        a0 = (ref0 + offset) * factor
 
                 # Check whether we need to allocate an adder for the input vector.
                 if np.any(np.asarray(a0)):
@@ -2154,10 +2167,9 @@ class Group(System):
         if mode == 'fwd':
             if xfer is not None:
                 if self._has_input_scaling:
-                    use_nl_scale = vec_name == 'linear'
-                    vec_inputs.scale_to_norm(use_nonlinear_scaling=use_nl_scale)
+                    vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale_to_phys(use_nonlinear_scaling=use_nl_scale)
+                    vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
@@ -2166,9 +2178,9 @@ class Group(System):
         else:  # rev
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale_to_norm()
+                    vec_inputs.scale_to_norm(mode='rev')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale_to_phys()
+                    vec_inputs.scale_to_phys(mode='rev')
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 

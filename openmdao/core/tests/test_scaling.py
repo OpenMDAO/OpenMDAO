@@ -1001,12 +1001,15 @@ class TestScaling(unittest.TestCase):
     def test_totals_with_solver_scaling(self):
         ref = 1000.0
 
-        class comp_1(om.ExplicitComponent):
+        class Comp1(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('units', None)
 
             def setup(self):
                 self.add_input('a1')
                 self.add_input('a2')
-                self.add_output('b', ref = ref)
+                self.add_output('b', units=self.options['units'], ref = ref)
                 self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
@@ -1021,10 +1024,14 @@ class TestScaling(unittest.TestCase):
                 partials['b', 'a1'] = 2*a2
                 partials['b', 'a2'] = 2*a1
 
-        class comp_2(om.ExplicitComponent):
+
+        class Comp2(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('units', None)
 
             def setup(self):
-                self.add_input('b')
+                self.add_input('b', units=self.options['units'])
                 self.add_output('c')
                 self.declare_partials(['c'], ['b'])
 
@@ -1037,8 +1044,36 @@ class TestScaling(unittest.TestCase):
                 partials['c', 'b'] = 2
 
         model = om.Group()
-        model.add_subsystem('comp_1', comp_1(), promotes = ['*'])
-        model.add_subsystem('comp_2', comp_2(), promotes = ['*'])
+        model.add_subsystem('comp_1', Comp1(), promotes = ['*'])
+        model.add_subsystem('comp_2', Comp2(), promotes = ['*'])
+
+        model.add_design_var('a1', lower = 0.5, upper = 1.5)
+        model.add_design_var('a2', lower = 0.5, upper = 1.5)
+
+        model.set_input_defaults('a1', val = 1.)
+        model.set_input_defaults('a2', val = 1.)
+
+        model.add_objective('c')
+
+        problem = om.Problem()
+        problem.model = model
+
+        problem.driver = om.ScipyOptimizeDriver()
+        problem.driver.options['optimizer'] = 'SLSQP'
+
+        problem.setup(mode='rev')
+        problem.set_solver_print(level=0)
+        problem.run_model()
+
+        totals = problem.check_totals(out_stream=None)
+        assert_near_equal(totals['comp_2.c', 'a1']['abs error'][0], 0.0, tolerance=1e-7)
+        assert_near_equal(totals['comp_2.c', 'a2']['abs error'][0], 0.0, tolerance=1e-7)
+
+        # Now, include unit conversion
+
+        model = om.Group()
+        model.add_subsystem('comp_1', Comp1(units='degC'), promotes = ['*'])
+        model.add_subsystem('comp_2', Comp2(units='degF'), promotes = ['*'])
 
         model.add_design_var('a1', lower = 0.5, upper = 1.5)
         model.add_design_var('a2', lower = 0.5, upper = 1.5)

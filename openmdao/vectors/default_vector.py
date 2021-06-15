@@ -102,8 +102,13 @@ class DefaultVector(Vector):
                     else:
                         self._scaling = (None, np.ones(data.size))
                 elif self._name == 'linear':
-                    # Sadly, we can no longer res-use the nl vector.
-                    self._scaling = (None, np.ones(data.size))
+                    if self._has_solver_ref:
+                        # We only allocate an extra scaling vector when we have output scaling
+                        # somewhere in the model.
+                        self._scaling = (None, np.ones(data.size))
+                    else:
+                        nlvec = self._system()._root_vecs[self._kind]['nonlinear']
+                        self._scaling = (None, nlvec._scaling[1])
                 else:
                     self._scaling = (None, np.ones(data.size))
         else:
@@ -287,21 +292,57 @@ class DefaultVector(Vector):
         data = self.asarray()
         data[idxs] = val
 
-    def scale_to_norm(self, use_nonlinear_scaling=False):
+    def scale_to_norm(self, mode='fwd'):
         """
         Scale this vector to normalized form.
 
         Parameters
         ----------
-        use_nonlinear_scaling : bool
-            When True, pull scaling values from the nonlinear input vector.
+        mode : string
+            Derivative direction.
         """
-        if use_nonlinear_scaling:
-            scaler = self._scaling_fwd[1]
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
             adder = None
         else:
             adder, scaler = self._scaling
 
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_reverse(scaler, adder)
+        else:
+            self._scale_forward(scaler, adder)
+
+    def scale_to_phys(self, mode='fwd'):
+        """
+        Scale this vector to physical form.
+
+        Parameters
+        ----------
+        mode : string
+            Derivative direction.
+        """
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_forward(scaler, adder)
+        else:
+            self._scale_reverse(scaler, adder)
+
+    def _scale_forward(self, scaler, adder):
+        """
+        Scale this vector to physical form.
+
+        Parameters
+        ----------
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
+        """
         data = self.asarray()
         if self._ncol == 1:
             if adder is not None:  # nonlinear only
@@ -312,21 +353,17 @@ class DefaultVector(Vector):
                 data -= adder
             data /= scaler[:, np.newaxis]
 
-    def scale_to_phys(self, use_nonlinear_scaling=False):
+    def _scale_reverse(self, scaler, adder):
         """
         Scale this vector to physical form.
 
         Parameters
         ----------
-        use_nonlinear_scaling : bool
-            When True, pull scaling values from the nonlinear input vector.
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
         """
-        if use_nonlinear_scaling:
-            scaler = self._scaling_fwd[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         data = self.asarray()
         if self._ncol == 1:
             data *= scaler

@@ -688,7 +688,7 @@ class System(object):
                                                                  ncol=ncol)
 
         if 'linear' in vec_names:
-            root_vectors['input']['linear']._scaling_fwd = \
+            root_vectors['input']['linear']._scaling_nl_vec = \
                 root_vectors['input']['nonlinear']._scaling
 
         return root_vectors
@@ -1792,7 +1792,7 @@ class System(object):
                     alloc_complex=vec_alloc_complex, ncol=rootvec._ncol)
 
         if 'linear' in vec_names:
-            vectors['input']['linear']._scaling_fwd = vectors['input']['nonlinear']._scaling
+            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
