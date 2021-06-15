@@ -665,6 +665,11 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex)
+
+        if 'linear' in root_vectors['input']:
+            root_vectors['input']['linear']._scaling_nl_vec = \
+                root_vectors['input']['nonlinear']._scaling
+
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -1655,6 +1660,9 @@ class System(object):
                 rootvec = root_vectors[kind][vec_name]
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
+
+        if 'linear' in vectors['input']:
+            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
