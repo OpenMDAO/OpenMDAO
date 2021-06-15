@@ -52,6 +52,22 @@ def _valid_var_name(name):
             return False
     return name[0] not in _whitespace and name[-1] not in _whitespace
 
+class MetadataDict(dict):
+    def __init__(self, *args):
+      dict.__init__(self, args)
+
+    def __getitem__(self, key):
+        if key == 'value':
+          warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+          key = 'val'
+        val = dict.__getitem__(self, key)
+        return val
+
+    def __setitem__(self, key, val):
+        if key == 'value':
+          warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+          key = 'val'
+        dict.__setitem__(self, key, val)
 
 class Component(System):
     """
@@ -580,9 +596,10 @@ class Component(System):
             # using ._dict below to avoid tons of deprecation warnings
             distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = {
+        metadata = MetadataDict()
+
+        metadata_dict = {
             'val': val,
-            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
@@ -596,6 +613,11 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
         }
+
+        for key, val in metadata_dict.items():
+            metadata[key] = val
+
+        # metadata = metadata_dict
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -649,7 +671,6 @@ class Component(System):
 
         metadata = {
             'val': val,
-            'value': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
@@ -824,7 +845,6 @@ class Component(System):
 
         metadata = {
             'val': val,
-            'value': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
@@ -893,7 +913,6 @@ class Component(System):
 
         metadata = {
             'val': val,
-            'value': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags)
