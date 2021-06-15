@@ -326,7 +326,7 @@ class DefaultVector(Vector):
 
     def _scale_forward(self, scaler, adder):
         """
-        Scale this vector to physical form.
+        Scale this vector by subtracting the adder and dividing by the scaler.
 
         Parameters
         ----------
@@ -342,7 +342,7 @@ class DefaultVector(Vector):
 
     def _scale_reverse(self, scaler, adder):
         """
-        Scale this vector to physical form.
+        Scale this vector by multiplying by the scaler ahd adding the adder.
 
         Parameters
         ----------
