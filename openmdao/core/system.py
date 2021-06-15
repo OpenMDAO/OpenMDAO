@@ -1493,17 +1493,18 @@ class System(object):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    high_dims = local_shape[1:]
-                    if high_dims:
-                        high_size = np.prod(high_dims)
-                        dim1 = global_size // high_size
-                        if global_size % high_size != 0:
-                            raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                               "with local shape %s" % (self.msginfo, abs_name,
-                                                                        global_size, local_shape))
-                        mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                    else:
-                        mymeta['global_shape'] = (global_size,)
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name)
+                    # high_dims = local_shape[1:]
+                    # if high_dims:
+                    #     high_size = np.prod(high_dims)
+                    #     dim1 = global_size // high_size
+                    #     if global_size % high_size != 0:
+                    #         raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
+                    #                            "with local shape %s" % (self.msginfo, abs_name,
+                    #                                                     global_size, local_shape))
+                    #     mymeta['global_shape'] = tuple([dim1] + list(high_dims))
+                    # else:
+                    #     mymeta['global_shape'] = (global_size,)
 
                 else:
                     # not distributed, just use local shape and size
@@ -2532,7 +2533,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer(indices, flat=flat)
+            idxer = indexer(indices, flat=flat, new_style=True)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -4577,7 +4578,7 @@ class System(object):
             vmeta = self._var_abs2meta['input'][abs_name]
             src_indices = vmeta['src_indices']
         else:
-            # vmeta = self._var_allprocs_abs2meta['input'][abs_name]
+            vmeta = self._var_allprocs_abs2meta['input'][abs_name]
             # if 'src_slice' in vmeta:
             #     smeta = self._var_allprocs_abs2meta['output'][src]
             #     src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
@@ -4593,7 +4594,7 @@ class System(object):
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
         if name in scope_sys._var_prom2inds:
-            src_shape, inds, flat = scope_sys._var_prom2inds[name]
+            src_shape, inds, _ = scope_sys._var_prom2inds[name]
             if inds is None:
                 if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
                     src_indices = None
@@ -5238,3 +5239,37 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
+    def _get_full_dist_shape(self, abs_name):
+        """
+        Get the full 'distributed' shape for a variable.
+
+        Variable name is absoute and variable is assumed to be continuous.
+
+        Parameters
+        ----------
+        abs_name : str
+            Absolute name of the variable.
+
+        Returns
+        -------
+        tuple
+            The distributed shape for the given variable.
+        """
+        io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+        meta = self._var_allprocs_abs2meta[io][abs_name]
+        var_idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
+        global_size = np.sum(self._var_sizes['nonlinear'][io][:, var_idx])
+
+        # assume that all but the first dimension of the shape of a
+        # distributed variable is the same on all procs
+        high_dims = meta['shape'][1:]
+        if high_dims:
+            high_size = np.prod(high_dims)
+            dim1 = global_size // high_size
+            if global_size % high_size != 0:
+                raise RuntimeError("%s: Global size of variable '%s' (%s) does not agree "
+                                   "with local shape %s" % (self.msginfo, src,
+                                                            global_size, meta['shape']))
+            return tuple([dim1] + list(high_dims))
+        return (global_size,)

@@ -174,10 +174,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
         if indices.src_ndim > 1 and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
-        indshape = indices.shape
+        indshape = shape2tuple(indices.shape)
         if shape is not None and indshape != shape:
-            raise ValueError("Shape of indices does not match shape for '%s': " %
-                                (name, shape, indshape))
+            raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
+                                (indshape, shape, name))
         if shape is None:
             shape = indshape
 
@@ -1071,19 +1071,21 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return my_src_inds
     elif my_src_inds is None:
         return parent_src_inds
-    if isinstance(my_src_inds, tuple):
-        ndims = len(my_src_inds)
-    elif isinstance(my_src_inds, np.ndarray):
-        ndims = my_src_inds.ndim
-    else:  # slice
-        ndims = 1
-    if _is_slicer_op(parent_src_inds):
-        parent_src_inds = _slice_indices(parent_src_inds, np.prod(parent_src_shape),
-                                         parent_src_shape)
+    ndims = my_src_inds.src_ndim
+
+    #if isinstance(my_src_inds, tuple):
+        #ndims = len(my_src_inds)
+    #elif isinstance(my_src_inds, np.ndarray):
+        #ndims = my_src_inds.ndim
+    #else:  # slice
+        #ndims = 1
+    #if _is_slicer_op(parent_src_inds):
+        #parent_src_inds = _slice_indices(parent_src_inds, np.prod(parent_src_shape),
+                                         #parent_src_shape)
     if ndims == 1:
-        return parent_src_inds.ravel()[my_src_inds]
+        return parent_src_inds.shaped_array()[my_src_inds()]
     else:
-        return parent_src_inds.reshape(my_src_shape)[my_src_inds]
+        return parent_src_inds.shaped_array().reshape(my_src_shape)[my_src_inds()]
 
 
 def shape_from_idx(src_shape, src_inds, flat_src_inds):
@@ -1199,13 +1201,15 @@ def get_connection_owner(system, tgt):
 
     model = system._problem_meta['model_ref']()
     src = model._conn_global_abs_in2out[tgt]
+    abs2prom = model._var_allprocs_abs2prom
 
-    if model._var_allprocs_abs2prom['input'][tgt] != model._var_allprocs_abs2prom['output'][src]:
-        # connection is explicit
-        for g in model.system_iter(include_self=True, recurse=True, typ=Group):
-            if g._manual_connections:
-                tprom = g._var_allprocs_abs2prom['input'][tgt]
-                if tprom in g._manual_connections:
-                    return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
+    if src in abs2prom['output'] and tgt in abs2prom['input'][tgt]:
+        if abs2prom['input'][tgt] != abs2prom['output'][src]:
+            # connection is explicit
+            for g in model.system_iter(include_self=True, recurse=True, typ=Group):
+                if g._manual_connections:
+                    tprom = g._var_allprocs_abs2prom['input'][tgt]
+                    if tprom in g._manual_connections:
+                        return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
 
     return None, None, None

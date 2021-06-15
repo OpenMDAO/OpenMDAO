@@ -596,7 +596,6 @@ class TestGroup(unittest.TestCase):
         idxs = np.array([0, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15], dtype=int)
 
         # the ellipsis in this case is basically ignored
-        with assert_warning(UserWarning, msg):
         p.model.connect('indep.x', 'row123_comp.x', src_indices=om.slicer[idxs, ...],
                         flat_src_indices=True)
 
@@ -675,7 +674,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
         
-        msg = "<class Group>: When promoting ['a']: Can't use multdimensional index into a flat source."
+        msg = "<class Group>: When promoting ['a'] from 'comp1': Can't use multdimensional index into a flat source."
 
         with self.assertRaises(Exception) as context:
             model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
@@ -1146,9 +1145,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "src_indices for 'x' is not flat, so its input shape "
-                         "must be provided. src_indices may contain an extra "
-                         "dimension if the connected source is not flat, making "
-                         "the input shape ambiguous.")
+                         "must be provided.")
 
     @parameterized.expand(itertools.product(
         [((4, 3),  [(0, 0), (3, 1), (2, 1), (1, 1)]),
@@ -1159,6 +1156,7 @@ class TestGroup(unittest.TestCase):
     ), name_func=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args))
     def test_promote_src_indices_param(self, src_info, tgt_shape):
         src_shape, idxvals = src_info
+        flat = np.atleast_1d(idxvals).ndim == 1
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
@@ -1176,7 +1174,7 @@ class TestGroup(unittest.TestCase):
                             i += 1
 
                 self.add_input('x', np.ones(4).reshape(tgt_shape),
-                               src_indices=sidxs, shape=tshape)
+                               src_indices=sidxs, flat_src_indices=flat, shape=tshape)
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1434,6 +1432,8 @@ class TestGroupMPISlice(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp1())
         p.model.connect('indep.x', 'C1.x')
 
+        #import wingdbstub
+        
         p.setup()
         p.run_model()
 
@@ -1799,9 +1799,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "<model> <class SimpleGroup>: The src_indices argument should be an int, list, "
-            "tuple, ndarray, slice or Iterable, but src_indices for promotes from 'comp2' are "
-            "<class 'float'>.")
+            "<model> <class SimpleGroup>: When promoting ['a'] from 'comp2': Can't create an index array using indices of non-integral type 'float64'.")
 
     def test_promotes_src_indices_bad_dtype(self):
 
@@ -1818,8 +1816,7 @@ class TestGroupPromotes(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(cm.exception),
-            "<model> <class SimpleGroup>: src_indices must contain integers, but src_indices "
-            "for promotes from 'comp2' are type <class 'numpy.complex128'>.")
+            "<model> <class SimpleGroup>: When promoting ['a'] from 'comp2': Can't create an index array using indices of non-integral type 'complex128'.")
 
     def test_promotes_src_indices_bad_shape(self):
 
@@ -1992,7 +1989,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "<model> <class SimpleGroup>: Trying to promote outputs ['*'] "
-            "while specifying src_indices [0, 2, 4] is not meaningful.")
+            "while specifying src_indices [0 2 4] is not meaningful.")
 
     def test_promotes_src_indices_collision(self):
 
@@ -2095,18 +2092,20 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1, dtype=int))
 
     def test_src_indices_as_float_list(self):
-        msg = "src_indices must contain integers, but src_indices for " + \
-              "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
 
-        with self.assertRaisesRegex(TypeError, msg):
+        with self.assertRaises(Exception) as cm:
             self.sub.connect('src.x', 'tgt.x', src_indices=[1.0])
 
-    def test_src_indices_as_float_array(self):
-        msg = "src_indices must contain integers, but src_indices for " + \
-              "connection from 'src.x' to 'tgt.x' is <.* 'numpy.float64'>."
+        msg = "'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an index array using indices of non-integral type 'float64'."
+        self.assertEquals(str(cm.exception), msg)
 
-        with self.assertRaisesRegex(TypeError, msg):
+    def test_src_indices_as_float_array(self):
+
+        with self.assertRaises(Exception) as cm:
             self.sub.connect('src.x', 'tgt.x', src_indices=np.zeros(1))
+
+        msg = "'sub' <class Group>: When connecting from 'src.x' to 'tgt.x': Can't create an index array using indices of non-integral type 'float64'."
+        self.assertEquals(str(cm.exception), msg)
 
     def test_src_indices_as_str(self):
         msg = "src_indices must be an index array, " + \
@@ -2384,7 +2383,7 @@ class TestConnect(unittest.TestCase):
 
         msg = "<model> <class Group>: The source indices [[1 1]] do not specify a valid shape " + \
               "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
-              "indices are (1, 2)."
+              "indices are shape (1,)."
 
         with self.assertRaises(ValueError) as context:
             p.setup()
@@ -2400,7 +2399,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a valid shape for the connection 'sub.src.x' to 'sub.arr.x'. The source has 2 dimensions but the indices expect 3."
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer [[ 2 -1  2]\n [ 2  2  2]] expects 3 dimensions."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2418,13 +2417,11 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = ("'sub' <class Group>: The source indices do not specify a valid index for the "
-               "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
-               "is out of range for source dimension of size 3.")
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Indexer [[ 2 -1]\n [ 4  4]] exceeds bounds for axis of dimension 3."
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except Exception as err:
             self.assertEqual(str(err), msg)
         else:
             self.fail('Exception expected.')
@@ -2461,9 +2458,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
-              "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '9' is out of range for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
 
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
@@ -2481,9 +2476,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
-              "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '9' is out of range for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[4, 5], [7, 9]],
@@ -2500,9 +2493,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "<model> <class Group>: The source indices do not specify a valid index " + \
-              "for the connection 'indeps.x' to 'C1.x'. " + \
-              "Index '-10' is out of range for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[-10, 5], [7, 8]],
@@ -2531,11 +2522,7 @@ class TestSrcIndices(unittest.TestCase):
         with self.assertRaises(IndexError) as err:
             p.setup()
 
-        expected_error_msg = ( "'row4_comp' <class SlicerComp>:\n"
-                               "Error 'index 4 is out of bounds for axis 0 with size 4'\n"
-                               "  in resolving source indices in connection between"
-                               " source='indep.x' and target='row4_comp.x'\n"
-                               "  with src_indices='(4, Ellipsis)'" )
+        expected_error_msg = "<model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,)."
         self.assertEqual(str(err.exception), expected_error_msg)
 
 

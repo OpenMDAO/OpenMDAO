@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from itertools import product
 
 import numpy as np
+from numbers import Integral
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
@@ -19,7 +20,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import indexer, _update_new_style
 import openmdao.utils.coloring as coloring_mod
 from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
@@ -462,7 +463,7 @@ class Component(System):
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
-                  distributed=None):
+                  distributed=None, new_style_idx=False):
         """
         Add an input variable to the component.
 
@@ -500,6 +501,9 @@ class Component(System):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
+        new_style_idx : bool
+            If True, assume numpy compatible indexing.  Not setting this to True will result in a
+            deprecation warning for src_indices arrays with ndim > 1.
 
         Returns
         -------
@@ -515,15 +519,16 @@ class Component(System):
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
                             'Iterable' % self.msginfo)
-        if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
+        if shape is not None and not isinstance(shape, (Integral, tuple, list)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
         if src_indices is not None:
+            new_style_idx = _update_new_style(src_indices, new_style_idx)
             try:
-                src_indices = indexer(src_indices, flat=flat_src_indices)
-            except:
-                raise TypeError('%s: The src_indices argument should be an int, list, '
-                                'tuple, ndarray or slice' % self.msginfo)
+                src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
+            except Exception as err:
+                raise TypeError(f"{self.msginfo}: Error when specifying src_indices for input "
+                                f"'{name}': {err}")
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
@@ -959,7 +964,7 @@ class Component(System):
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
                 if meta_in['shape'] != inds.shape:
                     inds = inds.reshape(meta_in['shape'])
-                meta_in['src_indices'] = indexer[inds]
+                meta_in['src_indices'] = indexer(inds)
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 

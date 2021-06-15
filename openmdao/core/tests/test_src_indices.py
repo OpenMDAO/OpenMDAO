@@ -308,7 +308,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
 
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3))
 
         g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
@@ -339,14 +339,14 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         # C1.x has a shape of 3, so we apply a slice of [:, 1] to our source which has a shape
         # of (3,2) to give us our final shape of 3.
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
 
         g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
 
         # C2.x has a shape of 2, so we apply flat source indices of [1,5] to our source which has
         # a shape of (3,2) to give us our final shape of 2.
-        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2))
 
         p.setup()
 
@@ -370,7 +370,7 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         g2 = par.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
 
         # we want the connection to x to have a shape of (3,2), which differs from the
