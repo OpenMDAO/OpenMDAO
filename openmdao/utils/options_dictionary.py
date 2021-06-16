@@ -137,7 +137,7 @@ class OptionsDictionary(object):
         tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']]
         for key in sorted(self._dict.keys()):
             options = self._dict[key]
-            default = options['value'] if options['value'] is not _UNDEFINED else '**Required**'
+            default = options['val'] if options['val'] is not _UNDEFINED else '**Required**'
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
@@ -341,7 +341,7 @@ class OptionsDictionary(object):
             allow_none = True
 
         self._dict[name] = {
-            'value': default,
+            'val': default,
             'values': values,
             'types': types,
             'desc': desc,
@@ -437,7 +437,7 @@ class OptionsDictionary(object):
 
         self._assert_valid(name, value)
 
-        meta['value'] = value
+        meta['val'] = value
         meta['has_been_set'] = True
 
     def __getitem__(self, name):
@@ -461,7 +461,7 @@ class OptionsDictionary(object):
                 warn_deprecation(meta['deprecation'])
                 self._deprecation_warning_issued.append(name)
             if meta['has_been_set']:
-                return meta['value']
+                return meta['val']
             else:
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
@@ -472,4 +472,7 @@ class OptionsDictionary(object):
         Yield name and value of options.
         """
         for key, val in self._dict.items():
-            yield key, val['value']
+            if 'val' in val:
+                yield key, val['val']
+            elif 'value' in val:
+                yield key, val['value']

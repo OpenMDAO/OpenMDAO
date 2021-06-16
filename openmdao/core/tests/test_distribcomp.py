@@ -522,14 +522,14 @@ class MPITests(unittest.TestCase):
                     name, meta = inputs[0]
                     test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
                     test.assertTrue(meta['shape'] == (loc_size,))
-                    test.assertEqual(meta['value'].size, full_size)
-                    test.assertTrue(all(meta['value'] == in_vals*np.ones(full_size)))
+                    test.assertEqual(meta['val'].size, full_size)
+                    test.assertTrue(all(meta['val'] == in_vals*np.ones(full_size)))
 
                     test.assertEqual(len(outputs), 1)
                     name, meta = outputs[0]
                     test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
                     test.assertTrue(meta['shape'] == (loc_size,))
-                    test.assertTrue(all(meta['value'] == out_vals*np.ones(full_size)))
+                    test.assertTrue(all(meta['val'] == out_vals*np.ones(full_size)))
 
         p.setup()
 
@@ -590,14 +590,14 @@ class MPITests(unittest.TestCase):
                     test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
                     test.assertEqual(meta['shape'], (local_size,))
                     test.assertEqual(meta['global_shape'], global_shape)
-                    test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
+                    test.assertTrue(all(meta['val'] == in_vals*np.ones(size)))
 
                     test.assertEqual(len(outputs), 1)
                     name, meta = outputs[0]
                     test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
                     test.assertEqual(meta['shape'], (local_size,))
                     test.assertEqual(meta['global_shape'], global_shape)
-                    test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
+                    test.assertTrue(all(meta['val'] == out_vals*np.ones(size)))
 
         class Model(om.Group):
             def setup(self):

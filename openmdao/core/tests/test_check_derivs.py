@@ -9,7 +9,6 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
-from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
@@ -1276,27 +1275,6 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
-
-        # 5: One comp defines compute_multi_jacvec_product
-        size = 6
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('px', om.IndepVarComp('x', val=(np.arange(size, dtype=float) + 1.) * 3.0))
-        model.add_subsystem('py', om.IndepVarComp('y', val=(np.arange(size, dtype=float) + 1.) * 2.0))
-        model.add_subsystem('comp', MultiJacVec(size))
-
-        model.connect('px.x', 'comp.x')
-        model.connect('py.y', 'comp.y')
-
-        model.add_design_var('px.x', vectorize_derivs=False)
-        model.add_design_var('py.y', vectorize_derivs=False)
-        model.add_constraint('comp.f_xy', vectorize_derivs=False)
-
-        prob.setup()
-        prob.run_model()
-        stream = StringIO()
-        prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
 
     def test_check_partials_worst_subjac(self):
         # The first is printing the worst subjac at the bottom of the output. Worst is defined by

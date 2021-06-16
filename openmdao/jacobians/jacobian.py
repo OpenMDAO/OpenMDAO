@@ -17,7 +17,7 @@ from openmdao.vectors.vector import _full_slice
 SUBJAC_META_DEFAULTS = {
     'rows': None,
     'cols': None,
-    'value': None,
+    'val': None,
     'dependent': False,
 }
 
@@ -129,7 +129,7 @@ class Jacobian(object):
         """
         abs_key = self._get_abs_key(key)
         if abs_key in self._subjacs_info:
-            return self._subjacs_info[abs_key]['value']
+            return self._subjacs_info[abs_key]['val']
         else:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
@@ -156,7 +156,7 @@ class Jacobian(object):
             subjacs_info = self._subjacs_info[abs_key]
 
             if issparse(subjac):
-                subjacs_info['value'] = subjac
+                subjacs_info['val'] = subjac
             else:
                 # np.promote_types will choose the smallest dtype that can contain both arguments
                 subjac = np.atleast_1d(subjac)
@@ -178,7 +178,7 @@ class Jacobian(object):
                         raise ValueError(msg.format(self.msginfo, abs_key,
                                                     subjac.shape, rows.shape))
 
-                subjacs_info['value'][:] = subjac
+                subjacs_info['val'][:] = subjac
 
         else:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
@@ -201,7 +201,7 @@ class Jacobian(object):
         Yield name pair and value of sub-Jacobian.
         """
         for key, meta in self._subjacs_info.items():
-            yield key, meta['value']
+            yield key, meta['val']
 
     @property
     def msginfo(self):
@@ -302,9 +302,9 @@ class Jacobian(object):
         """
         for meta in self._subjacs_info.values():
             if active:
-                meta['value'] = meta['value'].astype(np.complex)
+                meta['val'] = meta['val'].astype(np.complex)
             else:
-                meta['value'] = meta['value'].real
+                meta['val'] = meta['val'].real
 
         self._under_complex_step = active
 
@@ -348,7 +348,7 @@ class Jacobian(object):
                     if self._subjacs_info is system._subjacs_info:
                         self._subjacs_info = system._subjacs_info.copy()
                     meta = self._subjacs_info[key] = meta.copy()
-                    val = meta['value']
+                    val = meta['val']
 
                     if ridxs is not _full_slice:
                         nrows = len(ridxs)
@@ -358,7 +358,7 @@ class Jacobian(object):
                     if meta['rows'] is None:  # dense
                         val = val[ridxs, :]
                         val = val[:, cidxs]
-                        meta['value'] = val
+                        meta['val'] = val
                     else:  # sparse
                         sprows = meta['rows']
                         spcols = meta['cols']
@@ -372,7 +372,7 @@ class Jacobian(object):
                             val = val[mask]
                         meta['rows'] = sprows
                         meta['cols'] = spcols
-                        meta['value'] = val
+                        meta['val'] = val
 
                     meta['shape'] = (nrows, ncols)
 
@@ -407,11 +407,11 @@ class Jacobian(object):
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]
                 if subjac['cols'] is None:  # dense
-                    subjac['value'][:, loc_idx] = column[start:end]
+                    subjac['val'][:, loc_idx] = column[start:end]
                 else:  # our COO format
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
-                        subjac['value'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+                        subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
 
     def _restore_approx_sparsity(self):
         """

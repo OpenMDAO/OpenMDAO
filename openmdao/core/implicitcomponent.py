@@ -7,7 +7,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.warnings import warn_deprecation
 
-_inst_functs = ['apply_linear', 'apply_multi_linear', 'solve_multi_linear']
+_inst_functs = ['apply_linear']
 
 
 class ImplicitComponent(Component):
@@ -42,31 +42,10 @@ class ImplicitComponent(Component):
         self._has_guess = overrides_method('guess_nonlinear', self, ImplicitComponent)
 
         new_apply_linear = getattr(self, 'apply_linear', None)
-        new_apply_multi_linear = getattr(self, 'apply_multi_linear', None)
-        new_solve_multi_linear = getattr(self, 'solve_multi_linear', None)
 
         self.matrix_free = (overrides_method('apply_linear', self, ImplicitComponent) or
                             (new_apply_linear is not None and
                              self._inst_functs['apply_linear'] != new_apply_linear))
-        self.has_apply_multi_linear = (overrides_method('apply_multi_linear',
-                                                        self, ImplicitComponent) or
-                                       (new_apply_multi_linear is not None and
-                                        self._inst_functs['apply_multi_linear'] !=
-                                        new_apply_multi_linear))
-        self.has_solve_multi_linear = (overrides_method('solve_multi_linear',
-                                                        self, ImplicitComponent) or
-                                       (new_solve_multi_linear is not None and
-                                        self._inst_functs['solve_multi_linear'] !=
-                                        new_solve_multi_linear))
-
-        self.supports_multivecs = self.has_apply_multi_linear or self.has_solve_multi_linear
-
-        if self.supports_multivecs:
-            warn_deprecation(f"{self.msginfo}: has an apply_multi_linear and/or a "
-                             "solve_multi_linear method, but support for vectorized derivatives "
-                             "is deprecated and will be removed in a future release.")
-
-        self.matrix_free |= self.has_apply_multi_linear
 
     def _apply_nonlinear(self):
         """
@@ -178,7 +157,7 @@ class ImplicitComponent(Component):
         else:
             self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
-    def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, jac, rel_systems, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
@@ -186,8 +165,6 @@ class ImplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         mode : str
@@ -202,112 +179,65 @@ class ImplicitComponent(Component):
         if jac is None:
             jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
 
-        for vec_name in vec_names:
-            if vec_name not in self._rel_vec_names:
-                continue
+        with self._matvec_context(scope_out, scope_in, mode) as vecs:
+            d_inputs, d_outputs, d_residuals = vecs
 
-            with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:
-                d_inputs, d_outputs, d_residuals = vecs
+            # Jacobian and vectors are all scaled, unitless
+            jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # Jacobian and vectors are all scaled, unitless
-                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+            # if we're not matrix free, we can skip the bottom of
+            # this loop because apply_linear does nothing.
+            if not self.matrix_free:
+                return
 
-                # if we're not matrix free, we can skip the bottom of
-                # this loop because apply_linear does nothing.
-                if not self.matrix_free:
-                    continue
+            # Jacobian and vectors are all unscaled, dimensional
+            with self._unscaled_context(
+                    outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
 
-                # Jacobian and vectors are all unscaled, dimensional
-                with self._unscaled_context(
-                        outputs=[self._outputs, d_outputs], residuals=[d_residuals]):
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_inputs.read_only = d_outputs.read_only = True
+                elif mode == 'rev':
+                    d_residuals.read_only = True
 
-                    # set appropriate vectors to read_only to help prevent user error
-                    if mode == 'fwd':
-                        d_inputs.read_only = d_outputs.read_only = True
-                    elif mode == 'rev':
-                        d_residuals.read_only = True
+                try:
+                    with self._call_user_function('apply_linear', protect_outputs=True):
+                        self._apply_linear_wrapper(self._inputs, self._outputs,
+                                                   d_inputs, d_outputs, d_residuals, mode)
+                finally:
+                    d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
-                    try:
-                        if d_inputs._ncol > 1:
-                            if self.has_apply_multi_linear:
-                                with self._call_user_function('apply_multi_linear',
-                                                              protect_outputs=True):
-                                    self.apply_multi_linear(self._inputs, self._outputs,
-                                                            d_inputs, d_outputs, d_residuals, mode)
-                            else:
-                                with self._call_user_function('apply_linear',
-                                                              protect_outputs=True):
-                                    for i in range(d_inputs._ncol):
-                                        # need to make the multivecs look like regular single vecs
-                                        # since the component doesn't know about multivecs.
-                                        d_inputs._icol = i
-                                        d_outputs._icol = i
-                                        d_residuals._icol = i
-                                        self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                                   d_inputs, d_outputs, d_residuals,
-                                                                   mode)
-                                d_inputs._icol = None
-                                d_outputs._icol = None
-                                d_residuals._icol = None
-                        else:
-                            with self._call_user_function('apply_linear', protect_outputs=True):
-                                self._apply_linear_wrapper(self._inputs, self._outputs,
-                                                           d_inputs, d_outputs, d_residuals, mode)
-                    finally:
-                        d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
-
-    def _solve_linear(self, vec_names, mode, rel_systems):
+    def _solve_linear(self, mode, rel_systems):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        vec_names : [str, ...]
-            list of names of the right-hand-side vectors.
         mode : str
             'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         """
         if self._linear_solver is not None:
-            self._linear_solver.solve(vec_names, mode, rel_systems)
+            self._linear_solver.solve(mode, rel_systems)
 
         else:
             failed = False
-            for vec_name in vec_names:
-                if vec_name not in self._rel_vec_names:
-                    continue
-                d_outputs = self._vectors['output'][vec_name]
-                d_residuals = self._vectors['residual'][vec_name]
+            d_outputs = self._vectors['output']['linear']
+            d_residuals = self._vectors['residual']['linear']
 
-                with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    # set appropriate vectors to read_only to help prevent user error
-                    if mode == 'fwd':
-                        d_residuals.read_only = True
-                    elif mode == 'rev':
-                        d_outputs.read_only = True
+            with self._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                # set appropriate vectors to read_only to help prevent user error
+                if mode == 'fwd':
+                    d_residuals.read_only = True
+                elif mode == 'rev':
+                    d_outputs.read_only = True
 
-                    try:
-                        if d_outputs._ncol > 1:
-                            if self.has_solve_multi_linear:
-                                with self._call_user_function('solve_multi_linear'):
-                                    self.solve_multi_linear(d_outputs, d_residuals, mode)
-                            else:
-                                with self._call_user_function('solve_linear'):
-                                    for i in range(d_outputs._ncol):
-                                        # need to make the multivecs look like regular single vecs
-                                        # since the component doesn't know about multivecs.
-                                        d_outputs._icol = i
-                                        d_residuals._icol = i
-                                        self.solve_linear(d_outputs, d_residuals, mode)
-
-                                    d_outputs._icol = None
-                                    d_residuals._icol = None
-                        else:
-                            with self._call_user_function('solve_linear'):
-                                self.solve_linear(d_outputs, d_residuals, mode)
-                    finally:
-                        d_outputs.read_only = d_residuals.read_only = False
+                try:
+                    with self._call_user_function('solve_linear'):
+                        self.solve_linear(d_outputs, d_residuals, mode)
+                finally:
+                    d_outputs.read_only = d_residuals.read_only = False
 
     def _approx_subjac_keys_iter(self):
         for abs_key, meta in self._subjacs_info.items():

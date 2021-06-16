@@ -42,10 +42,9 @@ class DefaultVector(Vector):
             zeros array of correct size to hold all of this vector's variables.
         """
         system = self._system()
-        ncol = self._ncol
-        size = np.sum(system._var_sizes[self._name][self._typ][system.comm.rank, :])
+        size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
         dtype = complex if self._alloc_complex else float
-        return np.zeros(size, dtype=dtype) if ncol == 1 else np.zeros((size, ncol), dtype=dtype)
+        return np.zeros(size, dtype=dtype)
 
     def _extract_root_data(self):
         """
@@ -58,14 +57,13 @@ class DefaultVector(Vector):
         """
         system = self._system()
         type_ = self._typ
-        ncol = self._ncol
         root_vec = self._root_vector
 
         slices = root_vec.get_slice_dict()
 
-        mynames = system._var_relevant_names[self._name][type_]
+        mynames = list(system._var_abs2meta[type_])
         if mynames:
-            myslice = slice(slices[mynames[0]].start // ncol, slices[mynames[-1]].stop // ncol)
+            myslice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
         else:
             myslice = slice(0, 0)
 
@@ -102,11 +100,17 @@ class DefaultVector(Vector):
                     else:
                         self._scaling = (None, np.ones(data.size))
                 elif self._name == 'linear':
-                    # reuse the nonlinear scaling vecs since they're the same as ours
-                    nlvec = self._system()._root_vecs[self._kind]['nonlinear']
-                    self._scaling = (None, nlvec._scaling[1])
+                    if self._has_solver_ref:
+                        # We only allocate an extra scaling vector when we have output scaling
+                        # somewhere in the model.
+                        self._scaling = (None, np.ones(data.size))
+                    else:
+                        # Reuse the nonlinear scaling vecs since they're the same as ours.
+                        nlvec = self._system()._root_vecs[self._kind]['nonlinear']
+                        self._scaling = (None, nlvec._scaling[1])
                 else:
                     self._scaling = (None, np.ones(data.size))
+
         else:
             self._data, self._scaling = self._extract_root_data()
 
@@ -121,7 +125,6 @@ class DefaultVector(Vector):
         system = self._system()
         io = self._typ
         kind = self._kind
-        ncol = self._ncol
 
         do_scaling = self._do_scaling
         if do_scaling:
@@ -131,17 +134,10 @@ class DefaultVector(Vector):
         self._views = views = {}
         self._views_flat = views_flat = {}
 
-        abs2meta = system._var_abs2meta[io]
         start = end = 0
-        for abs_name in system._var_relevant_names[self._name][io]:
-            meta = abs2meta[abs_name]
+        for abs_name, meta in system._var_abs2meta[io].items():
             end = start + meta['size']
             shape = meta['shape']
-            if ncol > 1:
-                if not isinstance(shape, tuple):
-                    shape = (shape,)
-                shape = tuple(list(shape) + [ncol])
-
             views_flat[abs_name] = v = self._data[start:end]
             if shape != v.shape:
                 v = v.view()
@@ -149,7 +145,22 @@ class DefaultVector(Vector):
             views[abs_name] = v
 
             if do_scaling:
-                scale0, scale1 = factors[abs_name][kind]
+                factor_tuple = factors[abs_name][kind]
+
+                if len(factor_tuple) == 4:
+                    # Input vector unit conversion.
+                    a0, a1, factor, offset = factor_tuple
+
+                    if self._name == 'linear':
+                        scale0 = None
+                        scale1 = a1 / factor
+
+                    else:
+                        scale0 = (a0 + offset) * factor
+                        scale1 = a1 * factor
+                else:
+                    scale0, scale1 = factor_tuple
+
                 if scaling[0] is not None:
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
@@ -273,35 +284,77 @@ class DefaultVector(Vector):
         data = self.asarray()
         data[idxs] = val
 
-    def scale_to_norm(self):
+    def scale_to_norm(self, mode='fwd'):
         """
         Scale this vector to normalized form.
-        """
-        adder, scaler = self._scaling
-        data = self.asarray()
-        if self._ncol == 1:
-            if adder is not None:  # nonlinear only
-                data -= adder
-            data /= scaler
-        else:
-            if adder is not None:  # nonlinear only
-                data -= adder
-            data /= scaler[:, np.newaxis]
 
-    def scale_to_phys(self):
+        Parameters
+        ----------
+        mode : string
+            Derivative direction.
+        """
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_reverse(scaler, adder)
+        else:
+            self._scale_forward(scaler, adder)
+
+    def scale_to_phys(self, mode='fwd'):
         """
         Scale this vector to physical form.
+
+        Parameters
+        ----------
+        mode : string
+            Derivative direction.
         """
-        adder, scaler = self._scaling
-        data = self.asarray()
-        if self._ncol == 1:
-            data *= scaler
-            if adder is not None:  # nonlinear only
-                data += adder
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
+            adder = None
         else:
-            data *= scaler[:, np.newaxis]
-            if adder is not None:  # nonlinear only
-                data += adder
+            adder, scaler = self._scaling
+
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_forward(scaler, adder)
+        else:
+            self._scale_reverse(scaler, adder)
+
+    def _scale_forward(self, scaler, adder):
+        """
+        Scale this vector by subtracting the adder and dividing by the scaler.
+
+        Parameters
+        ----------
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
+        """
+        data = self.asarray()
+        if adder is not None:  # nonlinear only
+            data -= adder
+        data /= scaler
+
+    def _scale_reverse(self, scaler, adder):
+        """
+        Scale this vector by multiplying by the scaler ahd adding the adder.
+
+        Parameters
+        ----------
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
+        """
+        data = self.asarray()
+        data *= scaler
+        if adder is not None:  # nonlinear only
+            data += adder
 
     def asarray(self, copy=False):
         """
@@ -423,8 +476,8 @@ class DefaultVector(Vector):
         if self._slices is None:
             slices = {}
             start = end = 0
-            for name in self._system()._var_relevant_names[self._name][self._typ]:
-                end += self._views_flat[name].size
+            for name, arr in self._views_flat.items():
+                end += arr.size
                 slices[name] = slice(start, end)
                 start = end
             self._slices = slices

@@ -727,7 +727,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return _truncate(f"{self()}".replace('\n', ' '))
+        return _truncate(f"{self()}".replace('\n', ''))
 
     def copy(self):
         """
@@ -1305,7 +1305,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         str
             String representation.
         """
-        return _truncate(f"{self._arr}".replace('\n', ' '))
+        return _truncate(f"{self._arr}".replace('\n', ''))
 
     def __call__(self):
         """

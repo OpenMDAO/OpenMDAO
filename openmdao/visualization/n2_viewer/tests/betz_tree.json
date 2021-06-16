@@ -42,7 +42,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.5
                     ]
                 },
@@ -55,7 +55,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         10.0
                     ]
                 },
@@ -68,7 +68,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.225
                     ]
                 },
@@ -81,7 +81,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         10.0
                     ]
                 }
@@ -124,7 +124,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.5
                     ]
                 },
@@ -136,7 +136,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         10.0
                     ]
                 },
@@ -148,7 +148,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         1.225
                     ]
                 },
@@ -160,7 +160,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         10.0
                     ]
                 },
@@ -173,7 +173,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 },
@@ -186,7 +186,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 },
@@ -199,7 +199,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 },
@@ -212,7 +212,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 },
@@ -225,7 +225,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 },
@@ -238,7 +238,7 @@
                     "shape": "(1,)",
                     "distributed": false,
                     "is_discrete": false,
-                    "value": [
+                    "val": [
                         0.0
                     ]
                 }

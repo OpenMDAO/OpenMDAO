@@ -39,14 +39,14 @@ class LinearSolverTests(object):
             # forward
             d_residuals.set_val(1.0)
             d_outputs.set_val(0.0)
-            group.run_solve_linear(['linear'], 'fwd')
+            group.run_solve_linear('fwd')
 
             self.assertTrue(group.linear_solver._iter_count == 2)
 
             # reverse
             d_outputs.set_val(1.0)
             d_residuals.set_val(0.0)
-            group.run_solve_linear(['linear'], 'rev')
+            group.run_solve_linear('rev')
 
             self.assertTrue(group.linear_solver._iter_count == 2)
 

@@ -25,9 +25,9 @@ class TestKeplersEquation(unittest.TestCase):
 
         # ExecComp used to compute the LHS of Kepler's equation.
         lhs_comp = om.ExecComp('lhs=E - ecc * sin(E)',
-                               lhs={'value': 0.0, 'units': 'rad'},
-                               E={'value': 0.0, 'units': 'rad'},
-                               ecc={'value': 0.0})
+                               lhs={'val': 0.0, 'units': 'rad'},
+                               E={'val': 0.0, 'units': 'rad'},
+                               ecc={'val': 0.0})
 
         prob.model.add_subsystem(name='balance', subsys=bal,
                                  promotes_inputs=['M'],

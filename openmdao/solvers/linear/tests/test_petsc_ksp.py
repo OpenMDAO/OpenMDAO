@@ -46,7 +46,7 @@ class TestPETScKrylov(unittest.TestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -54,7 +54,7 @@ class TestPETScKrylov(unittest.TestCase):
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -77,7 +77,7 @@ class TestPETScKrylov(unittest.TestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -85,7 +85,7 @@ class TestPETScKrylov(unittest.TestCase):
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -108,14 +108,14 @@ class TestPETScKrylov(unittest.TestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         self.assertTrue(group.linear_solver._iter_count == 3)
 
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         self.assertTrue(group.linear_solver._iter_count == 3)
 
@@ -137,7 +137,7 @@ class TestPETScKrylov(unittest.TestCase):
         # forward
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -147,7 +147,7 @@ class TestPETScKrylov(unittest.TestCase):
         # reverse
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
@@ -167,7 +167,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
         group.linear_solver._linearize()
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -176,7 +176,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         group.linear_solver._linearize()
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
@@ -202,7 +202,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
         group.run_linearize()
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -211,7 +211,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         group.run_linearize()
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
@@ -232,7 +232,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
         group.linear_solver._linearize()
-        group.run_solve_linear(['linear'], 'fwd')
+        group.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
@@ -241,7 +241,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         group.linear_solver._linearize()
-        group.run_solve_linear(['linear'], 'rev')
+        group.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 3e-15)
@@ -269,7 +269,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_inputs, d_outputs, d_residuals = g1.get_linear_vectors()
         d_residuals.set_val(1.0)
         d_outputs.set_val(0.0)
-        g1.run_solve_linear(['linear'], 'fwd')
+        g1.run_solve_linear('fwd')
 
         output = d_outputs.asarray()
         assert_near_equal(output, g1.expected_solution, 1e-15)
@@ -280,7 +280,7 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
         g1.linear_solver._linearize()
-        g1.run_solve_linear(['linear'], 'rev')
+        g1.run_solve_linear('rev')
 
         output = d_residuals.asarray()
         assert_near_equal(output, g1.expected_solution, 3e-15)

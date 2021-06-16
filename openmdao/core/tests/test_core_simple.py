@@ -55,7 +55,7 @@ class Test(unittest.TestCase):
     def test_var_indices(self):
         def get_inds(p, sname, type_):
             system = p.model._get_subsystem(sname) if sname else p.model
-            idxs = p.model._var_allprocs_abs2idx['linear']
+            idxs = p.model._var_allprocs_abs2idx
             return np.array([
                 idxs[name] for name in system._var_abs2meta[type_]
             ])

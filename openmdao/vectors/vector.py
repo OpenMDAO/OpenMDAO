@@ -30,9 +30,9 @@ class Vector(object):
     Attributes
     ----------
     _name : str
-        The name of the vector: 'nonlinear', 'linear', or right-hand side name.
+        The name of the vector: 'nonlinear' or 'linear'.
     _typ : str
-        Type : 'input' for input vectors; 'output' for output/residual vectors.
+        Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _system : System
@@ -57,8 +57,6 @@ class Vector(object):
         Mapping of var name to slice.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _ncol : int
-        Number of columns for multi-vectors.
     _icol : int or None
         If not None, specifies the 'active' column of a multivector when interfaceing with
         a component that does not support multivectors.
@@ -68,26 +66,30 @@ class Vector(object):
         True if this vector's scaling includes an additive term.
     _scaling : dict
         Contains scale factors to convert data arrays.
+    _scaling_nl_vec : dict
+        Reference to the scaling factors in the nonlinear vector. Only used for linear input
+        vectors.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
         Total length of data vector (including shared memory parts).
+    _has_solver_ref : bool
+        This is set to True only when a ref is defined on a solver.
     """
 
-    # Listing of relevant citations that should be referenced when
+    # Listing of relevant citations
     cite = ""
-
-    """Indicator whether a vector class is MPI-distributed"""
+    # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False, ncol=1):
+    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
 
         Parameters
         ----------
         name : str
-            The name of the vector: 'nonlinear', 'linear', or right-hand side name.
+            The name of the vector: 'nonlinear' or 'linear'.
         kind : str
             The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
@@ -96,13 +98,10 @@ class Vector(object):
             Pointer to the vector owned by the root system.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
-        ncol : int
-            Number of columns for multi-vectors.
         """
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._ncol = ncol
         self._icol = None
         self._len = 0
 
@@ -131,6 +130,11 @@ class Vector(object):
                           (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = None
+        self._scaling_nl_vec = None
+
+        # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
+        # for the linear and nonlinear input vectors.
+        self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
         if root_vector is None:
             self._root_vector = self

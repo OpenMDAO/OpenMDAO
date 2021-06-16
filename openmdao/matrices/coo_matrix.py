@@ -54,7 +54,7 @@ class COOMatrix(Matrix):
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in submats.items():
 
-            val = info['value']
+            val = info['val']
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
@@ -79,7 +79,7 @@ class COOMatrix(Matrix):
         for key, (start, end, dense, jrows) in key_ranges.items():
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
-            val = info['value']
+            val = info['val']
             idxs = None
 
             col_offset = row_offset = 0

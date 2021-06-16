@@ -472,10 +472,10 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
 
         p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.zeros(5), 'units': 'ft'},
+                                                   x={'val': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.zeros(5), 'units': 'ft'},
+                                                   x={'val': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
         p.setup()
@@ -488,10 +488,10 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
 
         p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.zeros(5), 'units': 'inch'},
+                                                   x={'val': np.zeros(5), 'units': 'inch'},
                                                    y={'units': 'inch'}), promotes=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
-                                                   x={'value': np.zeros(5), 'units': 'ft'},
+                                                   x={'val': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
         p.model.set_input_defaults('x', units='ft')
@@ -1408,7 +1408,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -1869,7 +1869,7 @@ class TestGroupPromotes(unittest.TestCase):
                 self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
                 self.add_subsystem('comp1', om.ExecComp('z=x+y',
                                                         x=np.ones(3),
-                                                        y={'value': np.ones(3),
+                                                        y={'val': np.ones(3),
                                                            'src_indices': [1, 2, 3]},
                                                         z=np.ones(3)),
                                     promotes_inputs=['y'])
@@ -1898,7 +1898,7 @@ class TestGroupPromotes(unittest.TestCase):
                 self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
                 self.add_subsystem('comp1', om.ExecComp('z=x+y',
                                                         x=np.ones(3),
-                                                        y={'value': np.ones(3),
+                                                        y={'val': np.ones(3),
                                                            'src_indices': [1, 2, 3]},
                                                         z=np.ones(3)),
                                     promotes_inputs=['y'])
@@ -2179,8 +2179,8 @@ class TestConnect(unittest.TestCase):
     def test_explicit_conn_to_prom_inputs(self):
         p = om.Problem()
         p.model.add_subsystem('indeps', om.IndepVarComp('foo', val=10., units='ft'))
-        p.model.add_subsystem('C1', om.ExecComp('y=3*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
-        p.model.add_subsystem('C2', om.ExecComp('y=4*x', x={'units': 'ft', 'value': 1.}), promotes_inputs=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=3*x', x={'units': 'ft', 'val': 1.}), promotes_inputs=['x'])
+        p.model.add_subsystem('C2', om.ExecComp('y=4*x', x={'units': 'ft', 'val': 1.}), promotes_inputs=['x'])
         p.model.connect('indeps.foo', 'x')
         p.setup()
         p.final_setup()
@@ -2399,7 +2399,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer [[ 2 -1  2]\n [ 2  2  2]] expects 3 dimensions."
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer [[ 2 -1  2] [ 2  2  2]] expects 3 dimensions."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2417,7 +2417,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Indexer [[ 2 -1]\n [ 4  4]] exceeds bounds for axis of dimension 3."
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Indexer [[ 2 -1] [ 4  4]] exceeds bounds for axis of dimension 3."
 
         try:
             self.prob.setup()
@@ -2544,23 +2544,23 @@ class TestGroupAddInput(unittest.TestCase):
 
         g2 = g1.add_subsystem("G2", om.Group(), promotes_inputs=['x'])
         g2.add_subsystem("C1", om.ExecComp("y = 2. * x",
-                                            x={'value': val, 'units': units2},
-                                            y={'value': 1.0, 'units': units2}),
+                                            x={'val': val, 'units': units2},
+                                            y={'val': 1.0, 'units': units2}),
                                             promotes_inputs=['x'])
         g2.add_subsystem("C2", om.ExecComp("y = 3. * x",
-                                            x={'value': val, 'units': units1},
-                                            y={'value': 1.0, 'units': units1}),
+                                            x={'val': val, 'units': units1},
+                                            y={'val': 1.0, 'units': units1}),
                                             promotes_inputs=['x'])
 
         g3 = g1.add_subsystem("G3", om.Group(), promotes_inputs=['x'])
         if diff_vals: val = 2.0
         g3.add_subsystem("C3", om.ExecComp("y = 4. * x",
-                                            x={'value': val, 'units': units1},
-                                            y={'value': 1.0, 'units': units1}),
+                                            x={'val': val, 'units': units1},
+                                            y={'val': 1.0, 'units': units1}),
                                             promotes_inputs=['x'])
         g3.add_subsystem("C4", om.ExecComp("y = 5. * x",
-                                            x={'value': val, 'units': units2},
-                                            y={'value': 1.0, 'units': units2}),
+                                            x={'val': val, 'units': units2},
+                                            y={'val': 1.0, 'units': units2}),
                                             promotes_inputs=['x'])
 
         par = model.add_subsystem("par", om.ParallelGroup(), promotes_inputs=['x'])
@@ -2568,23 +2568,23 @@ class TestGroupAddInput(unittest.TestCase):
         g4 = par.add_subsystem("G4", om.Group(), promotes_inputs=['x'])
         if diff_vals: val = 3.0
         g4.add_subsystem("C5", om.ExecComp("y = 6. * x",
-                                            x={'value': val, 'units': units2},
-                                            y={'value': 1.0, 'units': units2}),
+                                            x={'val': val, 'units': units2},
+                                            y={'val': 1.0, 'units': units2}),
                                             promotes_inputs=['x'])
         g4.add_subsystem("C6", om.ExecComp("y = 7. * x",
-                                            x={'value': val, 'units': units1},
-                                            y={'value': 1.0, 'units': units1}),
+                                            x={'val': val, 'units': units1},
+                                            y={'val': 1.0, 'units': units1}),
                                             promotes_inputs=['x'])
 
         g5 = par.add_subsystem("G5", om.Group(), promotes_inputs=['x'])
         if diff_vals: val = 4.0
         g5.add_subsystem("C7", om.ExecComp("y = 8. * x",
-                                            x={'value': val, 'units': units1},
-                                            y={'value': 1.0, 'units': units1}),
+                                            x={'val': val, 'units': units1},
+                                            y={'val': 1.0, 'units': units1}),
                                             promotes_inputs=['x'])
         g5.add_subsystem("C8", om.ExecComp("y = 9. * x",
-                                            x={'value': val, 'units': units2},
-                                            y={'value': 1.0, 'units': units2}),
+                                            x={'val': val, 'units': units2},
+                                            y={'val': 1.0, 'units': units2}),
                                             promotes_inputs=['x'])
 
         return p
@@ -2595,19 +2595,19 @@ class TestGroupAddInput(unittest.TestCase):
 
         par = model.add_subsystem('par', om.ParallelGroup(), promotes_inputs=['x'])
         par.add_subsystem('C1', om.ExecComp('y = 3. * x',
-                                            x={'value': 1.0, 'units': 'ft'},
-                                            y={'value': 1.0, 'units': 'ft'}),
+                                            x={'val': 1.0, 'units': 'ft'},
+                                            y={'val': 1.0, 'units': 'ft'}),
                                             promotes_inputs=['x'])
         par.add_subsystem('C2', om.ExecComp('y = 5. * x',
-                                            x={'value': 1.0, 'units': 'inch'},
-                                            y={'value': 1.0, 'units': 'inch'}),
+                                            x={'val': 1.0, 'units': 'inch'},
+                                            y={'val': 1.0, 'units': 'inch'}),
                                             promotes_inputs=['x'])
 
         with self.assertRaises(Exception) as cm:
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'value'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem()
@@ -2621,7 +2621,7 @@ class TestGroupAddInput(unittest.TestCase):
            p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['value'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
+                         "<model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted to 'x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -2826,7 +2826,7 @@ class TestGroupAddInput(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             p.setup()
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'value'. Call <group>.set_input_defaults('x', value=?), where <group> is the model to remove the ambiguity.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
 
 
 class MultComp(om.ExplicitComponent):
@@ -3059,7 +3059,7 @@ class Test3Deep(unittest.TestCase):
 
     def test_io_meta_local_bad_meta_key(self):
         p = self.build_model()
-        p.model.cfg.add_get_io('sub', metadata_keys=('value', 'foo'))
+        p.model.cfg.add_get_io('sub', metadata_keys=('val', 'foo'))
         with self.assertRaises(Exception) as cm:
             p.setup()
 
@@ -3166,7 +3166,7 @@ class TestInConfigMPIpar(Test3Deep):
 
     def test_io_meta_remote(self):
         p = self.build_model()
-        p.model.add_get_io('cfg', metadata_keys=('value', 'src_indices', 'shape'), get_remote=True)
+        p.model.add_get_io('cfg', metadata_keys=('val', 'src_indices', 'shape'), get_remote=True)
         p.model.cfg.add_get_io('sub')
 
         p.setup()
@@ -3343,7 +3343,7 @@ class TestFeatureConnect(unittest.TestCase):
         p.model.set_input_defaults('x', np.ones(5), units='ft')
 
         exec_comp = om.ExecComp('y=sum(x)',
-                                x={'value': np.zeros(5), 'units': 'inch'},
+                                x={'val': np.zeros(5), 'units': 'inch'},
                                 y={'units': 'inch'})
 
         p.model.add_subsystem('comp1', exec_comp, promotes_inputs=['x'])

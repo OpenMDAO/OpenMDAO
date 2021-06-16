@@ -318,7 +318,7 @@ class _AutoIndepVarComp(IndepVarComp):
         # source, and ivc metadata is minimal.
         value, shape = ensure_compatible(name, val, None)
         metadata = {
-            'value': val,
+            'val': value,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
