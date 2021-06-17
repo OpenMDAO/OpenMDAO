@@ -3318,7 +3318,7 @@ class System(object):
                     ret_meta = None
                 else:
                     if metadata_keys is None:
-                        ret_meta = _MetadataDict(meta.copy())
+                        ret_meta = _MetadataDict(meta)
                     else:
                         ret_meta = _MetadataDict()
                         for key in metadata_keys:
