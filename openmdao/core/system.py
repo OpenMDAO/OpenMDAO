@@ -1873,7 +1873,7 @@ class System(object):
             else:
                 new_using = f"'{tup[0]}'"
 
-            mismatch = info.compare(old_info) if info is not None else ()
+            mismatch = info.compare(old_info) if info is not None and old_info is not None else ()
             if mismatch:
                 raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
                                    f"{new_using}, was already promoted using {old_using} with "
