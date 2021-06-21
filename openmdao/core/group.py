@@ -111,13 +111,6 @@ class _PromotesInfo(object):
         """
         mismatches = []
 
-        # We want to raise an error if any of these things are done in a second promote.
-        if other is None:
-            other = _PromotesInfo()
-            other.flat = None
-            other.src_shape = None
-            other.src_indices = None
-
         if self.flat != other.flat:
             if self.flat is not None and other.flat is not None:
                 mismatches.append('flat_src_indices')
