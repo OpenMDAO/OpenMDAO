@@ -1232,18 +1232,14 @@ class MPIFeatureTests(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
-        ivc.add_output('x', np.ones((size, )))
-        ivc.add_output('y', -1.42 * np.ones((size, )))
-        ivc.add_output('offset', -3.0 + 0.6 * np.arange(size))
+        ivc.add_output('x', np.ones(size))
+        ivc.add_output('y', -1.42 * np.ones(size))
 
         model.add_subsystem('p', ivc, promotes=['*'])
-        model.add_subsystem("parab", DistParabFeature(arr_size=size),
-                            promotes=['*'])
-        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
-                                               f_sum=np.ones(1),
-                                               f_xy=np.ones(size)),
-                            promotes_outputs=['*'])
-        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+        model.add_subsystem("parab", DistParabFeature(arr_size=size), promotes=['*'])
+
+        # self.promotes('parab', inputs=['x', 'y', 'offset'])
+        # self.promotes('parab', outputs=['f_xy', 'f_sum'])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0)
