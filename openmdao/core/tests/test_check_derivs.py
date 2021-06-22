@@ -1927,6 +1927,79 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.check_partials(out_stream=None)
 
 
+
+
+    def test_deriv_check_same_as_comp_deriv(self):
+        # The check_partials functionality allows a user to check the accuracy of components that
+        # use cs by using cs. This will result in no difference and is obviously not what we want.
+        # This sort of behavior should probably
+        # result in an exception, since an ignored warning here can result in the failure of a model
+        # to work correctly.
+        # we need to check all the settings. FD/forward should be allowed for both if they have
+        # different step sizes.
+        # At least one settings has to be different
+
+        class ParaboloidA(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+                self.add_output('g_xy', val=0.0)
+
+                # makes extra calls to the model with no actual steps
+                # self.declare_partials(of='*', wrt='*', method='fd')
+                # self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1e-6)
+                self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=0.333, step_calc='abs')
+                # self.declare_partials(of='*', wrt='*')
+
+            # def compute(self, inputs, outputs):
+            #     x = inputs['x']
+            #     y = inputs['y']
+            #
+            #     outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+            #     g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+            #     outputs['g_xy'] = g_xy * 3
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
+        parab = ParaboloidA()
+        model.add_subsystem('parab', parab)
+
+        parab.set_check_partial_options('*', method='fd')
+
+        parab.set_check_partial_options(wrt='x', step=1e-2)
+
+        # def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
+        #                               directional=False):
+
+        model.connect('px.x', 'parab.x')
+        model.connect('py.y', 'parab.y')
+
+        model.add_design_var('px.x', lower=-50, upper=50)
+        model.add_design_var('py.y', lower=-50, upper=50)
+        model.add_objective('parab.f_xy')
+
+        prob.setup()
+        prob.run_model()
+        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
+
+        # prob.check_partials(out_stream=None)
+        prob.check_partials(method='fd', step=0.666, form='backward', step_calc='rel')
+
+
+
+
+
+
+
+
+
+
+
+
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
