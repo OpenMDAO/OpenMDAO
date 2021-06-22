@@ -157,10 +157,14 @@ class OptionsDictionary(object):
                     acceptable_types = (acceptable_types,)
                 acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
-            deprecation = options['deprecation']
-
             desc = options['desc']
-            tlist.append([key, default, acceptable_values, acceptable_types, desc, deprecation])
+
+            deprecation = options['deprecation']
+            if deprecation is not None:
+                tlist.append([key, default, acceptable_values, acceptable_types, desc, deprecation])
+            else:
+                tlist.append([key, default, acceptable_values, acceptable_types, desc])
+
         return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
