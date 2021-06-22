@@ -111,3 +111,49 @@ class DistParabFeature(om.ExplicitComponent):
         global_sum = np.zeros(1)
         self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
         outputs['f_sum'] = global_sum
+
+
+class DistParabDeprecated(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare('arr_size', types=int, default=10,
+                             desc="Size of input and output vectors.")
+
+    def setup(self):
+        arr_size = self.options['arr_size']
+        comm = self.comm
+        rank = comm.rank
+
+        sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
+        start = offsets[rank]
+        io_size = sizes[rank]
+        self.offset = offsets[rank]
+        end = start + io_size
+
+        self.add_input('x', val=np.ones(io_size), distributed=True,
+                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('y', val=np.ones(io_size), distributed=True,
+                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('offset', val=-3.0 * np.ones(io_size), distributed=True,
+                       src_indices=np.arange(start, end, dtype=int))
+
+        self.add_output('f_xy', val=np.ones(io_size), distributed=True)
+
+        row_col = np.arange(io_size)
+        self.declare_partials('f_xy', ['x', 'y', 'offset'], rows=row_col, cols=row_col)
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+        a = inputs['offset']
+
+        outputs['f_xy'] = (x + a)**2 + x * y + (y + 4.0)**2 - 3.0
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        y = inputs['y']
+        a = inputs['offset']
+
+        partials['f_xy', 'x'] = 2.0 * x + 2.0 * a + y
+        partials['f_xy', 'y'] = 2.0 * y + 8.0 + x
+        partials['f_xy', 'offset'] = 2.0 * a + 2.0 * x
