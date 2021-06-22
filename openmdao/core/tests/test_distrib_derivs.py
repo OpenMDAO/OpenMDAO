@@ -1238,15 +1238,12 @@ class MPIFeatureTests(unittest.TestCase):
         model.add_subsystem('p', ivc, promotes=['*'])
         model.add_subsystem("parab", DistParabFeature(arr_size=size), promotes=['*'])
 
-        # self.promotes('parab', inputs=['x', 'y', 'offset'])
-        # self.promotes('parab', outputs=['f_xy', 'f_sum'])
-
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_constraint('f_xy', lower=0.0)
         model.add_objective('f_sum', index=-1)
 
         prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
-        prob.setup(force_alloc_complex=True)
+        prob.setup()
 
         prob.run_driver()
 
