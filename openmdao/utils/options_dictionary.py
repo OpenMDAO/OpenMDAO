@@ -134,7 +134,8 @@ class OptionsDictionary(object):
                   " `pip install openmdao[notebooks]`."
             raise ImportError(msg)
 
-        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description', "Deprecation"]]
+        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description',
+                  'Deprecation']]
         for key in sorted(self._dict.keys()):
             options = self._dict[key]
             default = options['value'] if options['value'] is not _UNDEFINED else '**Required**'
