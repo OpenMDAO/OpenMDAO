@@ -317,6 +317,7 @@ class Component(System):
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         iproc = self.comm.rank
+        abs2idx = self._var_allprocs_abs2idx = {}
 
         for io in ('input', 'output'):
             sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
@@ -324,12 +325,12 @@ class Component(System):
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']
+                abs2idx[name] = i
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        self._setup_var_index_maps()
         self._owned_sizes = self._var_sizes['output']
 
     def _setup_partials(self):

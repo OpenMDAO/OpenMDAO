@@ -73,7 +73,7 @@ class ExplicitComponent(Component):
 
         return of, wrt
 
-    def _jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
 
@@ -86,9 +86,10 @@ class ExplicitComponent(Component):
         """
         offset = end = 0
         local_ins = self._var_abs2meta['input']
+        szname = 'global_size' if total else 'size'
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                end += meta['size']
+                end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
                 yield wrt, offset, end, vec, _full_slice
                 offset = end

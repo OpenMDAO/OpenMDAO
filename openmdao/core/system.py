@@ -549,20 +549,21 @@ class System(object):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
-    def _jac_of_iter(self):
+    def _jac_of_iter(self, total=False):
         """
         Iterate over (name, offset, end, slice) for each 'of' (row) var in the system's jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
         """
+        szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
-            end += meta['size']
+            end += meta[szname]
             yield of, start, end, _full_slice
             start = end
 
-    def _jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
         Iterate over (name, offset, end, idxs) for each 'wrt' (column) var in the system's jacobian.
 
@@ -576,8 +577,10 @@ class System(object):
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
+        szname = 'global_size' if total else 'size'
+
         start = end = 0
-        for of, _start, _end, _ in self._jac_of_iter():
+        for of, _start, _end, _ in self._jac_of_iter(total=total):
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
@@ -586,7 +589,7 @@ class System(object):
 
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                end += meta['size']
+                end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
                 yield wrt, start, end, vec, _full_slice
                 start = end
@@ -1439,15 +1442,6 @@ class System(object):
         cfginfo = self._problem_meta['config_info']
         if cfginfo and self.pathname in cfginfo._modified_systems:
             cfginfo._modified_systems.remove(self.pathname)
-
-    def _setup_var_index_maps(self):
-        """
-        Compute maps from abs var names to their index among allprocs variables in this system.
-        """
-        abs2idx = self._var_allprocs_abs2idx = {}
-        for io in ['input', 'output']:
-            for i, abs_name in enumerate(self._var_allprocs_abs2meta[io]):
-                abs2idx[abs_name] = i
 
     def _setup_global_shapes(self):
         """

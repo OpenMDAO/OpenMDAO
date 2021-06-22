@@ -319,7 +319,6 @@ class _TotalJacInfo(object):
         if not approx:
             self.sol2jac_map = {}
             for mode in modes:
-
                 self.sol2jac_map[mode] = self._get_sol2jac_map(self.output_list[mode],
                                                                self.output_meta[mode],
                                                                abs2meta_out, mode)

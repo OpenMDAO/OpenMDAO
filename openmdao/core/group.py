@@ -1313,6 +1313,7 @@ class Group(System):
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         self._var_offsets = None
+        abs2idx = self._var_allprocs_abs2idx = {}
 
         for subsys in self._subsystems_myproc:
             subsys._setup_var_sizes()
@@ -1324,14 +1325,13 @@ class Group(System):
                                                    dtype=INT_DTYPE)
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+                abs2idx[name] = i
                 if name in abs2meta:
                     sizes[iproc, i] = abs2meta[name]['size']
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
-
-        self._setup_var_index_maps()
 
         if self.comm.size > 1:
             if (self._has_distrib_vars or self._contains_parallel_group or
@@ -2920,7 +2920,7 @@ class Group(System):
 
             yield key
 
-    def _jac_of_iter(self):
+    def _jac_of_iter(self, total=False):
         """
         Iterate over (name, start, end, idxs) for each 'of' (row) var in the systems's jacobian.
 
@@ -2936,6 +2936,7 @@ class Group(System):
         approx_of_idx = self._owns_approx_of_idx
 
         if self._owns_approx_of:
+            szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
@@ -2943,14 +2944,14 @@ class Group(System):
                     end += len(approx_of_idx[of])
                     yield of, start, end, approx_of_idx[of].flat()
                 else:
-                    end += abs2meta[of]['size']
+                    end += abs2meta[of][szname]
                     yield of, start, end, _full_slice
 
                 start = end
         else:
-            yield from super()._jac_of_iter()
+            yield from super()._jac_of_iter(total=total)
 
-    def _jac_wrt_iter(self, wrt_matches=None):
+    def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
         Iterate over (name, start, end, vec, locinds) for each column var in the systems's jacobian.
 
@@ -2971,9 +2972,11 @@ class Group(System):
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
 
+            szname = 'global_size' if total else 'size'
+
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, _ in self._jac_of_iter():
+                for of, _offset, _end, _ in self._jac_of_iter(total=total):
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         vec = self._outputs if of in local_outs else None
@@ -2995,14 +2998,14 @@ class Group(System):
                     else:
                         sub_wrt_idx = _full_slice
                         if wrt in abs2meta['input']:
-                            size = abs2meta['input'][wrt]['size']
+                            size = abs2meta['input'][wrt][szname]
                         else:
-                            size = abs2meta['output'][wrt]['size']
+                            size = abs2meta['output'][wrt][szname]
                     end += size
                     yield wrt, offset, end, vec, sub_wrt_idx
                     offset = end
         else:
-            yield from super()._jac_wrt_iter(wrt_matches)
+            yield from super()._jac_wrt_iter(wrt_matches, total)
 
     def _update_wrt_matches(self, info):
         """

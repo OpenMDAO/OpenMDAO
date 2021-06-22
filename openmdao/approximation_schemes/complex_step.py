@@ -195,7 +195,7 @@ class ComplexStep(ApproximationScheme):
             Copy of the outputs or residuals array after running the perturbed system.
         """
         for vec, idxs in idx_info:
-            if vec is not None:
+            if vec is not None and idxs is not None:
                 vec.iadd(delta, idxs)
 
         if total:
