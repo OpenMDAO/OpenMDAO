@@ -1,3 +1,72 @@
+***********************************
+# Release Notes for OpenMDAO 3.10.0
+
+June 22, 2021
+
+OpenMDAO 3.10.0 features a few API changes and a migration of documentation to JupyterBook.
+
+## New Deprecations
+
+- Component option `distributed` is now replaced with `distributed=True` on `add_input` and `add_output`. [#2073](https://github.com/OpenMDAO/OpenMDAO/pull/2073)
+- Removed an inconsistency where various options/arguments used different forms of `val`/`value`/`values`.  All have been changed to `val`. [#2112](https://github.com/OpenMDAO/OpenMDAO/pull/2112)
+
+## Backwards Incompatible API Changes:
+
+- Option `vectorize_derivs` has been removed from optimization variables. [#2116](https://github.com/OpenMDAO/OpenMDAO/pull/2116)
+
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- Replaced options['distributed'] usages with distributed=True in add_input/add_output [#2073](https://github.com/OpenMDAO/OpenMDAO/pull/2073)
+- New documentation using Jupyter-Notebooks. [#2076](https://github.com/OpenMDAO/OpenMDAO/pull/2076)
+- Added flag to System to tell when under finite difference. [#2089](https://github.com/OpenMDAO/OpenMDAO/pull/2089)
+- Added code to handle the case where the sql_meta file already exists in case recording. [#2099](https://github.com/OpenMDAO/OpenMDAO/pull/2099)
+- 'indices' for design vars and constraints can now be slices or 'fancy' indices. [#2102](https://github.com/OpenMDAO/OpenMDAO/pull/2102)
+- Refactor of parallel derivative coloring and removal of vectorize_derivs [#2116](https://github.com/OpenMDAO/OpenMDAO/pull/2116)
+- Users who add a recorder after setup is called get improved error messages [#2125](https://github.com/OpenMDAO/OpenMDAO/pull/2125)
+
+## Bug Fixes:
+
+- Added rank check to only print driver summary to single rank. [#2077](https://github.com/OpenMDAO/OpenMDAO/pull/2077)
+- Updated the norm calculation to account for None and zero length array. [#2084](https://github.com/OpenMDAO/OpenMDAO/pull/2084)
+- Fixed Return Value Type of add_output for IndepVarComp. [#2104](https://github.com/OpenMDAO/OpenMDAO/pull/2104)
+- Whenever get_io_metadata is called, update metadata and promoted names to account for any new i/o that was added. [#2106](https://github.com/OpenMDAO/OpenMDAO/pull/2106)
+- Fixed a couple of bugs in the scaling report viewer. [#2109](https://github.com/OpenMDAO/OpenMDAO/pull/2109)
+- Fixed invalid value in QuadraticComp for docs. [#2112](https://github.com/OpenMDAO/OpenMDAO/pull/2112)
+- Fixed inconsistency of val vs value in OpenMDAO [#2118](https://github.com/OpenMDAO/OpenMDAO/pull/2118)
+- Fixed a bug in ExecComp when expressions were added with missing value/shape info [#2121](https://github.com/OpenMDAO/OpenMDAO/pull/2121)
+- Fixed an issue where ExecComp was required to have at least one expression before configure is called. [#2123](https://github.com/OpenMDAO/OpenMDAO/pull/2123)
+- Generalized distributed vector check in Problem.setup() [#2126](https://github.com/OpenMDAO/OpenMDAO/pull/2126)
+- Fixed bug in scaling/unscaling the linear vector during reverse mode in model with solver scaling defined on an output. via 'ref'. [#2131](https://github.com/OpenMDAO/OpenMDAO/pull/2131)
+- Fixed deprecation warning; remove extraneous 'value' from metadata [#2146](https://github.com/OpenMDAO/OpenMDAO/pull/2146)
+- Fix for exception when adding src_indices with self.promotes on a previously promoted input. [#2149](https://github.com/OpenMDAO/OpenMDAO/pull/2149)
+
+## Miscellaneous:
+
+- Fixed doc links in README; change coveralls base_dir arg. [#2081](https://github.com/OpenMDAO/OpenMDAO/pull/2081)
+- Added a doc for load_cases. [#2082](https://github.com/OpenMDAO/OpenMDAO/pull/2082)
+- Cleaned up notebooks and made reset_notebook a console script. [#2086](https://github.com/OpenMDAO/OpenMDAO/pull/2086)
+- Updated workflow for docs. [#2087](https://github.com/OpenMDAO/OpenMDAO/pull/2087)
+- Moved asserts in a notebook into hidden cells. [#2092](https://github.com/OpenMDAO/OpenMDAO/pull/2092)
+- Some minor clean up of the former doc tests. [#2093](https://github.com/OpenMDAO/OpenMDAO/pull/2093)
+- Added conditional doc build reports to github workflow. [#2094](https://github.com/OpenMDAO/OpenMDAO/pull/2094)
+- Updated show_options_table func for Dymos documentation. [#2095](https://github.com/OpenMDAO/OpenMDAO/pull/2095)
+- Fixed a couple of lingering doc issues. [#2097](https://github.com/OpenMDAO/OpenMDAO/pull/2097)
+- Sourced coveralls from pypi in actions workflow [#2101](https://github.com/OpenMDAO/OpenMDAO/pull/2101)
+- Added tests for return values from add_input and add_output [#2105](https://github.com/OpenMDAO/OpenMDAO/pull/2105)
+- Update readme with new instructions for building docs [#2108](https://github.com/OpenMDAO/OpenMDAO/pull/2108)
+- Fixed github repo information for JupyterBook docs [#2115](https://github.com/OpenMDAO/OpenMDAO/pull/2115)
+- Fixed Keplers equation example in docs to show better ordering [#2117](https://github.com/OpenMDAO/OpenMDAO/pull/2117)
+- Removed deprecated usage of src_indices from docs [#2124](https://github.com/OpenMDAO/OpenMDAO/pull/2124)
+- Added sphinx_sitemap to docs; tweak CI & badges [#2129](https://github.com/OpenMDAO/OpenMDAO/pull/2129)
+- Replaced 'value' with 'val' in ExecComp across the documentation [#2130](https://github.com/OpenMDAO/OpenMDAO/pull/2130)
+- Minor documentation tweaks. [#2135](https://github.com/OpenMDAO/OpenMDAO/pull/2135)
+- Remove a bunch of warnings from the notebooks in the docs. [#2145](https://github.com/OpenMDAO/OpenMDAO/pull/2145)
+- Updated distributed parab component to remove deprecation warnings from the documentation. [#2143](https://github.com/OpenMDAO/OpenMDAO/pull/2143)
+
 **********************************
 # Release Notes for OpenMDAO 3.9.2
 
