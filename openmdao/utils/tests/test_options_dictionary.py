@@ -105,7 +105,7 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(self.dict.to_table(fmt='github'), expected)
 
-    # @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
     def test_deprecation_col(self):
         class MyComp(ExplicitComponent):
             pass
