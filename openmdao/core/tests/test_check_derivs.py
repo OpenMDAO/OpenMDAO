@@ -1939,7 +1939,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # different step sizes.
         # At least one settings has to be different
 
-        class ParaboloidA(om.ExplicitComponent):
+        class Paraboloid(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
@@ -1968,9 +1968,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         parab = ParaboloidA()
         model.add_subsystem('parab', parab)
 
-        parab.set_check_partial_options('*', method='fd')
+        # parab.set_check_partial_options('*', method='fd')
+        parab.set_check_partial_options('*', method='fd', form='forward', step=0.333, step_calc='abs')
 
-        parab.set_check_partial_options(wrt='x', step=1e-2)
+        # parab.set_check_partial_options(wrt='x', step=1e-2)
 
         # def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
         #                               directional=False):
@@ -1991,6 +1992,57 @@ class TestProblemCheckPartials(unittest.TestCase):
 
 
 
+
+
+    def test_deriv_check_same_as_comp_deriv_2(self):
+        class Paraboloid(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+                self.add_output('g_xy', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+
+                outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+                outputs['g_xy'] = g_xy * 3
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
+        parab = Paraboloid()
+        # parab.declare_partials(of='*', wrt='*', method='fd', step=0.333)
+        parab.declare_partials(of='*', wrt='*', method='fd')
+
+        model.add_subsystem('parab', parab)
+
+        parab.set_check_partial_options('*', method='fd')
+        # parab.set_check_partial_options('*', method='fd', form='forward', step=0.333, step_calc='abs')
+
+        # parab.set_check_partial_options(wrt='x', step=1e-2)
+
+        # def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
+        #                               directional=False):
+
+        model.connect('px.x', 'parab.x')
+        model.connect('py.y', 'parab.y')
+
+        model.add_design_var('px.x', lower=-50, upper=50)
+        model.add_design_var('py.y', lower=-50, upper=50)
+        model.add_objective('parab.f_xy')
+
+        prob.setup()
+        prob.run_model()
+        # J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
+
+        # prob.check_partials(out_stream=None)
+        # prob.check_partials(method='fd', step=0.666, form='backward', step_calc='rel')
+        prob.check_partials(method='fd')
 
 
 

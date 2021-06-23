@@ -73,6 +73,8 @@ CITATION = """@article{openmdao_2019,
     }"""
 
 
+
+
 class Problem(object):
     """
     Top-level container for the systems and drivers.
@@ -1140,152 +1142,53 @@ class Problem(object):
 
 
         ##################### start new ##################
+        # Could do this later in this method but at that point some computations could have been
+        #   made and it would just waste time before the user is told there is an error and the
+        #   program errs out
         requested_method = method
         alloc_complex = model._outputs._alloc_complex
 
         for comp in comps:
-            # of, wrt = comp._get_partials_varlists()
-            #
-            # # Load up approximation objects with the requested settings.
-            # local_opts = comp._get_check_partial_options()
-            # for rel_key in product(of, wrt):
-            #     abs_key = rel_key2abs_key(comp, rel_key)
-            #     local_wrt = rel_key[1]
-            #
-            #     # Determine if fd or cs.
-            #     method = requested_method
-            #     if local_wrt in local_opts:
-            #         local_method = local_opts[local_wrt]['method']
-            #         if local_method:
-            #             method = local_method
-            #
-            #     # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-            #     if method == 'cs' and not alloc_complex:
-            #         method = 'fd'
-            #
-            #     fd_options = {'order': None,
-            #                   'method': method}
-            #
-            #     if method == 'cs':
-            #         defaults = ComplexStep.DEFAULT_OPTIONS
-            #
-            #         fd_options['form'] = None
-            #         fd_options['step_calc'] = None
-            #
-            #     elif method == 'fd':
-            #         defaults = FiniteDifference.DEFAULT_OPTIONS
-            #
-            #         fd_options['form'] = form
-            #         fd_options['step_calc'] = step_calc
-            #
-            #     if step and requested_method == method:
-            #         fd_options['step'] = step
-            #     else:
-            #         fd_options['step'] = defaults['step']
-            #
-            #     # Precedence: component options > global options > defaults
-            #     if local_wrt in local_opts:
-            #         for name in ['form', 'step', 'step_calc', 'directional']:
-            #             value = local_opts[local_wrt][name]
-            #             if value is not None:
-            #                 fd_options[name] = value
 
-                def get_fd_options(var, global_method, component, global_step, global_form, global_step_calc):
-                    local_wrt = var
-
-                    local_opts = component._get_check_partial_options()
-
-                    # Determine if fd or cs.
-                    method = global_method
-                    if local_wrt in local_opts:
-                        local_method = local_opts[local_wrt]['method']
-                        if local_method:
-                            method = local_method
-
-                    # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-                    alloc_complex = model._outputs._alloc_complex
-                    if method == 'cs' and not alloc_complex:
-                        method = 'fd'
-
-                    fd_options = {'order': None,
-                                  'method': method}
-
-                    if method == 'cs':
-                        defaults = ComplexStep.DEFAULT_OPTIONS
-
-                        fd_options['form'] = None
-                        fd_options['step_calc'] = None
-
-                    elif method == 'fd':
-                        defaults = FiniteDifference.DEFAULT_OPTIONS
-
-                        fd_options['form'] = global_form
-                        fd_options['step_calc'] = global_step_calc
-
-                    if global_step and global_method == method:
-                        fd_options['step'] = global_step
-                    else:
-                        fd_options['step'] = defaults['step']
-
-                    # Precedence: component options > global options > defaults
-                    if local_wrt in local_opts:
-                        for name in ['form', 'step', 'step_calc', 'directional']:
-                            value = local_opts[local_wrt][name]
-                            if value is not None:
-                                fd_options[name] = value
-
-                    return fd_options
 
                 for key, meta in comp._declared_partials.items():
+
+                    # Can method be exact ? Yes, it could
+                    # If exact, then no problem
+                    if meta['method'] == 'cs':
+                        default_options = ComplexStep.DEFAULT_OPTIONS
+                    else:
+                        default_options = FiniteDifference.DEFAULT_OPTIONS
+
+                    meta_with_defaults = meta.copy()
+                    for name in ['method', 'form', 'step', 'step_calc']:
+                        if name not in meta_with_defaults:
+                            meta_with_defaults[name] = default_options[name]
                     pattern_matches = comp._find_partial_matches(*key)
                     wrt_vars = pattern_matches[1]
                     for wrt_var in wrt_vars:
                         _, vars = wrt_var
                         for var in vars:
                             # we now have 'x', ...
-                            fd_options = get_fd_options(var, requested_method, comp, step, form, step_calc)
+                            fd_options = _get_fd_options(var, requested_method, comp, step, form, step_calc, alloc_complex)
                             # compare those to the values in meta
                             all_same = True
                             for name in ['method', 'form', 'step', 'step_calc']:
-                                if fd_options[name] != meta[name]:
+                                if fd_options[name] != meta_with_defaults[name]:
                                     all_same = False
                                     break
                             if all_same:
-                                raise ValueError('Using same method and settings for check_partials as component derivatives')
-
-                    # from openmdao.utils.name_maps import rel_name2abs_name
-                    # from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, \
-                    #     rel_name2abs_name
-                    # self._var_abs2prom = {'input': {}, 'output': {}}
-                    # self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
-
-                    # need to go through the wrt in pattern_matches[1] and see what
-                    #    the check partials options are for those but these are
-                    #    rel vars, not abs
-
-                    # use rel_name2abs_name(comp,'x') if needed
-
-
-                    # print(key, meta)
-
-
-                # pattern_matches = self._find_partial_matches(of, wrt)
-                # abs2meta_in = self._var_abs2meta['input']
-                # abs2meta_out = self._var_abs2meta['output']
-                #
-                # is_array = isinstance(val, ndarray)
-                # patmeta = dict(dct)
-                # patmeta_not_none = {k: v for k, v in dct.items() if v is not None}
-                #
-                # for of_bundle, wrt_bundle in product(*pattern_matches):
-                #     of_pattern, of_matches = of_bundle
-                #     wrt_pattern, wrt_matches = wrt_bundle
-                #     if not of_matches:
-
+                                raise ValueError(f"{self.msginfo}: Checking partials on variable {var} in component {comp.pathname} using the same "
+                                                 "method and settings as the used to compute derivatives "
+                                                 "will not provide any relevant information on the accuracy.\n"
+                                                 "Settings for both are:\n"
+                                                 f"    method: {fd_options['method']}\n"
+                                                 f"    form: {fd_options['form']}\n"
+                                                 f"    step: {fd_options['step']}\n"
+                                                 f"    step_calc: {fd_options['step_calc']}\n"
+                                                 )
 
         ###################### end new ################
-
-
 
         self.set_solver_print(level=0)
 
@@ -2601,3 +2504,49 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+def _get_fd_options(var, global_method, component, global_step, global_form, global_step_calc, alloc_complex):
+    local_wrt = var
+
+    local_opts = component._get_check_partial_options()
+
+    # Determine if fd or cs.
+    method = global_method
+    if local_wrt in local_opts:
+        local_method = local_opts[local_wrt]['method']
+        if local_method:
+            method = local_method
+
+    # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
+    # alloc_complex = model._outputs._alloc_complex
+    if method == 'cs' and not alloc_complex:
+        method = 'fd'
+
+    fd_options = {'order': None,
+                  'method': method}
+
+    if method == 'cs':
+        defaults = ComplexStep.DEFAULT_OPTIONS
+
+        fd_options['form'] = None
+        fd_options['step_calc'] = None
+
+    elif method == 'fd':
+        defaults = FiniteDifference.DEFAULT_OPTIONS
+
+        fd_options['form'] = global_form
+        fd_options['step_calc'] = global_step_calc
+
+    if global_step and global_method == method:
+        fd_options['step'] = global_step
+    else:
+        fd_options['step'] = defaults['step']
+
+    # Precedence: component options > global options > defaults
+    if local_wrt in local_opts:
+        for name in ['form', 'step', 'step_calc', 'directional']:
+            value = local_opts[local_wrt][name]
+            if value is not None:
+                fd_options[name] = value
+
+    return fd_options
