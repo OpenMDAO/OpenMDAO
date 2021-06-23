@@ -105,6 +105,49 @@ class TestOptionsDict(unittest.TestCase):
 
         self.assertEqual(self.dict.to_table(fmt='github'), expected)
 
+    @unittest.skipIf(tabulate is None, reason="package 'tabulate' is not installed")
+    def test_deprecation_col(self):
+        class MyComp(ExplicitComponent):
+            pass
+
+        my_comp = MyComp()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
+        self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
+        self.dict.declare('long_desc', types=str,
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.',
+                          deprecation='This option is deprecated')
+
+        expected = "|Option|Default|AcceptableValues|AcceptableTypes|Description|Deprecation|\n|" \
+        "-----------|--------------|---------------------|-----------------------|-----------------" \
+        "--------------------------------------------------------------------------|---------------" \
+        "------------|\n|comp|MyComp|N/A|['ExplicitComponent']||N/A|\n|flag|False|[True,False]|" \
+        "['bool']||N/A|\n|long_desc|**Required**|N/A|['str']|Thisdescriptionislongandverbose,soit" \
+        "takesupmultiplelinesintheoptionstable.|Thisoptionisdeprecated|\n|test|**Required**|" \
+        "['a','b']|N/A|Testintegervalue|N/A|"
+
+        self.assertEqual(self.dict.to_table(fmt='github').replace(" ", ""), expected)
+
+        my_comp = MyComp()
+
+        self.dict.declare('test', values=['a', 'b'], desc='Test integer value')
+        self.dict.declare('flag', default=False, types=bool)
+        self.dict.declare('comp', default=my_comp, types=ExplicitComponent)
+        self.dict.declare('long_desc', types=str,
+                          desc='This description is long and verbose, so it '
+                               'takes up multiple lines in the options table.')
+
+        expected = "|Option|Default|AcceptableValues|AcceptableTypes|Description|\n|-----------|----" \
+        "----------|---------------------|-----------------------|-----------------------------------" \
+        "--------------------------------------------------------|\n|comp|MyComp|N/A|" \
+        "['ExplicitComponent']||\n|flag|False|[True,False]|['bool']||\n|long_desc|**Required**|N/A|" \
+        "['str']|Thisdescriptionislongandverbose,soittakesupmultiplelinesintheoptionstable.|\n|test|" \
+        "**Required**|['a','b']|N/A|Testintegervalue|"
+
+        self.assertEqual(self.dict.to_table(fmt='github').replace(" ", ""), expected)
+
     def test_type_checking(self):
         self.dict.declare('test', types=int, desc='Test integer value')
 
