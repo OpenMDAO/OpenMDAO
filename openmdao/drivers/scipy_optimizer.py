@@ -214,34 +214,17 @@ class ScipyOptimizeDriver(Driver):
             msg = '{} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(self.msginfo))
 
-        # Since COBYLA does not support bounds, we
-        #   need to add to the _cons metadata for any bounds that
-        #   need to be translated into a constraint
+        # Since COBYLA does not support bounds, we need to add to the _cons metadata
+        # for any bounds that need to be translated into a constraint
         if opt == 'COBYLA':
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower >= -INF_BOUND \
                         or isinstance(upper, np.ndarray) or upper <= INF_BOUND:
-                    # some of the metadata from the design variable is not copied over into
-                    # the metadata for the constraint: indices and scaling parameters 
-                    #     indices: only used to determine size, which is provided
-                    #     scaling: applied in add_design_var() (everything scipy sees is scaled)
-                    d = {}
-                    d['lower'] = lower
-                    d['upper'] = upper
-                    d['equals'] = None
-                    d['indices'] = None
-                    d['adder'] = None
-                    d['scaler'] = None
-                    d['total_adder'] = None
-                    d['total_scaler'] = None
-                    d['size'] = meta['size']
-                    d['global_size'] = meta['global_size']
-                    d['distributed'] = meta['distributed']
-                    d['linear'] = True
-                    d['ivc_source'] = meta['ivc_source']
-                    self._cons[name] = d
+                    self._cons[name] = meta.copy()
+                    self._cons[name]['equals'] = None
+                    self._cons[name]['linear'] = True
 
     def run(self):
         """
