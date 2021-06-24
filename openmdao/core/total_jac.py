@@ -1385,12 +1385,9 @@ class _TotalJacInfo(object):
                 if model._coloring_info['coloring'] is not None:
                     model._update_wrt_matches(model._coloring_info)
 
-                # Linearize Model
-                model._linearize(model._assembled_jac,
-                                sub_do_ln=model._linear_solver._linearize_children())
-            else:
-                for approximation in model._approx_schemes.values():
-                    approximation.compute_approximations(model, jac=model._jacobian, total=True)
+            # Linearize Model
+            model._linearize(model._assembled_jac,
+                            sub_do_ln=model._linear_solver._linearize_children())
 
         finally:
             model._tot_jac = None
