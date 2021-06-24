@@ -1,5 +1,7 @@
-
 import numpy as np
+
+om.display_source("openmdao.test_suite.test_examples.beam_optimization.beam_group.BeamGroup")
+om.display_source("openmdao.test_suite.test_examples.beam_optimization.beam_group.MultipointBeamGroup")
 
 import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
