@@ -536,6 +536,7 @@ class ApproximationScheme(object):
 
         for ic, col in self.compute_approx_col_iter(system, total,
                                                     under_cs=system._outputs._under_complex_step):
+            print("** col:", ic, "column:", col)
             if system._tot_jac is None:
                 jac.set_col(system, ic, col)
             else:
