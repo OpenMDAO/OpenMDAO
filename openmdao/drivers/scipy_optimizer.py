@@ -768,9 +768,9 @@ class ScipyOptimizeDriver(Driver):
             grad = self._grad_cache
         grad_idx = self._con_idx[name] + idx
 
-        # print("Constraint Gradient returned")
-        # print('   xnew', x_new)
-        # print('   grad', name, 'idx', idx, grad[grad_idx, :])
+        print("Constraint Gradient returned")
+        print('   xnew', x_new)
+        print('   grad', name, 'idx', idx, grad[grad_idx, :])
 
         # Equality constraints
         if meta['equals'] is not None:
