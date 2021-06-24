@@ -1215,5 +1215,8 @@ def get_connection_owner(system, tgt):
 
 
 def wing_dbg():
+    """
+    Make import of wingdbstub contingent on value of WING_DBG environment variable.
+    """
     if env_truthy('WING_DBG'):
         import wingdbstub

@@ -85,6 +85,8 @@ class ApproximationScheme(object):
             Group or component instance.
         under_cs : bool
             Flag that indicates if we are under complex step.
+        total : bool
+            If True, this is in the context of computing total derivatives.
 
         Returns
         -------
@@ -169,9 +171,7 @@ class ApproximationScheme(object):
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
-            it = [(of, end - start) for of, start, end, _ in
-                #   system._jac_of_iter(total=system.pathname == '')]
-                system._jac_of_iter()]
+            it = [(of, end - start) for of, start, end, _ in system._jac_of_iter()]
         else:
             it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
 
@@ -212,6 +212,8 @@ class ApproximationScheme(object):
         ----------
         system : System
             The system having its derivs approximated.
+        total : bool
+            If True, this is in the context of computing total derivatives.
         """
         abs2meta = system._var_allprocs_abs2meta
 
@@ -285,8 +287,10 @@ class ApproximationScheme(object):
         if total:
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
-                src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float), comm=system.comm)
-                tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float), comm=system.comm)
+                src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
+                                                      comm=system.comm)
+                tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float),
+                                                      comm=system.comm)
                 src_inds = PETSc.IS().createGeneral(sinds, comm=system.comm)
                 tgt_inds = PETSc.IS().createGeneral(tinds, comm=system.comm)
                 self.jac_scatter = (has_dist_data,
@@ -362,8 +366,7 @@ class ApproximationScheme(object):
                         result *= mult
 
                     if total:
-                        result = self._get_semitotal_result(system, result, tot_result,
-                                                            ordered_of_iter, my_rem_out_vars)
+                        result = self._get_semitotal_result(result, tot_result)
 
                     tosend = (fd_count, result)
 
@@ -424,16 +427,8 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
-        ordered_of_iter = list(system._jac_of_iter(total=system.pathname==''))
+        ordered_of_iter = list(system._jac_of_iter(total=system.pathname == ''))
         if total:
-            # if we have any remote vars, find the list of vars from this proc that need to be
-            # transferred to other procs
-            #if system.comm.size > 1:
-                #my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                   #if n in system._vars_to_gather and
-                                   #system._vars_to_gather[n] == system.comm.rank]
-            #else:
-            my_rem_out_vars = ()
             tot_result = np.zeros(ordered_of_iter[-1][2])
 
         # Clean vector for results (copy of the outputs or resids)
@@ -471,11 +466,8 @@ class ApproximationScheme(object):
 
                     if direction is not None or mult != 1.0:
                         result *= mult
-                    # print("result:", result, "size:", result.size)
                     if total:
-                        result = self._get_semitotal_result(system, result, tot_result,
-                                                            ordered_of_iter, my_rem_out_vars)
-                        # print("total_res", result)
+                        result = self._get_semitotal_result(result, tot_result)
 
                     tosend = (group_i, i_count, result)
 
@@ -504,8 +496,6 @@ class ApproximationScheme(object):
                     if tup is None:
                         continue
                     gi, icount, res = tup
-                    # if icount is None:
-                    #     continue
                     # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
@@ -536,7 +526,6 @@ class ApproximationScheme(object):
 
         for ic, col in self.compute_approx_col_iter(system, total,
                                                     under_cs=system._outputs._under_complex_step):
-            print("** col:", ic, "column:", col)
             if system._tot_jac is None:
                 jac.set_col(system, ic, col)
             else:
@@ -555,7 +544,7 @@ class ApproximationScheme(object):
 
         system._set_approx_mode(False)
 
-    def _get_semitotal_result(self, system, outarr, totarr, of_iter, my_rem_out_vars):
+    def _get_semitotal_result(self, outarr, totarr):
         """
         Convert output array into a column array that matches the size of the jacobian.
 
@@ -563,16 +552,10 @@ class ApproximationScheme(object):
 
         Parameters
         ----------
-        system : System
-            The owning system.
         outarr : ndarray
             Array containing local results from the outputs vector.
         totarr : ndarray
             Array sized to fit a total jac column.
-        of_iter : list
-            List of (of, start, end, inds) for each 'of' (row) variable in the total jacobian.
-        my_rem_out_vars : list
-            List of names of local variables that are remote on other procs.
 
         Returns
         -------
@@ -588,39 +571,45 @@ class ApproximationScheme(object):
         else:
             _, sinds, tinds = self.jac_scatter
             totarr[tinds] = outarr[sinds]
-        # out_slices = system._outputs.get_slice_dict()
-
-        # if system._vars_to_gather:
-        #     myvars = {}
-        #     for n in my_rem_out_vars:
-        #         val = outarr[out_slices[n]]
-        #         if n in system._owns_approx_of_idx:
-        #             val = val[system._owns_approx_of_idx[n]()]
-        #         myvars[n] = val
-        #     allremvars = system.comm.allgather(myvars)
-
-        #     for of, start, end, inds in of_iter:
-        #         if of not in system._vars_to_gather:
-        #             totarr[start:end] = outarr[out_slices[of]][inds]
-        #         else:
-        #             for procvars in allremvars:
-        #                 if of in procvars:
-        #                     totarr[start:end] = procvars[of]
-        #                     break
-        #             else:  # shouldn't ever get here
-        #                 raise RuntimeError(f"Couldn't find '{of}'.")
-        # else:
-        #     for of, start, end, inds in of_iter:
-        #         totarr[start:end] = outarr[out_slices[of]][inds]
 
         return totarr
 
 
 class LocalRangeIterable(object):
+    """
+    Iterable object that yields local indices while iterating over local or distributed vars.
 
-    def __init__(self, system, vname, var_inds, dist=False):
+    The number of iterations for a distributed variable will be the full distributed size of the
+    variable but None will be returned for any indices that are not local to the given rank.
+
+    Attributes
+    ----------
+    _inds : ndarray
+        Variable indices.
+    _dist_size : int
+        Full size of distributed variable.
+    _start : int
+        Starting index of distributed variable on this rank.
+    _end : int
+        Last index + 1 of distributed variable on this rank.
+    _iter : method
+        The iteration method used.
+    """
+
+    def __init__(self, system, vname, var_inds):
+        """
+        Initialize the iterator.
+
+        Parameters
+        ----------
+        system : System
+            Containing System.
+        vname : str
+            Name of the variable.
+        var_inds : iter of int
+            Local indices of the variable to iterate over.
+        """
         self._inds = var_inds
-        self._dist = dist
         self._dist_size = 0
 
         abs2meta = system._var_allprocs_abs2meta['output']
@@ -642,18 +631,41 @@ class LocalRangeIterable(object):
             self._iter = self._serial_iter
 
     def _serial_iter(self):
+        """
+        Iterate over a local non-distributed variable.
+
+        Yields
+        ------
+        int
+            Variable index.
+        """
         yield from self._inds
 
     def _dist_iter(self):
+        """
+        Iterate over a distributed variable.
+
+        Yields
+        ------
+        int or None
+            Variable index or None if index is not local to this rank.
+        """
         start = self._start
         end = self._end
-        offset = 0 if self._dist else start
 
         for i in range(self._dist_size):
             if i >= start and i < end:
-                yield i - offset
+                yield i - start
             else:
                 yield None
 
     def __iter__(self):
+        """
+        Return an iterator.
+
+        Returns
+        -------
+        iterator
+            An iterator over our indices.
+        """
         return self._iter()

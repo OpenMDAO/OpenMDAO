@@ -715,7 +715,6 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        print(f"{self._system().msginfo}: resids: {self._system()._residuals._data}")
         return self._system()._residuals.get_norm()
 
     def _disallow_discrete_outputs(self):

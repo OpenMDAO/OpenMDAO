@@ -356,6 +356,9 @@ class System(object):
         If True, this is the first call to _linearize.
     _is_local : bool
         If True, this system is local to this mpi process.
+    _tot_jac : __TotalJacInfo or None
+        If a total jacobian is being computed and this is the top level System, this will
+        be a reference to the _TotalJacInfo object.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -575,6 +578,22 @@ class System(object):
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
+
+        Parameters
+        ----------
+        total : bool
+            If True, this is part of a total derivative calculation and global sizes should be used.
+
+        Yields
+        ------
+        str
+            Name of 'of' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        slice or ndarray
+            A full slice or indices for the 'of' variable.
         """
         szname = 'global_size' if total else 'size'
         start = end = 0
@@ -585,7 +604,7 @@ class System(object):
 
     def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
-        Iterate over (name, offset, end, idxs) for each 'wrt' (column) var in the system's jacobian.
+        Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
         Parameters
         ----------
@@ -593,6 +612,22 @@ class System(object):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+        total : bool
+            If True, use full distributed var sizes because this is being used when computing
+            total derivatives.
+
+        Yields
+        ------
+        str
+            Name of 'wrt' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        Vector
+            Either the _outputs or _inputs vector.
+        slice
+            A full slice.
         """
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
@@ -1289,11 +1324,11 @@ class System(object):
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info['coloring'] = coloring = Coloring.load(fname)
-            #if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
-                #raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
-                                   #"declared ones (%s)." %
-                                   #(self.msginfo, coloring._meta['wrt_patterns'],
-                                    #info['wrt_patterns']))
+            if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
+                raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
+                                   "declared ones (%s)." %
+                                   (self.msginfo, coloring._meta['wrt_patterns'],
+                                    info['wrt_patterns']))
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
@@ -2978,8 +3013,7 @@ class System(object):
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()
                         meta['size'] = len(indices)
-                        meta['global_size'] = len(indices) # if vmeta['distributed'] \
-                            # else vmeta['global_size']
+                        meta['global_size'] = len(indices)
                     else:
                         meta['global_size'] = vmeta['global_size']
 

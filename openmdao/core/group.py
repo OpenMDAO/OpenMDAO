@@ -2911,7 +2911,7 @@ class Group(System):
         for key in product(of, wrt.union(of)):
             # Create approximations for the ones we need.
             if self._tot_jac is not None:
-                yield key # get all combos if we're doing total derivs
+                yield key  # get all combos if we're doing total derivs
                 continue
 
             # Skip explicit res wrt outputs
@@ -2934,14 +2934,18 @@ class Group(System):
         Parameters
         ----------
         total : bool
-            If True, this is being called in the context of a total jacobian, so all distributed
-            variables should use their global size.
-
-            # However, result_variable_slice_or_idxs will be local to the current proc.
+            If True, this is part of a total derivative calculation and global sizes should be used.
 
         Yields
         ------
-        of_name, start, end, result_variable_slice_or_idxs
+        str
+            Name of 'of' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        slice or ndarray
+            A full slice or indices for the 'of' variable.
         """
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
@@ -2964,18 +2968,30 @@ class Group(System):
 
     def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
-        Iterate over (name, start, end, vec, locinds) for each column var in the systems's jacobian.
+        Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
         Parameters
         ----------
         wrt_matches : set or None
-            Only include vars in each row that are contained in this set.  This will determine what
+            Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+        total : bool
+            If True, use full distributed var sizes because this is being used when computing
+            total derivatives.
 
         Yields
         ------
-        wrt_name, start, end, vec, locinds
+        str
+            Name of 'wrt' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        Vector
+            Either the _outputs or _inputs vector.
+        slice or ndarray
+            A full slice or indices for the 'wrt' variable.
         """
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta

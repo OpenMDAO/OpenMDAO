@@ -75,7 +75,7 @@ class ExplicitComponent(Component):
 
     def _jac_wrt_iter(self, wrt_matches=None, total=False):
         """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+        Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
         Parameters
         ----------
@@ -83,6 +83,22 @@ class ExplicitComponent(Component):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+        total : bool
+            If True, use full distributed var sizes because this is being used when computing
+            total derivatives.
+
+        Yields
+        ------
+        str
+            Name of 'wrt' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        Vector
+            The _inputs vector.
+        slice
+            A full slice.
         """
         offset = end = 0
         local_ins = self._var_abs2meta['input']
