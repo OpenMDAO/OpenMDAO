@@ -1365,10 +1365,10 @@ class _TotalJacInfo(object):
         try:
             # Re-initialize so that it is clean.
             if initialize:
-    
+
                 # Need this cache cleared because we re-initialize after computing linear constraints.
                 model._approx_subjac_keys = None
-    
+
                 if model._approx_schemes:
                     method = list(model._approx_schemes)[0]
                     kwargs = model._owns_approx_jac_meta
@@ -1379,15 +1379,19 @@ class _TotalJacInfo(object):
                     model.approx_totals(method='fd')
                     if progress_out_stream is not None:
                         model._approx_schemes['fd']._progress_out = progress_out_stream
-    
+
                 model._setup_jacobians(recurse=False)
                 model._setup_approx_partials()
                 if model._coloring_info['coloring'] is not None:
                     model._update_wrt_matches(model._coloring_info)
-    
+
                 # Linearize Model
                 model._linearize(model._assembled_jac,
                                 sub_do_ln=model._linear_solver._linearize_children())
+            else:
+                for approximation in model._approx_schemes.values():
+                    approximation.compute_approximations(model, jac=model._jacobian, total=True)
+
         finally:
             model._tot_jac = None
 
