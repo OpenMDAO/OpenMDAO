@@ -2910,6 +2910,9 @@ class Group(System):
 
         for key in product(of, wrt.union(of)):
             # Create approximations for the ones we need.
+            if self._tot_jac is not None:
+                yield key # get all combos if we're doing total derivs
+                continue
 
             # Skip explicit res wrt outputs
             if key[1] in of and key[1] not in ivc:
@@ -2928,6 +2931,14 @@ class Group(System):
         except in cases where _owns_approx__idx has a value for that variable, in which case it'll
         be indices into the variable.
 
+        Parameters
+        ----------
+        total : bool
+            If True, this is being called in the context of a total jacobian, so all distributed
+            variables should use their global size.
+
+            # However, result_variable_slice_or_idxs will be local to the current proc.
+
         Yields
         ------
         of_name, start, end, result_variable_slice_or_idxs
@@ -2942,7 +2953,7 @@ class Group(System):
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, start, end, approx_of_idx[of].flat()
+                    yield of, start, end, approx_of_idx[of].shaped_array().flat[:]
                 else:
                     end += abs2meta[of][szname]
                     yield of, start, end, _full_slice
@@ -3023,16 +3034,18 @@ class Group(System):
 
         info['wrt_matches'] = wrt_colors_matched = set()
 
-        if wrt_color_patterns:
-            abs2prom = self._var_allprocs_abs2prom
-            for _, wrt in self._get_approx_subjac_keys():
-                if wrt in wrt_colors_matched:
-                    continue
-                if wrt in abs2prom['output']:
-                    wrtprom = abs2prom['output'][wrt]
-                else:
-                    wrtprom = abs2prom['input'][wrt]
+        abs2prom = self._var_allprocs_abs2prom
+        for _, wrt in self._get_approx_subjac_keys():
+            if wrt in wrt_colors_matched:
+                continue
+            if wrt in abs2prom['output']:
+                wrtprom = abs2prom['output'][wrt]
+            else:
+                wrtprom = abs2prom['input'][wrt]
 
+            if wrt_color_patterns is None:
+                wrt_colors_matched.add(wrt)
+            else:
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
                         wrt_colors_matched.add(wrt)

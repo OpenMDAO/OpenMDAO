@@ -514,6 +514,7 @@ class System(object):
         self._owning_rank = None
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
+        self._tot_jac = None
 
     @property
     def msginfo(self):
@@ -1288,11 +1289,11 @@ class System(object):
                 fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info['coloring'] = coloring = Coloring.load(fname)
-            if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
-                raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
-                                   "declared ones (%s)." %
-                                   (self.msginfo, coloring._meta['wrt_patterns'],
-                                    info['wrt_patterns']))
+            #if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
+                #raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
+                                   #"declared ones (%s)." %
+                                   #(self.msginfo, coloring._meta['wrt_patterns'],
+                                    #info['wrt_patterns']))
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
@@ -2977,8 +2978,8 @@ class System(object):
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()
                         meta['size'] = len(indices)
-                        meta['global_size'] = len(indices) if vmeta['distributed'] \
-                            else vmeta['global_size']
+                        meta['global_size'] = len(indices) # if vmeta['distributed'] \
+                            # else vmeta['global_size']
                     else:
                         meta['global_size'] = vmeta['global_size']
 
@@ -3101,8 +3102,9 @@ class System(object):
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
                     indices = indices.shaped_instance()
-                    response['size'] = sz = len(indices)
-                    response['global_size'] = sz if meta['distributed'] else meta['global_size']
+                    response['size'] = response['global_size'] = len(indices)
+                    # response['size'] = sz = len(indices)
+                    # response['global_size'] = sz if meta['distributed'] else meta['global_size']
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
@@ -5205,3 +5207,95 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
+    def _get_jac_col_scatter(self):
+        """
+        Return source and target indices for a scatter from the output vector to a jacobian column.
+
+        If the transfer involves remote or distributed variables, the indices will be global.
+        Otherwise they will be converted to local.
+
+        Returns
+        -------
+        ndarray
+            Source indices.
+        ndarray
+            Target indices.
+        int
+            Size of jacobian column.
+        bool
+            True if remote or distributed vars are present.
+        """
+        myrank = self.comm.rank
+        owns = self._owning_rank
+        abs2idx = self._var_allprocs_abs2idx
+        abs2meta = self._var_abs2meta['output']
+        allabs2meta = self._var_allprocs_abs2meta['output']
+        sizes = self._var_sizes['output']
+        global_offsets = self._get_var_offsets()['output']
+        oflist = list(self._jac_of_iter(total=True))
+        tsize = oflist[-1][2]
+        toffset = myrank * tsize
+        has_dist_data = False
+
+        print("vars:", list(allabs2meta))
+        print("sizes:", sizes)
+        print("global_offsets:", global_offsets)
+        for tup in oflist:
+            print("oflist:", tup)
+
+        sinds = []
+        tinds = []
+
+        for name, tstart, tend, jinds in oflist:
+            vind = abs2idx[name]
+            if allabs2meta[name]['distributed']:
+                has_dist_data = True
+                dtstart = dtend = tstart
+                dsstart = dsend = 0
+                for rnk, sz in enumerate(sizes[:, vind]):
+                    dsend += sz
+                    if sz > 0:
+                        voff = global_offsets[rnk, vind]
+                        if jinds is _full_slice:
+                            dtend += sz
+                            sinds.append(range(voff, voff + sz))
+                            tinds.append(range(toffset + dtstart, toffset + dtend))
+                        elif jinds.size > 0:  # jinds is a flat array
+                            subinds = jinds[jinds >= dsstart]
+                            subinds = subinds[subinds < dsend]
+                            if subinds.size > 0:
+                                dtend += subinds.size
+                                sinds.append(subinds + (voff - dsstart))
+                                tinds.append(range(toffset + dtstart, toffset + dtend))
+                        dtstart = dtend
+                    dsstart = dsend
+                assert((len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1]))
+            else:
+                if name in abs2meta:
+                    owner = myrank
+                else:
+                    owner = owns[name]
+                    has_dist_data = True
+
+                voff = global_offsets[owner, vind]
+                if jinds is _full_slice:
+                    vsize = sizes[owner, vind]
+                    sinds.append(range(voff, voff + vsize))
+                else:
+                    sinds.append(jinds + voff)
+                tinds.append(range(tstart + toffset, tend + toffset))
+                assert(len(sinds[-1]) == len(tinds[-1]))
+
+        sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
+        tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)
+
+        if not has_dist_data:
+            # convert global indices back to local so we can use them to transfer between two
+            # local arrays
+            sysoffset = np.sum(sizes[:myrank, :])
+            sarr -= sysoffset
+            tarr -= toffset
+
+        print("xfer inds:", sarr, "->", tarr)
+        return sarr, tarr, tsize, has_dist_data

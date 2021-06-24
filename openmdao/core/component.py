@@ -384,7 +384,7 @@ class Component(System):
         """
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
-        if '*' in wrt_patterns:
+        if '*' in wrt_patterns or wrt_patterns is None:
             info['wrt_matches_rel'] = None
             info['wrt_matches'] = None
             return

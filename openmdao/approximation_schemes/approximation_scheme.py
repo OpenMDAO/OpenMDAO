@@ -1,17 +1,23 @@
 """Base class used to define the interface for derivative approximation schemes."""
 import time
-from collections import defaultdict
-from itertools import chain
-from scipy.sparse import coo_matrix
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
-from openmdao.utils.mpi import MPI
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.vectors.vector import _full_slice
+from openmdao.utils.mpi import check_mpi_env
+
+use_mpi = check_mpi_env()
+if use_mpi is False:
+    PETSc = None
+else:
+    try:
+        from petsc4py import PETSc
+    except ImportError:
+        if use_mpi:
+            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        PETSc = None
 
 
 class ApproximationScheme(object):
@@ -143,7 +149,8 @@ class ApproximationScheme(object):
             if is_total:
                 ccol2vcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-            ordered_wrt_iter = list(system._jac_wrt_iter(total=system.pathname == ''))
+            # ordered_wrt_iter = list(system._jac_wrt_iter(total=system.pathname == ''))
+            ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
             for abs_wrt, cstart, cend, vec, cinds in ordered_wrt_iter:
                 if wrt_matches is None or abs_wrt in wrt_matches:
@@ -162,7 +169,9 @@ class ApproximationScheme(object):
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
-            it = [(of, end - start) for of, start, end, _ in system._jac_of_iter(total=system.pathname == '')]
+            it = [(of, end - start) for of, start, end, _ in
+                #   system._jac_of_iter(total=system.pathname == '')]
+                system._jac_of_iter()]
         else:
             it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
 
@@ -192,8 +201,7 @@ class ApproximationScheme(object):
                 vcols = ccol2vcol[cols]
             else:
                 vcols = jaccols
-            vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols,
-                                               is_total)
+            vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols, is_total)
             self._colored_approx_groups.append((data, jaccols, vec_ind_list, nzrows))
 
     def _init_approximations(self, system, total=False):
@@ -255,9 +263,11 @@ class ApproximationScheme(object):
                             vec_idx = range(abs2meta['input'][wrt]['global_size'])
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    else:
+                    elif total:
                         vec_idx = LocalRangeIterable(system, wrt,
                                                      range(slices[wrt].start, slices[wrt].stop))
+                    else:
+                        vec_idx = range(slices[wrt].start, slices[wrt].stop)
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.
                     if directional:
@@ -271,6 +281,19 @@ class ApproximationScheme(object):
 
                 self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
                                             meta['vector']))
+
+        if total:
+            sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
+            if has_dist_data:
+                src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float), comm=system.comm)
+                tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float), comm=system.comm)
+                src_inds = PETSc.IS().createGeneral(sinds, comm=system.comm)
+                tgt_inds = PETSc.IS().createGeneral(tinds, comm=system.comm)
+                self.jac_scatter = (has_dist_data,
+                                    PETSc.Scatter().create(src_vec, src_inds, tgt_vec, tgt_inds),
+                                    src_vec, tgt_vec)
+            else:
+                self.jac_scatter = (has_dist_data, sinds, tinds)
 
     def _colored_column_iter(self, system, colored_approx_groups, total):
         """
@@ -405,13 +428,13 @@ class ApproximationScheme(object):
         if total:
             # if we have any remote vars, find the list of vars from this proc that need to be
             # transferred to other procs
-            if system.comm.size > 1:
-                my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                   if n in system._vars_to_gather and
-                                   system._vars_to_gather[n] == system.comm.rank]
-            else:
-                my_rem_out_vars = ()
-            tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            #if system.comm.size > 1:
+                #my_rem_out_vars = [n for n in system._outputs._abs_iter()
+                                   #if n in system._vars_to_gather and
+                                   #system._vars_to_gather[n] == system.comm.rank]
+            #else:
+            my_rem_out_vars = ()
+            tot_result = np.zeros(ordered_of_iter[-1][2])
 
         # Clean vector for results (copy of the outputs or resids)
         results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
@@ -438,6 +461,7 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             for i_count, vecidxs in enumerate(vec_idxs):
+
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, [(vec, vecidxs)],
@@ -447,10 +471,11 @@ class ApproximationScheme(object):
 
                     if direction is not None or mult != 1.0:
                         result *= mult
-
+                    print("result:", result, "size:", result.size)
                     if total:
                         result = self._get_semitotal_result(system, result, tot_result,
                                                             ordered_of_iter, my_rem_out_vars)
+                        print("total_res", result)
 
                     tosend = (group_i, i_count, result)
 
@@ -479,6 +504,8 @@ class ApproximationScheme(object):
                     if tup is None:
                         continue
                     gi, icount, res = tup
+                    # if icount is None:
+                    #     continue
                     # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
@@ -509,7 +536,10 @@ class ApproximationScheme(object):
 
         for ic, col in self.compute_approx_col_iter(system, total,
                                                     under_cs=system._outputs._under_complex_step):
-            jac.set_col(system, ic, col)
+            if system._tot_jac is None:
+                jac.set_col(system, ic, col)
+            else:
+                system._tot_jac.set_col(ic, col)
 
     def _compute_approx_col_iter(self, system, total, under_cs):
         system._set_approx_mode(True)
@@ -548,30 +578,39 @@ class ApproximationScheme(object):
         ndarray
             totarr, now filled with current values, potentially from other mpi procs.
         """
-        out_slices = system._outputs.get_slice_dict()
-
-        if system._vars_to_gather:
-            myvars = {}
-            for n in my_rem_out_vars:
-                val = outarr[out_slices[n]]
-                if n in system._owns_approx_of_idx:
-                    val = val[system._owns_approx_of_idx[n]()]
-                myvars[n] = val
-            allremvars = system.comm.allgather(myvars)
-
-            for of, start, end, inds in of_iter:
-                if of not in system._vars_to_gather:
-                    totarr[start:end] = outarr[out_slices[of]][inds]
-                else:
-                    for procvars in allremvars:
-                        if of in procvars:
-                            totarr[start:end] = procvars[of]
-                            break
-                    else:  # shouldn't ever get here
-                        raise RuntimeError(f"Couldn't find '{of}'.")
+        if self.jac_scatter[0]:  # dist data passing
+            _, scatter, svec, tvec = self.jac_scatter
+            svec.array = outarr
+            tvec.array[:] = totarr
+            scatter.scatter(svec, tvec, addv=False, mode=False)
+            totarr[:] = tvec.array
         else:
-            for of, start, end, inds in of_iter:
-                totarr[start:end] = outarr[out_slices[of]][inds]
+            _, sinds, tinds = self.jac_scatter
+            totarr[tinds] = outarr[sinds]
+        # out_slices = system._outputs.get_slice_dict()
+
+        # if system._vars_to_gather:
+        #     myvars = {}
+        #     for n in my_rem_out_vars:
+        #         val = outarr[out_slices[n]]
+        #         if n in system._owns_approx_of_idx:
+        #             val = val[system._owns_approx_of_idx[n]()]
+        #         myvars[n] = val
+        #     allremvars = system.comm.allgather(myvars)
+
+        #     for of, start, end, inds in of_iter:
+        #         if of not in system._vars_to_gather:
+        #             totarr[start:end] = outarr[out_slices[of]][inds]
+        #         else:
+        #             for procvars in allremvars:
+        #                 if of in procvars:
+        #                     totarr[start:end] = procvars[of]
+        #                     break
+        #             else:  # shouldn't ever get here
+        #                 raise RuntimeError(f"Couldn't find '{of}'.")
+        # else:
+        #     for of, start, end, inds in of_iter:
+        #         totarr[start:end] = outarr[out_slices[of]][inds]
 
         return totarr
 

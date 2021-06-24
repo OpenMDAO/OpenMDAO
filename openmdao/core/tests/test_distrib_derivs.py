@@ -566,6 +566,9 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('f_xy', lower=0.0)
         model.add_objective('f_sum', index=-1)
 
+        from openmdao.utils.general_utils import wing_dbg
+        wing_dbg()
+
         sub.approx_totals(method='fd')
 
         prob.setup(mode='fwd', force_alloc_complex=True)
@@ -911,6 +914,9 @@ class MPITests3(unittest.TestCase):
         model.add_constraint('f_xy', lower=0.0, indices=[3])
 
         prob.setup(force_alloc_complex=True, mode='fwd')
+
+        from openmdao.utils.general_utils import wing_dbg
+        wing_dbg()
 
         prob.run_model()
 

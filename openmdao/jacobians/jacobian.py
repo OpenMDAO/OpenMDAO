@@ -309,7 +309,9 @@ class Jacobian(object):
         self._under_complex_step = active
 
     def _setup_index_maps(self, system):
-        self._col_var_info = col_var_info = {t[0]: t for t in system._jac_wrt_iter()}
+        self._col_var_info = col_var_info = {
+            t[0]: t for t in system._jac_wrt_iter(total=system.pathname=='')
+        }
         self._colnames = list(col_var_info)   # map var id to varname
 
         ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())

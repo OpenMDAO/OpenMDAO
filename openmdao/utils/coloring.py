@@ -399,10 +399,10 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
-        info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
+        info = {'coloring': None, 'wrt_patterns': self._meta.get('wrt_patterns')}
         system._update_wrt_matches(info)
         if system.pathname:
-            if info['wrt_matches_rel'] is None:
+            if info.get('wrt_matches_rel') is None:
                 wrt_matches = None
             else:
                 wrt_matches = set(['.'.join((system.pathname, n))
@@ -2235,13 +2235,14 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         # Support for indices defined on driver vars.
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
-            driver_resp = driver._dist_driver_vars
+            # driver_resp = driver._dist_driver_vars
             for key, meta in driver._responses.items():
                 if meta['indices'] is not None:
-                    if meta['distributed'] and key in driver_resp:
-                        of_idx[key] = driver_resp[key][0]
-                    else:
-                        of_idx[key] = meta['indices']
+                    # if meta['distributed'] and key in driver_resp:
+                    #     of_idx[key] = driver_resp[key][0]
+                    # else:
+                    #     of_idx[key] = meta['indices']
+                    of_idx[key] = meta['indices']
         else:
             model._owns_approx_of_idx = {
                 key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(driver._responses)

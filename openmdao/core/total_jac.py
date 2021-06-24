@@ -14,7 +14,7 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
 
-from openmdao.utils.mpi import MPI, check_mpi_env, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
@@ -1361,98 +1361,102 @@ class _TotalJacInfo(object):
         # Solve for derivs with the approximation_scheme.
         # This cuts out the middleman by grabbing the Jacobian directly after linearization.
 
-        # Re-initialize so that it is clean.
-        if initialize:
+        model._tot_jac = self
+        try:
+            # Re-initialize so that it is clean.
+            if initialize:
+    
+                # Need this cache cleared because we re-initialize after computing linear constraints.
+                model._approx_subjac_keys = None
+    
+                if model._approx_schemes:
+                    method = list(model._approx_schemes)[0]
+                    kwargs = model._owns_approx_jac_meta
+                    model.approx_totals(method=method, **kwargs)
+                    if progress_out_stream is not None:
+                        model._approx_schemes[method]._progress_out = progress_out_stream
+                else:
+                    model.approx_totals(method='fd')
+                    if progress_out_stream is not None:
+                        model._approx_schemes['fd']._progress_out = progress_out_stream
+    
+                model._setup_jacobians(recurse=False)
+                model._setup_approx_partials()
+                if model._coloring_info['coloring'] is not None:
+                    model._update_wrt_matches(model._coloring_info)
+    
+                # Linearize Model
+                model._linearize(model._assembled_jac,
+                                sub_do_ln=model._linear_solver._linearize_children())
+        finally:
+            model._tot_jac = None
 
-            # Need this cache cleared because we re-initialize after computing linear constraints.
-            model._approx_subjac_keys = None
+        # approx_jac = model._jacobian._subjacs_info
 
-            if model._approx_schemes:
-                method = list(model._approx_schemes)[0]
-                kwargs = model._owns_approx_jac_meta
-                model.approx_totals(method=method, **kwargs)
-                if progress_out_stream is not None:
-                    model._approx_schemes[method]._progress_out = progress_out_stream
-            else:
-                model.approx_totals(method='fd')
-                if progress_out_stream is not None:
-                    model._approx_schemes['fd']._progress_out = progress_out_stream
-
-            model._setup_jacobians(recurse=False)
-            model._setup_approx_partials()
-            if model._coloring_info['coloring'] is not None:
-                model._update_wrt_matches(model._coloring_info)
-
-        # Linearize Model
-        model._linearize(model._assembled_jac,
-                         sub_do_ln=model._linear_solver._linearize_children())
-
-        approx_jac = model._jacobian._subjacs_info
-
-        of_idx = model._owns_approx_of_idx
-        wrt_idx = model._owns_approx_wrt_idx
-        wrt_meta = self.wrt_meta
+        # of_idx = model._owns_approx_of_idx
+        # wrt_idx = model._owns_approx_wrt_idx
+        # wrt_meta = self.wrt_meta
 
         t0 = time.time()
 
         totals = self.J_dict
-        if return_format == 'flat_dict':
-            for prom_out, output_name in zip(self.prom_of, of):
-                if output_name in self.remote_vois:
-                    continue
-                dist_resp = self._dist_driver_vars.get(output_name)
+        # if return_format == 'flat_dict':
+        #     for prom_out, output_name in zip(self.prom_of, of):
+        #         if output_name in self.remote_vois:
+        #             continue
+        #         dist_resp = self._dist_driver_vars.get(output_name)
 
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    if input_name in self.remote_vois:
-                        continue
+        #         for prom_in, input_name in zip(self.prom_wrt, wrt):
+        #             if input_name in self.remote_vois:
+        #                 continue
 
-                    if output_name in wrt_meta and output_name != input_name:
-                        # Special case where we constrain an input, and need derivatives of that
-                        # constraint wrt all other inputs.
-                        continue
+        #             if output_name in wrt_meta and output_name != input_name:
+        #                 # Special case where we constrain an input, and need derivatives of that
+        #                 # constraint wrt all other inputs.
+        #                 continue
 
-                    ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
-                    wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
+        #             ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
+        #             wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
 
-                    approxJ = approx_jac[output_name, input_name]
+        #             approxJ = approx_jac[output_name, input_name]
 
-                    totals[prom_out, prom_in][:] = _get_approx_subjac(approxJ,
-                                                                      prom_out, prom_in, ofidx,
-                                                                      wrtidx, dist_resp, comm)
+        #             totals[prom_out, prom_in][:] = _get_approx_subjac(approxJ,
+        #                                                               prom_out, prom_in, ofidx,
+        #                                                               wrtidx, dist_resp, comm)
 
-        elif return_format in ('dict', 'array'):
-            for prom_out, output_name in zip(self.prom_of, of):
-                if output_name in self.remote_vois:
-                    continue
+        # elif return_format in ('dict', 'array'):
+        #     for prom_out, output_name in zip(self.prom_of, of):
+        #         if output_name in self.remote_vois:
+        #             continue
 
-                tot = totals[prom_out]
+        #         tot = totals[prom_out]
 
-                dist_resp = self._dist_driver_vars.get(output_name)
+        #         dist_resp = self._dist_driver_vars.get(output_name)
 
-                for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    if input_name in self.remote_vois:
-                        continue
-                    if output_name in wrt_meta and output_name != input_name:
-                        # Special case where we constrain an input, and need derivatives of that
-                        # constraint wrt all other inputs.
-                        continue
+        #         for prom_in, input_name in zip(self.prom_wrt, wrt):
+        #             if input_name in self.remote_vois:
+        #                 continue
+        #             if output_name in wrt_meta and output_name != input_name:
+        #                 # Special case where we constrain an input, and need derivatives of that
+        #                 # constraint wrt all other inputs.
+        #                 continue
 
-                    ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
-                    wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
+        #             ofidx = of_idx[output_name]() if output_name in of_idx else _full_slice
+        #             wrtidx = wrt_idx[input_name]() if input_name in wrt_idx else _full_slice
 
-                    if prom_out == prom_in and isinstance(tot[prom_in], dict):
-                        rows, cols, data = tot[prom_in]['coo']
-                        data[:] = _get_approx_subjac(approx_jac[output_name, input_name],
-                                                     prom_out, prom_in, ofidx, wrtidx,
-                                                     dist_resp, comm)[rows, cols]
-                    else:
-                        tot[prom_in][:] = _get_approx_subjac(approx_jac[output_name, input_name],
-                                                             prom_out, prom_in, ofidx, wrtidx,
-                                                             dist_resp, comm)
+        #             if prom_out == prom_in and isinstance(tot[prom_in], dict):
+        #                 rows, cols, data = tot[prom_in]['coo']
+        #                 data[:] = _get_approx_subjac(approx_jac[output_name, input_name],
+        #                                              prom_out, prom_in, ofidx, wrtidx,
+        #                                              dist_resp, comm)[rows, cols]
+        #             else:
+        #                 tot[prom_in][:] = _get_approx_subjac(approx_jac[output_name, input_name],
+        #                                                      prom_out, prom_in, ofidx, wrtidx,
+        #                                                      dist_resp, comm)
 
-        else:
-            msg = "Unsupported return format '%s." % return_format
-            raise NotImplementedError(msg)
+        # else:
+        #     msg = "Unsupported return format '%s." % return_format
+        #     raise NotImplementedError(msg)
 
         if debug_print:
             print(f'Elapsed time to approx totals: {time.time() - t0} secs\n', flush=True)
@@ -1696,6 +1700,18 @@ class _TotalJacInfo(object):
         finally:
             self.model._recording_iter.pop()
 
+    def set_col(self, icol, column):
+        """
+        Set the given column of the total jacobian.
+
+        Parameters
+        ----------
+        icol : int
+            Index of the column.
+        column : ndarray
+            Array to be copied into the jacobian column.
+        """
+        self.J[:, icol] = column
 
 def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, comm):
     """

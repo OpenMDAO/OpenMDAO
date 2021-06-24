@@ -1212,3 +1212,8 @@ def get_connection_owner(system, tgt):
                     return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
 
     return None, None, None
+
+
+def wing_dbg():
+    if env_truthy('WING_DBG'):
+        import wingdbstub
