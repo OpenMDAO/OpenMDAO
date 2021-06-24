@@ -728,9 +728,9 @@ class ScipyOptimizeDriver(Driver):
             self._exc_info = msg
             return np.array([[]])
 
-        # print("Gradients calculated for objective")
-        # print('   xnew', x_new)
-        # print('   grad', grad[0, :])
+        print("Gradients calculated for objective")
+        print('   xnew', x_new)
+        print('   grad', grad[0, :])
 
         return grad[0, :]
 

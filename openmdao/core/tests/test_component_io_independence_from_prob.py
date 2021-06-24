@@ -46,6 +46,7 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
             prob.driver = om.ScipyOptimizeDriver()
 
             prob.setup()
+            print("J:", prob.compute_totals())
             prob.run_driver()
 
 

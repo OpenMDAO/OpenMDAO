@@ -5238,11 +5238,11 @@ class System(object):
         toffset = myrank * tsize
         has_dist_data = False
 
-        print("vars:", list(allabs2meta))
-        print("sizes:", sizes)
-        print("global_offsets:", global_offsets)
-        for tup in oflist:
-            print("oflist:", tup)
+        # print("vars:", list(allabs2meta))
+        # print("sizes:", sizes)
+        # print("global_offsets:", global_offsets)
+        # for tup in oflist:
+        #     print("oflist:", tup)
 
         sinds = []
         tinds = []
@@ -5297,5 +5297,5 @@ class System(object):
             sarr -= sysoffset
             tarr -= toffset
 
-        print("xfer inds:", sarr, "->", tarr)
+        # print("xfer inds:", sarr, "->", tarr)
         return sarr, tarr, tsize, has_dist_data

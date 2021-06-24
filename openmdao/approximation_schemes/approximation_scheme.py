@@ -471,11 +471,11 @@ class ApproximationScheme(object):
 
                     if direction is not None or mult != 1.0:
                         result *= mult
-                    print("result:", result, "size:", result.size)
+                    # print("result:", result, "size:", result.size)
                     if total:
                         result = self._get_semitotal_result(system, result, tot_result,
                                                             ordered_of_iter, my_rem_out_vars)
-                        print("total_res", result)
+                        # print("total_res", result)
 
                     tosend = (group_i, i_count, result)
 
