@@ -223,6 +223,10 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 if isinstance(lower, np.ndarray) or lower >= -INF_BOUND \
                         or isinstance(upper, np.ndarray) or upper <= INF_BOUND:
+                    # some of the metadata from the design variable is not copied over into
+                    # the metadata for the constraint: indices and scaling parameters 
+                    #     indices: only used to determine size, which is provided
+                    #     scaling: applied in add_design_var() (everything scipy sees is scaled)
                     d = {}
                     d['lower'] = lower
                     d['upper'] = upper
