@@ -101,15 +101,13 @@ class TestMPIScatter(unittest.TestCase):
 
         model.set_input_defaults('x', 50.0)
         model.set_input_defaults('y', 50.0)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', DummyComp(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-6
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-6, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -169,10 +167,7 @@ class TestScipyOptimizeDriverMPI(unittest.TestCase):
     def test_optimization_output_single_proc(self):
         prob = om.Problem()
         prob.model = SellarMDA()
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-8
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-8)
 
         prob.model.add_design_var('x', lower=0, upper=10)
         prob.model.add_design_var('z', lower=0, upper=10)
@@ -230,8 +225,10 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+
+        model.set_input_defaults('x', val=0.)
+        model.set_input_defaults('y', val=0.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -326,8 +323,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
@@ -362,10 +360,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -385,16 +380,14 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -415,17 +408,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -448,17 +439,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+        
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -482,17 +471,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -516,17 +503,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -552,8 +537,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
 
         prob.model.add_design_var('x', lower=0)
         # prob.model.add_constraint('x', lower=0)
@@ -574,17 +558,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -605,17 +587,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+        
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -646,10 +626,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -677,10 +654,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -708,10 +682,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -739,10 +710,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -770,10 +738,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -801,10 +766,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0, upper=50.0)
         model.add_objective('o')
@@ -834,10 +796,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('widths', lower=-50.0*np.ones((2, 2)), upper=50.0*np.ones((2, 2)))
         model.add_objective('o')
@@ -865,10 +824,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
         model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
@@ -889,17 +845,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0, ref=.02)
         model.add_design_var('y', lower=-50.0, upper=50.0, ref=.02)
@@ -927,10 +881,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -958,10 +909,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -989,10 +937,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1013,10 +958,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -1080,8 +1022,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                                  promotes_inputs=['a', 'Vu'])
 
         # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
 
         prob.model.add_design_var('a', lower=0., upper=1.)
         # negative one so we maximize the objective
@@ -1100,17 +1041,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1128,15 +1067,40 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
+    def test_simple_paraboloid_desvar_indices_COBYLA(self):
+        # verify indices are handled properly when creating constraints for
+        # upper and lower bounds on design variables for COBYLA
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', om.IndepVarComp('xy', val=[-1., 50., 50., -1]))
+        model.add_subsystem('comp', Paraboloid())
+        model.add_subsystem('cons', om.ExecComp('c = - x + y'))
+
+        model.connect('indep.xy', ['comp.x', 'cons.x'], src_indices=[1])
+        model.connect('indep.xy', ['comp.y', 'cons.y'], src_indices=[2])
+
+        model.add_design_var('indep.xy', indices=[1,2], lower=[-50.0, -50.0], upper=[50.0, 50.0])
+        model.add_objective('comp.f_xy')
+        model.add_constraint('cons.c', upper=-15.0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
+        prob.setup()
+
+        failed = prob.run_driver()
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver.result))
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_near_equal(prob['indep.xy'], [-1, 7.16667, -7.833334, -1], 1e-6)
+
     def test_sellar_mdf_COBYLA(self):
 
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
@@ -1367,10 +1331,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1402,10 +1363,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1435,10 +1393,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         prob.driver.options['debug_print'] = ['totals']
 
@@ -1467,10 +1422,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         prob.driver.options['debug_print'] = ['totals']
 
@@ -1501,12 +1453,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['desvars','ln_cons','nl_cons','objs']
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
+        prob.driver.options['debug_print'] = ['desvars', 'ln_cons', 'nl_cons', 'objs']
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1544,11 +1492,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivatives()
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-3
-        prob.driver.options['disp'] = False
-
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
         model.add_objective('obj')
@@ -1558,6 +1501,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup(check=False, mode='rev')
         prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         failed = prob.run_driver()
 
@@ -1583,10 +1528,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -1618,8 +1560,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.connect('indeps.x', ['parab.x', 'const.x'])
         prob.model.connect('indeps.y', ['parab.y', 'const.y'])
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'COBYLA'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
         prob.model.add_design_var('indeps.x', **{'ref0': 0, 'ref': 2, 'lower': -50, 'upper': 50})
@@ -1643,10 +1584,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         self.assertFalse(prob.driver.supports['multiple_objectives'])
         prob.driver.options['debug_print'] = ['nl_cons', 'objs']
@@ -1986,8 +1924,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.set_input_defaults('x', 3.0)
         prob.model.set_input_defaults('y', -4.0)
 
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
         # Default behavior is 'warn'
 
         prob.model.add_design_var('x', lower=-50, upper=50)
