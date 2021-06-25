@@ -572,17 +572,12 @@ class System(object):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
-    def _jac_of_iter(self, total=False):
+    def _jac_of_iter(self):
         """
         Iterate over (name, offset, end, slice) for each 'of' (row) var in the system's jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
-
-        Parameters
-        ----------
-        total : bool
-            If True, this is part of a total derivative calculation and global sizes should be used.
 
         Yields
         ------
@@ -595,6 +590,7 @@ class System(object):
         slice or ndarray
             A full slice or indices for the 'of' variable.
         """
+        total = self.pathname == ''
         szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
@@ -602,7 +598,7 @@ class System(object):
             yield of, start, end, _full_slice
             start = end
 
-    def _jac_wrt_iter(self, wrt_matches=None, total=False):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
@@ -612,9 +608,6 @@ class System(object):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
-        total : bool
-            If True, use full distributed var sizes because this is being used when computing
-            total derivatives.
 
         Yields
         ------
@@ -632,10 +625,11 @@ class System(object):
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
+        total = self.pathname == ''
         szname = 'global_size' if total else 'size'
 
         start = end = 0
-        for of, _start, _end, _ in self._jac_of_iter(total=total):
+        for of, _start, _end, _ in self._jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
@@ -1178,7 +1172,7 @@ class System(object):
 
                 for scheme in self._approx_schemes.values():
                     scheme._reset()  # force a re-initialization of approx
-                    approx_scheme._during_sparsity_comp = True
+                    scheme._during_sparsity_comp = True
 
             self.run_linearize(sub_do_ln=False)
 
@@ -1187,7 +1181,8 @@ class System(object):
         self._jacobian = save_jac
 
         # revert uncolored approx back to normal
-        approx_scheme._reset()
+        for scheme in self._approx_schemes.values():
+            scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
 
@@ -5267,7 +5262,7 @@ class System(object):
         allabs2meta = self._var_allprocs_abs2meta['output']
         sizes = self._var_sizes['output']
         global_offsets = self._get_var_offsets()['output']
-        oflist = list(self._jac_of_iter(total=True))
+        oflist = list(self._jac_of_iter())
         tsize = oflist[-1][2]
         toffset = myrank * tsize
         has_dist_data = False

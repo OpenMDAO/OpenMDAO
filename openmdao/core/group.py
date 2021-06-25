@@ -2772,13 +2772,13 @@ class Group(System):
             jac = self._jacobian
             if self.pathname == "":
                 for approximation in self._approx_schemes.values():
-                    approximation.compute_approximations(self, jac=jac, total=True)
+                    approximation.compute_approximations(self, jac=jac)
             else:
                 # When an approximation exists in a submodel (instead of in root), the model is
                 # in a scaled state.
                 with self._unscaled_context(outputs=[self._outputs]):
                     for approximation in self._approx_schemes.values():
-                        approximation.compute_approximations(self, jac=jac, total=True)
+                        approximation.compute_approximations(self, jac=jac)
 
         else:
             if self._assembled_jac is not None:
@@ -2923,18 +2923,13 @@ class Group(System):
 
             yield key
 
-    def _jac_of_iter(self, total=False):
+    def _jac_of_iter(self):
         """
         Iterate over (name, start, end, idxs) for each 'of' (row) var in the systems's jacobian.
 
         idxs will usually be the var slice into the full variable in the result array,
         except in cases where _owns_approx__idx has a value for that variable, in which case it'll
         be indices into the variable.
-
-        Parameters
-        ----------
-        total : bool
-            If True, this is part of a total derivative calculation and global sizes should be used.
 
         Yields
         ------
@@ -2966,9 +2961,9 @@ class Group(System):
 
                 start = end
         else:
-            yield from super()._jac_of_iter(total=total)
+            yield from super()._jac_of_iter()
 
-    def _jac_wrt_iter(self, wrt_matches=None, total=False):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
@@ -2978,9 +2973,6 @@ class Group(System):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
-        total : bool
-            If True, use full distributed var sizes because this is being used when computing
-            total derivatives.
 
         Yields
         ------
@@ -3007,7 +2999,7 @@ class Group(System):
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, _ in self._jac_of_iter(total=total):
+                for of, _offset, _end, _ in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - _offset)
                         vec = self._outputs if of in local_outs else None
@@ -3036,7 +3028,7 @@ class Group(System):
                     yield wrt, offset, end, vec, sub_wrt_idx
                     offset = end
         else:
-            yield from super()._jac_wrt_iter(wrt_matches, total)
+            yield from super()._jac_wrt_iter(wrt_matches)
 
     def _update_wrt_matches(self, info):
         """

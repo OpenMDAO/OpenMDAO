@@ -3,7 +3,7 @@ from collections import namedtuple, defaultdict
 
 import numpy as np
 
-from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _is_group
 from openmdao.warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
@@ -171,7 +171,7 @@ class FiniteDifference(ApproximationScheme):
 
         return deltas, coeffs, current_coeff
 
-    def compute_approx_col_iter(self, system, total=False, under_cs=False):
+    def compute_approx_col_iter(self, system, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -179,8 +179,6 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        total : bool
-            If True total derivatives are being approximated, else partials.
         under_cs : bool
             True if we're currently under complex step at a higher level.
         """
@@ -190,7 +188,7 @@ class FiniteDifference(ApproximationScheme):
         self._starting_outs = system._outputs.asarray(copy=True)
         self._starting_resids = system._residuals.asarray(copy=True)
         self._starting_ins = system._inputs.asarray(copy=True)
-        if total:
+        if _is_group(system):  # totals/semitotals
             self._results_tmp = self._starting_outs.copy()
         else:
             self._results_tmp = self._starting_resids.copy()
@@ -199,7 +197,7 @@ class FiniteDifference(ApproximationScheme):
         system._set_finite_difference_mode(True)
 
         try:
-            yield from self._compute_approx_col_iter(system, total=total, under_cs=under_cs)
+            yield from self._compute_approx_col_iter(system, under_cs=under_cs)
         finally:
             # Turn off finite difference.
             system._set_finite_difference_mode(False)

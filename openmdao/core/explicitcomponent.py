@@ -73,7 +73,7 @@ class ExplicitComponent(Component):
 
         return of, wrt
 
-    def _jac_wrt_iter(self, wrt_matches=None, total=False):
+    def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
 
@@ -83,9 +83,6 @@ class ExplicitComponent(Component):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
-        total : bool
-            If True, use full distributed var sizes because this is being used when computing
-            total derivatives.
 
         Yields
         ------
@@ -102,6 +99,7 @@ class ExplicitComponent(Component):
         """
         offset = end = 0
         local_ins = self._var_abs2meta['input']
+        total = self.pathname == ''
         szname = 'global_size' if total else 'size'
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:

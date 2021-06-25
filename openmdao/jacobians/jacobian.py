@@ -310,7 +310,7 @@ class Jacobian(object):
 
     def _setup_index_maps(self, system):
         self._col_var_info = col_var_info = {
-            t[0]: t for t in system._jac_wrt_iter(total=system.pathname == '')
+            t[0]: t for t in system._jac_wrt_iter()
         }
         self._colnames = list(col_var_info)   # map var id to varname
 

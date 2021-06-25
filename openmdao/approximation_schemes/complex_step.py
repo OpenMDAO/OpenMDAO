@@ -87,7 +87,7 @@ class ComplexStep(ApproximationScheme):
         step *= 1j
         return step
 
-    def compute_approx_col_iter(self, system, total=False, under_cs=False):
+    def compute_approx_col_iter(self, system, under_cs=False):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -95,8 +95,6 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             System on which the execution is run.
-        total : bool
-            If True total derivatives are being approximated, else partials.
         under_cs : bool
             True if we're currently under complex step at a higher level.
         """
@@ -117,7 +115,7 @@ class ComplexStep(ApproximationScheme):
                 for wrt in self._wrt_meta:
                     fd.add_approximation(wrt, system, empty)
 
-            yield from self._fd.compute_approx_col_iter(system, total=total)
+            yield from self._fd.compute_approx_col_iter(system)
             return
 
         saved_inputs = system._inputs._get_data().copy()
@@ -131,7 +129,7 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(True)
 
         try:
-            yield from self._compute_approx_col_iter(system, total, under_cs=True)
+            yield from self._compute_approx_col_iter(system, under_cs=True)
         finally:
             # Turn off complex step.
             system._set_complex_step_mode(False)
