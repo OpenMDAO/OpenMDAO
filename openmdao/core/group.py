@@ -2947,6 +2947,8 @@ class Group(System):
         slice or ndarray
             A full slice or indices for the 'of' variable.
         """
+        total = self.pathname == ''
+
         abs2meta = self._var_allprocs_abs2meta['output']
         approx_of_idx = self._owns_approx_of_idx
 
@@ -2993,6 +2995,8 @@ class Group(System):
         slice or ndarray
             A full slice or indices for the 'wrt' variable.
         """
+        total = self.pathname == ''
+
         if self._owns_approx_wrt:
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
