@@ -21,3 +21,4 @@ rank*.dat
 .coverage
 n2.html
 coloring_files
+.ipynb_checkpoints/
