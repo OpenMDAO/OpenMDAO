@@ -1369,6 +1369,8 @@ class _TotalJacInfo(object):
                 model._approx_subjac_keys = None
 
                 if model._approx_schemes:
+                    for scheme in model._approx_schemes.values():
+                        scheme._reset()
                     method = list(model._approx_schemes)[0]
                     kwargs = model._owns_approx_jac_meta
                     model.approx_totals(method=method, **kwargs)

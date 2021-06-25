@@ -40,6 +40,8 @@ class ApproximationScheme(object):
     _during_sparsity_comp : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
+    _jac_scatter : tuple
+        Data needed to scatter values from results array to a total jacobian column.
     """
 
     def __init__(self):
@@ -52,6 +54,7 @@ class ApproximationScheme(object):
         self._wrt_meta = {}
         self._progress_out = None
         self._during_sparsity_comp = False
+        self._jac_scatter = None
 
     def __repr__(self):
         """
@@ -215,6 +218,7 @@ class ApproximationScheme(object):
         total : bool
             If True, this is in the context of computing total derivatives.
         """
+        # total = system._tot_jac is not None
         abs2meta = system._var_allprocs_abs2meta
 
         in_slices = system._inputs.get_slice_dict()
@@ -293,11 +297,13 @@ class ApproximationScheme(object):
                                                       comm=system.comm)
                 src_inds = PETSc.IS().createGeneral(sinds, comm=system.comm)
                 tgt_inds = PETSc.IS().createGeneral(tinds, comm=system.comm)
-                self.jac_scatter = (has_dist_data,
-                                    PETSc.Scatter().create(src_vec, src_inds, tgt_vec, tgt_inds),
-                                    src_vec, tgt_vec)
+                self._jac_scatter = (has_dist_data,
+                                     PETSc.Scatter().create(src_vec, src_inds, tgt_vec, tgt_inds),
+                                     src_vec, tgt_vec)
             else:
-                self.jac_scatter = (has_dist_data, sinds, tinds)
+                self._jac_scatter = (has_dist_data, sinds, tinds)
+        else:
+            self._jac_scatter = None
 
     def _colored_column_iter(self, system, colored_approx_groups, total):
         """
@@ -314,7 +320,7 @@ class ApproximationScheme(object):
                 Tuple of wrt indices and corresponding data vector to perturb.
             nzrows -> rows containing nonzero values for each column in jaccols
         total : bool
-            If True total derivatives are being approximated, else partials.
+            If True total/semitotal derivatives are being approximated, else partials.
 
         Yields
         ------
@@ -324,14 +330,6 @@ class ApproximationScheme(object):
             solution array corresponding to the jacobian column at the given column index
         """
         if total:
-            # if we have any remote vars, find the list of vars from this proc that need to be
-            # transferred to other procs
-            if system.comm.size > 1:
-                my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                   if n in system._vars_to_gather and
-                                   system._vars_to_gather[n] == system.comm.rank]
-            else:
-                my_rem_out_vars = ()
             ordered_of_iter = list(system._jac_of_iter())
             tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
             scratch = tot_result.copy()
@@ -339,7 +337,8 @@ class ApproximationScheme(object):
             scratch = np.empty(len(system._outputs))
 
         # Clean vector for results (copy of the outputs or resids)
-        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
+        vec = system._outputs if total else system._residuals
+        results_array = vec.asarray(True)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
@@ -351,6 +350,8 @@ class ApproximationScheme(object):
 
         nruns = len(colored_approx_groups)
         tosend = None
+
+        # total = system.pathname == ''
 
         for data, jcols, vec_ind_list, nzrows in colored_approx_groups:
             mult = self._get_multiplier(data)
@@ -427,7 +428,9 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
-        ordered_of_iter = list(system._jac_of_iter(total=system.pathname == ''))
+        # total = system._tot_jac is not None
+
+        ordered_of_iter = list(system._jac_of_iter(total=total))
         if total:
             tot_result = np.zeros(ordered_of_iter[-1][2])
 
@@ -562,14 +565,14 @@ class ApproximationScheme(object):
         ndarray
             totarr, now filled with current values, potentially from other mpi procs.
         """
-        if self.jac_scatter[0]:  # dist data passing
-            _, scatter, svec, tvec = self.jac_scatter
+        if self._jac_scatter[0]:  # dist data passing
+            _, scatter, svec, tvec = self._jac_scatter
             svec.array = outarr
             tvec.array[:] = totarr
             scatter.scatter(svec, tvec, addv=False, mode=False)
             totarr[:] = tvec.array
         else:
-            _, sinds, tinds = self.jac_scatter
+            _, sinds, tinds = self._jac_scatter
             totarr[tinds] = outarr[sinds]
 
         return totarr
