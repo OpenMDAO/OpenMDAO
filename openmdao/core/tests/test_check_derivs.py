@@ -8,6 +8,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -342,7 +343,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials(step=1e-7, out_stream=None)
 
         for comp_name, comp in data.items():
             for partial_name, partial in comp.items():
@@ -1926,130 +1927,155 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         p.check_partials(out_stream=None)
 
-
-
-
     def test_deriv_check_same_as_comp_deriv(self):
-        # The check_partials functionality allows a user to check the accuracy of components that
-        # use cs by using cs. This will result in no difference and is obviously not what we want.
-        # This sort of behavior should probably
-        # result in an exception, since an ignored warning here can result in the failure of a model
-        # to work correctly.
-        # we need to check all the settings. FD/forward should be allowed for both if they have
-        # different step sizes.
-        # At least one settings has to be different
+        # Ensure check_partials options differs from the compute partials options
 
+        # COULD MAYBE USE the one from test suite
         class Paraboloid(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
 
                 self.add_output('f_xy', val=0.0)
-                self.add_output('g_xy', val=0.0)
 
-                # makes extra calls to the model with no actual steps
-                # self.declare_partials(of='*', wrt='*', method='fd')
-                # self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1e-6)
-                self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=0.333, step_calc='abs')
-                # self.declare_partials(of='*', wrt='*')
-
-            # def compute(self, inputs, outputs):
-            #     x = inputs['x']
-            #     y = inputs['y']
-            #
-            #     outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-            #     g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-            #     outputs['g_xy'] = g_xy * 3
-
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
-        model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
-        parab = ParaboloidA()
-        model.add_subsystem('parab', parab)
-
-        # parab.set_check_partial_options('*', method='fd')
-        parab.set_check_partial_options('*', method='fd', form='forward', step=0.333, step_calc='abs')
-
-        # parab.set_check_partial_options(wrt='x', step=1e-2)
-
-        # def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
-        #                               directional=False):
-
-        model.connect('px.x', 'parab.x')
-        model.connect('py.y', 'parab.y')
-
-        model.add_design_var('px.x', lower=-50, upper=50)
-        model.add_design_var('py.y', lower=-50, upper=50)
-        model.add_objective('parab.f_xy')
-
-        prob.setup()
-        prob.run_model()
-        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
-
-        # prob.check_partials(out_stream=None)
-        prob.check_partials(method='fd', step=0.666, form='backward', step_calc='rel')
-
-
-
-
-
-    def test_deriv_check_same_as_comp_deriv_2(self):
-        class Paraboloid(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', val=0.0)
-                self.add_input('y', val=0.0)
-
-                self.add_output('f_xy', val=0.0)
-                self.add_output('g_xy', val=0.0)
+            def setup_partials(self):
+                self.declare_partials('*', '*')
 
             def compute(self, inputs, outputs):
                 x = inputs['x']
                 y = inputs['y']
 
                 outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-                g_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-                outputs['g_xy'] = g_xy * 3
+
+            def compute_partials(self, inputs, partials):
+                """
+                Jacobian for our paraboloid.
+                """
+                x = inputs['x']
+                y = inputs['y']
+
+                partials['f_xy', 'x'] = 2.0 * x - 6.0 + y
+                partials['f_xy', 'y'] = 2.0 * y + 8.0 + x
 
         prob = om.Problem()
         model = prob.model
         model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
         model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
         parab = Paraboloid()
-        # parab.declare_partials(of='*', wrt='*', method='fd', step=0.333)
-        parab.declare_partials(of='*', wrt='*', method='fd')
 
         model.add_subsystem('parab', parab)
-
-        parab.set_check_partial_options('*', method='fd')
-        # parab.set_check_partial_options('*', method='fd', form='forward', step=0.333, step_calc='abs')
-
-        # parab.set_check_partial_options(wrt='x', step=1e-2)
-
-        # def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
-        #                               directional=False):
-
         model.connect('px.x', 'parab.x')
         model.connect('py.y', 'parab.y')
-
         model.add_design_var('px.x', lower=-50, upper=50)
         model.add_design_var('py.y', lower=-50, upper=50)
         model.add_objective('parab.f_xy')
-
         prob.setup()
         prob.run_model()
-        # J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
 
-        # prob.check_partials(out_stream=None)
-        # prob.check_partials(method='fd', step=0.666, form='backward', step_calc='rel')
+        expected_error_msg = "Problem: Checking partials with respect to variable 'x' in " \
+                             "component 'parab' using the same method and options"
+
+        # Scenario 1:
+        #    Compute partials: exact
+        #    Check partials: fd using argument to check_partials, default options
+        #    Expected result: no error
+        # parab.declare_partials('*', '*')
         prob.check_partials(method='fd')
 
+        # Scenario 2:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, default options
+        #    Expected result: Error
+        parab.declare_partials(of='*', wrt='*', method='fd')
 
+        with self.assertRaises(ValueError) as err:
+            prob.check_partials(method='fd')
 
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
+        # Scenario 3:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different step option
+        #    Expected result: No error
+        prob.check_partials(method='fd', step=1e-4)
 
+        # Scenario 4:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different form option
+        #    Expected result: No error
+        prob.check_partials(method='fd', form='backward')
 
+        # Scenario 5:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different step_calc option
+        #    Expected result: No error
+        prob.check_partials(method='fd', step_calc='rel')
 
+        # Scenario 6:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using argument to check_partials
+        #    Other condition: haven't allocated a complex vector, so we fall back on fd
+        #    Expected result: Error since using fd to check fd. All options the same
+        with self.assertRaises(ValueError) as err:
+            prob.check_partials(method='cs')
+
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+
+        # Scenario 7:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using argument to check_partials
+        #    Other condition: setup with complex vector, so complex step can be used
+        #    Expected result: No error
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_partials(method='cs')
+
+        # Scenario 8:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, default options
+        #    Expected result: Error
+        parab.set_check_partial_options('*')
+        with self.assertRaises(ValueError) as err:
+            prob.check_partials()
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+
+        # Scenario 9:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, step set
+        #    Expected result: No error
+        parab.set_check_partial_options('*', step=1e-4)
+        prob.check_partials()
+
+        # Scenario 10:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, form set
+        #    Expected result: No error
+        parab.set_check_partial_options('*', form='backward',
+                                        step= FiniteDifference.DEFAULT_OPTIONS['step'])
+        prob.check_partials()
+
+        # Scenario 11:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, step_calc set
+        #    Expected result: No error
+        parab.set_check_partial_options('*', step_calc='rel',
+                                        form= FiniteDifference.DEFAULT_OPTIONS['form'])
+        prob.check_partials()
+
+        # Scenario 12:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using Component.set_check_partial_options argument
+        #    Expected result: No error
+        parab.set_check_partial_options('*', method='cs')
+        prob.check_partials()
+
+        # Scenario 13:
+        #    Compute partials: cs, with default options
+        #    Check partials: fd
+        #    Expected result: No error
+        parab.declare_partials(of='*', wrt='*', method='cs')
+        parab.set_check_partial_options('*', method='fd')
+        prob.check_partials()
 
 
 class TestCheckPartialsFeature(unittest.TestCase):
@@ -2385,7 +2411,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        J = prob.check_partials(compact_print=True, method='cs', step=1e-40, out_stream=None)
+        # J = prob.check_partials(compact_print=True, method='cs', step=1e-40, out_stream=None)
+        J = prob.check_partials(compact_print=True, method='cs', step=1e-40)
 
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 

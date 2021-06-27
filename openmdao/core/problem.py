@@ -1103,45 +1103,6 @@ class Problem(object):
 
         # Check to make sure the method and settings used for checking
         #   is different from the method used to calc the derivatives
-
-        # get the settings used for the checking. Need to use defaults as needed
-        ###  directional ????
-        # if method == 'cs':
-        #     deriv_check_method_default_options = ComplexStep.DEFAULT_OPTIONS
-        # else:
-        #     deriv_check_method_default_options = FiniteDifference.DEFAULT_OPTIONS
-        #     if step is None:
-        #         deriv_check_method_step = deriv_check_method_default_options['step']
-        #     if form is None:
-        #         deriv_check_method_form = deriv_check_method_default_options['form']
-        #     if step_calc is None:
-        #         deriv_check_method_step_calc = deriv_check_method_default_options['step_calc']
-        #
-        # for comp in comps:
-        #
-        #
-        #     if method == 'cs':
-        #         default_options = ComplexStep.DEFAULT_OPTIONS
-        #     else:
-        #         default_options = FiniteDifference.DEFAULT_OPTIONS
-        #
-        #     # I think declared partials is OK. Go through all of them and see if
-        #     # any have exactly the same params
-        #     for key, meta in comp._declared_partials.items():
-        #         # check method, step, form, step_calc to see if it matches the
-        #         #   arguments to check_partials
-        #         if meta.get('method', 'exact') != method: # cool
-        #             continue
-        #         if meta.get('step', default_options['step']) != step: # cool
-        #             continue
-        #         if meta.get('form', default_options['form']) != form: # cool
-        #             continue
-        #         if meta.get('step_calc', default_options['step_calc']) != step_calc: # cool
-        #             continue
-        #         raise ValueError('Using same method and settings for check_partials as component derivatives')
-
-
-        ##################### start new ##################
         # Could do this later in this method but at that point some computations could have been
         #   made and it would just waste time before the user is told there is an error and the
         #   program errs out
@@ -1149,46 +1110,65 @@ class Problem(object):
         alloc_complex = model._outputs._alloc_complex
 
         for comp in comps:
+            for key, meta in comp._declared_partials.items():
 
+                # Get the complete set of options, including defaults
+                #    for the computing of the derivs for this component
+                if 'method' not in meta:
+                    meta_with_defaults = {}
+                    meta_with_defaults['method'] = 'exact'
+                elif meta['method'] == 'cs':
+                    meta_with_defaults = ComplexStep.DEFAULT_OPTIONS.copy()
+                else:
+                    meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
+                for name in meta:
+                    meta_with_defaults[name] = meta[name]
 
-                for key, meta in comp._declared_partials.items():
-
-                    # Can method be exact ? Yes, it could
-                    # If exact, then no problem
-                    if meta['method'] == 'cs':
-                        default_options = ComplexStep.DEFAULT_OPTIONS
-                    else:
-                        default_options = FiniteDifference.DEFAULT_OPTIONS
-
-                    meta_with_defaults = meta.copy()
-                    for name in ['method', 'form', 'step', 'step_calc']:
-                        if name not in meta_with_defaults:
-                            meta_with_defaults[name] = default_options[name]
-                    pattern_matches = comp._find_partial_matches(*key)
-                    wrt_vars = pattern_matches[1]
-                    for wrt_var in wrt_vars:
-                        _, vars = wrt_var
-                        for var in vars:
-                            # we now have 'x', ...
-                            fd_options = _get_fd_options(var, requested_method, comp, step, form, step_calc, alloc_complex)
-                            # compare those to the values in meta
-                            all_same = True
-                            for name in ['method', 'form', 'step', 'step_calc']:
-                                if fd_options[name] != meta_with_defaults[name]:
-                                    all_same = False
-                                    break
-                            if all_same:
-                                raise ValueError(f"{self.msginfo}: Checking partials on variable {var} in component {comp.pathname} using the same "
-                                                 "method and settings as the used to compute derivatives "
-                                                 "will not provide any relevant information on the accuracy.\n"
-                                                 "Settings for both are:\n"
-                                                 f"    method: {fd_options['method']}\n"
-                                                 f"    form: {fd_options['form']}\n"
-                                                 f"    step: {fd_options['step']}\n"
-                                                 f"    step_calc: {fd_options['step_calc']}\n"
-                                                 )
-
-        ###################### end new ################
+                # For each of the partials, check to see if the
+                #   check partials options are different than the options used to compute
+                #   the partials
+                pattern_matches = comp._find_partial_matches(*key)
+                wrt_vars = pattern_matches[1]
+                for wrt_var in wrt_vars:
+                    _, vars = wrt_var
+                    for var in vars:
+                        # we now have individual vars like 'x'
+                        fd_options = _get_fd_options(var, requested_method, comp, step, form,
+                                                     step_calc, alloc_complex)
+                        # compare the compute options to the check options
+                        all_same = True
+                        for name in ['method', 'form', 'step', 'step_calc']:
+                            if fd_options[name] != meta_with_defaults[name]:
+                                all_same = False
+                                break
+                        if all_same:
+                            doc_root_url = 'http://openmdao.org/newdocs/versions/latest/'
+                            raise ValueError(f"{self.msginfo}: Checking partials with respect "
+                                             f"to variable '{var}' in component "
+                                             f"'{comp.pathname}' using the same "
+                                             "method and options as the used to compute the "
+                                             "component's derivatives "
+                                             "will not provide any relevant information on the "
+                                             "accuracy.\n"
+                                             "Settings for both are currently:\n"
+                                             f"    method: {fd_options['method']}\n"
+                                             f"    form: {fd_options['form']}\n"
+                                             f"    step: {fd_options['step']}\n"
+                                             f"    step_calc: {fd_options['step_calc']}\n"
+                                             "To correct this, change the options to do the "
+                                             "check_partials using either:\n"
+                                             "     - arguments to Problem.check_partials. "
+                                             "See:\n"
+                                             f"        {doc_root_url}features/core_features"
+                                             f"/working_with_derivatives/"
+                                             f"basic_check_partials.html"
+                                             "     or\n"
+                                             "     - arguments to "
+                                             "Component.set_check_partial_options. See\n"
+                                             f"        {doc_root_url}features/core_features"
+                                             f"/working_with_derivatives/"
+                                             f"check_partials_settings.html"
+                                             )
 
         self.set_solver_print(level=0)
 
