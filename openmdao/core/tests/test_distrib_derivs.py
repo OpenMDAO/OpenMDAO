@@ -1445,7 +1445,6 @@ class Distrib_Derivs(om.ExplicitComponent):
         self.add_output('out_dist', copy_shape='in_dist', distributed=True)
 
         # Serial Output
-        self.add_output('out_serial_wrong', copy_shape='in_serial')
         self.add_output('out_serial', copy_shape='in_serial')
 
     def setup_partials(self):
@@ -1476,12 +1475,6 @@ class Distrib_Derivs(om.ExplicitComponent):
 
         g_x = x ** 0.5
         g_y = y**2 + 3.0*y - 5.0
-
-        # Our serial distributed output is a function of serial input and the distributed input.
-        # However, this is the wrong way because we are only using the local part of the distributed
-        # input instead of gathering all of it.
-        # As a result, we end up with different values for this output on each proc.
-        outputs['out_serial_wrong'] = g_y + np.sum(g_x)
 
         if MPI and comm.size > 1:
 
@@ -1557,34 +1550,31 @@ class TestApproxDistrib(unittest.TestCase):
     def test_get_val(self):
         if self.prob.model.comm.rank == 0:
             D1_out_dist = np.array([17.6138701, 22.6138701, 29.6138701])
-            D1_out_serial_wrong = np.array([4.96811879,  18.96811879,  40.96811879,  70.96811879, 108.96811879])
         else:
             D1_out_dist = np.array([38.6138701, 49.6138701])
-            D1_out_serial_wrong = np.array([4.09524105,  18.09524105,  40.09524105,  70.09524105, 108.09524105])
 
         D1_out_dist_full = np.array([17.6138701, 22.6138701, 29.6138701, 38.6138701, 49.6138701])
         D1_out_serial = np.array([ 10.06335984,  24.06335984,  46.06335984,  76.06335984, 114.06335984])
 
-        vnames = ['indep.x_dist', 'indep.x_serial', 'D1.out_dist', 'D1.out_serial_wrong', 'D1.out_serial']
-        expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial_wrong, D1_out_serial]
-        expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial_wrong, D1_out_serial]
+        vnames = ['indep.x_dist', 'indep.x_serial', 'D1.out_dist', 'D1.out_serial']
+        expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial]
+        expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial]
         for var, ex, ex_remote in zip(vnames, expected, expected_remote):
             assert_near_equal(self.prob.get_val(var), ex, tolerance=1e-8)
             full_val = self.prob.get_val(var, get_remote=True)
             assert_near_equal(full_val, ex_remote, tolerance=1e-8)
 
     def test_check_totals_serial(self):
-        self.prob.check_totals(of=['D1.out_serial'], wrt=['indep.x_serial'])
-
-    def test_check_totals_dist(self):
-        self.prob.check_totals(of=['D1.out_dist'], wrt=['indep.x_dist'])
+        totals = self.prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+                                        wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_check_partials(self):
-        self.prob.check_partials()
+        data = self.prob.check_partials()
+        assert_check_partials(data, atol=3.e-6)
 
     def test_compute_totals(self):
-        J = self.prob.compute_totals(of=['D1.out_serial'], wrt=['indep.x_dist'])
-
         J = self.prob.compute_totals(of=['D1.out_serial', 'D1.out_dist'], wrt=['indep.x_serial', 'indep.x_dist'])
 
 
