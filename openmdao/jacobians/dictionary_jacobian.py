@@ -166,6 +166,7 @@ class _CheckingJacobian(DictionaryJacobian):
     def __init__(self, system):
         super().__init__(system)
         self._subjacs_info = self._subjacs_info.copy()
+        self._errors = []
 
     def __iter__(self):
         for key, _ in self.items():
@@ -260,7 +261,7 @@ class _CheckingJacobian(DictionaryJacobian):
                     arr[row_inds] = 0.
                     nzs = np.nonzero(arr)
                     if nzs[0].size > 0:
-                        raise ValueError(f"{system.msginfo}: User specified sparsity (rows/cols) "
-                                         f"for subjac '{of}' wrt '{wrt}' is incorrect. There are "
-                                         f"non-covered nonzeros in column {loc_idx} at "
-                                         f"row(s) {nzs[0]}.")
+                        self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
+                                            f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
+                                            f"are non-covered nonzeros in column {loc_idx} at "
+                                            f"row(s) {nzs[0]}.")

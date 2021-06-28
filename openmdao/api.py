@@ -104,6 +104,8 @@ from openmdao.warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning
 
 
+from openmdao.utils.general_utils import wing_dbg
+
 # set up tracing or memory profiling if env vars are set.
 import os
 if os.environ.get('OPENMDAO_TRACE'):

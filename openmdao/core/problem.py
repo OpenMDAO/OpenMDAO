@@ -32,8 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices
-from openmdao.utils.mpi import FakeComm
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -1404,6 +1403,10 @@ class Problem(object):
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
+
+            with multi_proc_exception_check(comp.comm):
+                if approx_jac._errors:
+                    raise RuntimeError('\n'.join(approx_jac._errors))
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)

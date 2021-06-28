@@ -4232,13 +4232,14 @@ class System(object):
             all_meta = self._var_allprocs_abs2meta[io]
             my_meta = self._var_abs2meta[io]
 
+        vars_to_gather = self._problem_meta['vars_to_gather']
+
         # if abs_name is non-discrete it should be found in all_meta
         if abs_name in all_meta:
             if get_remote:
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
             elif self.comm.size > 1:
-                vars_to_gather = self._problem_meta['vars_to_gather']
                 if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
@@ -4289,7 +4290,7 @@ class System(object):
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 
-        if get_remote and self.comm.size > 1:
+        if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
             if rank is None:   # bcast

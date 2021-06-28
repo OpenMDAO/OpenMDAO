@@ -1429,6 +1429,165 @@ class TestBugs(unittest.TestCase):
         totals = prob.check_totals(wrt='dvs.state')
         assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
 
+
+class Distrib_Derivs(om.ExplicitComponent):
+    """Simplest example that combines distributed and serial inputs and outputs."""
+
+    def setup(self):
+
+        # Distributed Input
+        self.add_input('in_dist', shape_by_conn=True, distributed=True)
+
+        # Serial Input
+        self.add_input('in_serial', shape_by_conn=True)
+
+        # Distributed Output
+        self.add_output('out_dist', copy_shape='in_dist', distributed=True)
+
+        # Serial Output
+        self.add_output('out_serial_wrong', copy_shape='in_serial')
+        self.add_output('out_serial', copy_shape='in_serial')
+
+    def setup_partials(self):
+        meta = self.get_io_metadata(metadata_keys=['shape'])
+        local_size = meta['in_dist']['shape'][0]
+        serial_size = meta['in_serial']['shape'][0]
+
+        row_col_d = np.arange(local_size)
+        row_col_s = np.arange(serial_size)
+
+        self.declare_partials('out_dist', 'in_dist', rows=row_col_d, cols=row_col_d)
+        self.declare_partials('out_serial', 'in_serial', rows=row_col_s, cols=row_col_s)
+        self.declare_partials('out_dist', 'in_serial')
+        self.declare_partials('out_serial', 'in_dist')
+
+    def compute(self, inputs, outputs):
+        comm = self.comm
+        x = inputs['in_dist']
+        y = inputs['in_serial']
+
+        # "Computationally Intensive" operation that we wish to parallelize.
+        f_x = x**2 - 2.0*x + 4.0
+        f_y = y ** 0.5
+
+        # Our local distributed output is a function of local distributed input computed above.
+        # It also is a function of the serial input.
+        outputs['out_dist'] = f_x + np.sum(f_y)
+
+        g_x = x ** 0.5
+        g_y = y**2 + 3.0*y - 5.0
+
+        # Our serial distributed output is a function of serial input and the distributed input.
+        # However, this is the wrong way because we are only using the local part of the distributed
+        # input instead of gathering all of it.
+        # As a result, we end up with different values for this output on each proc.
+        outputs['out_serial_wrong'] = g_y + np.sum(g_x)
+
+        if MPI and comm.size > 1:
+
+            # We need to gather the summed values to compute the total sum over all procs.
+            local_sum = np.sum(g_x)
+            all_local_sums = np.zeros(comm.size)
+            self.comm.Allgather(local_sum, all_local_sums)
+
+            outputs['out_serial'] = g_y + np.sum(all_local_sums)
+        else:
+            outputs['out_serial'] = g_y + np.sum(g_x)
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['in_dist']
+        y = inputs['in_serial']
+        size = len(y)
+        local_size = len(x)
+
+        partials['out_dist', 'in_dist'] = 2.0 * x - 2.0
+
+        partials['out_serial', 'in_serial'] = 2.0 * y + 3.0
+
+        df_dy = 0.5 / y ** 0.5
+        partials['out_dist', 'in_serial'] = np.tile(df_dy, local_size).reshape((local_size, size))
+
+        dg_dx = 0.5 / x ** 0.5
+        partials['out_serial', 'in_dist'] = np.tile(dg_dx, size).reshape((size, local_size))
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestApproxDistrib(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def setUp(self):
+        size = 5
+
+        if MPI:
+            comm = MPI.COMM_WORLD
+            rank = comm.rank
+            sizes, offsets = evenly_distrib_idxs(comm.size, size)
+        else:
+            rank = 0
+            sizes = {rank : size}
+            offsets = {rank : 0}
+
+        model = om.Group()
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
+        ivc.add_output('x_serial', np.zeros(size))
+
+        model.add_subsystem("indep", ivc)
+        model.add_subsystem("D1", Distrib_Derivs())
+
+        model.connect('indep.x_dist', 'D1.in_dist')
+        model.connect('indep.x_serial', 'D1.in_serial')
+
+        om.wing_dbg()
+
+        self.prob = prob = om.Problem(model)
+        prob.setup()
+
+        self.x_dist_init = x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
+        self.x_serial_init = x_serial_init = 1.0 + 2.0*np.arange(size)
+
+        # This set operates on the entire vector.
+        prob.set_val('indep.x_dist', x_dist_init)
+        prob.set_val('indep.x_serial', x_serial_init)
+
+        prob.run_model()
+
+    def test_get_val(self):
+        if self.prob.model.comm.rank == 0:
+            D1_out_dist = np.array([17.6138701, 22.6138701, 29.6138701])
+            D1_out_serial_wrong = np.array([4.96811879,  18.96811879,  40.96811879,  70.96811879, 108.96811879])
+        else:
+            D1_out_dist = np.array([38.6138701, 49.6138701])
+            D1_out_serial_wrong = np.array([4.09524105,  18.09524105,  40.09524105,  70.09524105, 108.09524105])
+
+        D1_out_dist_full = np.array([17.6138701, 22.6138701, 29.6138701, 38.6138701, 49.6138701])
+        D1_out_serial = np.array([ 10.06335984,  24.06335984,  46.06335984,  76.06335984, 114.06335984])
+
+        vnames = ['indep.x_dist', 'indep.x_serial', 'D1.out_dist', 'D1.out_serial_wrong', 'D1.out_serial']
+        expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial_wrong, D1_out_serial]
+        expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial_wrong, D1_out_serial]
+        for var, ex, ex_remote in zip(vnames, expected, expected_remote):
+            assert_near_equal(self.prob.get_val(var), ex, tolerance=1e-8)
+            full_val = self.prob.get_val(var, get_remote=True)
+            assert_near_equal(full_val, ex_remote, tolerance=1e-8)
+
+    def test_check_totals_serial(self):
+        self.prob.check_totals(of=['D1.out_serial'], wrt=['indep.x_serial'])
+
+    def test_check_totals_dist(self):
+        self.prob.check_totals(of=['D1.out_dist'], wrt=['indep.x_dist'])
+
+    def test_check_partials(self):
+        self.prob.check_partials()
+
+    def test_compute_totals(self):
+        J = self.prob.compute_totals(of=['D1.out_serial'], wrt=['indep.x_dist'])
+
+        J = self.prob.compute_totals(of=['D1.out_serial', 'D1.out_dist'], wrt=['indep.x_serial', 'indep.x_dist'])
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

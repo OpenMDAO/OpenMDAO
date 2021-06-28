@@ -212,7 +212,7 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-
+        during_compute_totals = system._problem_meta['model_ref']()._tot_jac is not None
         abs2meta = system._var_allprocs_abs2meta
 
         in_slices = system._inputs.get_slice_dict()
@@ -229,7 +229,7 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
-        for wrt, start, end, vec, cinds in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -263,7 +263,7 @@ class ApproximationScheme(object):
                             vec_idx = range(abs2meta['input'][wrt]['global_size'])
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    elif total:
+                    elif total or not during_compute_totals:
                         vec_idx = LocalRangeIterable(system, wrt,
                                                      range(slices[wrt].start, slices[wrt].stop))
                     else:
@@ -450,6 +450,7 @@ class ApproximationScheme(object):
 
             mult = self._get_multiplier(data)
 
+            jidx_iter = iter(range(len(jcol_idxs)))
             for i_count, vecidxs in enumerate(vec_idxs):
 
                 if fd_count % num_par_fd == system._par_fd_id:
@@ -461,10 +462,14 @@ class ApproximationScheme(object):
 
                     if direction is not None or mult != 1.0:
                         result *= mult
+
                     if total:
                         result = self._get_total_result(result, tot_result)
 
-                    tosend = (group_i, i_count, result)
+                    if vecidxs is None and not total_or_semi:
+                        tosend = (group_i, None, None)
+                    else:
+                        tosend = (group_i, next(jidx_iter), result)  # use local jac row var index
 
                     if self._progress_out:
                         end_time = time.time()
@@ -474,6 +479,8 @@ class ApproximationScheme(object):
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "
                                                  f"{round(end_time-start_time, 4)} seconds\n")
+                elif use_parallel_fd:
+                    next(jidx_iter)  # skip this column index
 
                 fd_count += 1
 
@@ -491,6 +498,8 @@ class ApproximationScheme(object):
                     if tup is None:
                         continue
                     gi, icount, res = tup
+                    if icount is None:
+                        continue  # skip yield for non-local partial jac column
                     # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
