@@ -327,9 +327,9 @@ class _TotalJacInfo(object):
             self.tgt_petsc = {n: {} for n in modes}
             self.src_petsc = {n: {} for n in modes}
             if 'fwd' in modes:
-                self._compute_jac_scatters('fwd', J.shape[0], get_remote)
+                self.jac_scatters['fwd'] = self._compute_jac_scatters('fwd', J.shape[0], get_remote)
             if 'rev' in modes:
-                self._compute_jac_scatters('rev', J.shape[1], get_remote)
+                self.jac_scatters['rev'] = self._compute_jac_scatters('rev', J.shape[1], get_remote)
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
@@ -446,10 +446,7 @@ class _TotalJacInfo(object):
 
             src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
             tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
-            self.jac_scatters[mode] = PETSc.Scatter().create(src_vec, src_indexset,
-                                                             tgt_vec, tgt_indexset)
-        else:
-            self.jac_scatters[mode] = None
+            return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
         """
