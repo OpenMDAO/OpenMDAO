@@ -236,6 +236,7 @@ class _TotalJacInfo(object):
             has_lin_cons = False
 
         self.has_lin_cons = has_lin_cons
+        self.dist_input_idx_map = {}
 
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
@@ -267,22 +268,49 @@ class _TotalJacInfo(object):
             self.in_loc_idxs = {}
             self.idx_iter_dict = {}
             self.seeds = {}
+            self.nondist_loc_map = {}
             self.loc_jac_idxs = {}
             self.dist_idx_map = {}
-            self.nondist_loc_map = {}
 
             for mode in modes:
                 self._create_in_idx_map(mode)
 
-        self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta_out)
-        self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta_out)
+        self.of_meta, self.of_size, of_dist_size, has_of_dist = \
+            self._get_tuple_map(of, responses, abs2meta_out)
+        self.wrt_meta, self.wrt_size, wrt_dist_size, has_wrt_dist = \
+            self._get_tuple_map(wrt, design_vars, abs2meta_out)
+        self.has_wrt_dist = has_wrt_dist
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
         self.J = J = np.zeros((self.of_size, self.wrt_size))
 
-        if not self.get_remote:
-            abs2meta = model._var_allprocs_abs2meta['output']
+        abs2meta = model._var_allprocs_abs2meta['output']
+        if self.get_remote:
+            # if we have distributed 'wrt' variables in fwd mode, we have to broadcast the jac
+            # columns from the owner of a given range of dist indices to everyone else.
+            if has_wrt_dist and self.comm.size > 1:
+                abs2idx = model._var_allprocs_abs2idx
+                sizes = model._var_sizes['output']
+                if 'fwd' in modes:
+                    meta = self.wrt_meta
+                    # map which indices belong to dist vars and to which rank
+                    self.dist_input_idx_map['fwd'] = dist_map = []
+                    start = end = 0
+                    for name in self.input_list['fwd']:
+                        slc, _, is_dist = meta[name]
+                        end += (slc.stop - slc.start)
+                        if is_dist:
+                            # get owning rank for each part of the distrib var
+                            varidx = abs2idx[name]
+                            distsz = sizes[:, varidx]
+                            dstart = dend = start
+                            for rank, sz in enumerate(distsz):
+                                dend += sz
+                                dist_map.append((dstart, dend, rank))
+                                dstart = dend
+                        start = end
+        else:
             for mode in modes:
                 # If we're running with only a local total jacobian, then we need to keep
                 # track of which rows/cols actually exist in our local jac and what the
@@ -294,7 +322,6 @@ class _TotalJacInfo(object):
 
                 # we also need a mapping of which indices correspond to distrib vars so
                 # we can exclude them from jac scatters
-                axis = 0 if mode == 'fwd' else 1
                 self.dist_idx_map[mode] = dist_map = np.zeros(arr.size, dtype=bool)
                 start = end = 0
                 for name in self.output_list[mode]:
@@ -379,13 +406,6 @@ class _TotalJacInfo(object):
                 self.comm.Allgather(loc_size, jac_sizes)
                 myoffset = np.sum(jac_sizes[:myrank])
 
-            tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
-            self.tgt_petsc[mode] = tgt_vec
-            src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
-            self.src_petsc[mode] = src_vec
-
             _, _, name2jinds = self.sol2jac_map[mode]
 
             owns = self.model._owning_rank
@@ -446,6 +466,12 @@ class _TotalJacInfo(object):
 
             src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
             tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
+            self.tgt_petsc[mode] = tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
+                                                                                  dtype=float),
+                                                                         comm=self.comm)
+            self.src_petsc[mode] = src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
+                                                                                  dtype=float),
+                                                                         comm=self.comm)
             return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
@@ -844,11 +870,17 @@ class _TotalJacInfo(object):
             Dict of metadata tuples keyed by output name.
         int
             Total number of rows or columns.
+        int
+            Total number of full distributed rows or columns.
+        bool
+            True if any named variables are distributed.
         """
         idx_map = {}
         start = 0
         end = 0
         get_remote = self.get_remote
+        dist_size = 0
+        has_dist = False
 
         for name in names:
             if name in self.remote_vois:
@@ -860,17 +892,21 @@ class _TotalJacInfo(object):
                     size = voi['global_size']
                 else:
                     size = voi['size']
+                dist_size += voi['global_size']
                 indices = vois[name]['indices']
             else:
                 size = abs2meta_out[name]['global_size']
                 indices = None
+                dist_size += size
+
+            has_dist |= abs2meta_out[name]['distributed']
 
             end += size
 
             idx_map[name] = (slice(start, end), indices, abs2meta_out[name]['distributed'])
             start = end
 
-        return idx_map, end  # after the loop, end is the total size
+        return idx_map, end, dist_size, has_dist  # after the loop, end is the total size
 
     #
     # outer loop iteration functions
@@ -1113,17 +1149,21 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        if (self.get_remote and mode == 'fwd') or (not self.get_remote and mode == 'rev'):
-            vecname, _, _ = self.in_idx_map[mode][i]
-            scatter = self.jac_scatters[mode]
-            if scatter is not None:
-                if mode == 'fwd':
-                    self.src_petsc[mode].array = self.J[:, i]
-                    self.tgt_petsc[mode].array[:] = self.J[:, i]
-                    scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
-                                    addv=False, mode=False)
-                    self.J[:, i] = self.tgt_petsc[mode].array
-                else:  # rev only used with get_remote False
+        if self.get_remote and mode == 'fwd':
+            if self.jac_scatters[mode] is not None:
+                self.src_petsc[mode].array = self.J[:, i]
+                self.tgt_petsc[mode].array[:] = self.J[:, i]
+                self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
+                                                addv=False, mode=False)
+                self.J[:, i] = self.tgt_petsc[mode].array
+        elif mode == 'rev':
+            if self.get_remote:
+                scratch = self.jac_scratch['rev'][1]
+                scratch[:] = self.J[i]
+                self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+            else:
+                scatter = self.jac_scatters[mode]
+                if scatter is not None:
                     if self.dist_idx_map[mode][i]:  # distrib var, skip scatter
                         return
                     loc = self.loc_jac_idxs[mode][i]
@@ -1136,10 +1176,6 @@ class _TotalJacInfo(object):
                                     addv=True, mode=False)
                     if loc >= 0:
                         self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
-        elif self.get_remote and mode == 'rev':
-            scratch = self.jac_scratch['rev'][1]
-            scratch[:] = self.J[i]
-            self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
 
     def single_jac_setter(self, i, mode, meta):
         """
@@ -1321,6 +1357,14 @@ class _TotalJacInfo(object):
         # Driver scaling.
         if self.has_scaling:
             self._do_driver_scaling(self.J_dict)
+
+        # if some of the wrt vars are distributed in fwd mode, we have to bcast from the rank
+        # where each part of the distrib var exists
+        if self.get_remote and self.has_wrt_dist and mode == 'fwd':
+            for start, stop, rank in self.dist_input_idx_map[mode]:
+                contig = self.J[:, start:stop].copy()
+                model.comm.Bcast(contig, root=rank)
+                self.J[:, start:stop] = contig
 
         if debug_print:
             # Debug outputs scaled derivatives.

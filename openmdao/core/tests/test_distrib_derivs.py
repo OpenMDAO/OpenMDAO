@@ -1505,11 +1505,11 @@ class Distrib_Derivs(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestApproxDistrib(unittest.TestCase):
+class TestDistribBugs(unittest.TestCase):
 
     N_PROCS = 2
 
-    def setUp(self):
+    def get_problem(self, mode='auto'):
         size = 5
 
         if MPI:
@@ -1535,8 +1535,8 @@ class TestApproxDistrib(unittest.TestCase):
 
         om.wing_dbg()
 
-        self.prob = prob = om.Problem(model)
-        prob.setup()
+        prob = om.Problem(model)
+        prob.setup(mode=mode)
 
         self.x_dist_init = x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
         self.x_serial_init = x_serial_init = 1.0 + 2.0*np.arange(size)
@@ -1547,8 +1547,11 @@ class TestApproxDistrib(unittest.TestCase):
 
         prob.run_model()
 
+        return prob
+
     def test_get_val(self):
-        if self.prob.model.comm.rank == 0:
+        prob = self.get_problem()
+        if prob.model.comm.rank == 0:
             D1_out_dist = np.array([17.6138701, 22.6138701, 29.6138701])
         else:
             D1_out_dist = np.array([38.6138701, 49.6138701])
@@ -1560,22 +1563,28 @@ class TestApproxDistrib(unittest.TestCase):
         expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial]
         expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial]
         for var, ex, ex_remote in zip(vnames, expected, expected_remote):
-            assert_near_equal(self.prob.get_val(var), ex, tolerance=1e-8)
-            full_val = self.prob.get_val(var, get_remote=True)
+            assert_near_equal(prob.get_val(var), ex, tolerance=1e-8)
+            full_val = prob.get_val(var, get_remote=True)
             assert_near_equal(full_val, ex_remote, tolerance=1e-8)
 
-    def test_check_totals_serial(self):
-        totals = self.prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+    def test_check_totals_fwd(self, mode='fwd'):
+        prob = self.get_problem()
+        totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+                                        wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+
+    def test_check_totals_rev(self, mode='rev'):
+        prob = self.get_problem()
+        totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 1e-6)
 
     def test_check_partials(self):
-        data = self.prob.check_partials()
+        prob = self.get_problem()
+        data = prob.check_partials()
         assert_check_partials(data, atol=3.e-6)
-
-    def test_compute_totals(self):
-        J = self.prob.compute_totals(of=['D1.out_serial', 'D1.out_dist'], wrt=['indep.x_serial', 'indep.x_dist'])
 
 
 if __name__ == "__main__":

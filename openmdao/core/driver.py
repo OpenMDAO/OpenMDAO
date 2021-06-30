@@ -288,7 +288,7 @@ class Driver(object):
 
         self._remote_dvs = remote_dv_dict = {}
         self._remote_cons = remote_con_dict = {}
-        self._dist_driver_vars = model._dist_driver_vars = dist_dict = {}
+        self._dist_driver_vars = dist_dict = {}
         self._remote_objs = remote_obj_dict = {}
 
         # Only allow distributed design variables on drivers that support it.
