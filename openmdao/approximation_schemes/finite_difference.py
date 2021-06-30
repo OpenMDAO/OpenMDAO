@@ -4,7 +4,7 @@ from collections import namedtuple, defaultdict
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 

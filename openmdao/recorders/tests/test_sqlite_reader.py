@@ -34,7 +34,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_sc
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.units import convert_units
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')

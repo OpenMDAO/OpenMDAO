@@ -8,7 +8,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.name_maps import rel_key2abs_key
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 class MetaModelUnStructuredComp(ExplicitComponent):

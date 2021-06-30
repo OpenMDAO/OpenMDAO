@@ -27,7 +27,7 @@ from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
 from openmdao.solvers.solver import Solver
-from openmdao.warnings import issue_warning, CaseRecorderWarning
+from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 
 
 """
