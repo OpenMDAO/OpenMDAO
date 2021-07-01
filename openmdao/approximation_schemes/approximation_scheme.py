@@ -263,11 +263,11 @@ class ApproximationScheme(object):
                             vec_idx = range(abs2meta['input'][wrt]['global_size'])
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    elif total or not during_compute_totals:
+                    else:  # if total or not during_compute_totals:
                         vec_idx = LocalRangeIterable(system, wrt,
                                                      range(slices[wrt].start, slices[wrt].stop))
-                    else:
-                        vec_idx = range(slices[wrt].start, slices[wrt].stop)
+                    #else:
+                        #vec_idx = range(slices[wrt].start, slices[wrt].stop)
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.
                     if directional:

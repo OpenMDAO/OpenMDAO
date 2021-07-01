@@ -489,6 +489,8 @@ class MPITests2(unittest.TestCase):
         model.add_constraint('f_xy', lower=0.0)
         model.add_objective('f_sum', index=-1)
 
+        om.wing_dbg()
+
         prob.setup(mode='fwd', force_alloc_complex=True)
 
         prob.run_model()
