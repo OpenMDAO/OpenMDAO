@@ -1230,4 +1230,3 @@ def wing_dbg():
             import wingdbstub
         finally:
             sys.path = save
-

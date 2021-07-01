@@ -212,7 +212,6 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-        during_compute_totals = system._problem_meta['model_ref']()._tot_jac is not None
         abs2meta = system._var_allprocs_abs2meta
 
         in_slices = system._inputs.get_slice_dict()
@@ -263,11 +262,10 @@ class ApproximationScheme(object):
                             vec_idx = range(abs2meta['input'][wrt]['global_size'])
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
-                    else:  # if total or not during_compute_totals:
+                    else:
                         vec_idx = LocalRangeIterable(system, wrt,
                                                      range(slices[wrt].start, slices[wrt].stop))
-                    #else:
-                        #vec_idx = range(slices[wrt].start, slices[wrt].stop)
+
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.
                     if directional:
@@ -594,6 +592,8 @@ class LocalRangeIterable(object):
         Starting index of distributed variable on this rank.
     _end : int
         Last index + 1 of distributed variable on this rank.
+    _offset : int
+        Offset of this variable into the vector.
     _iter : method
         The iteration method used.
     """
@@ -624,6 +624,7 @@ class LocalRangeIterable(object):
         if abs2meta[vname]['distributed']:
             var_idx = system._var_allprocs_abs2idx[vname]
             rank = system.comm.rank
+            self._offset = offset = np.sum(sizes[rank, :var_idx])
 
             self._iter = self._dist_iter
             self._start = np.sum(sizes[:rank, var_idx])
@@ -657,7 +658,7 @@ class LocalRangeIterable(object):
 
         for i in range(self._dist_size):
             if i >= start and i < end:
-                yield i - start
+                yield i - start + self._offset
             else:
                 yield None
 

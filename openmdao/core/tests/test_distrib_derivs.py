@@ -503,7 +503,7 @@ class MPITests2(unittest.TestCase):
                           np.array([27.0, 24.96, 23.64, 23.04, 23.16, 24.0, 25.56]),
                           1e-6)
 
-        J = prob.check_totals(method='cs')
+        J = prob.check_totals(out_stream=None, method='cs')
         assert_near_equal(J['parab.f_xy', 'p.x']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['parab.f_xy', 'p.y']['abs error'][0], 0.0, 1e-5)
         assert_near_equal(J['sum.f_sum', 'p.x']['abs error'][0], 0.0, 1e-5)
