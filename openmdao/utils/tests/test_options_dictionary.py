@@ -3,7 +3,7 @@ from openmdao.api import OptionsDictionary
 import unittest
 
 from openmdao.utils.assert_utils import assert_warning, assert_no_warning
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 

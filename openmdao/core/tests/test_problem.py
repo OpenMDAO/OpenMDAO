@@ -14,7 +14,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.warnings import DerivativesWarning
+from openmdao.utils.om_warnings import DerivativesWarning
 
 try:
     from parameterized import parameterized

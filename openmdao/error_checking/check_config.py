@@ -17,7 +17,7 @@ from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions, ignore_errors
 from openmdao.utils.units import _has_val_mismatch
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.warnings import issue_warning, SetupWarning
+from openmdao.utils.om_warnings import issue_warning, SetupWarning
 
 
 _UNSET = object()

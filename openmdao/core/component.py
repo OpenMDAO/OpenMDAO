@@ -20,7 +20,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
 import openmdao.utils.coloring as coloring_mod
-from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
+from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']

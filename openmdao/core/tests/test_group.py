@@ -18,7 +18,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context
-from openmdao.warnings import reset_warning_registry
+from openmdao.utils.om_warnings import reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
