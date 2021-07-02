@@ -2941,10 +2941,14 @@ class Group(System):
             Ending index.
         slice or ndarray
             A full slice or indices for the 'of' variable.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
         total = self.pathname == ''
 
         abs2meta = self._var_allprocs_abs2meta['output']
+        abs2idx = self._var_allprocs_abs2idx
+        sizes = self._var_sizes['output']
         approx_of_idx = self._owns_approx_of_idx
 
         if self._owns_approx_of:
@@ -2952,12 +2956,17 @@ class Group(System):
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for of in self._owns_approx_of:
+                meta = abs2meta[of]
+                if meta['distributed']:
+                    dist_sizes = sizes[:, abs2idx[of]]
+                else:
+                    dist_sizes = None
                 if of in approx_of_idx:
                     end += len(approx_of_idx[of])
-                    yield of, start, end, approx_of_idx[of].shaped_array().flat[:]
+                    yield of, start, end, approx_of_idx[of].shaped_array().flat[:], dist_sizes
                 else:
                     end += abs2meta[of][szname]
-                    yield of, start, end, _full_slice
+                    yield of, start, end, _full_slice, dist_sizes
 
                 start = end
         else:
@@ -2986,10 +2995,15 @@ class Group(System):
             Either the _outputs or _inputs vector.
         slice or ndarray
             A full slice or indices for the 'wrt' variable.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
         total = self.pathname == ''
 
         if self._owns_approx_wrt:
+            sizes = self._var_sizes
+            sizes_out = self._var_sizes['output']
+            toidx = self._var_allprocs_abs2idx
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
             local_ins = self._var_abs2meta['input']
@@ -2999,15 +3013,17 @@ class Group(System):
 
             offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, _offset, _end, _ in self._jac_of_iter():
+                for of, start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
-                        end += (_end - _offset)
+                        end += (_end - start)
                         vec = self._outputs if of in local_outs else None
-                        yield of, offset, end, vec, _full_slice
+                        yield of, offset, end, vec, _full_slice, dist_sizes
                         offset = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
+                    io = 'input' if wrt in abs2meta['input'] else 'output'
+                    meta = abs2meta[io][wrt]
                     if wrt in local_ins:
                         vec = self._inputs
                     elif wrt in local_outs:
@@ -3020,12 +3036,10 @@ class Group(System):
                         sub_wrt_idx = sub_wrt_idx.flat()
                     else:
                         sub_wrt_idx = _full_slice
-                        if wrt in abs2meta['input']:
-                            size = abs2meta['input'][wrt][szname]
-                        else:
-                            size = abs2meta['output'][wrt][szname]
+                        size = abs2meta[io][wrt][szname]
                     end += size
-                    yield wrt, offset, end, vec, sub_wrt_idx
+                    dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
+                    yield wrt, offset, end, vec, sub_wrt_idx, dist_sizes
                     offset = end
         else:
             yield from super()._jac_wrt_iter(wrt_matches)

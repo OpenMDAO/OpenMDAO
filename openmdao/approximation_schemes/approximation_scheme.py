@@ -148,7 +148,7 @@ class ApproximationScheme(object):
 
             ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, vec, cinds in ordered_wrt_iter:
+            for abs_wrt, cstart, cend, _, cinds, _ in ordered_wrt_iter:
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
@@ -165,7 +165,7 @@ class ApproximationScheme(object):
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
-            it = [(of, end - start) for of, start, end, _ in system._jac_of_iter()]
+            it = [(of, end - start) for of, start, end, _, _ in system._jac_of_iter()]
         else:
             it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
 
@@ -228,7 +228,7 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
-        for wrt, start, end, vec, _ in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -323,7 +323,8 @@ class ApproximationScheme(object):
         total = system.pathname == ''
 
         if total:
-            tot_result = np.zeros(sum([end - start for _, start, end, _ in system._jac_of_iter()]))
+            tot_result = np.zeros(sum([end - start for _, start, end, _, _
+                                       in system._jac_of_iter()]))
             scratch = tot_result.copy()
         else:
             scratch = np.empty(len(system._outputs))

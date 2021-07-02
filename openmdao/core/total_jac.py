@@ -237,6 +237,7 @@ class _TotalJacInfo(object):
 
         self.has_lin_cons = has_lin_cons
         self.dist_input_idx_map = {}
+        self.has_input_dist = {}
 
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
@@ -277,9 +278,10 @@ class _TotalJacInfo(object):
 
         self.of_meta, self.of_size, of_dist_size, has_of_dist = \
             self._get_tuple_map(of, responses, abs2meta_out)
+        self.has_input_dist['rev'] = has_of_dist
         self.wrt_meta, self.wrt_size, wrt_dist_size, has_wrt_dist = \
             self._get_tuple_map(wrt, design_vars, abs2meta_out)
-        self.has_wrt_dist = has_wrt_dist
+        self.has_input_dist['fwd'] = has_wrt_dist
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -378,6 +380,9 @@ class _TotalJacInfo(object):
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
     def _compute_jac_scatters(self, mode, rowcol_size, get_remote):
+        """
+        Compute scatter between a given local jacobian row/col to others in other procs.
+        """
         model = self.model
         nproc = self.comm.size
 
@@ -1360,7 +1365,7 @@ class _TotalJacInfo(object):
 
         # if some of the wrt vars are distributed in fwd mode, we have to bcast from the rank
         # where each part of the distrib var exists
-        if self.get_remote and self.has_wrt_dist and mode == 'fwd':
+        if self.get_remote and self.has_input_dist['fwd'] and mode == 'fwd':
             for start, stop, rank in self.dist_input_idx_map[mode]:
                 contig = self.J[:, start:stop].copy()
                 model.comm.Bcast(contig, root=rank)

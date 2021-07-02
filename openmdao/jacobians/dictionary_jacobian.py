@@ -196,9 +196,9 @@ class _CheckingJacobian(DictionaryJacobian):
         else:
             local_opts = None
 
-        for of, start, end, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._jac_of_iter():
             nrows = end - start
-            for wrt, wstart, wend, _, _ in system._jac_wrt_iter():
+            for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
                 ncols = wend - wstart
                 loc_wrt = wrt.rsplit('.', 1)[-1]
                 directional = (local_opts is not None and loc_wrt in local_opts and
@@ -238,12 +238,12 @@ class _CheckingJacobian(DictionaryJacobian):
             self._setup_index_maps(system)
 
         wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _, _ = self._col_var_info[wrt]
+        _, offset, _, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
 
         scratch = np.zeros(column.shape)
 
-        for of, start, end, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]

@@ -96,16 +96,21 @@ class ExplicitComponent(Component):
             The _inputs vector.
         slice
             A full slice.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
         offset = end = 0
         local_ins = self._var_abs2meta['input']
+        toidx = self._var_allprocs_abs2idx
+        sizes = self._var_sizes['input']
         total = self.pathname == ''
         szname = 'global_size' if total else 'size'
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, offset, end, vec, _full_slice
+                dist_sizes = sizes[:, toidx[wrt]] if meta['distributed'] else None
+                yield wrt, offset, end, vec, _full_slice, dist_sizes
                 offset = end
 
     def _setup_partials(self):

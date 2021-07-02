@@ -589,13 +589,17 @@ class System(object):
             Ending index.
         slice or ndarray
             A full slice or indices for the 'of' variable.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
+        toidx = self._var_allprocs_abs2idx
+        sizes = self._var_sizes['output']
         total = self.pathname == ''
         szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
             end += meta[szname]
-            yield of, start, end, _full_slice
+            yield of, start, end, _full_slice, sizes[:, toidx[of]] if meta['distributed'] else None
             start = end
 
     def _jac_wrt_iter(self, wrt_matches=None):
@@ -621,7 +625,16 @@ class System(object):
             Either the _outputs or _inputs vector.
         slice
             A full slice.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
+        toidx = self._var_allprocs_abs2idx
+        sizes_in = self._var_sizes['input']
+        sizes_out = self._var_sizes['output']
+
+        tometa_in = self._var_allprocs_abs2meta['input']
+        tometa_out = self._var_allprocs_abs2meta['output']
+
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
@@ -629,18 +642,19 @@ class System(object):
         szname = 'global_size' if total else 'size'
 
         start = end = 0
-        for of, _start, _end, _ in self._jac_of_iter():
+        for of, _start, _end, _, dist_sizes in self._jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
-                yield of, start, end, vec, _full_slice
+                yield of, start, end, vec, _full_slice, dist_sizes
                 start = end
 
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, start, end, vec, _full_slice
+                dist_sizes = sizes_in[:, toidx[wrt]] if tometa_in[wrt]['distributed'] else None
+                yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
 
     def _declare_options(self):
@@ -5268,22 +5282,31 @@ class System(object):
         toffset = myrank * tsize
         has_dist_data = False
 
-        # print("vars:", list(allabs2meta))
-        # print("sizes:", sizes)
-        # print("global_offsets:", global_offsets)
-        # for tup in oflist:
-        #     print("oflist:", tup)
-
         sinds = []
         tinds = []
 
-        for name, tstart, tend, jinds in oflist:
+        for name, tstart, tend, jinds, dist_sizes in oflist:
             vind = abs2idx[name]
-            if allabs2meta[name]['distributed']:
+            if dist_sizes is None:
+                if name in abs2meta:
+                    owner = myrank
+                else:
+                    owner = owns[name]
+                    has_dist_data = True
+
+                voff = global_offsets[owner, vind]
+                if jinds is _full_slice:
+                    vsize = sizes[owner, vind]
+                    sinds.append(range(voff, voff + vsize))
+                else:
+                    sinds.append(jinds + voff)
+                tinds.append(range(tstart + toffset, tend + toffset))
+                assert(len(sinds[-1]) == len(tinds[-1]))
+            else:  # 'name' refers to a distributed variable
                 has_dist_data = True
                 dtstart = dtend = tstart
                 dsstart = dsend = 0
-                for rnk, sz in enumerate(sizes[:, vind]):
+                for rnk, sz in enumerate(dist_sizes):
                     dsend += sz
                     if sz > 0:
                         voff = global_offsets[rnk, vind]
@@ -5301,21 +5324,6 @@ class System(object):
                         dtstart = dtend
                     dsstart = dsend
                 assert((len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1]))
-            else:
-                if name in abs2meta:
-                    owner = myrank
-                else:
-                    owner = owns[name]
-                    has_dist_data = True
-
-                voff = global_offsets[owner, vind]
-                if jinds is _full_slice:
-                    vsize = sizes[owner, vind]
-                    sinds.append(range(voff, voff + vsize))
-                else:
-                    sinds.append(jinds + voff)
-                tinds.append(range(tstart + toffset, tend + toffset))
-                assert(len(sinds[-1]) == len(tinds[-1]))
 
         sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
         tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)

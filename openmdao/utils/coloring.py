@@ -2268,7 +2268,7 @@ class _ColSparsityJac(object):
     def __init__(self, system, color_info):
         self._color_info = color_info
 
-        nrows = sum([end - start for _, start, end, _ in system._jac_of_iter()])
+        nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
         ordered_wrt_info = list(system._jac_wrt_iter(color_info['wrt_matches']))
 
         ncols = ordered_wrt_info[-1][2]
