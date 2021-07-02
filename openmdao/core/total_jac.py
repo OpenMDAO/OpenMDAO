@@ -238,6 +238,7 @@ class _TotalJacInfo(object):
         self.has_lin_cons = has_lin_cons
         self.dist_input_idx_map = {}
         self.has_input_dist = {}
+        self.has_output_dist = {}
 
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
@@ -278,10 +279,10 @@ class _TotalJacInfo(object):
 
         self.of_meta, self.of_size, of_dist_size, has_of_dist = \
             self._get_tuple_map(of, responses, abs2meta_out)
-        self.has_input_dist['rev'] = has_of_dist
+        self.has_input_dist['rev'] = self.has_output_dist['fwd'] = has_of_dist
         self.wrt_meta, self.wrt_size, wrt_dist_size, has_wrt_dist = \
             self._get_tuple_map(wrt, design_vars, abs2meta_out)
-        self.has_input_dist['fwd'] = has_wrt_dist
+        self.has_input_dist['fwd'] = self.has_output_dist['rev'] = has_wrt_dist
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -293,8 +294,8 @@ class _TotalJacInfo(object):
             # columns from the owner of a given range of dist indices to everyone else.
             if has_wrt_dist and self.comm.size > 1:
                 abs2idx = model._var_allprocs_abs2idx
-                sizes = model._var_sizes['output']
                 if 'fwd' in modes:
+                    sizes = model._var_sizes['output']
                     meta = self.wrt_meta
                     # map which indices belong to dist vars and to which rank
                     self.dist_input_idx_map['fwd'] = dist_map = []
@@ -312,6 +313,36 @@ class _TotalJacInfo(object):
                                 dist_map.append((dstart, dend, rank))
                                 dstart = dend
                         start = end
+                # if 'rev' in modes:  # need scatter to move distrib var data around before Allreduce
+                #     sinds = []
+                #     tinds = []
+                #     toffset = model.comm.rank * self.wrt_size
+                #     start = end = 0
+                #     for name in self.output_list['rev']:
+                #         slc, indices, is_dist = meta[name]
+                #         end += (slc.stop - slc.start)
+                #         if is_dist:
+                #             varidx = abs2idx[name]
+                #             distsz = sizes[:, varidx]
+                #             dtstart = dtend = start
+                #             dsstart = dsend = 0
+                #             for rnk, sz in enumerate(distsz):
+                #                 dsend += sz
+                #                 if sz > 0:
+                #                     if indices is None:
+                #                         dtend += sz
+                #                         sinds.append(range(voff, voff + sz))
+                #                         tinds.append(range(toffset + dtstart, toffset + dtend))
+                #                     elif jinds.size > 0:  # jinds is a flat array
+                #                         subinds = jinds[jinds >= dsstart]
+                #                         subinds = subinds[subinds < dsend]
+                #                         if subinds.size > 0:
+                #                             dtend += subinds.size
+                #                             sinds.append(subinds + (voff - dsstart))
+                #                             tinds.append(range(toffset + dtstart, toffset + dtend))
+                #                     dtstart = dtend
+                #                 dsstart = dsend
+                #         start = end
         else:
             for mode in modes:
                 # If we're running with only a local total jacobian, then we need to keep
@@ -386,12 +417,12 @@ class _TotalJacInfo(object):
         model = self.model
         nproc = self.comm.size
 
-        if (((mode == 'fwd' and get_remote) or (mode == 'rev' and not get_remote)) and
+        if (((mode == 'fwd' and get_remote) or mode == 'rev') and
                 (nproc > 1 or (model._full_comm is not None and model._full_comm.size > 1))):
             myrank = self.comm.rank
             if get_remote:  # fwd
                 myoffset = rowcol_size * myrank
-            else:  # rev and not get_remote
+            elif not get_remote:  # rev and not get_remote
                 # reduce size of vector by not including distrib vars
                 arr = np.ones(rowcol_size, dtype=bool)
                 start = end = 0
@@ -422,15 +453,21 @@ class _TotalJacInfo(object):
             full_j_tgts = []
             full_j_srcs = []
 
+            print("sol2jac_map:", self.sol2jac_map)
+
             start = end = 0
             for name in name2jinds:
                 if name not in abs2idx:
                     continue
 
+                is_dist = abs2meta_out[name]['distributed']
+
+                print(name, "is_dist:", is_dist)
+
                 if name in loc_abs:
                     end += abs2meta_out[name]['size']
 
-                if get_remote and abs2meta_out[name]['distributed']:
+                if get_remote and is_dist:
                     srcinds = name2jinds[name]
                     myinds = srcinds + myoffset
                     for rank in range(nproc):
@@ -438,7 +475,7 @@ class _TotalJacInfo(object):
                             offset = rowcol_size * rank   # J is same size on all procs
                             full_j_srcs.append(myinds)
                             full_j_tgts.append(srcinds + offset)
-                elif not self.get_remote and not abs2meta_out[name]['distributed']:
+                elif not self.get_remote and not is_dist:
                     var_idx = abs2idx[name]
                     mysize = sizes[myrank, var_idx]
                     if mysize > 0:
@@ -469,6 +506,8 @@ class _TotalJacInfo(object):
                 full_src_inds = np.zeros(0, dtype=INT_DTYPE)
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
 
+            print(mode, "SRC_INDS:", full_src_inds)
+            print(mode, "TGT_INDS:", full_tgt_inds)
             src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
             tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
             self.tgt_petsc[mode] = tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size,
@@ -1165,6 +1204,12 @@ class _TotalJacInfo(object):
             if self.get_remote:
                 scratch = self.jac_scratch['rev'][1]
                 scratch[:] = self.J[i]
+                if self.jac_scatters[mode] is not None:
+                    self.src_petsc[mode].array = scratch
+                    self.tgt_petsc[mode].array[:] = scratch
+                    self.jac_scatters[mode].scatter(self.src_petsc[mode], self.tgt_petsc[mode],
+                                                    addv=False, mode=False)
+                    scratch[:] = self.tgt_petsc[mode].array
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
             else:
                 scatter = self.jac_scatters[mode]

@@ -5274,7 +5274,6 @@ class System(object):
         owns = self._owning_rank
         abs2idx = self._var_allprocs_abs2idx
         abs2meta = self._var_abs2meta['output']
-        allabs2meta = self._var_allprocs_abs2meta['output']
         sizes = self._var_sizes['output']
         global_offsets = self._get_var_offsets()['output']
         oflist = list(self._jac_of_iter())
@@ -5335,5 +5334,4 @@ class System(object):
             sarr -= sysoffset
             tarr -= toffset
 
-        # print("xfer inds:", sarr, "->", tarr)
         return sarr, tarr, tsize, has_dist_data
