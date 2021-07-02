@@ -262,15 +262,14 @@ class InterpAlgorithmSemi(object):
         Array containing the table values for all dimensions.
     _compute_d_dvalues : bool
         When set to True, compute gradients with respect to the table values.
-    _full_slice : tuple of <Slice>
-        Used to cache the full slice if training derivatives are computed.
+    _idx : list
+        Maps values to their indices in the training data input. Used when _compute_d_dvalues
+        is True.
     _name : str
         Algorithm name for error messages.
-    _vectorized :bool
-        If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
 
-    def __init__(self, grid, values, interp, **kwargs):
+    def __init__(self, grid, values, interp, idx=None, **kwargs):
         """
         Initialize table and subtables.
 
@@ -282,6 +281,9 @@ class InterpAlgorithmSemi(object):
             Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
@@ -292,36 +294,41 @@ class InterpAlgorithmSemi(object):
         self.values = values
 
         if grid.shape[1] > 1:
-            # Create subtables.
+            # Build hieararchy of subtables.
             subtables = []
             i_pt = grid[0, 0]
+            if idx is None:
+                idx = [item for item in range(len(values))]
+
             i0, i1 = 0, 1
-            for point in grid[1:]:
-                print(i0, i1, point, i_pt)
+            sub_idx = [idx[0]]
+            for point, jj in zip(grid[1:], idx[1:]):
                 if point[0] != i_pt:
-                    newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, **kwargs)
-                    print(grid[i0:i1, 1:])
+                    newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
+                                      **kwargs)
                     subtables.append(newtable)
                     i0 = i1
                     i_pt = point[0]
-                i1 += 1
+                    sub_idx = []
 
-            newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, **kwargs)
-            print(grid[i0:i1, 1:])
+                i1 += 1
+                sub_idx.append(jj)
+
+            newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx, **kwargs)
             subtables.append(newtable)
 
             self.subtables = subtables
             self.grid = np.unique(grid[:, 0])
         else:
+            # A "leaf" of the hierarchy.
             self.grid = grid
             self.subtables = None
+            self._idx = idx
 
         self.last_index = 0
         self.k = None
         self._name = None
-        self._vectorized = False
         self._compute_d_dvalues = False
-        self._full_slice = None
 
     def initialize(self):
         """

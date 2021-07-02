@@ -24,6 +24,7 @@ from openmdao.components.ks_comp import KSComp
 from openmdao.components.linear_system_comp import LinearSystemComp
 from openmdao.components.matrix_vector_product_comp import MatrixVectorProductComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_semi_structured_comp import MetaModelSemiStructuredComp
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.spline_comp import SplineComp
 from openmdao.components.multifi_meta_model_unstructured_comp \

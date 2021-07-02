@@ -3,13 +3,17 @@ Base class for interpolation methods that work on a semi-structured grid.
 """
 import numpy as np
 
+from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2Semi
 from openmdao.components.interp_util.interp_slinear import InterpLinearSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 INTERP_METHODS = {
+    'lagrange2': InterpLagrange2Semi,
     'slinear': InterpLinearSemi,
 }
+
+TABLE_METHODS = [method for method in INTERP_METHODS.keys()]
 
 
 class InterpNDSemi(object):
@@ -93,14 +97,15 @@ class InterpNDSemi(object):
         self._xi = None
         self._d_dx = None
         self._d_dvalues = None
-        self._compute_d_dvalues = False
         self._compute_d_dx = True
+        self._compute_d_dvalues = False
 
         # Cache spline coefficients.
         interp = INTERP_METHODS[method]
 
         table = interp(self.grid, values, interp, **kwargs)
         table.check_config()
+
         self.table = table
         self._interp = interp
         self._interp_options = kwargs
@@ -180,13 +185,28 @@ class InterpNDSemi(object):
 
         table = self.table
 
-        val, d_x, d_values = table.evaluate(xi)
+        xi = np.atleast_2d(xi)
+        n_nodes, nx = xi.shape
+        result = np.empty((n_nodes, ), dtype=xi.dtype)
+        derivs_x = np.empty((n_nodes, nx), dtype=xi.dtype)
+        if self._compute_d_dvalues:
+            derivs_val = np.empty((n_nodes, len(self.values)), dtype=xi.dtype)
+
+        # Loop over n_nodes because there isn't a way to vectorize.
+        for j in range(n_nodes):
+            val, d_x, d_values_tuple = table.evaluate(xi[j, :])
+            result[j] = val
+            derivs_x[j, :] = d_x.flatten()
+            if self._compute_d_dvalues:
+                d_values, idx = d_values_tuple
+                derivs_val[j, idx] = d_values.flatten()
 
         # Cache derivatives
-        self._d_dx = d_x
-        self._d_dvalues = d_values
+        self._d_dx = derivs_x
+        if self._compute_d_dvalues:
+            self._d_dvalues = derivs_val
 
-        return val
+        return result
 
     def gradient(self, xi):
         """
@@ -213,7 +233,7 @@ class InterpNDSemi(object):
             # If inputs have changed since last computation, then re-interpolate.
             self.interpolate(xi)
 
-        return self._d_dx.reshape(np.asarray(xi).shape)
+        return self._d_dx
 
     def training_gradients(self, pt):
         """
@@ -229,25 +249,4 @@ class InterpNDSemi(object):
         ndarray
             Gradient of output with respect to training point values.
         """
-        grid = self.grid
-        interp = self._interp
-        opts = self._interp_options
-
-        for i, axis in enumerate(grid):
-            ngrid = axis.size
-            values = np.zeros(ngrid)
-            deriv_i = np.zeros(ngrid)
-
-            for j in range(ngrid):
-                values[j] = 1.0
-                table = interp([grid[i]], values, interp, **opts)
-                table._compute_d_dvalues = False
-                deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
-                values[j] = 0.0
-
-            if i == 0:
-                deriv_running = deriv_i.copy()
-            else:
-                deriv_running = np.outer(deriv_running, deriv_i)
-
-            return deriv_running
+        return self._d_dvalues

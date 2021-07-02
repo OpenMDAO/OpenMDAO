@@ -139,9 +139,9 @@ class InterpLinearSemi(InterpAlgorithmSemi):
         ndarray
             Derivative of interpolated values with respect to this independent and child
             independents.
-        ndarray
+        tuple(ndarray, list)
             Derivative of interpolated values with respect to values for this and subsequent table
-            dimensions.
+            dimensions. Second term is the indices into the value array.
         """
         grid = self.grid
         subtables = self.subtables
@@ -157,19 +157,40 @@ class InterpLinearSemi(InterpAlgorithmSemi):
         if subtables is not None:
             # Interpolate between values that come from interpolating the subtables in the
             # subsequent dimensions.
-            val1, deriv1, _ = subtables[idx + 1].evaluate(x[1:])
-            val0, deriv0, _ = subtables[idx].evaluate(x[1:])
+            val1, dx1, dvalue1 = subtables[idx + 1].evaluate(x[1:])
+            val0, dx0, dvalue0 = subtables[idx].evaluate(x[1:])
             slope = (val1 - val0) * h
 
-            derivs = np.empty(len(deriv0) + 1)
+            derivs = np.empty(len(dx0) + 1, dtype=x.dtype)
             derivs[0] = slope
-            dslope_dsub = (deriv1 - deriv0) * h
-            derivs[1:] = deriv0 + (x[0] - grid[idx]) * dslope_dsub
+            dslope_dsub = (dx1 - dx0) * h
+            derivs[1:] = dx0 + (x[0] - grid[idx]) * dslope_dsub
 
-            return val0 + (x[0] - grid[idx]) * slope, derivs, None
+            d_value = None
+            if self._compute_d_dvalues:
+                dvalue0, idx0 = dvalue0
+                dvalue1, idx1 = dvalue1
+                n = len(dvalue0)
+
+                d_value = np.empty(n * 2, dtype=x.dtype)
+                d_value[:n] = dvalue0 * (1.0 - (x[0] - grid[idx]) * h)
+                d_value[n:] = dvalue1 * (x[0] - grid[idx]) * h
+
+                idx0.extend(idx1)
+                d_value = (d_value, idx0)
+
+            return val0 + (x[0] - grid[idx]) * slope, derivs, d_value
 
         else:
             values = self.values
             slope = (values[idx + 1] - values[idx]) * h
 
-            return values[idx] + (x - grid[idx]) * slope, slope, None
+            d_value = None
+            if self._compute_d_dvalues:
+                d_value = np.empty(2, dtype=x.dtype)
+                d_value[1] = h * (x - grid[idx])
+                d_value[0] = 1.0 - d_value[1]
+
+                d_value = (d_value, [self._idx[idx], self._idx[idx + 1]])
+
+            return values[idx] + (x - grid[idx]) * slope, slope, d_value
