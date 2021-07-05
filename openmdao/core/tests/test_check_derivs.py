@@ -9,6 +9,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -18,7 +19,8 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
+    assert_no_warning
 from openmdao.utils.mpi import MPI
 
 try:
@@ -1957,6 +1959,35 @@ class TestProblemCheckPartials(unittest.TestCase):
                 partials['f_xy', 'x'] = 2.0 * x - 6.0 + y
                 partials['f_xy', 'y'] = 2.0 * y + 8.0 + x
 
+        def expected_error(var, comp, method, form, step, step_calc):
+            doc_root_url = 'http://openmdao.org/newdocs/versions/latest/'
+            msg = f"Problem: Checking partials with respect " \
+                  f"to variable '{var}' in component " \
+                  f"'{comp.pathname}' using the same " \
+                  "method and options as the used to compute the " \
+                  "component's derivatives " \
+                  "will not provide any relevant information on the " \
+                  "accuracy.\n" \
+                  "Settings for both are currently:\n" \
+                  f"    method: {method}\n" \
+                  f"    form: {form}\n" \
+                  f"    step: {step}\n" \
+                  f"    step_calc: {step_calc}\n" \
+                  "To correct this, change the options to do the " \
+                  "check_partials using either:\n" \
+                  "     - arguments to Problem.check_partials. " \
+                  "See:\n" \
+                  f"        {doc_root_url}features/core_features" \
+                  f"/working_with_derivatives/" \
+                  f"basic_check_partials.html\n" \
+                  "     or\n" \
+                  "     - arguments to " \
+                  "Component.set_check_partial_options. See\n" \
+                  f"        {doc_root_url}features/core_features" \
+                  f"/working_with_derivatives/" \
+                  f"check_partials_settings.html"
+            return msg
+
         prob = om.Problem()
         model = prob.model
         model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
@@ -1972,15 +2003,24 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        expected_error_msg = "Problem: Checking partials with respect to variable 'x' in " \
-                             "component 'parab' using the same method and options"
-
+        # expected_error_msg = "Problem: Checking partials with respect to variable 'x' in " \
+        #                      "component 'parab' using the same method and options"
+        #
         # Scenario 1:
         #    Compute partials: exact
         #    Check partials: fd using argument to check_partials, default options
         #    Expected result: no error
         # parab.declare_partials('*', '*')
-        prob.check_partials(method='fd')
+
+        from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+            OMInvalidCheckPartialOptionsWarning
+
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='fd')
+
+        import warnings
+        warnings.filterwarnings('error', category=OMInvalidCheckPartialOptionsWarning)
+
 
         # Scenario 2:
         #    Compute partials: fd, with default options
@@ -1988,38 +2028,61 @@ class TestProblemCheckPartials(unittest.TestCase):
         #    Expected result: Error
         parab.declare_partials(of='*', wrt='*', method='fd')
 
-        with self.assertRaises(ValueError) as err:
-            prob.check_partials(method='fd')
+        # with self.assertRaises(OMInvalidCheckPartialOptionsWarning) as err:
+        expected_msg = expected_error('x', parab, 'fd', 'forward', '1e-6', 'abs') + \
+                        "\n" + \
+                        expected_error('y', parab, 'fd', 'forward', '1e-6', 'abs') + \
+            '\n' +\
+            'Calling np.sum(generator) is deprecated, and in the future will give a different result. Use np.sum(np.fromiter(generator)) or the python sum builtin instead.'
 
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        prob.check_partials(method='fd')
+
+        # with assert_warning(OMInvalidCheckPartialOptionsWarning, expected_msg):
+        #     prob.check_partials(method='fd')
+
+        return
+
+        # self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 3:
         #    Compute partials: fd, with default options
         #    Check partials: fd using argument to check_partials, different step option
         #    Expected result: No error
-        prob.check_partials(method='fd', step=1e-4)
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='fd', step=1e-4)
 
         # Scenario 4:
         #    Compute partials: fd, with default options
         #    Check partials: fd using argument to check_partials, different form option
         #    Expected result: No error
-        prob.check_partials(method='fd', form='backward')
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='fd', form='backward')
 
         # Scenario 5:
         #    Compute partials: fd, with default options
         #    Check partials: fd using argument to check_partials, different step_calc option
         #    Expected result: No error
-        prob.check_partials(method='fd', step_calc='rel')
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='fd', step_calc='rel')
+
+        # Scenario 5:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different step_calc option
+        #    Expected result: No error
+        parab.set_check_partial_options('*', directional=True)
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='fd')
 
         # Scenario 6:
         #    Compute partials: fd, with default options
         #    Check partials: cs using argument to check_partials
         #    Other condition: haven't allocated a complex vector, so we fall back on fd
         #    Expected result: Error since using fd to check fd. All options the same
-        with self.assertRaises(ValueError) as err:
+        # with self.assertRaises(ValueError) as err:
+        with assert_warning(OMInvalidCheckPartialOptionsWarning, 'Problem: gleep'):
             prob.check_partials(method='cs')
 
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        # self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 7:
         #    Compute partials: fd, with default options
@@ -2028,23 +2091,26 @@ class TestProblemCheckPartials(unittest.TestCase):
         #    Expected result: No error
         prob.setup(force_alloc_complex=True)
         prob.run_model()
-        prob.check_partials(method='cs')
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials(method='cs')
 
         # Scenario 8:
         #    Compute partials: fd, with default options
         #    Check partials: fd using Component.set_check_partial_options argument, default options
         #    Expected result: Error
         parab.set_check_partial_options('*')
-        with self.assertRaises(ValueError) as err:
+        # with self.assertRaises(ValueError) as err:
+        with assert_warning(OMInvalidCheckPartialOptionsWarning, 'Problem: gleep'):
             prob.check_partials()
-        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+        # self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 9:
         #    Compute partials: fd, with default options
         #    Check partials: fd using Component.set_check_partial_options argument, step set
         #    Expected result: No error
         parab.set_check_partial_options('*', step=1e-4)
-        prob.check_partials()
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
 
         # Scenario 10:
         #    Compute partials: fd, with default options
@@ -2052,22 +2118,25 @@ class TestProblemCheckPartials(unittest.TestCase):
         #    Expected result: No error
         parab.set_check_partial_options('*', form='backward',
                                         step= FiniteDifference.DEFAULT_OPTIONS['step'])
-        prob.check_partials()
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
 
         # Scenario 11:
         #    Compute partials: fd, with default options
         #    Check partials: fd using Component.set_check_partial_options argument, step_calc set
         #    Expected result: No error
         parab.set_check_partial_options('*', step_calc='rel',
-                                        form= FiniteDifference.DEFAULT_OPTIONS['form'])
-        prob.check_partials()
+                                        form=FiniteDifference.DEFAULT_OPTIONS['form'])
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
 
         # Scenario 12:
         #    Compute partials: fd, with default options
         #    Check partials: cs using Component.set_check_partial_options argument
         #    Expected result: No error
         parab.set_check_partial_options('*', method='cs')
-        prob.check_partials()
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
 
         # Scenario 13:
         #    Compute partials: cs, with default options
@@ -2075,7 +2144,30 @@ class TestProblemCheckPartials(unittest.TestCase):
         #    Expected result: No error
         parab.declare_partials(of='*', wrt='*', method='cs')
         parab.set_check_partial_options('*', method='fd')
-        prob.check_partials()
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
+
+        # Scenario 14:
+        #    Compute partials: cs, with default options
+        #    Check partials: cs
+        #    Expected result: Error
+        parab.declare_partials(of='*', wrt='*', method='cs',
+                               step=ComplexStep.DEFAULT_OPTIONS['step'])
+        parab.set_check_partial_options('*', method='cs',
+                                        step=ComplexStep.DEFAULT_OPTIONS['step'])
+        with assert_warning(OMInvalidCheckPartialOptionsWarning, 'Problem: gleep'):
+            prob.check_partials()
+
+        # Scenario 15:
+        #    Compute partials: cs, with default options
+        #    Check partials: cs, with different step
+        #    Expected result: No error
+        parab.declare_partials(of='*', wrt='*', method='cs',
+                               step=ComplexStep.DEFAULT_OPTIONS['step'])
+        parab.set_check_partial_options('*', method='cs',
+                                        step=2.0*ComplexStep.DEFAULT_OPTIONS['step'])
+        with assert_no_warning(OMInvalidCheckPartialOptionsWarning):
+            prob.check_partials()
 
 
 class TestCheckPartialsFeature(unittest.TestCase):

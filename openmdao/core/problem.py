@@ -44,7 +44,8 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+    OMInvalidCheckPartialOptionsWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -71,8 +72,6 @@ CITATION = """@article{openmdao_2019,
     pdf={http://openmdao.org/pubs/openmdao_overview_2019.pdf},
     note= {In Press}
     }"""
-
-
 
 
 class Problem(object):
@@ -870,6 +869,12 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
+        import warnings
+        from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+            OMInvalidCheckPartialOptionsWarning
+
+        # warnings.simplefilter('error', OMInvalidCheckPartialOptionsWarning)
+
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
@@ -1110,6 +1115,8 @@ class Problem(object):
         alloc_complex = model._outputs._alloc_complex
 
         for comp in comps:
+            local_opts = comp._get_check_partial_options()
+
             for key, meta in comp._declared_partials.items():
 
                 # Get the complete set of options, including defaults
@@ -1133,42 +1140,80 @@ class Problem(object):
                     _, vars = wrt_var
                     for var in vars:
                         # we now have individual vars like 'x'
-                        fd_options = _get_fd_options(var, requested_method, comp, step, form,
-                                                     step_calc, alloc_complex)
+                        # get the options for checking partials
+                        fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
+                                                        form, step_calc, alloc_complex)
                         # compare the compute options to the check options
-                        all_same = True
-                        for name in ['method', 'form', 'step', 'step_calc']:
-                            if fd_options[name] != meta_with_defaults[name]:
-                                all_same = False
-                                break
+                        if fd_options['method'] != meta_with_defaults['method']:
+                            all_same = False
+                        else:
+                            all_same = True
+                            if fd_options['method'] == 'fd':
+                                option_names = ['form', 'step', 'step_calc', 'directional']
+                            else:
+                                option_names = ['step', 'directional']
+                            for name in option_names:
+                                if fd_options[name] != meta_with_defaults[name]:
+                                    all_same = False
+                                    break
                         if all_same:
                             doc_root_url = 'http://openmdao.org/newdocs/versions/latest/'
-                            raise ValueError(f"{self.msginfo}: Checking partials with respect "
-                                             f"to variable '{var}' in component "
-                                             f"'{comp.pathname}' using the same "
-                                             "method and options as the used to compute the "
-                                             "component's derivatives "
-                                             "will not provide any relevant information on the "
-                                             "accuracy.\n"
-                                             "Settings for both are currently:\n"
-                                             f"    method: {fd_options['method']}\n"
-                                             f"    form: {fd_options['form']}\n"
-                                             f"    step: {fd_options['step']}\n"
-                                             f"    step_calc: {fd_options['step_calc']}\n"
-                                             "To correct this, change the options to do the "
-                                             "check_partials using either:\n"
-                                             "     - arguments to Problem.check_partials. "
-                                             "See:\n"
-                                             f"        {doc_root_url}features/core_features"
-                                             f"/working_with_derivatives/"
-                                             f"basic_check_partials.html"
-                                             "     or\n"
-                                             "     - arguments to "
-                                             "Component.set_check_partial_options. See\n"
-                                             f"        {doc_root_url}features/core_features"
-                                             f"/working_with_derivatives/"
-                                             f"check_partials_settings.html"
-                                             )
+                            msg = f"Checking partials with respect " \
+                                  f"to variable '{var}' in component " \
+                                  "'{comp.pathname}' using the same " \
+                                  "method and options as the used to compute the " \
+                                  "component's derivatives " \
+                                  "will not provide any relevant information on the " \
+                                  "accuracy.\n" \
+                                  "Settings for both are currently:\n" \
+                                  f"    method: {fd_options['method']}\n" \
+                                  f"    form: {fd_options['form']}\n" \
+                                  f"    step: {fd_options['step']}\n" \
+                                  f"    step_calc: {fd_options['step_calc']}\n" \
+                                  "To correct this, change the options to do the " \
+                                  "check_partials using either:\n" \
+                                  "     - arguments to Problem.check_partials. " \
+                                  "See:\n" \
+                                  f"        {doc_root_url}features/core_features" \
+                                  f"/working_with_derivatives/" \
+                                  f"basic_check_partials.html\n" \
+                                  "     or\n" \
+                                  "     - arguments to " \
+                                  "Component.set_check_partial_options. See\n" \
+                                  f"        {doc_root_url}features/core_features" \
+                                  f"/working_with_derivatives/" \
+                                  f"check_partials_settings.html"
+
+                            # msg = 'gleep'
+                            issue_warning(msg, prefix=self.msginfo,
+                                          category=OMInvalidCheckPartialOptionsWarning)
+
+                            # raise ValueError(f"{self.msginfo}: Checking partials with respect "
+                            #                  f"to variable '{var}' in component "
+                            #                  f"'{comp.pathname}' using the same "
+                            #                  "method and options as the used to compute the "
+                            #                  "component's derivatives "
+                            #                  "will not provide any relevant information on the "
+                            #                  "accuracy.\n"
+                            #                  "Settings for both are currently:\n"
+                            #                  f"    method: {fd_options['method']}\n"
+                            #                  f"    form: {fd_options['form']}\n"
+                            #                  f"    step: {fd_options['step']}\n"
+                            #                  f"    step_calc: {fd_options['step_calc']}\n"
+                            #                  "To correct this, change the options to do the "
+                            #                  "check_partials using either:\n"
+                            #                  "     - arguments to Problem.check_partials. "
+                            #                  "See:\n"
+                            #                  f"        {doc_root_url}features/core_features"
+                            #                  f"/working_with_derivatives/"
+                            #                  f"basic_check_partials.html"
+                            #                  "     or\n"
+                            #                  "     - arguments to "
+                            #                  "Component.set_check_partial_options. See\n"
+                            #                  f"        {doc_root_url}features/core_features"
+                            #                  f"/working_with_derivatives/"
+                            #                  f"check_partials_settings.html"
+                            #                  )
 
         self.set_solver_print(level=0)
 
@@ -1396,49 +1441,62 @@ class Problem(object):
             of, wrt = comp._get_partials_varlists()
 
             # Load up approximation objects with the requested settings.
+
             local_opts = comp._get_check_partial_options()
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 local_wrt = rel_key[1]
 
+                fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method, local_opts,
+                                                           step, form, step_calc, alloc_complex)
+
+                if could_not_cs:
+                    comps_could_not_cs.add(c_name)
+
                 # Determine if fd or cs.
                 method = requested_method
-                if local_wrt in local_opts:
-                    local_method = local_opts[local_wrt]['method']
-                    if local_method:
-                        method = local_method
+
+                #
+                # if method == 'cs' and not alloc_complex:
+                #     comps_could_not_cs.add(c_name)
+
+                # if local_wrt in local_opts:
+                #     local_method = local_opts[local_wrt]['method']
+                #     if local_method:
+                #         method = local_method
 
                 # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-                if method == 'cs' and not alloc_complex:
-                    comps_could_not_cs.add(c_name)
-                    method = 'fd'
+                # if fd_options['method'] == 'cs' and not alloc_complex:
+                # if method == 'cs' and not alloc_complex:
+                #     comps_could_not_cs.add(c_name)
+                #     method = 'fd'
 
-                fd_options = {'order': None,
-                              'method': method}
-
-                if method == 'cs':
-                    defaults = ComplexStep.DEFAULT_OPTIONS
-
-                    fd_options['form'] = None
-                    fd_options['step_calc'] = None
-
-                elif method == 'fd':
-                    defaults = FiniteDifference.DEFAULT_OPTIONS
-
-                    fd_options['form'] = form
-                    fd_options['step_calc'] = step_calc
-
-                if step and requested_method == method:
-                    fd_options['step'] = step
-                else:
-                    fd_options['step'] = defaults['step']
-
-                # Precedence: component options > global options > defaults
-                if local_wrt in local_opts:
-                    for name in ['form', 'step', 'step_calc', 'directional']:
-                        value = local_opts[local_wrt][name]
-                        if value is not None:
-                            fd_options[name] = value
+                # fd_options = {'order': None,
+                #               'method': method}
+                #
+                # if method == 'cs':
+                #     defaults = ComplexStep.DEFAULT_OPTIONS
+                #
+                #     fd_options['form'] = None
+                #     fd_options['step_calc'] = None
+                #
+                # elif method == 'fd':
+                #     defaults = FiniteDifference.DEFAULT_OPTIONS
+                #
+                #     fd_options['form'] = form
+                #     fd_options['step_calc'] = step_calc
+                #
+                # if step and requested_method == method:
+                #     fd_options['step'] = step
+                # else:
+                #     fd_options['step'] = defaults['step']
+                #
+                # # Precedence: component options > global options > defaults
+                # if local_wrt in local_opts:
+                #     for name in ['form', 'step', 'step_calc', 'directional']:
+                #         value = local_opts[local_wrt][name]
+                #         if value is not None:
+                #             fd_options[name] = value
 
                 all_fd_options[c_name][local_wrt] = fd_options
                 if c_name in mfree_directions:
@@ -2485,10 +2543,10 @@ def _format_error(error, tol):
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
 
-def _get_fd_options(var, global_method, component, global_step, global_form, global_step_calc, alloc_complex):
-    local_wrt = var
 
-    local_opts = component._get_check_partial_options()
+def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
+                    alloc_complex):
+    local_wrt = var
 
     # Determine if fd or cs.
     method = global_method
@@ -2498,9 +2556,11 @@ def _get_fd_options(var, global_method, component, global_step, global_form, glo
             method = local_method
 
     # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-    # alloc_complex = model._outputs._alloc_complex
     if method == 'cs' and not alloc_complex:
         method = 'fd'
+        could_not_cs = True
+    else:
+        could_not_cs = False
 
     fd_options = {'order': None,
                   'method': method}
@@ -2517,10 +2577,13 @@ def _get_fd_options(var, global_method, component, global_step, global_form, glo
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
 
+
     if global_step and global_method == method:
         fd_options['step'] = global_step
     else:
         fd_options['step'] = defaults['step']
+
+    fd_options['directional'] = defaults['directional']
 
     # Precedence: component options > global options > defaults
     if local_wrt in local_opts:
@@ -2529,4 +2592,4 @@ def _get_fd_options(var, global_method, component, global_step, global_form, glo
             if value is not None:
                 fd_options[name] = value
 
-    return fd_options
+    return fd_options, could_not_cs
