@@ -44,7 +44,8 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, OMInvalidCheckPartialOptionsWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+    OMInvalidCheckDerivativesOptionsWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -886,12 +887,6 @@ class Problem(object):
         model = self.model
         comm = self.comm
 
-        import warnings
-        from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation, \
-            OMInvalidCheckPartialOptionsWarning
-
-        # warnings.simplefilter('error', OMInvalidCheckPartialOptionsWarning)
-
         # A distributed vector type is required for MPI
         if comm.size > 1:
             if distributed_vector_class is PETScVector and PETScVector is None:
@@ -1177,7 +1172,7 @@ class Problem(object):
                             doc_root_url = 'http://openmdao.org/newdocs/versions/latest/'
                             msg = f"Checking partials with respect " \
                                   f"to variable '{var}' in component " \
-                                  "'{comp.pathname}' using the same " \
+                                  f"'{comp.pathname}' using the same " \
                                   "method and options as the used to compute the " \
                                   "component's derivatives " \
                                   "will not provide any relevant information on the " \
@@ -1187,6 +1182,7 @@ class Problem(object):
                                   f"    form: {fd_options['form']}\n" \
                                   f"    step: {fd_options['step']}\n" \
                                   f"    step_calc: {fd_options['step_calc']}\n" \
+                                  f"    directional: {fd_options['directional']}\n" \
                                   "To correct this, change the options to do the " \
                                   "check_partials using either:\n" \
                                   "     - arguments to Problem.check_partials. " \
@@ -1201,36 +1197,8 @@ class Problem(object):
                                   f"/working_with_derivatives/" \
                                   f"check_partials_settings.html"
 
-                            # msg = 'gleep'
                             issue_warning(msg, prefix=self.msginfo,
-                                          category=OMInvalidCheckPartialOptionsWarning)
-
-                            # raise ValueError(f"{self.msginfo}: Checking partials with respect "
-                            #                  f"to variable '{var}' in component "
-                            #                  f"'{comp.pathname}' using the same "
-                            #                  "method and options as the used to compute the "
-                            #                  "component's derivatives "
-                            #                  "will not provide any relevant information on the "
-                            #                  "accuracy.\n"
-                            #                  "Settings for both are currently:\n"
-                            #                  f"    method: {fd_options['method']}\n"
-                            #                  f"    form: {fd_options['form']}\n"
-                            #                  f"    step: {fd_options['step']}\n"
-                            #                  f"    step_calc: {fd_options['step_calc']}\n"
-                            #                  "To correct this, change the options to do the "
-                            #                  "check_partials using either:\n"
-                            #                  "     - arguments to Problem.check_partials. "
-                            #                  "See:\n"
-                            #                  f"        {doc_root_url}features/core_features"
-                            #                  f"/working_with_derivatives/"
-                            #                  f"basic_check_partials.html"
-                            #                  "     or\n"
-                            #                  "     - arguments to "
-                            #                  "Component.set_check_partial_options. See\n"
-                            #                  f"        {doc_root_url}features/core_features"
-                            #                  f"/working_with_derivatives/"
-                            #                  f"check_partials_settings.html"
-                            #                  )
+                                          category=OMInvalidCheckDerivativesOptionsWarning)
 
         self.set_solver_print(level=0)
 
@@ -2593,7 +2561,6 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
-
 
     if global_step and global_method == method:
         fd_options['step'] = global_step
