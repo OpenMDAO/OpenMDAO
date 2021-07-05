@@ -375,7 +375,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         jac = units._subjacs_info
         for deriv, val in expected_subjacs.items():
-            assert_near_equal(jac[deriv]['value'], val, 1e-6)
+            assert_near_equal(jac[deriv]['val'], val, 1e-6)
 
     def test_reference(self):
         class TmpComp(om.ExplicitComponent):

@@ -5,7 +5,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 class IndepVarComp(ExplicitComponent):
@@ -318,7 +318,7 @@ class _AutoIndepVarComp(IndepVarComp):
         # source, and ivc metadata is minimal.
         value, shape, _ = ensure_compatible(name, val, None)
         metadata = {
-            'value': value,
+            'val': value,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,

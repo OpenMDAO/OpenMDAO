@@ -12,7 +12,7 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.notebook_utils import notebook, tabulate, display, HTML
 
 column_widths = {
-    'value': 20,
+    'val': 20,
     'resids': 20,
     'units': 10,
     'shape': 10,
@@ -90,9 +90,9 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
     if var_type == 'input':
-        out_types = ('value', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
+        out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
     else:
-        out_types = ('value', 'resids', 'units', 'shape', 'global_shape',
+        out_types = ('val', 'resids', 'units', 'shape', 'global_shape',
                      'lower', 'upper', 'ref', 'ref0', 'res_ref', 'prom_name', 'desc')
 
     # Figure out which columns will be displayed

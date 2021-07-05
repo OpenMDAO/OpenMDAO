@@ -98,7 +98,7 @@ from openmdao.utils.notebook_utils import notebook_mode, display_source, show_op
 from openmdao.utils.units import convert_units, unit_conversion
 
 # Warning Options
-from openmdao.warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
+from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
     SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
     MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning

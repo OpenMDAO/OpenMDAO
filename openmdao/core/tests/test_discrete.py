@@ -15,7 +15,7 @@ from openmdao.test_suite.components.sellar import StateConnection, \
 from openmdao.utils.assert_utils import assert_near_equal, assert_no_warning
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -246,29 +246,30 @@ class DiscreteTestCase(unittest.TestCase):
         #
         # list vars before model has been run (relative names)
         #
+        # expl_inputs = prob.model.expl.list_inputs(values=True, out_stream=None)
         expl_inputs = prob.model.expl.list_inputs(out_stream=None)
         expected = {
-            'a': {'value': [10.]},
-            'x': {'value': 10}
+            'a': {'val': [10.]},
+            'x': {'val': 10}
         }
         self.assertEqual(dict(expl_inputs), expected)
 
         impl_inputs = prob.model.impl.list_inputs(out_stream=None)
         expected = {
-            'x': {'value': 10}
+            'x': {'val': 10}
         }
         self.assertEqual(dict(impl_inputs), expected)
 
         expl_outputs = prob.model.expl.list_outputs(out_stream=None)
         expected = {
-            'b': {'value': [0.]},
-            'y': {'value': 0}
+            'b': {'val': [0.]},
+            'y': {'val': 0}
         }
         self.assertEqual(dict(expl_outputs), expected)
 
         impl_outputs = prob.model.impl.list_outputs(out_stream=None)
         expected = {
-            'y': {'value': 0}
+            'y': {'val': 0}
         }
         self.assertEqual(dict(impl_outputs), expected)
 
@@ -355,7 +356,7 @@ class DiscreteTestCase(unittest.TestCase):
         expected = [
             "3 Input(s) in 'model'",
             "",
-            "varname  value  prom_name",
+            "varname  val  prom_name",
             "-------  -----  ---------",
             "expl.a   [10.]  expl.a",
             "expl.x   11     x",
@@ -378,7 +379,7 @@ class DiscreteTestCase(unittest.TestCase):
         expected = [
             "4 Explicit Output(s) in 'model'",
             "",
-            "varname  value  prom_name",
+            "varname  val    prom_name",
             "-------  -----  ---------",
             "_auto_ivc",
             "  v0    [10.]  _auto_ivc.v0",
@@ -390,7 +391,7 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "1 Implicit Output(s) in 'model'",
             "",
-            "varname  value  prom_name",
+            "varname  val    prom_name",
             "-------  -----  ---------",
             "impl",
             "  y    2      impl.y",

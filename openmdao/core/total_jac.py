@@ -16,7 +16,7 @@ from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI, check_mpi_env, multi_proc_exception_check
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
 
 
@@ -1740,9 +1740,9 @@ def _get_approx_subjac(jac_meta, prom_out, prom_in, of_idx, wrt_idx, dist_resp, 
             tot = np.eye(sz)[of_idx, wrt_idx]
         else:
             tot = np.zeros(jac_meta['shape'])
-            tot[jac_meta['rows'], jac_meta['cols']] = jac_meta['value']
+            tot[jac_meta['rows'], jac_meta['cols']] = jac_meta['val']
     else:
-        tot = jac_meta['value']
+        tot = jac_meta['val']
 
     if dist_resp:
         n_wrt = tot.shape[1]

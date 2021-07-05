@@ -1,6 +1,6 @@
 """Define the OptionsDictionary class."""
 
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 
 
@@ -134,10 +134,11 @@ class OptionsDictionary(object):
                   " `pip install openmdao[notebooks]`."
             raise ImportError(msg)
 
-        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description']]
+        tlist = [['Option', 'Default', 'Acceptable Values', 'Acceptable Types', 'Description',
+                  'Deprecation']]
         for key in sorted(self._dict.keys()):
             options = self._dict[key]
-            default = options['value'] if options['value'] is not _UNDEFINED else '**Required**'
+            default = options['val'] if options['val'] is not _UNDEFINED else '**Required**'
             # if the default is an object instance, replace with the (unqualified) object type
             default_str = str(default)
             idx = default_str.find(' object at ')
@@ -158,7 +159,13 @@ class OptionsDictionary(object):
                 acceptable_types = [type_.__name__ for type_ in acceptable_types]
 
             desc = options['desc']
-            tlist.append([key, default, acceptable_values, acceptable_types, desc])
+
+            deprecation = options['deprecation']
+            if deprecation is not None:
+                tlist.append([key, default, acceptable_values, acceptable_types, desc, deprecation])
+            else:
+                tlist.append([key, default, acceptable_values, acceptable_types, desc])
+
         return tabulate(tlist, headers='firstrow', tablefmt=fmt, missingval=missingval)
 
     def __str__(self, width=100):
@@ -341,7 +348,7 @@ class OptionsDictionary(object):
             allow_none = True
 
         self._dict[name] = {
-            'value': default,
+            'val': default,
             'values': values,
             'types': types,
             'desc': desc,
@@ -437,7 +444,7 @@ class OptionsDictionary(object):
 
         self._assert_valid(name, value)
 
-        meta['value'] = value
+        meta['val'] = value
         meta['has_been_set'] = True
 
     def __getitem__(self, name):
@@ -461,7 +468,7 @@ class OptionsDictionary(object):
                 warn_deprecation(meta['deprecation'])
                 self._deprecation_warning_issued.append(name)
             if meta['has_been_set']:
-                return meta['value']
+                return meta['val']
             else:
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
@@ -472,4 +479,7 @@ class OptionsDictionary(object):
         Yield name and value of options.
         """
         for key, val in self._dict.items():
-            yield key, val['value']
+            if 'val' in val:
+                yield key, val['val']
+            elif 'value' in val:
+                yield key, val['value']

@@ -32,10 +32,10 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
+from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 
 # regex to check for valid names.
 import re
@@ -282,7 +282,7 @@ class Group(System):
         if val is _UNDEFINED:
             src_shape = shape2tuple(src_shape)
         else:
-            meta['value'] = val
+            meta['val'] = val
             if src_shape is not None:
                 issue_warning("value was set in set_input_defaults, so ignoring "
                               f"value {src_shape} of src_shape.", prefix=self.msginfo,
@@ -438,14 +438,37 @@ class Group(System):
                 if units_in is None or units_out is None or units_in == units_out:
                     a0 = ref0
                     a1 = ref - ref0
+
+                    scale_factors[abs_in] = {
+                        'input': (a0, a1),
+                    }
+
                 else:
                     factor, offset = unit_conversion(units_out, units_in)
-                    a0 = (ref0 + offset) * factor
-                    a1 = (ref - ref0) * factor
+                    a0 = ref0
+                    a1 = ref - ref0
 
-                scale_factors[abs_in] = {
-                    'input': (a0, a1),
-                }
+                    if a1 == 1.0:
+                        # No solver scaling, just unit conversion.
+                        # Note: a case like ref=3, ref0=2 is safe to treat as unscaled for the
+                        # linear vectors because the "scaler" is 1.0.
+                        a0 = (ref0 + offset) * factor
+                        a1 = (ref - ref0) * factor
+
+                        scale_factors[abs_in] = {
+                            'input': (a0, a1),
+                        }
+
+                    else:
+                        # When we have unit conversion and solver scaling, we need to track them
+                        # independently during reverse mode linear solves, so save the unit
+                        # conversion factors too, and let the root vector sort it out.
+                        scale_factors[abs_in] = {
+                            'input': (a0, a1, factor, offset),
+                        }
+
+                        # For adder allocation check.
+                        a0 = (ref0 + offset) * factor
 
                 # Check whether we need to allocate an adder for the input vector.
                 if np.any(np.asarray(a0)):
@@ -1630,7 +1653,7 @@ class Group(System):
             if to_meta:
                 to_meta['shape'] = from_shape
                 to_meta['size'] = from_size
-                to_meta['value'] = np.full(from_shape, to_meta['value'])
+                to_meta['val'] = np.full(from_shape, to_meta['val'])
             if from_var in distrib_sizes:
                 distrib_sizes[to_var] = distrib_sizes[from_var]
 
@@ -2121,9 +2144,9 @@ class Group(System):
         else:  # rev
             if xfer is not None:
                 if self._has_input_scaling:
-                    vec_inputs.scale_to_phys()
+                    vec_inputs.scale_to_norm(mode='rev')
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
-                    vec_inputs.scale_to_norm()
+                    vec_inputs.scale_to_phys(mode='rev')
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
@@ -2157,7 +2180,7 @@ class Group(System):
             if key in self._discrete_transfers:
                 xfers, remote_send = self._discrete_transfers[key]
                 if allprocs_recv:
-                    sendvars = [(n, discrete_out[n]['value']) for n in remote_send]
+                    sendvars = [(n, discrete_out[n]['val']) for n in remote_send]
                     allprocs_send = comm.gather(sendvars, root=0)
                     if comm.rank == 0:
                         allprocs_dict = {}
@@ -3054,7 +3077,7 @@ class Group(System):
                     meta['rows'] = meta['cols'] = np.arange(size)
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
-                    meta['value'] = np.full(size, -1.0)
+                    meta['val'] = np.full(size, -1.0)
                 self._subjacs_info[key] = meta
 
             meta['method'] = method
@@ -3064,7 +3087,7 @@ class Group(System):
             if wrt_matches is None or key[1] in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
-            if meta['value'] is None:
+            if meta['val'] is None:
                 if key[1] in abs2meta['input']:
                     sz = abs2meta['input'][key[1]]['size']
                 else:
@@ -3072,9 +3095,9 @@ class Group(System):
                 shape = (abs2meta['output'][key[0]]['size'], sz)
                 meta['shape'] = shape
                 if meta['rows'] is not None:  # subjac is sparse
-                    meta['value'] = np.zeros(len(meta['rows']))
+                    meta['val'] = np.zeros(len(meta['rows']))
                 else:
-                    meta['value'] = np.zeros(shape)
+                    meta['val'] = np.zeros(shape)
 
             approx.add_approximation(key, self, meta)
 
@@ -3203,7 +3226,7 @@ class Group(System):
             size = meta['size']
             has_src_inds = meta['src_indices'] is not None
 
-            value = meta['value']
+            value = meta['val']
             val = None
             if prom in self._var_prom2inds:
                 src_shape = self._var_prom2inds[prom][0]
@@ -3322,8 +3345,8 @@ class Group(System):
             else:
                 units = all_abs2meta[tgt]['units']
 
-            if not remote and 'value' in gmeta:
-                val = gmeta['value']
+            if not remote and 'val' in gmeta:
+                val = gmeta['val']
             relsrc = src.rsplit('.', 1)[-1]
             auto_ivc.add_output(relsrc, val=val, units=units)
             if remote:
@@ -3348,7 +3371,7 @@ class Group(System):
                     conns[abs_in] = ivc_name
 
                     if abs_in in self._var_abs2prom['input']:  # var is local
-                        val = self._var_discrete['input'][abs_in]['value']
+                        val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
                     if abs_in in vars2gather:
@@ -3451,9 +3474,9 @@ class Group(System):
                 tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
 
                 if tgt in all_discrete_ins:
-                    if 'value' not in gmeta and sval != tval:
+                    if 'val' not in gmeta and sval != tval:
                         errs.add('val')
-                        metadata.add('value')
+                        metadata.add('val')
                 else:
                     tmeta = all_abs2meta_in[tgt]
                     tunits = tmeta['units'] if 'units' in tmeta else None
@@ -3468,18 +3491,18 @@ class Group(System):
                             errs.add('units')
                             metadata.add('units')
 
-                    if 'value' not in gmeta:
+                    if 'val' not in gmeta:
                         if tval.shape == sval.shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
                                 errs.add('val')
-                                metadata.add('value')
+                                metadata.add('val')
                         else:
                             if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
                                 s = sval.ravel() if abs2meta_in[tgt]['flat_src_indices'] else sval
                                 srcpart = s[abs2meta_in[tgt]['src_indices']]
                                 if _has_val_mismatch(tunits, tval, sunits, srcpart):
                                     errs.add('val')
-                                    metadata.add('value')
+                                    metadata.add('val')
 
             if errs:
                 self._show_ambiguity_msg(prom, errs, tgts, metadata)

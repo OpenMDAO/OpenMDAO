@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
@@ -84,7 +84,7 @@ global_meta_names = {
 }
 
 allowed_meta_names = {
-    'value',
+    'val',
     'global_shape',
     'global_size',
     'src_indices',
@@ -120,6 +120,25 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
+
+
+class _MetadataDict(dict):
+    """
+    A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
+    """
+
+    def __getitem__(self, key):
+        if key == 'value':
+            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
+        val = dict.__getitem__(self, key)
+        return val
+
+    def __setitem__(self, key, val):
+        if key == 'value':
+            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
+        dict.__setitem__(self, key, val)
 
 
 class System(object):
@@ -359,8 +378,8 @@ class System(object):
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
-                             desc='Linear solver(s) in this group, if using an assembled '
-                                  'jacobian, will use this type.')
+                             desc='Linear solver(s) in this group or implicit component, '
+                                  'if using an assembled jacobian, will use this type.')
 
         # Case recording options
         self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
@@ -665,6 +684,11 @@ class System(object):
             for key in ['input', 'output', 'residual']:
                 root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
                                                                  alloc_complex=alloc_complex)
+
+        if 'linear' in root_vectors['input']:
+            root_vectors['input']['linear']._scaling_nl_vec = \
+                root_vectors['input']['nonlinear']._scaling
+
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -1656,6 +1680,9 @@ class System(object):
                 vectors[kind][vec_name] = vector_class(
                     vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
 
+        if 'linear' in vectors['input']:
+            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
+
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
@@ -1764,10 +1791,10 @@ class System(object):
         Set all input and output variables to their declared initial values.
         """
         for abs_name, meta in self._var_abs2meta['input'].items():
-            self._inputs.set_var(abs_name, meta['value'])
+            self._inputs.set_var(abs_name, meta['val'])
 
         for abs_name, meta in self._var_abs2meta['output'].items():
-            self._outputs.set_var(abs_name, meta['value'])
+            self._outputs.set_var(abs_name, meta['val'])
 
     def _get_promotion_maps(self):
         """
@@ -1846,7 +1873,7 @@ class System(object):
             else:
                 new_using = f"'{tup[0]}'"
 
-            mismatch = info.compare(old_info) if info is not None else ()
+            mismatch = info.compare(old_info) if info is not None and old_info is not None else ()
             if mismatch:
                 raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
                                    f"{new_using}, was already promoted using {old_using} with "
@@ -3234,8 +3261,8 @@ class System(object):
         loc2meta = self._var_abs2meta
         all2meta = self._var_allprocs_abs2meta
 
-        dynset = set(('shape', 'size', 'value'))
-        gather_keys = {'value', 'src_indices'}
+        dynset = set(('shape', 'size', 'val'))
+        gather_keys = {'val', 'src_indices'}
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
@@ -3291,9 +3318,9 @@ class System(object):
                     ret_meta = None
                 else:
                     if metadata_keys is None:
-                        ret_meta = meta.copy()
+                        ret_meta = _MetadataDict(meta)
                     else:
-                        ret_meta = {}
+                        ret_meta = _MetadataDict()
                         for key in metadata_keys:
                             try:
                                 ret_meta[key] = meta[key]
@@ -3309,16 +3336,16 @@ class System(object):
 
                         if rank is None or self.comm.rank == rank:
                             if not ret_meta:
-                                ret_meta = {}
+                                ret_meta = _MetadataDict()
                             if distrib:
-                                if 'value' in metadata_keys:
+                                if 'val' in metadata_keys:
                                     # assemble the full distributed value
-                                    dist_vals = [m['value'] for m in allproc_metas
-                                                 if m is not None and m['value'].size > 0]
+                                    dist_vals = [m['val'] for m in allproc_metas
+                                                 if m is not None and m['val'].size > 0]
                                     if dist_vals:
-                                        ret_meta['value'] = np.concatenate(dist_vals)
+                                        ret_meta['val'] = np.concatenate(dist_vals)
                                     else:
-                                        ret_meta['value'] = np.zeros(0)
+                                        ret_meta['val'] = np.zeros(0)
                                 if 'src_indices' in metadata_keys:
                                     # assemble full src_indices
                                     dist_src_inds = [m['src_indices'] for m in allproc_metas
@@ -3350,7 +3377,7 @@ class System(object):
         return result
 
     def list_inputs(self,
-                    values=True,
+                    val=True,
                     prom_name=False,
                     units=False,
                     shape=False,
@@ -3362,13 +3389,14 @@ class System(object):
                     includes=None,
                     excludes=None,
                     all_procs=False,
-                    out_stream=_DEFAULT_OUT_STREAM):
+                    out_stream=_DEFAULT_OUT_STREAM,
+                    values=None):
         """
         Write a list of input names and other optional information to a specified stream.
 
         Parameters
         ----------
-        values : bool, optional
+        val : bool, optional
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -3404,20 +3432,31 @@ class System(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
         list of (name, metadata)
             List of input names and other optional information about those inputs.
         """
+        if values is not None:
+            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_inputs()' is "
+                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
+        elif not val and values:
+            values = True
+        else:
+            values = val
+
         metavalues = values and self._inputs is None
-        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyvals = [metavalues, units, shape, global_shape, desc, tags is not None]
         keys = [n for i, n in enumerate(keynames) if keyvals[i]]
 
         inputs = self.get_io_metadata(('input',), keys, includes, excludes, tags,
                                       get_remote=True,
-                                      rank=None if all_procs or values else 0,
+                                      rank=None if all_procs or val else 0,
                                       return_rel_names=False)
 
         if inputs:
@@ -3426,7 +3465,6 @@ class System(object):
                 to_remove.append('tags')
             if not prom_name:
                 to_remove.append('prom_name')
-
             for _, meta in inputs.items():
                 for key in to_remove:
                     del meta[key]
@@ -3434,8 +3472,8 @@ class System(object):
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
             for n, meta in inputs.items():
-                meta['value'] = self._abs_get_val(n, get_remote=True,
-                                                  rank=None if all_procs else 0, kind='input')
+                meta['val'] = self._abs_get_val(n, get_remote=True,
+                                                rank=None if all_procs else 0, kind='input')
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3455,7 +3493,7 @@ class System(object):
 
     def list_outputs(self,
                      explicit=True, implicit=True,
-                     values=True,
+                     val=True,
                      prom_name=False,
                      residuals=False,
                      residuals_tol=None,
@@ -3472,7 +3510,8 @@ class System(object):
                      excludes=None,
                      all_procs=False,
                      list_autoivcs=False,
-                     out_stream=_DEFAULT_OUT_STREAM):
+                     out_stream=_DEFAULT_OUT_STREAM,
+                     values=None):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -3482,7 +3521,7 @@ class System(object):
             include outputs from explicit components. Default is True.
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-        values : bool, optional
+        val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
             When True, display the promoted name of the variable.
@@ -3529,13 +3568,23 @@ class System(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
         list of (name, metadata)
             List of output names and other optional information about those outputs.
         """
-        keynames = ['value', 'units', 'shape', 'global_shape', 'desc', 'tags']
+        if values is not None:
+            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_outputs()' is "
+                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
+        elif not val and values:
+            values = True
+        else:
+            values = val
+
+        keynames = ['val', 'units', 'shape', 'global_shape', 'desc', 'tags']
         keyflags = [values, units, shape, global_shape, desc, tags]
 
         keys = [name for i, name in enumerate(keynames) if keyflags[i]]
@@ -3547,7 +3596,7 @@ class System(object):
 
         outputs = self.get_io_metadata(('output',), keys, includes, excludes, tags,
                                        get_remote=True,
-                                       rank=None if all_procs or values or residuals else 0,
+                                       rank=None if all_procs or val or residuals else 0,
                                        return_rel_names=False)
 
         # filter auto_ivcs if requested
@@ -3561,8 +3610,8 @@ class System(object):
             for name, meta in outputs.items():
                 if values:
                     # we want value from the input vector, not from the metadata
-                    meta['value'] = self._abs_get_val(name, get_remote=True,
-                                                      rank=None if all_procs else 0, kind='output')
+                    meta['val'] = self._abs_get_val(name, get_remote=True,
+                                                    rank=None if all_procs else 0, kind='output')
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -3586,7 +3635,6 @@ class System(object):
             to_remove.append('tags')
         if not prom_name:
             to_remove.append('prom_name')
-
         for _, meta in outputs.items():
             for key in to_remove:
                 del meta[key]
@@ -4209,7 +4257,7 @@ class System(object):
                         raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
                                          "because linear vectors are not available before "
                                          "final_setup.")
-                    val = my_meta[abs_name]['value']
+                    val = my_meta[abs_name]['val']
             else:
                 if from_root:
                     vec = vec._root_vector
@@ -4619,13 +4667,13 @@ class System(object):
                         if vec._contains_abs(n):
                             vdict[n] = get(n, False)
                         elif n[offset:] in discrete_vec:
-                            vdict[n] = discrete_vec[n[offset:]]['value']
+                            vdict[n] = discrete_vec[n[offset:]]['val']
                         else:
                             ivc_path = conns[prom2abs_in[n][0]]
                             if vec._contains_abs(ivc_path):
                                 vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
-                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['value']
+                                vdict[ivc_path] = discrete_vec[ivc_path[offset:]]['val']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
@@ -4642,7 +4690,7 @@ class System(object):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
                         elif name[offset:] in discrete_vec and self._owning_rank[name] == rank:
-                            vdict[name] = discrete_vec[name[offset:]]['value']
+                            vdict[name] = discrete_vec[name[offset:]]['val']
                 else:
                     for name in variables:
                         if vec._contains_abs(name):
@@ -4663,7 +4711,7 @@ class System(object):
                             if vec._contains_abs(name):
                                 vdict[name] = vec._abs_get_val(name, flat=False)
                             elif name[offset:] in discrete_vec:
-                                vdict[name] = discrete_vec[name[offset:]]['value']
+                                vdict[name] = discrete_vec[name[offset:]]['val']
                     else:
                         vdict[name] = self.get_val(name, get_remote=True, rank=0,
                                                    vec_name=vec_name, kind=kind, from_src=False)
@@ -4812,7 +4860,7 @@ class System(object):
                 return meta[key]
             else:
                 # key is either bogus or a key into the local metadata dict
-                # (like 'value' or 'src_indices'). If MPI is active, this val may be remote
+                # (like 'val' or 'src_indices'). If MPI is active, this val may be remote
                 # on some procs
                 if self.comm.size > 1 and abs_name in self._vars_to_gather:
                     # TODO: fix this

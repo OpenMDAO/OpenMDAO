@@ -27,7 +27,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
 
 # names of optimizers that use gradients
@@ -259,9 +259,9 @@ class pyOptSparseDriver(Driver):
         self._setup_tot_jac_sparsity()
 
         # Handle deprecated option.
-        if self.options._dict['user_teriminate_signal']['value'] is not None:
+        if self.options._dict['user_teriminate_signal']['val'] is not None:
             self.options['user_terminate_signal'] = \
-                self.options._dict['user_teriminate_signal']['value']
+                self.options._dict['user_teriminate_signal']['val']
 
     def run(self):
         """

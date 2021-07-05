@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
 

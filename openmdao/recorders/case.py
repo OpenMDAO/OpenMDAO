@@ -16,6 +16,7 @@ from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
+from openmdao.utils.om_warnings import issue_warning
 
 _AMBIGOUS_PROM_NAME = object()
 
@@ -392,7 +393,7 @@ class Case(object):
         return self._get_variables_of_type('response', scaled, use_indices)
 
     def list_inputs(self,
-                    values=True,
+                    val=True,
                     prom_name=False,
                     units=False,
                     shape=False,
@@ -402,13 +403,14 @@ class Case(object):
                     tags=None,
                     includes=None,
                     excludes=None,
-                    out_stream=_DEFAULT_OUT_STREAM):
+                    out_stream=_DEFAULT_OUT_STREAM,
+                    values=None):
         """
         Return and optionally log a list of input names and other optional information.
 
         Parameters
         ----------
-        values : bool, optional
+        val : bool, optional
             When True, display/return input values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -440,6 +442,8 @@ class Case(object):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
@@ -448,6 +452,14 @@ class Case(object):
         """
         meta = self._abs2meta
         inputs = []
+
+        if values is not None:
+            issue_warning("'value' is deprecated and will be removed in 4.0. "
+                          "Please index in using 'val'")
+        elif not val and values:
+            values = True
+        else:
+            values = val
 
         if self.inputs is not None:
             for var_name in self.inputs.absolute_names():
@@ -464,6 +476,7 @@ class Case(object):
 
                 var_meta = {}
                 if values:
+                    var_meta['val'] = val
                     var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
@@ -488,7 +501,7 @@ class Case(object):
 
     def list_outputs(self,
                      explicit=True, implicit=True,
-                     values=True,
+                     val=True,
                      prom_name=False,
                      residuals=False,
                      residuals_tol=None,
@@ -503,7 +516,8 @@ class Case(object):
                      includes=None,
                      excludes=None,
                      list_autoivcs=False,
-                     out_stream=_DEFAULT_OUT_STREAM):
+                     out_stream=_DEFAULT_OUT_STREAM,
+                     values=None):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -513,7 +527,7 @@ class Case(object):
             include outputs from explicit components. Default is True.
         implicit : bool, optional
             include outputs from implicit components. Default is True.
-        values : bool, optional
+        val : bool, optional
             When True, display/return output values. Default is True.
         prom_name : bool, optional
             When True, display/return the promoted name of the variable.
@@ -557,6 +571,8 @@ class Case(object):
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        values : bool, optional
+            This argument has been deprecated and will be removed in 4.0.
 
         Returns
         -------
@@ -566,6 +582,14 @@ class Case(object):
         meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
+
+        if values is not None:
+            issue_warning("'value' is deprecated and will be removed in 4.0. "
+                          "Please index in using 'val'")
+        elif not val and values:
+            values = True
+        else:
+            values = val
 
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
@@ -592,6 +616,7 @@ class Case(object):
 
             var_meta = {}
             if values:
+                var_meta['val'] = val
                 var_meta['value'] = val
             if prom_name:
                 var_meta['prom_name'] = var_name_prom

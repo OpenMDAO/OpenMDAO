@@ -10,13 +10,13 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
-from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 
 # Names of metadata entries allowed for ExecComp variables.
-_allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
+_allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
@@ -163,7 +163,7 @@ class ExecComp(ExplicitComponent):
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
             to contain metadata.  To set the initial value in addition to
-            other metadata, assign the initial value to the 'value' entry
+            other metadata, assign the initial value to the 'val' entry
             of the dict.
 
         Notes
@@ -191,7 +191,7 @@ class ExecComp(ExplicitComponent):
         .. code-block:: python
 
             excomp = ExecComp('y=sum(x)',
-                              x={'value': numpy.ones(10, dtype=float),
+                              x={'val': numpy.ones(10, dtype=float),
                                  'units': 'ft'})
         """
         options = {}
@@ -295,6 +295,8 @@ class ExecComp(ExplicitComponent):
         shape = self.options['shape']
         shape_by_conn = self.options['shape_by_conn']
 
+        warned = False
+
         if shape is not None and shape_by_conn:
             raise RuntimeError(f"{self.msginfo}: Can't set both shape and shape_by_conn.")
 
@@ -340,6 +342,17 @@ class ExecComp(ExplicitComponent):
                                        "recognized for variable '%s': %s" %
                                        (self.msginfo, arg, sorted(diff)))
 
+                if 'val' in val and 'value' in val:
+                    raise RuntimeError(f"{self.msginfo}: 'val' and 'value' at the same time, use "
+                                       "'val'.")
+                elif 'value' in val and not warned:
+                    warn_deprecation(f"{self.msginfo}: 'value' will be deprecated in 4.0. Please "
+                                     "use 'val' in the future.")
+
+                if 'value' in val:
+                    val['val'] = val.pop('value')
+                    warned = True
+
                 kwargs2[arg] = val.copy()
 
                 if units is not None:
@@ -357,22 +370,22 @@ class ExecComp(ExplicitComponent):
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
                                            (self.msginfo, val['shape'], arg, shape))
-                    elif 'value' in val and np.atleast_1d(val['value']).shape != shape:
+                    elif 'val' in val and np.atleast_1d(val['val']).shape != shape:
                         raise RuntimeError("%s: value of shape %s has been specified for "
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
-                                           (self.msginfo, np.atleast_1d(val['value']).shape,
+                                           (self.msginfo, np.atleast_1d(val['val']).shape,
                                             arg, shape))
                     else:
                         init_vals[arg] = np.ones(shape)
 
-                if 'value' in val:
-                    init_vals[arg] = val['value']
-                    del kwargs2[arg]['value']
+                if 'val' in val:
+                    init_vals[arg] = val['val']
+                    del kwargs2[arg]['val']
 
                 if shape_by_conn or 'shape_by_conn' in val or 'copy_shape' in val:
-                    if val.get('shape') is not None or val.get('value') is not None:
-                        raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'value' for "
+                    if val.get('shape') is not None or val.get('val') is not None:
+                        raise RuntimeError(f"{self.msginfo}: Can't set 'shape' or 'val' for "
                                            f"variable '{arg}' along with 'copy_shape' or "
                                            "'shape_by_conn'.")
 
@@ -414,9 +427,9 @@ class ExecComp(ExplicitComponent):
                     if kvalue is not None:
                         current_meta[kname] = kvalue
 
-                new_val = kwargs[var].get('value')
+                new_val = kwargs[var].get('val')
                 if new_val is not None:
-                    current_meta['value'] = new_val
+                    current_meta['val'] = new_val
             else:
                 # new input and/or output.
                 if var in outs:
@@ -425,7 +438,7 @@ class ExecComp(ExplicitComponent):
                     current_meta = self.add_input(var, val, **meta)
 
             if var not in init_vals:
-                init_vals[var] = current_meta['value']
+                init_vals[var] = current_meta['val']
 
         self._codes = self._compile_exprs(self._exprs)
 
@@ -442,7 +455,7 @@ class ExecComp(ExplicitComponent):
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named arg with the var name.  If
             the value is a dict it is assumed to contain metadata.  To set the initial value in
-            addition to other metadata, assign the initial value to the 'value' entry of the dict.
+            addition to other metadata, assign the initial value to the 'val' entry of the dict.
             Do not include for inputs whose default kwargs have been declared on previous
             expressions.
         """
@@ -582,9 +595,9 @@ class ExecComp(ExplicitComponent):
                 for out in sorted(outs):
                     for inp in ins:
                         if self.options['has_diag_partials']:
-                            ival = meta[inp]['value']
+                            ival = meta[inp]['val']
                             iarray = isinstance(ival, ndarray) and ival.size > 1
-                            oval = meta[out]['value']
+                            oval = meta[out]['val']
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:
                                     raise RuntimeError(

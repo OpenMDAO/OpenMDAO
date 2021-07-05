@@ -100,9 +100,17 @@ class DefaultVector(Vector):
                     else:
                         self._scaling = (None, np.ones(data.size))
                 elif self._name == 'linear':
-                    # reuse the nonlinear scaling vecs since they're the same as ours
-                    nlvec = self._system()._root_vecs[self._kind]['nonlinear']
-                    self._scaling = (None, nlvec._scaling[1])
+                    if self._has_solver_ref:
+                        # We only allocate an extra scaling vector when we have output scaling
+                        # somewhere in the model.
+                        self._scaling = (None, np.ones(data.size))
+                    else:
+                        # Reuse the nonlinear scaling vecs since they're the same as ours.
+                        nlvec = self._system()._root_vecs[self._kind]['nonlinear']
+                        self._scaling = (None, nlvec._scaling[1])
+                else:
+                    self._scaling = (None, np.ones(data.size))
+
         else:
             self._data, self._scaling = self._extract_root_data()
 
@@ -137,7 +145,22 @@ class DefaultVector(Vector):
             views[abs_name] = v
 
             if do_scaling:
-                scale0, scale1 = factors[abs_name][kind]
+                factor_tuple = factors[abs_name][kind]
+
+                if len(factor_tuple) == 4:
+                    # Input vector unit conversion.
+                    a0, a1, factor, offset = factor_tuple
+
+                    if self._name == 'linear':
+                        scale0 = None
+                        scale1 = a1 / factor
+
+                    else:
+                        scale0 = (a0 + offset) * factor
+                        scale1 = a1 * factor
+                else:
+                    scale0, scale1 = factor_tuple
+
                 if scaling[0] is not None:
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
@@ -261,21 +284,73 @@ class DefaultVector(Vector):
         data = self.asarray()
         data[idxs] = val
 
-    def scale_to_norm(self):
+    def scale_to_norm(self, mode='fwd'):
         """
         Scale this vector to normalized form.
+
+        Parameters
+        ----------
+        mode : string
+            Derivative direction.
         """
-        adder, scaler = self._scaling
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_reverse(scaler, adder)
+        else:
+            self._scale_forward(scaler, adder)
+
+    def scale_to_phys(self, mode='fwd'):
+        """
+        Scale this vector to physical form.
+
+        Parameters
+        ----------
+        mode : string
+            Derivative direction.
+        """
+        if self._has_solver_ref and mode == 'fwd':
+            scaler = self._scaling_nl_vec[1]
+            adder = None
+        else:
+            adder, scaler = self._scaling
+
+        if mode == 'rev' and not self._has_solver_ref:
+            self._scale_forward(scaler, adder)
+        else:
+            self._scale_reverse(scaler, adder)
+
+    def _scale_forward(self, scaler, adder):
+        """
+        Scale this vector by subtracting the adder and dividing by the scaler.
+
+        Parameters
+        ----------
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
+        """
         data = self.asarray()
         if adder is not None:  # nonlinear only
             data -= adder
         data /= scaler
 
-    def scale_to_phys(self):
+    def _scale_reverse(self, scaler, adder):
         """
-        Scale this vector to physical form.
+        Scale this vector by multiplying by the scaler ahd adding the adder.
+
+        Parameters
+        ----------
+        scaler : darray
+            Vector of multiplicative scaling factors.
+        adder : darray
+            Vector of additive scaling factors.
         """
-        adder, scaler = self._scaling
         data = self.asarray()
         data *= scaler
         if adder is not None:  # nonlinear only

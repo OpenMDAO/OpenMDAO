@@ -44,8 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation, \
-    OMInvalidCheckPartialOptionsWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, OMInvalidCheckPartialOptionsWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -120,6 +119,8 @@ class Problem(object):
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
+    _warned : bool
+        Bool to check if `value` deprecation warning has occured yet
     """
 
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
@@ -142,6 +143,7 @@ class Problem(object):
         """
         self.cite = CITATION
         self._name = name
+        self._warned = False
 
         if comm is None:
             try:
@@ -311,9 +313,9 @@ class Problem(object):
             io = 'output' if abs_name in meta['output'] else 'input'
             if abs_name in meta[io]:
                 if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['value']
+                    val = meta['output'][conns[abs_name]]['val']
                 else:
-                    val = meta[io][abs_name]['value']
+                    val = meta[io][abs_name]['val']
 
             if get_remote and abs_name in vars_to_gather:
                 owner = vars_to_gather[abs_name]
@@ -409,7 +411,7 @@ class Problem(object):
         """
         self.set_val(name, value)
 
-    def set_val(self, name, value, units=None, indices=None):
+    def set_val(self, name, val=None, units=None, indices=None, **kwargs):
         """
         Set an output/input variable.
 
@@ -419,13 +421,28 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
-        value : float or ndarray or list
-            Value to set this variable to.
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
+        val : float or ndarray or list or None
+            Value to set this variable to.
+        **kwargs : dict
+            Additional keyword argument for deprecated `value` arg.
         """
+        if 'value' not in kwargs:
+            value = None
+        elif 'value' in kwargs:
+            value = kwargs['value']
+
+        if value is not None and not self._warned:
+            self._warned = True
+            warn_deprecation(f"{self.msginfo} 'value' will be deprecated in 4.0. Please use 'val' "
+                             "in the future.")
+        elif val is not None:
+            self._warned = True
+            value = val
+
         model = self.model
         if self._metadata is not None:
             conns = model._conn_global_abs_in2out
@@ -1373,7 +1390,7 @@ class Problem(object):
 
                             # No need to calculate partials; they are already stored
                             try:
-                                deriv_value = subjacs[abs_key]['value']
+                                deriv_value = subjacs[abs_key]['val']
                                 rows = subjacs[abs_key]['rows']
                             except KeyError:
                                 deriv_value = rows = None
@@ -1837,7 +1854,7 @@ class Problem(object):
             'parallel_deriv_color', 'cache_linear_solution']
 
         """
-        default_col_names = ['name', 'value', 'size']
+        default_col_names = ['name', 'val', 'size']
 
         # Design vars
         desvars = self.driver._designvars
@@ -1914,7 +1931,7 @@ class Problem(object):
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = name
 
-                elif col_name == 'value':
+                elif col_name == 'val':
                     row[col_name] = vals[name]
                 else:
                     row[col_name] = meta[col_name]

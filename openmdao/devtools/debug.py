@@ -18,7 +18,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.general_utils import simple_warning
 from openmdao.core.constants import _SetupStatus
-from openmdao.warnings import issue_warning, MPIWarning
+from openmdao.utils.om_warnings import issue_warning, MPIWarning
 
 # an object used to detect when a named value isn't found
 _notfound = object()

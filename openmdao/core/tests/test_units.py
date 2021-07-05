@@ -275,7 +275,7 @@ class TestUnitConversion(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
-        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': None}))
+        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'val': 0.0, 'units': None}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "<model> <class Group>: Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
@@ -884,14 +884,14 @@ class TestUnitConversion(unittest.TestCase):
 
         g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
         g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
-                                            x={'value': 5.0, 'units': 'm/s/s'},
-                                            y={'value': 1.0, 'units': None},
-                                            z={'value': 1.0, 'units': 'W'}),
+                                            x={'val': 5.0, 'units': 'm/s/s'},
+                                            y={'val': 1.0, 'units': None},
+                                            z={'val': 1.0, 'units': 'W'}),
                                             promotes_inputs=['x', 'z'])
         g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
-                                            x={'value': 5.0, 'units': 'm/s**2'},
-                                            y={'value': 1.0, 'units': None},
-                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            x={'val': 5.0, 'units': 'm/s**2'},
+                                            y={'val': 1.0, 'units': None},
+                                            z={'val': 1.0, 'units': 'J/s'}),
                                             promotes_inputs=['x', 'z'])
         # converting m/s/s to m/s**2 is allowed
         p.setup()
@@ -902,14 +902,14 @@ class TestUnitConversion(unittest.TestCase):
 
         g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
         g1.add_subsystem("C1", om.ExecComp("y = 2. * x * z",
-                                            x={'value': 5.0, 'units': 'J/s/s'},
-                                            y={'value': 1.0, 'units': None},
-                                            z={'value': 1.0, 'units': 'W'}),
+                                            x={'val': 5.0, 'units': 'J/s/s'},
+                                            y={'val': 1.0, 'units': None},
+                                            z={'val': 1.0, 'units': 'W'}),
                                             promotes_inputs=['x', 'z'])
         g1.add_subsystem("C2", om.ExecComp("y = 3. * x * z",
-                                            x={'value': 5.0, 'units': 'm/s**2'},
-                                            y={'value': 1.0, 'units': None},
-                                            z={'value': 1.0, 'units': 'J/s'}),
+                                            x={'val': 5.0, 'units': 'm/s**2'},
+                                            y={'val': 1.0, 'units': None},
+                                            z={'val': 1.0, 'units': 'J/s'}),
                                             promotes_inputs=['x', 'z'])
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
         with self.assertRaises(TypeError) as e:
@@ -932,11 +932,11 @@ class TestUnitConversion(unittest.TestCase):
         p = om.Problem()
 
         p.model.add_subsystem("C1", om.ExecComp("y = 2*x",
-                                                y={'value': 1.0, 'units': 'as'}),
+                                                y={'val': 1.0, 'units': 'as'}),
                               promotes=['x', 'y'])
         p.model.add_subsystem("C2", om.ExecComp("z = 3*y",
-                                                y={'value': 1.0, 'units': 'zs'},
-                                                z={'value': 1.0, 'units': 'zs'}),
+                                                y={'val': 1.0, 'units': 'zs'},
+                                                z={'val': 1.0, 'units': 'zs'}),
                               promotes=['z', 'y'])
 
         p.setup()

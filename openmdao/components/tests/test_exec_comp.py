@@ -20,260 +20,260 @@ except ImportError:
 import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict, _temporary_expr_dict
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 _ufunc_test_data = {
     'min': {
         'str': 'f=min(x)',
         'check_func': np.min,
-        'args': { 'f': {'value': np.zeros(6)},
-                  'x': {'value': np.random.random(6)}}},
+        'args': { 'f': {'val': np.zeros(6)},
+                  'x': {'val': np.random.random(6)}}},
     'max': {
         'str': 'f=max(x)',
         'check_func': np.max,
-        'args': { 'f': {'value': np.zeros(6)},
-                  'x': {'value': np.random.random(6)}}},
+        'args': { 'f': {'val': np.zeros(6)},
+                  'x': {'val': np.random.random(6)}}},
     'diff': {
         'str': 'f=diff(x)',
         'check_func': np.diff,
-        'args': { 'f': {'value': np.zeros(5)},
-                  'x': {'value': np.random.random(6)}}},
+        'args': { 'f': {'val': np.zeros(5)},
+                  'x': {'val': np.random.random(6)}}},
     'abs': {
         'str': 'f=abs(x)',
         'check_func': np.abs,
-        'args': { 'f': {'value': np.zeros(6)},
-                  'x': {'value': np.random.random(6)}}},
+        'args': { 'f': {'val': np.zeros(6)},
+                  'x': {'val': np.random.random(6)}}},
     'acos': {
         'str': 'f=acos(x)',
         'check_func': np.arccos,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) - 0.5}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) - 0.5}}},
     'arccos': {
         'str': 'f=arccos(x)',
         'check_func': np.arccos,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) - 0.5}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) - 0.5}}},
     'arccosh': {
         'str': 'f=arccosh(x)',
         'check_func': np.arccosh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': 1.1 + np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': 1.1 + np.random.random(6)}}},
     'acosh': {
         'str': 'f=acosh(x)',
         'check_func': np.arccosh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': 1.1 + np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': 1.1 + np.random.random(6)}}},
     'arange': {
         'str': 'f=arange(0,10,2)',
         'check_val': np.arange(0, 10, 2),
-        'args': {'f': {'value': np.zeros(5)}}},
+        'args': {'f': {'val': np.zeros(5)}}},
     'arcsin': {
         'str': 'f=arcsin(x)',
         'check_func': np.arcsin,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) - .5}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) - .5}}},
     'arcsinh': {
         'str': 'f=arcsinh(x)',
         'check_func': np.arcsinh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'asinh': {
         'str': 'f=asinh(x)',
         'check_func': np.arcsinh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'asin': {
         'str': 'f=asin(x)',
         'check_func': np.arcsin,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) - .5}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) - .5}}},
     'arctan': {
         'str': 'f=arctan(x)',
         'check_func': np.arctan,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'arctan2': {
         'str': 'f=arctan2(y, x)',
         'check_val': np.array([-2.35619449, -0.78539816,  0.78539816,  2.35619449]),
-        'args': {'f': {'value': np.zeros(4)},
-                 'x': {'value': np.array([-1, +1, +1, -1])},
-                 'y': {'value': np.array([-1, -1, +1, +1])}}},
+        'args': {'f': {'val': np.zeros(4)},
+                 'x': {'val': np.array([-1, +1, +1, -1])},
+                 'y': {'val': np.array([-1, -1, +1, +1])}}},
     'atan': {
         'str': 'f=atan(x)',
         'check_func': np.arctan,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'cos': {
         'str': 'f=cos(x)',
         'check_func': np.cos,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'cosh': {
         'str': 'f=cosh(x)',
         'check_func': np.cosh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'dot': {
         'str': 'f=dot(x, y)',
         'check_func': np.dot,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'e': {
         'str': 'f=e',
         'check_val': np.e,
-        'args': {'f': {'value': 0.0}}},
+        'args': {'f': {'val': 0.0}}},
     'erf': {
         'str': 'f=erf(x)',
         'check_func': scipy.special.erf,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'erfc': {
         'str': 'f=erfc(x)',
         'check_func': scipy.special.erfc,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'exp': {
         'str': 'f=exp(x)',
         'check_func': np.exp,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'expm1': {
         'str': 'f=expm1(x)',
         'check_func': np.expm1,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'fmax': {
         'str': 'f=fmax(x, y)',
         'check_func': np.fmax,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'fmin': {
         'str': 'f=fmin(x, y)',
         'check_func': np.fmin,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'inner': {
         'str': 'f=inner(x, y)',
         'check_func': np.inner,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'isinf': {
         'str': 'f=isinf(x)',
         'check_func': np.isinf,
-        'args': {'f': {'value': np.zeros(3)},
-                 'x': {'value': [0, np.inf, 5.0]}}},
+        'args': {'f': {'val': np.zeros(3)},
+                 'x': {'val': [0, np.inf, 5.0]}}},
     'isnan': {
         'str': 'f=isnan(x)',
         'check_func': np.isnan,
-        'args': {'f': {'value': np.zeros(3)},
-                 'x': {'value': [0, np.nan, np.nan]}}},
+        'args': {'f': {'val': np.zeros(3)},
+                 'x': {'val': [0, np.nan, np.nan]}}},
     'kron': {
         'str': 'f=kron(x, y)',
         'check_func': np.kron,
-        'args': {'f': {'value': np.zeros(36)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(36)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'linspace': {
         'str': 'f=linspace(0,10,50)',
         'check_val': np.linspace(0, 10, 50),
-        'args': {'f': {'value': np.zeros(50)}}},
+        'args': {'f': {'val': np.zeros(50)}}},
     'log': {
         'str': 'f=log(x)',
         'check_func': np.log,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) + 0.1}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) + 0.1}}},
     'log10': {
         'str': 'f=log10(x)',
         'check_func': np.log10,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6) + 0.1}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6) + 0.1}}},
     'log1p': {
         'str': 'f=log1p(x)',
         'check_func': np.log1p,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'matmul': {
         'str': 'f=matmul(x, y)',
         'check_func': np.matmul,
-        'args': {'f': {'value': np.zeros((3, 1))},
-                 'x': {'value': np.random.random((3, 3))},
-                 'y': {'value': np.random.random((3, 1))}}},
+        'args': {'f': {'val': np.zeros((3, 1))},
+                 'x': {'val': np.random.random((3, 3))},
+                 'y': {'val': np.random.random((3, 1))}}},
     'maximum': {
         'str': 'f=maximum(x, y)',
         'check_func': np.maximum,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'minimum': {
         'str': 'f=minimum(x, y)',
         'check_func': np.minimum,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'ones': {
         'str': 'f=ones(21)',
         'check_val': np.ones(21),
-         'args': {'f': {'value': np.zeros(21)}}},
+         'args': {'f': {'val': np.zeros(21)}}},
     'outer': {
         'str': 'f=outer(x, y)',
         'check_func': np.outer,
-        'args': {'f': {'value': np.zeros((6, 6))},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros((6, 6))},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6)}}},
     'pi': {
         'str': 'f=pi',
         'check_val': np.pi,
-        'args': {'f': {'value': 0.0}}},
+        'args': {'f': {'val': 0.0}}},
     'power': {
         'str': 'f=power(x, y)',
         'check_func': np.power,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)},
-                 'y': {'value': np.random.random(6) + 1.0}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)},
+                 'y': {'val': np.random.random(6) + 1.0}}},
     'prod': {
         'str': 'f=prod(x)',
         'check_func': np.prod,
-        'args': {'f': {'value': 0.0},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': 0.0},
+                 'x': {'val': np.random.random(6)}}},
     'sin': {
         'str': 'f=sin(x)',
         'check_func': np.sin,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'sinh': {
         'str': 'f=sinh(x)',
         'check_func': np.sinh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'sum': {
         'str': 'f=sum(x)',
         'check_func': np.sum,
-        'args': {'f': {'value': 0.0},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': 0.0},
+                 'x': {'val': np.random.random(6)}}},
     'tan': {
         'str': 'f=tan(x)',
         'check_func': np.tan,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'tanh': {
         'str': 'f=tanh(x)',
         'check_func': np.tanh,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}}},
     'tensordot': {
         'str': 'f=tensordot(x, y)',
         'check_func': np.tensordot,
-        'args': {'f': {'value': 0.0},
-                 'x': {'value': np.random.random((6, 6))},
-                 'y': {'value': np.random.random((6, 6))}}},
+        'args': {'f': {'val': 0.0},
+                 'x': {'val': np.random.random((6, 6))},
+                 'y': {'val': np.random.random((6, 6))}}},
     'zeros': {
         'str': 'f=zeros(21)',
         'check_val': np.zeros(21),
-        'args': {'f': {'value': np.zeros(21)}}},
+        'args': {'f': {'val': np.zeros(21)}}},
 }
 
 
@@ -281,8 +281,8 @@ _ufunc_test_data = {
 if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
     _ufunc_test_data['factorial'] = {
         'str': 'f=factorial(x)',
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}},
         'error': (RuntimeError,
                   "The 'factorial' function is not supported for SciPy "
                   f"versions >= 1.5, current version: {scipy.__version__}")
@@ -291,8 +291,8 @@ else:
     _ufunc_test_data['factorial'] = {
         'str': 'f=factorial(x)',
         'check_func': scipy.special.factorial,
-        'args': {'f': {'value': np.zeros(6)},
-                 'x': {'value': np.random.random(6)}},
+        'args': {'f': {'val': np.zeros(6)},
+                 'x': {'val': np.random.random(6)}},
         'warning': (OMDeprecationWarning,
                     "The 'factorial' function is deprecated. "
                     "It is no longer supported for SciPy versions >= 1.5.")
@@ -336,7 +336,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
         self.assertEqual(str(context.exception),
                          "'C1' <class ExecComp>: the following metadata names were not recognized for "
-                         "variable 'x': ['high', 'low', 'val']")
+                         "variable 'x': ['high', 'low']")
 
     def test_name_collision_const(self):
         prob = om.Problem()
@@ -421,7 +421,7 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-                                                        x={'value': 2.0, 'units': 'm'},
+                                                        x={'val': 2.0, 'units': 'm'},
                                                         y={'units': 'm'},
                                                         z=2.0))
         prob.model.connect('indep.x', 'C1.x')
@@ -438,7 +438,7 @@ class TestExecComp(unittest.TestCase):
 
         with self.assertRaises(TypeError) as cm:
             prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-                                                       x={'value': 2.0, 'units': 'm'},
+                                                       x={'val': 2.0, 'units': 'm'},
                                                        y={'units': 'm'},
                                                        units=2.0))
 
@@ -451,7 +451,7 @@ class TestExecComp(unittest.TestCase):
 
         with self.assertRaises(ValueError) as cm:
             prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-                                                       x={'value': 2.0, 'units': 'm'},
+                                                       x={'val': 2.0, 'units': 'm'},
                                                        y={'units': 'm'},
                                                        units='two'))
 
@@ -461,7 +461,7 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-                                                        x={'value': 2.0, 'units': 'm'},
+                                                        x={'val': 2.0, 'units': 'm'},
                                                         y={'units': 'm'}))
         prob.model.connect('indep.x', 'C1.x')
 
@@ -477,7 +477,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
         prob.model.add_subsystem('comp', om.ExecComp('y=x+z+1.', units='m',
-                                                     x={'value': 2.0},
+                                                     x={'val': 2.0},
                                                      z=2.0))
         prob.model.connect('indep.x', 'comp.x')
 
@@ -504,7 +504,7 @@ class TestExecComp(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
-                                                        x={'value': 2.0, 'units': 'km'},
+                                                        x={'val': 2.0, 'units': 'km'},
                                                         z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
@@ -520,8 +520,8 @@ class TestExecComp(unittest.TestCase):
         model = p.model
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
-                                                x={'shape': (5,), 'value': np.zeros(5)},
-                                                y={'shape': (5,), 'value': np.zeros(5)}))
+                                                x={'shape': (5,), 'val': np.zeros(5)},
+                                                y={'shape': (5,), 'val': np.zeros(5)}))
 
         p.setup()
         p.run_model()
@@ -535,7 +535,7 @@ class TestExecComp(unittest.TestCase):
         model = p.model
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
-                                                x={'shape': (5,), 'value': 5},
+                                                x={'shape': (5,), 'val': 5},
                                                 y={'shape': (5,)}))
 
         with self.assertRaises(Exception) as context:
@@ -563,8 +563,8 @@ class TestExecComp(unittest.TestCase):
         model = p.model
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                                x={'value': np.zeros(5)},
-                                                y={'value': np.zeros(5)}))
+                                                x={'val': np.zeros(5)},
+                                                y={'val': np.zeros(5)}))
 
         p.setup()
         p.run_model()
@@ -592,7 +592,7 @@ class TestExecComp(unittest.TestCase):
         model = p.model
 
         model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                                x={'value': 5}))
+                                                x={'val': 5}))
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -966,9 +966,9 @@ class TestExecComp(unittest.TestCase):
     def test_tags(self):
         prob = om.Problem(model=om.Group())
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-                                                     x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                     x={'val': 1.0, 'units': 'm', 'tags': 'tagx'},
                                                      y={'units': 'm', 'tags': ['tagy','tagq']},
-                                                     z={'value': 2.0, 'tags': 'tagz'},
+                                                     z={'val': 2.0, 'tags': 'tagz'},
                                                      ))
 
         prob.setup(check=False)
@@ -1129,9 +1129,9 @@ class TestExecComp(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'value': 0.0, 'units': 'inch'},
-                                                y={'value': 0.0, 'units': 'inch'},
-                                                z={'value': 0.0, 'units': 'inch'}))
+                                                x={'val': 0.0, 'units': 'inch'},
+                                                y={'val': 0.0, 'units': 'inch'},
+                                                z={'val': 0.0, 'units': 'inch'}))
 
         prob.setup()
 
@@ -1199,7 +1199,7 @@ class TestExecComp(unittest.TestCase):
         p = om.Problem()
 
         excomp = om.ExecComp('y=x',
-                             x={'value' : 3.0, 'units' : 'mm'},
+                             x={'val' : 3.0, 'units' : 'mm'},
                              y={'shape' : (1, ), 'units' : 'cm'})
 
         excomp.add_expr('z = 2.9*x',
@@ -1218,7 +1218,7 @@ class TestExecComp(unittest.TestCase):
         excomp = om.ExecComp()
 
         excomp.add_expr('z = 2.9*x',
-                        x={'value' : 3.0, 'units' : 'mm'},
+                        x={'val' : 3.0, 'units' : 'mm'},
                         z={'shape' : (1, ), 'units' : 's'})
 
         p.model.add_subsystem('comp', excomp, promotes=['*'])
@@ -1232,7 +1232,7 @@ class TestExecComp(unittest.TestCase):
         class ConfigGroup(om.Group):
             def setup(self):
                 excomp = om.ExecComp('y=x',
-                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     x={'val' : 3.0, 'units' : 'mm'},
                                      y={'shape' : (1, ), 'units' : 'cm'})
 
                 self.add_subsystem('excomp', excomp, promotes=['*'])
@@ -1323,7 +1323,7 @@ class TestExecComp(unittest.TestCase):
 
             def configure(self):
                 self.excomp.add_expr('z = 2.9*x',
-                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     x={'val' : 3.0, 'units' : 'mm'},
                                      z={'shape' : (1, ), 'units' : 's'})
 
 
@@ -1339,12 +1339,12 @@ class TestExecComp(unittest.TestCase):
         p = om.Problem()
 
         excomp = om.ExecComp('y=x',
-                             x={'value' : 3.0, 'units' : 'mm'},
+                             x={'val' : 3.0, 'units' : 'mm'},
                              y={'shape' : (1, ), 'units' : 'cm'})
 
         with self.assertRaises(NameError) as cm:
             excomp.add_expr('z = 2.9*x',
-                            x={'value' : 3.0, 'units' : 'cm'},
+                            x={'val' : 3.0, 'units' : 'cm'},
                             z={'shape' : (1, ), 'units' : 's'})
 
         self.assertEquals(cm.exception.args[0],
@@ -1365,12 +1365,37 @@ class TestExecComp(unittest.TestCase):
         self.assertEquals(cm.exception.args[0],
                           "'zzz' <class ExecComp>: The output 'y' has already been defined by an expression.")
 
+    def test_value_deprecation(self):
+        p = om.Problem()
+
+        msg = ("'zzz' <class ExecComp>: 'value' will be deprecated in 4.0. Please use 'val' in the future.")
+
+        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10)}, y={'val': np.ones(10)})
+
+        p.model.add_subsystem('zzz', excomp)
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_val_value_error(self):
+        p = om.Problem()
+
+        msg = ("Cannot use 'val' and 'value' at the same time, use 'val'.")
+
+        excomp = om.ExecComp('y=x**2', x={'value': np.ones(10), 'val': np.ones(10)},
+                                       y={'val': np.ones(10)})
+
+        p.model.add_subsystem('zzz', excomp)
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+            self.assertEquals(cm.exception.args[0], msg)
+
     def test_feature_add_expr(self):
 
         class ConfigGroup(om.Group):
             def setup(self):
                 excomp = om.ExecComp('y=x',
-                                     x={'value' : 3.0, 'units' : 'mm'},
+                                     x={'val' : 3.0, 'units' : 'mm'},
                                      y={'shape' : (1, ), 'units' : 'cm'})
 
                 self.add_subsystem('excomp', excomp, promotes=['*'])
@@ -1672,10 +1697,10 @@ class TestFunctionRegistration(unittest.TestCase):
         prob.final_setup()
 
         # all subjac values should be size == size from above instead of (size, size)
-        self.assertEqual(comp1._subjacs_info[('comp1.x', 'comp1.t')]['value'].size, size)
-        self.assertEqual(comp2._subjacs_info[('comp2.y', 'comp2.t')]['value'].size, size)
-        self.assertEqual(comp3._subjacs_info[('comp3.z', 'comp3.t')]['value'].size, size)
-        self.assertEqual(comp4._subjacs_info[('comp4.w', 'comp4.t')]['value'].size, size)
+        self.assertEqual(comp1._subjacs_info[('comp1.x', 'comp1.t')]['val'].size, size)
+        self.assertEqual(comp2._subjacs_info[('comp2.y', 'comp2.t')]['val'].size, size)
+        self.assertEqual(comp3._subjacs_info[('comp3.z', 'comp3.t')]['val'].size, size)
+        self.assertEqual(comp4._subjacs_info[('comp4.w', 'comp4.t')]['val'].size, size)
 
     def test_register_err_keyword(self):
         with _temporary_expr_dict():
@@ -1777,7 +1802,7 @@ class TestExecCompParameterized(unittest.TestCase):
             for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
-                ivc.add_output(name=arg_name, val=arg_value['value'])
+                ivc.add_output(name=arg_name, val=arg_value['val'])
                 model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
 
         model.add_subsystem('comp', om.ExecComp(test_data['str'], **test_data['args']),
@@ -1799,11 +1824,11 @@ class TestExecCompParameterized(unittest.TestCase):
         if 'check_func' in test_data:
             check_args = []
             try:
-                check_args.append(test_data['args']['x']['value'])
+                check_args.append(test_data['args']['x']['val'])
             except Exception:
                 pass
             try:
-                check_args.append(test_data['args']['y']['value'])
+                check_args.append(test_data['args']['y']['val'])
             except Exception:
                 pass
             check_args = tuple(check_args)
@@ -1833,7 +1858,7 @@ class TestExecCompParameterized(unittest.TestCase):
             for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
-                ivc.add_output(name=arg_name, val=arg_value['value'])
+                ivc.add_output(name=arg_name, val=arg_value['val'])
                 model.connect('ivc.{0}'.format(arg_name),
                               '{0}_comp.{1}'.format(f, arg_name))
 

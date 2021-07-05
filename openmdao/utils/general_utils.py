@@ -20,7 +20,7 @@ import numbers
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE, INF_BOUND
-from openmdao.warnings import issue_warning, _warn_simple_format, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, _warn_simple_format, warn_deprecation
 
 # Certain command line tools can make use of this to allow visualization of models when errors
 # are present that would normally cause setup to abort.

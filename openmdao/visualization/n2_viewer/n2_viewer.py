@@ -26,7 +26,7 @@ from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-from openmdao.warnings import issue_warning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
 
@@ -103,7 +103,7 @@ def _get_var_dict(system, typ, name, is_parallel):
         var_dict['type'] = 'output'
         var_dict['implicit'] = isimplicit
 
-    var_dict['dtype'] = type(meta['value']).__name__
+    var_dict['dtype'] = type(meta['val']).__name__
     if 'units' in meta:
         if meta['units'] is None:
             var_dict['units'] = 'None'
@@ -124,26 +124,26 @@ def _get_var_dict(system, typ, name, is_parallel):
     var_dict['is_discrete'] = is_discrete
 
     if is_discrete:
-        if isinstance(meta['value'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
-            var_dict['value'] = default_noraise(system.get_val(name))
+        if isinstance(meta['val'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
+            var_dict['val'] = default_noraise(system.get_val(name))
         else:
-            var_dict['value'] = type(meta['value']).__name__
+            var_dict['val'] = type(meta['val']).__name__
     else:
-        if meta['value'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+        if meta['val'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
             if not MPI:
                 # get the current value
-                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
+                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
             elif is_parallel or is_distributed:
                 # we can't access non-local values, so just get the initial value
-                var_dict['value'] = meta['value']
+                var_dict['val'] = meta['val']
                 var_dict['initial_value'] = True
             else:
                 # get the current value but don't try to get it from the source,
                 # which could be remote under MPI
                 val = system.get_val(name, from_src=False)
-                var_dict['value'] = _convert_ndarray_to_support_nans_in_json(val)
+                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(val)
         else:
-            var_dict['value'] = None
+            var_dict['val'] = None
 
     return var_dict
 
@@ -165,7 +165,7 @@ def _serialize_single_option(option):
     object
        JSON-safe serialized object.
     """
-    val = option['value']
+    val = option['val']
     if not option['recordable']:
         serialized_option = 'Not Recordable'
     elif val is _UNDEFINED:
@@ -398,6 +398,7 @@ def _get_viewer_data(data_source, case_id=None):
 
             def recurse(children, stack):
                 for child in children:
+                    # if 'val' in child
                     if child['type'] == 'subsystem':
                         if child['name'] != '_auto_ivc':
                             stack.append(child['name'])
@@ -405,19 +406,19 @@ def _get_viewer_data(data_source, case_id=None):
                             stack.pop()
                     elif child['type'] == 'input':
                         if cases.inputs is None:
-                            child['value'] = 'N/A'
+                            child['val'] = 'N/A'
                         else:
                             path = child['name'] if not stack else '.'.join(stack + [child['name']])
-                            child['value'] = cases.inputs[path]
+                            child['val'] = cases.inputs[path]
                     elif child['type'] == 'output':
                         if cases.outputs is None:
-                            child['value'] = 'N/A'
+                            child['val'] = 'N/A'
                         else:
                             path = child['name'] if not stack else '.'.join(stack + [child['name']])
                             try:
-                                child['value'] = cases.outputs[path]
+                                child['val'] = cases.outputs[path]
                             except KeyError:
-                                child['value'] = 'N/A'
+                                child['val'] = 'N/A'
             recurse(data_dict['tree']['children'], [])
 
         # Delete the variables key since it's not used in N2

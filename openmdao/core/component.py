@@ -9,7 +9,7 @@ from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names
+    global_meta_names, _MetadataDict
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -20,7 +20,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
 import openmdao.utils.coloring as coloring_mod
-from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
+from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
@@ -180,11 +180,11 @@ class Component(System):
             if 'shape_by_conn' in meta and (meta['shape_by_conn'] or
                                             meta['copy_shape'] is not None):
                 meta['shape'] = None
-                if not np.isscalar(meta['value']):
-                    if meta['value'].size > 0:
-                        meta['value'] = meta['value'].flatten()[0]
+                if not np.isscalar(meta['val']):
+                    if meta['val'].size > 0:
+                        meta['val'] = meta['val'].flatten()[0]
                     else:
-                        meta['value'] = 1.0
+                        meta['val'] = 1.0
 
         self._var_rel2meta.update(self._static_var_rel2meta)
         for io in ['input', 'output']:
@@ -282,7 +282,7 @@ class Component(System):
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
-                del v['value']
+                del v['val']
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -539,10 +539,12 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['value']
+            distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = {
-            'value': val,
+        metadata = _MetadataDict()
+
+        metadata.update({
+            'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'src_indices': src_indices,  # these will ultimately be converted to a flat index array
@@ -555,7 +557,7 @@ class Component(System):
             'tags': make_set(tags),
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape,
-        }
+        })
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -607,12 +609,14 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
 
-        metadata = {
-            'value': val,
+        metadata = _MetadataDict()
+
+        metadata.update({
+            'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags),
-        }
+        })
 
         if metadata['type'] == np.ndarray:
             metadata.update({'shape': val.shape})
@@ -779,10 +783,12 @@ class Component(System):
             if distributed is None:
                 distributed = False
             # using ._dict below to avoid tons of deprecation warnings
-            distributed = distributed or self.options._dict['distributed']['value']
+            distributed = distributed or self.options._dict['distributed']['val']
 
-        metadata = {
-            'value': val,
+        metadata = _MetadataDict()
+
+        metadata.update({
+            'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
             'units': units,
@@ -797,7 +803,7 @@ class Component(System):
             'upper': upper,
             'shape_by_conn': shape_by_conn,
             'copy_shape': copy_shape
-        }
+        })
 
         # this will get reset later if comm size is 1
         self._has_distrib_vars |= metadata['distributed']
@@ -849,12 +855,14 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
 
-        metadata = {
-            'value': val,
+        metadata = _MetadataDict()
+
+        metadata.update({
+            'val': val,
             'type': type(val),
             'desc': desc,
             'tags': make_set(tags)
-        }
+        })
 
         if metadata['type'] == np.ndarray:
             metadata.update({'shape': val.shape})
@@ -1054,7 +1062,7 @@ class Component(System):
                              'both must be specified.'.format(self.msginfo, of, wrt))
 
         if dependent:
-            meta['value'] = val
+            meta['val'] = val
             if rows is not None:
                 rows = np.array(rows, dtype=INT_DTYPE, copy=False)
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
@@ -1314,7 +1322,7 @@ class Component(System):
         dct : dict
             Metadata dict specifying shape, and/or approx properties.
         """
-        val = dct['value'] if 'value' in dct else None
+        val = dct['val'] if 'val' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
 
@@ -1414,16 +1422,16 @@ class Component(System):
 
                 if val is None:
                     # we can only get here if rows is None  (we're not sparse list format)
-                    meta['value'] = np.zeros(shape)
+                    meta['val'] = np.zeros(shape)
                 elif is_array:
                     if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['value'] = val = val.copy().reshape(shape)
+                        meta['val'] = val = val.copy().reshape(shape)
                     else:
-                        meta['value'] = val.copy()
+                        meta['val'] = val.copy()
                 elif is_scalar:
-                    meta['value'] = np.full(shape, val, dtype=float)
+                    meta['val'] = np.full(shape, val, dtype=float)
                 else:
-                    meta['value'] = val
+                    meta['val'] = val
 
                 if rows_max >= shape[0] or cols_max >= shape[1]:
                     of, wrt = rel_key
@@ -1431,7 +1439,7 @@ class Component(System):
                     raise ValueError(msg.format(self.msginfo, of, wrt, shape[0], shape[1],
                                                 rows_max + 1, cols_max + 1))
 
-                self._check_partials_meta(abs_key, meta['value'],
+                self._check_partials_meta(abs_key, meta['val'],
                                           shape if rows is None else (rows.shape[0], 1))
 
                 self._subjacs_info[abs_key] = meta
@@ -1580,17 +1588,17 @@ class Component(System):
 
 class _DictValues(object):
     """
-    A dict-like wrapper for a dict of metadata, where getitem returns 'value' from metadata.
+    A dict-like wrapper for a dict of metadata, where getitem returns 'val' from metadata.
     """
 
     def __init__(self, dct):
         self._dict = dct
 
     def __getitem__(self, key):
-        return self._dict[key]['value']
+        return self._dict[key]['val']
 
     def __setitem__(self, key, value):
-        self._dict[key]['value'] = value
+        self._dict[key]['val'] = value
 
     def __contains__(self, key):
         return key in self._dict
@@ -1599,4 +1607,4 @@ class _DictValues(object):
         return len(self._dict)
 
     def items(self):
-        return [(key, self._dict[key]['value']) for key in self._dict]
+        return [(key, self._dict[key]['val']) for key in self._dict]

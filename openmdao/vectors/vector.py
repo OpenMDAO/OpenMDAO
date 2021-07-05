@@ -66,10 +66,15 @@ class Vector(object):
         True if this vector's scaling includes an additive term.
     _scaling : dict
         Contains scale factors to convert data arrays.
+    _scaling_nl_vec : dict
+        Reference to the scaling factors in the nonlinear vector. Only used for linear input
+        vectors.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
         Total length of data vector (including shared memory parts).
+    _has_solver_ref : bool
+        This is set to True only when a ref is defined on a solver.
     """
 
     # Listing of relevant citations
@@ -125,6 +130,11 @@ class Vector(object):
                           (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = None
+        self._scaling_nl_vec = None
+
+        # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
+        # for the linear and nonlinear input vectors.
+        self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
         if root_vector is None:
             self._root_vector = self

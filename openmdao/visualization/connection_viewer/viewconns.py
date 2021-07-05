@@ -20,7 +20,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.notebook_utils import notebook, colab
-from openmdao.warnings import issue_warning
+from openmdao.utils.om_warnings import issue_warning
 
 
 def _val2str(val):

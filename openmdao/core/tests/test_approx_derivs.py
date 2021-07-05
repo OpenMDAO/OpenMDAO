@@ -2323,9 +2323,9 @@ class CheckTotalsParallelGroup(unittest.TestCase):
         pg.add_subsystem('dc2', PassThruComp(size=size, time=0.0))
         pg.add_subsystem('dc3', PassThruComp(size=size, time=0.0))
         model.connect('iv.x', ['dc1.x', 'dc2.x', 'dc3.x'])
-        model.add_subsystem('adder', om.ExecComp('z = sum(y1)+sum(y2)+sum(y3)', y1={'value': np.zeros((size, ))},
-                                                                                y2={'value': np.zeros((size, ))},
-                                                                                y3={'value': np.zeros((size, ))}))
+        model.add_subsystem('adder', om.ExecComp('z = sum(y1)+sum(y2)+sum(y3)', y1={'val': np.zeros((size, ))},
+                                                                                y2={'val': np.zeros((size, ))},
+                                                                                y3={'val': np.zeros((size, ))}))
         model.connect('dc1.y', 'adder.y1')
         model.connect('dc2.y', 'adder.y2')
         model.connect('dc3.y', 'adder.y3')

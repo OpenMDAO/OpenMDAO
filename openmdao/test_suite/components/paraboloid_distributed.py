@@ -6,6 +6,7 @@ This version is used for testing, so it will have different options.
 import numpy as np
 
 import openmdao.api as om
+from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 
 
@@ -77,6 +78,42 @@ class DistParab(om.ExplicitComponent):
 # Simplified version for feature docs without the extra testing args.
 
 class DistParabFeature(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare('arr_size', types=int, default=10,
+                             desc="Size of input and output vectors.")
+
+    def setup(self):
+
+        arr_size = self.options['arr_size']
+        self.add_input('x', val=1., distributed=False,
+                       shape=arr_size)
+        self.add_input('y', val=1., distributed=False,
+                       shape=arr_size)
+
+        sizes, offsets = evenly_distrib_idxs(self.comm.size, arr_size)
+        self.start = offsets[self.comm.rank]
+        self.end = self.start + sizes[self.comm.rank]
+        self.a = -3.0 + 0.6 * np.arange(self.start,self.end)
+
+        self.add_output('f_xy', shape=len(self.a), distributed=True)
+        self.add_output('f_sum', shape=1, distributed=False)
+
+        self.declare_coloring(wrt='*', method='fd')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x'][self.start:self.end]
+        y = inputs['y'][self.start:self.end]
+
+        outputs['f_xy'] = (x + self.a)**2 + x * y + (y + 4.0)**2 - 3.0
+
+        local_sum = np.sum(outputs['f_xy'])
+        global_sum = np.zeros(1)
+        self.comm.Allreduce(local_sum, global_sum, op=MPI.SUM)
+        outputs['f_sum'] = global_sum
+
+
+class DistParabDeprecated(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('arr_size', types=int, default=10,

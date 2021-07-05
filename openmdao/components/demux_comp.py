@@ -4,7 +4,7 @@
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 class DemuxComp(ExplicitComponent):

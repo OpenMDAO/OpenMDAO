@@ -7,7 +7,8 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.distributed_components import DistribCompDerivs, SummerDerivs
-from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature
+from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature, \
+    DistParabDeprecated
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
@@ -78,14 +79,14 @@ class DistribExecComp(om.ExecComp):
         for name in outs:
             if name not in kwargs or not isinstance(kwargs[name], dict):
                 kwargs[name] = {}
-            kwargs[name]['value'] = np.ones(sizes[rank], float)
+            kwargs[name]['val'] = np.ones(sizes[rank], float)
 
         for name in allvars:
             if name not in outs:
                 if name not in kwargs or not isinstance(kwargs[name], dict):
                     kwargs[name] = {}
                 meta = kwargs[name]
-                meta['value'] = np.ones(sizes[rank], float)
+                meta['val'] = np.ones(sizes[rank], float)
                 meta['src_indices'] = np.arange(start, end, dtype=int)
 
         super().setup()
@@ -1232,12 +1233,44 @@ class MPIFeatureTests(unittest.TestCase):
         model = prob.model
 
         ivc = om.IndepVarComp()
+        ivc.add_output('x', np.ones(size))
+        ivc.add_output('y', -1.42 * np.ones(size))
+
+        model.add_subsystem('p', ivc, promotes=['*'])
+        model.add_subsystem("parab", DistParabFeature(arr_size=size), promotes=['*'])
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_constraint('f_xy', lower=0.0)
+        model.add_objective('f_sum', index=-1)
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.setup()
+
+        prob.run_driver()
+
+        desvar = prob.get_val('p.x', get_remote=True)
+        obj = prob.get_val('f_sum', get_remote=True)
+
+        assert_near_equal(desvar, np.array([2.65752672, 2.60433212, 2.51005989, 1.91021257,
+                                            1.3100763,  0.70992863, 0.10978096]), 1e-6)
+        assert_near_equal(obj, 11.5015, 1e-6)
+
+    @unittest.skipUnless(pyoptsparse_opt, "pyOptsparse is required.")
+    def test_distributed_constraint_deprecated(self):
+        """ Test distributed constraint with deprecated usage of src_indices. """
+
+        size = 7
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = om.IndepVarComp()
         ivc.add_output('x', np.ones((size, )))
         ivc.add_output('y', -1.42 * np.ones((size, )))
         ivc.add_output('offset', -3.0 + 0.6 * np.arange(size))
 
         model.add_subsystem('p', ivc, promotes=['*'])
-        model.add_subsystem("parab", DistParabFeature(arr_size=size),
+        model.add_subsystem("parab", DistParabDeprecated(arr_size=size),
                             promotes=['*'])
         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
                                                f_sum=np.ones(1),
@@ -1260,7 +1293,6 @@ class MPIFeatureTests(unittest.TestCase):
         assert_near_equal(desvar, np.array([2.65752672, 2.60433212, 2.51005989, 1.91021257,
                                             1.3100763,  0.70992863, 0.10978096]), 1e-6)
         assert_near_equal(obj, 11.5015, 1e-6)
-
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ZeroLengthInputsOutputs(unittest.TestCase):
