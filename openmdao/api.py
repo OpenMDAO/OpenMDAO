@@ -101,7 +101,8 @@ from openmdao.utils.units import convert_units, unit_conversion
 from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWarning, \
     SetupWarning, DistributedComponentWarning, CaseRecorderWarning,\
     DriverWarning, CacheWarning, PromotionWarning, UnusedOptionWarning, DerivativesWarning, \
-    MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning
+    MPIWarning, UnitsWarning, SolverWarning, OMDeprecationWarning, \
+    OMInvalidCheckDerivativesOptionsWarning
 
 
 # set up tracing or memory profiling if env vars are set.
