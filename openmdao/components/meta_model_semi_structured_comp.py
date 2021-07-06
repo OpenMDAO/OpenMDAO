@@ -27,8 +27,6 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    grad_shape : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
     interps : dict
         Dictionary of interpolations for each output.
     pnames : list
@@ -52,11 +50,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         self.pnames = []
-        self.inputs = []
         self.training_inputs = {}
         self.training_outputs = {}
         self.interps = {}
-        self.grad_shape = ()
 
         self._no_check_partials = True
 
@@ -109,10 +105,13 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         ----------
         name : string
             Name of the output.
-        val : float or ndarray
-            Initial value for the output.
+        grid_points : ndarray
+            2-dimensional array containing all defined points in ascending order.  Must be (m x n)
+            where m is the number of points in the semi-structured grid, and n is the number of
+            inputs that were added. These points should be strictly ascending.
         training_data : ndarray
-            training data sample points for this output variable.
+            Training data sample points for this output variable. Must be of length m, where m is
+            the number of points defined in "grid_points".
         **kwargs : dict
             Additional agruments for add_output.
         """
@@ -138,9 +137,6 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
             grid = self.training_inputs[name]
             self.interps[name] = InterpNDSemi(grid, train_data, method=interp_method,
                                               extrapolate=self.options['extrapolate'])
-
-        if self.options['training_data_gradients']:
-            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.inputs])
 
         super()._setup_var_data()
 

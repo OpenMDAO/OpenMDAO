@@ -99,7 +99,6 @@ class InterpNDSemi(object):
         self._xi = None
         self._d_dx = None
         self._d_dvalues = None
-        self._compute_d_dx = True
         self._compute_d_dvalues = False
 
         # Cache spline coefficients.
@@ -131,7 +130,6 @@ class InterpNDSemi(object):
             Value of derivative of interpolated output with respect to input x. (Only when
             compute_derivative is True.)
         """
-        self._compute_d_dx = compute_derivative
         self.table._compute_d_dx = compute_derivative
         self.table._compute_d_dvalues = False
 
