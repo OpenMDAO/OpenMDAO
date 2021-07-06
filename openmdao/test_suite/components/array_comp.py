@@ -25,7 +25,7 @@ class ArrayComp(om.ExplicitComponent):
         self.add_output('y1', np.zeros([4]))
 
         self.exec_count = 0
-        #self.set_check_partial_options('x*', directional=True)
+        self.set_check_partial_options('x*', directional=True)
 
     def setup_partials(self):
         self.declare_partials(of='*', wrt='*')
