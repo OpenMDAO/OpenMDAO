@@ -64,10 +64,9 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         Check Jupyter Notebooks for code cell installing openmdao.
         """
         header = ["try:\n",
-                  "    import openmdao.api as om\n",
+                  "    from openmdao.utils.notebook_utils import notebook_mode\n",
                   "except ImportError:\n",
-                  "    !python -m pip install openmdao[notebooks]\n",
-                  "    import openmdao.api as om"]
+                  "    !python -m pip install openmdao[notebooks]"]
 
         mpi_header = ['%pylab inline\n',
                       'from ipyparallel import Client, error\n',
