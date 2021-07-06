@@ -134,11 +134,11 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             interp = InterpND(method=method, points=xcp, x_interp=x)
             y, dy = interp.evaluate_spline(ycp, compute_derivative=True)
 
-            self.assertTrue(y.dtype == np.complex)
+            self.assertTrue(y.dtype == complex)
 
             if method in ['akima']:
                 # Derivs depend on values only for akima.
-                self.assertTrue(dy.dtype == np.complex)
+                self.assertTrue(dy.dtype == complex)
 
         p1 = np.linspace(0, 100, 25)
         p2 = np.linspace(-10, 10, 5)
@@ -161,8 +161,8 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             interp = InterpND(method=method, points=(p1, p2, p3), values=f)
             y, dy = interp.interpolate(x, compute_derivative=True)
 
-            self.assertTrue(y.dtype == np.complex)
-            self.assertTrue(dy.dtype == np.complex)
+            self.assertTrue(y.dtype == complex)
+            self.assertTrue(dy.dtype == complex)
 
 
 class TestInterpNDPython(unittest.TestCase):
@@ -619,7 +619,7 @@ class TestInterpNDPython(unittest.TestCase):
         msg = ('There are 4 points and 6 values in dimension 0')
         self.assertEqual(str(cm.exception), msg)
 
-        badvalues = np.array(values, dtype=np.complex)
+        badvalues = np.array(values, dtype=complex)
         with self.assertRaises(ValueError) as cm:
             interp = InterpND(method='slinear', points=badpoints, values=badvalues.tolist())
 

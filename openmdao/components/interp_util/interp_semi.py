@@ -4,12 +4,14 @@ Base class for interpolation methods that work on a semi-structured grid.
 import numpy as np
 
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2Semi
+from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3Semi
 from openmdao.components.interp_util.interp_slinear import InterpLinearSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 INTERP_METHODS = {
     'lagrange2': InterpLagrange2Semi,
+    'lagrange3': InterpLagrange3Semi,
     'slinear': InterpLinearSemi,
 }
 
@@ -190,7 +192,7 @@ class InterpNDSemi(object):
         result = np.empty((n_nodes, ), dtype=xi.dtype)
         derivs_x = np.empty((n_nodes, nx), dtype=xi.dtype)
         if self._compute_d_dvalues:
-            derivs_val = np.empty((n_nodes, len(self.values)), dtype=xi.dtype)
+            derivs_val = np.zeros((n_nodes, len(self.values)), dtype=xi.dtype)
 
         # Loop over n_nodes because there isn't a way to vectorize.
         for j in range(n_nodes):

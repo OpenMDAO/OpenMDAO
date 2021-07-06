@@ -65,7 +65,7 @@ class InterpLagrange2(InterpAlgorithm):
         subtable = self.subtable
 
         # Complex Step
-        if self.values.dtype == np.complex:
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -81,6 +81,10 @@ class InterpLagrange2(InterpAlgorithm):
         xx2 = x[0] - grid[idx + 1]
         xx3 = x[0] - grid[idx + 2]
 
+        c12 = grid[idx] - grid[idx + 1]
+        c13 = grid[idx] - grid[idx + 2]
+        c23 = grid[idx + 1] - grid[idx + 2]
+
         if subtable is not None:
             # Interpolate between values that come from interpolating the subtables in the
             # subsequent dimensions.
@@ -91,10 +95,6 @@ class InterpLagrange2(InterpAlgorithm):
             nshape = list(tshape[:-nx])
             nshape.append(nx)
             derivs = np.empty(tuple(nshape), dtype=dtype)
-
-            c12 = grid[idx] - grid[idx + 1]
-            c13 = grid[idx] - grid[idx + 2]
-            c23 = grid[idx + 1] - grid[idx + 2]
 
             subval, subderiv, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
@@ -115,9 +115,6 @@ class InterpLagrange2(InterpAlgorithm):
             nshape.append(1)
             derivs = np.empty(tuple(nshape), dtype=dtype)
 
-            c12 = grid[idx] - grid[idx + 1]
-            c13 = grid[idx] - grid[idx + 2]
-            c23 = grid[idx + 1] - grid[idx + 2]
             q1 = values[..., idx] / (c12 * c13)
             q2 = values[..., idx + 1] / (c12 * c23)
             q3 = values[..., idx + 2] / (c13 * c23)
@@ -180,7 +177,7 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
         idx, _ = self.bracket(x[0])
 
         # Complex Step
-        if self.values.dtype == np.complex:
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -196,6 +193,10 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
         xx2 = x[0] - grid[idx + 1]
         xx3 = x[0] - grid[idx + 2]
 
+        c12 = grid[idx] - grid[idx + 1]
+        c13 = grid[idx] - grid[idx + 2]
+        c23 = grid[idx + 1] - grid[idx + 2]
+
         if subtables is not None:
             # Interpolate between values that come from interpolating the subtables in the
             # subsequent dimensions.
@@ -204,10 +205,6 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
             val2, dx2, dvalue2 = subtables[idx + 2].evaluate(x[1:])
 
             derivs = np.empty(len(dx0) + 1, dtype=dtype)
-
-            c12 = grid[idx] - grid[idx + 1]
-            c13 = grid[idx] - grid[idx + 2]
-            c23 = grid[idx + 1] - grid[idx + 2]
 
             q1 = val0 / (c12 * c13)
             q2 = val1 / (c12 * c23)
@@ -238,9 +235,6 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
         else:
             values = self.values
 
-            c12 = grid[idx] - grid[idx + 1]
-            c13 = grid[idx] - grid[idx + 2]
-            c23 = grid[idx + 1] - grid[idx + 2]
             q1 = values[idx] / (c12 * c13)
             q2 = values[idx + 1] / (c12 * c23)
             q3 = values[idx + 2] / (c13 * c23)

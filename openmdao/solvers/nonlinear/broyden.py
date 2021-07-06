@@ -297,9 +297,9 @@ class BroydenSolver(NonlinearSolver):
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
-            self.Gm = self.Gm.astype(np.complex)
-            self.xm = self.xm.astype(np.complex)
-            self.fxm = self.fxm.astype(np.complex)
+            self.Gm = self.Gm.astype(complex)
+            self.xm = self.xm.astype(complex)
+            self.fxm = self.fxm.astype(complex)
         elif np.iscomplexobj(self.xm):
             self.Gm = self.Gm.real
             self.xm = self.xm.real

@@ -58,8 +58,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         self.interps = {}
         self.grad_shape = ()
 
-        # TODO - Turn this back off when comp is validated.
-        #self._no_check_partials = True
+        self._no_check_partials = True
 
     def initialize(self):
         """

@@ -118,7 +118,7 @@ class EQConstraintComp(ExplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         if inputs._under_complex_step:
-            self._scale_factor = self._scale_factor.astype(np.complex)
+            self._scale_factor = self._scale_factor.astype(complex)
         else:
             self._scale_factor = self._scale_factor.real
 
@@ -155,7 +155,7 @@ class EQConstraintComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         if inputs._under_complex_step:
-            self._dscale_drhs = self._dscale_drhs.astype(np.complex)
+            self._dscale_drhs = self._dscale_drhs.astype(complex)
         else:
             self._dscale_drhs = self._dscale_drhs.real
 
