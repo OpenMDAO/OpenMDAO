@@ -58,5 +58,4 @@ sphinx:
   - 'sphinx.ext.autosummary'
   - 'sphinx.ext.viewcode'
   - 'sphinx_sitemap'
-  - 'jupyter_sphinx'
   - 'numpydoc'
