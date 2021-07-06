@@ -15,7 +15,7 @@ from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.warnings import issue_warning, SolverWarning
+from openmdao.utils.om_warnings import issue_warning, SolverWarning
 from openmdao.core.component import Component
 
 _emptyset = set()

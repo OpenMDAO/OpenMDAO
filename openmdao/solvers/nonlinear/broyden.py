@@ -9,7 +9,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.warnings import issue_warning, SetupWarning
+from openmdao.utils.om_warnings import issue_warning, SetupWarning
 from openmdao.utils.mpi import MPI
 
 

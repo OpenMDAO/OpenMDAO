@@ -6,7 +6,7 @@ from hashlib import md5
 from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
-from openmdao.warnings import issue_warning, CacheWarning
+from openmdao.utils.om_warnings import issue_warning, CacheWarning
 
 MACHINE_EPSILON = np.finfo(np.double).eps
 

@@ -44,7 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

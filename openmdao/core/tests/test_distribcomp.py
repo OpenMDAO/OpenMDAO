@@ -9,7 +9,7 @@ from openmdao.test_suite.components.distributed_components import DistribComp, S
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.warnings import DistributedComponentWarning
+from openmdao.utils.om_warnings import DistributedComponentWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
