@@ -1983,8 +1983,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             prob.setup(force_alloc_complex=force_alloc_complex)
             return prob, parab
 
-        def get_expected_error(var, comp, method, form, step, step_calc, directional):
-            doc_root_url = 'http://openmdao.org/newdocs/versions/latest/'
+        def get_expected_check_partials_error(var, comp, method, form, step, step_calc, directional):
             msg = f"Problem: Checking partials with respect " \
                   f"to variable '{var}' in component " \
                   f"'{comp.pathname}' using the same " \
@@ -1992,25 +1991,10 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
                   "component's derivatives " \
                   "will not provide any relevant information on the " \
                   "accuracy.\n" \
-                  "Settings for both are currently:\n" \
-                  f"    method: {method}\n" \
-                  f"    form: {form}\n" \
-                  f"    step: {step}\n" \
-                  f"    step_calc: {step_calc}\n" \
-                  f"    directional: {directional}\n" \
-                  "To correct this, change the options to do the " \
+                  "To correct this, change the options to do the \n" \
                   "check_partials using either:\n" \
-                  "     - arguments to Problem.check_partials. " \
-                  "See:\n" \
-                  f"        {doc_root_url}features/core_features" \
-                  f"/working_with_derivatives/" \
-                  f"basic_check_partials.html\n" \
-                  "     or\n" \
-                  "     - arguments to " \
-                  "Component.set_check_partial_options. See\n" \
-                  f"        {doc_root_url}features/core_features" \
-                  f"/working_with_derivatives/" \
-                  f"check_partials_settings.html"
+                  "     - arguments to Problem.check_partials. \n" \
+                  "     - arguments to Component.set_check_partial_options"
             return msg
 
         # Scenario 1:
@@ -2028,7 +2012,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials(method='fd')
-        expected_error_msg = get_expected_error('x', self.parab, 'fd', 'forward', 1e-6, 'abs',
+        expected_error_msg = get_expected_check_partials_error('x', self.parab, 'fd', 'forward', 1e-6, 'abs',
                                                 False)
         self.assertEqual(expected_error_msg, str(err.exception))
 
@@ -2074,7 +2058,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials(method='cs')
-        expected_error_msg = get_expected_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
+        expected_error_msg = get_expected_check_partials_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 7:
@@ -2097,7 +2081,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.set_check_partial_options('*')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials()
-        expected_error_msg = get_expected_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
+        expected_error_msg = get_expected_check_partials_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 9:
@@ -2156,7 +2140,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.set_check_partial_options('*', method='cs')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials()
-        expected_error_msg = get_expected_error('x', parab, 'cs', None, 1e-40, None, False)
+        expected_error_msg = get_expected_check_partials_error('x', parab, 'cs', None, 1e-40, None, False)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 15:
@@ -2169,6 +2153,86 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.set_check_partial_options('*', method='cs',
                                         step=2.0*ComplexStep.DEFAULT_OPTIONS['step'])
         prob.check_partials()
+
+        # Now do similar checks for check_totals when approximations are used for
+        expected_check_totals_error_msg = "Problem: Checking totals using the same " \
+              "method and options as the used to compute the " \
+              "totals will not provide any relevant information on the " \
+              "accuracy.\n" \
+              "To correct this, change the options to do the " \
+              "check_totals or on the call to approx_totals for the model."
+
+        # Scenario 16:
+        #    Compute totals: no approx on totals
+        #    Check totals: defaults
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals()
+
+        # Scenario 17:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: using defaults
+        #    Expected result: Error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_totals()
+        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
+
+        # Scenario 18:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default step
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(step=1e-7)
+        prob.setup()
+        prob.run_model()
+        prob.check_totals()
+
+        # Scenario 19:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default form
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(form='central')
+        prob.setup()
+        prob.run_model()
+        prob.check_totals()
+
+
+        # Scenario 20:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default step_calc
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(step_calc='rel')
+        prob.setup()
+        prob.run_model()
+        prob.check_totals()
+
+        # Scenario 21:
+        #    Compute totals: cs
+        #    Check totals: cs
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(method='cs')
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(method='cs')
+
+        # Scenario 22:
+        #    Compute totals: fd
+        #    Check totals: cs
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_totals(method='cs')
 
 
 class TestCheckPartialsFeature(unittest.TestCase):
