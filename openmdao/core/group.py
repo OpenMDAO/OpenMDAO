@@ -310,7 +310,7 @@ class Group(System):
             if overlap:
                 issue_warning(f"Setting input defaults for input '{name}' which "
                               f"override previously set defaults for {overlap}.",
-                              prefix=self.msginfo, condition=PromotionWarning)
+                              prefix=self.msginfo, category=PromotionWarning)
             old.update(meta)
         else:
             dct[name] = [meta]
