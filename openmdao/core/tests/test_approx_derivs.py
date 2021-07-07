@@ -726,7 +726,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.model.add_constraint('y', equals=0, indices=[0,])
         p.model.add_objective('circle.area', ref=-1)
 
-        p.setup(derivatives=True)
+        p.setup(derivatives=True, force_alloc_complex=True)
 
         p.run_model()
         # Formerly a KeyError
