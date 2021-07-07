@@ -49,7 +49,7 @@ def _get_object_from_reference(reference):
     return obj
 
 
-def display_source(reference, hide_doc_string=False):
+def get_code(reference, hide_doc_string=False):
     """
     Return the source code of the given reference path to a function.
 
@@ -62,7 +62,7 @@ def display_source(reference, hide_doc_string=False):
 
     Returns
     -------
-    IPython.display
+    IPython.display.Code
         Source code of the given class or function.
     """
     obj = inspect.getsource(_get_object_from_reference(reference))
@@ -73,10 +73,25 @@ def display_source(reference, hide_doc_string=False):
         obj = ''.join(obj)
 
     if ipy:
-        return display(Code(obj, language='python'))
+        return Code(obj, language='python')
     else:
         simple_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
                        "`pip install openmdao[docs]` to upgrade.")
+
+
+def display_source(reference, hide_doc_string=False):
+    """
+    Display the source code of the given reference path to a function.
+
+    Parameters
+    ----------
+    reference : str
+        Dot path of desired function.
+    hide_doc_string : bool
+        Option to hide the docstring.
+    """
+    if ipy:
+        display(get_code(reference, hide_doc_string))
 
 
 def show_options_table(reference, recording_options=False):
