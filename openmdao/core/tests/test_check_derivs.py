@@ -19,10 +19,8 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1w
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials, \
-    assert_no_warning
-from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
-    OMInvalidCheckDerivativesOptionsWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
 
 from openmdao.utils.mpi import MPI
 
@@ -1934,36 +1932,6 @@ class TestProblemCheckPartials(unittest.TestCase):
 
 class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
     # Ensure check_partials options differs from the compute partials options
-
-
-    # COULD MAYBE USE the one from test suite
-    class Paraboloid(om.ExplicitComponent):
-        def setup(self):
-            self.add_input('x', val=0.0)
-            self.add_input('y', val=0.0)
-
-            self.add_output('f_xy', val=0.0)
-
-        def setup_partials(self):
-            self.declare_partials('*', '*')
-
-        def compute(self, inputs, outputs):
-            x = inputs['x']
-            y = inputs['y']
-
-            outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-
-        def compute_partials(self, inputs, partials):
-            """
-            Jacobian for our paraboloid.
-            """
-            x = inputs['x']
-            y = inputs['y']
-
-            partials['f_xy', 'x'] = 2.0 * x - 6.0 + y
-            partials['f_xy', 'y'] = 2.0 * y + 8.0 + x
-
-
 
     def test_partials_check_same_as_derivative_compute(self):
         def create_problem(force_alloc_complex=False):
