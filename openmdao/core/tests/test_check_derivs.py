@@ -1955,7 +1955,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             msg = f"Problem: Checking partials with respect " \
                   f"to variable '{var}' in component " \
                   f"'{comp.pathname}' using the same " \
-                  "method and options as the used to compute the " \
+                  "method and options as are used to compute the " \
                   "component's derivatives " \
                   "will not provide any relevant information on the " \
                   "accuracy.\n" \
@@ -2124,7 +2124,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
 
         # Now do similar checks for check_totals when approximations are used
         expected_check_totals_error_msg = "Problem: Checking totals using the same " \
-              "method and options as the used to compute the " \
+              "method and options as are used to compute the " \
               "totals will not provide any relevant information on the " \
               "accuracy.\n" \
               "To correct this, change the options to do the " \

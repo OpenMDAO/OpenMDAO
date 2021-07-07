@@ -1172,7 +1172,7 @@ class Problem(object):
                             msg = f"Checking partials with respect " \
                                   f"to variable '{var}' in component " \
                                   f"'{comp.pathname}' using the same " \
-                                  "method and options as the used to compute the " \
+                                  "method and options as are used to compute the " \
                                   "component's derivatives " \
                                   "will not provide any relevant information on the " \
                                   "accuracy.\n" \
@@ -1574,7 +1574,7 @@ class Problem(object):
 
             if all_same:
                 msg = "Checking totals using the same " \
-                      "method and options as the used to compute the " \
+                      "method and options as are used to compute the " \
                       "totals will not provide any relevant " \
                       "information on the " \
                       "accuracy.\n" \
