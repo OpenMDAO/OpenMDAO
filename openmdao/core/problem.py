@@ -1545,37 +1545,32 @@ class Problem(object):
 
         # Check to see if approximation options are the same as that used to compute totals
         # If yes, issue an warning
-        if self.model._owns_approx_jac:
-            all_same = True
+        if self.model._owns_approx_jac and method in self.model._approx_schemes:
+            scheme = self.model._get_approx_scheme(method)
 
             # get approx options. Fill in with defaults, as needed
-            approx_method = self.model._owns_approx_jac_meta.get('method', 'fd')
-            approx_options = {'method': approx_method}
-            approx_scheme = self.model._get_approx_scheme(approx_method)
-            approx_options.update(approx_scheme.DEFAULT_OPTIONS)
+            approx_options = scheme.DEFAULT_OPTIONS.copy()
             approx_options.update(self.model._owns_approx_jac_meta)
 
             # get check options. Fill in with defaults, as needed
-            check_options = {'method':method}
-            check_scheme = self.model._get_approx_scheme(method)
-            check_options.update(check_scheme.DEFAULT_OPTIONS)
-            if step: check_options['step'] = step
+            check_options = scheme.DEFAULT_OPTIONS.copy()
+            if step:
+                check_options['step'] = step
             if method == 'fd':
-                if form: check_options['form'] = form
-                if step_calc: check_options['step_calc'] = step_calc
+                if form:
+                    check_options['form'] = form
+                if step_calc:
+                    check_options['step_calc'] = step_calc
 
             # Compare the approx and check options
             all_same = True
-            if approx_options['method'] != check_options['method']:
+            if approx_options['step'] != check_options['step']:
                 all_same = False
-            else:
-                if approx_options['step'] != check_options['step']:
+            elif method == 'fd':
+                if approx_options['form'] != check_options['form']:
                     all_same = False
-                if approx_options['method'] == 'fd':
-                    if approx_options['form'] != check_options['form']:
-                        all_same = False
-                    if approx_options['step_calc'] != check_options['step_calc']:
-                        all_same = False
+                if approx_options['step_calc'] != check_options['step_calc']:
+                    all_same = False
 
             if all_same:
                 msg = "Checking totals using the same " \
