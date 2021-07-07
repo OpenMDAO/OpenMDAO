@@ -2,6 +2,7 @@
 A module for OpenMDAO-specific warnings and associated functions.
 """
 
+from functools import cmp_to_key
 import inspect
 import re
 import sys
@@ -135,6 +136,23 @@ class OMDeprecationWarning(OpenMDAOWarning):
 _warnings = [_class for _, _class in
              inspect.getmembers(sys.modules[__name__], inspect.isclass)
              if issubclass(_class, Warning)]
+
+
+# The order of warnings matters in the Python warnings module! See
+#    https://docs.python.org/3/library/warnings.html#the-warnings-filter
+# reset_warnings processes the warnings classes in the order returned by inspect.getmembers.
+# The order is alphabetized. But this causes problems.
+# To solve this problem, we sort the warnings classes so that parents come before their children
+def compare_class_hierarchy(class1, class2):
+    if issubclass(class1, class2):
+        return 1
+    elif issubclass(class2, class1):
+        return -1
+    else:
+        return 0
+
+
+_warnings = sorted(_warnings, key=cmp_to_key(compare_class_hierarchy))
 
 
 def reset_warnings():

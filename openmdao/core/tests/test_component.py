@@ -9,7 +9,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.impl_comp_simple import TestImplCompSimple
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestExplicitComponent(unittest.TestCase):
@@ -300,7 +300,7 @@ class TestExplicitComponent(unittest.TestCase):
         prob = Problem(comp).setup()
 
         # check optional metadata (desc)
-        msg = ("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+        msg = ("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
 
         prob.setup()
         with assert_warning(OMDeprecationWarning, msg):
@@ -311,7 +311,7 @@ class TestExplicitComponent(unittest.TestCase):
         idv = prob.model.add_subsystem('idv', IndepVarComp())
         meta = idv.add_output('x', 1.0)
 
-        msg = ("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
+        msg = ("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
         with assert_warning(OMDeprecationWarning, msg):
             meta['value']
 

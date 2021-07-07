@@ -4,7 +4,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestIndepVarComp(unittest.TestCase):
@@ -154,28 +154,28 @@ class TestIndepVarComp(unittest.TestCase):
         # Outputs no tags
         outputs = prob.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.], 'value': [1.]}),
-            ('indep_var_2', {'val': [2.], 'value': [2.]}),
+            ('indep_var_1', {'val': [1.]}),
+            ('indep_var_2', {'val': [2.]}),
         ])
 
         # Outputs with tags
         outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.], 'value': [1.]}),
+            ('indep_var_1', {'val': [1.]}),
         ])
 
         # Outputs with the indep_var tags
         outputs = prob.model.list_outputs(out_stream=None, tags="indep_var")
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.], 'value': [1.]}),
-            ('indep_var_2', {'val': [2.], 'value': [2.]}),
+            ('indep_var_1', {'val': [1.]}),
+            ('indep_var_2', {'val': [2.]}),
         ])
 
         # Outputs with multiple tags
         outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(outputs), [
-            ('indep_var_1', {'val': [1.], 'value': [1.]}),
-            ('indep_var_2', {'val': [2.], 'value': [2.]}),
+            ('indep_var_1', {'val': [1.]}),
+            ('indep_var_2', {'val': [2.]}),
         ])
 
         # Outputs with tag that does not match

@@ -9,7 +9,7 @@ import unittest
 import functools
 
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.notebook_utils import notebook
 
 

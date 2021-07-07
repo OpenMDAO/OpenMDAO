@@ -18,7 +18,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context
-from openmdao.warnings import reset_warning_registry
+from openmdao.utils.om_warnings import reset_warning_registry
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -1676,6 +1676,29 @@ class TestGroupPromotes(unittest.TestCase):
         msg = "'sub.comp1' <class ExecComp>: input variable 'bb', promoted using 'bb', was already promoted using 'b*'."
         with assert_warning(UserWarning, msg):
             top.setup()
+
+    def test_promotes_src_indcies_in_second_prommote(self):
+        # Make sure we can call `promotes` on and already-promoted input and add src_indices.
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(4))
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep',
+                              om.IndepVarComp('x', np.arange(12)),
+                              promotes_outputs=['x'])
+        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
+
+        p.model.promotes('C1', inputs=['x'], src_indices=np.arange(4))
+
+        # Runs without exception.
+        p.setup()
 
     def test_multiple_promotes(self):
 

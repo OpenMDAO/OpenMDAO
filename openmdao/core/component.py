@@ -10,7 +10,7 @@ from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse, coo_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names
+    global_meta_names, _MetadataDict
 from openmdao.core.constants import INT_DTYPE
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.array_utils import shape_to_len
@@ -22,7 +22,7 @@ from openmdao.utils.general_utils import format_as_float_or_array, ensure_compat
     _slice_indices
 from openmdao.utils.indexer import indexer, _update_new_style
 import openmdao.utils.coloring as coloring_mod
-from openmdao.warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
+from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
@@ -53,28 +53,6 @@ def _valid_var_name(name):
         if char in name:
             return False
     return name[0] not in _whitespace and name[-1] not in _whitespace
-
-
-class _MetadataDict(dict):
-    """
-    A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
-    """
-
-    def __init__(self, *args):
-        dict.__init__(self, args)
-
-    def __getitem__(self, key):
-        if key == 'value':
-            warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
-            key = 'val'
-        val = dict.__getitem__(self, key)
-        return val
-
-    def __setitem__(self, key, val):
-        if key == 'value':
-            warn_deprecation("The dict key 'value' will be deprecated in 4.0. Please use 'val'")
-            key = 'val'
-        dict.__setitem__(self, key, val)
 
 
 class Component(System):

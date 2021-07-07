@@ -34,7 +34,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer
-from openmdao.warnings import issue_warning, DerivativesWarning, PromotionWarning,\
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
@@ -119,6 +119,25 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
+
+
+class _MetadataDict(dict):
+    """
+    A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
+    """
+
+    def __getitem__(self, key):
+        if key == 'value':
+            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
+        val = dict.__getitem__(self, key)
+        return val
+
+    def __setitem__(self, key, val):
+        if key == 'value':
+            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            key = 'val'
+        dict.__setitem__(self, key, val)
 
 
 class System(object):
@@ -1843,7 +1862,7 @@ class System(object):
             else:
                 new_using = f"'{tup[0]}'"
 
-            mismatch = info.compare(old_info) if info is not None else ()
+            mismatch = info.compare(old_info) if info is not None and old_info is not None else ()
             if mismatch:
                 raise RuntimeError(f"{self.msginfo}: {io} variable '{name}', promoted using "
                                    f"{new_using}, was already promoted using {old_using} with "
@@ -3290,9 +3309,9 @@ class System(object):
                     ret_meta = None
                 else:
                     if metadata_keys is None:
-                        ret_meta = meta.copy()
+                        ret_meta = _MetadataDict(meta)
                     else:
-                        ret_meta = {}
+                        ret_meta = _MetadataDict()
                         for key in metadata_keys:
                             try:
                                 ret_meta[key] = meta[key]
@@ -3308,7 +3327,7 @@ class System(object):
 
                         if rank is None or self.comm.rank == rank:
                             if not ret_meta:
-                                ret_meta = {}
+                                ret_meta = _MetadataDict()
                             if distrib:
                                 if 'val' in metadata_keys:
                                     # assemble the full distributed value
@@ -3413,8 +3432,8 @@ class System(object):
             List of input names and other optional information about those inputs.
         """
         if values is not None:
-            issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
-                          "Please index in using 'val'")
+            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_inputs()' is "
+                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
         elif not val and values:
             values = True
         else:
@@ -3437,11 +3456,6 @@ class System(object):
                 to_remove.append('tags')
             if not prom_name:
                 to_remove.append('prom_name')
-            if metavalues:
-                for key, val in inputs.items():
-                    if 'val' in val:
-                        val['value'] = val['val']
-
             for _, meta in inputs.items():
                 for key in to_remove:
                     del meta[key]
@@ -3451,7 +3465,6 @@ class System(object):
             for n, meta in inputs.items():
                 meta['val'] = self._abs_get_val(n, get_remote=True,
                                                 rank=None if all_procs else 0, kind='input')
-                meta['value'] = meta['val']
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3555,8 +3568,8 @@ class System(object):
             List of output names and other optional information about those outputs.
         """
         if values is not None:
-            issue_warning(f"{self.msginfo}: 'value' is deprecated and will be removed in 4.0. "
-                          "Please index in using 'val'")
+            warn_deprecation(f"{self.msginfo}: The 'values' argument to 'list_outputs()' is "
+                             "deprecated and will be removed in 4.0. Please use 'val' instead.")
         elif not val and values:
             values = True
         else:
@@ -3590,7 +3603,6 @@ class System(object):
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
-                    meta['value'] = meta['val']
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -3614,11 +3626,6 @@ class System(object):
             to_remove.append('tags')
         if not prom_name:
             to_remove.append('prom_name')
-        if values:
-            for key, val in outputs.items():
-                if 'val' in val and ('value' not in val):
-                    val['value'] = val['val']
-
         for _, meta in outputs.items():
             for key in to_remove:
                 del meta[key]

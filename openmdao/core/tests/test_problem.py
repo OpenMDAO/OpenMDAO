@@ -14,7 +14,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDeriv
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
-from openmdao.warnings import DerivativesWarning
+from openmdao.utils.om_warnings import DerivativesWarning
 
 try:
     from parameterized import parameterized
@@ -1716,17 +1716,17 @@ class TestProblem(unittest.TestCase):
 
             inputs = p.model.list_inputs(out_stream=None)
             self.assertEqual(sorted(inputs), [
-                ('comp3.a', {'val': [2.], 'value': [2.]}),
-                ('comp3.b', {'val': [3.], 'value': [3.]})
+                ('comp3.a', {'val': [2.]}),
+                ('comp3.b', {'val': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
             outputs = p.model.list_outputs(out_stream=None)
             self.assertEqual(sorted(outputs), [
-                ('comp1.a',   {'val': [2.], 'value': [2.]}),
-                ('comp1.foo', {'val': [1.], 'value': [1.]}),
-                ('comp2.b',   {'val': [3.], 'value': [3.]}),
-                ('comp2.foo', {'val': [1.], 'value': [1.]}),
-                ('comp3.y',   {'val': [5.], 'value': [5.]})
+                ('comp1.a',   {'val': [2.]}),
+                ('comp1.foo', {'val': [1.]}),
+                ('comp2.b',   {'val': [3.]}),
+                ('comp2.foo', {'val': [1.]}),
+                ('comp3.y',   {'val': [5.]})
             ], "Outputs don't match when added in %s." % where)
 
     def test_configure_add_input_output(self):
@@ -1772,15 +1772,15 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a',     {'val': [2.], 'value': [2.]}),
-            ('sub.mcomp.a', {'val': [2.], 'value': [2.]}),
+            ('mcomp.a',     {'val': [2.]}),
+            ('sub.mcomp.a', {'val': [2.]}),
         ])
 
         outputs = p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',      {'val': [2.], 'value': [2.]}),
-            ('mcomp.a2',     {'val': [4.], 'value': [4.]}),
-            ('sub.mcomp.a2', {'val': [4.], 'value': [4.]}),
+            ('indep.a',      {'val': [2.]}),
+            ('mcomp.a2',     {'val': [4.]}),
+            ('sub.mcomp.a2', {'val': [4.]}),
         ])
 
         # add inputs/outputs in configure
@@ -1790,20 +1790,20 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a',     {'val': [2.], 'value': [2.]}),
-            ('mcomp.b',     {'val': [3.], 'value': [3.]}),
-            ('sub.mcomp.a', {'val': [2.], 'value': [2.]}),
-            ('sub.mcomp.b', {'val': [3.], 'value': [3.]}),
+            ('mcomp.a',     {'val': [2.]}),
+            ('mcomp.b',     {'val': [3.]}),
+            ('sub.mcomp.a', {'val': [2.]}),
+            ('sub.mcomp.b', {'val': [3.]}),
         ])
 
         outputs= p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',      {'val': [2.], 'value': [2.]}),
-            ('indep.b',      {'val': [3.], 'value': [3.]}),
-            ('mcomp.a2',     {'val': [4.], 'value': [4.]}),
-            ('mcomp.b2',     {'val': [6.], 'value': [6.]}),
-            ('sub.mcomp.a2', {'val': [4.], 'value': [4.]}),
-            ('sub.mcomp.b2', {'val': [6.], 'value': [6.]}),
+            ('indep.a',      {'val': [2.]}),
+            ('indep.b',      {'val': [3.]}),
+            ('mcomp.a2',     {'val': [4.]}),
+            ('mcomp.b2',     {'val': [6.]}),
+            ('sub.mcomp.a2', {'val': [4.]}),
+            ('sub.mcomp.b2', {'val': [6.]}),
         ])
 
     def test_feature_post_setup_solver_configure(self):

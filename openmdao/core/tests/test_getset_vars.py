@@ -285,15 +285,15 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(10)), promotes=['x'])
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
-                                             x={'val': np.zeros(7),
-                                                'src_indices': list(range(7))},
-                                             y={'val': np.zeros(7)}),
-                              promotes=['x'])
+                                             x={'val': np.zeros(7)},
+                                             y={'val': np.zeros(7)}))
         p.model.add_subsystem('C2', ExecComp('y=x*3.',
-                                             x={'val': np.zeros(3),
-                                                'src_indices': list(range(7,10))},
-                                             y={'val': np.zeros(3)}),
-                              promotes=['x'])
+                                             x={'val': np.zeros(3)},
+                                             y={'val': np.zeros(3)}))
+
+        p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
+        p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
+
         p.setup()
 
         p['C1.x'] = (np.arange(7) + 1.) * 2.
@@ -314,16 +314,16 @@ class TestGetSetVariables(unittest.TestCase):
         indep.add_output('x', units='inch', val=np.ones(10))
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
-                                                'units': 'ft',
-                                                'src_indices': list(range(7))},
-                                             y={'val': np.zeros(7), 'units': 'ft'}),
-                              promotes=['x'])
+                                                'units': 'ft'},
+                                             y={'val': np.zeros(7), 'units': 'ft'}))
         p.model.add_subsystem('C2', ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
-                                                'units': 'inch',
-                                                'src_indices': list(range(7,10))},
-                                             y={'val': np.zeros(3), 'units': 'inch'}),
-                              promotes=['x'])
+                                                'units': 'inch'},
+                                             y={'val': np.zeros(3), 'units': 'inch'}))
+
+        p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
+        p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
+
         p.setup()
 
         p['C1.x'] = np.ones(7) * 2.
@@ -342,20 +342,19 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
-                                                'units': 'ft',
-                                                'src_indices': list(range(7))},
-                                             y={'val': np.zeros(7), 'units': 'ft'}),
-                              promotes=['x'])
+                                                'units': 'ft'},
+                                             y={'val': np.zeros(7), 'units': 'ft'}))
         p.model.add_subsystem('C2', ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
-                                                'units': 'inch',
-                                                'src_indices': list(range(7, 10))},
-                                             y={'val': np.zeros(3), 'units': 'inch'}),
-                              promotes=['x'])
+                                                'units': 'inch'},
+                                             y={'val': np.zeros(3), 'units': 'inch'}))
         p.model.add_subsystem('C3', ExecComp('y=x*4.',
                                              x={'val': np.zeros(10), 'units': 'mm'},
                                              y={'val': np.zeros(10), 'units': 'mm'}),
                          promotes=['x'])
+
+        p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
+        p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
@@ -368,16 +367,16 @@ class TestGetSetVariables(unittest.TestCase):
         indep.add_output('x', units='inch', val=np.ones(10))
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
                                              x={'val': np.zeros(7),
-                                                'units': 'ft',
-                                                'src_indices': list(range(7))},
-                                             y={'val': np.zeros(7), 'units': 'ft'}),
-                              promotes=['x'])
+                                                'units': 'ft'},
+                                             y={'val': np.zeros(7), 'units': 'ft'}))
         p.model.add_subsystem('C2', ExecComp('y=x*3.',
                                              x={'val': np.zeros(3),
-                                                'units': 'inch',
-                                                'src_indices': list(range(7,10))},
-                                             y={'val': np.zeros(3), 'units': 'inch'}),
-                              promotes=['x'])
+                                                'units': 'inch'},
+                                             y={'val': np.zeros(3), 'units': 'inch'}))
+
+        p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
+        p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
+
         p.setup()
 
         p.set_val('C1.x', np.ones(7) * 24., units='inch')
