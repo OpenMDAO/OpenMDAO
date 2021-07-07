@@ -2154,7 +2154,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
                                         step=2.0*ComplexStep.DEFAULT_OPTIONS['step'])
         prob.check_partials()
 
-        # Now do similar checks for check_totals when approximations are used for
+        # Now do similar checks for check_totals when approximations are used
         expected_check_totals_error_msg = "Problem: Checking totals using the same " \
               "method and options as the used to compute the " \
               "totals will not provide any relevant information on the " \
@@ -2165,7 +2165,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         # Scenario 16:
         #    Compute totals: no approx on totals
         #    Check totals: defaults
-        #    Expected result: No error
+        #    Expected result: No error since no approx on computing totals
         prob, parab = create_problem()
         prob.setup()
         prob.run_model()
@@ -2174,7 +2174,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         # Scenario 17:
         #    Compute totals: approx on totals using defaults
         #    Check totals: using defaults
-        #    Expected result: Error
+        #    Expected result: Error since compute and check have same method and options
         prob, parab = create_problem()
         prob.model.approx_totals()
         prob.setup()
@@ -2188,20 +2188,20 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         #    Check totals: fd, non default step
         #    Expected result: No error
         prob, parab = create_problem()
-        prob.model.approx_totals(step=1e-7)
+        prob.model.approx_totals()
         prob.setup()
         prob.run_model()
-        prob.check_totals()
+        prob.check_totals(step=1e-7)
 
         # Scenario 19:
         #    Compute totals: approx on totals using defaults
         #    Check totals: fd, non default form
         #    Expected result: No error
         prob, parab = create_problem()
-        prob.model.approx_totals(form='central')
+        prob.model.approx_totals()
         prob.setup()
         prob.run_model()
-        prob.check_totals()
+        prob.check_totals(form='central')
 
 
         # Scenario 20:
@@ -2209,23 +2209,25 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         #    Check totals: fd, non default step_calc
         #    Expected result: No error
         prob, parab = create_problem()
-        prob.model.approx_totals(step_calc='rel')
+        prob.model.approx_totals()
         prob.setup()
         prob.run_model()
-        prob.check_totals()
+        prob.check_totals(step_calc='rel')
 
         # Scenario 21:
         #    Compute totals: cs
         #    Check totals: cs
-        #    Expected result: No error
-        prob, parab = create_problem()
+        #    Expected result: Error since both using the same method
+        prob, parab = create_problem(force_alloc_complex=True)
         prob.model.approx_totals(method='cs')
         prob.setup()
         prob.run_model()
-        prob.check_totals(method='cs')
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_totals(method='cs')
+        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
 
         # Scenario 22:
-        #    Compute totals: fd
+        #    Compute totals: fd, the default
         #    Check totals: cs
         #    Expected result: No error
         prob, parab = create_problem()
@@ -2233,6 +2235,16 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
         prob.check_totals(method='cs')
+
+        # Scenario 23:
+        #    Compute totals: cs
+        #    Check totals: default
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(method='cs')
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_totals()
 
 
 class TestCheckPartialsFeature(unittest.TestCase):
@@ -3414,7 +3426,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver()
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
+                                   step = 1e-39, # needs to be different than arrox_totals or error
+                                   out_stream=None)
 
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 3e-8)
