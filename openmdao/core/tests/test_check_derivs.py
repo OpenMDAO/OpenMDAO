@@ -1951,19 +1951,17 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
             prob.setup(force_alloc_complex=force_alloc_complex)
             return prob, parab
 
-        def get_expected_check_partials_error(var, comp, method, form, step, step_calc, directional):
-            msg = f"Problem: Checking partials with respect " \
-                  f"to variable '{var}' in component " \
-                  f"'{comp.pathname}' using the same " \
-                  "method and options as are used to compute the " \
-                  "component's derivatives " \
-                  "will not provide any relevant information on the " \
-                  "accuracy.\n" \
-                  "To correct this, change the options to do the \n" \
-                  "check_partials using either:\n" \
-                  "     - arguments to Problem.check_partials. \n" \
-                  "     - arguments to Component.set_check_partial_options"
-            return msg
+        expected_check_partials_error = f"Problem: Checking partials with respect " \
+              "to variable '{var}' in component " \
+              "'{comp.pathname}' using the same " \
+              "method and options as are used to compute the " \
+              "component's derivatives " \
+              "will not provide any relevant information on the " \
+              "accuracy.\n" \
+              "To correct this, change the options to do the \n" \
+              "check_partials using either:\n" \
+              "     - arguments to Problem.check_partials. \n" \
+              "     - arguments to Component.set_check_partial_options"
 
         # Scenario 1:
         #    Compute partials: exact
@@ -1980,8 +1978,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials(method='fd')
-        expected_error_msg = get_expected_check_partials_error('x', self.parab, 'fd', 'forward', 1e-6, 'abs',
-                                                False)
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=self.parab)
         self.assertEqual(expected_error_msg, str(err.exception))
 
         # Scenario 3:
@@ -2026,7 +2023,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.declare_partials(of='*', wrt='*', method='fd')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials(method='cs')
-        expected_error_msg = get_expected_check_partials_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 7:
@@ -2049,7 +2046,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.set_check_partial_options('*')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials()
-        expected_error_msg = get_expected_check_partials_error('x', parab, 'fd', 'forward', 1e-6, 'abs', False)
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 9:
@@ -2108,7 +2105,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         parab.set_check_partial_options('*', method='cs')
         with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
             prob.check_partials()
-        expected_error_msg = get_expected_check_partials_error('x', parab, 'cs', None, 1e-40, None, False)
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
         self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
 
         # Scenario 15:
