@@ -121,7 +121,8 @@ def simple_warning(msg, category=UserWarning, stacklevel=2):
     stacklevel : int
         Number of levels up the stack to identify as the warning location.
     """
-    warn_deprecation('simple_warning is deprecated.  Use openmdao.warnings.issue_warning instead.')
+    warn_deprecation('simple_warning is deprecated. '
+                     'Use openmdao.utils.om_warnings.issue_warning instead.')
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
     try:

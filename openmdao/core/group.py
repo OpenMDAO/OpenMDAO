@@ -32,10 +32,10 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer, _update_new_style
-from openmdao.warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
+from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 
 # regex to check for valid names.
 import re
