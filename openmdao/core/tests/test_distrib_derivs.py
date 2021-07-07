@@ -1,5 +1,6 @@
 """ Test out some crucial linear GS tests in parallel with distributed comps."""
 
+from openmdao.jacobians.jacobian import Jacobian
 import unittest
 import itertools
 
@@ -1020,6 +1021,8 @@ class MPITests3(unittest.TestCase):
         model.add_constraint('f_xy', lower=0.0, indices=[-5, -1])
         model.add_objective('f_sum', index=-1)
 
+        om.wing_dbg()
+
         prob.setup(force_alloc_complex=True, mode='fwd')
 
         prob.run_model()
@@ -1504,7 +1507,6 @@ class Distrib_Derivs(om.ExplicitComponent):
 
         dg_dx = 0.5 / x ** 0.5
         partials['out_serial', 'in_dist'] = np.tile(dg_dx, size).reshape((size, local_size))
-        print("partials['out_serial', 'in_dist']", np.tile(dg_dx, size).reshape((size, local_size)))
 
 
 class Distrib_DerivsFD(om.ExplicitComponent):
@@ -1631,14 +1633,20 @@ class TestDistribBugs(unittest.TestCase):
         totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
 
     def test_check_totals_rev(self):
         prob = self.get_problem(mode='rev')
         totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
-                                        wrt=['indep.x_serial', 'indep.x_dist'])
+                                                   wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
 
     def test_check_partials(self):
         prob = self.get_problem()

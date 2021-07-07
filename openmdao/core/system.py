@@ -5084,7 +5084,6 @@ class System(object):
 
                     sys_deps.add('')  # top level Group is always relevant
 
-        dvcache = None
         rescache = None
 
         if pd_dv_locs or pd_res_locs:
