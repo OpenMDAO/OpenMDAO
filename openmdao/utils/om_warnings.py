@@ -13,7 +13,8 @@ import warnings
 __all__ = ['issue_warning', 'reset_warnings', 'reset_warning_registry', '_warn_simple_format',
            'OpenMDAOWarning', 'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
            'CacheWarning', 'PromotionWarning', 'UnusedOptionWarning', 'DerivativesWarning',
-           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning']
+           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning',
+           'OMInvalidCheckDerivativesOptionsWarning']
 
 
 class OpenMDAOWarning(UserWarning):
@@ -131,6 +132,18 @@ class OMDeprecationWarning(OpenMDAOWarning):
 
     name = 'warn_deprecation'
     filter = 'once'
+
+
+class OMInvalidCheckDerivativesOptionsWarning(OpenMDAOWarning):
+    """
+    An OpenMDAO-specific warning that defaults to raising an exception.
+
+    It tells the user that they are checking derivatives with the exact same method
+    used to computer the derivatives, including all the settings.
+    """
+
+    name = 'warn_invalid_check_derivatives'
+    filter = 'error'
 
 
 _warnings = [_class for _, _class in
