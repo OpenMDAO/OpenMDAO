@@ -204,7 +204,7 @@ jobs:
           cd openmdao/docs
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
-            echo "Build docs with SNOPT examples."
+            echo "Building docs with SNOPT examples."
             echo "============================================================="
           else
             echo "============================================================="
@@ -220,14 +220,17 @@ jobs:
           echo "============================================================="
           echo "Build the docs"
           echo "============================================================="
-          python build_source_docs.py
-          jupyter-book build -W --keep-going openmdao_book
-          python copy_build_artifacts.py
+          ./build_all_docs.sh
 
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
         run: |
-          cat /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*
+          for f in /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports/*; do
+            echo "============================================================="
+            echo $f
+            echo "============================================================="
+            cat $f
+          done
 
       - name: Publish docs
         if: ${{ github.event_name == 'push' && matrix.PUBLISH_DOCS }}
