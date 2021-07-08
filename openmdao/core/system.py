@@ -537,6 +537,22 @@ class System(object):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
+    def var_path(self, varname):
+        """
+        Return the pathname of the given variable.
+
+        Parameters
+        ----------
+        varname : str
+            The name of the variable relative to this system.
+
+        Returns
+        -------
+        str
+            The absolute pathname of the given variable.
+        """
+        return '.'.join((self.pathname, varname)) if self.pathname else varname
+
     def _get_inst_id(self):
         return self.pathname
 

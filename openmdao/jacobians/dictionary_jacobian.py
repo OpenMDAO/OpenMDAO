@@ -97,15 +97,11 @@ class DictionaryJacobian(Jacobian):
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
         is_explicit = isinstance(system, ExplicitComponent)
-        meta_in = system._var_allprocs_abs2meta['input']
-        meta_out = system._var_allprocs_abs2meta['output']
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
                 res_name, other_name = abs_key
-                dist_in = dist_out = False
                 if res_name in d_res_names:
-                    dist_out = meta_out[res_name]['distributed']
                     if other_name in d_out_names:
                         # skip the matvec mult completely for identity subjacs
                         if is_explicit and res_name is other_name:
@@ -122,7 +118,6 @@ class DictionaryJacobian(Jacobian):
                         else:
                             left_vec = oflat(other_name)
                             right_vec = rflat(res_name)
-                            dist_in = meta_out[other_name]['distributed']
                     elif other_name in d_inp_names:
                         if fwd:
                             left_vec = rflat(res_name)
@@ -130,7 +125,6 @@ class DictionaryJacobian(Jacobian):
                         else:
                             left_vec = iflat(other_name)
                             right_vec = rflat(res_name)
-                            dist_in = meta_in[other_name]['distributed']
                     else:
                         continue
 
@@ -160,17 +154,7 @@ class DictionaryJacobian(Jacobian):
                             left_vec += subjac.dot(right_vec)
                         else:  # rev
                             subjac = subjac.transpose()
-                            if MPI and not dist_out and dist_in:
-                                cpy = right_vec.copy()
-                                # print("ALLREDUCE for", abs_key)
-                                system.comm.Allreduce(right_vec, cpy, op=MPI.SUM)
-                                left_vec += subjac.dot(cpy)
-                            else:
-                                left_vec += subjac.dot(right_vec)
-                            # print(abs_key, "SUBJAC:")
-                            # print(subjac)
-                            # print(abs_key, "RIGHT VEC:", right_vec)
-                            # print(abs_key, "LEFT VEC:", left_vec)
+                            left_vec += subjac.dot(right_vec)
 
 
 class _CheckingJacobian(DictionaryJacobian):

@@ -1452,61 +1452,75 @@ class Distrib_Derivs(om.ExplicitComponent):
         # Serial Output
         self.add_output('out_serial', copy_shape='in_serial')
 
-    def setup_partials(self):
-        meta = self.get_io_metadata(metadata_keys=['shape'])
-        local_size = meta['in_dist']['shape'][0]
-        serial_size = meta['in_serial']['shape'][0]
-
-        row_col_d = np.arange(local_size)
-        row_col_s = np.arange(serial_size)
-
-        self.declare_partials('out_dist', 'in_dist', rows=row_col_d, cols=row_col_d)
-        self.declare_partials('out_serial', 'in_serial', rows=row_col_s, cols=row_col_s)
-        self.declare_partials('out_dist', 'in_serial')
-        self.declare_partials('out_serial', 'in_dist')
-
     def compute(self, inputs, outputs):
         comm = self.comm
-        x = inputs['in_dist']
-        y = inputs['in_serial']
+        Id = inputs['in_dist']
+        Is = inputs['in_serial']
 
         # "Computationally Intensive" operation that we wish to parallelize.
-        f_x = x**2 - 2.0*x + 4.0
-        f_y = y ** 0.5
+        f_Id = Id**2 - 2.0*Id + 4.0
+        f_Is = Is ** 0.5
 
         # Our local distributed output is a function of local distributed input computed above.
         # It also is a function of the serial input.
-        outputs['out_dist'] = f_x + np.sum(f_y)
+        outputs['out_dist'] = f_Id + np.sum(f_Is)
 
-        g_x = x ** 0.5
-        g_y = y**2 + 3.0*y - 5.0
+        g_Id = Id ** 0.5
+        g_Is = Is**2 + 3.0*Is - 5.0
 
         if MPI and comm.size > 1:
 
             # We need to gather the summed values to compute the total sum over all procs.
-            local_sum = np.sum(g_x)
+            local_sum = np.sum(g_Id)
             all_local_sums = np.zeros(comm.size)
             self.comm.Allgather(local_sum, all_local_sums)
 
-            outputs['out_serial'] = g_y + np.sum(all_local_sums)
+            outputs['out_serial'] = g_Is + np.sum(all_local_sums)
         else:
-            outputs['out_serial'] = g_y + np.sum(g_x)
+            outputs['out_serial'] = g_Is + np.sum(g_Id)
 
-    def compute_partials(self, inputs, partials):
-        x = inputs['in_dist']
-        y = inputs['in_serial']
-        size = len(y)
-        local_size = len(x)
+    # def compute_partials(self, inputs, partials):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_serial']
 
-        partials['out_dist', 'in_dist'] = 2.0 * x - 2.0
+        size = len(Is)
+        local_size = len(Id)
 
-        partials['out_serial', 'in_serial'] = 2.0 * y + 3.0
+        df_dIs = 0.5 / Is ** 0.5
+        dg_dId = 0.5 / Id ** 0.5
 
-        df_dy = 0.5 / y ** 0.5
-        partials['out_dist', 'in_serial'] = np.tile(df_dy, local_size).reshape((local_size, size))
-
-        dg_dx = 0.5 / x ** 0.5
-        partials['out_serial', 'in_dist'] = np.tile(dg_dx, size).reshape((size, local_size))
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += (2.0 * Id - 2.0) * d_inputs['in_dist']
+                if 'in_serial' in d_inputs:
+                    d_outputs['out_dist'] += np.tile(df_dIs, local_size).reshape((local_size, size)).dot(d_inputs['in_serial'])
+            if 'out_serial' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_serial'] += np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
+                if 'in_serial' in d_inputs:
+                    d_outputs['out_serial'] += (2.0 * Is + 3.0) * d_inputs['in_serial']
+        else:  # rev
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
+                if 'in_serial' in d_inputs:
+                    d_inputs['in_serial'] += np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
+            if 'out_serial' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    fullId = np.hstack(self.comm.allgather(Id))
+                    dg_dId = 0.5 / fullId ** 0.5
+                    tmpdId = np.tile(dg_dId, size).reshape(size, size).T.dot(d_outputs['out_serial'])
+                    cpy = tmpdId.copy()
+                    self.comm.Allreduce(cpy, tmpdId, op=MPI.SUM)
+                    vidx = self._var_allprocs_abs2idx[self.var_path('in_dist')]
+                    sizes = self._var_sizes['input'][:, vidx]
+                    myoff = np.sum(sizes[:self.comm.rank])
+                    mypart = tmpdId[myoff:myoff + sizes[self.comm.rank]]
+                    d_inputs['in_dist'] += mypart
+                if 'in_serial' in d_inputs:
+                    d_inputs['in_serial'] += (2.0 * Is + 3.0) * d_outputs['out_serial']
 
 
 class Distrib_DerivsFD(om.ExplicitComponent):

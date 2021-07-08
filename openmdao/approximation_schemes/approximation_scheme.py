@@ -5,7 +5,7 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
 
 use_mpi = check_mpi_env()
@@ -263,8 +263,7 @@ class ApproximationScheme(object):
                         else:
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
                     else:
-                        vec_idx = LocalRangeIterable(system, wrt,
-                                                     range(slices[wrt].start, slices[wrt].stop))
+                        vec_idx = LocalRangeIterable(system, wrt)
 
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.
@@ -574,105 +573,6 @@ class ApproximationScheme(object):
             totarr[tinds] = outarr[sinds]
 
         return totarr
-
-
-class LocalRangeIterable(object):
-    """
-    Iterable object that yields local indices while iterating over local or distributed vars.
-
-    The number of iterations for a distributed variable will be the full distributed size of the
-    variable but None will be returned for any indices that are not local to the given rank.
-
-    Attributes
-    ----------
-    _inds : ndarray
-        Variable indices.
-    _dist_size : int
-        Full size of distributed variable.
-    _start : int
-        Starting index of distributed variable on this rank.
-    _end : int
-        Last index + 1 of distributed variable on this rank.
-    _offset : int
-        Offset of this variable into the vector.
-    _iter : method
-        The iteration method used.
-    """
-
-    def __init__(self, system, vname, var_inds):
-        """
-        Initialize the iterator.
-
-        Parameters
-        ----------
-        system : System
-            Containing System.
-        vname : str
-            Name of the variable.
-        var_inds : iter of int
-            Local indices of the variable to iterate over.
-        """
-        self._inds = var_inds
-        self._dist_size = 0
-
-        abs2meta = system._var_allprocs_abs2meta['output']
-        if vname in abs2meta:
-            sizes = system._var_sizes['output']
-        else:
-            abs2meta = system._var_allprocs_abs2meta['input']
-            sizes = system._var_sizes['input']
-
-        if abs2meta[vname]['distributed']:
-            var_idx = system._var_allprocs_abs2idx[vname]
-            rank = system.comm.rank
-            self._offset = offset = np.sum(sizes[rank, :var_idx])
-
-            self._iter = self._dist_iter
-            self._start = np.sum(sizes[:rank, var_idx])
-            self._end = self._start + sizes[rank, var_idx]
-            self._dist_size = np.sum(sizes[:, var_idx])
-        else:
-            self._iter = self._serial_iter
-
-    def _serial_iter(self):
-        """
-        Iterate over a local non-distributed variable.
-
-        Yields
-        ------
-        int
-            Variable index.
-        """
-        yield from self._inds
-
-    def _dist_iter(self):
-        """
-        Iterate over a distributed variable.
-
-        Yields
-        ------
-        int or None
-            Variable index or None if index is not local to this rank.
-        """
-        start = self._start
-        end = self._end
-
-        for i in range(self._dist_size):
-            if i >= start and i < end:
-                yield i - start + self._offset
-            else:
-                yield None
-
-    def __iter__(self):
-        """
-        Return an iterator.
-
-        Returns
-        -------
-        iterator
-            An iterator over our indices.
-        """
-        return self._iter()
 
 
 def _is_group(obj):
