@@ -1403,8 +1403,7 @@ class Component(System):
                 else:
                     dist_in = abs2meta_out[wrt]['distributed']
 
-                if (dist_in and not dist_out and meta['method'] not in ('cs', 'fd')
-                        and not self.matrix_free):
+                if dist_in and not dist_out and not self.matrix_free:
                     raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
                                        "which is a serial output wrt a distributed input. This is "
                                        "only supported using the matrix free API.")

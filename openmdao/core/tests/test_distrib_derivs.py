@@ -1479,6 +1479,8 @@ class Distrib_Derivs(om.ExplicitComponent):
         else:
             outputs['out_serial'] = g_Is + np.sum(g_Id)
 
+
+class Distrib_Derivs_Matfree(Distrib_Derivs):
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
@@ -1508,100 +1510,26 @@ class Distrib_Derivs(om.ExplicitComponent):
                     d_inputs['in_serial'] += np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    fullId = np.hstack(self.comm.allgather(Id))
-                    dg_dId = 0.5 / fullId ** 0.5
-                    tmpdId = np.tile(dg_dId, size).reshape(size, size).T.dot(d_outputs['out_serial'])
-                    cpy = tmpdId.copy()
-                    self.comm.Allreduce(cpy, tmpdId, op=MPI.SUM)
-                    vidx = self._var_allprocs_abs2idx[self.var_path('in_dist')]
-                    sizes = self._var_sizes['input'][:, vidx]
-                    myoff = np.sum(sizes[:self.comm.rank])
-                    mypart = tmpdId[myoff:myoff + sizes[self.comm.rank]]
-                    d_inputs['in_dist'] += mypart
+                    full = d_outputs['out_serial'].copy()
+                    # add up contributions from the serial variable that is duplicated over
+                    # all of the procs.
+                    self.comm.Allreduce(d_outputs['out_serial'], full, op=MPI.SUM)
+                    d_inputs['in_dist'] += np.tile(dg_dId, size).reshape((size, local_size)).T.dot(full)
                 if 'in_serial' in d_inputs:
                     d_inputs['in_serial'] += (2.0 * Is + 3.0) * d_outputs['out_serial']
 
 
-class Distrib_DerivsFD(om.ExplicitComponent):
+class Distrib_DerivsFD(Distrib_Derivs):
     """Simplest example that combines distributed and serial inputs and outputs."""
-
-    def setup(self):
-
-        # Distributed Input
-        self.add_input('in_dist', shape_by_conn=True, distributed=True)
-
-        # Serial Input
-        self.add_input('in_serial', shape_by_conn=True)
-
-        # Distributed Output
-        self.add_output('out_dist', copy_shape='in_dist', distributed=True)
-
-        # Serial Output
-        self.add_output('out_serial_wrong', copy_shape='in_serial')
-        self.add_output('out_serial', copy_shape='in_serial')
 
     def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
 
-    def compute(self, inputs, outputs):
-        comm = self.comm
-        x = inputs['in_dist']
-        y = inputs['in_serial']
 
-        # "Computationally Intensive" operation that we wish to parallelize.
-        f_x = x**2 - 2.0*x + 4.0
-
-        f_y = y ** 0.5
-        g_x = x ** 0.5
-        g_y = y**2 + 3.0*y - 5.0
-
-        # Our local distributed output is a function of local distributed input computed above.
-        # It also is a function of the serial input.
-        outputs['out_dist'] = f_x + np.sum(f_y)
-
-        # Our serial distributed output is a function of serial input and the distributed input.
-        # However, this is the wrong way because we are only using the local part of the distributed
-        # input instead of gathering all of it.
-        # As a result, we end up with different values for this output on each proc.
-        outputs['out_serial_wrong'] = g_y + np.sum(g_x)
-
-        if MPI and comm.size > 1:
-
-            # We need to gather the summed values to compute the total sum over all procs.
-            local_sum = np.sum(g_x)
-            all_local_sums = np.zeros(comm.size)
-            self.comm.Allgather(local_sum, all_local_sums)
-
-            outputs['out_serial'] = g_y + np.sum(all_local_sums)
-        else:
-            outputs['out_serial'] = g_y + np.sum(g_x)
-
-
-class Distrib_DerivsErr(om.ExplicitComponent):
-
-    def setup(self):
-
-        self.add_input('in_dist', shape_by_conn=True, distributed=True)
-        self.add_output('out_serial', copy_shape='in_serial')
+class Distrib_DerivsErr(Distrib_Derivs):
 
     def setup_partials(self):
         self.declare_partials('*', '*')
-
-    def compute(self, inputs, outputs):
-        comm = self.comm
-        Id = inputs['in_dist']
-
-        g_Id = Id ** 0.5
-
-        if MPI and comm.size > 1:
-            # We need to gather the summed values to compute the total sum over all procs.
-            local_sum = np.sum(g_Id)
-            all_local_sums = np.zeros(comm.size)
-            self.comm.Allgather(local_sum, all_local_sums)
-
-            outputs['out_serial'] = np.sum(all_local_sums)
-        else:
-            outputs['out_serial'] = np.sum(g_Id)
 
     def compute_partials(self, inputs, partials):
         pass  # do nothing here.  Error will occur before calling this.
@@ -1612,7 +1540,7 @@ class TestDistribBugs(unittest.TestCase):
 
     N_PROCS = 2
 
-    def get_problem(self, mode='auto'):
+    def get_problem(self, comp_class, mode='auto'):
         size = 5
 
         if MPI:
@@ -1631,7 +1559,7 @@ class TestDistribBugs(unittest.TestCase):
         ivc.add_output('x_serial', np.zeros(size))
 
         model.add_subsystem("indep", ivc)
-        model.add_subsystem("D1", Distrib_Derivs())
+        model.add_subsystem("D1", comp_class())
 
         model.connect('indep.x_dist', 'D1.in_dist')
         model.connect('indep.x_serial', 'D1.in_serial')
@@ -1653,7 +1581,7 @@ class TestDistribBugs(unittest.TestCase):
         return prob
 
     def test_get_val(self):
-        prob = self.get_problem()
+        prob = self.get_problem(Distrib_Derivs_Matfree)
         if prob.model.comm.rank == 0:
             D1_out_dist = np.array([17.6138701, 22.6138701, 29.6138701])
         else:
@@ -1671,7 +1599,7 @@ class TestDistribBugs(unittest.TestCase):
             assert_near_equal(full_val, ex_remote, tolerance=1e-8)
 
     def test_check_totals_fwd(self):
-        prob = self.get_problem(mode='fwd')
+        prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
         totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
@@ -1681,7 +1609,7 @@ class TestDistribBugs(unittest.TestCase):
                 self.fail(f"For key {key}: {err}")
 
     def test_check_totals_rev(self):
-        prob = self.get_problem(mode='rev')
+        prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
         totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
@@ -1691,61 +1619,23 @@ class TestDistribBugs(unittest.TestCase):
                 self.fail(f"For key {key}: {err}")
 
     def test_check_partials(self):
-        prob = self.get_problem()
+        prob = self.get_problem(Distrib_Derivs_Matfree)
         data = prob.check_partials()
         assert_check_partials(data, atol=3.e-6)
 
-    def get_fd_problem(self):
-        size = 5
+    def test_check_err(self):
+        with self.assertRaises(RuntimeError) as cm:
+            prob = self.get_problem(Distrib_DerivsErr)
 
-        if MPI:
-            comm = MPI.COMM_WORLD
-            rank = comm.rank
-            sizes, offsets = evenly_distrib_idxs(comm.size, size)
-        else:
-            rank = 0
-            sizes = {rank : size}
-            offsets = {rank : 0}
+        msg = "'D1' <class Distrib_DerivsErr>: component has defined partial ('out_serial', 'in_dist') which is a serial output wrt a distributed input. This is only supported using the matrix free API."
+        self.assertEqual(str(cm.exception), msg)
 
-        model = om.Group()
+    def test_fd_check_err(self):
+        with self.assertRaises(RuntimeError) as cm:
+            prob = self.get_problem(Distrib_DerivsFD, mode='fwd')
 
-        ivc = om.IndepVarComp()
-        ivc.add_output('x_dist', np.zeros(sizes[rank]), distributed=True)
-        ivc.add_output('x_serial', np.zeros(size))
-
-        model.add_subsystem("indep", ivc)
-        model.add_subsystem("D1", Distrib_DerivsFD())
-
-        model.connect('indep.x_dist', 'D1.in_dist')
-        model.connect('indep.x_serial', 'D1.in_serial')
-
-        prob = om.Problem(model)
-        prob.setup(mode='fwd')
-
-        # Set initial values of distributed variable.
-        x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
-        prob.set_val('indep.x_dist', x_dist_init)
-
-        # Set initial values of serial variable.
-        x_serial_init = 1.0 + 2.0*np.arange(size)
-        prob.set_val('indep.x_serial', x_serial_init)
-
-        prob.run_model()
-
-        return prob
-
-    def test_fd_check_totals(self):
-        prob = self.get_fd_problem()
-
-        totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
-                                        wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-
-    def test_fd_check_partials(self):
-        prob = self.get_fd_problem()
-        data = prob.check_partials()
-        assert_check_partials(data, atol=3.e-6)
+        msg = "'D1' <class Distrib_DerivsFD>: component has defined partial ('out_serial', 'in_dist') which is a serial output wrt a distributed input. This is only supported using the matrix free API."
+        self.assertEqual(str(cm.exception), msg)
 
 
 if __name__ == "__main__":
