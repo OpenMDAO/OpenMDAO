@@ -71,7 +71,6 @@ class DOEDriver(Driver):
             self.options['generator'] = generator
 
         self._name = ''
-        self._recorders = []
         self._problem_comm = None
         self._color = None
 
