@@ -1479,7 +1479,6 @@ class Distrib_Derivs(om.ExplicitComponent):
         else:
             outputs['out_serial'] = g_Is + np.sum(g_Id)
 
-    # def compute_partials(self, inputs, partials):
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
@@ -1542,7 +1541,6 @@ class Distrib_DerivsFD(om.ExplicitComponent):
         self.add_output('out_serial', copy_shape='in_serial')
 
     def setup_partials(self):
-        # Note: component-FD hangs in mpi.
         self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
@@ -1577,6 +1575,36 @@ class Distrib_DerivsFD(om.ExplicitComponent):
             outputs['out_serial'] = g_y + np.sum(all_local_sums)
         else:
             outputs['out_serial'] = g_y + np.sum(g_x)
+
+
+class Distrib_DerivsErr(om.ExplicitComponent):
+
+    def setup(self):
+
+        self.add_input('in_dist', shape_by_conn=True, distributed=True)
+        self.add_output('out_serial', copy_shape='in_serial')
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        comm = self.comm
+        Id = inputs['in_dist']
+
+        g_Id = Id ** 0.5
+
+        if MPI and comm.size > 1:
+            # We need to gather the summed values to compute the total sum over all procs.
+            local_sum = np.sum(g_Id)
+            all_local_sums = np.zeros(comm.size)
+            self.comm.Allgather(local_sum, all_local_sums)
+
+            outputs['out_serial'] = np.sum(all_local_sums)
+        else:
+            outputs['out_serial'] = np.sum(g_Id)
+
+    def compute_partials(self, inputs, partials):
+        pass  # do nothing here.  Error will occur before calling this.
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

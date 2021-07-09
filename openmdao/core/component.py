@@ -244,8 +244,6 @@ class Component(System):
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
-        iproc = self.comm.rank
-
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
             allprocs_abs2meta = self._var_allprocs_abs2meta[io]
@@ -1399,22 +1397,29 @@ class Component(System):
                 meta['cols'] = cols
                 csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
                 meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+                dist_out = abs2meta_out[of]['distributed']
+                if wrt in abs2meta_in:
+                    dist_in = abs2meta_in[wrt]['distributed']
+                else:
+                    dist_in = abs2meta_out[wrt]['distributed']
+
+                if (dist_in and not dist_out and meta['method'] not in ('cs', 'fd')
+                        and not self.matrix_free):
+                    raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
+                                       "which is a serial output wrt a distributed input. This is "
+                                       "only supported using the matrix free API.")
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if abs2meta_out[of]['distributed']:
+                        if dist_out:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
                         else:
                             # non-distributed components are not allowed to have zero size inputs
                             raise ValueError(msg.format(self.msginfo, of))
                     if shape[1] == 0:
-                        if wrt in abs2meta_in:
-                            distrib = abs2meta_in[wrt]['distributed']
-                        else:
-                            distrib = abs2meta_out[wrt]['distributed']
-                        if not distrib:
+                        if not dist_in:
                             # non-distributed components are not allowed to have zero size outputs
                             raise ValueError(msg.format(self.msginfo, wrt))
                         else:
