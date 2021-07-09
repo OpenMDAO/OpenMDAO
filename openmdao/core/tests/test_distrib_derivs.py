@@ -1440,16 +1440,10 @@ class Distrib_Derivs(om.ExplicitComponent):
 
     def setup(self):
 
-        # Distributed Input
         self.add_input('in_dist', shape_by_conn=True, distributed=True)
-
-        # Serial Input
         self.add_input('in_serial', shape_by_conn=True)
 
-        # Distributed Output
         self.add_output('out_dist', copy_shape='in_dist', distributed=True)
-
-        # Serial Output
         self.add_output('out_serial', copy_shape='in_serial')
 
     def compute(self, inputs, outputs):
@@ -1457,25 +1451,24 @@ class Distrib_Derivs(om.ExplicitComponent):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
 
-        # "Computationally Intensive" operation that we wish to parallelize.
         f_Id = Id**2 - 2.0*Id + 4.0
-        f_Is = Is ** 0.5
+        f_Is = Is ** 3
 
         # Our local distributed output is a function of local distributed input computed above.
         # It also is a function of the serial input.
         outputs['out_dist'] = f_Id + np.sum(f_Is)
 
-        g_Id = Id ** 0.5
+        g_Id = Id ** 3
         g_Is = Is**2 + 3.0*Is - 5.0
 
         if MPI and comm.size > 1:
 
             # We need to gather the summed values to compute the total sum over all procs.
-            local_sum = np.sum(g_Id)
-            all_local_sums = np.zeros(comm.size)
-            self.comm.Allgather(local_sum, all_local_sums)
+            local_sum = np.array([np.sum(g_Id)])
+            total_sum = local_sum.copy()
+            self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
 
-            outputs['out_serial'] = g_Is + np.sum(all_local_sums)
+            outputs['out_serial'] = g_Is + total_sum[0]
         else:
             outputs['out_serial'] = g_Is + np.sum(g_Id)
 
@@ -1488,8 +1481,8 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
         size = len(Is)
         local_size = len(Id)
 
-        df_dIs = 0.5 / Is ** 0.5
-        dg_dId = 0.5 / Id ** 0.5
+        df_dIs = 3. * Is ** 2
+        dg_dId = 3. * Id ** 2
 
         if mode == 'fwd':
             if 'out_dist' in d_outputs:
@@ -1560,14 +1553,17 @@ class TestDistribBugs(unittest.TestCase):
 
         model.add_subsystem("indep", ivc)
         model.add_subsystem("D1", comp_class())
+        model.add_subsystem("D2", comp_class())
 
         model.connect('indep.x_dist', 'D1.in_dist')
         model.connect('indep.x_serial', 'D1.in_serial')
+        model.connect('D1.out_dist', 'D2.in_dist')
+        model.connect('D1.out_serial', 'D2.in_serial')
 
         om.wing_dbg()
 
         prob = om.Problem(model)
-        prob.setup(mode=mode)
+        prob.setup(mode=mode, force_alloc_complex=True)
 
         self.x_dist_init = x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
         self.x_serial_init = x_serial_init = 1.0 + 2.0*np.arange(size)
@@ -1600,27 +1596,39 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_totals_fwd(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
-        totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+        # totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+        #                                 wrt=['indep.x_serial', 'indep.x_dist'])
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             try:
+                print(key)
+                print(val['J_fd'])
+                print(val['J_fwd'])
+                print('diff')
+                print(val['J_fd'] - val['J_fwd'])
                 assert_near_equal(val['rel error'][0], 0.0, 1e-6)
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
 
     def test_check_totals_rev(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
-        totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             try:
+                print(key)
+                print(val['J_fd'])
+                print(val['J_fwd'])
+                print('diff')
+                print(val['J_fd'] - val['J_fwd'])
                 assert_near_equal(val['rel error'][0], 0.0, 1e-6)
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
 
     def test_check_partials(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
-        data = prob.check_partials()
+        data = prob.check_partials(method='cs', show_only_incorrect=True)
         assert_check_partials(data, atol=3.e-6)
 
     def test_check_err(self):
