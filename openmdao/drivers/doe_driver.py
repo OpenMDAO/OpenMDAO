@@ -14,6 +14,7 @@ from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.recorders.recording_manager import RecordingManager
 
 
 class DOEDriver(Driver):
@@ -240,21 +241,6 @@ class DOEDriver(Driver):
             if i % size == color:
                 yield case
 
-    def add_recorder(self, recorder):
-        """
-        Add a recorder to the driver.
-
-        Parameters
-        ----------
-        recorder : CaseRecorder
-           A recorder instance.
-        """
-        # keep track of recorders so we can flag them as parallel
-        # if we end up running in parallel
-        self._recorders.append(recorder)
-
-        super().add_recorder(recorder)
-
     def _setup_recording(self):
         """
         Set up case recording.
@@ -262,7 +248,7 @@ class DOEDriver(Driver):
         if MPI:
             procs_per_model = self.options['procs_per_model']
 
-            for recorder in self._recorders:
+            for recorder in self._rec_mgr:
                 recorder._parallel = True
 
                 # if SqliteRecorder, write cases only on procs up to the number

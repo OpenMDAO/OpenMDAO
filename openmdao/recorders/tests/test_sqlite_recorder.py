@@ -236,7 +236,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.final_setup()
         prob.driver.record_iteration()
 
-        # no problem recording an iteration during a run        
+        # no problem recording an iteration during a run
         prob.run_driver()
 
         # no problem adding a recorder after a run
@@ -254,7 +254,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.final_setup()
         prob.driver.record_iteration()
 
-        # no problem recording an iteration on both recorders during a run        
+        # no problem recording an iteration on both recorders during a run
         prob.run_driver()
 
         # no problem recording an iteration after a run that initializes the new recorder
