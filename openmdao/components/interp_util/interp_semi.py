@@ -3,6 +3,7 @@ Base class for interpolation methods that work on a semi-structured grid.
 """
 import numpy as np
 
+from openmdao.components.interp_util.interp_akima import InterpAkimaSemi
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2Semi
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3Semi
 from openmdao.components.interp_util.interp_slinear import InterpLinearSemi
@@ -10,9 +11,10 @@ from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 INTERP_METHODS = {
+    'slinear': InterpLinearSemi,
     'lagrange2': InterpLagrange2Semi,
     'lagrange3': InterpLagrange3Semi,
-    'slinear': InterpLinearSemi,
+    'akima': InterpAkimaSemi,
 }
 
 TABLE_METHODS = [method for method in INTERP_METHODS.keys()]

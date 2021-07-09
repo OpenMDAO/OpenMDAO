@@ -293,7 +293,7 @@ class InterpAlgorithmSemi(object):
 
         self.values = values
 
-        if grid.shape[1] > 1:
+        if len(grid.shape) > 1 and grid.shape[1] > 1:
             # Build hieararchy of subtables.
             subtables = []
             i_pt = grid[0, 0]
@@ -323,7 +323,7 @@ class InterpAlgorithmSemi(object):
             # A "leaf" of the hierarchy.
             self.grid = grid
             self.subtables = None
-            self._idx = idx
+            self._idx = idx if idx is not None else np.arange(len(values))
 
         self.last_index = 0
         self.k = None
