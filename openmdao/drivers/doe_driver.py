@@ -14,7 +14,6 @@ from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
-from openmdao.recorders.recording_manager import RecordingManager
 
 
 class DOEDriver(Driver):
