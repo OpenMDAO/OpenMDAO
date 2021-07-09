@@ -220,7 +220,9 @@ jobs:
           echo "============================================================="
           echo "Build the docs"
           echo "============================================================="
-          ./build_all_docs.sh
+          python build_source_docs.py
+          jupyter-book build -W --keep-going openmdao_book
+          python copy_build_artifacts.py
 
       - name: Display doc build reports
         if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
