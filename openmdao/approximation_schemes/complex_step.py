@@ -204,7 +204,7 @@ class ComplexStep(ApproximationScheme):
             result_array[:] = system._residuals.asarray()
 
         for vec, idxs in idx_info:
-            if vec is not None:
+            if vec is not None and idxs is not None:
                 vec.isub(delta, idxs)
 
         return result_array

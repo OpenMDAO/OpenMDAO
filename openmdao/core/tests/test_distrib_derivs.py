@@ -1452,13 +1452,13 @@ class Distrib_Derivs(om.ExplicitComponent):
         Is = inputs['in_serial']
 
         f_Id = Id**2 - 2.0*Id + 4.0
-        f_Is = Is ** 3
+        f_Is = 1.5 * Is ** 2
 
         # Our local distributed output is a function of local distributed input computed above.
         # It also is a function of the serial input.
         outputs['out_dist'] = f_Id + np.sum(f_Is)
 
-        g_Id = Id ** 3
+        g_Id = 1.5 * Id ** 2
         g_Is = Is**2 + 3.0*Is - 5.0
 
         if MPI and comm.size > 1:
@@ -1481,8 +1481,8 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
         size = len(Is)
         local_size = len(Id)
 
-        df_dIs = 3. * Is ** 2
-        dg_dId = 3. * Id ** 2
+        df_dIs = 3. * Is
+        dg_dId = 3. * Id
 
         if mode == 'fwd':
             if 'out_dist' in d_outputs:
@@ -1596,8 +1596,6 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_totals_fwd(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
-        # totals = prob.check_totals(out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
-        #                                 wrt=['indep.x_serial', 'indep.x_dist'])
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
@@ -1626,10 +1624,15 @@ class TestDistribBugs(unittest.TestCase):
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
 
-    def test_check_partials(self):
+    def test_check_partials_cs(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
         data = prob.check_partials(method='cs', show_only_incorrect=True)
-        assert_check_partials(data, atol=3.e-6)
+        assert_check_partials(data, atol=1e-10)
+
+    def test_check_partials_fd(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree)
+        data = prob.check_partials(method='fd', show_only_incorrect=True)
+        assert_check_partials(data, atol=1e-3)
 
     def test_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
