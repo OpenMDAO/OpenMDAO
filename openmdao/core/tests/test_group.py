@@ -18,7 +18,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.general_utils import ignore_errors_context
-from openmdao.utils.om_warnings import reset_warning_registry
+from openmdao.utils.om_warnings import reset_warning_registry, PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -1410,6 +1410,17 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', are connected but their metadata entries ['units', 'val'] differ. Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model to remove the ambiguity.")
 
+    def test_double_set_input_defaults(self):
+        problem = om.Problem()
+        problem.model.add_subsystem("foo", om.ExecComp("a=b+c"), promotes=["*"])
+
+        problem.model.set_input_defaults("b", 5)
+        problem.model.set_input_defaults("c", 10)
+
+        msg = ("<class Group>: Setting input defaults for input 'b' which override "
+               "previously set defaults for ['auto', 'prom', 'src_shape', 'val'].")
+        with assert_warning(PromotionWarning, msg):
+            problem.model.set_input_defaults("b", 4)
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):

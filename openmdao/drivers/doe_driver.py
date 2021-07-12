@@ -24,8 +24,6 @@ class DOEDriver(Driver):
     ----------
     _name : str
         The name used to identify this driver in recorded cases.
-    _recorders : list
-        List of case recorders that have been added to this driver.
     _problem_comm : MPI.Comm or None
         The MPI communicator for the Problem.
     _color : int or None
@@ -71,7 +69,6 @@ class DOEDriver(Driver):
             self.options['generator'] = generator
 
         self._name = ''
-        self._recorders = []
         self._problem_comm = None
         self._color = None
 
@@ -240,21 +237,6 @@ class DOEDriver(Driver):
             if i % size == color:
                 yield case
 
-    def add_recorder(self, recorder):
-        """
-        Add a recorder to the driver.
-
-        Parameters
-        ----------
-        recorder : CaseRecorder
-           A recorder instance.
-        """
-        # keep track of recorders so we can flag them as parallel
-        # if we end up running in parallel
-        self._recorders.append(recorder)
-
-        super().add_recorder(recorder)
-
     def _setup_recording(self):
         """
         Set up case recording.
@@ -262,7 +244,7 @@ class DOEDriver(Driver):
         if MPI:
             procs_per_model = self.options['procs_per_model']
 
-            for recorder in self._recorders:
+            for recorder in self._rec_mgr:
                 recorder._parallel = True
 
                 # if SqliteRecorder, write cases only on procs up to the number

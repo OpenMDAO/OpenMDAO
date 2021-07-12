@@ -8,6 +8,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -18,6 +20,8 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC, Diamond
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
+from openmdao.utils.om_warnings import OMInvalidCheckDerivativesOptionsWarning
+
 from openmdao.utils.mpi import MPI
 
 try:
@@ -342,7 +346,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
         p.setup()
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials(step=1e-7, out_stream=None)
 
         for comp_name, comp in data.items():
             for partial_name, partial in comp.items():
@@ -1926,6 +1930,287 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         p.check_partials(out_stream=None)
 
+class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
+    # Ensure check_partials options differs from the compute partials options
+
+    def test_partials_check_same_as_derivative_compute(self):
+        def create_problem(force_alloc_complex=False):
+            # Create a fresh model for each little test so tests don't interfere with each other
+            prob = self.prob = om.Problem()
+            model = prob.model
+            model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
+            model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
+            parab = self.parab = Paraboloid()
+
+            model.add_subsystem('parab', parab)
+            model.connect('px.x', 'parab.x')
+            model.connect('py.y', 'parab.y')
+            model.add_design_var('px.x', lower=-50, upper=50)
+            model.add_design_var('py.y', lower=-50, upper=50)
+            model.add_objective('parab.f_xy')
+            prob.setup(force_alloc_complex=force_alloc_complex)
+            return prob, parab
+
+        expected_check_partials_error = f"Problem: Checking partials with respect " \
+              "to variable '{var}' in component " \
+              "'{comp.pathname}' using the same " \
+              "method and options as are used to compute the " \
+              "component's derivatives " \
+              "will not provide any relevant information on the " \
+              "accuracy.\n" \
+              "To correct this, change the options to do the \n" \
+              "check_partials using either:\n" \
+              "     - arguments to Problem.check_partials. \n" \
+              "     - arguments to Component.set_check_partial_options"
+
+        # Scenario 1:
+        #    Compute partials: exact
+        #    Check partials: fd using argument to check_partials, default options
+        #    Expected result: no error
+        prob, parab = create_problem()
+        prob.check_partials(method='fd')
+
+        # Scenario 2:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, default options
+        #    Expected result: Error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_partials(method='fd')
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=self.parab)
+        self.assertEqual(expected_error_msg, str(err.exception))
+
+        # Scenario 3:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different step option
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        prob.check_partials(method='fd', step=1e-4)
+
+        # Scenario 4:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different form option
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        prob.check_partials(method='fd', form='backward')
+
+        # Scenario 5:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different step_calc option
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        prob.check_partials(method='fd', step_calc='rel')
+
+        # Scenario 5:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using argument to check_partials, different directional option
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*', directional=True)
+        prob.check_partials(method='fd')
+
+        # Scenario 6:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using argument to check_partials
+        #    Other condition: haven't allocated a complex vector, so we fall back on fd
+        #    Expected result: Error since using fd to check fd. All options the same
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_partials(method='cs')
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+
+        # Scenario 7:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using argument to check_partials
+        #    Other condition: setup with complex vector, so complex step can be used
+        #    Expected result: No error
+        prob, parab = create_problem(force_alloc_complex=True)
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_partials(method='cs')
+
+        # Scenario 8:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, default options
+        #    Expected result: Error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*')
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_partials()
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+
+        # Scenario 9:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, step set
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*', step=1e-4)
+        prob.check_partials()
+
+        # Scenario 10:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, form set
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*', form='backward',
+                                        step= FiniteDifference.DEFAULT_OPTIONS['step'])
+        prob.check_partials()
+
+        # Scenario 11:
+        #    Compute partials: fd, with default options
+        #    Check partials: fd using Component.set_check_partial_options argument, step_calc set
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*', step_calc='rel',
+                                        form=FiniteDifference.DEFAULT_OPTIONS['form'])
+        prob.check_partials()
+
+        # Scenario 12:
+        #    Compute partials: fd, with default options
+        #    Check partials: cs using Component.set_check_partial_options argument
+        #    Expected result: No error
+        prob, parab = create_problem(force_alloc_complex=True)
+        parab.declare_partials(of='*', wrt='*', method='fd')
+        parab.set_check_partial_options('*', method='cs')
+        prob.check_partials()
+
+        # Scenario 13:
+        #    Compute partials: cs, with default options
+        #    Check partials: fd
+        #    Expected result: No error
+        prob, parab = create_problem()
+        parab.declare_partials(of='*', wrt='*', method='cs')
+        parab.set_check_partial_options('*', method='fd')
+        prob.check_partials()
+
+        # Scenario 14:
+        #    Compute partials: cs, with default options
+        #    Check partials: cs
+        #    Expected result: Error
+        prob, parab = create_problem(force_alloc_complex=True)
+        parab.declare_partials(of='*', wrt='*', method='cs')
+        parab.set_check_partial_options('*', method='cs')
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_partials()
+        expected_error_msg = expected_check_partials_error.format(var='x', comp=parab)
+        self.assertEqual(expected_error_msg, str(err.exception)[:len(expected_error_msg)])
+
+        # Scenario 15:
+        #    Compute partials: cs, with default options
+        #    Check partials: cs, with different step
+        #    Expected result: No error
+        prob, parab = create_problem(force_alloc_complex=True)
+        parab.declare_partials(of='*', wrt='*', method='cs',
+                               step=ComplexStep.DEFAULT_OPTIONS['step'])
+        parab.set_check_partial_options('*', method='cs',
+                                        step=2.0*ComplexStep.DEFAULT_OPTIONS['step'])
+        prob.check_partials()
+
+        # Now do similar checks for check_totals when approximations are used
+        expected_check_totals_error_msg = "Problem: Checking totals using the same " \
+              "method and options as are used to compute the " \
+              "totals will not provide any relevant information on the " \
+              "accuracy.\n" \
+              "To correct this, change the options to do the " \
+              "check_totals or on the call to approx_totals for the model."
+
+        # Scenario 16:
+        #    Compute totals: no approx on totals
+        #    Check totals: defaults
+        #    Expected result: No error since no approx on computing totals
+        prob, parab = create_problem()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals()
+
+        # Scenario 17:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: using defaults
+        #    Expected result: Error since compute and check have same method and options
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_totals()
+        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
+
+        # Scenario 18:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default step
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(step=1e-7)
+
+        # Scenario 19:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default form
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(form='central')
+
+
+        # Scenario 20:
+        #    Compute totals: approx on totals using defaults
+        #    Check totals: fd, non default step_calc
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup()
+        prob.run_model()
+        prob.check_totals(step_calc='rel')
+
+        # Scenario 21:
+        #    Compute totals: cs
+        #    Check totals: cs
+        #    Expected result: Error since both using the same method
+        prob, parab = create_problem(force_alloc_complex=True)
+        prob.model.approx_totals(method='cs')
+        prob.setup()
+        prob.run_model()
+        with self.assertRaises(OMInvalidCheckDerivativesOptionsWarning) as err:
+            prob.check_totals(method='cs')
+        self.assertEqual(expected_check_totals_error_msg, str(err.exception))
+
+        # Scenario 22:
+        #    Compute totals: fd, the default
+        #    Check totals: cs
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals()
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_totals(method='cs')
+
+        # Scenario 23:
+        #    Compute totals: cs
+        #    Check totals: default
+        #    Expected result: No error
+        prob, parab = create_problem()
+        prob.model.approx_totals(method='cs')
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+        prob.check_totals()
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 
@@ -2260,7 +2545,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        J = prob.check_partials(compact_print=True, method='cs', step=1e-40, out_stream=None)
+        # J = prob.check_partials(compact_print=True, method='cs', step=1e-40, out_stream=None)
+        J = prob.check_partials(compact_print=True, method='cs', step=1e-40)
 
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 
@@ -3109,7 +3395,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver()
         prob.run_model()
 
-        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs', out_stream=None)
+        totals = prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'], method='cs',
+                                   step = 1e-39, # needs to be different than arrox_totals or error
+                                   out_stream=None)
 
         for key, val in totals.items():
             assert_near_equal(val['rel error'][0], 0.0, 3e-8)
