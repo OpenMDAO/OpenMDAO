@@ -24,8 +24,6 @@ class DOEDriver(Driver):
     ----------
     _name : str
         The name used to identify this driver in recorded cases.
-    _recorders : list
-        List of case recorders that have been added to this driver.
     _problem_comm : MPI.Comm or None
         The MPI communicator for the Problem.
     _color : int or None
