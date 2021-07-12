@@ -1492,7 +1492,10 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
                     d_outputs['out_dist'] += np.tile(df_dIs, local_size).reshape((local_size, size)).dot(d_inputs['in_serial'])
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    d_outputs['out_serial'] += np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
+                    deriv = np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
+                    cpy = deriv.copy()
+                    self.comm.Allreduce(cpy, deriv, op=MPI.SUM)
+                    d_outputs['out_serial'] += deriv
                 if 'in_serial' in d_inputs:
                     d_outputs['out_serial'] += (2.0 * Is + 3.0) * d_inputs['in_serial']
         else:  # rev
@@ -1533,7 +1536,7 @@ class TestDistribBugs(unittest.TestCase):
 
     N_PROCS = 2
 
-    def get_problem(self, comp_class, mode='auto'):
+    def get_problem(self, comp_class, mode='auto', stacked=True):
         size = 5
 
         if MPI:
@@ -1553,12 +1556,14 @@ class TestDistribBugs(unittest.TestCase):
 
         model.add_subsystem("indep", ivc)
         model.add_subsystem("D1", comp_class())
-        model.add_subsystem("D2", comp_class())
+        if stacked:
+            model.add_subsystem("D2", comp_class())
 
         model.connect('indep.x_dist', 'D1.in_dist')
         model.connect('indep.x_serial', 'D1.in_serial')
-        model.connect('D1.out_dist', 'D2.in_dist')
-        model.connect('D1.out_serial', 'D2.in_serial')
+        if stacked:
+            model.connect('D1.out_dist', 'D2.in_dist')
+            model.connect('D1.out_serial', 'D2.in_serial')
 
         om.wing_dbg()
 
@@ -1577,20 +1582,21 @@ class TestDistribBugs(unittest.TestCase):
         return prob
 
     def test_get_val(self):
-        prob = self.get_problem(Distrib_Derivs_Matfree)
+        prob = self.get_problem(Distrib_Derivs_Matfree, stacked=False)
         if prob.model.comm.rank == 0:
-            D1_out_dist = np.array([17.6138701, 22.6138701, 29.6138701])
+            D1_out_dist = np.array([254.5, 259.5, 266.5])
         else:
-            D1_out_dist = np.array([38.6138701, 49.6138701])
+            D1_out_dist = np.array([275.5, 286.5])
 
-        D1_out_dist_full = np.array([17.6138701, 22.6138701, 29.6138701, 38.6138701, 49.6138701])
-        D1_out_serial = np.array([ 10.06335984,  24.06335984,  46.06335984,  76.06335984, 114.06335984])
+        D1_out_dist_full = np.array([254.5, 259.5, 266.5, 275.5, 286.5])
+        D1_out_serial = np.array([201.5, 215.5, 237.5, 267.5, 305.5])
 
         vnames = ['indep.x_dist', 'indep.x_serial', 'D1.out_dist', 'D1.out_serial']
         expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial]
         expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial]
         for var, ex, ex_remote in zip(vnames, expected, expected_remote):
-            assert_near_equal(prob.get_val(var), ex, tolerance=1e-8)
+            val = prob.get_val(var)
+            assert_near_equal(val, ex, tolerance=1e-8)
             full_val = prob.get_val(var, get_remote=True)
             assert_near_equal(full_val, ex_remote, tolerance=1e-8)
 
@@ -1600,11 +1606,6 @@ class TestDistribBugs(unittest.TestCase):
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             try:
-                print(key)
-                print(val['J_fd'])
-                print(val['J_fwd'])
-                print('diff')
-                print(val['J_fd'] - val['J_fwd'])
                 assert_near_equal(val['rel error'][0], 0.0, 1e-6)
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
@@ -1615,11 +1616,6 @@ class TestDistribBugs(unittest.TestCase):
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             try:
-                print(key)
-                print(val['J_fd'])
-                print(val['J_fwd'])
-                print('diff')
-                print(val['J_fd'] - val['J_fwd'])
                 assert_near_equal(val['rel error'][0], 0.0, 1e-6)
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
