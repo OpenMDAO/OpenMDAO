@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import openmdao.api as om 
+import openmdao.api as om
 import gc
 
 class TestComponentIOIndependenceFromProb(unittest.TestCase):
@@ -46,14 +46,13 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
             prob.driver = om.ScipyOptimizeDriver()
 
             prob.setup()
-            print("J:", prob.compute_totals())
             prob.run_driver()
 
 
     class ParabolaSystem(om.Group):
 
         def __init__(self):
-            super(TestComponentIOIndependenceFromProb.ParabolaSystem, 
+            super(TestComponentIOIndependenceFromProb.ParabolaSystem,
                 self).__init__()
             self.p = TestComponentIOIndependenceFromProb.Parabola()
             self.x0 = 3

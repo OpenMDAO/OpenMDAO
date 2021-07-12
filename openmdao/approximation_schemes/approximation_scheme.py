@@ -280,6 +280,7 @@ class ApproximationScheme(object):
                                             meta['vector']))
 
         if total:
+            # compute scatter from the results vector into a column of the total jacobian
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
                 src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
@@ -546,7 +547,7 @@ class ApproximationScheme(object):
 
     def _get_total_result(self, outarr, totarr):
         """
-        Convert output array into a column array that matches the size of the jacobian.
+        Convert output array into a column array that matches the size of the total jacobian.
 
         Also gather any remote vars, if necessary, into the column array.
 

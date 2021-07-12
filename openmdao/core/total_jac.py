@@ -237,7 +237,6 @@ class _TotalJacInfo(object):
 
         self.has_lin_cons = has_lin_cons
         self.dist_input_idx_map = {}
-        # self.dist_idx_arr = {}
         self.has_input_dist = {}
         self.has_output_dist = {}
 
@@ -314,9 +313,6 @@ class _TotalJacInfo(object):
                                 dist_map.append((dstart, dend, rank))
                             dstart = dend
                     start = end
-                    # self.dist_idx_arr[mode] = idx_arr = np.zeros(end, dtype=bool)
-                    # for dstart, dend, _ in dist_map:
-                    #     idx_arr[dstart:dend] = True
         else:
             for mode in modes:
                 # If we're running with only a local total jacobian, then we need to keep
@@ -328,6 +324,7 @@ class _TotalJacInfo(object):
                 self.loc_jac_idxs[mode] = arr
 
                 # we also need a mapping of which indices correspond to distrib vars so
+                # we can exclude them from jac scatters
                 self.dist_idx_map[mode] = dist_map = np.zeros(arr.size, dtype=bool)
                 start = end = 0
                 for name in self.output_list[mode]:
@@ -828,7 +825,6 @@ class _TotalJacInfo(object):
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
                                         np.arange(len(local_idx), dtype=INT_DTYPE))
-                        # if fwd:
                         name2jinds[name] = jac_inds[-1]
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
@@ -836,7 +832,6 @@ class _TotalJacInfo(object):
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
                                         dtype=INT_DTYPE))
-                        # if fwd:
                         name2jinds[name] = jac_inds[-1]
                 else:
                     idx_array = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
@@ -1370,7 +1365,7 @@ class _TotalJacInfo(object):
 
         # if some of the wrt vars are distributed in fwd mode, we have to bcast from the rank
         # where each part of the distrib var exists
-        if self.get_remote and self.has_input_dist['fwd'] and mode == 'fwd':
+        if self.get_remote and mode == 'fwd' and self.has_input_dist[mode]:
             for start, stop, rank in self.dist_input_idx_map[mode]:
                 contig = self.J[:, start:stop].copy()
                 model.comm.Bcast(contig, root=rank)

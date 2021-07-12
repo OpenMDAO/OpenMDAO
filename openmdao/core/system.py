@@ -537,22 +537,6 @@ class System(object):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def var_path(self, varname):
-        """
-        Return the pathname of the given variable.
-
-        Parameters
-        ----------
-        varname : str
-            The name of the variable relative to this system.
-
-        Returns
-        -------
-        str
-            The absolute pathname of the given variable.
-        """
-        return '.'.join((self.pathname, varname)) if self.pathname else varname
-
     def _get_inst_id(self):
         return self.pathname
 
@@ -3162,8 +3146,6 @@ class System(object):
                     indices.set_src_shape(meta['global_shape'])
                     indices = indices.shaped_instance()
                     response['size'] = response['global_size'] = len(indices)
-                    # response['size'] = sz = len(indices)
-                    # response['global_size'] = sz if meta['distributed'] else meta['global_size']
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']

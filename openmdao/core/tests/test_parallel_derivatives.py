@@ -38,8 +38,6 @@ class ParDerivTestCase(unittest.TestCase):
         prob.model.add_design_var('x2')
         prob.model.add_objective('c3.y')
 
-        om.wing_dbg()
-
         prob.setup(check=False, mode='rev')
         prob.run_driver()
 

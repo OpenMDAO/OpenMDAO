@@ -3,7 +3,6 @@ import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.mpi import MPI
 
 
 class DictionaryJacobian(Jacobian):
