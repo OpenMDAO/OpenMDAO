@@ -1303,9 +1303,6 @@ class Problem(object):
                                 # Matrix Vector Product
                                 comp._apply_linear(None, _contains_all, mode)
 
-                                if idx is None:
-                                    continue
-
                                 for out in out_list:
                                     out_abs = rel_name2abs_name(comp, out)
 
@@ -1324,7 +1321,8 @@ class Problem(object):
                                             shape = (len(derivs), n_in)
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][:, idx] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][:, idx] = derivs
 
                                     else:  # rev
                                         if out_abs in meta_out:
@@ -1351,7 +1349,8 @@ class Problem(object):
                                             shape = (n_in, len(derivs))
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][idx, :] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][idx, :] = derivs
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
