@@ -1620,7 +1620,6 @@ class Group(System):
             # transfer shape/size info from from_var to to_var
             all_from_meta = self._var_allprocs_abs2meta[from_io][from_var]
             all_to_meta = self._var_allprocs_abs2meta[to_io][to_var]
-            from_meta = self._var_abs2meta[from_io].get(from_var, {})
             to_meta = self._var_abs2meta[to_io].get(to_var, {})
 
             nprocs = self.comm.size

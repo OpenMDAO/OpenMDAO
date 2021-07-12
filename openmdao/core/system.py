@@ -837,11 +837,6 @@ class System(object):
 
         self._setup_var_data()
 
-        if self._use_derivatives:
-            self._problem_meta['vec_names'] = ['nonlinear', 'linear']
-        else:
-            self._problem_meta['vec_names'] = ['nonlinear']
-
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
@@ -2275,10 +2270,6 @@ class System(object):
     @property
     def _distributed_vector_class(self):
         return self._problem_meta['distributed_vector_class']
-
-    @property
-    def _vec_names(self):
-        return self._problem_meta['vec_names']
 
     @property
     def _recording_iter(self):

@@ -926,7 +926,6 @@ class Problem(object):
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
-            'vec_names': None,  # names of all nonlinear and linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used

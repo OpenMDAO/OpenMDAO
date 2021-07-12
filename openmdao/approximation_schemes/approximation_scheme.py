@@ -450,7 +450,7 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             jidx_iter = iter(range(len(jcol_idxs)))
-            for i_count, vecidxs in enumerate(vec_idxs):
+            for vecidxs in vec_idxs:
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference

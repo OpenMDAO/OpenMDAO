@@ -277,10 +277,10 @@ class _TotalJacInfo(object):
             for mode in modes:
                 self._create_in_idx_map(mode)
 
-        self.of_meta, self.of_size, of_dist_size, has_of_dist = \
+        self.of_meta, self.of_size, has_of_dist = \
             self._get_tuple_map(of, responses, abs2meta_out)
         self.has_input_dist['rev'] = self.has_output_dist['fwd'] = has_of_dist
-        self.wrt_meta, self.wrt_size, wrt_dist_size, has_wrt_dist = \
+        self.wrt_meta, self.wrt_size, has_wrt_dist = \
             self._get_tuple_map(wrt, design_vars, abs2meta_out)
         self.has_input_dist['fwd'] = self.has_output_dist['rev'] = has_wrt_dist
 
@@ -876,8 +876,6 @@ class _TotalJacInfo(object):
             Dict of metadata tuples keyed by output name.
         int
             Total number of rows or columns.
-        int
-            Total number of full distributed rows or columns.
         bool
             True if any named variables are distributed.
         """
@@ -885,7 +883,6 @@ class _TotalJacInfo(object):
         start = 0
         end = 0
         get_remote = self.get_remote
-        dist_size = 0
         has_dist = False
 
         for name in names:
@@ -898,12 +895,10 @@ class _TotalJacInfo(object):
                     size = voi['global_size']
                 else:
                     size = voi['size']
-                dist_size += voi['global_size']
                 indices = vois[name]['indices']
             else:
                 size = abs2meta_out[name]['global_size']
                 indices = None
-                dist_size += size
 
             has_dist |= abs2meta_out[name]['distributed']
 
@@ -912,7 +907,7 @@ class _TotalJacInfo(object):
             idx_map[name] = (slice(start, end), indices, abs2meta_out[name]['distributed'])
             start = end
 
-        return idx_map, end, dist_size, has_dist  # after the loop, end is the total size
+        return idx_map, end, has_dist  # after the loop, end is the total size
 
     #
     # outer loop iteration functions
