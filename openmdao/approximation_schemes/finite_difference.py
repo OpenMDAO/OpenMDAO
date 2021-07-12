@@ -1,10 +1,9 @@
 """Finite difference derivative approximations."""
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _is_group
-from openmdao.warnings import issue_warning, DerivativesWarning
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 

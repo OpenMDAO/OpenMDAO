@@ -17,7 +17,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 from openmdao.utils.mpi import MPI
 

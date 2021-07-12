@@ -16,7 +16,7 @@ from openmdao.utils.general_utils import ContainsAll, _prom2ivc_src_dict
 
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.coloring import _initialize_model_approx, Coloring
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.vectors.vector import _full_slice
 
 

@@ -726,7 +726,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.model.add_constraint('y', equals=0, indices=[0,])
         p.model.add_objective('circle.area', ref=-1)
 
-        p.setup(derivatives=True)
+        p.setup(derivatives=True, force_alloc_complex=True)
 
         p.run_model()
         # Formerly a KeyError
@@ -1972,7 +1972,9 @@ class TestComponentComplexStep(unittest.TestCase):
                 self.add_input('x', val=1.0)
                 self.add_output('y', val=1.0)
 
-                self.declare_partials(of='y', wrt='x', method='cs')
+                # Need to set step to something other than default because
+                #   OpenMDAO now checks to make sure step is different for compute and check
+                self.declare_partials(of='y', wrt='x', method='cs', step=1e-20)
                 self.count = 0
 
             def compute(self, inputs, outputs):
@@ -1981,7 +1983,7 @@ class TestComponentComplexStep(unittest.TestCase):
                 if self.under_complex_step:
 
                     # Local cs
-                    if self.count == 0 and inputs['x'].imag != 1.0e-40:
+                    if self.count == 0 and inputs['x'].imag != 1.0e-20:
                         msg = "Wrong stepsize for local CS"
                         raise RuntimeError(msg)
 
@@ -1996,7 +1998,7 @@ class TestComponentComplexStep(unittest.TestCase):
                         raise RuntimeError(msg)
 
                     # Check partials cs with default setting forward.
-                    if self.count == 4 and inputs['x'].imag != 1.0e-40:
+                    if self.count == 4 and inputs['x'].imag != 1.0e-20:
                         msg = "Wrong stepsize for check partial default CS forward"
                         raise RuntimeError(msg)
 
@@ -2006,7 +2008,7 @@ class TestComponentComplexStep(unittest.TestCase):
                         raise RuntimeError(msg)
 
                     # Check partials cs with user setting forward.
-                    if self.count == 6 and inputs['x'].imag != 1.0e-40:
+                    if self.count == 6 and inputs['x'].imag != 1.0e-20:
                         msg = "Wrong stepsize for check partial user CS forward"
                         raise RuntimeError(msg)
 

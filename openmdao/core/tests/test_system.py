@@ -6,7 +6,7 @@ import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class TestSystem(unittest.TestCase):

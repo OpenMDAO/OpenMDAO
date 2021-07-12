@@ -11,7 +11,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.warnings import issue_warning, SolverWarning
+from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
 
 def _print_violations(outputs, lower, upper):

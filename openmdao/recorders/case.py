@@ -16,7 +16,7 @@ from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import make_set, match_prom_or_abs
 from openmdao.utils.units import unit_conversion, simplify_unit
 from openmdao.recorders.sqlite_recorder import format_version as current_version
-from openmdao.warnings import issue_warning
+from openmdao.utils.om_warnings import issue_warning
 
 _AMBIGOUS_PROM_NAME = object()
 

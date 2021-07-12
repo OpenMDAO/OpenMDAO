@@ -1,6 +1,6 @@
 """Define the OptionsDictionary class."""
 
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 
 

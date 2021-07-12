@@ -27,7 +27,7 @@ from openmdao.utils.general_utils import _prom2ivc_src_dict, \
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.devtools.memory import mem_usage
 
 

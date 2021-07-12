@@ -2,7 +2,7 @@
 Base class for all CaseReaders.
 """
 
-from openmdao.warnings import warn_deprecation
+from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 
 

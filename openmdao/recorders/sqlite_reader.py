@@ -12,7 +12,7 @@ from openmdao.recorders.case import Case
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
 from openmdao.utils.variable_table import write_source_table
 from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
-from openmdao.warnings import issue_warning, CaseRecorderWarning
+from openmdao.utils.om_warnings import issue_warning, CaseRecorderWarning
 
 from openmdao.recorders.sqlite_recorder import format_version, META_KEY_SEP
 
