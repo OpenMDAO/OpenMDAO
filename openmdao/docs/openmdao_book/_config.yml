@@ -12,6 +12,7 @@ execute:
   execute_notebooks: force
   stderr_output: show
   allow_errors: false
+  timeout: 120
 
 # Define the name of the latex output file for PDF builds
 latex:
