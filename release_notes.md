@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.10.0
 
-June 22, 2021
+July 14, 2021
 
 OpenMDAO 3.10.0 features a few API changes and a migration of documentation to JupyterBook.
 
@@ -9,6 +9,7 @@ OpenMDAO 3.10.0 features a few API changes and a migration of documentation to J
 
 - Component option `distributed` is now replaced with `distributed=True` on `add_input` and `add_output`. [#2073](https://github.com/OpenMDAO/OpenMDAO/pull/2073)
 - Removed an inconsistency where various options/arguments used different forms of `val`/`value`/`values`.  All have been changed to `val`. [#2112](https://github.com/OpenMDAO/OpenMDAO/pull/2112)
+- We've switched our documentation to JupyterBook, which allows our documentation examples to be run online through Google Colab.
 
 ## Backwards Incompatible API Changes:
 
@@ -27,6 +28,7 @@ OpenMDAO 3.10.0 features a few API changes and a migration of documentation to J
 - 'indices' for design vars and constraints can now be slices or 'fancy' indices. [#2102](https://github.com/OpenMDAO/OpenMDAO/pull/2102)
 - Refactor of parallel derivative coloring and removal of vectorize_derivs [#2116](https://github.com/OpenMDAO/OpenMDAO/pull/2116)
 - Users who add a recorder after setup is called get improved error messages [#2125](https://github.com/OpenMDAO/OpenMDAO/pull/2125)
+- OpenMDAO now checks that derivative settings are different for computing derivatives and checking derivatives. [#2166](https://github.com/OpenMDAO/OpenMDAO/pull/2166)
 
 ## Bug Fixes:
 
@@ -43,6 +45,13 @@ OpenMDAO 3.10.0 features a few API changes and a migration of documentation to J
 - Fixed bug in scaling/unscaling the linear vector during reverse mode in model with solver scaling defined on an output. via 'ref'. [#2131](https://github.com/OpenMDAO/OpenMDAO/pull/2131)
 - Fixed deprecation warning; remove extraneous 'value' from metadata [#2146](https://github.com/OpenMDAO/OpenMDAO/pull/2146)
 - Fix for exception when adding src_indices with self.promotes on a previously promoted input. [#2149](https://github.com/OpenMDAO/OpenMDAO/pull/2149)
+- Now all metadata for COBYLA design variable bounds is copied to constraints. [#2156](https://github.com/OpenMDAO/OpenMDAO/pull/2156)
+- Fixed broken docs scaling link [#2160](https://github.com/OpenMDAO/OpenMDAO/pull/2160)
+- Moved and renamed the openmdao warnings module to utils.om_warnings and fixed a few issues with it.  [#2162](https://github.com/OpenMDAO/OpenMDAO/pull/2162)
+- Fixed invalid keyword arg in issue_warning call [#2167](https://github.com/OpenMDAO/OpenMDAO/pull/2167)
+- Refactored DOEDriver to eliminate recorder pointer copies. [#2174](https://github.com/OpenMDAO/OpenMDAO/pull/2174)
+- Fixed for multiple issues with computing analytic and approx derivatives for components with a mix of serial and distributed variables. [#2177](https://github.com/OpenMDAO/OpenMDAO/pull/2177)
+- Fixed some issues so now OpenMDAO works with networkx==2.6 [#2178](https://github.com/OpenMDAO/OpenMDAO/pull/2178)
 
 ## Miscellaneous:
 
@@ -66,6 +75,12 @@ OpenMDAO 3.10.0 features a few API changes and a migration of documentation to J
 - Minor documentation tweaks. [#2135](https://github.com/OpenMDAO/OpenMDAO/pull/2135)
 - Remove a bunch of warnings from the notebooks in the docs. [#2145](https://github.com/OpenMDAO/OpenMDAO/pull/2145)
 - Updated distributed parab component to remove deprecation warnings from the documentation. [#2143](https://github.com/OpenMDAO/OpenMDAO/pull/2143)
+- Added deprecation column to options table in documentation. [#2151](https://github.com/OpenMDAO/OpenMDAO/pull/2151)
+- Added full test_suite examples with display_source to allow users to see the underlying code examples being imported from test_suite. [#2159](https://github.com/OpenMDAO/OpenMDAO/pull/2159)
+- Docs now explicitly import the om namespace so they can be more easily reproduced outside of the notebook. [#2165](https://github.com/OpenMDAO/OpenMDAO/pull/2165)
+- Added min/max example to ks_comp feature doc [#2170](https://github.com/OpenMDAO/OpenMDAO/pull/2170)
+- Addressed some issues with CI until changes to networkx are accounted for. [#2172](https://github.com/OpenMDAO/OpenMDAO/pull/2172)
+- Fixed broken links in documentation to papers at the MDO lab. [#2173](https://github.com/OpenMDAO/OpenMDAO/pull/2173)
 
 **********************************
 # Release Notes for OpenMDAO 3.9.2
