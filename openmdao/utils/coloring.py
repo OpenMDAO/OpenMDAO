@@ -27,7 +27,7 @@ from openmdao.utils.general_utils import _prom2ivc_src_dict, \
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.warnings import issue_warning, DerivativesWarning
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 from openmdao.devtools.memory import mem_usage
 
 
@@ -399,10 +399,10 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
-        info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
+        info = {'coloring': None, 'wrt_patterns': self._meta.get('wrt_patterns')}
         system._update_wrt_matches(info)
         if system.pathname:
-            if info['wrt_matches_rel'] is None:
+            if info.get('wrt_matches_rel') is None:
                 wrt_matches = None
             else:
                 wrt_matches = set(['.'.join((system.pathname, n))
@@ -2235,13 +2235,9 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
         # Support for indices defined on driver vars.
         if MPI and model.comm.size > 1:
             of_idx = model._owns_approx_of_idx
-            driver_resp = driver._dist_driver_vars
             for key, meta in driver._responses.items():
                 if meta['indices'] is not None:
-                    if meta['distributed'] and key in driver_resp:
-                        of_idx[key] = driver_resp[key][0]
-                    else:
-                        of_idx[key] = meta['indices']
+                    of_idx[key] = meta['indices']
         else:
             model._owns_approx_of_idx = {
                 key: meta['indices'] for key, meta in _prom2ivc_src_item_iter(driver._responses)
@@ -2272,7 +2268,7 @@ class _ColSparsityJac(object):
     def __init__(self, system, color_info):
         self._color_info = color_info
 
-        nrows = sum([end - start for _, start, end, _ in system._jac_of_iter()])
+        nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
         ordered_wrt_info = list(system._jac_wrt_iter(color_info['wrt_matches']))
 
         ncols = ordered_wrt_info[-1][2]

@@ -26,7 +26,7 @@ from openmdao.utils.general_utils import default_noraise
 from openmdao.utils.mpi import MPI
 from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
-from openmdao.warnings import issue_warning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 from openmdao.core.constants import _UNDEFINED
 from openmdao import __version__ as openmdao_version
 

@@ -15,7 +15,7 @@ from openmdao.test_suite.components.sellar import StateConnection, \
 from openmdao.utils.assert_utils import assert_near_equal, assert_no_warning
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class ModCompEx(om.ExplicitComponent):

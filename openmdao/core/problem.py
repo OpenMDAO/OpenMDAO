@@ -17,9 +17,8 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
-from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -31,9 +30,9 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices
-from openmdao.utils.mpi import FakeComm
-from openmdao.utils.mpi import MPI
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices, \
+    LocalRangeIterable
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -44,7 +43,8 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
-from openmdao.warnings import issue_warning, DerivativesWarning, warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
+    OMInvalidCheckDerivativesOptionsWarning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -926,7 +926,6 @@ class Problem(object):
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
-            'vec_names': None,  # names of all nonlinear and linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
@@ -1117,6 +1116,72 @@ class Problem(object):
 
             comps.append(comp)
 
+        # Check to make sure the method and settings used for checking
+        #   is different from the method used to calc the derivatives
+        # Could do this later in this method but at that point some computations could have been
+        #   made and it would just waste time before the user is told there is an error and the
+        #   program errs out
+        requested_method = method
+        alloc_complex = model._outputs._alloc_complex
+
+        for comp in comps:
+            local_opts = comp._get_check_partial_options()
+
+            for key, meta in comp._declared_partials.items():
+
+                # Get the complete set of options, including defaults
+                #    for the computing of the derivs for this component
+                if 'method' not in meta:
+                    meta_with_defaults = {}
+                    meta_with_defaults['method'] = 'exact'
+                elif meta['method'] == 'cs':
+                    meta_with_defaults = ComplexStep.DEFAULT_OPTIONS.copy()
+                else:
+                    meta_with_defaults = FiniteDifference.DEFAULT_OPTIONS.copy()
+                for name in meta:
+                    meta_with_defaults[name] = meta[name]
+
+                # For each of the partials, check to see if the
+                #   check partials options are different than the options used to compute
+                #   the partials
+                pattern_matches = comp._find_partial_matches(*key)
+                wrt_vars = pattern_matches[1]
+                for wrt_var in wrt_vars:
+                    _, vars = wrt_var
+                    for var in vars:
+                        # we now have individual vars like 'x'
+                        # get the options for checking partials
+                        fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
+                                                        form, step_calc, alloc_complex)
+                        # compare the compute options to the check options
+                        if fd_options['method'] != meta_with_defaults['method']:
+                            all_same = False
+                        else:
+                            all_same = True
+                            if fd_options['method'] == 'fd':
+                                option_names = ['form', 'step', 'step_calc', 'directional']
+                            else:
+                                option_names = ['step', 'directional']
+                            for name in option_names:
+                                if fd_options[name] != meta_with_defaults[name]:
+                                    all_same = False
+                                    break
+                        if all_same:
+                            msg = f"Checking partials with respect " \
+                                  f"to variable '{var}' in component " \
+                                  f"'{comp.pathname}' using the same " \
+                                  "method and options as are used to compute the " \
+                                  "component's derivatives " \
+                                  "will not provide any relevant information on the " \
+                                  "accuracy.\n" \
+                                  "To correct this, change the options to do the \n" \
+                                  "check_partials using either:\n" \
+                                  "     - arguments to Problem.check_partials. \n" \
+                                  "     - arguments to Component.set_check_partial_options"
+
+                            issue_warning(msg, prefix=self.msginfo,
+                                          category=OMInvalidCheckDerivativesOptionsWarning)
+
         self.set_solver_print(level=0)
 
         # This is a defaultdict of (defaultdict of dicts).
@@ -1132,6 +1197,9 @@ class Problem(object):
 
         # Directional derivative directions for matrix free comps.
         mfree_directions = {}
+
+        meta_in = model._var_allprocs_abs2meta['input']
+        meta_out = model._var_allprocs_abs2meta['output']
 
         # Analytic Jacobians
         print_reverse = False
@@ -1149,7 +1217,6 @@ class Problem(object):
                 if mode == 'fwd':
                     comp.run_linearize(sub_do_ln=False)
 
-                explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 if mode == 'fwd':
@@ -1190,8 +1257,14 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._abs_get_val(inp_abs)
 
+                            if inp_abs in meta_in:
+                                in_dist = meta_in[inp_abs]['distributed']
+                            else:
+                                in_dist = meta_out[inp_abs]['distributed']
+
                             if directional:
                                 n_in = 1
+                                idxs = range(1)
                                 if c_name not in mfree_directions:
                                     mfree_directions[c_name] = {}
 
@@ -1203,9 +1276,19 @@ class Problem(object):
 
                             else:
                                 n_in = len(flat_view)
+                                idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
 
-                            for idx in range(n_in):
+                            # in rev mode when we have a serial resid and a distrib input, we
+                            # need to multiply the derivative to correct for the effect of having
+                            # a seed that hasn't been split between each instance of the duplicated
+                            # serial resid.
+                            if in_dist or mode == 'fwd':
+                                mult = 1.0
+                            else:
+                                mult = 1.0 / comp.comm.size
+
+                            for idx in idxs:
 
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
@@ -1214,7 +1297,7 @@ class Problem(object):
                                 # need a vector for clean code, so use _views_flat.
                                 if directional:
                                     flat_view[:] = perturb
-                                else:
+                                elif idx is not None:
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
@@ -1238,9 +1321,17 @@ class Problem(object):
                                             shape = (len(derivs), n_in)
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][:, idx] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][:, idx] = derivs
 
-                                    else:
+                                    else:  # rev
+                                        if out_abs in meta_out:
+                                            out_dist = meta_out[out_abs]['distributed']
+                                        else:
+                                            out_dist = meta_in[out_abs]['distributed']
+                                        if out_dist and not in_dist:
+                                            derivs *= mult
+
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
 
@@ -1258,7 +1349,8 @@ class Problem(object):
                                             shape = (n_in, len(derivs))
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][idx, :] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][idx, :] = derivs
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
@@ -1343,49 +1435,20 @@ class Problem(object):
             of, wrt = comp._get_partials_varlists()
 
             # Load up approximation objects with the requested settings.
+
             local_opts = comp._get_check_partial_options()
             for rel_key in product(of, wrt):
                 abs_key = rel_key2abs_key(comp, rel_key)
                 local_wrt = rel_key[1]
 
+                fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method, local_opts,
+                                                           step, form, step_calc, alloc_complex)
+
+                if could_not_cs:
+                    comps_could_not_cs.add(c_name)
+
                 # Determine if fd or cs.
                 method = requested_method
-                if local_wrt in local_opts:
-                    local_method = local_opts[local_wrt]['method']
-                    if local_method:
-                        method = local_method
-
-                # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-                if method == 'cs' and not alloc_complex:
-                    comps_could_not_cs.add(c_name)
-                    method = 'fd'
-
-                fd_options = {'order': None,
-                              'method': method}
-
-                if method == 'cs':
-                    defaults = ComplexStep.DEFAULT_OPTIONS
-
-                    fd_options['form'] = None
-                    fd_options['step_calc'] = None
-
-                elif method == 'fd':
-                    defaults = FiniteDifference.DEFAULT_OPTIONS
-
-                    fd_options['form'] = form
-                    fd_options['step_calc'] = step_calc
-
-                if step and requested_method == method:
-                    fd_options['step'] = step
-                else:
-                    fd_options['step'] = defaults['step']
-
-                # Precedence: component options > global options > defaults
-                if local_wrt in local_opts:
-                    for name in ['form', 'step', 'step_calc', 'directional']:
-                        value = local_opts[local_wrt][name]
-                        if value is not None:
-                            fd_options[name] = value
 
                 all_fd_options[c_name][local_wrt] = fd_options
                 if c_name in mfree_directions:
@@ -1404,6 +1467,10 @@ class Problem(object):
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
+
+            with multi_proc_exception_check(comp.comm):
+                if approx_jac._errors:
+                    raise RuntimeError('\n'.join(approx_jac._errors))
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
@@ -1504,6 +1571,48 @@ class Problem(object):
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
+
+        # Check to see if approximation options are the same as that used to compute totals
+        # If yes, issue an warning
+        if self.model._owns_approx_jac and method in self.model._approx_schemes:
+            scheme = self.model._get_approx_scheme(method)
+
+            # get approx options. Fill in with defaults, as needed
+            approx_options = scheme.DEFAULT_OPTIONS.copy()
+            approx_options.update(self.model._owns_approx_jac_meta)
+
+            # get check options. Fill in with defaults, as needed
+            check_options = scheme.DEFAULT_OPTIONS.copy()
+            if step:
+                check_options['step'] = step
+            if method == 'fd':
+                if form:
+                    check_options['form'] = form
+                if step_calc:
+                    check_options['step_calc'] = step_calc
+
+            # Compare the approx and check options
+            all_same = True
+            if approx_options['step'] != check_options['step']:
+                all_same = False
+            elif method == 'fd':
+                if approx_options['form'] != check_options['form']:
+                    all_same = False
+                if approx_options['step_calc'] != check_options['step_calc']:
+                    all_same = False
+
+            if all_same:
+                msg = "Checking totals using the same " \
+                      "method and options as are used to compute the " \
+                      "totals will not provide any relevant " \
+                      "information on the " \
+                      "accuracy.\n" \
+                      "To correct this, change the options to do the " \
+                      "check_totals or on the call to approx_totals " \
+                      "for the model."
+
+                issue_warning(msg, prefix=self.msginfo,
+                              category=OMInvalidCheckDerivativesOptionsWarning)
 
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             raise RuntimeError(self.msginfo + ": run_model must be called before total "
@@ -2431,3 +2540,53 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
+                    alloc_complex):
+    local_wrt = var
+
+    # Determine if fd or cs.
+    method = global_method
+    if local_wrt in local_opts:
+        local_method = local_opts[local_wrt]['method']
+        if local_method:
+            method = local_method
+
+    # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
+    if method == 'cs' and not alloc_complex:
+        method = 'fd'
+        could_not_cs = True
+    else:
+        could_not_cs = False
+
+    fd_options = {'order': None,
+                  'method': method}
+
+    if method == 'cs':
+        defaults = ComplexStep.DEFAULT_OPTIONS
+
+        fd_options['form'] = None
+        fd_options['step_calc'] = None
+
+    elif method == 'fd':
+        defaults = FiniteDifference.DEFAULT_OPTIONS
+
+        fd_options['form'] = global_form
+        fd_options['step_calc'] = global_step_calc
+
+    if global_step and global_method == method:
+        fd_options['step'] = global_step
+    else:
+        fd_options['step'] = defaults['step']
+
+    fd_options['directional'] = defaults['directional']
+
+    # Precedence: component options > global options > defaults
+    if local_wrt in local_opts:
+        for name in ['form', 'step', 'step_calc', 'directional']:
+            value = local_opts[local_wrt][name]
+            if value is not None:
+                fd_options[name] = value
+
+    return fd_options, could_not_cs

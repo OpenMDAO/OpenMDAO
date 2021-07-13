@@ -2,6 +2,7 @@
 A module for OpenMDAO-specific warnings and associated functions.
 """
 
+from functools import cmp_to_key
 import inspect
 import re
 import sys
@@ -12,7 +13,8 @@ import warnings
 __all__ = ['issue_warning', 'reset_warnings', 'reset_warning_registry', '_warn_simple_format',
            'OpenMDAOWarning', 'SetupWarning', 'DistributedComponentWarning', 'CaseRecorderWarning',
            'CacheWarning', 'PromotionWarning', 'UnusedOptionWarning', 'DerivativesWarning',
-           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning']
+           'MPIWarning', 'UnitsWarning', 'SolverWarning', 'DriverWarning', 'OMDeprecationWarning',
+           'OMInvalidCheckDerivativesOptionsWarning']
 
 
 class OpenMDAOWarning(UserWarning):
@@ -132,9 +134,38 @@ class OMDeprecationWarning(OpenMDAOWarning):
     filter = 'once'
 
 
+class OMInvalidCheckDerivativesOptionsWarning(OpenMDAOWarning):
+    """
+    An OpenMDAO-specific warning that defaults to raising an exception.
+
+    It tells the user that they are checking derivatives with the exact same method
+    used to computer the derivatives, including all the settings.
+    """
+
+    name = 'warn_invalid_check_derivatives'
+    filter = 'error'
+
+
 _warnings = [_class for _, _class in
              inspect.getmembers(sys.modules[__name__], inspect.isclass)
              if issubclass(_class, Warning)]
+
+
+# The order of warnings matters in the Python warnings module! See
+#    https://docs.python.org/3/library/warnings.html#the-warnings-filter
+# reset_warnings processes the warnings classes in the order returned by inspect.getmembers.
+# The order is alphabetized. But this causes problems.
+# To solve this problem, we sort the warnings classes so that parents come before their children
+def compare_class_hierarchy(class1, class2):
+    if issubclass(class1, class2):
+        return 1
+    elif issubclass(class2, class1):
+        return -1
+    else:
+        return 0
+
+
+_warnings = sorted(_warnings, key=cmp_to_key(compare_class_hierarchy))
 
 
 def reset_warnings():

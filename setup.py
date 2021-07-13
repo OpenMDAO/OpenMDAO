@@ -17,6 +17,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'tabulate',
         'jupyter-book',
+        'jupyter-sphinx==0.3.1',
         'sphinx-sitemap'
     ],
     'notebooks': [

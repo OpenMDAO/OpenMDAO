@@ -5,7 +5,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
-from openmdao.warnings import OMDeprecationWarning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 from openmdao.utils.mpi import MPI
 if MPI:

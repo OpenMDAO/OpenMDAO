@@ -308,7 +308,8 @@ class MatMultTestCase(unittest.TestCase):
         self.assertLess(norm, 1.e-7)
 
         # make sure check_partials works
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials(out_stream=None, step=1.1e-6) # step needs to be different
+        #  than compute step, otherwise we get an error
         norm = np.linalg.norm(data['comp']['y', 'x']['J_fd'] - comp.mat)
         self.assertLess(norm, 1.e-7)
 
@@ -372,7 +373,8 @@ class MatMultParallelTestCase(unittest.TestCase):
                 self.assertLess(norm, 1.e-7)
 
         # make sure check_partials works
-        data = p.check_partials(out_stream=None)
+        data = p.check_partials(out_stream=None, step=1.1e-6) # step needs to be different than
+        # compute step size
         if 'par.C1' in data:
             norm = np.linalg.norm(data['par.C1']['y', 'x']['J_fd'] - C1.mat)
             self.assertLess(norm, 1.e-7)

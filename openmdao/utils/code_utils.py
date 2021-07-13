@@ -185,18 +185,19 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
 
     graph = OrderedDiGraph()
     seen = set()
+    top = object()
 
     full, klass = _find_owning_class(inspect.getmro(class_), method_name)
     if full is None:
         print("Can't find function '%s' in class '%s'." % (method_name, class_.__name__))
     else:
-        graph.add_edge(None, full)
+        graph.add_edge(top, full)
         parent = full
         _get_nested_calls(class_, klass, method_name, parent, graph, seen)
 
     if graph and stream is not None:
-        seen = set([None])
-        stack = [(0, iter(graph[None]))]
+        seen = set([top])
+        stack = [(0, iter(graph[top]))]
         while stack:
             depth, children = stack[-1]
             try:
