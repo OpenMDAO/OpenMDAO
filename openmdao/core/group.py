@@ -175,7 +175,7 @@ class Group(System):
         Flag to check if set_order has been called.
     _auto_ivc_warnings : list
         List of Auto IVC warnings to be raised later with simple_warnings.
-    _shapes_graph : nx.OrderedGraph
+    _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
     _shape_knowns : set
         Set of shape dependency graph nodes with known (non-dynamic) shapes.
@@ -1606,8 +1606,6 @@ class Group(System):
         """
         Add shape/size metadata for variables that were created with shape_by_conn or copy_shape.
         """
-        self._shapes_graph = graph = nx.OrderedGraph()  # ordered graph for consistency across procs
-        self._shape_knowns = knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
 
@@ -1673,9 +1671,9 @@ class Group(System):
                     rev[src] = [tgt]
             return rev
 
-        graph = nx.OrderedGraph()  # ordered graph for consistency across procs
+        self._shapes_graph = graph = nx.Graph()
+        self._shape_knowns = knowns = set()
         dist_sz = {}  # local distrib sizes
-        knowns = set()  # variable nodes in the graph with known shapes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
 
