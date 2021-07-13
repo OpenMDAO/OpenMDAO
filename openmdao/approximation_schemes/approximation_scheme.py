@@ -1,17 +1,23 @@
 """Base class used to define the interface for derivative approximation schemes."""
 import time
-from collections import defaultdict
-from itertools import chain
-from scipy.sparse import coo_matrix
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.array_utils import get_input_idx_split
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name
-from openmdao.utils.mpi import MPI
-from openmdao.jacobians.jacobian import Jacobian
-from openmdao.vectors.vector import _full_slice
+from openmdao.utils.general_utils import _convert_auto_ivc_to_conn_name, LocalRangeIterable
+from openmdao.utils.mpi import check_mpi_env
+
+use_mpi = check_mpi_env()
+if use_mpi is False:
+    PETSc = None
+else:
+    try:
+        from petsc4py import PETSc
+    except ImportError:
+        if use_mpi:
+            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        PETSc = None
 
 
 class ApproximationScheme(object):
@@ -34,6 +40,8 @@ class ApproximationScheme(object):
     _during_sparsity_comp : bool
         If True, we're doing a sparsity computation and uncolored approxs need to be restricted
         to only colored columns.
+    _jac_scatter : tuple
+        Data needed to scatter values from results array to a total jacobian column.
     """
 
     def __init__(self):
@@ -46,6 +54,7 @@ class ApproximationScheme(object):
         self._wrt_meta = {}
         self._progress_out = None
         self._during_sparsity_comp = False
+        self._jac_scatter = None
 
     def __repr__(self):
         """
@@ -116,14 +125,8 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
-        from openmdao.core.group import Group
-        from openmdao.core.implicitcomponent import ImplicitComponent
-
-        is_group = isinstance(system, Group)
+        is_group = _is_group(system)
         is_total = is_group and system.pathname == ''
-        is_semi = is_group and not is_total
-        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
-
         self._colored_approx_groups = []
 
         # don't do anything if the coloring doesn't exist yet
@@ -145,7 +148,7 @@ class ApproximationScheme(object):
 
             ordered_wrt_iter = list(system._jac_wrt_iter())
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, vec, cinds in ordered_wrt_iter:
+            for abs_wrt, cstart, cend, _, cinds, _ in ordered_wrt_iter:
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     ccol2jcol[colored_start:colored_end] = np.arange(cstart, cend, dtype=INT_DTYPE)
@@ -162,7 +165,7 @@ class ApproximationScheme(object):
         abs2prom = system._var_allprocs_abs2prom['output']
 
         if is_total:
-            it = [(of, end - start) for of, start, end, _ in system._jac_of_iter()]
+            it = [(of, end - start) for of, start, end, _, _ in system._jac_of_iter()]
         else:
             it = [(n, arr.size) for n, arr in system._outputs._abs_item_iter()]
 
@@ -185,6 +188,10 @@ class ApproximationScheme(object):
         outputs = system._outputs
         inputs = system._inputs
 
+        from openmdao.core.implicitcomponent import ImplicitComponent
+        is_semi = is_group and not is_total
+        use_full_cols = is_semi or isinstance(system, ImplicitComponent)
+
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             nzrows = [row_map[r] for r in nzrows]
             jaccols = cols if wrt_matches is None else ccol2jcol[cols]
@@ -192,8 +199,7 @@ class ApproximationScheme(object):
                 vcols = ccol2vcol[cols]
             else:
                 vcols = jaccols
-            vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols,
-                                               is_total)
+            vec_ind_list = get_input_idx_split(vcols, inputs, outputs, use_full_cols, is_total)
             self._colored_approx_groups.append((data, jaccols, vec_ind_list, nzrows))
 
     def _init_approximations(self, system):
@@ -205,6 +211,7 @@ class ApproximationScheme(object):
         system : System
             The system having its derivs approximated.
         """
+        total = system.pathname == ''
         abs2meta = system._var_allprocs_abs2meta
 
         in_slices = system._inputs.get_slice_dict()
@@ -221,7 +228,7 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
-        for wrt, start, end, vec, cinds in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -252,11 +259,11 @@ class ApproximationScheme(object):
                 else:
                     if vec is None:  # remote wrt
                         if wrt in abs2meta['input']:
-                            vec_idx = range(abs2meta['input'][wrt]['size'])
+                            vec_idx = range(abs2meta['input'][wrt]['global_size'])
                         else:
-                            vec_idx = range(abs2meta['output'][wrt]['size'])
+                            vec_idx = range(abs2meta['output'][wrt]['global_size'])
                     else:
-                        vec_idx = range(slices[wrt].start, slices[wrt].stop)
+                        vec_idx = LocalRangeIterable(system, wrt)
 
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.
@@ -272,7 +279,25 @@ class ApproximationScheme(object):
                 self._approx_groups.append((wrt, data, in_idx, vec, vec_idx, directional,
                                             meta['vector']))
 
-    def _colored_column_iter(self, system, colored_approx_groups, total):
+        if total:
+            # compute scatter from the results vector into a column of the total jacobian
+            sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
+            if has_dist_data:
+                src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
+                                                      comm=system.comm)
+                tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float),
+                                                      comm=system.comm)
+                src_inds = PETSc.IS().createGeneral(sinds, comm=system.comm)
+                tgt_inds = PETSc.IS().createGeneral(tinds, comm=system.comm)
+                self._jac_scatter = (has_dist_data,
+                                     PETSc.Scatter().create(src_vec, src_inds, tgt_vec, tgt_inds),
+                                     src_vec, tgt_vec)
+            else:
+                self._jac_scatter = (has_dist_data, sinds, tinds)
+        else:
+            self._jac_scatter = None
+
+    def _colored_column_iter(self, system, colored_approx_groups):
         """
         Perform colored approximations and yields (column_index, column) for each jac column.
 
@@ -286,8 +311,6 @@ class ApproximationScheme(object):
             vec_ind_list -> list of tuples of the form (Vector, ndarray of int)
                 Tuple of wrt indices and corresponding data vector to perturb.
             nzrows -> rows containing nonzero values for each column in jaccols
-        total : bool
-            If True total derivatives are being approximated, else partials.
 
         Yields
         ------
@@ -296,23 +319,19 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
+        total_or_semi = _is_group(system)
+        total = system.pathname == ''
+
         if total:
-            # if we have any remote vars, find the list of vars from this proc that need to be
-            # transferred to other procs
-            if system.comm.size > 1:
-                my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                   if n in system._vars_to_gather and
-                                   system._vars_to_gather[n] == system.comm.rank]
-            else:
-                my_rem_out_vars = ()
-            ordered_of_iter = list(system._jac_of_iter())
-            tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            tot_result = np.zeros(sum([end - start for _, start, end, _, _
+                                       in system._jac_of_iter()]))
             scratch = tot_result.copy()
         else:
             scratch = np.empty(len(system._outputs))
 
         # Clean vector for results (copy of the outputs or resids)
-        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
+        vec = system._outputs if total_or_semi else system._residuals
+        results_array = vec.asarray(True)
 
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
@@ -330,7 +349,7 @@ class ApproximationScheme(object):
 
             if fd_count % num_par_fd == system._par_fd_id:
                 # run the finite difference
-                result = self._run_point(system, vec_ind_list, data, results_array, total)
+                result = self._run_point(system, vec_ind_list, data, results_array, total_or_semi)
 
                 if par_fd_w_serial_model or not is_parallel:
                     result = self._transform_result(result)
@@ -339,8 +358,7 @@ class ApproximationScheme(object):
                         result *= mult
 
                     if total:
-                        result = self._get_semitotal_result(system, result, tot_result,
-                                                            ordered_of_iter, my_rem_out_vars)
+                        result = self._get_total_result(result, tot_result)
 
                     tosend = (fd_count, result)
 
@@ -373,7 +391,7 @@ class ApproximationScheme(object):
                     scratch[nzrows[i]] = res[nzrows[i]]
                     yield col, scratch
 
-    def _uncolored_column_iter(self, system, approx_groups, total):
+    def _uncolored_column_iter(self, system, approx_groups):
         """
         Perform approximations and yields (column_index, column) for each jac column.
 
@@ -391,8 +409,6 @@ class ApproximationScheme(object):
             directional -> if True we're computing a directional derivative (one approx for the
                            whole wrt variable instead of 1 per entry in the variable)
             dir_vector -> if directional is True, this may contain the direction vector
-        total : bool
-            If True total derivatives are being approximated, else partials.
 
         Yields
         ------
@@ -401,23 +417,18 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
+        total = system.pathname == ''
         ordered_of_iter = list(system._jac_of_iter())
         if total:
-            # if we have any remote vars, find the list of vars from this proc that need to be
-            # transferred to other procs
-            if system.comm.size > 1:
-                my_rem_out_vars = [n for n in system._outputs._abs_iter()
-                                   if n in system._vars_to_gather and
-                                   system._vars_to_gather[n] == system.comm.rank]
-            else:
-                my_rem_out_vars = ()
-            tot_result = np.zeros(sum([end - start for _, start, end, _ in ordered_of_iter]))
+            tot_result = np.zeros(ordered_of_iter[-1][2])
+
+        total_or_semi = total or _is_group(system)
 
         # Clean vector for results (copy of the outputs or resids)
-        results_array = system._outputs.asarray(True) if total else system._residuals.asarray(True)
+        results_array = system._outputs.asarray(True) if total_or_semi \
+            else system._residuals.asarray(True)
         use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
                                                       system._full_comm.size > 1)
-        is_parallel = use_parallel_fd or system.comm.size > 1
         num_par_fd = system._num_par_fd if use_parallel_fd else 1
 
         nruns = self._nruns_uncolored
@@ -438,11 +449,13 @@ class ApproximationScheme(object):
 
             mult = self._get_multiplier(data)
 
-            for i_count, (idxs, vecidxs) in enumerate(zip(jcol_idxs, vec_idxs)):
+            jidx_iter = iter(range(len(jcol_idxs)))
+            for vecidxs in vec_idxs:
+
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
                     result = self._run_point(system, [(vec, vecidxs)],
-                                             app_data, results_array, total)
+                                             app_data, results_array, total_or_semi)
 
                     result = self._transform_result(result)
 
@@ -450,10 +463,12 @@ class ApproximationScheme(object):
                         result *= mult
 
                     if total:
-                        result = self._get_semitotal_result(system, result, tot_result,
-                                                            ordered_of_iter, my_rem_out_vars)
+                        result = self._get_total_result(result, tot_result)
 
-                    tosend = (group_i, i_count, result)
+                    if vecidxs is None and not total_or_semi:
+                        tosend = (group_i, None, None)
+                    else:
+                        tosend = (group_i, next(jidx_iter), result)  # use local jac row var index
 
                     if self._progress_out:
                         end_time = time.time()
@@ -463,6 +478,8 @@ class ApproximationScheme(object):
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "
                                                  f"{round(end_time-start_time, 4)} seconds\n")
+                elif use_parallel_fd:
+                    next(jidx_iter)  # skip this column index
 
                 fd_count += 1
 
@@ -480,6 +497,8 @@ class ApproximationScheme(object):
                     if tup is None:
                         continue
                     gi, icount, res = tup
+                    if icount is None:
+                        continue  # skip yield for non-local partial jac column
                     # approx_groups[gi] -> (wrt, data, jcol_idxs, vec, vec_idxs, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
@@ -488,7 +507,7 @@ class ApproximationScheme(object):
                     else:
                         yield jinds, res
 
-    def compute_approximations(self, system, jac=None, total=False):
+    def compute_approximations(self, system, jac=None):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -499,8 +518,6 @@ class ApproximationScheme(object):
         jac : None or dict-like
             If None, update system with the approximated sub-Jacobians. Otherwise, store the
             approximations in the given dict-like object.
-        total : bool
-            If True total derivatives are being approximated, else partials.
         """
         if not self._wrt_meta:
             return
@@ -508,70 +525,65 @@ class ApproximationScheme(object):
         if jac is None:
             jac = system._jacobian
 
-        for ic, col in self.compute_approx_col_iter(system, total,
+        for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
-            jac.set_col(system, ic, col)
+            if system._tot_jac is None:
+                jac.set_col(system, ic, col)
+            else:
+                system._tot_jac.set_col(ic, col)
 
-    def _compute_approx_col_iter(self, system, total, under_cs):
+    def _compute_approx_col_iter(self, system, under_cs):
         system._set_approx_mode(True)
 
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
 
         if colored_approx_groups:
-            yield from self._colored_column_iter(system, colored_approx_groups, total)
+            yield from self._colored_column_iter(system, colored_approx_groups)
 
-        yield from self._uncolored_column_iter(system, approx_groups, total)
+        yield from self._uncolored_column_iter(system, approx_groups)
 
         system._set_approx_mode(False)
 
-    def _get_semitotal_result(self, system, outarr, totarr, of_iter, my_rem_out_vars):
+    def _get_total_result(self, outarr, totarr):
         """
-        Convert output array into a column array that matches the size of the jacobian.
+        Convert output array into a column array that matches the size of the total jacobian.
 
         Also gather any remote vars, if necessary, into the column array.
 
         Parameters
         ----------
-        system : System
-            The owning system.
         outarr : ndarray
             Array containing local results from the outputs vector.
         totarr : ndarray
             Array sized to fit a total jac column.
-        of_iter : list
-            List of (of, start, end, inds) for each 'of' (row) variable in the total jacobian.
-        my_rem_out_vars : list
-            List of names of local variables that are remote on other procs.
 
         Returns
         -------
         ndarray
             totarr, now filled with current values, potentially from other mpi procs.
         """
-        out_slices = system._outputs.get_slice_dict()
-
-        if system._vars_to_gather:
-            myvars = {}
-            for n in my_rem_out_vars:
-                val = outarr[out_slices[n]]
-                if n in system._owns_approx_of_idx:
-                    val = val[system._owns_approx_of_idx[n]()]
-                myvars[n] = val
-            allremvars = system.comm.allgather(myvars)
-
-            for of, start, end, inds in of_iter:
-                if of not in system._vars_to_gather:
-                    totarr[start:end] = outarr[out_slices[of]][inds]
-                else:
-                    for procvars in allremvars:
-                        if of in procvars:
-                            totarr[start:end] = procvars[of]
-                            break
-                    else:  # shouldn't ever get here
-                        raise RuntimeError(f"Couldn't find '{of}'.")
+        if self._jac_scatter[0]:  # dist data passing
+            _, scatter, svec, tvec = self._jac_scatter
+            svec.array = outarr
+            tvec.array[:] = totarr
+            scatter.scatter(svec, tvec, addv=False, mode=False)
+            totarr[:] = tvec.array
         else:
-            for of, start, end, inds in of_iter:
-                totarr[start:end] = outarr[out_slices[of]][inds]
+            _, sinds, tinds = self._jac_scatter
+            totarr[tinds] = outarr[sinds]
 
         return totarr
+
+
+def _is_group(obj):
+    """
+    Return True if the given object is Group.
+
+    Parameters
+    ----------
+    obj : object
+        Object to be checked.
+    """
+    from openmdao.core.group import Group
+    return isinstance(obj, Group)
