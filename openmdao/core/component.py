@@ -1552,7 +1552,11 @@ class Component(System):
                 all_abs2meta_in[tgt]['has_src_indices'] = True
                 meta = abs2meta_in[tgt]
                 if src_shape is None and parent_src_shape is not None:
-                    src_inds.set_src_shape(parent_src_shape)
+                    try:
+                        src_inds.set_src_shape(parent_src_shape)
+                    except Exception as err:
+                        raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
+                                           f"src_indices {src_inds}: {err}")
                 meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,

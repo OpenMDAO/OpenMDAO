@@ -320,6 +320,37 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0], "'G.g1' <class Group>: Promoted src_shape of (3, 3) for 'x' in 'G.g1.C1' differs from src_shape (3, 2) for 'x' in 'G'.")
 
+    def test_src_indices_on_promotes(self):
+        src_shape = (3, 3)
+        tgt_shape = (2, 2)
+        src_indices = [[4, 5], [7, 9]]
+        flat_src_indices = True
+
+        class MyComp(om.ExplicitComponent):
+            def __init__(self, input_shape):
+                super().__init__()
+                self._input_shape = input_shape
+            def setup(self):
+                self.add_input('x', val=np.zeros(self._input_shape))
+                self.add_output('y', val=np.zeros(self._input_shape))
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2.0 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape))
+        p.model.add_subsystem('C1', MyComp(tgt_shape))
+        p.model.promotes('C1', any=['x'],
+                            src_indices=src_indices,
+                            flat_src_indices=flat_src_indices)
+        p.model.set_input_defaults('x', src_shape=src_shape)
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]]: "
+                         "index 9 is out of bounds for source dimension of size 9.")
+
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
     def test_multi_promotes(self):
