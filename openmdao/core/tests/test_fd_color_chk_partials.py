@@ -94,6 +94,6 @@ class TestColoringChkPartials(unittest.TestCase):
         p.run_model()
 
         s = StringIO()
-        p.check_partials(out_stream=s, method='cs', show_only_incorrect=True)
+        p.check_partials(out_stream=s, method='cs', show_only_incorrect=True, step=1e-39)
         out = s.getvalue().strip()
         self.assertEqual(out, '** Only writing information about components with incorrect Jacobians **')

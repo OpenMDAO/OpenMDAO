@@ -21,4 +21,13 @@ rank*.dat
 .coverage
 n2.html
 coloring_files
+*.ipynb_checkpoints
+cases.sql_0
+cases.sql_1
+cases.sql_meta
+*.db
+openmdao/docs/openmdao_book/*/*/cases.sql
+openmdao/docs/openmdao_book/other_useful_docs/sqlite_test
+driver_scaling_report.html
+*.dat
 .ipynb_checkpoints/

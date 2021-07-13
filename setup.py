@@ -17,6 +17,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'tabulate',
         'jupyter-book',
+        'jupyter-sphinx==0.3.1',
         'sphinx-sitemap'
     ],
     'notebooks': [
@@ -162,7 +163,7 @@ setup(
     },
     python_requires=">=3.6",
     install_requires=[
-        'networkx>=2.0',
+        'networkx>=2.0, <2.6',
         'numpy',
         'pyDOE2',
         'pyparsing',

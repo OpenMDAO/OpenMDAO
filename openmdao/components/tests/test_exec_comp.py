@@ -1484,7 +1484,7 @@ class TestFunctionRegistration(unittest.TestCase):
             p.run_model()
             assert_near_equal(p['comp.area_square'], np.ones(size) * 9., 1e-6)
 
-            data = p.check_partials(out_stream=None)
+            data = p.check_partials(out_stream=None, step=1e-7)
             self.assertEqual(list(data), ['comp'])
 
     def test_register_check_partials_not_safe_err(self):
@@ -1533,7 +1533,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.out2', 'comp.y'], np.eye(size) * 2. * y, 1e-11)
             assert_near_equal(J['comp.out2', 'comp.z'], np.eye(size), 1e-6)
 
-            data = p.check_partials(out_stream=None)
+            data = p.check_partials(out_stream=None, step=1e-7)
             self.assertEqual(list(data), ['comp'])
 
     def test_register_check_partials_not_safe_mult_expr_err(self):
@@ -1554,7 +1554,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(p['comp.out2'], np.ones(size) * 21., 1e-6)
 
             with self.assertRaises(Exception) as cm:
-                data = p.check_partials(out_stream=None)
+                data = p.check_partials(out_stream=None, step=1e-7)
             self.assertEquals(cm.exception.args[0],
                               "'comp' <class ExecComp>: expression contains functions ['unsafe'] that are not complex safe. To fix this, call declare_partials('*', ['z'], method='fd') on this component prior to setup.")
 
