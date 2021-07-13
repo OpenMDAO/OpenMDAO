@@ -309,13 +309,15 @@ class Jacobian(object):
         self._under_complex_step = active
 
     def _setup_index_maps(self, system):
-        self._col_var_info = col_var_info = {t[0]: t for t in system._jac_wrt_iter()}
+        self._col_var_info = col_var_info = {
+            t[0]: t for t in system._jac_wrt_iter()
+        }
         self._colnames = list(col_var_info)   # map var id to varname
 
-        ncols = np.sum(end - start for _, start, end, _, _ in col_var_info.values())
+        ncols = np.sum(end - start for _, start, end, _, _, _ in col_var_info.values())
         self._col2name_ind = np.empty(ncols, dtype=INT_DTYPE)  # jac col to var id
         start = end = 0
-        for i, (wrt, _start, _end, _, _) in enumerate(col_var_info.values()):
+        for i, (wrt, _start, _end, _, _, _) in enumerate(col_var_info.values()):
             end += _end - _start
             self._col2name_ind[start:end] = i
             start = end
@@ -399,10 +401,10 @@ class Jacobian(object):
             self._setup_index_maps(system)
 
         wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _, _ = self._col_var_info[wrt]
+        _, offset, _, _, _, _ = self._col_var_info[wrt]
         loc_idx = icol - offset  # local col index into subjacs
 
-        for of, start, end, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
                 subjac = self._subjacs_info[key]

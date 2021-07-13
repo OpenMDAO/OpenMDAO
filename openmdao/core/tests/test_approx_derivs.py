@@ -65,7 +65,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['fd']._wrt_meta), 2)
+        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -997,7 +997,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_near_equal(derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['cs']._wrt_meta), 2)
+        self.assertEqual(np.sum(v.size for v in derivs.values()), 2)
 
     @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:

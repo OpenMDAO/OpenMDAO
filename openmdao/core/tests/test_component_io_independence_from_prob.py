@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import openmdao.api as om 
+import openmdao.api as om
 import gc
 
 class TestComponentIOIndependenceFromProb(unittest.TestCase):
@@ -52,7 +52,7 @@ class TestComponentIOIndependenceFromProb(unittest.TestCase):
     class ParabolaSystem(om.Group):
 
         def __init__(self):
-            super(TestComponentIOIndependenceFromProb.ParabolaSystem, 
+            super(TestComponentIOIndependenceFromProb.ParabolaSystem,
                 self).__init__()
             self.p = TestComponentIOIndependenceFromProb.Parabola()
             self.x0 = 3
