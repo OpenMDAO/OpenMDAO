@@ -5259,6 +5259,7 @@ class System(object):
             True if remote or distributed vars are present.
         """
         myrank = self.comm.rank
+        nranks = self.comm.size
         owns = self._owning_rank
         abs2idx = self._var_allprocs_abs2idx
         abs2meta = self._var_abs2meta['output']
@@ -5279,7 +5280,7 @@ class System(object):
                     owner = myrank
                 else:
                     owner = owns[name]
-                    has_dist_data = True
+                    has_dist_data = nranks > 1
 
                 voff = global_offsets[owner, vind]
                 if jinds is _full_slice:
@@ -5290,7 +5291,7 @@ class System(object):
                 tinds.append(range(tstart + toffset, tend + toffset))
                 assert(len(sinds[-1]) == len(tinds[-1]))
             else:  # 'name' refers to a distributed variable
-                has_dist_data = True
+                has_dist_data = nranks > 1
                 dtstart = dtend = tstart
                 dsstart = dsend = 0
                 for rnk, sz in enumerate(dist_sizes):
