@@ -782,7 +782,7 @@ class System(object):
         """
         try:
             prom2abs = self._problem_meta['prom2abs']
-        except StandardError:
+        except Exception:
             raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
                                "before Problem.setup has been called.")
 
@@ -5246,7 +5246,7 @@ class System(object):
             dim1 = global_size // high_size
             if global_size % high_size != 0:
                 raise RuntimeError("%s: Global size of variable '%s' (%s) does not agree "
-                                   "with local shape %s" % (self.msginfo, src,
+                                   "with local shape %s" % (self.msginfo, abs_name,
                                                             global_size, meta['shape']))
             return tuple([dim1] + list(high_dims))
         return (global_size,)
