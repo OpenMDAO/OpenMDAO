@@ -3009,9 +3009,9 @@ class Group(System):
 
             start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, start, _end, _, dist_sizes in self._jac_of_iter():
+                for of, _start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
-                        end += (_end - start)
+                        end += (_end - _start)
                         vec = self._outputs if of in local_outs else None
                         yield of, start, end, vec, _full_slice, dist_sizes
                         start = end
