@@ -574,7 +574,7 @@ class System(object):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, offset, end, slice) for each 'of' (row) var in the system's jacobian.
+        Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
@@ -604,7 +604,7 @@ class System(object):
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
+        Iterate over (name, offset, end, vec, slc, dist_sizes) for each column var in the jacobian.
 
         Parameters
         ----------

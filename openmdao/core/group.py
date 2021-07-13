@@ -2924,7 +2924,7 @@ class Group(System):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, start, end, idxs) for each 'of' (row) var in the systems's jacobian.
+        Iterate over (name, start, end, idxs, dist_sizes) for each 'of' (row) var in the jacobian.
 
         idxs will usually be the var slice into the full variable in the result array,
         except in cases where _owns_approx__idx has a value for that variable, in which case it'll
@@ -2973,7 +2973,7 @@ class Group(System):
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, vec, idxs) for each column var in the system's jacobian.
+        Iterate over (name, offset, end, vec, idxs, dist_sizes) for each column var in the jacobian.
 
         Parameters
         ----------
@@ -3001,7 +3001,6 @@ class Group(System):
 
         if self._owns_approx_wrt:
             sizes = self._var_sizes
-            sizes_out = self._var_sizes['output']
             toidx = self._var_allprocs_abs2idx
             abs2meta = self._var_allprocs_abs2meta
             approx_wrt_idx = self._owns_approx_wrt_idx
@@ -3010,14 +3009,14 @@ class Group(System):
 
             szname = 'global_size' if total else 'size'
 
-            offset = end = 0
+            start = end = 0
             if self.pathname:  # doing semitotals, so include output columns
                 for of, start, _end, _, dist_sizes in self._jac_of_iter():
                     if wrt_matches is None or of in wrt_matches:
                         end += (_end - start)
                         vec = self._outputs if of in local_outs else None
-                        yield of, offset, end, vec, _full_slice, dist_sizes
-                        offset = end
+                        yield of, start, end, vec, _full_slice, dist_sizes
+                        start = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt_matches is None or wrt in wrt_matches:
@@ -3038,8 +3037,8 @@ class Group(System):
                         size = abs2meta[io][wrt][szname]
                     end += size
                     dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
-                    yield wrt, offset, end, vec, sub_wrt_idx, dist_sizes
-                    offset = end
+                    yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
+                    start = end
         else:
             yield from super()._jac_wrt_iter(wrt_matches)
 
