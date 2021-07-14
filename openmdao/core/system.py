@@ -1489,10 +1489,6 @@ class System(object):
                     if high_dims:
                         high_size = np.prod(high_dims)
                         dim1 = global_size // high_size
-                        if global_size % high_size != 0:
-                            raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                               "with local shape %s" % (self.msginfo, abs_name,
-                                                                        global_size, local_shape))
                         mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                     else:
                         mymeta['global_shape'] = (global_size,)
