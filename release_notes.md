@@ -5,6 +5,11 @@ July 14, 2021
 
 OpenMDAO 3.10.0 features a few API changes and a migration of documentation to JupyterBook.
 
+## Known Issues
+
+Currently total derivatives of serial outputs with respect to distributed inputs do not work.
+This corner case did not exist in prior releases, but was created by the new distributed variable API from [POEM_046](https://github.com/OpenMDAO/POEMs/blob/master/POEM_046.md). We will fix this in the next release.
+
 ## New Deprecations
 
 - Component option `distributed` is now replaced with `distributed=True` on `add_input` and `add_output`. [#2073](https://github.com/OpenMDAO/OpenMDAO/pull/2073)
