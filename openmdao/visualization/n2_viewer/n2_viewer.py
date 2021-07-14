@@ -5,6 +5,7 @@ import json
 import os
 import zlib
 import networkx as nx
+from collections import defaultdict
 
 import numpy as np
 
@@ -83,27 +84,23 @@ def _convert_ndarray_to_support_nans_in_json(val):
 
 
 def _get_var_dict(system, typ, name, is_parallel):
-    if name in system._var_discrete[typ]:
-        meta = system._var_discrete[typ][name]
-        is_discrete = True
-    else:
-        if name in system._var_abs2meta['output']:
-            meta = system._var_abs2meta['output'][name]
-        else:
-            meta = system._var_abs2meta['input'][name]
+    if name in system._var_abs2meta[typ]:
+        meta = system._var_abs2meta[typ][name]
         name = system._var_abs2prom[typ][name]
         is_discrete = False
+    else:
+        meta = system._var_discrete[typ][name]
+        is_discrete = True
 
-    var_dict = {}
+    var_dict = {
+        'name': name,
+        'type': typ,
+        'dtype': type(meta['val']).__name__,
+    }
 
-    var_dict['name'] = name
-    var_dict['type'] = typ
     if typ == 'output':
-        isimplicit = isinstance(system, ImplicitComponent)
-        var_dict['type'] = 'output'
-        var_dict['implicit'] = isimplicit
+        var_dict['implicit'] = isinstance(system, ImplicitComponent)
 
-    var_dict['dtype'] = type(meta['val']).__name__
     if 'units' in meta:
         if meta['units'] is None:
             var_dict['units'] = 'None'
@@ -437,58 +434,134 @@ def _get_viewer_data(data_source, case_id=None):
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
-    orders = {}
+    orders = defaultdict(lambda: -1)
     data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
     data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
 
     sys_pathnames_list = []  # list of pathnames of systems found in cycles
-    sys_pathnames_dict = {}  # map of pathnames to index of pathname in list
+    sys_idx = {}  # map of pathnames to index of pathname in list
 
     G = root_group.compute_sys_graph(comps_only=True)
 
     scc = nx.strongly_connected_components(G)
 
-    for strong_comp in scc:
+    strongdict = {}
+
+    for i, strong_comp in enumerate(scc):
+        for c in strong_comp:
+            strongdict[c] = i  # associate each comp with a strongly connected component
+
         if len(strong_comp) > 1:
             # these IDs are only used when back edges are present
             sys_pathnames_list.extend(strong_comp)
             for name in strong_comp:
-                sys_pathnames_dict[name] = len(sys_pathnames_dict)
+                sys_idx[name] = len(sys_idx)
 
-        for src, tgt in G.edges(strong_comp):
-            if src in strong_comp and tgt in strong_comp:
-                if src in orders:
-                    exe_src = orders[src]
-                else:
-                    exe_src = orders[src] = -1
-                if tgt in orders:
-                    exe_tgt = orders[tgt]
-                else:
-                    exe_tgt = orders[tgt] = -1
+    comp_orders = {name: i for i, name in enumerate(root_group._ordered_comp_name_iter())}
 
-                if exe_tgt < exe_src:
-                    exe_low = exe_tgt
-                    exe_high = exe_src
-                else:
-                    exe_low = exe_src
-                    exe_high = exe_tgt
+    # 1 is added to the indices of all edges in the matrix so that we can use 0 entries to
+    # indicate empty cells.
+    matrix = np.zeros((len(comp_orders), len(comp_orders)), dtype=np.int32)
+    edge_list = [(s, t) for s, t in G.edges()]
+    edge_ids = {}
+    for i, (src, tgt) in enumerate(edge_list):
+        if strongdict[src] == strongdict[tgt]:
+            matrix[comp_orders[src], comp_orders[tgt]] = i + 1  # bump edge index by 1
+            edge_ids[(src, tgt)] = (sys_idx[src], sys_idx[tgt])
 
+    for edge_i, (src, tgt) in enumerate(edge_list):
+        if strongdict[src] == strongdict[tgt]:
+            start = comp_orders[src]
+            end = comp_orders[tgt]
+            if end < start:
+                start, end = end, start
+            submat = matrix[start:end + 1, start:end + 1]
+            nz = submat[submat > 0]
+            if nz.size > 1:
                 edges_list = [
-                    (sys_pathnames_dict[s], sys_pathnames_dict[t]) for s, t in G.edges(strong_comp)
-                    if s in orders and exe_low <= orders[s] <= exe_high and t in orders and
-                    exe_low <= orders[t] <= exe_high and
-                    not (s == src and t == tgt) and t in sys_pathnames_dict
+                    edge_ids[edge_list[i - 1]] for i in nz if i - 1 != edge_i
                 ]
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
-                                                 'cycle_arrows': edges_list})
-            else:  # edge is out of the SCC
-                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
-                    for vtgt in vtgtlist:
-                        connections_list.append({'src': vsrc, 'tgt': vtgt})
+                                                'cycle_arrows': edges_list})
+                continue
+
+        for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
+            for vtgt in vtgtlist:
+                connections_list.append({'src': vsrc, 'tgt': vtgt})
+
+    # edge_range = []
+    # for edge in G.edges():
+    #     src, tgt = edge
+    #     start = orders[src]
+    #     end = orders[tgt]
+    #     if end < start:
+    #         start, end = end, start
+    #     edge_range.append((edge, (start, end)))
+
+    # edge_min_range = sorted(edge_range, key=lambda x: x[1][0])
+    # edge_max_range = sorted(edge_range, key=lambda x: x[1][1])
+    # edge_idxs = {}
+    # for i, edge, _, _ in edge_min_range:
+    #     edge_idxs[edge] = [i, None]
+
+    # for i, edge, _, _ in edge_max_range:
+    #     edge_idxs[edge][1] = i
+    # subgraphs = {}
+
+    # for src, tgt, conns in G.edges.data('conns'):
+    #     if strongdict[src] == strongdict[tgt]:
+    #         if strongdict[src] not in subgraphs:
+    #             subgraphs[strongdict[src]] = subgraph = list(G.subgraph(scc[strongdict[src]]).edges())
+    #         else:
+    #             subgraph = subgraphs[strongdict[src]]
+    #         start = orders[src]
+    #         end = orders[tgt]
+    #         if end < start:
+    #             start, end = end, start
+    #         edges_list = [
+    #             (sys_idx[s], sys_idx[t]) for s, t in
+    #                 subgraph if start <= orders[s] <= end and start <= orders[t] <= end and src != s and t != tgt
+    #         ]
+    #         for vsrc, vtgtlist in conns.items():
+    #             for vtgt in vtgtlist:
+    #                 connections_list.append({'src': vsrc, 'tgt': vtgt,
+    #                                          'cycle_arrows': edges_list})
+    #     else:
+    #         for vsrc, vtgtlist in conns.items():
+    #             for vtgt in vtgtlist:
+    #                 connections_list.append({'src': vsrc, 'tgt': vtgt})
+
+
+        # gedges = G.edges(strong_comp)
+        # for src, tgt in gedges:
+        #     if nstrong > 1 and src in strong_comp and tgt in strong_comp:
+        #         exe_src = orders[src]
+        #         exe_tgt = orders[tgt]
+
+        #         if exe_tgt < exe_src:
+        #             exe_low = exe_tgt
+        #             exe_high = exe_src
+        #         else:
+        #             exe_low = exe_src
+        #             exe_high = exe_tgt
+
+        #         edges_list = [
+        #             (sys_idx[s], sys_idx[t]) for s, t in gedges
+        #             if exe_low <= orders[s] <= exe_high and exe_low <= orders[t] <= exe_high and
+        #             not (s == src and t == tgt) and t in sys_idx
+        #         ]
+        #         for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
+        #             for vtgt in vtgtlist:
+        #                 connections_list.append({'src': vsrc, 'tgt': vtgt,
+        #                                          'cycle_arrows': edges_list})
+        #     else:  # edge is out of the SCC
+        #         for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
+        #             for vtgt in vtgtlist:
+        #                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
