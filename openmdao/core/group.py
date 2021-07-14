@@ -82,8 +82,9 @@ class _PromotesInfo(object):
         yield self.src_shape
 
     def __repr__(self):
-        return (f"_PromotesInfo({self.src_indices}, {self.flat}, {self.src_shape}, "
-                f"{self.parent_sys}, {self.prom})")
+        return (f"_PromotesInfo(src_indices={self.src_indices}, flat={self.flat}, "
+                f"src_shape={self.src_shape}, parent_sys={self.parent_sys}, "
+                f"prom={self.prom}, root_shape={self.root_shape})")
 
     def prom_path(self):
         if self.parent_sys is None or self.prom is None:

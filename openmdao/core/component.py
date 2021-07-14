@@ -1560,8 +1560,10 @@ class Component(System):
                     try:
                         src_inds.set_src_shape(parent_src_shape)
                     except Exception as err:
+                        parent_sys = f"{pinfo.parent_sys} " if pinfo.parent_sys else ""
                         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
-                                           f"src_indices {src_inds}: {err}")
+                                           f"src_indices {src_inds}, "
+                                           f"parent{parent_sys} shape {parent_src_shape}: {err}")
                 meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
