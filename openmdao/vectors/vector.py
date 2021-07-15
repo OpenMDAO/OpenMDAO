@@ -102,7 +102,6 @@ class Vector(object):
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._icol = None
         self._len = 0
 
         self._system = weakref.ref(system)
@@ -319,10 +318,7 @@ class Vector(object):
         """
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
-            if self._icol is None:
-                val = self._views[abs_name]
-            else:
-                val = self._views[abs_name][:, self._icol]
+            val = self._views[abs_name]
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
@@ -538,9 +534,6 @@ class Vector(object):
         if self.read_only:
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
-
-        if self._icol is not None:
-            idxs = (idxs, self._icol)
 
         if flat:
             if isinstance(val, float):
