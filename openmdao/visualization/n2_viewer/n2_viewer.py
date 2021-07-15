@@ -89,20 +89,31 @@ def _convert_ndarray_to_support_nans_in_json(val):
     return val_as_list
 
 
-def _get_var_dict(system, typ, name, is_parallel):
+def _get_var_dict(system, typ, name, is_parallel, is_implicit):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
-        name = system._var_abs2prom[typ][name]
+        prom = system._var_abs2prom[typ][name]
         val = meta['val']
+        is_dist = MPI is not None and meta['distributed']
+
         var_dict = {
-            'name': name,
+            'name': prom,
             'type': typ,
             'dtype': type(val).__name__,
             'is_discrete': False,
-            'distributed': meta['distributed'],
+            'distributed': is_dist,
+            'shape': str(meta['shape']),
         }
+
         if typ == 'output':
-            var_dict['implicit'] = isinstance(system, ImplicitComponent)
+            var_dict['implicit'] = is_implicit
+            vec = system._outputs
+        else:  # input
+            if MPI:
+                vec = system._inputs
+            else:
+                vec = None
+
         if meta['units'] is None:
             var_dict['units'] = 'None'
         else:
@@ -111,16 +122,25 @@ def _get_var_dict(system, typ, name, is_parallel):
         if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
             if not MPI:
                 # get the current value
-                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
-            elif is_parallel or meta['distributed']:
+                if vec:
+                    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
+                        vec._abs_get_val(name, flat=False))
+                else:
+                    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
+                        system.get_val(prom))
+            elif is_parallel or is_dist:
                 # we can't access non-local values, so just get the initial value
                 var_dict['val'] = val
                 var_dict['initial_value'] = True
             else:
                 # get the current value but don't try to get it from the source,
                 # which could be remote under MPI
-                val = system.get_val(name, from_src=False)
-                var_dict['val'] = _convert_ndarray_to_support_nans_in_json(val)
+                if vec:
+                    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
+                        vec._abs_get_val(name, flat=False))
+                else:
+                    var_dict['val'] = _convert_ndarray_to_support_nans_in_json(
+                        system.get_val(prom, from_src=False))
         else:
             var_dict['val'] = None
     else:  # discrete
@@ -136,9 +156,6 @@ def _get_var_dict(system, typ, name, is_parallel):
             var_dict['val'] = default_noraise(system.get_val(name))
         else:
             var_dict['val'] = type(val).__name__
-
-    if 'shape' in meta:
-        var_dict['shape'] = str(meta['shape'])
 
     if 'surrogate_name' in meta:
         var_dict['surrogate_name'] = meta['surrogate_name']
@@ -185,17 +202,16 @@ def _get_tree_dict(system, is_parallel=False):
         'linear_solver': "",
         'linear_solver_options': None,
     }
+    is_implicit = False
 
     if isinstance(system, Group):
-        if isinstance(system, ParallelGroup):
+        if MPI and isinstance(system, ParallelGroup):
             is_parallel = True
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
 
-        children = []
-        for s in system._subsystems_myproc:
-            children.append(_get_tree_dict(s, is_parallel))
+        children = [_get_tree_dict(s, is_parallel) for s in system._subsystems_myproc]
 
         if system.comm.size > 1:
             if system._subsystems_myproc:
@@ -210,15 +226,17 @@ def _get_tree_dict(system, is_parallel=False):
 
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            options = {k: _serialize_single_option(opt)
-                       for k, opt in system.linear_solver.options._dict.items()}
-            tree_dict['linear_solver_options'] = options
+            tree_dict['linear_solver_options'] = {
+                k: _serialize_single_option(opt)
+                for k, opt in system.linear_solver.options._dict.items()
+            }
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: _serialize_single_option(opt)
-                       for k, opt in system.nonlinear_solver.options._dict.items()}
-            tree_dict['nonlinear_solver_options'] = options
+            tree_dict['nonlinear_solver_options'] = {
+                k: _serialize_single_option(opt)
+                for k, opt in system.nonlinear_solver.options._dict.items()
+            }
 
             if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
                 tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
@@ -226,6 +244,7 @@ def _get_tree_dict(system, is_parallel=False):
         tree_dict['subsystem_type'] = 'component'
         tree_dict['is_parallel'] = is_parallel
         if isinstance(system, ImplicitComponent):
+            is_implicit = True
             tree_dict['component_type'] = 'implicit'
             if overrides_method('solve_linear', system, ImplicitComponent):
                 tree_dict['linear_solver'] = "solve_linear"
@@ -259,10 +278,10 @@ def _get_tree_dict(system, is_parallel=False):
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
+                children.append(_get_var_dict(system, typ, abs_name, is_parallel, is_implicit))
 
             for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
+                children.append(_get_var_dict(system, typ, prom_name, is_parallel, is_implicit))
 
     tree_dict['children'] = children
 
