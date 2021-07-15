@@ -998,12 +998,13 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
-        X : array_like
-            An array with shape (n_samples_X, n_features) with the input at which observations
-            were made.
-        Y : array_like
-            An array with shape (n_samples_X, n_features) with the observations of the scalar
-            output to be predicted.
+        X : list of double array_like elements
+            A list of arrays with the input at which observations were made, from highest
+            fidelity to lowest fidelity. Designs must be nested
+            with X[i] = np.vstack([..., X[i+1])
+        Y : list of double array_like elements
+            A list of arrays with the observations of the scalar output to be predicted,
+            from lowest fidelity to highest fidelity.
         """
         opt = self.options
         if not self.model:
