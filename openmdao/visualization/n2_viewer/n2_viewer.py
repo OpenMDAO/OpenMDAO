@@ -443,8 +443,7 @@ def _get_viewer_data(data_source, case_id=None):
 
     connections_list = []
 
-    sys_pathnames_list = []  # list of pathnames of systems found in cycles
-    sys_idx = {}  # map of pathnames to index of pathname in list
+    sys_idx = {}  # map of pathnames to index of pathname in list (systems in cycles only)
 
     G = root_group.compute_sys_graph(comps_only=True)
 
@@ -458,7 +457,6 @@ def _get_viewer_data(data_source, case_id=None):
 
         if len(strong_comp) > 1:
             # these IDs are only used when back edges are present
-            sys_pathnames_list.extend(strong_comp)
             for name in strong_comp:
                 sys_idx[name] = len(sys_idx)
 
@@ -480,15 +478,19 @@ def _get_viewer_data(data_source, case_id=None):
         if strongdict[src] == strongdict[tgt]:
             start = comp_orders[src]
             end = comp_orders[tgt]
-            # get a view so we can remove this edge from submat temporarily to eliminate
+            # get a view here so we can remove this edge from submat temporarily to eliminate
             # an 'if' check inside the nested list comprehension for edges_list
             rem = matrix[start:start + 1, end:end + 1]
             rem[0, 0] = 0
+
             if end < start:
                 start, end = end, start
+
             submat = matrix[start:end + 1, start:end + 1]
             nz = submat[submat > 0]
+
             rem[0, 0] = edge_i + 1  # put removed edge back
+
             if nz.size > 1:
                 edges_list = [edge_ids[i - 1] for i in nz]
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
@@ -501,7 +503,7 @@ def _get_viewer_data(data_source, case_id=None):
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
-    data_dict['sys_pathnames_list'] = sys_pathnames_list
+    data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
