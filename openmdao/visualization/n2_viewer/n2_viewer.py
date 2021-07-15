@@ -491,7 +491,8 @@ def _get_viewer_data(data_source, case_id=None):
             rem[0, 0] = edge_i + 1  # put removed edge back
 
             if nz.size > 1:
-                edges_list = [edge_ids[i - 1] for i in nz]
+                nz -= 1  # convert back to correct edge index
+                edges_list = [edge_ids[i] for i in nz]
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
