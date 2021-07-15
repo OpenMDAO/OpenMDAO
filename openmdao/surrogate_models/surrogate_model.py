@@ -94,7 +94,7 @@ class MultiFiSurrogateModel(SurrogateModel):
 
     def train(self, x, y):
         """
-        Calculate a predicted value of the response based on the current trained model.
+        Train the surrogate model with the given set of inputs and outputs.
 
         Parameters
         ----------
@@ -112,10 +112,12 @@ class MultiFiSurrogateModel(SurrogateModel):
 
         Parameters
         ----------
-        x : list of (m samples, n inputs) ndarrays
-            Values representing the multi-fidelity training case inputs.
-        y : list of ndarray
-            output training values which corresponds to the multi-fidelity
-            training case input given by x.
+        x : list of double array_like elements
+            A list of arrays with the input at which observations were made, from highest
+            fidelity to lowest fidelity. Designs must be nested
+            with X[i] = np.vstack([..., X[i+1])
+        y : list of double array_like elements
+            A list of arrays with the observations of the scalar output to be predicted,
+            from highest fidelity to lowest fidelity.
         """
         pass
