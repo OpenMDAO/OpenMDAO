@@ -180,34 +180,13 @@ def _get_tree_dict(system, is_parallel=False):
         'type': 'subsystem' if system.name else 'root',
         'class': system.__class__.__name__,
         'expressions': None,
+        'nonlinear_solver': "",
+        'nonlinear_solver_options': None,
+        'linear_solver': "",
+        'linear_solver_options': None,
     }
 
-    if not isinstance(system, Group):
-        tree_dict['subsystem_type'] = 'component'
-        tree_dict['is_parallel'] = is_parallel
-        if isinstance(system, ImplicitComponent):
-            tree_dict['component_type'] = 'implicit'
-        elif isinstance(system, ExecComp):
-            tree_dict['component_type'] = 'exec'
-            tree_dict['expressions'] = system._exprs
-        elif isinstance(system, (MetaModelStructuredComp, MetaModelUnStructuredComp)):
-            tree_dict['component_type'] = 'metamodel'
-        elif isinstance(system, IndepVarComp):
-            tree_dict['component_type'] = 'indep'
-        elif isinstance(system, ExplicitComponent):
-            tree_dict['component_type'] = 'explicit'
-        else:
-            tree_dict['component_type'] = None
-
-        children = []
-        for typ in ['input', 'output']:
-            for abs_name in system._var_abs2meta[typ]:
-                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
-
-            for prom_name in system._var_discrete[typ]:
-                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
-
-    else:
+    if isinstance(system, Group):
         if isinstance(system, ParallelGroup):
             is_parallel = True
         tree_dict['component_type'] = None
@@ -229,61 +208,76 @@ def _get_tree_dict(system, is_parallel=False):
             for children_list in children_lists:
                 children.extend(children_list)
 
-    tree_dict['children'] = children
-
-    if isinstance(system, ImplicitComponent):
-        if overrides_method('solve_linear', system, ImplicitComponent):
-            tree_dict['linear_solver'] = "solve_linear"
-            tree_dict['linear_solver_options'] = None
-        elif system.linear_solver:
-            tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
-                       for k in system.linear_solver.options}
-            tree_dict['linear_solver_options'] = options
-        else:
-            tree_dict['linear_solver'] = ""
-            tree_dict['linear_solver_options'] = None
-
-        if overrides_method('solve_nonlinear', system, ImplicitComponent):
-            tree_dict['nonlinear_solver'] = "solve_nonlinear"
-            tree_dict['nonlinear_solver_options'] = None
-        elif system.nonlinear_solver:
-            tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
-                       for k in system.nonlinear_solver.options}
-            tree_dict['nonlinear_solver_options'] = options
-        else:
-            tree_dict['nonlinear_solver'] = ""
-            tree_dict['nonlinear_solver_options'] = None
-    else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
-            options = {k: _serialize_single_option(system.linear_solver.options._dict[k])
-                       for k in system.linear_solver.options}
+            options = {k: _serialize_single_option(opt)
+                       for k, opt in system.linear_solver.options._dict.items()}
             tree_dict['linear_solver_options'] = options
-        else:
-            tree_dict['linear_solver'] = ""
-            tree_dict['linear_solver_options'] = None
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
-            options = {k: _serialize_single_option(system.nonlinear_solver.options._dict[k])
-                       for k in system.nonlinear_solver.options}
+            options = {k: _serialize_single_option(opt)
+                       for k, opt in system.nonlinear_solver.options._dict.items()}
             tree_dict['nonlinear_solver_options'] = options
 
             if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
                 tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
+    else:
+        tree_dict['subsystem_type'] = 'component'
+        tree_dict['is_parallel'] = is_parallel
+        if isinstance(system, ImplicitComponent):
+            tree_dict['component_type'] = 'implicit'
+            if overrides_method('solve_linear', system, ImplicitComponent):
+                tree_dict['linear_solver'] = "solve_linear"
+            elif system.linear_solver:
+                tree_dict['linear_solver'] = system.linear_solver.SOLVER
+                tree_dict['linear_solver_options'] = {
+                    k: _serialize_single_option(opt)
+                    for k, opt in system.linear_solver.options._dict.items()
+                }
+
+            if overrides_method('solve_nonlinear', system, ImplicitComponent):
+                tree_dict['nonlinear_solver'] = "solve_nonlinear"
+            elif system.nonlinear_solver:
+                tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+                tree_dict['nonlinear_solver_options'] = {
+                    k: _serialize_single_option(opt)
+                    for k, opt in system.nonlinear_solver.options._dict.items()
+                }
+        elif isinstance(system, ExecComp):
+            tree_dict['component_type'] = 'exec'
+            tree_dict['expressions'] = system._exprs
+        elif isinstance(system, (MetaModelStructuredComp, MetaModelUnStructuredComp)):
+            tree_dict['component_type'] = 'metamodel'
+        elif isinstance(system, IndepVarComp):
+            tree_dict['component_type'] = 'indep'
+        elif isinstance(system, ExplicitComponent):
+            tree_dict['component_type'] = 'explicit'
         else:
-            tree_dict['nonlinear_solver'] = ""
-            tree_dict['nonlinear_solver_options'] = None
+            tree_dict['component_type'] = None
+
+        children = []
+        for typ in ['input', 'output']:
+            for abs_name in system._var_abs2meta[typ]:
+                children.append(_get_var_dict(system, typ, abs_name, is_parallel))
+
+            for prom_name in system._var_discrete[typ]:
+                children.append(_get_var_dict(system, typ, prom_name, is_parallel))
+
+    tree_dict['children'] = children
 
     options = {}
-    for k in system.options:
+    slv = {'linear_solver', 'nonlinear_solver'}
+    for k, opt in system.options._dict.items():
         # need to handle solvers separate because they are classes or instances
-        if k in ['linear_solver', 'nonlinear_solver']:
-            options[k] = system.options[k].SOLVER
+        if k in slv:
+            try:
+                options[k] = opt['val'].SOLVER
+            except KeyError:
+                options[k] = opt['value'].SOLVER
+
         else:
-            options[k] = _serialize_single_option(system.options._dict[k])
+            options[k] = _serialize_single_option(opt)
 
     tree_dict['options'] = options
 
