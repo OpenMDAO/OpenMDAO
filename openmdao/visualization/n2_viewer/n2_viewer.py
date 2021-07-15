@@ -78,61 +78,43 @@ def _convert_ndarray_to_support_nans_in_json(val):
     object : list, possibly nested
         The equivalent list with any nan values replaced with the string "nan".
     """
+    # do a quick check for any nans or infs and if not we can avoid the slow check
+    nans = np.where(np.isnan(val))
+    infs = np.where(np.isinf(val))
+    if nans[0].size == 0 and infs[0].size == 0:
+        return val.tolist()
+
     val_as_list = val.tolist()
     _convert_nans_in_nested_list(val_as_list)
-    return(val_as_list)
+    return val_as_list
 
 
 def _get_var_dict(system, typ, name, is_parallel):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
         name = system._var_abs2prom[typ][name]
-        is_discrete = False
-    else:
-        meta = system._var_discrete[typ][name]
-        is_discrete = True
-
-    var_dict = {
-        'name': name,
-        'type': typ,
-        'dtype': type(meta['val']).__name__,
-    }
-
-    if typ == 'output':
-        var_dict['implicit'] = isinstance(system, ImplicitComponent)
-
-    if 'units' in meta:
+        val = meta['val']
+        var_dict = {
+            'name': name,
+            'type': typ,
+            'dtype': type(val).__name__,
+            'is_discrete': False,
+            'distributed': meta['distributed'],
+        }
+        if typ == 'output':
+            var_dict['implicit'] = isinstance(system, ImplicitComponent)
         if meta['units'] is None:
             var_dict['units'] = 'None'
         else:
             var_dict['units'] = meta['units']
 
-    if 'shape' in meta:
-        var_dict['shape'] = str(meta['shape'])
-
-    if 'distributed' in meta:
-        var_dict['distributed'] = is_distributed = meta['distributed']
-    else:
-        is_distributed = False
-
-    if 'surrogate_name' in meta:
-        var_dict['surrogate_name'] = meta['surrogate_name']
-
-    var_dict['is_discrete'] = is_discrete
-
-    if is_discrete:
-        if isinstance(meta['val'], (int, str, list, dict, complex, np.ndarray)) or MPI is None:
-            var_dict['val'] = default_noraise(system.get_val(name))
-        else:
-            var_dict['val'] = type(meta['val']).__name__
-    else:
-        if meta['val'].size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
+        if val.size < _MAX_ARRAY_SIZE_FOR_REPR_VAL:
             if not MPI:
                 # get the current value
                 var_dict['val'] = _convert_ndarray_to_support_nans_in_json(system.get_val(name))
-            elif is_parallel or is_distributed:
+            elif is_parallel or meta['distributed']:
                 # we can't access non-local values, so just get the initial value
-                var_dict['val'] = meta['val']
+                var_dict['val'] = val
                 var_dict['initial_value'] = True
             else:
                 # get the current value but don't try to get it from the source,
@@ -141,6 +123,25 @@ def _get_var_dict(system, typ, name, is_parallel):
                 var_dict['val'] = _convert_ndarray_to_support_nans_in_json(val)
         else:
             var_dict['val'] = None
+    else:  # discrete
+        meta = system._var_discrete[typ][name]
+        val = meta['val']
+        var_dict = {
+            'name': name,
+            'type': typ,
+            'dtype': type(val).__name__,
+            'is_discrete': True,
+        }
+        if MPI is None or isinstance(val, (int, str, list, dict, complex, np.ndarray)):
+            var_dict['val'] = default_noraise(system.get_val(name))
+        else:
+            var_dict['val'] = type(val).__name__
+
+    if 'shape' in meta:
+        var_dict['shape'] = str(meta['shape'])
+
+    if 'surrogate_name' in meta:
+        var_dict['surrogate_name'] = meta['surrogate_name']
 
     return var_dict
 
@@ -162,25 +163,24 @@ def _serialize_single_option(option):
     object
        JSON-safe serialized object.
     """
-    val = option['val']
     if not option['recordable']:
-        serialized_option = 'Not Recordable'
-    elif val is _UNDEFINED:
-        serialized_option = str(val)
-    else:
-        serialized_option = default_noraise(val)
+        return 'Not Recordable'
 
-    return serialized_option
+    val = option['val']
+    if val is _UNDEFINED:
+        return str(val)
+
+    return default_noraise(val)
 
 
-def _get_tree_dict(system, component_execution_orders, component_execution_index,
-                   is_parallel=False):
+def _get_tree_dict(system, is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
-    tree_dict = {}
-    tree_dict['name'] = system.name
-    tree_dict['type'] = 'subsystem'
-    tree_dict['class'] = system.__class__.__name__
-    tree_dict['expressions'] = None
+    tree_dict = {
+        'name': system.name if system.name else 'root',
+        'type': 'subsystem' if system.name else 'root',
+        'class': system.__class__.__name__,
+        'expressions': None,
+    }
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
@@ -199,9 +199,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         else:
             tree_dict['component_type'] = None
 
-        component_execution_orders[system.pathname] = component_execution_index[0]
-        component_execution_index[0] += 1
-
         children = []
         for typ in ['input', 'output']:
             for abs_name in system._var_abs2meta[typ]:
@@ -219,8 +216,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for s in system._subsystems_myproc:
-            children.append(_get_tree_dict(s, component_execution_orders,
-                            component_execution_index, is_parallel))
+            children.append(_get_tree_dict(s, is_parallel))
 
         if system.comm.size > 1:
             if system._subsystems_myproc:
@@ -232,6 +228,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             children = []
             for children_list in children_lists:
                 children.extend(children_list)
+
+    tree_dict['children'] = children
 
     if isinstance(system, ImplicitComponent):
         if overrides_method('solve_linear', system, ImplicitComponent):
@@ -279,8 +277,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['nonlinear_solver'] = ""
             tree_dict['nonlinear_solver_options'] = None
 
-    tree_dict['children'] = children
-
     options = {}
     for k in system.options:
         # need to handle solvers separate because they are classes or instances
@@ -290,10 +286,6 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             options[k] = _serialize_single_option(system.options._dict[k])
 
     tree_dict['options'] = options
-
-    if not tree_dict['name']:
-        tree_dict['name'] = 'root'
-        tree_dict['type'] = 'root'
 
     return tree_dict
 
@@ -363,7 +355,7 @@ def _get_viewer_data(data_source, case_id=None):
         driver_options = {key: _serialize_single_option(driver.options._dict[key])
                           for key in driver.options}
 
-        if driver_type == 'optimization' and 'opt_settings' in dir(driver):
+        if driver_type == 'optimization' and hasattr(driver, 'opt_settings'):
             driver_opt_settings = driver.opt_settings
         else:
             driver_opt_settings = None
@@ -433,9 +425,7 @@ def _get_viewer_data(data_source, case_id=None):
                         "The source must be a Problem, model or the filename of a recording.")
 
     data_dict = {}
-    comp_exec_idx = [0]  # list so pass by ref
-    orders = defaultdict(lambda: -1)
-    data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
+    data_dict['tree'] = _get_tree_dict(root_group)
     data_dict['md5_hash'] = root_group._generate_md5_hash()
 
     connections_list = []
@@ -462,106 +452,41 @@ def _get_viewer_data(data_source, case_id=None):
     comp_orders = {name: i for i, name in enumerate(root_group._ordered_comp_name_iter())}
 
     # 1 is added to the indices of all edges in the matrix so that we can use 0 entries to
-    # indicate empty cells.
+    # indicate that there is no connection.
     matrix = np.zeros((len(comp_orders), len(comp_orders)), dtype=np.int32)
-    edge_list = [(s, t) for s, t in G.edges()]
-    edge_ids = {}
-    for i, (src, tgt) in enumerate(edge_list):
+    edge_ids = []
+    for i, edge in enumerate(G.edges()):
+        src, tgt = edge
         if strongdict[src] == strongdict[tgt]:
             matrix[comp_orders[src], comp_orders[tgt]] = i + 1  # bump edge index by 1
-            edge_ids[(src, tgt)] = (sys_idx[src], sys_idx[tgt])
+            edge_ids.append((sys_idx[src], sys_idx[tgt]))
+        else:
+            edge_ids.append(None)
 
-    for edge_i, (src, tgt) in enumerate(edge_list):
+    for edge_i, (src, tgt) in enumerate(G.edges()):
         if strongdict[src] == strongdict[tgt]:
             start = comp_orders[src]
             end = comp_orders[tgt]
+            # get a view so we can remove this edge from submat temporarily to eliminate
+            # an 'if' check inside the nested list comprehension for edges_list
+            rem = matrix[start:start + 1, end:end + 1]
+            rem[0, 0] = 0
             if end < start:
                 start, end = end, start
             submat = matrix[start:end + 1, start:end + 1]
             nz = submat[submat > 0]
+            rem[0, 0] = edge_i + 1  # put removed edge back
             if nz.size > 1:
-                edges_list = [
-                    edge_ids[edge_list[i - 1]] for i in nz if i - 1 != edge_i
-                ]
+                edges_list = [edge_ids[i - 1] for i in nz]
                 for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
-                                                'cycle_arrows': edges_list})
+                                                 'cycle_arrows': edges_list})
                 continue
 
         for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
             for vtgt in vtgtlist:
                 connections_list.append({'src': vsrc, 'tgt': vtgt})
-
-    # edge_range = []
-    # for edge in G.edges():
-    #     src, tgt = edge
-    #     start = orders[src]
-    #     end = orders[tgt]
-    #     if end < start:
-    #         start, end = end, start
-    #     edge_range.append((edge, (start, end)))
-
-    # edge_min_range = sorted(edge_range, key=lambda x: x[1][0])
-    # edge_max_range = sorted(edge_range, key=lambda x: x[1][1])
-    # edge_idxs = {}
-    # for i, edge, _, _ in edge_min_range:
-    #     edge_idxs[edge] = [i, None]
-
-    # for i, edge, _, _ in edge_max_range:
-    #     edge_idxs[edge][1] = i
-    # subgraphs = {}
-
-    # for src, tgt, conns in G.edges.data('conns'):
-    #     if strongdict[src] == strongdict[tgt]:
-    #         if strongdict[src] not in subgraphs:
-    #             subgraphs[strongdict[src]] = subgraph = list(G.subgraph(scc[strongdict[src]]).edges())
-    #         else:
-    #             subgraph = subgraphs[strongdict[src]]
-    #         start = orders[src]
-    #         end = orders[tgt]
-    #         if end < start:
-    #             start, end = end, start
-    #         edges_list = [
-    #             (sys_idx[s], sys_idx[t]) for s, t in
-    #                 subgraph if start <= orders[s] <= end and start <= orders[t] <= end and src != s and t != tgt
-    #         ]
-    #         for vsrc, vtgtlist in conns.items():
-    #             for vtgt in vtgtlist:
-    #                 connections_list.append({'src': vsrc, 'tgt': vtgt,
-    #                                          'cycle_arrows': edges_list})
-    #     else:
-    #         for vsrc, vtgtlist in conns.items():
-    #             for vtgt in vtgtlist:
-    #                 connections_list.append({'src': vsrc, 'tgt': vtgt})
-
-
-        # gedges = G.edges(strong_comp)
-        # for src, tgt in gedges:
-        #     if nstrong > 1 and src in strong_comp and tgt in strong_comp:
-        #         exe_src = orders[src]
-        #         exe_tgt = orders[tgt]
-
-        #         if exe_tgt < exe_src:
-        #             exe_low = exe_tgt
-        #             exe_high = exe_src
-        #         else:
-        #             exe_low = exe_src
-        #             exe_high = exe_tgt
-
-        #         edges_list = [
-        #             (sys_idx[s], sys_idx[t]) for s, t in gedges
-        #             if exe_low <= orders[s] <= exe_high and exe_low <= orders[t] <= exe_high and
-        #             not (s == src and t == tgt) and t in sys_idx
-        #         ]
-        #         for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
-        #             for vtgt in vtgtlist:
-        #                 connections_list.append({'src': vsrc, 'tgt': vtgt,
-        #                                          'cycle_arrows': edges_list})
-        #     else:  # edge is out of the SCC
-        #         for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
-        #             for vtgt in vtgtlist:
-        #                 connections_list.append({'src': vsrc, 'tgt': vtgt})
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
