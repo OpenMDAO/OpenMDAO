@@ -1212,3 +1212,126 @@ def get_connection_owner(system, tgt):
                     return g.pathname, g._var_allprocs_abs2prom['output'][src], tprom
 
     return None, None, None
+
+
+def wing_dbg():
+    """
+    Make import of wingdbstub contingent on value of WING_DBG environment variable.
+
+    Also will import wingdbstub from the WINGHOME directory.
+    """
+    if env_truthy('WING_DBG'):
+        import sys
+        import os
+        save = sys.path
+        new = sys.path[:] + [os.environ['WINGHOME']]
+        sys.path = new
+        try:
+            import wingdbstub
+        finally:
+            sys.path = save
+
+
+class LocalRangeIterable(object):
+    """
+    Iterable object yielding local indices while iterating over local or distributed vars.
+
+    The number of iterations for a distributed variable will be the full distributed size of the
+    variable but None will be returned for any indices that are not local to the given rank.
+
+    Attributes
+    ----------
+    _inds : ndarray
+        Variable indices (unused for distributed variables).
+    _dist_size : int
+        Full size of distributed variable.
+    _start : int
+        Starting index of distributed variable on this rank.
+    _end : int
+        Last index + 1 of distributed variable on this rank.
+    _offset : int
+        Offset of this variable into the local vector,.
+    _iter : method
+        The iteration method used.
+    """
+
+    def __init__(self, system, vname, use_vec_offset=True):
+        """
+        Initialize the iterator.
+
+        Parameters
+        ----------
+        system : System
+            Containing System.
+        vname : str
+            Name of the variable.
+        use_vec_offset : bool
+            If True, return indices for the given variable within its vector, else just return
+            indices within the variable itself, i.e. range(var_size).
+        """
+        self._dist_size = 0
+
+        abs2meta = system._var_allprocs_abs2meta['output']
+        if vname in abs2meta:
+            sizes = system._var_sizes['output']
+            slices = system._outputs.get_slice_dict()
+        else:
+            abs2meta = system._var_allprocs_abs2meta['input']
+            sizes = system._var_sizes['input']
+            slices = system._inputs.get_slice_dict()
+
+        if abs2meta[vname]['distributed']:
+            var_idx = system._var_allprocs_abs2idx[vname]
+            rank = system.comm.rank
+            self._offset = np.sum(sizes[rank, :var_idx]) if use_vec_offset else 0
+
+            self._iter = self._dist_iter
+            self._start = np.sum(sizes[:rank, var_idx])
+            self._end = self._start + sizes[rank, var_idx]
+            self._dist_size = np.sum(sizes[:, var_idx])
+        else:
+            self._iter = self._serial_iter
+            if use_vec_offset:
+                self._inds = range(slices[vname].start, slices[vname].stop)
+            else:
+                self._inds = range(slices[vname].stop - slices[vname].start)
+
+    def _serial_iter(self):
+        """
+        Iterate over a local non-distributed variable.
+
+        Yields
+        ------
+        int
+            Variable index.
+        """
+        yield from self._inds
+
+    def _dist_iter(self):
+        """
+        Iterate over a distributed variable.
+
+        Yields
+        ------
+        int or None
+            Variable index or None if index is not local to this rank.
+        """
+        start = self._start
+        end = self._end
+
+        for i in range(self._dist_size):
+            if i >= start and i < end:
+                yield i - start + self._offset
+            else:
+                yield None
+
+    def __iter__(self):
+        """
+        Return an iterator.
+
+        Returns
+        -------
+        iterator
+            An iterator over our indices.
+        """
+        return self._iter()

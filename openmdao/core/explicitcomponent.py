@@ -75,7 +75,7 @@ class ExplicitComponent(Component):
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+        Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
 
         Parameters
         ----------
@@ -83,15 +83,35 @@ class ExplicitComponent(Component):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+
+        Yields
+        ------
+        str
+            Name of 'wrt' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        Vector
+            The _inputs vector.
+        slice
+            A full slice.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
-        offset = end = 0
+        start = end = 0
         local_ins = self._var_abs2meta['input']
+        toidx = self._var_allprocs_abs2idx
+        sizes = self._var_sizes['input']
+        total = self.pathname == ''
+        szname = 'global_size' if total else 'size'
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                end += meta['size']
+                end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, offset, end, vec, _full_slice
-                offset = end
+                dist_sizes = sizes[:, toidx[wrt]] if meta['distributed'] else None
+                yield wrt, start, end, vec, _full_slice, dist_sizes
+                start = end
 
     def _setup_partials(self):
         """

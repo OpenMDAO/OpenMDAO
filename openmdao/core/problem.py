@@ -17,9 +17,8 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.core.driver import Driver, record_iteration
-from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group, System
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
@@ -31,9 +30,9 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices
-from openmdao.utils.mpi import FakeComm
-from openmdao.utils.mpi import MPI
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices, \
+    LocalRangeIterable
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -927,7 +926,6 @@ class Problem(object):
             'config_info': None,  # used during config to determine if additional updates required
             'parallel_groups': [],  # list of pathnames of parallel groups in this model (all procs)
             'setup_status': _SetupStatus.PRE_SETUP,
-            'vec_names': None,  # names of all nonlinear and linear vectors
             'model_ref': weakref.ref(model),  # ref to the model (needed to get out-of-scope
                                               # src data for inputs)
             'using_par_deriv_color': False,  # True if parallel derivative coloring is being used
@@ -1200,6 +1198,9 @@ class Problem(object):
         # Directional derivative directions for matrix free comps.
         mfree_directions = {}
 
+        meta_in = model._var_allprocs_abs2meta['input']
+        meta_out = model._var_allprocs_abs2meta['output']
+
         # Analytic Jacobians
         print_reverse = False
         for mode in ('fwd', 'rev'):
@@ -1216,7 +1217,6 @@ class Problem(object):
                 if mode == 'fwd':
                     comp.run_linearize(sub_do_ln=False)
 
-                explicit = isinstance(comp, ExplicitComponent)
                 matrix_free = comp.matrix_free
                 c_name = comp.pathname
                 if mode == 'fwd':
@@ -1257,8 +1257,14 @@ class Problem(object):
                                 # Implicit state
                                 flat_view = dstate._abs_get_val(inp_abs)
 
+                            if inp_abs in meta_in:
+                                in_dist = meta_in[inp_abs]['distributed']
+                            else:
+                                in_dist = meta_out[inp_abs]['distributed']
+
                             if directional:
                                 n_in = 1
+                                idxs = range(1)
                                 if c_name not in mfree_directions:
                                     mfree_directions[c_name] = {}
 
@@ -1270,9 +1276,19 @@ class Problem(object):
 
                             else:
                                 n_in = len(flat_view)
+                                idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
 
-                            for idx in range(n_in):
+                            # in rev mode when we have a serial resid and a distrib input, we
+                            # need to multiply the derivative to correct for the effect of having
+                            # a seed that hasn't been split between each instance of the duplicated
+                            # serial resid.
+                            if in_dist or mode == 'fwd':
+                                mult = 1.0
+                            else:
+                                mult = 1.0 / comp.comm.size
+
+                            for idx in idxs:
 
                                 dinputs.set_val(0.0)
                                 dstate.set_val(0.0)
@@ -1281,7 +1297,7 @@ class Problem(object):
                                 # need a vector for clean code, so use _views_flat.
                                 if directional:
                                     flat_view[:] = perturb
-                                else:
+                                elif idx is not None:
                                     flat_view[idx] = perturb
 
                                 # Matrix Vector Product
@@ -1305,9 +1321,17 @@ class Problem(object):
                                             shape = (len(derivs), n_in)
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][:, idx] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][:, idx] = derivs
 
-                                    else:
+                                    else:  # rev
+                                        if out_abs in meta_out:
+                                            out_dist = meta_out[out_abs]['distributed']
+                                        else:
+                                            out_dist = meta_in[out_abs]['distributed']
+                                        if out_dist and not in_dist:
+                                            derivs *= mult
+
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
 
@@ -1325,7 +1349,8 @@ class Problem(object):
                                             shape = (n_in, len(derivs))
                                             deriv[jac_key] = np.zeros(shape)
 
-                                        deriv[jac_key][idx, :] = derivs
+                                        if idx is not None:
+                                            deriv[jac_key][idx, :] = derivs
 
                     # These components already have a Jacobian with calculated derivatives.
                     else:
@@ -1442,6 +1467,10 @@ class Problem(object):
             for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
+
+            with multi_proc_exception_check(comp.comm):
+                if approx_jac._errors:
+                    raise RuntimeError('\n'.join(approx_jac._errors))
 
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(comp, abs_key)
