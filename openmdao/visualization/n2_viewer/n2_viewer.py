@@ -5,7 +5,6 @@ import json
 import os
 import zlib
 import networkx as nx
-from collections import defaultdict
 
 import numpy as np
 
