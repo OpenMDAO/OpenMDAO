@@ -356,6 +356,9 @@ class System(object):
         If True, this is the first call to _linearize.
     _is_local : bool
         If True, this system is local to this mpi process.
+    _tot_jac : __TotalJacInfo or None
+        If a total jacobian is being computed and this is the top level System, this will
+        be a reference to the _TotalJacInfo object.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -514,6 +517,7 @@ class System(object):
         self._owning_rank = None
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
+        self._tot_jac = None
 
     @property
     def msginfo(self):
@@ -570,20 +574,37 @@ class System(object):
 
     def _jac_of_iter(self):
         """
-        Iterate over (name, offset, end, slice) for each 'of' (row) var in the system's jacobian.
+        Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
 
         The slice is internal to the given variable in the result, and this is always a full
         slice except possible for groups where _owns_approx_of_idx is defined.
+
+        Yields
+        ------
+        str
+            Name of 'of' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        slice or ndarray
+            A full slice or indices for the 'of' variable.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
+        toidx = self._var_allprocs_abs2idx
+        sizes = self._var_sizes['output']
+        total = self.pathname == ''
+        szname = 'global_size' if total else 'size'
         start = end = 0
         for of, meta in self._var_abs2meta['output'].items():
-            end += meta['size']
-            yield of, start, end, _full_slice
+            end += meta[szname]
+            yield of, start, end, _full_slice, sizes[:, toidx[of]] if meta['distributed'] else None
             start = end
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
-        Iterate over (name, offset, end, idxs) for each 'wrt' (column) var in the system's jacobian.
+        Iterate over (name, offset, end, vec, slc, dist_sizes) for each column var in the jacobian.
 
         Parameters
         ----------
@@ -591,23 +612,49 @@ class System(object):
             Only include row vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+
+        Yields
+        ------
+        str
+            Name of 'wrt' variable.
+        int
+            Starting index.
+        int
+            Ending index.
+        Vector
+            Either the _outputs or _inputs vector.
+        slice
+            A full slice.
+        ndarray or None
+            Distributed sizes if var is distributed else None
         """
+        toidx = self._var_allprocs_abs2idx
+        sizes_in = self._var_sizes['input']
+        sizes_out = self._var_sizes['output']
+
+        tometa_in = self._var_allprocs_abs2meta['input']
+        tometa_out = self._var_allprocs_abs2meta['output']
+
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']
 
+        total = self.pathname == ''
+        szname = 'global_size' if total else 'size'
+
         start = end = 0
-        for of, _start, _end, _ in self._jac_of_iter():
+        for of, _start, _end, _, dist_sizes in self._jac_of_iter():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
-                yield of, start, end, vec, _full_slice
+                yield of, start, end, vec, _full_slice, dist_sizes
                 start = end
 
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                end += meta['size']
+                end += meta[szname]
                 vec = self._inputs if wrt in local_ins else None
-                yield wrt, start, end, vec, _full_slice
+                dist_sizes = sizes_in[:, toidx[wrt]] if tometa_in[wrt]['distributed'] else None
+                yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
 
     def _declare_options(self):
@@ -789,11 +836,6 @@ class System(object):
         self._configure_check()
 
         self._setup_var_data()
-
-        if self._use_derivatives:
-            self._problem_meta['vec_names'] = ['nonlinear', 'linear']
-        else:
-            self._problem_meta['vec_names'] = ['nonlinear']
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
@@ -1139,7 +1181,7 @@ class System(object):
 
                 for scheme in self._approx_schemes.values():
                     scheme._reset()  # force a re-initialization of approx
-                    approx_scheme._during_sparsity_comp = True
+                    scheme._during_sparsity_comp = True
 
             self.run_linearize(sub_do_ln=False)
 
@@ -1148,7 +1190,8 @@ class System(object):
         self._jacobian = save_jac
 
         # revert uncolored approx back to normal
-        approx_scheme._reset()
+        for scheme in self._approx_schemes.values():
+            scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
 
@@ -1458,15 +1501,6 @@ class System(object):
         cfginfo = self._problem_meta['config_info']
         if cfginfo and self.pathname in cfginfo._modified_systems:
             cfginfo._modified_systems.remove(self.pathname)
-
-    def _setup_var_index_maps(self):
-        """
-        Compute maps from abs var names to their index among allprocs variables in this system.
-        """
-        abs2idx = self._var_allprocs_abs2idx = {}
-        for io in ['input', 'output']:
-            for i, abs_name in enumerate(self._var_allprocs_abs2meta[io]):
-                abs2idx[abs_name] = i
 
     def _setup_global_shapes(self):
         """
@@ -2238,10 +2272,6 @@ class System(object):
         return self._problem_meta['distributed_vector_class']
 
     @property
-    def _vec_names(self):
-        return self._problem_meta['vec_names']
-
-    @property
     def _recording_iter(self):
         return self._problem_meta['recording_iter']
 
@@ -2983,8 +3013,7 @@ class System(object):
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()
                         meta['size'] = len(indices)
-                        meta['global_size'] = len(indices) if vmeta['distributed'] \
-                            else vmeta['global_size']
+                        meta['global_size'] = len(indices)
                     else:
                         meta['global_size'] = vmeta['global_size']
 
@@ -3107,8 +3136,7 @@ class System(object):
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
                     indices = indices.shaped_instance()
-                    response['size'] = sz = len(indices)
-                    response['global_size'] = sz if meta['distributed'] else meta['global_size']
+                    response['size'] = response['global_size'] = len(indices)
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
@@ -4207,13 +4235,14 @@ class System(object):
             all_meta = self._var_allprocs_abs2meta[io]
             my_meta = self._var_abs2meta[io]
 
+        vars_to_gather = self._problem_meta['vars_to_gather']
+
         # if abs_name is non-discrete it should be found in all_meta
         if abs_name in all_meta:
             if get_remote:
                 meta = all_meta[abs_name]
                 distrib = meta['distributed']
             elif self.comm.size > 1:
-                vars_to_gather = self._problem_meta['vars_to_gather']
                 if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
@@ -4264,7 +4293,7 @@ class System(object):
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 
-        if get_remote and self.comm.size > 1:
+        if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
             if rank is None:   # bcast
@@ -5044,7 +5073,6 @@ class System(object):
 
                     sys_deps.add('')  # top level Group is always relevant
 
-        dvcache = None
         rescache = None
 
         if pd_dv_locs or pd_res_locs:
@@ -5211,3 +5239,88 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
+    def _get_jac_col_scatter(self):
+        """
+        Return source and target indices for a scatter from the output vector to a jacobian column.
+
+        If the transfer involves remote or distributed variables, the indices will be global.
+        Otherwise they will be converted to local.
+
+        Returns
+        -------
+        ndarray
+            Source indices.
+        ndarray
+            Target indices.
+        int
+            Size of jacobian column.
+        bool
+            True if remote or distributed vars are present.
+        """
+        myrank = self.comm.rank
+        nranks = self.comm.size
+        owns = self._owning_rank
+        abs2idx = self._var_allprocs_abs2idx
+        abs2meta = self._var_abs2meta['output']
+        sizes = self._var_sizes['output']
+        global_offsets = self._get_var_offsets()['output']
+        oflist = list(self._jac_of_iter())
+        tsize = oflist[-1][2]
+        toffset = myrank * tsize
+        has_dist_data = False
+
+        sinds = []
+        tinds = []
+
+        for name, tstart, tend, jinds, dist_sizes in oflist:
+            vind = abs2idx[name]
+            if dist_sizes is None:
+                if name in abs2meta:
+                    owner = myrank
+                else:
+                    owner = owns[name]
+                    has_dist_data = nranks > 1
+
+                voff = global_offsets[owner, vind]
+                if jinds is _full_slice:
+                    vsize = sizes[owner, vind]
+                    sinds.append(range(voff, voff + vsize))
+                else:
+                    sinds.append(jinds + voff)
+                tinds.append(range(tstart + toffset, tend + toffset))
+                assert(len(sinds[-1]) == len(tinds[-1]))
+            else:  # 'name' refers to a distributed variable
+                has_dist_data = nranks > 1
+                dtstart = dtend = tstart
+                dsstart = dsend = 0
+                for rnk, sz in enumerate(dist_sizes):
+                    dsend += sz
+                    if sz > 0:
+                        voff = global_offsets[rnk, vind]
+                        if jinds is _full_slice:
+                            dtend += sz
+                            sinds.append(range(voff, voff + sz))
+                            tinds.append(range(toffset + dtstart, toffset + dtend))
+                        elif jinds.size > 0:  # jinds is a flat array
+                            subinds = jinds[jinds >= dsstart]
+                            subinds = subinds[subinds < dsend]
+                            if subinds.size > 0:
+                                dtend += subinds.size
+                                sinds.append(subinds + (voff - dsstart))
+                                tinds.append(range(toffset + dtstart, toffset + dtend))
+                        dtstart = dtend
+                    dsstart = dsend
+                assert((len(sinds) == 0 and len(tinds) == 0) or len(sinds[-1]) == len(tinds[-1]))
+
+        sarr = np.array(list(chain(*sinds)), dtype=INT_DTYPE)
+        tarr = np.array(list(chain(*tinds)), dtype=INT_DTYPE)
+
+        if not has_dist_data:
+            # convert global indices back to local so we can use them to transfer between two
+            # local arrays
+            sysoffset = np.sum(sizes[:myrank, :])
+            sarr -= sysoffset
+            tarr -= toffset
+
+        return sarr, tarr, tsize, has_dist_data

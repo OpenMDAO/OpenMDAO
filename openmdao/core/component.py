@@ -244,8 +244,6 @@ class Component(System):
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.' if self.pathname else ''
 
-        iproc = self.comm.rank
-
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
             allprocs_abs2meta = self._var_allprocs_abs2meta[io]
@@ -295,6 +293,7 @@ class Component(System):
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         iproc = self.comm.rank
+        abs2idx = self._var_allprocs_abs2idx = {}
 
         for io in ('input', 'output'):
             sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
@@ -302,12 +301,12 @@ class Component(System):
 
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sizes[iproc, i] = metadata['size']
+                abs2idx[name] = i
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        self._setup_var_index_maps()
         self._owned_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
@@ -383,7 +382,7 @@ class Component(System):
         """
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
-        if '*' in wrt_patterns:
+        if '*' in wrt_patterns or wrt_patterns is None:
             info['wrt_matches_rel'] = None
             info['wrt_matches'] = None
             return
@@ -1398,22 +1397,28 @@ class Component(System):
                 meta['cols'] = cols
                 csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
                 meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+                dist_out = abs2meta_out[of]['distributed']
+                if wrt in abs2meta_in:
+                    dist_in = abs2meta_in[wrt]['distributed']
+                else:
+                    dist_in = abs2meta_out[wrt]['distributed']
+
+                if dist_in and not dist_out and not self.matrix_free:
+                    raise RuntimeError(f"{self.msginfo}: component has defined partial {rel_key} "
+                                       "which is a serial output wrt a distributed input. This is "
+                                       "only supported using the matrix free API.")
 
                 if shape[0] == 0 or shape[1] == 0:
                     msg = "{}: '{}' is an array of size 0"
                     if shape[0] == 0:
-                        if abs2meta_out[of]['distributed']:
+                        if dist_out:
                             # distributed comp are allowed to have zero size inputs on some procs
                             rows_max = -1
                         else:
                             # non-distributed components are not allowed to have zero size inputs
                             raise ValueError(msg.format(self.msginfo, of))
                     if shape[1] == 0:
-                        if wrt in abs2meta_in:
-                            distrib = abs2meta_in[wrt]['distributed']
-                        else:
-                            distrib = abs2meta_out[wrt]['distributed']
-                        if not distrib:
+                        if not dist_in:
                             # non-distributed components are not allowed to have zero size outputs
                             raise ValueError(msg.format(self.msginfo, wrt))
                         else:
