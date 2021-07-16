@@ -15,8 +15,9 @@ from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
 from bokeh.server.server import Server
 
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_semi_structured_comp import MetaModelSemiStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.core.problem import Problem
 
 
@@ -49,8 +50,8 @@ class MetaModelVisualization(object):
         Name of empty Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
-    is_structured_meta_model : bool
-        Boolean used to signal whether the meta model is structured or unstructured
+    mm_type : bool
+        Type of metamodel, from "struct", "semistruct", "unstruct"
     slider_source : ColumnDataSource
         Data source containing dictionary of sliders
     contour_training_data_source : ColumnDataSource
@@ -134,38 +135,45 @@ class MetaModelVisualization(object):
         self.resolution = resolution
         logging.getLogger("bokeh").setLevel(logging.ERROR)
 
-        # If the surrogate model coming in is structured
+        # Surrogate model is unstructured.
         if isinstance(model, MetaModelUnStructuredComp):
-            self.is_structured_meta_model = False
+            self.mm_type = "unstruct"
 
-            # Create list of input names, check if it has more than one input, then create list
-            # of outputs
             self.input_names = [name[0] for name in model._surrogate_input_names]
-            if len(self.input_names) < 2:
-                raise ValueError('Must have more than one input value')
             self.output_names = [name[0] for name in model._surrogate_output_names]
 
             # Create reference for untructured component
             self.meta_model = MetaModelUnStructuredComp(
                 default_surrogate=model.options['default_surrogate'])
 
-        # If the surrogate model coming in is unstructured
+        # Surrogate model is structured.
         elif isinstance(model, MetaModelStructuredComp):
-            self.is_structured_meta_model = True
+            self.mm_type = "struct"
 
             self.input_names = [name for name in model._var_rel_names['input']]
-
-            if len(self.input_names) < 2:
-                raise ValueError('Must have more than one input value')
-
             self.output_names = [name for name in model._var_rel_names['output']]
 
             self.meta_model = MetaModelStructuredComp(
-                distributed=model.options['distributed'],
                 extrapolate=model.options['extrapolate'],
                 method=model.options['method'],
                 training_data_gradients=model.options['training_data_gradients'],
                 vec_size=1)
+
+        # Surrogate model is semi-structured.
+        elif isinstance(model, MetaModelSemiStructuredComp):
+            self.mm_type = "semistruct"
+
+            self.input_names = model.pnames
+            self.output_names = [name for name in model._var_rel_names['output']]
+
+            self.meta_model = MetaModelSemiStructuredComp(
+                extrapolate=True,  # Set to True so that we can evaluate the full space.
+                method=model.options['method'],
+                training_data_gradients=model.options['training_data_gradients'],
+                vec_size=1)
+
+        if len(self.input_names) < 2:
+            raise ValueError('Must have more than one input value')
 
         # Pair input list names with their respective data
         self.training_inputs = {}
@@ -268,8 +276,7 @@ class MetaModelVisualization(object):
             Reference to meta model component
 
         """
-        # Check for structured or unstructured
-        if self.is_structured_meta_model:
+        if self.mm_type == "struct":
             # Loop through the input names
             for idx, name in enumerate(self.input_names):
                 # Check for no training data
@@ -289,13 +296,12 @@ class MetaModelVisualization(object):
                     name, 0.,
                     training_data=metamodel.training_outputs[name])
 
-        else:
+        elif self.mm_type == 'unstruct':
             for name in self.input_names:
                 try:
                     self.training_inputs[name] = {
                         title for title in metamodel.options['train:' + str(name)]}
-                    self.meta_model.add_input(
-                        name, 0.,
+                    self.meta_model.add_input(name, 0.,
                         training_data=[
                             title for title in metamodel.options['train:' + str(name)]])
                 except TypeError:
@@ -307,6 +313,16 @@ class MetaModelVisualization(object):
                     name, 0.,
                     training_data=[
                         title for title in metamodel.options['train:' + str(name)]])
+
+        else: #semi-struct
+            for name in self.input_names:
+                train = metamodel.training_inputs[name]
+                self.meta_model.add_input(name, train)
+                self.training_inputs[name] = train
+
+            for name in self.output_names:
+                train = metamodel.training_outputs[name]
+                self.meta_model.add_output(name, train)
 
         # Add the subsystem and setup
         self.prob.model.add_subsystem('interp', self.meta_model)
@@ -364,7 +380,7 @@ class MetaModelVisualization(object):
             inputs[:, idx] = values.flatten()
 
         # Check for structured or unstructured
-        if self.is_structured_meta_model:
+        if self.mm_type == "struct":
             # Assign each row of the data coming in to a tuple. Loop through the tuple, and append
             # the name of the input and value.
             for idx, tup in enumerate(inputs):
@@ -490,21 +506,27 @@ class MetaModelVisualization(object):
                            palette="Viridis11")
 
         # Adding training data points overlay to contour plot
-        if self.is_structured_meta_model:
+        if self.mm_type == "struct":
             data = self._structured_training_points()
-        else:
+        elif self.mm_type == "unstruct":
             data = self._unstructured_training_points()
+        else: # Semi-struct
+            data = self._semi_structured_training_points()
 
         if len(data):
             # Add training data points overlay to contour plot
             data = np.array(data)
-            if self.is_structured_meta_model:
+            if self.mm_type == "struct":
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
                                                               z=self.meta_model.training_outputs[
                                                               self.output_select.value].flatten())
-            else:
+            elif self.mm_type == "unstruct":
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
                                                               z=self.meta_model._training_output[
+                                                              self.output_select.value])
+            else: # semi-struct
+                self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
+                                                              z=self.meta_model.training_outputs[
                                                               self.output_select.value])
 
             training_data_renderer = self.contour_plot.circle(
@@ -565,10 +587,12 @@ class MetaModelVisualization(object):
         right_plot_fig.y_range.range_padding = 0.02
 
         # Determine distance and alpha opacity of training points
-        if self.is_structured_meta_model:
+        if self.mm_type == "struct":
             data = self._structured_training_points(compute_distance=True, source='right')
-        else:
+        elif self.mm_type == "unstruct":
             data = self._unstructured_training_points(compute_distance=True, source='right')
+        else:
+            data = self._semi_structured_training_points(compute_distance=True, source='right')
 
         self.right_alphas = 1.0 - data[:, 2] / self.dist_range
 
@@ -650,10 +674,12 @@ class MetaModelVisualization(object):
         bottom_plot_fig.y_range.range_padding = 0.1
 
         # Determine distance and alpha opacity of training points
-        if self.is_structured_meta_model:
+        if self.mm_type == "struct":
             data = self._structured_training_points(compute_distance=True)
-        else:
+        elif self.mm_type == "unstruct":
             data = self._unstructured_training_points(compute_distance=True)
+        else: # semi-struct
+            data = self._semi_structured_training_points(compute_distance=True)
 
         self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
 
@@ -706,6 +732,71 @@ class MetaModelVisualization(object):
         # Input training data and output training data
         x_training = self.meta_model._training_input
         training_output = np.squeeze(stack_outputs(self.meta_model._training_output), axis=1)
+
+        # Index of input/output variables
+        x_index = self.x_input_select.options.index(self.x_input_select.value)
+        y_index = self.y_input_select.options.index(self.y_input_select.value)
+        output_variable = self.output_names.index(self.output_select.value)
+
+        # Vertically stack the x/y inputs and then transpose them
+        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
+        if not compute_distance:
+            return infos
+
+        points = x_training.copy()
+
+        # Normalize so each dimension spans [0, 1]
+        points = np.divide(points, self.limit_range)
+        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        scaled_x0 = np.divide(self.input_point_list, self.limit_range)
+
+        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+        # Nearest points to x slice
+        if x_training.shape[1] < 3:
+
+            tree = cKDTree(points)
+            # Query the nearest neighbors tree for the closest points to the scaled x0 array
+            dists, idxs = tree.query(
+                scaled_x0, k=len(x_training), distance_upper_bound=self.dist_range)
+
+            # kdtree query always returns requested k even if there are not enough valid points
+            idx_finite = np.where(np.isfinite(dists))
+            dists = dists[idx_finite]
+            idxs = idxs[idx_finite]
+
+        else:
+            dists, idxs = self._multidimension_input(scaled_x0, points, source=source)
+
+        # data contains:
+        # [x_value, y_value, ND-distance, func_value]
+
+        data = np.zeros((len(idxs), 4))
+        for dist_index, j in enumerate(idxs):
+            data[dist_index, 0:2] = infos[j, :]
+            data[dist_index, 2] = dists[dist_index]
+            data[dist_index, 3] = training_output[j, output_variable]
+
+        return data
+
+    def _semi_structured_training_points(self, compute_distance=False, source='bottom'):
+        """
+        Calculate the training points and returns and array containing the position and alpha.
+
+        Parameters
+        ----------
+        compute_distance : bool
+            If true, compute the distance of training points from surrogate line.
+        source : str
+            Which subplot the method is being called from.
+
+        Returns
+        -------
+        array
+            The array of training points and their alpha opacity with respect to the surrogate line
+        """
+        # Input training data and output training data
+        x_training = np.array([col for col in self.meta_model.training_inputs.values()]).T
+        training_output = np.array([col for col in self.meta_model.training_outputs.values()]).T
 
         # Index of input/output variables
         x_index = self.x_input_select.options.index(self.x_input_select.value)

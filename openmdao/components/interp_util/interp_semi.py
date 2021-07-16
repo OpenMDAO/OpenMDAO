@@ -237,14 +237,9 @@ class InterpNDSemi(object):
 
         return self._d_dx
 
-    def training_gradients(self, pt):
+    def training_gradients(self):
         """
         Compute the training gradient for the vector of training points.
-
-        Parameters
-        ----------
-        pt : ndarray
-            Training point values.
 
         Returns
         -------

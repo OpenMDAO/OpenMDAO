@@ -71,7 +71,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         self.options.declare('method', values=TABLE_METHODS, default='slinear',
                              desc='Spline interpolation method to use for all outputs.')
 
-    def add_input(self, name, val=1.0, **kwargs):
+    def add_input(self, name, training_data, val=1.0, **kwargs):
         """
         Add an input to this component and a corresponding training input.
 
@@ -79,6 +79,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         ----------
         name : string
             Name of the input.
+        training_data : ndarray
+            Training data grid sample points for this input variable. Must be of length m, where m
+            is the total number of points in the table..
         val : float or ndarray
             Initial value for the input.
         **kwargs : dict
@@ -95,9 +98,11 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         super().add_input(name, val * np.ones(n), **kwargs)
 
+        self.training_inputs[name] = training_data
+
         self.pnames.append(name)
 
-    def add_output(self, name, grid_points=None, training_data=None, **kwargs):
+    def add_output(self, name, training_data, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -105,20 +110,15 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         ----------
         name : string
             Name of the output.
-        grid_points : ndarray
-            2-dimensional array containing all defined points in ascending order.  Must be (m x n)
-            where m is the number of points in the semi-structured grid, and n is the number of
-            inputs that were added. These points should be strictly ascending.
         training_data : ndarray
             Training data sample points for this output variable. Must be of length m, where m is
-            the number of points defined in "grid_points".
+            the total number of points in the table.
         **kwargs : dict
             Additional agruments for add_output.
         """
         n = self.options['vec_size']
         super().add_output(name, np.ones(n), **kwargs)
 
-        self.training_inputs[name] = grid_points
         self.training_outputs[name] = training_data
 
         if self.options['training_data_gradients']:
@@ -130,11 +130,19 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
+        # Make sure all training data is sized correctly.
+        size = len(self.training_inputs[self.pnames[0]])
+        for data_dict in [self.training_inputs, self.training_outputs]:
+            for name, data in data_dict.items():
+                size2 = len(data)
+                if size2 != size:
+                    msg = f"Size mismatch: training data for '{name}' is length {size2}, but" + \
+                        f" data for '{self.pnames[0]}' is length {size}."
+                    raise ValueError(msg)
+
+        grid = np.array([col for col in self.training_inputs.values()]).T
+
         for name, train_data in self.training_outputs.items():
-            grid = self.training_inputs[name]
             self.interps[name] = InterpNDSemi(grid, train_data, method=interp_method,
                                               extrapolate=self.options['extrapolate'])
 
