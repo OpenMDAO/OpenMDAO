@@ -109,9 +109,15 @@ def _get_var_dict(system, typ, name, is_parallel, is_implicit):
             vec = system._outputs
         else:  # input
             if MPI:
+                # for inputs if we're under MPI, we only retrieve the value currently stored
+                # in the input vector and not from the connected source because that source
+                # could be remote.
                 vec = system._inputs
             else:
                 vec = None
+
+        # if 'vec' is not None at this point, we can retrieve the value using vec._abs_get_val,
+        # which is a faster call than system.get_val.
 
         if meta['units'] is None:
             var_dict['units'] = 'None'
