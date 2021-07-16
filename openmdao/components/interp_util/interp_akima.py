@@ -881,17 +881,20 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
             start = 0
             for j in range(low_idx, high_idx):
                 val, dx, dvalue_tuple = subtables[j].evaluate(x[1:])
-                dvalue, sub_idx = dvalue_tuple
-                sub_idxs.extend(sub_idx)
                 vals.append(val)
                 dxs.append(dx)
-                dvalues.append(dvalue)
-                end = start + len(dvalue)
-                dval_slice.append((start, end))
-                start = end
+
+                if self._compute_d_dvalues:
+                    dvalue, sub_idx = dvalue_tuple
+                    sub_idxs.extend(sub_idx)
+                    dvalues.append(dvalue)
+                    end = start + len(dvalue)
+                    dval_slice.append((start, end))
+                    start = end
 
             deriv_dx = np.empty(len(dxs[0]) + 1, dtype=dtype)
-            size = start
+            if self._compute_d_dvalues:
+                size = start
 
             j = 0
             if idx >= 2:

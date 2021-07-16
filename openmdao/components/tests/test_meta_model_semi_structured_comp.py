@@ -154,7 +154,7 @@ data_y = np.array([
 data_values = 3.0 + np.sin(data_x*0.2) * np.cos(data_y*0.3)
 
 
-class TestMetaModelStructuredScipy(unittest.TestCase):
+class TestMetaModelSemiStructured(unittest.TestCase):
 
     def test_vectorized_linear(self):
         # Test using the model we used for the Structured metamodel.
@@ -380,7 +380,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         y = [1.0, 2.0, 1.0, 2.0, 3.0]
         f = [1.0, 2.5, 1.5, 4.0, 4.5]
 
-        comp = om.MetaModelSemiStructuredComp(method='slinear', training_data_gradients=True)
+        comp = om.MetaModelSemiStructuredComp(method='slinear', training_data_gradients=True, extrapolate=False)
         comp.add_input('x', x)
         comp.add_input('y', y)
         comp.add_output('f', f)
@@ -399,7 +399,18 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         f = prob.get_val('comp.f')
         assert_near_equal(f, 2.25)
 
+        # Attempt internal extrapolation.
+        prob.set_val('comp.x', 1.5)
+        prob.set_val('comp.y', 2.5)
+
+        msg = "'comp' <class MetaModelSemiStructuredComp>: Error interpolating output 'f' because input 'comp.y' required extrapolation while interpolating dimension 2, where its value '2.5' exceeded the range ('[1.]', '[2.]')"
+        with self.assertRaises(om.AnalysisError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception), msg)
+
     def test_simple(self):
+
         prob = om.Problem()
         model = prob.model
 
@@ -444,6 +455,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val('interp.f'), 3.39415716, 1e-7)
+
 
 if __name__ == "__main__":
     unittest.main()

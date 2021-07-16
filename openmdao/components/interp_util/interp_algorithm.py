@@ -3,6 +3,7 @@ Base class for interpolation methods.  New methods should inherit from this clas
 """
 import numpy as np
 
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
@@ -248,6 +249,10 @@ class InterpAlgorithmSemi(object):
 
     Attributes
     ----------
+    idim : int
+        Integer corresponding to table depth. Use for error messages.
+    extrapolate: bool
+        When False, raise an error if extrapolation occurs in this dimension.
     grid : tuple(ndarray)
         Tuple containing x grid locations for this dimension.
     k : int
@@ -269,7 +274,7 @@ class InterpAlgorithmSemi(object):
         Algorithm name for error messages.
     """
 
-    def __init__(self, grid, values, interp, idx=None, **kwargs):
+    def __init__(self, grid, values, interp, extrapolate=True, idx=None, idim=0, **kwargs):
         """
         Initialize table and subtables.
 
@@ -281,9 +286,13 @@ class InterpAlgorithmSemi(object):
             Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
+        extrapolate: bool
+            When False, raise an error if extrapolation occurs in this dimension.
         idx : list or None
             Maps values to their indices in the training data input. Only used during recursive
             calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
@@ -292,8 +301,15 @@ class InterpAlgorithmSemi(object):
         self.options.update(kwargs)
 
         self.values = values
+        self.extrapolate = extrapolate
+        self.idim = idim
 
         if len(grid.shape) > 1 and grid.shape[1] > 1:
+
+            if np.any(np.diff(grid[:, 0]) < 0.):
+                msg = f"The points in dimension {idim} must be strictly ascending."
+                raise ValueError(msg)
+
             # Build hieararchy of subtables.
             subtables = []
             i_pt = grid[0, 0]
@@ -305,7 +321,7 @@ class InterpAlgorithmSemi(object):
             for point, jj in zip(grid[1:], idx[1:]):
                 if point[0] != i_pt:
                     newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
-                                      **kwargs)
+                                      idim=idim + 1, extrapolate=extrapolate, **kwargs)
                     subtables.append(newtable)
                     i0 = i1
                     i_pt = point[0]
@@ -314,7 +330,8 @@ class InterpAlgorithmSemi(object):
                 i1 += 1
                 sub_idx.append(jj)
 
-            newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx, **kwargs)
+            newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
+                              idim=idim + 1, extrapolate=extrapolate, **kwargs)
             subtables.append(newtable)
 
             self.subtables = subtables
@@ -324,6 +341,10 @@ class InterpAlgorithmSemi(object):
             self.grid = grid
             self.subtables = None
             self._idx = idx if idx is not None else np.arange(len(values))
+
+            if not np.all(np.diff(grid) > 0.):
+                msg = f"The points in dimension {idim} must be strictly ascending."
+                raise ValueError(msg)
 
         self.last_index = 0
         self.k = None
@@ -392,6 +413,10 @@ class InterpAlgorithmSemi(object):
 
                 # Check if we're off of the bottom end.
                 if x < grid[0]:
+                    if not self.extrapolate:
+                        msg = f"Extrapolation while evaluation dimension {self.idim}."
+                        raise OutOfBoundsError(msg, self.idim, x, grid[0], grid[-1])
+
                     return last_index, -1
                 break
 
@@ -407,6 +432,10 @@ class InterpAlgorithmSemi(object):
 
                 # Check if we're off of the top end
                 if x > grid[highbound]:
+                    if not self.extrapolate:
+                        msg = f"Extrapolation while evaluation dimension {self.idim}."
+                        raise OutOfBoundsError(msg, self.idim, x, grid[0], grid[-1])
+
                     last_index = highbound
                     return last_index, 1
 

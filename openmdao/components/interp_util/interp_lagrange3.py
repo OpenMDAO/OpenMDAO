@@ -168,7 +168,7 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
             Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, **kwargs)
-        self.k = 3
+        self.k = 4
         self._name = 'lagrange2'
 
     def interpolate(self, x):
