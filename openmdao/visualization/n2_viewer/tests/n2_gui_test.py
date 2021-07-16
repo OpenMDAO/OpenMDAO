@@ -407,16 +407,10 @@ n2_gui_test_scripts = {
             "button": "left"
         },
         {
-            "desc": "Uncollapse the indeps view",
-            "test": "click",
-            "selector": "rect#indeps",
-            "button": "right"
-        },
-        {
             "desc": "There should be two elements visible in indeps view",
-            "test": "uncollapse_zoomed_element",
-            "selector": "rect#indeps",
-            "n2ElementCount": 2
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 2
         }
     ],
     "nan_value": [
