@@ -198,7 +198,7 @@ setup(
             'linearsystemcomp=openmdao.components.linear_system_comp:LinearSystemComp',
             'matrixvectorproductcomp=openmdao.components.matrix_vector_product_comp:MatrixVectorProductComp',
             'metamodelstructuredcomp=openmdao.components.meta_model_structured_comp:MetaModelStructuredComp',
-            'metamodelstructuredcomp=openmdao.components.meta_model_semi_structured_comp:MetaModelSemiStructuredComp',
+            'metamodelsemistructuredcomp=openmdao.components.meta_model_semi_structured_comp:MetaModelSemiStructuredComp',
             'metamodelunstructuredcomp=openmdao.components.meta_model_unstructured_comp:MetaModelUnStructuredComp',
             'multifimetamodelunstructuredcomp=openmdao.components.multifi_meta_model_unstructured_comp:MultiFiMetaModelUnStructuredComp',
             'muxcomp=openmdao.components.mux_comp:MuxComp',

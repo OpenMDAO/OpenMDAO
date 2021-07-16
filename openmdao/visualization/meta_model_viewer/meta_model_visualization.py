@@ -301,9 +301,8 @@ class MetaModelVisualization(object):
                 try:
                     self.training_inputs[name] = {
                         title for title in metamodel.options['train:' + str(name)]}
-                    self.meta_model.add_input(name, 0.,
-                        training_data=[
-                            title for title in metamodel.options['train:' + str(name)]])
+                    tdata = [title for title in metamodel.options['train:' + str(name)]]
+                    self.meta_model.add_input(name, 0., training_data=tdata)
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
@@ -314,7 +313,7 @@ class MetaModelVisualization(object):
                     training_data=[
                         title for title in metamodel.options['train:' + str(name)]])
 
-        else: #semi-struct
+        else:  # semi-struct
             for name in self.input_names:
                 train = metamodel.training_inputs[name]
                 self.meta_model.add_input(name, train)
@@ -510,7 +509,7 @@ class MetaModelVisualization(object):
             data = self._structured_training_points()
         elif self.mm_type == "unstruct":
             data = self._unstructured_training_points()
-        else: # Semi-struct
+        else:  # Semi-struct
             data = self._semi_structured_training_points()
 
         if len(data):
@@ -524,7 +523,7 @@ class MetaModelVisualization(object):
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
                                                               z=self.meta_model._training_output[
                                                               self.output_select.value])
-            else: # semi-struct
+            else:  # semi-struct
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
                                                               z=self.meta_model.training_outputs[
                                                               self.output_select.value])
@@ -678,7 +677,7 @@ class MetaModelVisualization(object):
             data = self._structured_training_points(compute_distance=True)
         elif self.mm_type == "unstruct":
             data = self._unstructured_training_points(compute_distance=True)
-        else: # semi-struct
+        else:  # semi-struct
             data = self._semi_structured_training_points(compute_distance=True)
 
         self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
