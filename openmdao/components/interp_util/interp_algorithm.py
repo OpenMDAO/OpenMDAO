@@ -251,7 +251,7 @@ class InterpAlgorithmSemi(object):
     ----------
     idim : int
         Integer corresponding to table depth. Use for error messages.
-    extrapolate: bool
+    extrapolate : bool
         When False, raise an error if extrapolation occurs in this dimension.
     grid : tuple(ndarray)
         Tuple containing x grid locations for this dimension.
@@ -286,7 +286,7 @@ class InterpAlgorithmSemi(object):
             Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
-        extrapolate: bool
+        extrapolate : bool
             When False, raise an error if extrapolation occurs in this dimension.
         idx : list or None
             Maps values to their indices in the training data input. Only used during recursive
