@@ -479,7 +479,7 @@ class OptionsDictionary(object):
         Yield name and value of options.
         """
         for key, val in self._dict.items():
-            if 'val' in val:
+            try:
                 yield key, val['val']
-            elif 'value' in val:
+            except KeyError:
                 yield key, val['value']
