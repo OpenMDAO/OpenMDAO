@@ -848,17 +848,16 @@ class n2_gui_test_case(unittest.TestCase):
         self.current_test_desc = ''
         self.current_model = basename
 
-        if (basename != 'xcircuit'):
-            self.generate_n2_file()
+        self.generate_n2_file()
 
-            async with async_playwright() as playwright:
-                await self.run_gui_tests(playwright)
+        async with async_playwright() as playwright:
+            await self.run_gui_tests(playwright)
 
-            if not DEBUG:
-                try:
-                    for n2html in self.n2files:
-                        os.remove(self.n2files[n2html])
-                except:
-                    # Don't want the test to fail if the test file is
-                    # already removed
-                    pass
+        if not DEBUG:
+            try:
+                for n2html in self.n2files:
+                    os.remove(self.n2files[n2html])
+            except:
+                # Don't want the test to fail if the test file is
+                # already removed
+                pass
