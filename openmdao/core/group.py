@@ -3535,3 +3535,27 @@ class Group(System):
                           f"to '{prom}', are connected but their metadata entries {meta}"
                           f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
                           f"where <group> is the {gname} to remove the ambiguity.")
+
+    def _ordered_comp_name_iter(self):
+        """
+        Yield contained component pathnames in order of execution.
+
+        For components within ParallelGroups, true execution order is unknown so components
+        will be ordered by rank within a ParallelGroup.
+        """
+        if self._mpi_proc_allocator.parallel and self.comm.size > 1:
+            names = []
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    names.extend(s._ordered_comp_name_iter())
+                else:
+                    names.append(s.pathname)
+            for ranknames in self.comm.allgather(names):
+                for name in ranknames:
+                    yield name
+        else:
+            for s in self._subsystems_myproc:
+                if isinstance(s, Group):
+                    yield from s._ordered_comp_name_iter()
+                else:
+                    yield s.pathname

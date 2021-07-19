@@ -57,9 +57,6 @@ class Vector(object):
         Mapping of var name to slice.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _icol : int or None
-        If not None, specifies the 'active' column of a multivector when interfaceing with
-        a component that does not support multivectors.
     _do_scaling : bool
         True if this vector performs scaling.
     _do_adder : bool
@@ -102,7 +99,6 @@ class Vector(object):
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._icol = None
         self._len = 0
 
         self._system = weakref.ref(system)
@@ -319,10 +315,7 @@ class Vector(object):
         """
         abs_name = self._name2abs_name(name)
         if abs_name is not None:
-            if self._icol is None:
-                val = self._views[abs_name]
-            else:
-                val = self._views[abs_name][:, self._icol]
+            val = self._views[abs_name]
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
@@ -538,15 +531,6 @@ class Vector(object):
         if self.read_only:
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
-
-        if idxs is not _full_slice:
-            if flat:
-                idxs = idxs.flat()
-            else:
-                idxs = idxs()
-
-        if self._icol is not None:
-            idxs = (idxs, self._icol)
 
         if flat:
             if isinstance(val, float):
