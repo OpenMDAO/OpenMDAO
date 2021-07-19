@@ -40,7 +40,7 @@ optional_dependencies = {
     ]
 }
 
-if sys.version_info > (3, 6):
+if sys.version_info >= (3, 7):
     optional_dependencies['test'].append('playwright')
 
 # Add an optional dependency that concatenates all others
