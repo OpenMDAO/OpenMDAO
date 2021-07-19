@@ -1063,11 +1063,6 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
         if compute_local_train:
             db_dv = 0.5 * (dm2_dv + dm3_dv)
 
-        # We need to suppress some warnings that occur when we divide by zero.  We replace all
-        # values where this happens, so it never affects the result.
-        old_settings = np.seterr()
-        np.seterr(invalid='ignore', divide='ignore')
-
         if w2 + w31 > eps:
 
             bpos = (m2 * w2 + m3 * w31) / (w2 + w31)
@@ -1281,9 +1276,6 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
                 deriv_dv = da_dv + dx * (db_dv + cd_term_dv)
 
                 deriv_dv = (deriv_dv, sub_idxs)
-
-        # Restore numpy warnings to previous setting.
-        np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv

@@ -277,7 +277,7 @@ class TestInterpNDSemiPython(unittest.TestCase):
         self.assertEqual(err.idx, 1)
         self.assertTrue(np.isnan(err.value))
 
-    def ztest_error_messages(self):
+    def test_error_messages(self):
         points, values = self._get_sample_4d_large()
         X, Y, Z, W = np.meshgrid(*points, indexing='ij')
         X = X.ravel()
@@ -313,28 +313,11 @@ class TestInterpNDSemiPython(unittest.TestCase):
         msg = ('The points in dimension 0 must be strictly ascending.')
         self.assertEqual(str(cm.exception), msg)
 
-        badgrid[0] = (np.arange(4))
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(badgrid, values, method='slinear')
-
-        msg = ('There are 4 points and 6 values in dimension 0')
-        self.assertEqual(str(cm.exception), msg)
-
-        badvalues = np.array(values, dtype=complex)
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpNDSemi(badvalues, values, method='slinear')
-
-        msg = ("Interpolation method 'slinear' does not support complex values.")
-        self.assertEqual(str(cm.exception), msg)
-
-        interp = InterpNDSemi(points, values, method='slinear')
-        x = [0.5, 0, 0.5, 0.9]
-
         with self.assertRaises(KeyError) as cm:
-            interp = InterpNDSemi(points, values, method='slinear', bad_arg=1)
+            interp = InterpNDSemi(grid, values, method='slinear', bad_arg=1)
 
-        msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
-        self.assertTrue(str(cm.exception).startswith(msg))
+        msg = ("Option 'bad_arg' cannot be set because it has not been declared.")
+        self.assertTrue(str(cm.exception).endswith(msg))
 
 
 
