@@ -35,7 +35,7 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'pyppeteer',
+        'playwright',
         'aiounittest'
     ]
 }
