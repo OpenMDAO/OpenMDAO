@@ -5,6 +5,7 @@ import subprocess
 import unittest
 from aiounittest import async_test
 import os
+import sys
 
 try:
     from parameterized import parameterized
@@ -29,6 +30,10 @@ resize_dirs = {
     'left': [-1, 0],
     'top-left': [-1, -1]
 }
+
+if 'win32' in sys.platform:
+    # Windows specific event-loop policy & cmd
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 my_loop = asyncio.get_event_loop()
 
