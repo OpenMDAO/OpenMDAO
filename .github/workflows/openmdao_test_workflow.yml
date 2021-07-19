@@ -160,7 +160,6 @@ jobs:
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
           pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-          type playwright > /dev/null && playwright install
 
       - name: Display conda info
         shell: bash -l {0}
@@ -309,10 +308,6 @@ jobs:
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
           pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-          if (Get-Command "playwright" -ErrorAction SilentlyContinue) 
-          { 
-            playwright install
-          }
           
       - name: Display conda info
         shell: pwsh
