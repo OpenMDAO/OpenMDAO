@@ -122,6 +122,9 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
+value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
+
+
 class _MetadataDict(dict):
     """
     A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
@@ -129,14 +132,14 @@ class _MetadataDict(dict):
 
     def __getitem__(self, key):
         if key == 'value':
-            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            warn_deprecation(value_deprecated_msg)
             key = 'val'
         val = dict.__getitem__(self, key)
         return val
 
     def __setitem__(self, key, val):
         if key == 'value':
-            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            warn_deprecation(value_deprecated_msg)
             key = 'val'
         dict.__setitem__(self, key, val)
 
@@ -3298,7 +3301,7 @@ class System(object):
                 # DEPRECATION: if 'value' in keyset, replace with 'val'
                 keyset.remove('value')
                 keyset.add('val')
-                warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+                warn_deprecation(value_deprecated_msg)
             except KeyError:
                 pass
             diff = keyset - allowed_meta_names

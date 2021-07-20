@@ -268,7 +268,7 @@ class TestSystem(unittest.TestCase):
             inputs = p.model.list_inputs(values=True, out_stream=None)
         self.assertEqual(inputs, [('comp.a', {'val': 1})])
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'"
+        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
         with assert_warning(OMDeprecationWarning, msg):
             self.assertEqual(inputs[0][1]['value'], 1)
 
@@ -283,7 +283,7 @@ class TestSystem(unittest.TestCase):
             outputs = p.model.list_outputs(values=True, out_stream=None)
         self.assertEqual(outputs, [('comp.b', {'val': 2})])
 
-        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'"
+        msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
         with assert_warning(OMDeprecationWarning, msg):
             self.assertEqual(outputs[0][1]['value'], 2)
 
