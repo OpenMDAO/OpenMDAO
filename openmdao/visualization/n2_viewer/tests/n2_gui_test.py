@@ -1,4 +1,4 @@
-"""Test N2 GUI with multiple models using Pyppeteer."""
+"""Test N2 GUI with multiple models using Playwright."""
 import asyncio
 from playwright.async_api import async_playwright
 import subprocess
