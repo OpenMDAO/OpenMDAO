@@ -274,7 +274,8 @@ class InterpAlgorithmSemi(object):
         Algorithm name for error messages.
     """
 
-    def __init__(self, grid, values, interp, extrapolate=True, idx=None, idim=0, **kwargs):
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
         """
         Initialize table and subtables.
 
@@ -288,6 +289,8 @@ class InterpAlgorithmSemi(object):
             Interpolation class to be used for subsequent table dimensions.
         extrapolate : bool
             When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
         idx : list or None
             Maps values to their indices in the training data input. Only used during recursive
             calls.
@@ -303,6 +306,7 @@ class InterpAlgorithmSemi(object):
         self.values = values
         self.extrapolate = extrapolate
         self.idim = idim
+        self._compute_d_dvalues = compute_d_dvalues
 
         if len(grid.shape) > 1 and grid.shape[1] > 1:
 
@@ -321,7 +325,8 @@ class InterpAlgorithmSemi(object):
             for point, jj in zip(grid[1:], idx[1:]):
                 if point[0] != i_pt:
                     newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
-                                      idim=idim + 1, extrapolate=extrapolate, **kwargs)
+                                      idim=idim + 1, extrapolate=extrapolate,
+                                      compute_d_dvalues=compute_d_dvalues, **kwargs)
                     subtables.append(newtable)
                     i0 = i1
                     i_pt = point[0]
@@ -331,7 +336,8 @@ class InterpAlgorithmSemi(object):
                 sub_idx.append(jj)
 
             newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
-                              idim=idim + 1, extrapolate=extrapolate, **kwargs)
+                              idim=idim + 1, extrapolate=extrapolate,
+                              compute_d_dvalues=compute_d_dvalues, **kwargs)
             subtables.append(newtable)
 
             self.subtables = subtables
@@ -349,7 +355,6 @@ class InterpAlgorithmSemi(object):
         self.last_index = 0
         self.k = None
         self._name = None
-        self._compute_d_dvalues = False
 
     def initialize(self):
         """
@@ -453,36 +458,7 @@ class InterpAlgorithmSemi(object):
 
         return last_index, 0
 
-    def evaluate(self, x):
-        """
-        Interpolate across this and subsequent table dimensions.
-
-        Parameters
-        ----------
-        x : ndarray
-            The coordinates to sample the gridded data at. First array element is the point to
-            interpolate here. Remaining elements are interpolated on sub tables.
-
-        Returns
-        -------
-        ndarray
-            Interpolated values.
-        ndarray
-            Derivative of interpolated values with respect to this independent and child
-            independents.
-        ndarray
-            Derivative of interpolated values with respect to values for this and subsequent table
-            dimensions.
-        """
-        if self.subtables is not None:
-            for subtable in self.subtables:
-                subtable._compute_d_dvalues = self._compute_d_dvalues
-
-        result, d_dx, d_values = self.interpolate(x)
-
-        return result, d_dx, d_values
-
-    def interpolate(self, x, idx, slice_idx):
+    def interpolate(self, x):
         """
         Compute the interpolated value over this grid dimension.
 
@@ -491,13 +467,8 @@ class InterpAlgorithmSemi(object):
         Parameters
         ----------
         x : ndarray
-            The coordinates to sample the gridded data at. First array element is the point to
-            interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
-            Interval index for x.
-        slice_idx : list of <slice>
-            Slice object containing indices of data points requested by parent interpolating
-            tables.
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
 
         Returns
         -------
@@ -509,5 +480,7 @@ class InterpAlgorithmSemi(object):
         ndarray
             Derivative of interpolated values with respect to values for this and subsequent table
             dimensions.
+        bool
+            True if the coordinate is extrapolated in this dimension.
         """
         pass

@@ -132,9 +132,6 @@ class InterpNDSemi(object):
             Value of derivative of interpolated output with respect to input x. (Only when
             compute_derivative is True.)
         """
-        self.table._compute_d_dx = compute_derivative
-        self.table._compute_d_dvalues = False
-
         xnew = self._interpolate(x)
 
         if compute_derivative:
@@ -172,8 +169,7 @@ class InterpNDSemi(object):
             # each iteration.
             interp = self._interp
             self.table = interp(self.grid, self.values, interp, extrapolate=self.extrapolate,
-                                **self._interp_options)
-            self.table._compute_d_dvalues = True
+                                compute_d_dvalues=True, **self._interp_options)
 
         table = self.table
 
@@ -186,7 +182,7 @@ class InterpNDSemi(object):
 
         # Loop over n_nodes because there isn't a way to vectorize.
         for j in range(n_nodes):
-            val, d_x, d_values_tuple = table.evaluate(xi[j, :])
+            val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
             result[j] = val
             derivs_x[j, :] = d_x.flatten()
             if self._compute_d_dvalues:

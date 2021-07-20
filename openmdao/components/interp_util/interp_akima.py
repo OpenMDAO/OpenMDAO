@@ -769,22 +769,33 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
     Interpolate using an Akima polynomial.
     """
 
-    def __init__(self, grid, values, interp, **kwargs):
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
         """
         Initialize table and subtables.
 
         Parameters
         ----------
         grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
+            Tuple containing ndarray of x grid locations for each table dimension.
         values : ndarray
-            Array containing the table values for all dimensions.
+            Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
+        extrapolate : bool
+            When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super().__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, extrapolate=extrapolate,
+                         compute_d_dvalues=compute_d_dvalues, idx=idx, idim=idim, **kwargs)
         self.k = 4
         self._name = 'akima'
 
@@ -808,8 +819,8 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
         Parameters
         ----------
         x : ndarray
-            The coordinates to sample the gridded data at. First array element is the point to
-            interpolate here. Remaining elements are interpolated on sub tables.
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
 
         Returns
         -------
@@ -821,11 +832,14 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
         tuple(ndarray, list)
             Derivative of interpolated values with respect to values for this and subsequent table
             dimensions. Second term is the indices into the value array.
+        bool
+            True if the coordinate is extrapolated in this dimension.
         """
         grid = self.grid
         subtables = self.subtables
 
-        idx, _ = self.bracket(x[0])
+        idx, flag = self.bracket(x[0])
+        extrap = flag != 0
 
         eps = self.options['eps']
         delta_x = self.options['delta_x']
@@ -880,7 +894,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
             dval_slice = []
             start = 0
             for j in range(low_idx, high_idx):
-                val, dx, dvalue_tuple = subtables[j].evaluate(x[1:])
+                val, dx, dvalue_tuple, flag = subtables[j].interpolate(x[1:])
                 vals.append(val)
                 dxs.append(dx)
 
@@ -1120,7 +1134,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
                 db_dv = dbp1_dv
                 dc_dv = dd_dv = 0
 
-        else:
+        else:  # extrap is -1
             a = val3
             dx = x[0] - grid[0]
 
@@ -1278,4 +1292,4 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
                 deriv_dv = (deriv_dv, sub_idxs)
 
         # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, extrap

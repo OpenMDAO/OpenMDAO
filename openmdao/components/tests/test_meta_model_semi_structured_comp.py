@@ -456,6 +456,50 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         assert_near_equal(prob.get_val('interp.f'), 3.39415716, 1e-7)
 
+    def test_detect_local_extrapolation(self):
+        # Tests that we detect when any of our points we are using for interpolation are being extrapolated from
+        # somewhere else in the semi-structured grid, so that we can adjust our points (if we can.)
+        # This test is set up so that if we aren't actively doing this, lagrange2 and lagrange3 will compute
+        # large values near the ends. Akima seems to already be robust to this, and didn't require any changes.
+
+        # 8x8 block
+        u = np.arange(24)
+        v = np.arange(8)
+
+        grid = np.empty((192, 2))
+        grid[:, 0] = np.repeat(u, 8)
+        grid[:64, 1] = np.tile(v, 8) + 8
+        grid[64:128, 1] = np.tile(v, 8)
+        grid[128:, 1] = np.tile(v, 8) + 8
+
+        values = np.empty((192, ))
+        values[:64] = 1e8 * (6.0 + 5.0 * np.sin(.02 * grid[:64, 0]) + np.sin(.03 * grid[:64, 1]))
+        values[64:128] = (6.0 + 5.0 * np.sin(.02 * grid[64:128, 0]) + np.sin(.03 * grid[64:128, 1]))
+        values[128:] = 1e8 * (6.0 + 5.0 * np.sin(.02 * grid[128:, 0]) + np.sin(.03 * grid[128:, 1]))
+
+        expected = np.array([6.91181637, 7.01019418, 7.1081943,  7.20577754, 7.30290486, 7.39953742, 7.49563655])
+
+        for method in ['slinear', 'lagrange2', 'lagrange3', 'akima']:
+
+            prob = om.Problem()
+            model = prob.model
+
+            interp = om.MetaModelSemiStructuredComp(method=method, vec_size=7)
+            interp.add_input('x', grid[:, 0])
+            interp.add_input('y', grid[:, 1])
+            interp.add_output('f', values)
+
+            model.add_subsystem('interp', interp)
+
+            prob.setup()
+
+            prob.set_val('interp.x', np.array([8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5]))
+            prob.set_val('interp.y', np.array([2.2, 2.2, 2.2, 2.2, 2.2, 2.2, 2.2]))
+
+            prob.run_model()
+
+            assert_near_equal(prob.get_val('interp.f'), expected, 1e-3)
+
 
 if __name__ == "__main__":
     unittest.main()

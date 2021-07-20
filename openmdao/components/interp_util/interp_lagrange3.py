@@ -152,22 +152,33 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
     Interpolate on a semi structured grid using a second order Lagrange polynomial.
     """
 
-    def __init__(self, grid, values, interp, **kwargs):
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
         """
         Initialize table and subtables.
 
         Parameters
         ----------
         grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
+            Tuple containing ndarray of x grid locations for each table dimension.
         values : ndarray
-            Array containing the table values for all dimensions.
+            Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
+        extrapolate : bool
+            When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        super().__init__(grid, values, interp, **kwargs)
+        super().__init__(grid, values, interp, extrapolate=extrapolate,
+                         compute_d_dvalues=compute_d_dvalues, idx=idx, idim=idim, **kwargs)
         self.k = 4
         self._name = 'lagrange2'
 
@@ -178,8 +189,8 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
         Parameters
         ----------
         x : ndarray
-            The coordinates to sample the gridded data at. First array element is the point to
-            interpolate here. Remaining elements are interpolated on sub tables.
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
 
         Returns
         -------
@@ -191,11 +202,14 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
         tuple(ndarray, list)
             Derivative of interpolated values with respect to values for this and subsequent table
             dimensions. Second term is the indices into the value array.
+        bool
+            True if the coordinate is extrapolated in this dimension.
         """
         grid = self.grid
         subtables = self.subtables
 
-        idx, _ = self.bracket(x[0])
+        idx, flag = self.bracket(x[0])
+        extrap = flag != 0
 
         # Complex Step
         if self.values.dtype == complex:
@@ -211,6 +225,50 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
             idx = 1
 
         derivs = np.empty(len(x), dtype=dtype)
+
+        if subtables is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
+            val0, dx0, dvalue0, flag0 = subtables[idx - 1].interpolate(x[1:])
+            val1, dx1, dvalue1, flag1 = subtables[idx].interpolate(x[1:])
+            val2, dx2, dvalue2, flag2 = subtables[idx + 1].interpolate(x[1:])
+            val3, dx3, dvalue3, flag3 = subtables[idx + 2].interpolate(x[1:])
+
+            # Extrapolation detection.
+            flags = (flag0, flag1, flag2, flag3)
+            if extrap or flags == (False, False, False, False):
+                # If we are already extrapolating, no change needed.
+                # If no sub-points are extrapolating, no change needed.
+                pass
+            elif flags == (False, False, False, True) and idx > 0:
+                # We are near the right edge of our sub-region, so slide to the left.
+                idx -= 1
+                val_a, dx_a, dvalue_a, flag_a = subtables[idx - 1].interpolate(x[1:])
+                if flag_a:
+                    # Nothing we can do; there just aren't enough points here.
+                    idx += 1
+                    extrap = True
+                else:
+                    val3, dx3, dvalue3 = val2, dx2, dvalue2
+                    val2, dx2, dvalue2 = val1, dx1, dvalue1
+                    val1, dx1, dvalue1 = val0, dx0, dvalue0
+                    val0, dx0, dvalue0 = val_a, dx_a, dvalue_a
+            elif flags == (True, False, False, False) and idx > 0:
+                # We are near the left edge of our sub-region, so slide to the right.
+                idx += 1
+                val_a, dx_a, dvalue_a, flag_a = subtables[idx + 2].interpolate(x[1:])
+                if flag_a:
+                    # Nothing we can do; there just aren't enough points here.
+                    idx -= 1
+                    extrap = True
+                else:
+                    val0, dx0, dvalue0 = val1, dx1, dvalue1
+                    val1, dx1, dvalue1 = val2, dx2, dvalue2
+                    val2, dx2, dvalue2 = val3, dx3, dvalue3
+                    val3, dx3, dvalue3 = val_a, dx_a, dvalue_a
+            else:
+                # All other cases, we are in an extrapolation sub-region.
+                extrap = True
 
         p1 = grid[idx - 1]
         p2 = grid[idx]
@@ -235,12 +293,6 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
         fact4 = 1.0 / (c14 * c24 * c34)
 
         if subtables is not None:
-            # Interpolate between values that come from interpolating the subtables in the
-            # subsequent dimensions.
-            val0, dx0, dvalue0 = subtables[idx - 1].evaluate(x[1:])
-            val1, dx1, dvalue1 = subtables[idx].evaluate(x[1:])
-            val2, dx2, dvalue2 = subtables[idx + 1].evaluate(x[1:])
-            val3, dx3, dvalue3 = subtables[idx + 2].evaluate(x[1:])
 
             derivs = np.empty(len(dx0) + 1, dtype=dtype)
 
@@ -307,4 +359,4 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
                   p1 * (p2 + p3) + p2 * p3)
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
-            derivs, d_value
+            derivs, d_value, extrap

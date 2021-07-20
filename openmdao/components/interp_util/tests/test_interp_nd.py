@@ -291,19 +291,19 @@ class TestInterpNDSemiPython(unittest.TestCase):
             interp = InterpNDSemi(grid, values, method='junk')
 
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
-        self.assertTrue(str(cm.exception).startswith(msg))
+        self.assertTrue(cm.exception.args[0].startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
             interp = InterpNDSemi(grid, values, method=points)
 
         msg = ("Argument 'method' should be a string.")
-        self.assertTrue(str(cm.exception).startswith(msg))
+        self.assertTrue(cm.exception.args[0].startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
             interp = InterpNDSemi(grid, values[:-1], method='slinear')
 
         msg = ('There are 2016 point arrays, but 2015 values.')
-        self.assertEqual(str(cm.exception), msg)
+        self.assertEqual(cm.exception.args[0], msg)
 
         badgrid = deepcopy(grid)
         badgrid[0][0] = -6.0
@@ -311,13 +311,13 @@ class TestInterpNDSemiPython(unittest.TestCase):
             interp = InterpNDSemi(badgrid, values, method='slinear')
 
         msg = ('The points in dimension 0 must be strictly ascending.')
-        self.assertEqual(str(cm.exception), msg)
+        self.assertEqual(cm.exception.args[0], msg)
 
         with self.assertRaises(KeyError) as cm:
             interp = InterpNDSemi(grid, values, method='slinear', bad_arg=1)
 
         msg = ("Option 'bad_arg' cannot be set because it has not been declared.")
-        self.assertTrue(str(cm.exception).endswith(msg))
+        self.assertTrue(cm.exception.args[0].endswith(msg))
 
 
 
