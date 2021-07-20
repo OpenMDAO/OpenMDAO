@@ -3236,7 +3236,7 @@ class System(object):
             Will contain either 'input', 'output', or both.  Defaults to both.
         metadata_keys : iter of str or None
             Names of metadata entries to be retrieved or None, meaning retrieve all
-            available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
+            available 'allprocs' metadata.  If 'val' or 'src_indices' are required,
             their keys must be provided explicitly since they are not found in the 'allprocs'
             metadata and must be retrieved from local metadata located in each process.
         includes : str, iter of str or None
@@ -3294,6 +3294,13 @@ class System(object):
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
+            try:
+                # DEPRECATION: if 'value' in keyset, replace with 'val'
+                keyset.remove('value')
+                keyset.add('val')
+                warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            except KeyError:
+                pass
             diff = keyset - allowed_meta_names
             if diff:
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "

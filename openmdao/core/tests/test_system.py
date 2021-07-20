@@ -291,6 +291,14 @@ class TestSystem(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, msg):
             self.assertEqual(meta['comp.a']['value'], 1)
 
+        with assert_warning(OMDeprecationWarning, msg):
+            meta = p.model.get_io_metadata(metadata_keys=('value',))
+        self.assertEqual(meta['comp.a']['val'], 1)
+
+        with assert_warning(OMDeprecationWarning, msg):
+            meta = p.model.get_io_metadata(metadata_keys=('value',))
+        with assert_warning(OMDeprecationWarning, msg):
+            self.assertEqual(meta['comp.a']['value'], 1)
 
     def test_recording_options_deprecated(self):
         prob = Problem()
