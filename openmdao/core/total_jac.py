@@ -273,9 +273,13 @@ class _TotalJacInfo(object):
             self.nondist_loc_map = {}
             self.loc_jac_idxs = {}
             self.dist_idx_map = {}
+            self.modes = modes
 
             for mode in modes:
                 self._create_in_idx_map(mode)
+
+            if 'fwd' not in modes:
+                self._create_in_idx_map('fwd')
 
         self.of_meta, self.of_size, has_of_dist = \
             self._get_tuple_map(of, responses, abs2meta_out)
@@ -364,13 +368,8 @@ class _TotalJacInfo(object):
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
             self.J_final = J
-            if self.has_scaling or approx:
-                # for array return format, create a 'dict' view for scaling or FD, since
-                # our scaling and FD data is by variable.
-                self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
-                                               self.wrt_meta, self.of_meta, 'dict')
-            else:
-                self.J_dict = None
+            self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
+                                           self.wrt_meta, self.of_meta, 'dict')
         else:
             self.J_final = self.J_dict = self._get_dict_J(J, wrt, prom_wrt, of, prom_of,
                                                           self.wrt_meta, self.of_meta,
@@ -390,7 +389,7 @@ class _TotalJacInfo(object):
         if (((mode == 'fwd' and get_remote) or mode == 'rev') and
                 (nproc > 1 or (model._full_comm is not None and model._full_comm.size > 1))):
             myrank = self.comm.rank
-            if get_remote:  # fwd
+            if get_remote:
                 myoffset = rowcol_size * myrank
             elif not get_remote:  # rev and not get_remote
                 # reduce size of vector by not including distrib vars
@@ -596,7 +595,6 @@ class _TotalJacInfo(object):
             non_rel_outs = False
 
         for name in input_list:
-            rhsname = 'linear'
             if name not in abs2meta_out:
                 # could be promoted input name
                 abs_in = model._var_allprocs_prom2abs_list['input'][name][0]
@@ -617,8 +615,6 @@ class _TotalJacInfo(object):
 
                 _check_voi_meta(name, parallel_deriv_color, simul_coloring)
                 if parallel_deriv_color:
-                    rhsname = name
-
                     if parallel_deriv_color:
                         if parallel_deriv_color not in self.par_deriv_printnames:
                             self.par_deriv_printnames[parallel_deriv_color] = []
@@ -698,7 +694,7 @@ class _TotalJacInfo(object):
 
             # We apply a -1 here because the derivative of the output is minus the derivative of
             # the input
-            seed.append(np.full(irange.size, -1.0 / ndups, dtype=float))
+            seed.append(np.full(irange.size, -1.0, dtype=float))
 
             if parallel_deriv_color:
                 has_par_deriv_color = True
@@ -717,9 +713,9 @@ class _TotalJacInfo(object):
                 idx_iter_dict[name] = (imeta, self.single_index_iter)
 
             if name in relevant and not non_rel_outs:
-                tup = (rhsname, relevant[name]['@all'][1], cache_lin_sol)
+                tup = (ndups, relevant[name]['@all'][1], cache_lin_sol)
             else:
-                tup = (rhsname, _contains_all, cache_lin_sol)
+                tup = (ndups, _contains_all, cache_lin_sol)
 
             idx_map.extend([tup] * (end - start))
             start = end
@@ -1161,6 +1157,12 @@ class _TotalJacInfo(object):
                 scratch = self.jac_scratch['rev'][1]
                 scratch[:] = self.J[i]
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
+                ndups, _, _ = self.in_idx_map[mode][i]
+                # for rows corresponding to serial 'of' vars, we need to correct for
+                # duplication of their seed values by dividing columns corresponding to
+                # *local* serial 'wrt' vars by the number of duplications.
+                if ndups > 1:
+                    self.J[i] *= (1.0 / ndups)
             else:
                 scatter = self.jac_scatters[mode]
                 if scatter is not None:
@@ -1175,7 +1177,15 @@ class _TotalJacInfo(object):
                     scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                     addv=True, mode=False)
                     if loc >= 0:
-                        self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
+                        ndups, _, _ = self.in_idx_map[mode][i]
+                        # for rows corresponding to serial 'of' vars, we need to correct for
+                        # duplication of their seed values by dividing columns corresponding to
+                        # *local* serial 'wrt' vars by the number of duplications.
+                        if ndups > 1:
+                            self.J[loc, :][self.nondist_loc_map[mode]] = \
+                                self.tgt_petsc[mode].array * (1.0 / ndups)
+                        else:
+                            self.J[loc, :][self.nondist_loc_map[mode]] = self.tgt_petsc[mode].array
 
     def single_jac_setter(self, i, mode, meta):
         """
@@ -1316,7 +1326,7 @@ class _TotalJacInfo(object):
         self.J[:] = 0.0
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
-        for mode in self.idx_iter_dict:
+        for mode in self.modes:
             for key, idx_info in self.idx_iter_dict[mode].items():
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):

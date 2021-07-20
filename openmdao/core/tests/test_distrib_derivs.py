@@ -1526,7 +1526,7 @@ class TestDistribBugs(unittest.TestCase):
 
     N_PROCS = 2
 
-    def get_problem(self, comp_class, mode='auto', stacked=True):
+    def get_problem(self, comp_class, mode='auto', stacked=False):
         size = 5
 
         if MPI:
@@ -1592,7 +1592,7 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_totals_fwd(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
-        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
             try:
@@ -1602,6 +1602,26 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_check_totals_rev(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+                                                   wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
+
+    def test_check_totals_fwd_stacked(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd', stacked=True)
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
+                                        wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
+
+    def test_check_totals_rev_stacked(self):
+        prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
