@@ -1279,13 +1279,11 @@ class Problem(object):
                                 idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
 
-                            # in rev mode when we have a serial resid and a distrib input, we
+                            # in rev mode when we have a serial resid, we
                             # need to multiply the derivative to correct for the effect of having
                             # a seed that hasn't been split between each instance of the duplicated
                             # serial resid.
-                            if in_dist or mode == 'fwd':
-                                mult = 1.0
-                            else:
+                            if not in_dist and mode == 'rev':
                                 mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
@@ -1325,12 +1323,13 @@ class Problem(object):
                                             deriv[jac_key][:, idx] = derivs
 
                                     else:  # rev
-                                        if out_abs in meta_out:
-                                            out_dist = meta_out[out_abs]['distributed']
-                                        else:
-                                            out_dist = meta_in[out_abs]['distributed']
-                                        if out_dist and not in_dist:
-                                            derivs *= mult
+                                        if not in_dist:
+                                            if out_abs in meta_out:
+                                                out_dist = meta_out[out_abs]['distributed']
+                                            else:
+                                                out_dist = meta_in[out_abs]['distributed']
+                                            if out_dist:
+                                                derivs *= mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
