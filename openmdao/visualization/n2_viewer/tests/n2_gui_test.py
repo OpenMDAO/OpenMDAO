@@ -1,10 +1,11 @@
-"""Test N2 GUI with multiple models using Pyppeteer."""
+"""Test N2 GUI with multiple models using Playwright."""
 import asyncio
-import pyppeteer
+from playwright.async_api import async_playwright
 import subprocess
 import unittest
 from aiounittest import async_test
 import os
+import sys
 
 try:
     from parameterized import parameterized
@@ -30,6 +31,10 @@ resize_dirs = {
     'top-left': [-1, -1]
 }
 
+if 'win32' in sys.platform:
+    # Windows specific event-loop policy & cmd
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 my_loop = asyncio.get_event_loop()
 
 """ A set of toolbar tests that runs on each model. """
@@ -37,77 +42,62 @@ toolbar_script = [
     {
         "desc": "Uncollapse All button",
         "id": "expand-all",
-        "waitForTransition": True
     },
     {
         "desc": "Collapse Outputs in View Only button",
         "id": "collapse-element-2",
-        "waitForTransition": True
     },
     {
         "desc": "Uncollapse In View Only button",
         "id": "expand-element",
-        "waitForTransition": True
     },
     {
         "desc": "Show Legend (off) button",
         "id": "legend-button",
-        "waitForTransition": True
     },
     {
         "desc": "Show Legend (on) button",
         "id": "legend-button",
-        "waitForTransition": False
     },
     {
         "desc": "Show Path (on) button",
         "id": "info-button",
-        "waitForTransition": False
     },
     {
         "desc": "Show Path (off) button",
         "id": "info-button",
-        "waitForTransition": False
     },
     {
         "desc": "Non-linear solver names button",
         "id": "non-linear-solver-button",
-        "waitForTransition": False
     },
     {
         "desc": "Linear solver names button",
         "id": "linear-solver-button-2",
-        "waitForTransition": True
     },
     {
         "desc": "Toggle solver visibility button (off)",
         "id": "no-solver-button",
-        "waitForTransition": True
     },
     {
         "desc": "Toggle solver visibility button (on)",
         "id": "no-solver-button",
-        "waitForTransition": True
     },
     {
         "desc": "Clear Arrows and Connection button",
         "id": "hide-connections",
-        "waitForTransition": False
     },
     {
         "desc": "Help (on) button",
         "id": "question-button",
-        "waitForTransition": False
     },
     {
         "desc": "Help (off) button",
         "id": "question-button",
-        "waitForTransition": False
     },
     {
         "desc": "Collapse All Outputs button",
         "id": "collapse-all",
-        "waitForTransition": True
     }
 ]
 
@@ -422,16 +412,10 @@ n2_gui_test_scripts = {
             "button": "left"
         },
         {
-            "desc": "Uncollapse the indeps view",
-            "test": "click",
-            "selector": "rect#indeps",
-            "button": "right"
-        },
-        {
             "desc": "There should be two elements visible in indeps view",
-            "test": "uncollapse_zoomed_element",
-            "selector": "rect#indeps",
-            "n2ElementCount": 2
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 2
         }
     ],
     "nan_value": [
@@ -458,7 +442,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Display Value Info window",
             "test": "click",
-            "selector": '[id^="persistentNodeInfo"] button#val',
+            "selector": "text=Show more",
             "button": "left"
         },
         {
@@ -554,25 +538,12 @@ class n2_gui_test_case(unittest.TestCase):
         self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
         self.page.on('requestfailed', lambda msg: self.handle_request_err(msg))
 
-    async def setup_browser(self):
+    async def setup_browser(self, playwright):
         """ Create a browser instance and print user agent info. """
-        self.browser = await pyppeteer.launch({
-            'defaultViewport': {
-                'width': 1600,
-                'height': 900
-            },
-            'args': [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--start-fullscreen'
-            ],
-            'headless': True
-        })
-        userAgentStr = await self.browser.userAgent()
-        print("Browser: " + userAgentStr + "\n")
-
-        self.page = await self.browser.newPage()
-        await self.page.bringToFront()
+        self.browser = await playwright.chromium.launch(args = ['--start-fullscreen'])
+        self.page = await self.browser.new_page()
+    
+        await self.page.bring_to_front()
         self.setup_error_handlers()
 
     def log_test(self, msg):
@@ -605,42 +576,67 @@ class n2_gui_test_case(unittest.TestCase):
         """ Load the specified HTML file from the local filesystem. """
         url = URL_PREFIX + '/' + self.n2_filename
 
-        # Without waitUntil: 'networkidle0', processing will begin before
+        # Without wait_until: 'networkidle', processing will begin before
         # the page is fully rendered
-        await self.page.goto(url, waitUntil='networkidle0')
-
-        # Milliseconds to allow for the last transition animation to finish.
-        # Obtain value defined in N2 code.
-        self.transition_wait = \
-            await self.page.evaluate("N2TransitionDefaults.durationSlow")
-        self.transition_wait += 100
-        print("  Transition wait set to " + str(self.transition_wait) + "ms")
-        self.normal_wait = 10
-        await self.page.waitFor(self.transition_wait)
+        await self.page.goto(url, wait_until = 'networkidle')
 
     async def generic_toolbar_tests(self):
         """ Click most of the toolbar buttons to see if an error occurs """
         for test in toolbar_script:
             with self.subTest(test['desc']):
                 self.log_test("[Toolbar] " + test['desc'])
-                btnHandle = await self.page.querySelector('#' + test['id'])
-                await btnHandle.click(button='left', delay=5)
-                waitTime = self.transition_wait if test['waitForTransition'] \
-                    else self.normal_wait
-                await self.page.waitFor(waitTime)
 
-        await self.page.reload(waitUntil='networkidle0')
-        await self.page.waitFor(self.transition_wait)
+                btnHandle = await self.get_handle('#' + test['id'])
+                await btnHandle.click(button='left', timeout=3333, force=True)
+
+        await self.page.reload(wait_until='networkidle')
 
     async def assert_element_count(self, selector, expected_found):
         """
         Count the number of elements located by the selector and make
-        sure it matches the supplied value.
+        sure it exactly matches the supplied value. Try several times
+        because sometimes transition animations throw things off.
         """
-        hndl_list = await self.page.querySelectorAll(selector)
+        max_tries = 3 # Max number of times to attempt to find a selector
+        max_time = 2000 # The timeout in ms for each search
 
-        self.assertIsNot(hndl_list, False,
-                         "Could not find any '" + selector + "' elements.")
+        if (expected_found > 0):
+            num_tries = 0
+            found = False
+            while (not found and num_tries < max_tries):
+                nth_selector = f':nth-match({selector}, {expected_found})'
+                try:
+                    await self.page.wait_for_selector(nth_selector, state='attached', timeout=max_time)
+                    found = True
+                except:
+                    num_tries += 1
+            
+            num_tries = 0
+            found = False
+            while (not found and num_tries < max_tries):
+                    nth_selector = f':nth-match({selector}, {expected_found+1})'
+                    try:          
+                        await self.page.wait_for_selector(nth_selector, state='detached', timeout=max_time)
+                        found = True
+                    except:
+                        num_tries += 1
+
+        else:
+            num_tries = 0
+            found = False
+            while (not found and num_tries < max_tries):
+                nth_selector = f':nth-match({selector}, 1)'
+                try:
+                    await self.page.wait_for_selector(nth_selector, state='detached', timeout=max_time)
+                    found = True
+                except:
+                        num_tries += 1
+    
+        hndl_list = await self.page.query_selector_all(selector)
+        if (len(hndl_list) > expected_found):
+            global current_test
+            await self.page.screenshot(path=f'shot_{current_test}.png')
+
         self.assertEqual(len(hndl_list), expected_found,
                          'Found ' + str(len(hndl_list)) +
                          ' elements, expected ' + str(expected_found))
@@ -654,7 +650,7 @@ class n2_gui_test_case(unittest.TestCase):
 
     async def get_handle(self, selector):
         """ Get handle for a specific element and assert that it exists. """
-        handle = await self.page.querySelector(selector)
+        handle = await self.page.wait_for_selector(selector, state='attached', timeout=3055)
 
         self.assertIsNotNone(handle,
                              "Could not find element with selector '" +
@@ -672,10 +668,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         hndl = await self.get_handle(options['selector'])
 
-        await hndl.hover()
-
-        # Give the browser a chance to do whatever
-        await self.page.waitFor(self.normal_wait)
+        await hndl.hover(force=False)
 
     async def hover_and_check_arrow_count(self, options):
         """
@@ -687,7 +680,6 @@ class n2_gui_test_case(unittest.TestCase):
         # Make sure there are enough arrows
         await self.assert_arrow_count(options['arrowCount'])
         await self.page.mouse.move(0, 0)  # Get the mouse off the element
-        await self.page.waitFor(self.normal_wait)
         await self.assert_arrow_count(0)  # Make sure no arrows left
 
     async def click(self, options):
@@ -698,9 +690,9 @@ class n2_gui_test_case(unittest.TestCase):
         self.log_test(options['desc'] if 'desc' in options else
                       options['button'] + "-click on '" +
                       options['selector'] + "'")
+
         hndl = await self.get_handle(options['selector'])
         await hndl.click(button=options['button'])
-        await self.page.waitFor(self.transition_wait)
 
     async def drag(self, options):
         """
@@ -713,15 +705,14 @@ class n2_gui_test_case(unittest.TestCase):
 
         hndl = await self.get_handle(options['selector'])
 
-        pre_drag_bbox = await hndl.boundingBox()
+        pre_drag_bbox = await hndl.bounding_box()
 
-        await hndl.hover()
+        await hndl.hover(force=True)
         await self.page.mouse.down()
         await self.page.mouse.move(options['x'], options['y'])
         await self.page.mouse.up()
 
-        await self.page.waitFor(self.normal_wait)
-        post_drag_bbox = await hndl.boundingBox()
+        post_drag_bbox = await hndl.bounding_box()
 
         moved = ((pre_drag_bbox['x'] != post_drag_bbox['x']) or
                  (pre_drag_bbox['y'] != post_drag_bbox['y']))
@@ -737,13 +728,11 @@ class n2_gui_test_case(unittest.TestCase):
         self.log_test(options['desc'] if 'desc' in options else
                       "Resizing '" + options['selector'] + "' window.")
 
-        # await self.page.screenshot({'path': 'preresize.png'})
-
         win_hndl = await self.get_handle(options['selector'])
-        pre_resize_bbox = await win_hndl.boundingBox()
+        pre_resize_bbox = await win_hndl.bounding_box()
 
         edge_hndl = await self.get_handle(options['selector'] + ' div.rsz-' + options['side'])
-        edge_bbox = await edge_hndl.boundingBox()
+        edge_bbox = await edge_hndl.bounding_box()
 
         new_x = edge_bbox['x'] + \
             resize_dirs[options['side']][0] * options['distance']
@@ -755,7 +744,7 @@ class n2_gui_test_case(unittest.TestCase):
         await self.page.mouse.move(new_x, new_y)
         await self.page.mouse.up()
 
-        post_resize_bbox = await win_hndl.boundingBox()
+        post_resize_bbox = await win_hndl.bounding_box()
         dw = post_resize_bbox['width'] - pre_resize_bbox['width']
         dh = post_resize_bbox['height'] - pre_resize_bbox['height']
 
@@ -767,8 +756,6 @@ class n2_gui_test_case(unittest.TestCase):
             self.assertIsNot(resized, True,
                              "The '" + options['selector'] + "' element was resized and should NOT have been.")
 
-        # await self.page.screenshot({'path': 'postresize.png'})
-
     async def return_to_root(self):
         """
         Left-click the home button and wait for the transition to complete.
@@ -777,7 +764,6 @@ class n2_gui_test_case(unittest.TestCase):
         self.log_test("Return to root")
         hndl = await self.get_handle("#reset-graph")
         await hndl.click()
-        await self.page.waitFor(self.transition_wait * 2)
 
     async def search_and_check_result(self, options):
         """
@@ -790,20 +776,12 @@ class n2_gui_test_case(unittest.TestCase):
                       "' and checking for " +
                       str(options['n2ElementCount']) + " N2 elements after.")
 
-        # await self.page.hover(".searchbar-container")
         await self.page.click("#searchbar-container")
-        await self.page.waitFor(500)
 
-        searchbar = await self.page.querySelector('#awesompleteId')
-        await searchbar.type(searchString + "\n")
+        searchbar = await self.page.wait_for_selector('#awesompleteId', state='visible')
+        await searchbar.type(searchString + "\n", delay=50)
 
-        # await self.page.waitFor(500)
-
-        # await self.page.keyboard.press('Backspace')
-        # await self.page.keyboard.press("Enter")
-        await self.page.waitFor(self.transition_wait + 500)
-        await self.assert_element_count("g#n2elements > g.n2cell",
-                                        options['n2ElementCount'])
+        await self.assert_element_count("g.n2cell", options['n2ElementCount'])
 
     async def run_model_script(self, script):
         """
@@ -841,13 +819,12 @@ class n2_gui_test_case(unittest.TestCase):
                 await self.assert_element_count(script_item['selector'],
                                                 script_item['count'])
 
-    async def run_gui_tests(self):
+    async def run_gui_tests(self, playwright):
         """ Execute all of the tests in an async event loop. """
-        await self.setup_browser()
+        await self.setup_browser(playwright)
 
         self.n2_filename = self.n2files[self.current_model]
         await self.load_test_page()
-        await self.page.waitFor(2000)
         bname = os.path.basename(self.n2_filename)[:-len(GUI_N2_SUFFIX)]
 
         if bname in self.known_model_names:
@@ -875,8 +852,11 @@ class n2_gui_test_case(unittest.TestCase):
 
         self.current_test_desc = ''
         self.current_model = basename
+
         self.generate_n2_file()
-        await self.run_gui_tests()
+
+        async with async_playwright() as playwright:
+            await self.run_gui_tests(playwright)
 
         if not DEBUG:
             try:
