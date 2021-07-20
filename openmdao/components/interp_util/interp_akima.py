@@ -732,18 +732,18 @@ def abs_smooth_1d(x, x_deriv=None, delta_x=0):
 
     Parameters
     ----------
-    x : ndarray
-        Input array, used for determining which elements to negate.
-    x_deriv : ndarray
-        Incoming partial derivative array, may have one additional dimension. Optional.
+    x : float or ndarray of length 1
+        Input value.
+    x_deriv : float or ndarray of length 1
+        Incoming derivative value. Optional.
     delta_x : float
         Half width of the rounded section.
 
     Returns
     -------
-    ndarray
+    float or ndarray of length 1
         Absolute value applied to x.
-    ndarray
+    float or ndarray of length 1
         Absolute value applied to x_deriv.
     """
     if x < -delta_x:

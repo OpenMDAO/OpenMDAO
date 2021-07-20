@@ -184,10 +184,10 @@ class InterpNDSemi(object):
         for j in range(n_nodes):
             val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
             result[j] = val
-            derivs_x[j, :] = d_x.flatten()
+            derivs_x[j, :] = d_x.ravel()
             if self._compute_d_dvalues:
                 d_values, idx = d_values_tuple
-                derivs_val[j, idx] = d_values.flatten()
+                derivs_val[j, idx] = d_values.ravel()
 
         # Cache derivatives
         self._d_dx = derivs_x

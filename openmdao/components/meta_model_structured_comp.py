@@ -187,7 +187,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
+        pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
         for out_name, interp in self.interps.items():
             if self.options['training_data_gradients']:
                 # Training point values may have changed every time we compute.
@@ -225,7 +225,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
+        pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
 
         for out_name, interp in self.interps.items():
             dval = interp.gradient(pt).T
