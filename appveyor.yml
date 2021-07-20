@@ -105,7 +105,6 @@ install:
 - cmd: conda create -n PY%PYTHON% numpy scipy pip --quiet
 - cmd: activate PY%PYTHON%
 - cmd: pip install -e .[all]
-- cmd: pyppeteer-install
 - cmd: conda list
 
 test_script:
