@@ -160,7 +160,6 @@ jobs:
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
           pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-          pyppeteer-install
 
       - name: Display conda info
         shell: bash -l {0}
@@ -314,8 +313,7 @@ jobs:
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
           pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-          pyppeteer-install
-
+          
       - name: Display conda info
         shell: pwsh
         run: |
