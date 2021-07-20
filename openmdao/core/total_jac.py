@@ -278,9 +278,6 @@ class _TotalJacInfo(object):
             for mode in modes:
                 self._create_in_idx_map(mode)
 
-            if 'fwd' not in modes:
-                self._create_in_idx_map('fwd')
-
         self.of_meta, self.of_size, has_of_dist = \
             self._get_tuple_map(of, responses, abs2meta_out)
         self.has_input_dist['rev'] = self.has_output_dist['fwd'] = has_of_dist
@@ -1153,14 +1150,13 @@ class _TotalJacInfo(object):
                                                 addv=False, mode=False)
                 self.J[:, i] = self.tgt_petsc[mode].array
         elif mode == 'rev':
+            # for rows corresponding to serial 'of' vars, we need to correct for
+            # duplication of their seed values by dividing by the number of duplications.
+            ndups = self.in_idx_map[mode][i][0]
             if self.get_remote:
                 scratch = self.jac_scratch['rev'][1]
                 scratch[:] = self.J[i]
                 self.comm.Allreduce(scratch, self.J[i], op=MPI.SUM)
-                ndups, _, _ = self.in_idx_map[mode][i]
-                # for rows corresponding to serial 'of' vars, we need to correct for
-                # duplication of their seed values by dividing columns corresponding to
-                # *local* serial 'wrt' vars by the number of duplications.
                 if ndups > 1:
                     self.J[i] *= (1.0 / ndups)
             else:
@@ -1177,10 +1173,6 @@ class _TotalJacInfo(object):
                     scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                     addv=True, mode=False)
                     if loc >= 0:
-                        ndups, _, _ = self.in_idx_map[mode][i]
-                        # for rows corresponding to serial 'of' vars, we need to correct for
-                        # duplication of their seed values by dividing columns corresponding to
-                        # *local* serial 'wrt' vars by the number of duplications.
                         if ndups > 1:
                             self.J[loc, :][self.nondist_loc_map[mode]] = \
                                 self.tgt_petsc[mode].array * (1.0 / ndups)
