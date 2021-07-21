@@ -1614,8 +1614,7 @@ class TestDistribBugs(unittest.TestCase):
             sizes, offsets = evenly_distrib_idxs(comm.size, size)
         else:
             rank = 0
-            sizes = {rank : size}
-            offsets = {rank : 0}
+            sizes, offsets = [size], [0]
 
         model = om.Group()
 
@@ -1734,12 +1733,12 @@ class TestDistribBugs(unittest.TestCase):
     def test_check_partials_cs(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
         data = prob.check_partials(method='cs', show_only_incorrect=True)
-        assert_check_partials(data) #, atol=1e-10)
+        assert_check_partials(data)
 
     def test_check_partials_prod_cs(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree)
         data = prob.check_partials(method='cs', show_only_incorrect=True)
-        assert_check_partials(data)# , atol=2e-8)
+        assert_check_partials(data)
 
     def test_check_partials_fd(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
