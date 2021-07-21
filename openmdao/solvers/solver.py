@@ -987,7 +987,7 @@ class BlockLinearSolver(LinearSolver):
             Complex mode flag; set to True prior to commencing complex step.
         """
         if active:
-            self._rhs_vec = self._rhs_vec.astype(np.complex)
+            self._rhs_vec = self._rhs_vec.astype(complex)
         else:
             self._rhs_vec = self._rhs_vec.real
 
