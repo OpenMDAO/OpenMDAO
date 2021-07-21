@@ -348,8 +348,8 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]]: "
-                         "index 9 is out of bounds for source dimension of size 9.")
+                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]] and "
+                         "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
 
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
