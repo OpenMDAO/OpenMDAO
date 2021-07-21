@@ -11,6 +11,7 @@ from openmdao.test_suite.components.distributed_components import DistribCompDer
 from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature, \
     DistParabDeprecated
 from openmdao.utils.mpi import MPI
+from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
@@ -1425,6 +1426,13 @@ class TestBugs(unittest.TestCase):
         assert_near_equal(totals['solver.func', 'dvs.state']['abs error'][0], 0.0, tolerance=1e-7)
 
 
+def f_out_dist(Id, Is):
+    return Id**2 - 2.0*Id + 4.0 + np.sum(1.5 * Is ** 2)
+
+def f_out_serial(Id, Is):
+    return Is**2 + 3.0*Is - 5.0 + np.sum(1.5 * Id ** 2)
+
+
 class Distrib_Derivs(om.ExplicitComponent):
     """Simplest example that combines distributed and serial inputs and outputs."""
 
@@ -1437,30 +1445,23 @@ class Distrib_Derivs(om.ExplicitComponent):
         self.add_output('out_serial', copy_shape='in_serial')
 
     def compute(self, inputs, outputs):
-        comm = self.comm
         Id = inputs['in_dist']
         Is = inputs['in_serial']
 
-        f_Id = Id**2 - 2.0*Id + 4.0
-        f_Is = 1.5 * Is ** 2
-
         # Our local distributed output is a function of local distributed input computed above.
         # It also is a function of the serial input.
-        outputs['out_dist'] = f_Id + np.sum(f_Is)
+        outputs['out_dist'] = f_out_dist(Id, Is)
 
-        g_Id = 1.5 * Id ** 2
-        g_Is = Is**2 + 3.0*Is - 5.0
-
-        if MPI and comm.size > 1:
+        if self.comm.size > 1:
 
             # We need to gather the summed values to compute the total sum over all procs.
-            local_sum = np.array([np.sum(g_Id)])
+            local_sum = np.array([np.sum(1.5 * Id ** 2)])
             total_sum = local_sum.copy()
             self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
 
-            outputs['out_serial'] = g_Is + total_sum[0]
+            outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + total_sum[0]
         else:
-            outputs['out_serial'] = g_Is + np.sum(g_Id)
+            outputs['out_serial'] = f_out_serial(Id, Is)
 
 
 class Distrib_Derivs_Matfree(Distrib_Derivs):
@@ -1483,9 +1484,9 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
                     deriv = np.tile(dg_dId, size).reshape((size, local_size)).dot(d_inputs['in_dist'])
-                    cpy = deriv.copy()
-                    self.comm.Allreduce(cpy, deriv, op=MPI.SUM)
-                    d_outputs['out_serial'] += deriv
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_outputs['out_serial'] += deriv_sum
                 if 'in_serial' in d_inputs:
                     d_outputs['out_serial'] += (2.0 * Is + 3.0) * d_inputs['in_serial']
         else:  # rev
@@ -1496,7 +1497,7 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
                     d_inputs['in_serial'] += np.tile(df_dIs, local_size).reshape((local_size, size)).T.dot(d_outputs['out_dist'])
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    full = d_outputs['out_serial'].copy()
+                    full = np.zeros(d_outputs['out_serial'].size)
                     # add up contributions from the serial variable that is duplicated over
                     # all of the procs.
                     self.comm.Allreduce(d_outputs['out_serial'], full, op=MPI.SUM)
@@ -1519,6 +1520,84 @@ class Distrib_DerivsErr(Distrib_Derivs):
 
     def compute_partials(self, inputs, partials):
         pass  # do nothing here.  Error will occur before calling this.
+
+
+class Distrib_Derivs_Prod(om.ExplicitComponent):
+    """Simplest example that combines distributed and serial inputs and outputs."""
+
+    def setup(self):
+
+        self.add_input('in_dist', shape_by_conn=True, distributed=True)
+        self.add_input('in_serial', shape_by_conn=True)
+
+        self.add_output('out_dist', copy_shape='in_dist', distributed=True)
+        self.add_output('out_serial', copy_shape='in_serial')
+
+    def compute(self, inputs, outputs):
+        Id = inputs['in_dist']
+        Is = inputs['in_serial']
+
+        # Our local distributed output is a function of local distributed input computed above.
+        # It also is a function of the serial input.
+        outputs['out_dist'] = Id**2 - 2.0*Id + 4.0 + np.prod(1.5 * Is ** 2)
+
+        if self.comm.size > 1:
+            # get the full dist input before we take the product
+            Idfull = np.hstack(self.comm.allgather(Id))
+
+        outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + np.prod(1.5 * Idfull ** 2)
+
+
+class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
+    def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+        Id = inputs['in_dist']
+        Is = inputs['in_serial']
+        Idfull = np.hstack(self.comm.allgather(Id))
+
+        idx = self._var_allprocs_abs2idx[rel_name2abs_name(self, 'in_dist')]
+        sizes = self._var_sizes['input'][:, idx]
+        start = np.sum(sizes[:self.comm.rank])
+        end = start + sizes[self.comm.rank]
+
+        size = len(Is)
+
+        d_dIs = np.zeros((size, size))
+        for i in range(size):
+            d_dIs[:, i] = 3.*Is[i]*np.product([1.5*Is[j]**2 for j in range(size) if i != j])
+
+        d_dId = np.zeros((size, size))
+        for i in range(size):
+            d_dId[:, i] = 3.*Idfull[i]*np.product([1.5*Idfull[j]**2 for j in range(size) if i != j])
+
+        if mode == 'fwd':
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_outputs['out_dist'] += (2.0 * Id - 2.0) * d_inputs['in_dist']
+                if 'in_serial' in d_inputs:
+                    d_outputs['out_dist'] += d_dIs.dot(d_inputs['in_serial'])[start:end]
+            if 'out_serial' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    deriv = d_dId[:, start:end].dot(d_inputs['in_dist'])
+                    deriv_sum = np.zeros(deriv.size)
+                    self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
+                    d_outputs['out_serial'] += deriv_sum
+                if 'in_serial' in d_inputs:
+                    d_outputs['out_serial'] += (2.0 * Is + 3.0) * d_inputs['in_serial']
+        else:  # rev
+            if 'out_dist' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
+                if 'in_serial' in d_inputs:
+                    d_inputs['in_serial'] += d_dIs[start:end, :].T.dot(d_outputs['out_dist'])
+            if 'out_serial' in d_outputs:
+                if 'in_dist' in d_inputs:
+                    full = np.zeros(d_outputs['out_serial'].size)
+                    # add up contributions from the serial variable that is duplicated over
+                    # all of the procs.
+                    self.comm.Allreduce(d_outputs['out_serial'], full, op=MPI.SUM)
+                    d_inputs['in_dist'] += d_dId[:, start:end].T.dot(full)
+                if 'in_serial' in d_inputs:
+                    d_inputs['in_serial'] += (2.0 * Is + 3.0) * d_outputs['out_serial']
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1560,8 +1639,8 @@ class TestDistribBugs(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup(mode=mode, force_alloc_complex=True)
 
-        self.x_dist_init = x_dist_init = 3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]
-        self.x_serial_init = x_serial_init = 1.0 + 2.0*np.arange(size)
+        self.x_dist_init = x_dist_init = (3.0 + np.arange(size)[offsets[rank]:offsets[rank] + sizes[rank]]) * .1
+        self.x_serial_init = x_serial_init = (1.0 + 2.0*np.arange(size)) * .1
 
         # This set operates on the entire vector.
         prob.set_val('indep.x_dist', x_dist_init)
@@ -1573,21 +1652,23 @@ class TestDistribBugs(unittest.TestCase):
 
     def test_get_val(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, stacked=False)
+        indep = prob.model.indep
+        full_dist_init = np.hstack(indep.comm.allgather(indep._outputs['x_dist'].flat[:]))
+        D1_out_dist_full = f_out_dist(full_dist_init, self.x_serial_init)
         if prob.model.comm.rank == 0:
-            D1_out_dist = np.array([254.5, 259.5, 266.5])
+            D1_out_dist = f_out_dist(self.x_dist_init, self.x_serial_init)
         else:
-            D1_out_dist = np.array([275.5, 286.5])
+            D1_out_dist = f_out_dist(self.x_dist_init, self.x_serial_init)
 
-        D1_out_dist_full = np.array([254.5, 259.5, 266.5, 275.5, 286.5])
-        D1_out_serial = np.array([201.5, 215.5, 237.5, 267.5, 305.5])
+        D1_out_serial = f_out_serial(full_dist_init, self.x_serial_init)
 
         vnames = ['indep.x_dist', 'indep.x_serial', 'D1.out_dist', 'D1.out_serial']
         expected = [self.x_dist_init, self.x_serial_init, D1_out_dist, D1_out_serial]
-        expected_remote = [3+np.arange(5), self.x_serial_init, D1_out_dist_full, D1_out_serial]
+        expected_remote = [full_dist_init, self.x_serial_init, D1_out_dist_full, D1_out_serial]
         for var, ex, ex_remote in zip(vnames, expected, expected_remote):
             val = prob.get_val(var)
-            assert_near_equal(val, ex, tolerance=1e-8)
             full_val = prob.get_val(var, get_remote=True)
+            assert_near_equal(val, ex, tolerance=1e-8)
             assert_near_equal(full_val, ex_remote, tolerance=1e-8)
 
     def test_check_totals_fwd(self):
@@ -1600,8 +1681,28 @@ class TestDistribBugs(unittest.TestCase):
             except Exception as err:
                 self.fail(f"For key {key}: {err}")
 
+    def test_check_totals_prod_fwd(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='fwd')
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+                                        wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
+
     def test_check_totals_rev(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
+                                                   wrt=['indep.x_serial', 'indep.x_dist'])
+        for key, val in totals.items():
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
+
+    def test_check_totals_prod_rev(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
         for key, val in totals.items():
@@ -1633,12 +1734,22 @@ class TestDistribBugs(unittest.TestCase):
     def test_check_partials_cs(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
         data = prob.check_partials(method='cs', show_only_incorrect=True)
-        assert_check_partials(data, atol=1e-10)
+        assert_check_partials(data) #, atol=1e-10)
+
+    def test_check_partials_prod_cs(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree)
+        data = prob.check_partials(method='cs', show_only_incorrect=True)
+        assert_check_partials(data)# , atol=2e-8)
 
     def test_check_partials_fd(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
         data = prob.check_partials(method='fd', show_only_incorrect=True)
-        assert_check_partials(data, atol=1e-3)
+        assert_check_partials(data, atol=6e-6, rtol=1.5e-6)
+
+    def test_check_partials_prod_fd(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree)
+        data = prob.check_partials(method='fd', show_only_incorrect=True)
+        assert_check_partials(data, rtol=5e-6, atol=3e-6)
 
     def test_check_err(self):
         with self.assertRaises(RuntimeError) as cm:
