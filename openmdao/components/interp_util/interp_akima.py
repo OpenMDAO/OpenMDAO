@@ -5,7 +5,7 @@ Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, InterpAlgorithmSemi
 from openmdao.utils.array_utils import abs_complex, dv_abs_complex
 
 
@@ -148,7 +148,7 @@ class InterpAkima(InterpAlgorithm):
         nx = len(x)
 
         # Complex Step
-        if self.values.dtype == np.complex:
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -724,3 +724,572 @@ class InterpAkima(InterpAlgorithm):
 
         # Evaluate dependent value and exit
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, None
+
+
+def abs_smooth_1d(x, x_deriv=None, delta_x=0):
+    """
+    Compute the complex-step derivative of the absolute value function and its derivative.
+
+    Parameters
+    ----------
+    x : float or ndarray of length 1
+        Input value.
+    x_deriv : float or ndarray of length 1
+        Incoming derivative value. Optional.
+    delta_x : float
+        Half width of the rounded section.
+
+    Returns
+    -------
+    float or ndarray of length 1
+        Absolute value applied to x.
+    float or ndarray of length 1
+        Absolute value applied to x_deriv.
+    """
+    if x < -delta_x:
+        x = -x
+        if x_deriv is not None:
+            x_deriv = -x_deriv
+
+    elif x > delta_x:
+        pass
+
+    else:
+        x = 0.5 * (x**2 / delta_x + delta_x)
+        if x_deriv is not None:
+            x_deriv = x * x_deriv / delta_x
+
+    if x_deriv is not None:
+        return x, x_deriv
+    return x
+
+
+class InterpAkimaSemi(InterpAlgorithmSemi):
+    """
+    Interpolate using an Akima polynomial.
+    """
+
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
+        """
+        Initialize table and subtables.
+
+        Parameters
+        ----------
+        grid : tuple(ndarray)
+            Tuple containing ndarray of x grid locations for each table dimension.
+        values : ndarray
+            Array containing the values at all points in grid.
+        interp : class
+            Interpolation class to be used for subsequent table dimensions.
+        extrapolate : bool
+            When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
+        """
+        super().__init__(grid, values, interp, extrapolate=extrapolate,
+                         compute_d_dvalues=compute_d_dvalues, idx=idx, idim=idim, **kwargs)
+        self.k = 4
+        self._name = 'akima'
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('delta_x', default=0.,
+                             desc="half-width of the smoothing interval added in the valley of "
+                             "absolute-value function. This allows the derivatives with respect to"
+                             " the data points (dydxpt, dydypt) to also be C1 continuous. Set "
+                             "parameter to 0 to get the original Akima function (but only if you "
+                             "don't need dydxpt, dydypt")
+        self.options.declare('eps', default=1e-30,
+                             desc='Value that triggers division-by-zero safeguard.')
+
+    def interpolate(self, x):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        Parameters
+        ----------
+        x : ndarray
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        tuple(ndarray, list)
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions. Second term is the indices into the value array.
+        bool
+            True if the coordinate is extrapolated in this dimension.
+        """
+        grid = self.grid
+        subtables = self.subtables
+
+        idx, flag = self.bracket(x[0])
+        extrap = flag != 0
+
+        eps = self.options['eps']
+        delta_x = self.options['delta_x']
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        c = 0.0
+        d = 0.0
+        m1 = 0.0
+        m2 = 0.0
+        m4 = 0.0
+        m5 = 0.0
+        extrap = 0
+        deriv_dv = None
+
+        # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
+        # reset idx to interval lower bracket (ient-2). if off lower end of table
+        # (idx = 0) interval lower bracket already set but need to check if independent
+        # variable is < first value in independent array
+        ngrid = len(grid)
+        if idx == ngrid - 1:
+            idx = ngrid - 2
+            extrap = 1
+        elif idx == 0 and x[0] < grid[0]:
+            extrap = -1
+
+        if idx >= 2:
+            low_idx = idx - 2
+        elif idx == 1:
+            low_idx = idx - 1
+        else:
+            low_idx = idx
+
+        if idx < ngrid - 3:
+            high_idx = idx + 4
+        elif idx == ngrid - 3:
+            high_idx = idx + 3
+        else:
+            high_idx = idx + 2
+
+        if subtables is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
+            vals = []
+            dxs = []
+            dvalues = []
+            sub_idxs = []
+            dval_slice = []
+            start = 0
+            for j in range(low_idx, high_idx):
+                val, dx, dvalue_tuple, flag = subtables[j].interpolate(x[1:])
+                vals.append(val)
+                dxs.append(dx)
+
+                if self._compute_d_dvalues:
+                    dvalue, sub_idx = dvalue_tuple
+                    sub_idxs.extend(sub_idx)
+                    dvalues.append(dvalue)
+                    end = start + len(dvalue)
+                    dval_slice.append((start, end))
+                    start = end
+
+            deriv_dx = np.empty(len(dxs[0]) + 1, dtype=dtype)
+            if self._compute_d_dvalues:
+                size = start
+
+            j = 0
+            if idx >= 2:
+                val1 = vals[j]
+                dval1 = dxs[j]
+                if self._compute_d_dvalues:
+                    dval1_dv = np.zeros(size, dtype=dtype)
+                    start, end = dval_slice[j]
+                    dval1_dv[start:end] = dvalues[j]
+                j += 1
+            if idx >= 1:
+                val2 = vals[j]
+                dval2 = dxs[j]
+                if self._compute_d_dvalues:
+                    dval2_dv = np.zeros(size, dtype=dtype)
+                    start, end = dval_slice[j]
+                    dval2_dv[start:end] = dvalues[j]
+                j += 1
+            val3 = vals[j]
+            val4 = vals[j + 1]
+            dval3 = dxs[j]
+            dval4 = dxs[j + 1]
+            if self._compute_d_dvalues:
+                dval3_dv = np.zeros(size, dtype=dtype)
+                start, end = dval_slice[j]
+                dval3_dv[start:end] = dvalues[j]
+                dval4_dv = np.zeros(size, dtype=dtype)
+                start, end = dval_slice[j + 1]
+                dval4_dv[start:end] = dvalues[j + 1]
+
+            j += 2
+            if idx < ngrid - 2:
+                val5 = vals[j]
+                dval5 = dxs[j]
+                if self._compute_d_dvalues:
+                    dval5_dv = np.zeros(size, dtype=dtype)
+                    start, end = dval_slice[j]
+                    dval5_dv[start:end] = dvalues[j]
+                j += 1
+            if idx < ngrid - 3:
+                val6 = vals[j]
+                dval6 = dxs[j]
+                if self._compute_d_dvalues:
+                    dval6_dv = np.zeros(size, dtype=dtype)
+                    start, end = dval_slice[j]
+                    dval6_dv[start:end] = dvalues[j]
+                j += 1
+
+        else:
+            values = self.values
+
+            deriv_dx = np.empty(1, dtype=dtype)
+            if self._compute_d_dvalues:
+                n_this = high_idx - low_idx
+                deriv_dv = np.empty(n_this, dtype=dtype)
+
+            j = 0
+            if idx >= 2:
+                val1 = values[idx - 2]
+                if self._compute_d_dvalues:
+                    idx_val1 = j
+                    j += 1
+            if idx >= 1:
+                val2 = values[idx - 1]
+                if self._compute_d_dvalues:
+                    idx_val2 = j
+                    j += 1
+            val3 = values[idx]
+            if self._compute_d_dvalues:
+                idx_val3 = j
+                j += 1
+            val4 = values[idx + 1]
+            if self._compute_d_dvalues:
+                idx_val4 = j
+                j += 1
+            if idx < ngrid - 2:
+                val5 = values[idx + 2]
+                if self._compute_d_dvalues:
+                    idx_val5 = j
+                    j += 1
+            if idx < ngrid - 3:
+                val6 = values[idx + 3]
+                if self._compute_d_dvalues:
+                    idx_val6 = j
+
+        # Calculate interval slope values
+        #
+        # m1 is the slope of interval (xi-2, xi-1)
+        # m2 is the slope of interval (xi-1, xi)
+        # m3 is the slope of interval (xi, xi+1)
+        # m4 is the slope of interval (xi+1, xi+2)
+        # m5 is the slope of interval (xi+2, xi+3)
+        #
+        # The values of m1, m2, m4 and m5 may be calculated from other slope values
+        # depending on the value of idx
+
+        compute_local_train = self._compute_d_dvalues and subtables is None
+
+        m3 = (val4 - val3) / (grid[idx + 1] - grid[idx])
+        if compute_local_train:
+            dm1_dv = np.zeros(n_this, dtype=dtype)
+            dm2_dv = np.zeros(n_this, dtype=dtype)
+            dm3_dv = np.zeros(n_this, dtype=dtype)
+            dm4_dv = np.zeros(n_this, dtype=dtype)
+            dm5_dv = np.zeros(n_this, dtype=dtype)
+            dm3_dv[idx_val4] = 1.0 / (grid[idx + 1] - grid[idx])
+            dm3_dv[idx_val3] = - dm3_dv[idx_val4]
+
+        if idx >= 2:
+            m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])
+            if compute_local_train:
+                dm1_dv[idx_val2] = 1.0 / (grid[idx - 1] - grid[idx - 2])
+                dm1_dv[idx_val1] = - dm1_dv[idx_val2]
+
+        if idx >= 1:
+            m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
+            if compute_local_train:
+                dm2_dv[idx_val3] = 1.0 / (grid[idx] - grid[idx - 1])
+                dm2_dv[idx_val2] = - dm2_dv[idx_val3]
+
+        if idx < ngrid - 2:
+            m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+            if compute_local_train:
+                dm4_dv[idx_val5] = 1.0 / (grid[idx + 2] - grid[idx + 1])
+                dm4_dv[idx_val4] = - dm4_dv[idx_val5]
+
+        if idx < ngrid - 3:
+            m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
+            if compute_local_train:
+                dm5_dv[idx_val6] = 1.0 / (grid[idx + 3] - grid[idx + 2])
+                dm5_dv[idx_val5] = - dm5_dv[idx_val6]
+
+        if idx == 0:
+            m2 = 2 * m3 - m4
+            m1 = 2 * m2 - m3
+            if compute_local_train:
+                dm2_dv = 2.0 * dm3_dv - dm4_dv
+                dm1_dv = 2.0 * dm2_dv - dm3_dv
+
+        elif idx == 1:
+            m1 = 2 * m2 - m3
+            if compute_local_train:
+                dm1_dv = 2.0 * dm2_dv - dm3_dv
+
+        elif idx == ngrid - 3:
+            m5 = 2 * m4 - m3
+            if compute_local_train:
+                dm5_dv = 2.0 * dm4_dv - dm3_dv
+
+        elif idx == ngrid - 2:
+            m4 = 2 * m3 - m2
+            m5 = 2 * m4 - m3
+            if compute_local_train:
+                dm4_dv = 2.0 * dm3_dv - dm2_dv
+                dm5_dv = 2.0 * dm4_dv - dm3_dv
+
+        # Calculate cubic fit coefficients
+        if compute_local_train:
+            w2, dw2_dv = abs_smooth_1d(m4 - m3, dm4_dv - dm3_dv, delta_x=delta_x)
+            w31, dw31_dv = abs_smooth_1d(m2 - m1, dm2_dv - dm1_dv, delta_x=delta_x)
+        else:
+            w2 = abs_smooth_1d(m4 - m3, delta_x=delta_x)
+            w31 = abs_smooth_1d(m2 - m1, delta_x=delta_x)
+
+        b = 0.5 * (m2 + m3)
+        if compute_local_train:
+            db_dv = 0.5 * (dm2_dv + dm3_dv)
+
+        if w2 + w31 > eps:
+
+            bpos = (m2 * w2 + m3 * w31) / (w2 + w31)
+            b = bpos
+
+            if compute_local_train:
+                dbpos_dv = ((m2 * dw2_dv + dm2_dv * w2 + m3 * dw31_dv + dm3_dv * w31) *
+                            (w2 + w31) -
+                            (m2 * w2 + m3 * w31) * (dw2_dv + dw31_dv)) / (w2 + w31) ** 2
+                db_dv = dbpos_dv
+
+        if compute_local_train:
+            w32, dw32_dv = abs_smooth_1d(m5 - m4, dm5_dv - dm4_dv, delta_x=delta_x)
+            w4, dw4_dv = abs_smooth_1d(m3 - m2, dm3_dv - dm2_dv, delta_x=delta_x)
+        else:
+            w32 = abs_smooth_1d(m5 - m4, delta_x=delta_x)
+            w4 = abs_smooth_1d(m3 - m2, delta_x=delta_x)
+
+        bp1 = 0.5 * (m3 + m4)
+        if compute_local_train:
+            dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
+
+        bp1pos = (m3 * w32 + m4 * w4) / (w32 + w4)
+        if compute_local_train:
+            dbp1pos_dv = ((m3 * dw32_dv + dm3_dv * w32 + m4 * dw4_dv + dm4_dv * w4) *
+                          (w32 + w4) -
+                          (m3 * w32 + m4 * w4) * (dw32_dv + dw4_dv)) / (w32 + w4) ** 2
+
+        if w32 + w4 > eps:
+            bp1 = bp1pos
+            if compute_local_train:
+                dbp1_dv = dbp1pos_dv
+
+        if extrap == 0:
+            h = 1.0 / (grid[idx + 1] - grid[idx])
+            a = val3
+            c = (3 * m3 - 2 * b - bp1) * h
+            d = (b + bp1 - 2 * m3) * h * h
+            dx = x[0] - grid[idx]
+
+            if compute_local_train:
+                da_dv = np.zeros(n_this, dtype=dtype)
+                da_dv[idx_val3] = 1.0
+                dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
+                dd_dv = (db_dv + dbp1_dv - 2 * dm3_dv) * h * h
+
+        elif extrap == 1:
+            a = val4
+            b = bp1
+            dx = x[0] - grid[idx + 1]
+
+            if compute_local_train:
+                da_dv = np.zeros(n_this, dtype=dtype)
+                da_dv[idx_val4] = 1.0
+                db_dv = dbp1_dv
+                dc_dv = dd_dv = 0
+
+        else:  # extrap is -1
+            a = val3
+            dx = x[0] - grid[0]
+
+            if compute_local_train:
+                da_dv = np.zeros(n_this, dtype=dtype)
+                da_dv[idx_val3] = 1.0
+                dc_dv = dd_dv = 0
+
+        deriv_dx[0] = b + dx * (2.0 * c + 3.0 * d * dx)
+        if compute_local_train:
+            deriv_dv = da_dv + dx * (db_dv + dx * (dc_dv + dx * dd_dv))
+
+            deriv_dv = (deriv_dv, [self._idx[jj] for jj in range(low_idx, high_idx)])
+
+        # Propagate derivatives from sub table.
+        if subtables is not None:
+            cd_term = 0
+            if self._compute_d_dvalues:
+                cd_term_dv = 0
+
+            dm3 = (dval4 - dval3) / (grid[idx + 1] - grid[idx])
+            if self._compute_d_dvalues:
+                dm3_dv = (dval4_dv - dval3_dv) / (grid[idx + 1] - grid[idx])
+
+            if idx >= 2:
+                dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
+                if self._compute_d_dvalues:
+                    dm1_dv = (dval2_dv - dval1_dv) / (grid[idx - 1] - grid[idx - 2])
+            else:
+                dm1 = 0
+
+            if idx >= 1:
+                dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
+                if self._compute_d_dvalues:
+                    dm2_dv = (dval3_dv - dval2_dv) / (grid[idx] - grid[idx - 1])
+            else:
+                dm2 = 0
+
+            if idx < ngrid - 2:
+                dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
+                if self._compute_d_dvalues:
+                    dm4_dv = (dval5_dv - dval4_dv) / (grid[idx + 2] - grid[idx + 1])
+            else:
+                dm4 = 0
+
+            if idx < ngrid - 3:
+                dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
+                if self._compute_d_dvalues:
+                    dm5_dv = (dval6_dv - dval5_dv) / (grid[idx + 3] - grid[idx + 2])
+            else:
+                dm5 = 0
+
+            if idx == 0:
+                dm1 = 3 * dm3 - 2 * dm4
+                dm2 = 2 * dm3 - dm4
+                if self._compute_d_dvalues:
+                    dm1_dv = 3 * dm3_dv - 2 * dm4_dv
+                    dm2_dv = 2 * dm3_dv - dm4_dv
+
+            elif idx == 1:
+                dm1 = 2 * dm2 - dm3
+                if self._compute_d_dvalues:
+                    dm1_dv = 2 * dm2_dv - dm3_dv
+
+            elif idx == ngrid - 3:
+                dm5 = 2 * dm4 - dm3
+                if self._compute_d_dvalues:
+                    dm5_dv = 2 * dm4_dv - dm3_dv
+
+            elif idx == ngrid - 2:
+                dm4 = 2 * dm3 - dm2
+                dm5 = 3 * dm3 - 2 * dm2
+                if self._compute_d_dvalues:
+                    dm4_dv = 2 * dm3_dv - dm2_dv
+                    dm5_dv = 3 * dm3_dv - 2 * dm2_dv
+
+            # Calculate cubic fit coefficients
+            _, dw2 = abs_smooth_1d(m4 - m3, dm4 - dm3, delta_x=delta_x)
+            _, dw3 = abs_smooth_1d(m2 - m1, dm2 - dm1, delta_x=delta_x)
+            if self._compute_d_dvalues:
+                _, dw2_dv = abs_smooth_1d(m4 - m3, dm4_dv - dm3_dv, delta_x=delta_x)
+                _, dw3_dv = abs_smooth_1d(m2 - m1, dm2_dv - dm1_dv, delta_x=delta_x)
+
+            # Special case to avoid divide by zero.
+
+            db = 0.5 * (dm2 + dm3)
+
+            dbpos = ((dm2 * w2 + m2 * dw2 + dm3 * w31 + m3 * dw3) - bpos * (dw2 + dw3)) / \
+                (w2 + w31)
+
+            if self._compute_d_dvalues:
+                db_dv = 0.5 * (dm2_dv + dm3_dv)
+
+                dbpos_dv = ((dm2_dv * w2 + m2 * dw2_dv + dm3_dv * w31 + m3 * dw3_dv) -
+                            bpos * (dw2_dv + dw3_dv)) / \
+                    (w2 + w31)
+
+            if w2 + w31 > eps:
+                db = dbpos
+                if self._compute_d_dvalues:
+                    db_dv = dbpos_dv
+
+            _, dw3 = abs_smooth_1d(m5 - m4, dm5 - dm4, delta_x=delta_x)
+            _, dw4 = abs_smooth_1d(m3 - m2, dm3 - dm2, delta_x=delta_x)
+            if self._compute_d_dvalues:
+                _, dw3_dv = abs_smooth_1d(m5 - m4, dm5_dv - dm4_dv, delta_x=delta_x)
+                _, dw4_dv = abs_smooth_1d(m3 - m2, dm3_dv - dm2_dv, delta_x=delta_x)
+
+            # Special case to avoid divide by zero.
+            if w32 + w4 > eps:
+                dbp1 = 0.5 * (dm3 + dm4)
+
+                dbp1pos = ((dm3 * w32 + m3 * dw3 + dm4 * w4 + m4 * dw4) -
+                           bp1pos * (dw3 + dw4)) / \
+                    (w32 + w4)
+
+                if self._compute_d_dvalues:
+                    dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
+
+                    dbp1pos_dv = ((dm3_dv * w32 + m3 * dw3_dv + dm4_dv * w4 + m4 * dw4_dv) -
+                                  bp1pos * (dw3_dv + dw4_dv)) / \
+                        (w32 + w4)
+
+                dbp1 = dbp1pos
+                if self._compute_d_dvalues:
+                    dbp1_dv = dbp1pos_dv
+
+            if extrap == 0:
+                da = dval3
+                dc = (3 * dm3 - 2 * db - dbp1) * h
+                dd = (db + dbp1 - 2 * dm3) * h * h
+                cd_term = dx * (dc + dx * dd)
+                if self._compute_d_dvalues:
+                    da_dv = dval3_dv
+                    dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
+                    dd_dv = (db_dv + dbp1_dv - 2 * dm3_dv) * h * h
+                    cd_term_dv = dx * (dc_dv + dx * dd_dv)
+
+            elif extrap == 1:
+                da = dval4
+                db = dbp1
+                if self._compute_d_dvalues:
+                    da_dv = dval4_dv
+                    db_dv = dbp1_dv
+
+            else:
+                da = dval3
+                if self._compute_d_dvalues:
+                    da_dv = dval3_dv
+
+            deriv_dx[1:] = da + dx * (db + cd_term)
+            if self._compute_d_dvalues:
+                deriv_dv = da_dv + dx * (db_dv + cd_term_dv)
+
+                deriv_dv = (deriv_dv, sub_idxs)
+
+        # Evaluate dependent value and exit
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, extrap

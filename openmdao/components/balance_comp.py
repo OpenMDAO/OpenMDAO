@@ -160,7 +160,7 @@ class BalanceComp(ImplicitComponent):
             unscaled, dimensional residuals written to via residuals[key]
         """
         if inputs._under_complex_step:
-            self._scale_factor = self._scale_factor.astype(np.complex)
+            self._scale_factor = self._scale_factor.astype(complex)
         else:
             self._scale_factor = self._scale_factor.real
 
@@ -199,7 +199,7 @@ class BalanceComp(ImplicitComponent):
             sub-jac components written to jacobian[output_name, input_name]
         """
         if inputs._under_complex_step:
-            self._dscale_drhs = self._dscale_drhs.astype(np.complex)
+            self._dscale_drhs = self._dscale_drhs.astype(complex)
         else:
             self._dscale_drhs = self._dscale_drhs.real
 

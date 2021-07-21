@@ -76,10 +76,10 @@ class CSCMatrix(COOMatrix):
         """
         if active:
             if 'complex' not in self._matrix.dtype.__str__():
-                self._matrix.data = self._matrix.data.astype(np.complex)
-                self._matrix.dtype = np.complex
-                self._coo.data = self._coo.data.astype(np.complex)
-                self._coo.dtype = np.complex
+                self._matrix.data = self._matrix.data.astype(complex)
+                self._matrix.dtype = complex
+                self._coo.data = self._coo.data.astype(complex)
+                self._coo.dtype = complex
         else:
             self._matrix.data = self._matrix.data.real
             self._matrix.dtype = np.float

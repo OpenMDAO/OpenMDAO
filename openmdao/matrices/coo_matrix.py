@@ -269,8 +269,8 @@ class COOMatrix(Matrix):
         """
         if active:
             if 'complex' not in self._coo.dtype.__str__():
-                self._coo.data = self._coo.data.astype(np.complex)
-                self._coo.dtype = np.complex
+                self._coo.data = self._coo.data.astype(complex)
+                self._coo.dtype = complex
         else:
             self._coo.data = self._coo.data.real
             self._coo.dtype = np.float

@@ -1,6 +1,5 @@
 """ Unit tests for structured metamodels in view_mm. """
 import unittest
-import subprocess
 import os
 
 import numpy as np
@@ -13,7 +12,7 @@ except ImportError:
     bokeh = None
 
 import openmdao.api as om
-import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_model_example as example
+
 
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class StructuredMetaModelCompTests(unittest.TestCase):
