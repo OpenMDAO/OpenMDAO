@@ -1527,10 +1527,11 @@ class System(object):
                         high_size = np.prod(high_dims)
                         dim1 = global_size // high_size
                         if global_size % high_size != 0:
-                            raise RuntimeError(f"{self.msginfo}: Array dimensions above the "
-                                f"first must match across processes. For output '{abs_name}', "
-                                f"local shape {local_shape} has an upper dimension that "
-                                "differs in another process.")
+                            raise RuntimeError(f"{self.msginfo}: All but the first dimension of "
+                                f"the shape's local parts in a distributed variable must match "
+                                f"across processes. For output '{abs_name}', local shape "
+                                f"{local_shape} in MPI rank {MPI.COMM_WORLD.rank} has a higher "
+                                "dimension that differs in another rank.")
                         mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                     else:
                         mymeta['global_shape'] = (global_size,)
