@@ -1527,9 +1527,10 @@ class System(object):
                         high_size = np.prod(high_dims)
                         dim1 = global_size // high_size
                         if global_size % high_size != 0:
-                            raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                               "with local shape %s" % (self.msginfo, abs_name,
-                                                                        global_size, local_shape))
+                            raise RuntimeError(f"{self.msginfo}: Array dimensions above the "
+                                f"first must match across processes. For output '{abs_name}', "
+                                f"local shape {local_shape} has an upper dimension that "
+                                "differs in another process.")
                         mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                     else:
                         mymeta['global_shape'] = (global_size,)
