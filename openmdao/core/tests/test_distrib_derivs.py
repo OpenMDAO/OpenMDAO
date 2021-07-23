@@ -1649,6 +1649,22 @@ class TestDistribBugs(unittest.TestCase):
 
         return prob
 
+    def _compare_totals(self, totals):
+        fails = []
+        for key, val in totals.items():
+            try:
+                analytic = val['J_fwd']
+                fd = val['J_fd']
+            except Exception as err:
+                self.fail(f"For key {key}: {err}")
+            try:
+                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
+            except ValueError as err:
+                fails.append((key, val, err))
+        if fails:
+            msg = '\n\n'.join([f"Totals differ for {key}:\nAnalytic:\n{val['J_fwd']}\nFD:\n{val['J_fd']}\n{err}" for key, val, err in fails])
+            self.fail(msg)
+
     def test_get_val(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, stacked=False)
         indep = prob.model.indep
@@ -1674,61 +1690,49 @@ class TestDistribBugs(unittest.TestCase):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
 
     def test_check_totals_prod_fwd(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='fwd')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
 
     def test_check_totals_rev(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
 
     def test_check_totals_prod_rev(self):
         prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev')
         totals = prob.check_totals(method='cs', out_stream=None, of=['D1.out_serial', 'D1.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
 
     def test_check_totals_fwd_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='fwd', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                         wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
+
+    def test_check_totals_prod_fwd_stacked(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='fwd', stacked=True)
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
+                                        wrt=['indep.x_serial', 'indep.x_dist'])
+        self._compare_totals(totals)
 
     def test_check_totals_rev_stacked(self):
         prob = self.get_problem(Distrib_Derivs_Matfree, mode='rev', stacked=True)
         totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
                                                    wrt=['indep.x_serial', 'indep.x_dist'])
-        for key, val in totals.items():
-            try:
-                assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-            except Exception as err:
-                self.fail(f"For key {key}: {err}")
+        self._compare_totals(totals)
+
+    def test_check_totals_prod_rev_stacked(self):
+        prob = self.get_problem(Distrib_Derivs_Prod_Matfree, mode='rev', stacked=True)
+        totals = prob.check_totals(method='cs', out_stream=None, of=['D2.out_serial', 'D2.out_dist'],
+                                                   wrt=['indep.x_serial', 'indep.x_dist'])
+        self._compare_totals(totals)
 
     def test_check_partials_cs(self):
         prob = self.get_problem(Distrib_Derivs_Matfree)
