@@ -81,6 +81,7 @@ class FiniteDifference(ApproximationScheme):
         'order': None,
         'step_calc': 'abs',
         'directional': False,
+        'minimum_step' : 1e-10,
     }
 
     def __init__(self):
@@ -147,6 +148,7 @@ class FiniteDifference(ApproximationScheme):
         order = meta['order']
         step = meta['step']
         step_calc = meta['step_calc']
+        minimum_step = meta['minimum_step']
 
         # FD forms are written as a collection of changes to inputs (deltas) and the associated
         # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -158,15 +160,40 @@ class FiniteDifference(ApproximationScheme):
         # current_coeff = 0.
         fd_form = _generate_fd_coeff(form, order, system)
 
-        if step_calc == 'rel':
-            if system._outputs._contains_abs(wrt):
-                step *= np.linalg.norm(system._outputs._abs_get_val(wrt))
-            elif system._inputs._contains_abs(wrt):
-                step *= np.linalg.norm(system._inputs._abs_get_val(wrt))
+        if step_calc != 'abs':
+            if system._inputs._contains_abs(wrt):
+                wrt_val = system._inputs._abs_get_val(wrt)
+            else:
+                wrt_val = system._outputs._abs_get_val(wrt)
 
-        deltas = fd_form.deltas * step
-        coeffs = fd_form.coeffs / step
-        current_coeff = fd_form.current_coeff / step
+            if step_calc == 'rel_legacy' or step_calc == 'rel':
+                step *= np.linalg.norm(wrt_val)
+
+                if step < minimum_step:
+                    step = minimum_step
+
+            elif step_calc == 'rel_avg':
+                step *= np.sum(np.abs(wrt_val)) / len(wrt_val)
+
+                if step < minimum_step:
+                    step = minimum_step
+
+            else:  # 'rel_element'
+                step = np.abs(wrt_val) * step
+
+                idx_zero = np.where(step < minimum_step)
+                if idx_zero:
+                    step[idx_zero] = minimum_step
+
+        if step_calc == 'rel_element':
+            step_divide = 1.0 / step
+            deltas = np.outer(fd_form.deltas, step)
+            coeffs = np.outer(fd_form.coeffs, step_divide)
+            current_coeff = np.outer(fd_form.current_coeff, step_divide)
+        else:
+            deltas = fd_form.deltas * step
+            coeffs = fd_form.coeffs / step
+            current_coeff = fd_form.current_coeff / step
 
         return deltas, coeffs, current_coeff
 
@@ -241,7 +268,7 @@ class FiniteDifference(ApproximationScheme):
         """
         return array.real
 
-    def _run_point(self, system, idx_info, data, results_array, total):
+    def _run_point(self, system, idx_info, data, results_array, total, idx_start=0):
         """
         Alter the specified inputs by the given deltas, run the system, and return the results.
 
@@ -257,6 +284,8 @@ class FiniteDifference(ApproximationScheme):
             Where the results will be stored.
         total : bool
             If True total derivatives are being approximated, else partials.
+        idx_start : int
+            Vector index of the first element of this wrt variable.
 
         Returns
         -------
@@ -265,7 +294,17 @@ class FiniteDifference(ApproximationScheme):
         """
         deltas, coeffs, current_coeff = data
 
-        if current_coeff:
+        if isinstance(current_coeff, np.ndarray):
+            # rel_element - each element has its own relative step.
+            if current_coeff[0][0]:
+                current_vec = system._outputs if total else system._residuals
+                # copy data from outputs (if doing total derivs) or residuals (if doing partials)
+                results_array[:] = current_vec.asarray()
+                results_array *= current_coeff[0, :]
+            else:
+                results_array[:] = 0.
+
+        elif current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
@@ -275,13 +314,13 @@ class FiniteDifference(ApproximationScheme):
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            results = self._run_sub_point(system, idx_info, delta, total)
+            results = self._run_sub_point(system, idx_info, delta, total, idx_start)
             results *= coeff
             results_array += results
 
         return results_array
 
-    def _run_sub_point(self, system, idx_info, delta, total):
+    def _run_sub_point(self, system, idx_info, delta, total, idx_start=0):
         """
         Alter the specified inputs by the given delta, run the system, and return the results.
 
@@ -295,6 +334,8 @@ class FiniteDifference(ApproximationScheme):
             Perturbation amount.
         total : bool
             If True total derivatives are being approximated, else partials.
+        idx_start : int
+            Vector index of the first element of this wrt variable.
 
         Returns
         -------
@@ -303,7 +344,14 @@ class FiniteDifference(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None and idxs is not None:
-                vec.iadd(delta, idxs)
+
+                # Support rel_element stepsizing
+                if isinstance(delta, np.ndarray):
+                    local_delta = delta[idxs - idx_start]
+                else:
+                    local_delta = delta
+
+                vec.iadd(local_delta, idxs)
 
         if total:
             system.run_solve_nonlinear()
