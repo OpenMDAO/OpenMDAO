@@ -1434,7 +1434,6 @@ def f_out_serial(Id, Is):
 
 
 class Distrib_Derivs(om.ExplicitComponent):
-    """Simplest example that combines distributed and serial inputs and outputs."""
 
     def setup(self):
 
@@ -1448,8 +1447,8 @@ class Distrib_Derivs(om.ExplicitComponent):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
 
-        # Our local distributed output is a function of local distributed input computed above.
-        # It also is a function of the serial input.
+        # Our local distributed output is a function of the local distributed input and
+        # the serial input.
         outputs['out_dist'] = f_out_dist(Id, Is)
 
         if self.comm.size > 1:
@@ -1459,6 +1458,8 @@ class Distrib_Derivs(om.ExplicitComponent):
             total_sum = local_sum.copy()
             self.comm.Allreduce(local_sum, total_sum, op=MPI.SUM)
 
+            # so the serial output is a function of the serial input and the full distributed
+            # input.
             outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + total_sum[0]
         else:
             outputs['out_serial'] = f_out_serial(Id, Is)
@@ -1507,7 +1508,6 @@ class Distrib_Derivs_Matfree(Distrib_Derivs):
 
 
 class Distrib_DerivsFD(Distrib_Derivs):
-    """Simplest example that combines distributed and serial inputs and outputs."""
 
     def setup_partials(self):
         self.declare_partials('*', '*', method='fd')
@@ -1521,9 +1521,9 @@ class Distrib_DerivsErr(Distrib_Derivs):
     def compute_partials(self, inputs, partials):
         pass  # do nothing here.  Error will occur before calling this.
 
-
+# this is similar to Distrib_Derivs except we add in the product of inputs rather than the
+# summation of inputs.
 class Distrib_Derivs_Prod(om.ExplicitComponent):
-    """Simplest example that combines distributed and serial inputs and outputs."""
 
     def setup(self):
 
@@ -1537,15 +1537,17 @@ class Distrib_Derivs_Prod(om.ExplicitComponent):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
 
-        # Our local distributed output is a function of local distributed input computed above.
-        # It also is a function of the serial input.
+        # Our local distributed output is a function of local distributed input and the
+        # serial input.
         outputs['out_dist'] = Id**2 - 2.0*Id + 4.0 + np.prod(1.5 * Is ** 2)
 
         if self.comm.size > 1:
-            # get the full dist input before we take the product
-            Idfull = np.hstack(self.comm.allgather(Id))
+            # We need to gather the multplied values to compute the total product over all procs.
+            local_prod = np.array([np.prod(1.5 * Id ** 2)])
+            total_prod = local_prod.copy()
+            self.comm.Allreduce(local_prod, total_prod, op=MPI.PROD)
 
-        outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + np.prod(1.5 * Idfull ** 2)
+        outputs['out_serial'] = Is**2 + 3.0*Is - 5.0 + total_prod
 
 
 class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
