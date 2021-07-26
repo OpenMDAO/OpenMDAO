@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from mpi4py import MPI
+from openmdao.utils.mpi import MPI
 
 import openmdao.api as om
 
