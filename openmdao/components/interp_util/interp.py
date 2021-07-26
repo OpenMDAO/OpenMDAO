@@ -48,7 +48,7 @@ class InterpND(object):
     extrapolate : bool
         If False, when interpolated values are requested outside of the domain of the input data,
         a ValueError is raised. If True, then the methods are allowed to extrapolate.
-        Default is True (raise an exception).
+        Default is True.
     grid : tuple
         Collection of points that determine the regular grid.
     table : <InterpTable>

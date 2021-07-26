@@ -1,4 +1,5 @@
 import re
+import sys
 
 from setuptools import setup
 
@@ -36,10 +37,12 @@ optional_dependencies = {
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'
         'websockets>8',
-        'pyppeteer',
         'aiounittest'
     ]
 }
+
+if sys.version_info >= (3, 7):
+    optional_dependencies['test'].append('playwright')
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
@@ -198,6 +201,7 @@ setup(
             'linearsystemcomp=openmdao.components.linear_system_comp:LinearSystemComp',
             'matrixvectorproductcomp=openmdao.components.matrix_vector_product_comp:MatrixVectorProductComp',
             'metamodelstructuredcomp=openmdao.components.meta_model_structured_comp:MetaModelStructuredComp',
+            'metamodelsemistructuredcomp=openmdao.components.meta_model_semi_structured_comp:MetaModelSemiStructuredComp',
             'metamodelunstructuredcomp=openmdao.components.meta_model_unstructured_comp:MetaModelUnStructuredComp',
             'multifimetamodelunstructuredcomp=openmdao.components.multifi_meta_model_unstructured_comp:MultiFiMetaModelUnStructuredComp',
             'muxcomp=openmdao.components.mux_comp:MuxComp',

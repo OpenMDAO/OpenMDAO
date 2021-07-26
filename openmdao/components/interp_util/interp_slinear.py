@@ -5,7 +5,7 @@ Based on NPSS implementation.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, InterpAlgorithmSemi
 
 
 class InterpLinear(InterpAlgorithm):
@@ -96,3 +96,120 @@ class InterpLinear(InterpAlgorithm):
 
             return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1), \
                 None, None
+
+
+class InterpLinearSemi(InterpAlgorithmSemi):
+    """
+    Interpolate on a semi structured grid using a linear polynomial.
+    """
+
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
+        """
+        Initialize table and subtables.
+
+        Parameters
+        ----------
+        grid : tuple(ndarray)
+            Tuple containing ndarray of x grid locations for each table dimension.
+        values : ndarray
+            Array containing the values at all points in grid.
+        interp : class
+            Interpolation class to be used for subsequent table dimensions.
+        extrapolate : bool
+            When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
+        """
+        super().__init__(grid, values, interp, extrapolate=extrapolate,
+                         compute_d_dvalues=compute_d_dvalues, idx=idx, idim=idim, **kwargs)
+        self.k = 2
+        self._name = 'slinear'
+
+    def interpolate(self, x):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        Parameters
+        ----------
+        x : ndarray
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        tuple(ndarray, list)
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions. Second term is the indices into the value array.
+        bool
+            True if the coordinate is extrapolated in this dimension.
+        """
+        grid = self.grid
+        subtables = self.subtables
+
+        idx, flag = self.bracket(x[0])
+        extrap = flag != 0
+
+        # Extrapolate high
+        if idx == len(grid) - 1:
+            idx -= 1
+
+        h = 1.0 / (grid[idx + 1] - grid[idx])
+
+        if subtables is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
+            val0, dx0, dvalue0, flag0 = subtables[idx].interpolate(x[1:])
+            val1, dx1, dvalue1, flag1 = subtables[idx + 1].interpolate(x[1:])
+
+            # Extrapolation detection.
+            # (Not much we can do for linear.)
+            extrap = extrap or flag1 or flag0
+
+            slope = (val1 - val0) * h
+
+            derivs = np.empty(len(dx0) + 1, dtype=x.dtype)
+            derivs[0] = slope
+            dslope_dsub = (dx1 - dx0) * h
+            derivs[1:] = dx0 + (x[0] - grid[idx]) * dslope_dsub
+
+            d_value = None
+            if self._compute_d_dvalues:
+                dvalue0, idx0 = dvalue0
+                dvalue1, idx1 = dvalue1
+                n = len(dvalue0)
+
+                d_value = np.empty(n * 2, dtype=x.dtype)
+                d_value[:n] = dvalue0 * (1.0 - (x[0] - grid[idx]) * h)
+                d_value[n:] = dvalue1 * (x[0] - grid[idx]) * h
+
+                idx0.extend(idx1)
+                d_value = (d_value, idx0)
+
+            return val0 + (x[0] - grid[idx]) * slope, derivs, d_value, extrap
+
+        else:
+            values = self.values
+            slope = (values[idx + 1] - values[idx]) * h
+
+            d_value = None
+            if self._compute_d_dvalues:
+                d_value = np.empty(2, dtype=x.dtype)
+                d_value[1] = h * (x - grid[idx])
+                d_value[0] = 1.0 - d_value[1]
+
+                d_value = (d_value, [self._idx[idx], self._idx[idx + 1]])
+
+            return values[idx] + (x - grid[idx]) * slope, slope, d_value, extrap

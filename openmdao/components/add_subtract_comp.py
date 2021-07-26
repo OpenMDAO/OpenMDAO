@@ -247,7 +247,7 @@ class AddSubtractComp(ExplicitComponent):
                 shape = (vec_size, length)
 
             if complexify:
-                temp = np.zeros(shape, dtype=np.complex_)
+                temp = np.zeros(shape, dtype=complex)
             else:
                 temp = np.zeros(shape)
 

@@ -544,7 +544,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, resids):
 
-                if outputs.asarray().dtype == np.complex:
+                if outputs.asarray().dtype == complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # Default initial state of zero for x takes us to x=1 solution.

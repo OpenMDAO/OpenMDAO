@@ -12,8 +12,6 @@ try:
 except ImportError:
     pkg_resources = None
 
-from itertools import chain
-
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
@@ -26,8 +24,10 @@ try:
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 except ImportError:
     bokeh = None
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_semi_structured_comp import MetaModelSemiStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.core.component import Component
 from openmdao.devtools.debug import config_summary, tree
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -47,7 +47,6 @@ from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
         _find_plugins_setup_parser, _find_plugins_exec
-from openmdao.core.component import Component
 from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.om_warnings import warn_deprecation
 
@@ -208,7 +207,8 @@ def _meta_model_cmd(options, user_args):
 
         hooks._unregister_hook('final_setup', 'Problem')
 
-        mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
+        mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp,
+                    MetaModelSemiStructuredComp)
 
         pathname = options.pathname
         port_number = options.port_number
