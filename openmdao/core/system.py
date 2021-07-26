@@ -1517,30 +1517,32 @@ class System(object):
         Returns
         -------
         bool
-            True if all ranks have valid local shapes, False otherwise.
+            True if all ranks have valid local shapes or MPI not used, False otherwise.
         """
-        comm = MPI.COMM_WORLD
         global_status_ok = True
 
-        # Rank 0 collects the statuses of all other ranks
-        if comm.rank == 0:
-            global_status_ok = rank_status_ok
+        if MPI:
+            comm = MPI.COMM_WORLD
 
-            for other_rank in range(1, comm.size):
-                other_rank_ok = comm.recv(source=other_rank, tag=100)
-                if other_rank_ok is False:
-                    global_status_ok = False
-        # Ranks higher than 0 send their status to rank 0
-        else:
-            comm.send(rank_status_ok, dest=0, tag=100)
+            # Rank 0 collects the statuses of all other ranks
+            if comm.rank == 0:
+                global_status_ok = rank_status_ok
 
-        # Rank 0 sends the global status to higher ranks
-        if comm.rank == 0:
-            for other_rank in range(1, comm.size):
-                comm.send(global_status_ok, dest=other_rank, tag=101)
-        # Higher ranks receive the status from rank 0
-        else:
-            global_status_ok = comm.recv(source=0, tag=101)
+                for other_rank in range(1, comm.size):
+                    other_rank_ok = comm.recv(source=other_rank, tag=100)
+                    if other_rank_ok is False:
+                        global_status_ok = False
+            # Ranks higher than 0 send their status to rank 0
+            else:
+                comm.send(rank_status_ok, dest=0, tag=100)
+
+            # Rank 0 sends the global status to higher ranks
+            if comm.rank == 0:
+                for other_rank in range(1, comm.size):
+                    comm.send(global_status_ok, dest=other_rank, tag=101)
+            # Higher ranks receive the status from rank 0
+            else:
+                global_status_ok = comm.recv(source=0, tag=101)
 
         return global_status_ok
 
