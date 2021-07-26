@@ -1510,7 +1510,6 @@ class System(object):
         Compute the global size and shape of all variables on this system.
         """
         loc_meta = self._var_abs2meta
-        comm = MPI.COMM_WORLD
 
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
@@ -1528,12 +1527,12 @@ class System(object):
                         high_size = np.prod(high_dims)
                         dim_size_match = bool(global_size % high_size == 0)
 
-                        with multi_proc_exception_check(comm):
+                        with multi_proc_exception_check(self.comm):
                             if dim_size_match is False:
                                 msg = (f"{self.msginfo}: All but the first dimension of the "
                                        "shape's local parts in a distributed variable must match "
                                        f"across processes. For output '{abs_name}', local shape "
-                                       f"{local_shape} in MPI rank {comm.rank} has a "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
                                        "higher dimension that differs in another rank.")
 
                                 raise RuntimeError(msg)
