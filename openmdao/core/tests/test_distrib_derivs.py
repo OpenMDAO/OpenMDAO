@@ -1554,32 +1554,35 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
     def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
         Id = inputs['in_dist']
         Is = inputs['in_serial']
-        Idfull = np.hstack(self.comm.allgather(Id))
+
+        size = len(Is)
+        local_size = len(Id)
 
         idx = self._var_allprocs_abs2idx[rel_name2abs_name(self, 'in_dist')]
         sizes = self._var_sizes['input'][:, idx]
         start = np.sum(sizes[:self.comm.rank])
         end = start + sizes[self.comm.rank]
 
-        size = len(Is)
-
-        d_dIs = np.zeros((size, size))
+        d_dIs = np.zeros((local_size, size))
         for i in range(size):
-            d_dIs[:, i] = 3.*Is[i]*np.product([1.5*Is[j]**2 for j in range(size) if i != j])
+            d_dIs[:, i] = 3.*Is[i]*np.prod([1.5*Is[j]**2 for j in range(size) if i != j])
 
-        d_dId = np.zeros((size, size))
-        for i in range(size):
-            d_dId[:, i] = 3.*Idfull[i]*np.product([1.5*Idfull[j]**2 for j in range(size) if i != j])
+        # unfortunately we need the full distributed input here in order to compute the d_dId
+        # matrix.
+        Idfull = np.hstack(self.comm.allgather(Id))
+        d_dId = np.zeros((size, local_size))
+        for i in range(start, end):
+            d_dId[:, i-start] = 3.*Idfull[i]*np.prod([1.5*Idfull[j]**2 for j in range(size) if i != j])
 
         if mode == 'fwd':
             if 'out_dist' in d_outputs:
                 if 'in_dist' in d_inputs:
                     d_outputs['out_dist'] += (2.0 * Id - 2.0) * d_inputs['in_dist']
                 if 'in_serial' in d_inputs:
-                    d_outputs['out_dist'] += d_dIs.dot(d_inputs['in_serial'])[start:end]
+                    d_outputs['out_dist'] += d_dIs.dot(d_inputs['in_serial'])
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
-                    deriv = d_dId[:, start:end].dot(d_inputs['in_dist'])
+                    deriv = d_dId.dot(d_inputs['in_dist'])
                     deriv_sum = np.zeros(deriv.size)
                     self.comm.Allreduce(deriv, deriv_sum, op=MPI.SUM)
                     d_outputs['out_serial'] += deriv_sum
@@ -1590,14 +1593,12 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
                 if 'in_dist' in d_inputs:
                     d_inputs['in_dist'] += (2.0 * Id - 2.0) * d_outputs['out_dist']
                 if 'in_serial' in d_inputs:
-                    d_inputs['in_serial'] += d_dIs[start:end, :].T.dot(d_outputs['out_dist'])
+                    d_inputs['in_serial'] += d_dIs.T.dot(d_outputs['out_dist'])
             if 'out_serial' in d_outputs:
                 if 'in_dist' in d_inputs:
                     full = np.zeros(d_outputs['out_serial'].size)
-                    # add up contributions from the serial variable that is duplicated over
-                    # all of the procs.
                     self.comm.Allreduce(d_outputs['out_serial'], full, op=MPI.SUM)
-                    d_inputs['in_dist'] += d_dId[:, start:end].T.dot(full)
+                    d_inputs['in_dist'] += d_dId.T.dot(full)
                 if 'in_serial' in d_inputs:
                     d_inputs['in_serial'] += (2.0 * Is + 3.0) * d_outputs['out_serial']
 
