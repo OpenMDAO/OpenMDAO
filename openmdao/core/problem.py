@@ -1279,11 +1279,13 @@ class Problem(object):
                                 idxs = LocalRangeIterable(comp, inp_abs, use_vec_offset=False)
                                 perturb = 1.0
 
-                            # in rev mode when we have a serial resid, we
-                            # need to multiply the derivative to correct for the effect of having
-                            # a seed that hasn't been split between each instance of the duplicated
-                            # serial resid.
                             if not in_dist and mode == 'rev':
+                                # in rev mode, if in_dist is False that means that the 'of' var
+                                # is serial.  In cases where 'of' is serial and 'wrt' is
+                                # distributed, the component must do an internal Allreduce in
+                                # order for the total derivatives to be correct, so here we compute
+                                # a correction to undo this so we get the correct answer when
+                                # checking partials.
                                 mult = 1.0 / comp.comm.size
 
                             for idx in idxs:
@@ -1329,6 +1331,8 @@ class Problem(object):
                                             else:
                                                 out_dist = meta_in[out_abs]['distributed']
                                             if out_dist:
+                                                # apply the correction to undo the component's
+                                                # internal Allreduce.
                                                 derivs *= mult
 
                                         key = inp, out
