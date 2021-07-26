@@ -896,7 +896,7 @@ class ShapedMultiIndexer(Indexer):
 
     def __call__(self):
         """
-        Return this mltidimensional index.
+        Return this multidimensional index.
 
         Returns
         -------
