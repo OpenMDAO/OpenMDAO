@@ -1571,7 +1571,7 @@ class Component(System):
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
-                meta['src_indices'] = indexer(src_inds, flat=flat_src_inds)
+                meta['src_indices'] = src_inds.copy()  # indexer(src_inds, flat=flat_src_inds)
 
 
 class _DictValues(object):
