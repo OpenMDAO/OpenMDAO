@@ -1504,7 +1504,7 @@ class System(object):
         cfginfo = self._problem_meta['config_info']
         if cfginfo and self.pathname in cfginfo._modified_systems:
             cfginfo._modified_systems.remove(self.pathname)
- 
+
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
@@ -1531,10 +1531,10 @@ class System(object):
                         with multi_proc_exception_check(comm):
                             if dim_size_match is False:
                                 msg = (f"{self.msginfo}: All but the first dimension of the "
-                                    "shape's local parts in a distributed variable must match "
-                                    f"across processes. For output '{abs_name}', local shape "
-                                    f"{local_shape} in MPI rank {comm.rank} has a "
-                                    "higher dimension that differs in another rank.")
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
 
                                 raise RuntimeError(msg)
 
