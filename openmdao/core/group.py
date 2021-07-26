@@ -1553,9 +1553,6 @@ class Group(System):
                                               err=self._raise_connection_errors)
                             continue
                         meta['src_indices'] = src_indices
-                        # if _is_slicer_op(src_indices):
-                        #     meta['src_slice'] = src_indices
-                        # else:
                         meta['flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)

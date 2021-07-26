@@ -2647,8 +2647,6 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
 
-        #import wingdbstub
-
         p.setup(mode=mode)
         p.run_model()
 
@@ -2692,8 +2690,6 @@ class TestProblemComputeTotalsGetRemoteFalse(unittest.TestCase):
 
         p.model.add_design_var('x', lower=-100, upper=100)
         p.model.add_objective('y')
-
-        #import wingdbstub
 
         p.setup(mode=mode)
         p.run_model()

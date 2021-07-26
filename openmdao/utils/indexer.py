@@ -7,7 +7,6 @@ import numpy as np
 from numbers import Integral
 
 from openmdao.utils.general_utils import shape2tuple
-# from openmdao.utils.array_utils import _flatten_src_indices
 
 
 def array2slice(arr):

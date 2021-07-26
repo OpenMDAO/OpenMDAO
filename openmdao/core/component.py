@@ -508,7 +508,6 @@ class Component(System):
                                  "'copy_shape' for variable '%s' is currently unsupported." %
                                  (self.msginfo, name))
 
-        # src_slice = None
         if not (shape_by_conn or copy_shape):
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape, src_indices)
@@ -1572,7 +1571,7 @@ class Component(System):
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
-                meta['src_indices'] = src_inds.copy()  # indexer(src_inds, flat=flat_src_inds)
+                meta['src_indices'] = indexer(src_inds, flat=flat_src_inds)
 
 
 class _DictValues(object):

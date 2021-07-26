@@ -6,6 +6,7 @@ import weakref
 import numpy as np
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
+from openmdao.utils.indexer import indexer
 
 
 _full_slice = slice(None)
@@ -534,7 +535,6 @@ class Vector(object):
 
         if isinstance(idxs, slice):
             # why is this sometimes a slice and not an Indexer?
-            from openmdao.utils.indexer import indexer
             idxs = indexer(idxs, flat=flat)
 
         if flat:

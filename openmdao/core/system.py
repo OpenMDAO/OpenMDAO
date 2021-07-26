@@ -4609,40 +4609,6 @@ class System(object):
 
         return val
 
-    # def _get_src_inds_array(self, varname):
-    #     """
-    #     Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
-
-    #     Parameters
-    #     ----------
-    #     varname : str
-    #         Absolute name of the input variable.
-
-    #     Returns
-    #     -------
-    #     ndarray or None
-    #         The value of src_indices for the given input variable.
-    #     """
-    #     meta = self._var_abs2meta['input'][varname]
-    #     src_indices = meta['src_indices']
-    #     if src_indices is not None:
-    #         src_slice = meta['src_slice']
-    #         # if src_indices is still a slice, update it to an array
-    #         if src_slice is src_indices:
-    #             model = self._problem_meta['model_ref']()
-    #             src = model._conn_global_abs_in2out[varname]
-    #             try:
-    #                 global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
-    #                 global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
-    #             except KeyError:
-    #                 raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
-    #                                    f"src_slice for input '{varname}' because we don't know "
-    #                                    "the global shape of its source yet.")
-    #             src_indices = _slice_indices(src_slice, global_size, global_shape)
-
-    #             meta['src_indices'] = src_indices  # store converted value
-
-    #     return src_indices
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """
