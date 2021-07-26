@@ -1505,6 +1505,45 @@ class System(object):
         if cfginfo and self.pathname in cfginfo._modified_systems:
             cfginfo._modified_systems.remove(self.pathname)
 
+    def _comm_global_shape_status(self, rank_status_ok):
+        """
+        Communicate the validity of the global_shape dimensions to all ranks.
+
+        Parameters
+        ----------
+        rank_status_ok : bool
+            Whether the global_shape status of the current rank is OK.
+
+        Returns
+        -------
+        bool
+            True if all ranks have valid local shapes, False otherwise.
+        """
+        comm = MPI.COMM_WORLD
+        global_status_ok = True
+
+        # Rank 0 collects the statuses of all other ranks
+        if comm.rank == 0:
+            global_status_ok = rank_status_ok
+
+            for other_rank in range(1, comm.size):
+                other_rank_ok = comm.recv(source=other_rank, tag=100)
+                if other_rank_ok is False:
+                    global_status_ok = False
+        # Ranks higher than 0 send their status to rank 0
+        else:
+            comm.send(rank_status_ok, dest=0, tag=100)
+
+        # Rank 0 sends the global status to higher ranks
+        if comm.rank == 0:
+            for other_rank in range(1, comm.size):
+                comm.send(global_status_ok, dest=other_rank, tag=101)
+        # Higher ranks receive the status from rank 0
+        else:
+            global_status_ok = comm.recv(source=0, tag=101)
+
+        return global_status_ok
+
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
@@ -1525,8 +1564,14 @@ class System(object):
                     high_dims = local_shape[1:]
                     if high_dims:
                         high_size = np.prod(high_dims)
-                        dim1 = global_size // high_size
+
+                        dim_size_match = True
                         if global_size % high_size != 0:
+                            dim_size_match = False
+
+                        global_status_ok = self._comm_global_shape_status(dim_size_match)
+
+                        if global_status_ok is False:
                             msg = (f"{self.msginfo}: All but the first dimension of the "
                                    "shape's local parts in a distributed variable must match "
                                    f"across processes. For output '{abs_name}', local shape "
@@ -1534,6 +1579,8 @@ class System(object):
                                    "higher dimension that differs in another rank.")
 
                             raise RuntimeError(msg)
+
+                        dim1 = global_size // high_size
                         mymeta['global_shape'] = tuple([dim1] + list(high_dims))
                     else:
                         mymeta['global_shape'] = (global_size,)
