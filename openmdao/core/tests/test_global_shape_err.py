@@ -20,6 +20,7 @@ class TwoDArrayAdder(om.ExplicitComponent):
         outputs['x_sum'] = np.sum(inputs['x'], axis=0)
 
 
+@unittest.skipUnless(MPI, "MPI is required.")
 class GlobalShapeErr(unittest.TestCase):
     N_PROCS = 2
 
