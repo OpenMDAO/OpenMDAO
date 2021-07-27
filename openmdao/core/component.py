@@ -20,7 +20,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, _is_slicer_op, convert_src_inds, \
     _slice_indices
-from openmdao.utils.indexer import indexer, _update_new_style
+from openmdao.utils.indexer import Indexer, indexer, _update_new_style
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, UnusedOptionWarning, warn_deprecation
@@ -1546,8 +1546,8 @@ class Component(System):
         for tgt, (pinfo, parent_src_shape, oldprom, oldpath) in my_tdict.items():
             src_inds, flat_src_inds, src_shape = pinfo
 
-            # update the input metadata with the final src_indices,
-            # flat_src_indices and src_shape
+            # update the input metadata with the final
+            # src_indices, flat_src_indices and src_shape
             if src_inds is None:
                 prom = abs2prom[tgt]
                 if prom in self._var_prom2inds:
@@ -1571,7 +1571,12 @@ class Component(System):
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
-                meta['src_indices'] = src_inds.copy()  # indexer(src_inds, flat=flat_src_inds)
+
+                if not isinstance(src_inds, Indexer):
+                    meta['src_indices'] = indexer(src_inds, flat=flat_src_inds)
+                else:
+                    meta['src_indices'] = src_inds.copy()
+
 
 
 class _DictValues(object):

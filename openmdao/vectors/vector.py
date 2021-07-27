@@ -6,7 +6,7 @@ import weakref
 import numpy as np
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
@@ -533,8 +533,7 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
-        if isinstance(idxs, slice):
-            # why is this sometimes a slice and not an Indexer?
+        if not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat=flat)
 
         if flat:
