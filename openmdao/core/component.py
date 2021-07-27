@@ -1578,7 +1578,6 @@ class Component(System):
                     meta['src_indices'] = src_inds.copy()
 
 
-
 class _DictValues(object):
     """
     A dict-like wrapper for a dict of metadata, where getitem returns 'val' from metadata.
