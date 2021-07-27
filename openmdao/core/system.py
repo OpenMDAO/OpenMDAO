@@ -4609,7 +4609,6 @@ class System(object):
 
         return val
 
-
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """
         Retrieve variables, either local or remote, in the filtered_vars list.
