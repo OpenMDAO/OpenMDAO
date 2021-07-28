@@ -560,10 +560,10 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : str, iter of str, or None
+        includes : str, list of strs, or None
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
-        excludes : str, iter of str, or None
+        excludes : str, list of strs, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         list_autoivcs : bool
@@ -590,12 +590,12 @@ class Case(object):
             values = True
         else:
             values = val
-
+        
         if isinstance(includes, str):
-            includes = iter(includes)
+            includes = [includes,]
 
         if isinstance(excludes, str):
-            excludes = iter(excludes)
+            excludes = [excludes,]
 
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
