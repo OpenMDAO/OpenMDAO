@@ -3467,10 +3467,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all ranks. Default is False, which will display
@@ -3602,10 +3602,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.

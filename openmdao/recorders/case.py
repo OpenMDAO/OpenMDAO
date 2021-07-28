@@ -433,10 +433,10 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : iter of str or None
+        includes : str, iter of str, or None
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
-        excludes : iter of str or None
+        excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         out_stream : file-like object
@@ -460,6 +460,12 @@ class Case(object):
             values = True
         else:
             values = val
+
+        if isinstance(includes, str):
+            includes = [includes, ]
+
+        if isinstance(excludes, str):
+            excludes = [excludes, ]
 
         if self.inputs is not None:
             for var_name in self.inputs.absolute_names():
@@ -560,10 +566,10 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : str, list of strs, or None
+        includes : str, iter of str, or None
             Glob patterns for pathnames to include in the check. Default is None, which
             includes all.
-        excludes : str, list of strs, or None
+        excludes : str, iter of str, or None
             Glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
         list_autoivcs : bool
