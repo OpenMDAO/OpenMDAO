@@ -590,12 +590,12 @@ class Case(object):
             values = True
         else:
             values = val
-        
+
         if isinstance(includes, str):
-            includes = [includes,]
+            includes = [includes, ]
 
         if isinstance(excludes, str):
-            excludes = [excludes,]
+            excludes = [excludes, ]
 
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
