@@ -23,7 +23,7 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, 
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
@@ -3450,10 +3450,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all ranks. Default is False, which will display
@@ -3585,10 +3585,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.
@@ -5218,12 +5218,23 @@ class System(object):
         high_dims = meta['shape'][1:]
         if high_dims:
             high_size = np.prod(high_dims)
+
+            dim_size_match = bool(global_size % high_size == 0)
+            with multi_proc_exception_check(self.comm):
+                if dim_size_match is False:
+                    raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
+
             dim1 = global_size // high_size
             if global_size % high_size != 0:
                 raise RuntimeError("%s: Global size of variable '%s' (%s) does not agree "
                                    "with local shape %s" % (self.msginfo, abs_name,
                                                             global_size, meta['shape']))
             return tuple([dim1] + list(high_dims))
+
         return (global_size,)
 
     def _get_jac_col_scatter(self):
