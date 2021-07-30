@@ -1125,9 +1125,8 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         p.set_val('x', 0.75)
 
-        msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
-              "Line 210 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
-        with assert_warning(UserWarning, msg):
+        msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> "
+        with assert_warning(UserWarning, msg, contains_msg=True):
             p.run_driver()
 
     def test_slinear_backward_fd(self):
