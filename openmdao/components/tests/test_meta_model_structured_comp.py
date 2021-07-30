@@ -1154,7 +1154,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         p.run_model()
 
         cpd = p.check_partials(compact_print=False, out_stream=None, method='cs')
-        assert_check_partials(cpd, atol=1.0E-9, rtol=1.0E-9)
+        assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
 @use_tempdirs
