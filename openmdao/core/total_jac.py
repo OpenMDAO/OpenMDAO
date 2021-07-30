@@ -90,6 +90,9 @@ class _TotalJacInfo(object):
     _dist_driver_vars : dict
         Dict of constraints that are distributed outputs. Key is abs variable name, values are
         (local indices, local sizes).
+    in_idx_map : dict
+        Mapping of jacobian row/col index to a tuple of the form
+        (ndups, relevant_systems, cache_linear_solutions_flag)
     """
 
     def __init__(self, problem, of, wrt, use_abs_names, return_format, approx=False,
