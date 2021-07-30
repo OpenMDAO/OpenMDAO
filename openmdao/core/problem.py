@@ -1020,7 +1020,7 @@ class Problem(object):
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-9, force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -1060,6 +1060,8 @@ class Problem(object):
             compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
             future will default to 'rel_avg'. Defaults to None, in which case the approximation
             method provides its default value.
+        minimum_step : float
+            Minimum fd step size allowed when using 'rel_element' as the step_calc.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
@@ -1164,7 +1166,8 @@ class Problem(object):
                         else:
                             all_same = True
                             if fd_options['method'] == 'fd':
-                                option_names = ['form', 'step', 'step_calc', 'directional']
+                                option_names = ['form', 'step', 'step_calc', 'minimum_step',
+                                                'directional']
                             else:
                                 option_names = ['step', 'directional']
                             for name in option_names:

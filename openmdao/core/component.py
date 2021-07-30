@@ -1231,7 +1231,7 @@ class Component(System):
             future will default to 'rel_avg'. Defaults to None, in which case the approximation
             method provides its default value.
         minimum_step : float
-            Minimum step size allowed when using 'rel_element' as the step_calc.
+            Minimum fd step size allowed when using 'rel_element' as the step_calc.
         directional : bool
             Set to True to perform a single directional derivative for each vector variable in the
             pattern named in wrt.
