@@ -18,7 +18,7 @@ from openmdao.utils.om_warnings import warn_deprecation, reset_warning_registry
 
 
 @contextmanager
-def assert_warning(category, msg):
+def assert_warning(category, msg, contains_msg=False):
     """
     Context manager asserting that a warning is issued.
 
@@ -28,6 +28,8 @@ def assert_warning(category, msg):
         The class of the expected warning.
     msg : str
         The text of the expected warning.
+    contains_msg : bool
+        Set to True to check that the warning text contains msg, rather than checking equality.
 
     Raises
     ------
@@ -40,7 +42,12 @@ def assert_warning(category, msg):
             yield
 
     for warn in w:
-        if (issubclass(warn.category, category) and str(warn.message) == msg):
+        if contains_msg:
+            warn_clause = msg in str(warn.message)
+        else:
+            warn_clause = str(warn.message) == msg
+
+        if (issubclass(warn.category, category) and warn_clause):
             break
     else:
         msg = f"Did not see expected {category.__name__}:\n{msg}"
