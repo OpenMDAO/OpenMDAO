@@ -26,15 +26,15 @@ It fixes the known issue from 3.10.0 in which the derivatives of serial outputs 
 
 - Fixed deprecation of 'value' in get_io_metadata(). [#2191](https://github.com/OpenMDAO/OpenMDAO/pull/2191)
 - Improved error message for global shape errors. [#2192](https://github.com/OpenMDAO/OpenMDAO/pull/2192)
-- Use backward difference for check options on structured metamodel with slinear. [#2195](https://github.com/OpenMDAO/OpenMDAO/pull/2195)
 - Changed handling of seeds when computing total derivatives - distributed to serial derivatives now working. [#2197](https://github.com/OpenMDAO/OpenMDAO/pull/2197)
-- Handle includes given as a string for list_outputs on case object [#2198](https://github.com/OpenMDAO/OpenMDAO/pull/2198)
+- The "includes" and "excludes" arguments for list_outputs and list_inputs on case objects now support strings. [#2198](https://github.com/OpenMDAO/OpenMDAO/pull/2198)
 
 ## Miscellaneous:
 
 - Fixed errors in multifi_cokriging documentation. [#2183](https://github.com/OpenMDAO/OpenMDAO/pull/2183)
 - Introduced some speed improvements to final_setup when recorders are present. [#2184](https://github.com/OpenMDAO/OpenMDAO/pull/2184)
 - Switched from Pyppeteer to Playwright for N2 GUI tests. [#2187](https://github.com/OpenMDAO/OpenMDAO/pull/2187)
+- The MetaModelStructuredComp now uses backward difference for fd checks when the method is 'slinear' so that the finite difference step direction aligns with the bin bracketing. [#2195](https://github.com/OpenMDAO/OpenMDAO/pull/2195)
 
 ***********************************
 # Release Notes for OpenMDAO 3.10.0
