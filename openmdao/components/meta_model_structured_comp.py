@@ -176,6 +176,11 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['method'].startswith('scipy'):
             self.set_check_partial_options('*', method='fd')
 
+        # Our bracketing algorithm picks the bin behind it if you are interpolating exactly on one
+        # of the grid points, so we need to set the derivative check to look backwards.
+        elif self.options['method'] == 'slinear':
+            self.set_check_partial_options('*', form='backward')
+
     def compute(self, inputs, outputs):
         """
         Perform the interpolation at run time.
