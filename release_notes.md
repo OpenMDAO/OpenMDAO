@@ -1,4 +1,42 @@
 ***********************************
+# Release Notes for OpenMDAO 3.11.0
+
+August 03, 2021
+
+OpenMDAO 3.11.0 introduces SemiStructuredMetaModelComp as well as some bug fixes and performance improvements.
+It fixes the known issue from 3.10.0 in which the derivatives of serial outputs wrt distributed inputs were broken.
+
+## New Deprecations
+
+- None
+
+## Backwards Incompatible API Changes:
+
+- None
+- 
+## Backwards Incompatible NON-API Changes:
+
+- None
+
+## New Features:
+
+- New MetaModelSemiStructuredComp component that can interpolate on "semi-structured" data. [#2185](https://github.com/OpenMDAO/OpenMDAO/pull/2185)
+
+## Bug Fixes:
+
+- Fixed deprecation of 'value' in get_io_metadata(). [#2191](https://github.com/OpenMDAO/OpenMDAO/pull/2191)
+- Improved error message for global shape errors. [#2192](https://github.com/OpenMDAO/OpenMDAO/pull/2192)
+- Use backward difference for check options on structured metamodel with slinear. [#2195](https://github.com/OpenMDAO/OpenMDAO/pull/2195)
+- Changed handling of seeds when computing total derivatives - distributed to serial derivatives now working. [#2197](https://github.com/OpenMDAO/OpenMDAO/pull/2197)
+- Handle includes given as a string for list_outputs on case object [#2198](https://github.com/OpenMDAO/OpenMDAO/pull/2198)
+
+## Miscellaneous:
+
+- Fixed errors in multifi_cokriging documentation. [#2183](https://github.com/OpenMDAO/OpenMDAO/pull/2183)
+- Introduced some speed improvements to final_setup when recorders are present. [#2184](https://github.com/OpenMDAO/OpenMDAO/pull/2184)
+- Switched from Pyppeteer to Playwright for N2 GUI tests. [#2187](https://github.com/OpenMDAO/OpenMDAO/pull/2187)
+
+***********************************
 # Release Notes for OpenMDAO 3.10.0
 
 July 14, 2021
