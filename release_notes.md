@@ -35,6 +35,8 @@ It fixes the known issue from 3.10.0 in which the derivatives of serial outputs 
 - Introduced some speed improvements to final_setup when recorders are present. [#2184](https://github.com/OpenMDAO/OpenMDAO/pull/2184)
 - Switched from Pyppeteer to Playwright for N2 GUI tests. [#2187](https://github.com/OpenMDAO/OpenMDAO/pull/2187)
 - The MetaModelStructuredComp now uses backward difference for fd checks when the method is 'slinear' so that the finite difference step direction aligns with the bin bracketing. [#2195](https://github.com/OpenMDAO/OpenMDAO/pull/2195)
+- Fixed the inputs of the Hohmann transfer example in the docs. [#2202](https://github.com/OpenMDAO/OpenMDAO/pull/2202)
+
 
 ***********************************
 # Release Notes for OpenMDAO 3.10.0
