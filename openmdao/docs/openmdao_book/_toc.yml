@@ -1,5 +1,5 @@
-format: jb-book
 root: main
+format: jb-book
 parts:
 - caption: Getting Started
   chapters:
