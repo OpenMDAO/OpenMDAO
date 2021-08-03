@@ -1,6 +1,7 @@
 """Define utils for use in testing."""
 import json
 import functools
+import builtins
 
 import numpy as np
 
@@ -140,3 +141,45 @@ class _ModelViewerDataTreeEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+class MissingImports(object):
+    """
+    ContextManager that emulates missing python packages or modules.
+
+    Each import is checked to see if it starts with a missing import.
+
+    For instance:
+    with MissingImports('matplotlib'):
+        from matplotlib.pyplot import plt
+    will fail because 'matplotlib.pyplot'.startswith('matplotlib') is True.
+
+    This implementation modifies builtins.__import__ which is allowed but highly
+    discouraged according to the documentation, but implementing a MetaPathFinder
+    seemed like overkill.  Use at your own risk.
+
+    Parameters
+    ----------
+    missing_imports : str or Sequence of str
+        A string or sequence of strings that denotes modules that should appear to be absent
+        for testing purposes.
+    """
+    def __init__(self, missing_imports):
+        if isinstance(missing_imports, str):
+            self._missing_imports = set([missing_imports])
+        else:
+            self._missing_imports = set(missing_imports)
+        self._cached_import = None
+
+    def __enter__(self):
+        self._cached_import = builtins.__import__
+        builtins.__import__ = self._emulate_missing_import
+
+    def _emulate_missing_import(self, name, globals=None, locals=None, fromlist=(), level=0):
+        for mi in self._missing_imports:
+            if name.startswith(mi):
+                raise ImportError(f'No module named {name} due to missing import {mi}.')
+        return self._cached_import(name, globals, locals, fromlist, level)
+
+    def __exit__(self, type, value, traceback):
+        builtins.__import__ = self._cached_import
