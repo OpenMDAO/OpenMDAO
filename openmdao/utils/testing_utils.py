@@ -158,28 +158,46 @@ class MissingImports(object):
     discouraged according to the documentation, but implementing a MetaPathFinder
     seemed like overkill.  Use at your own risk.
 
-    Parameters
+    Attributes
     ----------
     missing_imports : str or Sequence of str
         A string or sequence of strings that denotes modules that should appear to be absent
         for testing purposes.
+    _cached_import : None or builtin
+        A cached import to emulate the missing import
     """
+
     def __init__(self, missing_imports):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        missing_imports : str or Sequence of str
+            A string or sequence of strings that denotes modules that should appear to be absent
+            for testing purposes.
+        """
         if isinstance(missing_imports, str):
-            self._missing_imports = set([missing_imports])
+            self.missing_imports = set([missing_imports])
         else:
-            self._missing_imports = set(missing_imports)
+            self.missing_imports = set(missing_imports)
         self._cached_import = None
 
     def __enter__(self):
+        """
+        Set cached import.
+        """
         self._cached_import = builtins.__import__
         builtins.__import__ = self._emulate_missing_import
 
     def _emulate_missing_import(self, name, globals=None, locals=None, fromlist=(), level=0):
-        for mi in self._missing_imports:
+        for mi in self.missing_imports:
             if name.startswith(mi):
                 raise ImportError(f'No module named {name} due to missing import {mi}.')
         return self._cached_import(name, globals, locals, fromlist, level)
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self):
+        """
+        Set builtins import.
+        """
         builtins.__import__ = self._cached_import
