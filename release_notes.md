@@ -13,7 +13,7 @@ It fixes the known issue from 3.10.0 in which the derivatives of serial outputs 
 ## Backwards Incompatible API Changes:
 
 - None
-- 
+ 
 ## Backwards Incompatible NON-API Changes:
 
 - None
