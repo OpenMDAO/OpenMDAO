@@ -1284,8 +1284,8 @@ class Component(System):
         if matrix_free:
             n_directional = 0
 
-        for wrt_list, method, form, step, step_calc, minimum_step, directional in \
-            self._declared_partial_checks:
+        for data_tup in self._declared_partial_checks:
+            wrt_list, method, form, step, step_calc, minimum_step, directional = data_tup
 
             for pattern in wrt_list:
                 matches = find_matches(pattern, wrt)

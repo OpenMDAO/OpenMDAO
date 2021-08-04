@@ -83,7 +83,7 @@ class FiniteDifference(ApproximationScheme):
         'order': None,
         'step_calc': 'abs',
         'directional': False,
-        'minimum_step' : 1e-12,
+        'minimum_step': 1e-12,
     }
 
     def __init__(self):
@@ -137,7 +137,6 @@ class FiniteDifference(ApproximationScheme):
                                  " larger vectors, and this behavior is being changed in "
                                  "OpenMDAO 3.12.0. To preserve the older way of doing this "
                                  "calculation, set step_calc to 'rel_legacy'.")
-
 
         options['vector'] = vector
         wrt = abs_key[1]
