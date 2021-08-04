@@ -915,7 +915,7 @@ class Group(System):
             src_inds = flat_src_inds = None
 
             if not smeta['distributed'] and tmeta['distributed']:
-                src_shape = self._get_full_dist_shape(src)
+                src_shape = self._get_full_dist_shape(src, smeta['shape'])
             else:
                 src_shape = smeta['global_shape']
 
@@ -1954,7 +1954,7 @@ class Group(System):
                 if meta_in['distributed']:
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
-                    out_shape = self._get_full_dist_shape(abs_out)
+                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
 
                 in_shape = meta_in['shape']
 

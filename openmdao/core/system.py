@@ -1521,7 +1521,7 @@ class System(object):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name)
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
 
                 else:
                     # not distributed, just use local shape and size
@@ -5192,16 +5192,19 @@ class System(object):
 
         return hashlib.md5(str(data).encode()).hexdigest()
 
-    def _get_full_dist_shape(self, abs_name):
+    def _get_full_dist_shape(self, abs_name, local_shape):
         """
         Get the full 'distributed' shape for a variable.
 
-        Variable name is absoute and variable is assumed to be continuous.
+        Variable name is absolute and variable is assumed to be continuous.
 
         Parameters
         ----------
         abs_name : str
             Absolute name of the variable.
+
+        local_shape : tuple
+            Local shape of the variable, used in error reporting.
 
         Returns
         -------
