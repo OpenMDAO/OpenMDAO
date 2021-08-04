@@ -1020,7 +1020,7 @@ class Problem(object):
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       minimum_step=1e-9, force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -1061,7 +1061,7 @@ class Problem(object):
             future will default to 'rel_avg'. Defaults to None, in which case the approximation
             method provides its default value.
         minimum_step : float
-            Minimum fd step size allowed when using 'rel_element' as the step_calc.
+            Minimum step size allowed when using one of the relative step_calc options.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
@@ -1159,7 +1159,8 @@ class Problem(object):
                         # we now have individual vars like 'x'
                         # get the options for checking partials
                         fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
-                                                        form, step_calc, alloc_complex)
+                                                        form, step_calc, alloc_complex,
+                                                        minimum_step)
                         # compare the compute options to the check options
                         if fd_options['method'] != meta_with_defaults['method']:
                             all_same = False
@@ -1453,7 +1454,8 @@ class Problem(object):
                 local_wrt = rel_key[1]
 
                 fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method, local_opts,
-                                                           step, form, step_calc, alloc_complex)
+                                                           step, form, step_calc, alloc_complex,
+                                                           minimum_step)
 
                 if could_not_cs:
                     comps_could_not_cs.add(c_name)
@@ -2559,7 +2561,7 @@ def _format_error(error, tol):
 
 
 def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
-                    alloc_complex):
+                    alloc_complex, global_minimum_step):
     local_wrt = var
 
     # Determine if fd or cs.
@@ -2584,12 +2586,14 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
         fd_options['form'] = None
         fd_options['step_calc'] = None
+        fd_options['minimum_step'] = None
 
     elif method == 'fd':
         defaults = FiniteDifference.DEFAULT_OPTIONS
 
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
+        fd_options['minimum_step'] = global_minimum_step
 
     if global_step and global_method == method:
         fd_options['step'] = global_step
