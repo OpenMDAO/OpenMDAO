@@ -170,11 +170,12 @@ class BalanceComp(ImplicitComponent):
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
 
                 # Compute scaling factors
                 # scale factor that normalizes by the rhs, except near 0
+                self._scale_factor = np.ones((rhs.shape))
                 self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
                 self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
             else:
