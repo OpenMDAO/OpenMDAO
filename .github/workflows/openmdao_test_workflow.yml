@@ -47,7 +47,7 @@ jobs:
             NUMPY: 1.17
             SCIPY: 1.2
             PETSc: 3.10.2
-            PYOPTSPARSE: 'v1.2'
+            PYOPTSPARSE: 'conda-forge'
             SNOPT: 7.2
             OPTIONAL: '[all]'
 
@@ -63,11 +63,6 @@ jobs:
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
-
-      # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
-      - name: Add the current IP address, long hostname and short hostname record to /etc/hosts file
-        run: |
-          echo -e "$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)\t$(hostname -f) $(hostname -s)" | sudo tee -a /etc/hosts
 
       - name: Create SSH key
         env:
@@ -120,37 +115,44 @@ jobs:
           echo "Install pyoptsparse"
           echo "============================================================="
 
-          git clone -q https://github.com/OpenMDAO/build_pyoptsparse
-
-          cd build_pyoptsparse
-          chmod 755 ./build_pyoptsparse.sh
-
-          if [[ "${{ matrix.PETSc }}" && "${{ matrix.PYOPTSPARSE }}" == "v1.2" ]]; then
-            PAROPT=-a
-          fi
-
-          if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-            echo "  > Secure copying SNOPT 7.7 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
-
-          elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
-            echo "  > Secure copying SNOPT 7.2 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
-
-          else
+          if [[ "${{ matrix.PYOPTSPARSE }}" == "conda-forge" ]]; then
+            conda install -c conda-forge pyoptsparse
             if [[ "${{ matrix.SNOPT }}" ]]; then
-              echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
+              echo "SNOPT ${{ matrix.SNOPT }} was requested but is not available on conda-forge"
             fi
-            ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
+          else
+            git clone -q https://github.com/OpenMDAO/build_pyoptsparse
+
+            cd build_pyoptsparse
+            chmod 755 ./build_pyoptsparse.sh
+
+            if [[ "${{ matrix.PETSc }}" && "${{ matrix.PYOPTSPARSE }}" == "v1.2" ]]; then
+              PAROPT=-a
+            fi
+
+            if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+              echo "  > Secure copying SNOPT 7.7 over SSH"
+              mkdir SNOPT
+              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/src
+
+            elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
+              echo "  > Secure copying SNOPT 7.2 over SSH"
+              mkdir SNOPT
+              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}" -s SNOPT/source
+
+            else
+              if [[ "${{ matrix.SNOPT }}" ]]; then
+                echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
+              fi
+              ./build_pyoptsparse.sh $PAROPT -b "${{ matrix.PYOPTSPARSE }}"
+            fi
+
+            cd ..
+
+            echo "LD_LIBRARY_PATH=$HOME/ipopt/lib" >> $GITHUB_ENV
           fi
-
-          cd ..
-
-          echo "LD_LIBRARY_PATH=$HOME/ipopt/lib" >> $GITHUB_ENV
 
       - name: Install optional dependencies
         if: matrix.OPTIONAL == '[all]'
@@ -313,7 +315,7 @@ jobs:
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
           pip install psutil objgraph git+https://github.com/mdolab/pyxdsm
-          
+
       - name: Display conda info
         shell: pwsh
         run: |
