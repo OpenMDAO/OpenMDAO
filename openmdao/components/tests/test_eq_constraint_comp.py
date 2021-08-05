@@ -549,22 +549,22 @@ class TestEQConstraintComp(unittest.TestCase):
         defect_comp = model.add_subsystem('eq_comp', om.EQConstraintComp())
 
         defect_comp.add_eq_output(name='diff_r',
-                                    shape=(n, 3),
-                                    eq_units='km',
-                                    lhs_name='r1', rhs_name='r2',
-                                    use_mult=False,
-                                    normalize=True,
-                                    add_constraint=True,
-                                    ref=100.0, ref0=None, adder=None, scaler=None)
+                                  shape=(n, 3),
+                                  eq_units='km',
+                                  lhs_name='r1', rhs_name='r2',
+                                  use_mult=False,
+                                  normalize=True,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
 
         defect_comp.add_eq_output(name='diff_k',
-                                    shape=(n,),
-                                    eq_units='km',
-                                    lhs_name='k1', rhs_name='k2',
-                                    use_mult=False,
-                                    normalize=True,
-                                    add_constraint=True,
-                                    ref=100.0, ref0=None, adder=None, scaler=None)
+                                  shape=(n,),
+                                  eq_units='km',
+                                  lhs_name='k1', rhs_name='k2',
+                                  use_mult=False,
+                                  normalize=True,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
 
 
         prob.setup()
