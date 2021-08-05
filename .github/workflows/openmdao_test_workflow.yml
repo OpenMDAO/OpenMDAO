@@ -31,7 +31,7 @@ jobs:
             BUILD_DOCS: True
             PUBLISH_DOCS: True
 
-          # try latest versions
+          # latest versions
           - NAME: Latest
             PY: 3
             NUMPY: 1
@@ -39,6 +39,15 @@ jobs:
             PETSc: 3
             PYOPTSPARSE: 'v2.6.1'
             SNOPT: 7.7
+            OPTIONAL: '[all]'
+
+          # minimal install
+          - NAME: Minimal
+            PY: 3
+            NUMPY: 1
+            SCIPY: 1
+            PETSc: 3
+            PYOPTSPARSE: 'conda-forge'
             OPTIONAL: '[test]'
 
           # oldest supported versions
@@ -47,7 +56,7 @@ jobs:
             NUMPY: 1.17
             SCIPY: 1.2
             PETSc: 3.10.2
-            PYOPTSPARSE: 'conda-forge'
+            PYOPTSPARSE: 'v2.1.5'
             SNOPT: 7.2
             OPTIONAL: '[all]'
 
