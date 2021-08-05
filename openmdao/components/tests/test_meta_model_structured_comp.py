@@ -1125,10 +1125,35 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         p.set_val('x', 0.75)
 
-        msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> " \
-              "Line 205 of file {}".format(inspect.getsourcefile(om.MetaModelStructuredComp))
-        with assert_warning(UserWarning, msg):
+        msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> "
+        with assert_warning(UserWarning, msg, contains_msg=True):
             p.run_driver()
+
+    def test_slinear_backward_fd(self):
+        # Verify that FD/CS direction for slinear is backward so that direction matches bracketing.
+        machs = np.linspace(4, 10, num=3)
+        grid = np.random.random((3, ))
+
+        class MGroup(om.Group):
+
+            def setup(self):
+                comp=om.MetaModelStructuredComp(method='slinear')
+                comp.add_input('mach', 0.0, machs)
+                comp.add_output('C_L', 0.0, grid)
+
+                self.add_subsystem('comp', comp, promotes=["*"])
+                self.comp._no_check_partials = False  # override skipping of check_partials
+
+        model = om.Group()
+        model.add_subsystem('InterpSubsystem', MGroup())
+        p = om.Problem(model)
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('InterpSubsystem.mach', 7.0)
+        p.run_model()
+
+        cpd = p.check_partials(compact_print=False, out_stream=None, method='cs')
+        assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
 @use_tempdirs
