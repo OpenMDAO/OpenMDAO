@@ -2604,7 +2604,7 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
     # Precedence: component options > global options > defaults
     if local_wrt in local_opts:
-        for name in ['form', 'step', 'step_calc', 'directional']:
+        for name in ['form', 'step', 'step_calc', 'minimum_step', 'directional']:
             value = local_opts[local_wrt][name]
             if value is not None:
                 fd_options[name] = value

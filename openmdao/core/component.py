@@ -1124,7 +1124,7 @@ class Component(System):
             else:
                 raise RuntimeError("{}: d({})/d({}): 'step' is not a valid option for "
                                    "'{}'".format(self.msginfo, of, wrt, method))
-        if minimum_step:
+        if minimum_step is not None:
             if 'minimum_step' in default_opts:
                 meta['minimum_step'] = minimum_step
             else:
