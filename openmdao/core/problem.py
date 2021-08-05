@@ -1052,7 +1052,7 @@ class Problem(object):
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
-        step_calc : string
+        step_calc : str
             Step type for computing the size of the finite difference step. It can be 'abs' for
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
@@ -1561,10 +1561,10 @@ class Problem(object):
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             None, which defaults to 'forward' for FD.
-        step_calc : string
+        step_calc : str
             Step type for computing the size of the finite difference step. It can be 'abs' for
             absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
             'rel_element' for a size relative to each value in the vector input. In addition, it
