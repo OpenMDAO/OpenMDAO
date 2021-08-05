@@ -63,8 +63,8 @@ class _PromotesInfo(object):
     def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
                  root_shape=None):
         self.flat = flat
-        self.src_shape = src_shape
         self.root_shape = src_shape if root_shape is None else root_shape
+        self.src_shape = self.root_shape
         if src_indices is not None:
             if isinstance(src_indices, Indexer):
                 self.src_indices = src_indices.copy()

@@ -1555,14 +1555,15 @@ class Component(System):
             else:
                 all_abs2meta_in[tgt]['has_src_indices'] = True
                 meta = abs2meta_in[tgt]
-                if src_shape is None and parent_src_shape is not None:
+                shape = pinfo.root_shape if pinfo.root_shape is not None else parent_src_shape
+                if src_shape is None and shape is not None:
                     try:
-                        src_inds.set_src_shape(parent_src_shape)
+                        src_inds.set_src_shape(shape)
                     except Exception as err:
                         parent_sys = f" {pinfo.parent_sys} " if pinfo.parent_sys else ""
                         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
                                            f"src_indices {src_inds} and source shape "
-                                           f"{parent_src_shape}: {err}")
+                                           f"{shape}: {err}")
                 meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
