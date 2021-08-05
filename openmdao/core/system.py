@@ -1530,10 +1530,10 @@ class System(object):
 
                             if dim_size_match is False:
                                 msg = (f"{self.msginfo}: All but the first dimension of the "
-                                        "shape's local parts in a distributed variable must match "
-                                        f"across processes. For output '{abs_name}', local shape "
-                                        f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                        "higher dimension that differs in another rank.")
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
 
                                 raise RuntimeError(msg)
 
