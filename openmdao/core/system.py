@@ -5225,10 +5225,10 @@ class System(object):
                 dim_size_match = bool(global_size % high_size == 0)
                 if dim_size_match is False:
                     raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
-                                    "shape's local parts in a distributed variable must match "
-                                    f"across processes. For output '{abs_name}', local shape "
-                                    f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                    "higher dimension that differs in another rank.")
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
 
                 dim1 = global_size // high_size
                 return tuple([dim1] + list(high_dims))
