@@ -175,8 +175,8 @@ class TestHohmannTransfer(unittest.TestCase):
         model.add_objective('delta_v', scaler=1.0)
 
         # set defaults for our promoted variables to remove ambiguities in value and/or units
-        model.set_input_defaults('r1', val=42164.0)
-        model.set_input_defaults('r2', val=398600.4418)
+        model.set_input_defaults('r1', val=6778.0)
+        model.set_input_defaults('r2', val=42164.0)
         model.set_input_defaults('mu', val=398600.4418)
         model.set_input_defaults('dinc1', val=0., units='deg')
         model.set_input_defaults('dinc2', val=28.5, units='deg')

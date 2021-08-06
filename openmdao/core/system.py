@@ -23,7 +23,7 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, 
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
@@ -122,6 +122,9 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
+value_deprecated_msg = "The metadata key 'value' will be deprecated in 4.0. Please use 'val'."
+
+
 class _MetadataDict(dict):
     """
     A dict wrapper for a dict of metadata, to throw deprecation if a user indexes in using value.
@@ -129,14 +132,14 @@ class _MetadataDict(dict):
 
     def __getitem__(self, key):
         if key == 'value':
-            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            warn_deprecation(value_deprecated_msg)
             key = 'val'
         val = dict.__getitem__(self, key)
         return val
 
     def __setitem__(self, key, val):
         if key == 'value':
-            warn_deprecation("The metadata key 'value' will be deprecated in 4.0. Please use 'val'")
+            warn_deprecation(value_deprecated_msg)
             key = 'val'
         dict.__setitem__(self, key, val)
 
@@ -1520,16 +1523,24 @@ class System(object):
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
                     high_dims = local_shape[1:]
-                    if high_dims:
-                        high_size = np.prod(high_dims)
-                        dim1 = global_size // high_size
-                        if global_size % high_size != 0:
-                            raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                               "with local shape %s" % (self.msginfo, abs_name,
-                                                                        global_size, local_shape))
-                        mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                    else:
-                        mymeta['global_shape'] = (global_size,)
+                    with multi_proc_exception_check(self.comm):
+                        if high_dims:
+                            high_size = np.prod(high_dims)
+                            dim_size_match = bool(global_size % high_size == 0)
+
+                            if dim_size_match is False:
+                                msg = (f"{self.msginfo}: All but the first dimension of the "
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
+
+                                raise RuntimeError(msg)
+
+                            dim1 = global_size // high_size
+                            mymeta['global_shape'] = tuple([dim1] + list(high_dims))
+                        else:
+                            mymeta['global_shape'] = (global_size,)
 
                 else:
                     # not distributed, just use local shape and size
@@ -3236,7 +3247,7 @@ class System(object):
             Will contain either 'input', 'output', or both.  Defaults to both.
         metadata_keys : iter of str or None
             Names of metadata entries to be retrieved or None, meaning retrieve all
-            available 'allprocs' metadata.  If 'values' or 'src_indices' are required,
+            available 'allprocs' metadata.  If 'val' or 'src_indices' are required,
             their keys must be provided explicitly since they are not found in the 'allprocs'
             metadata and must be retrieved from local metadata located in each process.
         includes : str, iter of str or None
@@ -3294,6 +3305,13 @@ class System(object):
         need_gather = get_remote and self.comm.size > 1
         if metadata_keys is not None:
             keyset = set(metadata_keys)
+            try:
+                # DEPRECATION: if 'value' in keyset, replace with 'val'
+                keyset.remove('value')
+                keyset.add('val')
+                warn_deprecation(value_deprecated_msg)
+            except KeyError:
+                pass
             diff = keyset - allowed_meta_names
             if diff:
                 raise RuntimeError(f"{self.msginfo}: {sorted(diff)} are not valid metadata entry "
@@ -3449,10 +3467,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all input variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all ranks. Default is False, which will display
@@ -3584,10 +3602,10 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
-        includes : None or iter of str
+        includes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to include. Default is None,
             which includes all output variables.
-        excludes : None or iter of str
+        excludes : None, str, or iter of str
             Collection of glob patterns for pathnames of variables to exclude. Default is None.
         all_procs : bool, optional
             When True, display output on all processors. Default is False.

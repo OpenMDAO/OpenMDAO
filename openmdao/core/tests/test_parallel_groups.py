@@ -436,6 +436,85 @@ class TestParallelJacBug(unittest.TestCase):
         self.assertLess(np.max(np.abs(J2 - Jsave)), 1e-20)
 
 
+def _make_tree_model():
+    p = om.Problem()
+    model = p.model
+
+    units1 = units2 = 'ft'
+
+    val = 1.0
+
+    g1 = model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
+
+    g2 = g1.add_subsystem("G2", om.Group(), promotes_inputs=['x'])
+    g2.add_subsystem("C1", om.ExecComp("y = 2. * x",
+                                        x={'val': val, 'units': units2},
+                                        y={'val': 1.0, 'units': units2}),
+                                        promotes_inputs=['x'])
+    g2.add_subsystem("C2", om.ExecComp("y = 3. * x",
+                                        x={'val': val, 'units': units1},
+                                        y={'val': 1.0, 'units': units1}),
+                                        promotes_inputs=['x'])
+
+    g3 = model.add_subsystem("G3", om.Group(), promotes_inputs=['x'])
+    g3.add_subsystem("C3", om.ExecComp("y = 4. * x",
+                                        x={'val': val, 'units': units1},
+                                        y={'val': 1.0, 'units': units1}),
+                                        promotes_inputs=['x'])
+    g3.add_subsystem("C4", om.ExecComp("y = 5. * x",
+                                        x={'val': val, 'units': units2},
+                                        y={'val': 1.0, 'units': units2}),
+                                        promotes_inputs=['x'])
+
+    par = model.add_subsystem("par", om.ParallelGroup(), promotes_inputs=['x'])
+
+    g4 = par.add_subsystem("G4", om.Group(), promotes_inputs=['x'])
+    g4.add_subsystem("C5", om.ExecComp("y = 6. * x",
+                                        x={'val': val, 'units': units2},
+                                        y={'val': 1.0, 'units': units2}),
+                                        promotes_inputs=['x'])
+    g4.add_subsystem("C6", om.ExecComp("y = 7. * x",
+                                        x={'val': val, 'units': units1},
+                                        y={'val': 1.0, 'units': units1}),
+                                        promotes_inputs=['x'])
+
+    g5 = par.add_subsystem("G5", om.Group(), promotes_inputs=['x'])
+    g5.add_subsystem("C7", om.ExecComp("y = 8. * x",
+                                        x={'val': val, 'units': units1},
+                                        y={'val': 1.0, 'units': units1}),
+                                        promotes_inputs=['x'])
+    g5.add_subsystem("C8", om.ExecComp("y = 9. * x",
+                                        x={'val': val, 'units': units2},
+                                        y={'val': 1.0, 'units': units2}),
+                                        promotes_inputs=['x'])
+
+    model.add_subsystem("C9", om.ExecComp("y = 10. * x",
+                                        x={'val': val, 'units': units2},
+                                        y={'val': 1.0, 'units': units2}),
+                                        promotes_inputs=['x'])
+
+    return p
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestParallelOrdering(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_get_ordered_comps(self):
+        from openmdao.core.component import Component
+        p = _make_tree_model()
+        p.setup()
+        p.run_model()
+        ordered_names = list(p.model._ordered_comp_name_iter())
+        self.assertEqual(ordered_names, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G4.C5', 'par.G4.C6', 'par.G5.C7', 'par.G5.C8', 'C9'])
+        locnames = [s.pathname for s in p.model.system_iter(recurse=True, typ=Component)]
+        if p.model.comm.rank == 0:
+            self.assertEqual(locnames, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G4.C5', 'par.G4.C6', 'C9'])
+        else:
+            self.assertEqual(locnames, ['_auto_ivc', 'G1.G2.C1', 'G1.G2.C2', 'G3.C3', 'G3.C4', 'par.G5.C7', 'par.G5.C8', 'C9'])
+
+
 if __name__ == "__main__":
     from openmdao.utils.mpi import mpirun_tests
     mpirun_tests()

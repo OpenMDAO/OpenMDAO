@@ -1289,7 +1289,7 @@ class TestGroup(unittest.TestCase):
 
             def guess_nonlinear(self, inputs, outputs, residuals):
 
-                if outputs.asarray().dtype == np.complex:
+                if outputs.asarray().dtype == complex:
                     raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
 
                 # inputs are addressed using full path name, regardless of promotion
@@ -1843,7 +1843,7 @@ class TestGroupPromotes(unittest.TestCase):
                 self.add_subsystem('comp2', om.ExecComp('b=2*a', a=np.zeros(5), b=np.zeros(5)))
 
             def configure(self):
-                self.promotes('comp2', inputs=['a'], src_indices=np.array([0], dtype=np.complex))
+                self.promotes('comp2', inputs=['a'], src_indices=np.array([0], dtype=complex))
 
         top = om.Problem(model=SimpleGroup())
 

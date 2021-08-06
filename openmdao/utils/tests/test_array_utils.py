@@ -57,7 +57,7 @@ class TestArrayUtils(unittest.TestCase):
         self.assertEqual(y[3], 6.0 + 3.5j)
 
         x = np.array([3.0 + 0.5j, -4.0 - 1.5j, -5.0 + 2.5j, -6.0 - 3.5j])
-        dx = 1.0 + 2j * np.ones((4, 3), dtype=np.complex)
+        dx = 1.0 + 2j * np.ones((4, 3), dtype=complex)
 
         yy, dy = dv_abs_complex(x, dx)
 

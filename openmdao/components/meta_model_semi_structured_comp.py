@@ -1,17 +1,17 @@
-"""Define the MetaModelStructured class."""
-
-import numpy as np
+"""Define the MetaModelSemiStructuredComp class."""
 import inspect
 
+import numpy as np
+
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.interp_util.interp import InterpND, TABLE_METHODS
+from openmdao.components.interp_util.interp_semi import InterpNDSemi, TABLE_METHODS
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 
-class MetaModelStructuredComp(ExplicitComponent):
+class MetaModelSemiStructuredComp(ExplicitComponent):
     """
-    Interpolation Component generated from data on a regular grid.
+    Interpolation Component generated from semi-structured data on a regular grid.
 
     Produces smooth fits through provided training data using polynomial splines of various
     orders. Analytic derivatives are automatically computed.
@@ -27,15 +27,14 @@ class MetaModelStructuredComp(ExplicitComponent):
 
     Attributes
     ----------
-    grad_shape : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
     interps : dict
         Dictionary of interpolations for each output.
-    inputs : list
-        List containing training data for each input.
     pnames : list
         Cached list of input names.
-    training_outputs : dict
+    training_inputs : dict of ndarray
+        Dictionary of grid point locations corresponding to the training values in
+        self.training_outputs.
+    training_outputs : dict of ndarray
         Dictionary of training data each output.
     """
 
@@ -51,10 +50,9 @@ class MetaModelStructuredComp(ExplicitComponent):
         super().__init__(**kwargs)
 
         self.pnames = []
-        self.inputs = []
+        self.training_inputs = {}
         self.training_outputs = {}
         self.interps = {}
-        self.grad_shape = ()
 
         self._no_check_partials = True
 
@@ -62,18 +60,18 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         Initialize the component.
         """
-        self.options.declare('extrapolate', types=bool, default=False,
+        self.options.declare('extrapolate', types=bool, default=True,
                              desc='Sets whether extrapolation should be performed '
                                   'when an input is out of bounds.')
         self.options.declare('training_data_gradients', types=bool, default=False,
-                             desc='Sets whether gradients with respect to output '
-                                  'training data should be computed.')
+                             desc='When True, compute gradients with respect to training data '
+                             'values.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=TABLE_METHODS, default='scipy_cubic',
+        self.options.declare('method', values=TABLE_METHODS, default='slinear',
                              desc='Spline interpolation method to use for all outputs.')
 
-    def add_input(self, name, val=1.0, training_data=None, **kwargs):
+    def add_input(self, name, training_data, val=1.0, **kwargs):
         """
         Add an input to this component and a corresponding training input.
 
@@ -81,10 +79,11 @@ class MetaModelStructuredComp(ExplicitComponent):
         ----------
         name : string
             Name of the input.
+        training_data : ndarray
+            Training data grid sample points for this input variable. Must be of length m, where m
+            is the total number of points in the table..
         val : float or ndarray
             Initial value for the input.
-        training_data : ndarray
-            training data sample points for this input variable.
         **kwargs : dict
             Additional agruments for add_input.
         """
@@ -99,10 +98,11 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         super().add_input(name, val * np.ones(n), **kwargs)
 
-        self.pnames.append(name)
-        self.inputs.append(np.asarray(training_data))
+        self.training_inputs[name] = training_data
 
-    def add_output(self, name, val=1.0, training_data=None, **kwargs):
+        self.pnames.append(name)
+
+    def add_output(self, name, training_data, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -110,23 +110,14 @@ class MetaModelStructuredComp(ExplicitComponent):
         ----------
         name : string
             Name of the output.
-        val : float or ndarray
-            Initial value for the output.
         training_data : ndarray
-            training data sample points for this output variable.
+            Training data sample points for this output variable. Must be of length m, where m is
+            the total number of points in the table.
         **kwargs : dict
             Additional agruments for add_output.
         """
         n = self.options['vec_size']
-
-        # Currently no support for vector outputs, apart from vec_size
-        if not np.isscalar(val):
-
-            if len(val) not in [1, n] or len(val.shape) > 1:
-                msg = "{}: Output {} must either be scalar, or of length equal to vec_size."
-                raise ValueError(msg.format(self.msginfo, name))
-
-        super().add_output(name, val * np.ones(n), **kwargs)
+        super().add_output(name, np.ones(n), **kwargs)
 
         self.training_outputs[name] = training_data
 
@@ -139,16 +130,21 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
-        for name, train_data in self.training_outputs.items():
-            self.interps[name] = InterpND(method=interp_method,
-                                          points=self.inputs, values=train_data,
-                                          extrapolate=self.options['extrapolate'])
+        # Make sure all training data is sized correctly.
+        size = len(self.training_inputs[self.pnames[0]])
+        for data_dict in [self.training_inputs, self.training_outputs]:
+            for name, data in data_dict.items():
+                size2 = len(data)
+                if size2 != size:
+                    msg = f"Size mismatch: training data for '{name}' is length {size2}, but" + \
+                        f" data for '{self.pnames[0]}' is length {size}."
+                    raise ValueError(msg)
 
-        if self.options['training_data_gradients']:
-            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.inputs])
+        grid = np.array([col for col in self.training_inputs.values()]).T
+
+        for name, train_data in self.training_outputs.items():
+            self.interps[name] = InterpNDSemi(grid, train_data, method=interp_method,
+                                              extrapolate=self.options['extrapolate'])
 
         super()._setup_var_data()
 
@@ -176,11 +172,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         if self.options['method'].startswith('scipy'):
             self.set_check_partial_options('*', method='fd')
 
-        # Our bracketing algorithm picks the bin behind it if you are interpolating exactly on one
-        # of the grid points, so we need to set the derivative check to look backwards.
-        elif self.options['method'] == 'slinear':
-            self.set_check_partial_options('*', form='backward')
-
     def compute(self, inputs, outputs):
         """
         Perform the interpolation at run time.
@@ -205,8 +196,9 @@ class MetaModelStructuredComp(ExplicitComponent):
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
-                          f"because input '{varname_causing_error}' was out of bounds "
-                          f"('{ err.lower}', '{err.upper}') with value '{err.value}'")
+                          f"because input '{varname_causing_error}' required extrapolation while "
+                          f"interpolating dimension {err.idx + 1}, where its value '{err.value}'"
+                          f" exceeded the range ('{ err.lower}', '{err.upper}')")
                 raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
                                     self.msginfo)
 
@@ -238,17 +230,6 @@ class MetaModelStructuredComp(ExplicitComponent):
                 partials[out_name, p] = dval[i, :]
 
             if self.options['training_data_gradients']:
-
-                dy_ddata = np.zeros(self.grad_shape)
-
-                if interp._d_dvalues is not None:
-                    # Akima must be handled individually.
-                    dy_ddata[:] = interp._d_dvalues
-
-                else:
-                    # This way works for most of the interpolation methods.
-                    for j in range(self.options['vec_size']):
-                        val = interp.training_gradients(pt[j, :])
-                        dy_ddata[j] = val.reshape(self.grad_shape[1:])
-
-                partials[out_name, "%s_train" % out_name] = dy_ddata
+                train_name = f"{out_name}_train"
+                d_dvalues = interp._d_dvalues
+                partials[out_name, train_name] = d_dvalues

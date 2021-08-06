@@ -14,6 +14,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 
+
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 

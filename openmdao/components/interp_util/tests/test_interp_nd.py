@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
+from openmdao.components.interp_util.interp_semi import InterpNDSemi, INTERP_METHODS
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
 
@@ -134,11 +135,11 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             interp = InterpND(method=method, points=xcp, x_interp=x)
             y, dy = interp.evaluate_spline(ycp, compute_derivative=True)
 
-            self.assertTrue(y.dtype == np.complex)
+            self.assertTrue(y.dtype == complex)
 
             if method in ['akima']:
                 # Derivs depend on values only for akima.
-                self.assertTrue(dy.dtype == np.complex)
+                self.assertTrue(dy.dtype == complex)
 
         p1 = np.linspace(0, 100, 25)
         p2 = np.linspace(-10, 10, 5)
@@ -161,8 +162,163 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             interp = InterpND(method=method, points=(p1, p2, p3), values=f)
             y, dy = interp.interpolate(x, compute_derivative=True)
 
-            self.assertTrue(y.dtype == np.complex)
-            self.assertTrue(dy.dtype == np.complex)
+            self.assertTrue(y.dtype == complex)
+            self.assertTrue(dy.dtype == complex)
+
+
+class TestInterpNDSemiPython(unittest.TestCase):
+    """Tests for the standalone semi structured interp."""
+
+    def setUp(self):
+        self.interp_configs = {
+            "slinear": 2,
+            "lagrange2": 3,
+            "lagrange3": 4,
+            "akima": 4,
+        }
+        self.interp_methods = self.interp_configs.keys()
+
+        self.tol = {
+            "slinear": 5e-2,
+            "lagrange2": 5e-2,
+            "lagrange3": 1e-4,
+            "akima": 1e-3,
+        }
+
+    def _get_sample_2d(self):
+        # test problem with enough points for smooth spline fits
+        def f(u, v):
+            return u * np.cos(u * v) + v * np.sin(u * v)
+
+        def df(u, v):
+            return (-u * v * np.sin(u * v) + v**2 * np.cos(u * v) +
+                    np.cos(u * v),
+                    -u**2 * np.sin(u * v) + u * v * np.cos(u * v) +
+                    np.sin(u * v))
+
+        # uniformly spaced axis
+        u = np.linspace(0, 3, 50)
+        # randomly spaced axis
+        np.random.seed(7590)
+        v = np.random.uniform(0, 3, 50)
+        v.sort()
+
+        points = [u, v]
+        values = f(*np.meshgrid(*points, indexing='ij'))
+        return points, values, f, df
+
+    def _get_sample_4d_large(self):
+        def f(x, y, z, w):
+            return x**2 + y**2 + z**2 + w**2
+        X = np.linspace(-10, 10, 6)
+        Y = np.linspace(-10, 10, 7)
+        np.random.seed(0)
+        Z = np.random.uniform(-10, 10, 6)
+        Z.sort()
+        W = np.linspace(-10, 10, 8)
+        points = [X, Y, Z, W]
+        values = f(*np.meshgrid(*points, indexing='ij'))
+        return points, values
+
+    def test_2d(self):
+        # test interpolated values
+        points, values, func, df = self._get_sample_2d()
+        np.random.seed(1)
+        X, Y = np.meshgrid(*points, indexing='ij')
+        X = X.ravel()
+        Y = Y.ravel()
+        grid = np.array([X, Y]).T
+
+        test_pt = np.random.uniform(0, 3, 2)
+        actual = func(*test_pt)
+        for method in self.interp_methods:
+            interp = InterpNDSemi(grid, values.ravel(), method=method)
+            computed = interp.interpolate(test_pt)
+            r_err = rel_error(actual, computed)
+            assert r_err < self.tol[method]
+
+    def test_minimum_required_gridsize(self):
+        for method in self.interp_methods:
+
+            k = self.interp_configs[method] - 1
+            x = np.linspace(0, 1, k)
+            y = np.linspace(0, 1, k)
+
+            points = [x, y]
+            X, Y = np.meshgrid(*points, indexing='ij')
+            X = X.ravel()
+            Y = Y.ravel()
+            values = X + Y
+            grid = np.array([X, Y]).T
+            with self.assertRaises(ValueError) as cm:
+                interp = InterpNDSemi(grid, values, method=method)
+
+            msg = 'There are {} points in a data dimension, but method'.format(k)
+            self.assertTrue(str(cm.exception).startswith(msg))
+
+    def test_NaN_exception(self):
+        np.random.seed(1234)
+        x = np.linspace(0, 2, 5)
+        y = np.linspace(0, 1, 7)
+        points = [x, y]
+        X, Y = np.meshgrid(*points, indexing='ij')
+        X = X.ravel()
+        Y = Y.ravel()
+        grid = np.array([X, Y]).T
+        values = np.random.rand(5, 7).ravel()
+        interp = InterpNDSemi(grid, values, method='slinear', extrapolate=False)
+
+        with self.assertRaises(OutOfBoundsError) as cm:
+            interp.interpolate(np.array([1, np.nan]))
+
+        err = cm.exception
+
+        self.assertEqual(str(err), 'One of the requested xi contains a NaN')
+        self.assertEqual(err.idx, 1)
+        self.assertTrue(np.isnan(err.value))
+
+    def test_error_messages(self):
+        points, values = self._get_sample_4d_large()
+        X, Y, Z, W = np.meshgrid(*points, indexing='ij')
+        X = X.ravel()
+        Y = Y.ravel()
+        Z = Z.ravel()
+        W = W.ravel()
+        grid = np.array([X, Y, Z, W]).T
+        values = values.ravel()
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpNDSemi(grid, values, method='junk')
+
+        msg = ('Interpolation method "junk" is not defined. Valid methods are')
+        self.assertTrue(cm.exception.args[0].startswith(msg))
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpNDSemi(grid, values, method=points)
+
+        msg = ("Argument 'method' should be a string.")
+        self.assertTrue(cm.exception.args[0].startswith(msg))
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpNDSemi(grid, values[:-1], method='slinear')
+
+        msg = ('There are 2016 point arrays, but 2015 values.')
+        self.assertEqual(cm.exception.args[0], msg)
+
+        badgrid = deepcopy(grid)
+        badgrid[0][0] = -6.0
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpNDSemi(badgrid, values, method='slinear')
+
+        msg = ('The points in dimension 0 must be strictly ascending.')
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(KeyError) as cm:
+            interp = InterpNDSemi(grid, values, method='slinear', bad_arg=1)
+
+        msg = ("Option 'bad_arg' cannot be set because it has not been declared.")
+        self.assertTrue(cm.exception.args[0].endswith(msg))
+
 
 
 class TestInterpNDPython(unittest.TestCase):
@@ -619,7 +775,7 @@ class TestInterpNDPython(unittest.TestCase):
         msg = ('There are 4 points and 6 values in dimension 0')
         self.assertEqual(str(cm.exception), msg)
 
-        badvalues = np.array(values, dtype=np.complex)
+        badvalues = np.array(values, dtype=complex)
         with self.assertRaises(ValueError) as cm:
             interp = InterpND(method='slinear', points=badpoints, values=badvalues.tolist())
 
@@ -648,6 +804,7 @@ class TestInterpNDPython(unittest.TestCase):
 
         msg = "Either 'values' or 'x_interp' must be specified."
         self.assertTrue(str(cm.exception).startswith(msg))
+
 
 if __name__ == '__main__':
     unittest.main()

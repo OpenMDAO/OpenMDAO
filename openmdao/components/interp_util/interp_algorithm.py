@@ -1,6 +1,9 @@
 """
 Base class for interpolation methods.  New methods should inherit from this class.
 """
+import numpy as np
+
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
@@ -232,5 +235,252 @@ class InterpAlgorithm(object):
         ndarray
             Derivative of interpolated values with respect to grid for this and subsequent table
             dimensions.
+        """
+        pass
+
+
+class InterpAlgorithmSemi(object):
+    """
+    Base class for interpolation over semi structured data in an n-dimensional table.
+
+    For semi structured data, this class represents a single dimension. However, every point in
+    this dimension has its own InterpAlgorithmSemi object that interpolates the subsequent
+    dimensions.
+
+    Attributes
+    ----------
+    idim : int
+        Integer corresponding to table depth. Use for error messages.
+    extrapolate : bool
+        When False, raise an error if extrapolation occurs in this dimension.
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension.
+    k : int
+        Minimum number of points required for this algorithm.
+    last_index : integer
+        Index of previous evaluation, used to start search for current index.
+    options : <OptionsDictionary>
+        Dictionary with general pyoptsparse options.
+    subtables : list of <InterpAlgorithmSemi>
+        Table interpolation that handles child dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    _compute_d_dvalues : bool
+        When set to True, compute gradients with respect to the table values.
+    _idx : list
+        Maps values to their indices in the training data input. Used when _compute_d_dvalues
+        is True.
+    _name : str
+        Algorithm name for error messages.
+    """
+
+    def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
+                 idim=0, **kwargs):
+        """
+        Initialize table and subtables.
+
+        Parameters
+        ----------
+        grid : tuple(ndarray)
+            Tuple containing ndarray of x grid locations for each table dimension.
+        values : ndarray
+            Array containing the values at all points in grid.
+        interp : class
+            Interpolation class to be used for subsequent table dimensions.
+        extrapolate : bool
+            When False, raise an error if extrapolation occurs in this dimension.
+        compute_d_dvalues : bool
+            When True, compute gradients with respect to the table values.
+        idx : list or None
+            Maps values to their indices in the training data input. Only used during recursive
+            calls.
+        idim : int
+            Integer corresponding to table depth. Used for error messages.
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
+        """
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
+        self.initialize()
+        self.options.update(kwargs)
+
+        self.values = values
+        self.extrapolate = extrapolate
+        self.idim = idim
+        self._compute_d_dvalues = compute_d_dvalues
+
+        if len(grid.shape) > 1 and grid.shape[1] > 1:
+
+            if np.any(np.diff(grid[:, 0]) < 0.):
+                msg = f"The points in dimension {idim} must be strictly ascending."
+                raise ValueError(msg)
+
+            # Build hieararchy of subtables.
+            subtables = []
+            i_pt = grid[0, 0]
+            if idx is None:
+                idx = [item for item in range(len(values))]
+
+            i0, i1 = 0, 1
+            sub_idx = [idx[0]]
+            for point, jj in zip(grid[1:], idx[1:]):
+                if point[0] != i_pt:
+                    newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
+                                      idim=idim + 1, extrapolate=extrapolate,
+                                      compute_d_dvalues=compute_d_dvalues, **kwargs)
+                    subtables.append(newtable)
+                    i0 = i1
+                    i_pt = point[0]
+                    sub_idx = []
+
+                i1 += 1
+                sub_idx.append(jj)
+
+            newtable = interp(grid[i0:i1, 1:], values[i0:i1], interp, idx=sub_idx,
+                              idim=idim + 1, extrapolate=extrapolate,
+                              compute_d_dvalues=compute_d_dvalues, **kwargs)
+            subtables.append(newtable)
+
+            self.subtables = subtables
+            self.grid = np.unique(grid[:, 0])
+        else:
+            # A "leaf" of the hierarchy.
+            self.grid = grid
+            self.subtables = None
+            self._idx = idx if idx is not None else np.arange(len(values))
+
+            if not np.all(np.diff(grid) > 0.):
+                msg = f"The points in dimension {idim} must be strictly ascending."
+                raise ValueError(msg)
+
+        self.last_index = 0
+        self.k = None
+        self._name = None
+
+    def initialize(self):
+        """
+        Declare options.
+
+        Override to add options.
+        """
+        pass
+
+    def check_config(self):
+        """
+        Verify that we have enough points for this interpolation algorithm.
+        """
+        if self.subtables:
+            for subtable in self.subtables:
+                subtable.check_config()
+        k = self.k
+        n_p = len(self.grid)
+        if n_p < k:
+            raise ValueError("There are %d points in a data dimension,"
+                             " but method %s requires at least %d "
+                             "points per dimension."
+                             "" % (n_p, self._name, k + 1))
+
+    def bracket(self, x):
+        """
+        Locate the interval of the new independent.
+
+        Uses the following algorithm:
+           1. Determine if the value is above or below the value at last_index
+           2. Bracket the value between last_index and last_index +- inc, where
+              inc has an increasing value of 1,2,4,8, etc.
+           3. Once the value is bracketed, use bisection method within that bracket.
+
+        The grid is assumed to increase in a monotonic fashion.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        integer
+            Grid interval index that contains x.
+        integer
+            Extrapolation flag, -1 if the bracket is below the first table element, 1 if the
+            bracket is above the last table element, 0 for normal interpolation.
+        """
+        grid = self.grid
+        last_index = self.last_index
+        high = last_index + 1
+        highbound = len(grid) - 1
+        inc = 1
+
+        while x < grid[last_index]:
+            high = last_index
+            last_index -= inc
+            if last_index < 0:
+                last_index = 0
+
+                # Check if we're off of the bottom end.
+                if x < grid[0]:
+                    if not self.extrapolate:
+                        msg = f"Extrapolation while evaluation dimension {self.idim}."
+                        raise OutOfBoundsError(msg, self.idim, x, grid[0], grid[-1])
+
+                    return last_index, -1
+                break
+
+            inc += inc
+
+        if high > highbound:
+            high = highbound
+
+        while x > grid[high]:
+            last_index = high
+            high += inc
+            if high >= highbound:
+
+                # Check if we're off of the top end
+                if x > grid[highbound]:
+                    if not self.extrapolate:
+                        msg = f"Extrapolation while evaluation dimension {self.idim}."
+                        raise OutOfBoundsError(msg, self.idim, x, grid[0], grid[-1])
+
+                    last_index = highbound
+                    return last_index, 1
+
+                high = highbound
+                break
+            inc += inc
+
+        # Bisection
+        while high - last_index > 1:
+            low = (high + last_index) // 2
+            if x < grid[low]:
+                high = low
+            else:
+                last_index = low
+
+        return last_index, 0
+
+    def interpolate(self, x):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x : ndarray
+            Coordinate of the point being interpolated. First element is component in this
+            dimension. Remaining elements are interpolated on sub tables.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        bool
+            True if the coordinate is extrapolated in this dimension.
         """
         pass
