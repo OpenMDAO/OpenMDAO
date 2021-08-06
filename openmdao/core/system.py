@@ -1522,7 +1522,6 @@ class System(object):
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
                     mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
-
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -5219,24 +5218,20 @@ class System(object):
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs
         high_dims = meta['shape'][1:]
-        if high_dims:
-            high_size = np.prod(high_dims)
+        with multi_proc_exception_check(self.comm):
+            if high_dims:
+                high_size = np.prod(high_dims)
 
-            dim_size_match = bool(global_size % high_size == 0)
-            with multi_proc_exception_check(self.comm):
+                dim_size_match = bool(global_size % high_size == 0)
                 if dim_size_match is False:
                     raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
-                                       "shape's local parts in a distributed variable must match "
-                                       f"across processes. For output '{abs_name}', local shape "
-                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                       "higher dimension that differs in another rank.")
+                                    "shape's local parts in a distributed variable must match "
+                                    f"across processes. For output '{abs_name}', local shape "
+                                    f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                    "higher dimension that differs in another rank.")
 
-            dim1 = global_size // high_size
-            if global_size % high_size != 0:
-                raise RuntimeError("%s: Global size of variable '%s' (%s) does not agree "
-                                   "with local shape %s" % (self.msginfo, abs_name,
-                                                            global_size, meta['shape']))
-            return tuple([dim1] + list(high_dims))
+                dim1 = global_size // high_size
+                return tuple([dim1] + list(high_dims))
 
         return (global_size,)
 
