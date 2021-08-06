@@ -1574,8 +1574,9 @@ def _update_new_style(src_indices, new_style, prefix=""):
         if isinstance(src_indices, tuple):
             for part in src_indices:
                 if part is ... or isinstance(part, slice):
-                    warn_deprecation(f"{prefix}: 'src_indices' have been specified in a"
-                                     " deprecated format.  In a future release, 'src_indices'"
-                                     " will be expected to use NumPy array indexing.")
                     return True
+            warn_deprecation(f"{prefix}: 'src_indices={src_indices}' is specified in"
+                             " a deprecated format. In a future release, 'src_indices'"
+                             " will be expected to use NumPy array indexing.")
+
     return new_style

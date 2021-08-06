@@ -14,11 +14,10 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.general_utils import ignore_errors_context
-from openmdao.utils.om_warnings import reset_warning_registry, PromotionWarning
+from openmdao.utils.om_warnings import PromotionWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -673,7 +672,7 @@ class TestGroup(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
-        
+
         msg = "<class Group>: When promoting ['a'] from 'comp1': Can't use multdimensional index into a flat source."
 
         with self.assertRaises(Exception) as context:
@@ -1443,8 +1442,6 @@ class TestGroupMPISlice(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp1())
         p.model.connect('indep.x', 'C1.x')
 
-        #import wingdbstub
-        
         p.setup()
         p.run_model()
 
