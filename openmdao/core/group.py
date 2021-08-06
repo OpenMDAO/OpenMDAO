@@ -2210,14 +2210,14 @@ class Group(System):
 
         else:
             if src_indices is not None:
-                new_style_idx = _update_new_style(src_indices, new_style_idx)
+                promoted = inputs if inputs else any
+                err_prefix = f"{self.msginfo}: When promoting {promoted} from '{subsys_name}'"
+                new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
                 try:
                     src_indices = indexer(src_indices, flat=flat_src_indices,
                                           new_style=new_style_idx)
                 except Exception as err:
-                    promoted = inputs if inputs else any
-                    raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
-                                        f"'{subsys_name}': {err}")
+                    raise err.__class__(f"{err_prefix}: {err}")
 
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2412,12 +2412,12 @@ class Group(System):
             return
 
         if src_indices is not None:
-            new_style_idx = _update_new_style(src_indices, new_style_idx)
+            err_prefix = f"{self.msginfo}: When connecting from '{src_name}' to '{tgt_name}'"
+            new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
                 src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
             except Exception as err:
-                raise err.__class__(f"{self.msginfo}: When connecting from '{src_name}' to "
-                                    f"'{tgt_name}': {err}")
+                raise err.__class__(f"{err_prefix}: {err}")
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:

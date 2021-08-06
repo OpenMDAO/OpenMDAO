@@ -7,6 +7,7 @@ import numpy as np
 from numbers import Integral
 
 from openmdao.utils.general_utils import shape2tuple
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 def array2slice(arr):
@@ -1568,10 +1569,13 @@ slicer = Slicer()
 
 
 # TODO: remove this when the 'new_style' src_indices arg is removed
-def _update_new_style(src_indices, new_style):
+def _update_new_style(src_indices, new_style, prefix=""):
     if not new_style:
         if isinstance(src_indices, tuple):
             for part in src_indices:
                 if part is ... or isinstance(part, slice):
+                    warn_deprecation(f"{prefix}: 'src_indices' have been specified in a"
+                                     " deprecated format.  In a future release, 'src_indices'"
+                                     " will be expected to use NumPy array indexing.")
                     return True
     return new_style

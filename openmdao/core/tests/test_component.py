@@ -93,7 +93,8 @@ class TestExplicitComponent(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, msg):
             comp.add_output('x', val=val)
 
-        msg = "Error when specifying src_indices for input 'x': Can't create an index array using indices of non-integral type 'object_'."
+        msg = "When specifying src_indices for input 'x': Can't create an index array " \
+              "using indices of non-integral type 'object_'."
         src = Component
 
         with self.assertRaisesRegex(TypeError, msg):

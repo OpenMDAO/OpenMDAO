@@ -483,12 +483,12 @@ class Component(System):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
         if src_indices is not None:
-            new_style_idx = _update_new_style(src_indices, new_style_idx)
+            err_prefix = f"{self.msginfo}: When specifying src_indices for input '{name}'"
+            new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
                 src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
             except Exception as err:
-                raise TypeError(f"{self.msginfo}: Error when specifying src_indices for input "
-                                f"'{name}': {err}")
+                raise TypeError(f"{err_prefix}: {err}")
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
