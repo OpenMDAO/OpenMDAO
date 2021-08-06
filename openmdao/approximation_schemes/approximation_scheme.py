@@ -456,7 +456,7 @@ class ApproximationScheme(object):
                     # run the finite difference
                     result = self._run_point(system, [(vec, vecidxs)],
                                              app_data, results_array, total_or_semi,
-                                             jcol_idxs[0])
+                                             jcol_idxs)
 
                     result = self._transform_result(result)
 

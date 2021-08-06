@@ -181,30 +181,34 @@ class FiniteDifference(ApproximationScheme):
         fd_form = _generate_fd_coeff(form, order, system)
 
         if step_calc != 'abs':
-            if system._inputs._contains_abs(wrt):
+            var_local = True
+            if system._outputs._contains_abs(wrt):
+                wrt_val = system._outputs._abs_get_val(wrt)
+            elif system._inputs._contains_abs(wrt):
                 wrt_val = system._inputs._abs_get_val(wrt)
             else:
-                wrt_val = system._outputs._abs_get_val(wrt)
+                var_local = False
 
-            # TODO - behavior or 'rel' will switch to 'rel_avg' in an upcoming release.
-            if step_calc == 'rel_legacy' or step_calc == 'rel':
-                step *= np.linalg.norm(wrt_val)
+            if var_local:
+                # TODO - behavior or 'rel' will switch to 'rel_avg' in an upcoming release.
+                if step_calc == 'rel_legacy' or step_calc == 'rel':
+                    step *= np.linalg.norm(wrt_val)
 
-                if step < minimum_step:
-                    step = minimum_step
+                    if step < minimum_step:
+                        step = minimum_step
 
-            elif step_calc == 'rel_avg':
-                step *= np.sum(np.abs(wrt_val)) / len(wrt_val)
+                elif step_calc == 'rel_avg':
+                    step *= np.sum(np.abs(wrt_val)) / len(wrt_val)
 
-                if step < minimum_step:
-                    step = minimum_step
+                    if step < minimum_step:
+                        step = minimum_step
 
-            else:  # 'rel_element'
-                step = np.abs(wrt_val) * step
+                else:  # 'rel_element'
+                    step = np.abs(wrt_val) * step
 
-                idx_zero = np.where(step < minimum_step)
-                if idx_zero:
-                    step[idx_zero] = minimum_step
+                    idx_zero = np.where(step < minimum_step)
+                    if idx_zero:
+                        step[idx_zero] = minimum_step
 
         if step_calc == 'rel_element':
             step_divide = 1.0 / step
@@ -316,9 +320,10 @@ class FiniteDifference(ApproximationScheme):
         deltas, coeffs, current_coeff = data
         rel_element = False
 
-        if isinstance(current_coeff, np.ndarray):
+        if isinstance(current_coeff, np.ndarray) and current_coeff.size > 0:
             # rel_element - each element has its own relative step.
             rel_element = True
+
             if current_coeff[0]:
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
@@ -326,7 +331,8 @@ class FiniteDifference(ApproximationScheme):
 
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
-                        results_array *= current_coeff[idxs - idx_start]
+
+                        results_array *= current_coeff[idxs - idx_start[0]]
                         # We don't allow mixed fd forms, so first one is all we need.
                         break
 
@@ -349,7 +355,7 @@ class FiniteDifference(ApproximationScheme):
             if rel_element:
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
-                        results *= coeff[idxs - idx_start]
+                        results *= coeff[idxs - idx_start[0]]
                         break
             else:
                 results *= coeff
@@ -387,7 +393,7 @@ class FiniteDifference(ApproximationScheme):
 
                 # Support rel_element stepsizing
                 if rel_element:
-                    local_delta = delta[idxs - idx_start]
+                    local_delta = delta[idxs - idx_start[0]]
                 else:
                     local_delta = delta
 
