@@ -191,7 +191,7 @@ def multi_proc_exception_check(comm):
     """
     Raise an exception on all procs if it is raised on one.
 
-    Exception raised with be the one from the lowest rank where an exception occurred.
+    Exception raised will be the one from the lowest rank where an exception occurred.
 
     Wrap this around code that you want to globally fail if it fails
     on any MPI process in comm.  If not running under MPI, don't
