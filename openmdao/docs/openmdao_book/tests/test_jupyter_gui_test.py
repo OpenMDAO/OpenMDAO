@@ -1,4 +1,4 @@
-"""Test Jupyter Book docs using Playwright."""
+"""Test Jupyter doc GUI mods specific to OpenMDAO using Playwright."""
 import unittest
 import os
 import sys

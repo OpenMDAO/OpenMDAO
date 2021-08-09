@@ -1,4 +1,4 @@
-"""Test N2 GUI with multiple models using Playwright."""
+"""Test Jupyter doc GUI mods specific to OpenMDAO using Playwright."""
 import asyncio
 from aiounittest import async_test
 import http.server
@@ -13,8 +13,6 @@ from playwright.async_api import async_playwright
 if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-my_loop = asyncio.get_event_loop()
 
 HEADLESS = True  # Set to False if you want to see the browser
 PORT = 8010
