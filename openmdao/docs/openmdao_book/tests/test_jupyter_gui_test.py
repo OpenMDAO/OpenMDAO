@@ -1,12 +1,12 @@
+"""Test Jupyter Book docs using Playwright."""
 import unittest
-import pathlib
+import os
+import sys
 
+# Playwright requires Python 3.7 or higher
+if sys.version_info >= (3, 7):
+    os.system("playwright install")
+    from .jupyter_gui_test import TestOpenMDAOJupyterBookDocs
 
-@unittest.skipUnless(pathlib.Path(__file__).parent.parent.joinpath("_build").exists(), "Cannot test without docs being built")
-class JupyterBookGuiTestCases(unittest.TestCase):
-    """
-    Use a GUI testing tool to test functionality of the docs.
-    """
-    def test_include_source_docs_option(self):
-        a = 1/1
-        pass
+    if __name__ == "__main__":
+        unittest.main()
