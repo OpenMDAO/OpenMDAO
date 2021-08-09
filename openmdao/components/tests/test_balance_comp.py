@@ -855,5 +855,12 @@ class TestBalanceComp(unittest.TestCase):
         self.assertTrue(p.get_val('bal.rhs:x').shape == init.shape)
 
 
+    def test_multidimentional_shape_normalize(self):
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0, shape=(5,3))
+
+
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
