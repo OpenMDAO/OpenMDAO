@@ -114,9 +114,6 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        # Assert that normalization is happening
-        assert_almost_equal(prob.model.balance._scale_factor, 1.0 / np.abs(2))
-
         cpd = prob.check_partials(out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
@@ -173,8 +170,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.run_model()
 
         assert_almost_equal(prob['balance.x'], np.sqrt(1.5), decimal=7)
-
-        assert_almost_equal(prob.model.balance._scale_factor, 1.0)
 
         cpd = prob.check_partials(out_stream=None)
 
