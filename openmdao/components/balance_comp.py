@@ -193,11 +193,6 @@ class BalanceComp(ImplicitComponent):
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
-        if inputs._under_complex_step:
-            self._dscale_drhs = self._dscale_drhs.astype(complex)
-        else:
-            self._dscale_drhs = self._dscale_drhs.real
-
         for name, options in self._state_vars.items():
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
@@ -231,7 +226,7 @@ class BalanceComp(ImplicitComponent):
                 mult = 1.0
 
             # Partials of residual wrt rhs
-            deriv = (mult * lhs - rhs) * self._dscale_drhs - _scale_factor
+            deriv = (mult * lhs - rhs) * _dscale_drhs - _scale_factor
             jacobian[name, rhs_name] = deriv.flatten()
 
             # Partials of residual wrt lhs

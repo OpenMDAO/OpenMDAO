@@ -859,7 +859,37 @@ class TestBalanceComp(unittest.TestCase):
         prob = om.Problem()
 
         bal = om.BalanceComp()
-        bal.add_balance('x', val=1.0, shape=(5,3))
+        bal.add_balance('x', use_mult=True, shape=(5,3))
+        bal.add_balance('z', val=4*np.ones(5,), shape=(5,))
+
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones((5,3)), 'shape': (5,3)}, y={'val': np.ones((5,3)), 'shape': (5,3)})
+        exec_comp2 = om.ExecComp('y=x**2', x={'val': np.ones((5,)), 'shape': (5,)}, y={'val': np.ones((5,)), 'shape': (5,)})
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        prob.model.add_subsystem(name='exec2', subsys=exec_comp2)
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.connect('balance.z', 'exec2.x')
+        prob.model.connect('exec2.y', 'balance.rhs:z')
+
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+
+        prob.setup()
+
+        prob.set_val('balance.rhs:x', np.ones((5,3)))
+        prob.set_val('balance.mult:x', np.ones((5,3)))
+
+        prob['balance.x'] = 1.0
+
+        prob.run_model()
+
+        cpd = prob.check_partials(out_stream=None)
+
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
 
 if __name__ == '__main__':  # pragma: no cover
