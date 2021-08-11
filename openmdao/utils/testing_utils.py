@@ -196,8 +196,17 @@ class MissingImports(object):
                 raise ImportError(f'No module named {name} due to missing import {mi}.')
         return self._cached_import(name, globals, locals, fromlist, level)
 
-    def __exit__(self):
+    def __exit__(self, type, value, traceback):
         """
-        Set builtins import.
+        Exit the runtime context related to this object.
+
+        Parameters
+        ----------
+        type : Exception class
+            The type of the exception.
+        value : Exception instance
+            The exception instance raised.
+        traceback : regex pattern
+            Traceback object.
         """
         builtins.__import__ = self._cached_import
