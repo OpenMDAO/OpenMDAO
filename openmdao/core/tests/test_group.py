@@ -519,6 +519,40 @@ class TestGroup(unittest.TestCase):
                          "<model> <class Group>: src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
+    def test_compatible_src_indices(self):
+        class ControlInterpComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_output('x', shape=(3, 2))
+
+        class CollocationComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', shape=(1, 2))
+
+        class Phase(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', ControlInterpComp())
+                self.add_subsystem('comp2', CollocationComp())
+
+                self.connect('comp1.x', 'comp2.x', src_indices=[1])
+
+        p = om.Problem()
+
+        p.model.add_subsystem('phase', Phase())
+
+        p.setup()
+
+        p['phase.comp1.x'] = np.resize(range(6), (3,2))
+
+        p.run_model()
+
+        p.model.list_outputs(hierarchical=False, print_arrays=True)
+        p.model.list_inputs(hierarchical=False, print_arrays=True)
+
+        self.assertEqual(p['phase.comp2.x'], np.array([2., 3.]))
+
     def test_incompatible_src_indices_error(self):
         class ControlInterpComp(om.ExplicitComponent):
 
