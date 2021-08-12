@@ -150,8 +150,10 @@ class MissingImports(object):
     Each import is checked to see if it starts with a missing import.
 
     For instance:
-    with MissingImports('matplotlib'):
-        from matplotlib.pyplot import plt
+
+    >>> with MissingImports('matplotlib'):
+    >>>    from matplotlib.pyplot import plt
+
     will fail because 'matplotlib.pyplot'.startswith('matplotlib') is True.
 
     This implementation modifies builtins.__import__ which is allowed but highly
