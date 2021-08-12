@@ -207,6 +207,20 @@ class PhysicalUnit(object):
     factor, and the exponentials of each of the SI base units that enter into
     it. Units can be multiplied, divided, and raised to integer powers.
 
+    Parameters
+    ----------
+    names : dict or str
+        A dictionary mapping each name component to its
+        associated integer power (e.g., C{{'m': 1, 's': -1}})
+        for M{m/s}). As a shorthand, a string may be passed
+        which is assigned an implicit power 1.
+    factor : float
+        A scaling factor.
+    powers : list of int
+        The integer powers for each of the nine base units.
+    offset : float
+        An additive offset to the base unit (used only for temperatures).
+
     Attributes
     ----------
     _names : dict or str
@@ -225,20 +239,6 @@ class PhysicalUnit(object):
     def __init__(self, names, factor, powers, offset=0):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        names : dict or str
-            A dictionary mapping each name component to its
-            associated integer power (e.g., C{{'m': 1, 's': -1}})
-            for M{m/s}). As a shorthand, a string may be passed
-            which is assigned an implicit power 1.
-        factor : float
-            A scaling factor.
-        powers : list of int
-            The integer powers for each of the nine base units.
-        offset : float
-            An additive offset to the base unit (used only for temperatures).
         """
         if isinstance(names, str):
             self._names = NumberDict(((names, 1),))
@@ -454,7 +454,7 @@ class PhysicalUnit(object):
         Returns
         -------
         PhysicalUnit
-            the equivalent base unit
+            The equivalent base unit.
         """
         num = ''
         denom = ''
@@ -524,7 +524,7 @@ class PhysicalUnit(object):
         Returns
         -------
         bool
-            indicates if two units are compatible
+            Indicates if two units are compatible.
         """
         return self._powers == other._powers
 
@@ -535,7 +535,7 @@ class PhysicalUnit(object):
         Returns
         -------
         bool
-            indicates if this is dimensionless
+            Indicates if this is dimensionless.
         """
         return not any(self._powers)
 
@@ -546,7 +546,7 @@ class PhysicalUnit(object):
         Returns
         -------
         bool
-            indicates if this an angle type
+            Indicates if this an angle type.
         """
         return (self._powers[_UNIT_LIB.base_types['angle']] == 1 and
                 sum(self._powers) == 1)
@@ -558,7 +558,7 @@ class PhysicalUnit(object):
         Parameters
         ----------
         name : str
-            the name
+            The name.
         """
         self._names = NumberDict()
         self._names[name] = 1
@@ -570,7 +570,7 @@ class PhysicalUnit(object):
         Returns
         -------
         str
-            str representation of the unit
+            String representation of the unit.
         """
         num = ''
         denom = ''
@@ -618,15 +618,15 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
     Parameters
     ----------
     name : str
-        The name of the unit
+        The name of the unit.
     baseunit : str or instance of PhysicalUnit
         The unit upon which this offset unit is based.
     factor : str
-        The scaling factor used to define the new unit w.r.t. baseunit
+        The scaling factor used to define the new unit w.r.t. base unit.
     offset : float
-        zero offset for new unit
+        Zero offset for new unit.
     comment : str
-        optional comment to describe unit
+        Optional comment to describe unit.
     """
     if isinstance(baseunit, str):
         baseunit = _find_unit(baseunit)
@@ -652,11 +652,11 @@ def add_unit(name, unit, comment=''):
     Parameters
     ----------
     name : str
-        The name of the unit being added. For example: 'Hz'
+        The name of the unit being added. For example: 'Hz'.
     unit : str
-        definition of the unit w.r.t. some other unit.  For example: '1/s'
+        Definition of the unit w.r.t. some other unit.  For example: '1/s'.
     comment : str
-        optional comment to describe unit
+        Optional comment to describe unit.
     """
     if comment:
         _UNIT_LIB.help.append((name, comment, unit))
@@ -706,12 +706,12 @@ def import_library(libfilepointer):
     Parameters
     ----------
     libfilepointer : file
-        new library file to work with
+        New library file to work with.
 
     Returns
     -------
     ConfigParser
-        newly updated units library for the module
+        Newly updated units library for the module.
     """
     global _UNIT_LIB
     global _UNIT_CACHE
@@ -983,14 +983,14 @@ def is_compatible(old_units, new_units):
     Parameters
     ----------
     old_units : str
-        original units as a string.
+        Original units as a string.
     new_units : str or None
-        new units to return the value in; if None, return in standard units.
+        New units to return the value in; if None, return in standard units.
 
     Returns
     -------
     bool
-        whether the units are compatible.
+        Whether the units are compatible.
     """
     if not old_units and not new_units:  # dimensionless
         return True
@@ -1008,14 +1008,14 @@ def unit_conversion(old_units, new_units):
     Parameters
     ----------
     old_units : str
-        original units as a string.
+        Original units as a string.
     new_units : str
-        new units to return the value in.
+        New units to return the value in.
 
     Returns
     -------
     (float, float)
-        Conversion factor and offset
+        Conversion factor and offset.
     """
     return _find_unit(old_units, error=True).conversion_tuple_to(_find_unit(new_units, error=True))
 
@@ -1027,14 +1027,14 @@ def get_conversion(old_units, new_units):
     Parameters
     ----------
     old_units : str
-        original units as a string.
+        Original units as a string.
     new_units : str
-        new units to return the value in.
+        New units to return the value in.
 
     Returns
     -------
     (float, float)
-        Conversion factor and offset
+        Conversion factor and offset.
     """
     warn_deprecation("'get_conversion' has been deprecated. Use "
                      "'unit_conversion' instead.")
@@ -1049,16 +1049,16 @@ def convert_units(val, old_units, new_units=None):
     Parameters
     ----------
     val : float
-        value in original units.
+        Value in original units.
     old_units : str or None
-        original units as a string or None.
+        Original units as a string or None.
     new_units : str or None
-        new units to return the value in or None.
+        New units to return the value in or None.
 
     Returns
     -------
     float
-        value in new units.
+        Value in new units.
     """
     if not old_units or not new_units:  # one side has no units
         return val

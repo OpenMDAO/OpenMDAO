@@ -59,7 +59,7 @@ def use_tempdirs(cls):
     tearDown method, and then returns to the original starting directory
     and deletes the temporary directory.
 
-    Parameters
+    Attributes
     ----------
     cls : TestCase
         TestCase being decorated to use a tempdir for each test.

@@ -14,14 +14,14 @@ def check_valid(name, value):
     Parameters
     ----------
     name : str
-        name of the option
+        Name of the option.
     value : any
-        value for the option
+        Value for the option.
 
     Raises
     ------
     ValueError
-        if value is not valid for option
+        If value is not valid for option.
     """
     raise ValueError(f"Option '{name}' with value {value} is not valid.")
 
@@ -34,6 +34,13 @@ class OptionsDictionary(object):
         1. the options attribute in solvers, drivers, and processor allocators
         2. the supports attribute in drivers
         3. the options attribute in systems
+
+    Parameters
+    ----------
+    parent_name : str
+        Name or class name of System that owns this OptionsDictionary.
+    read_only : bool
+        If True, setting (via __setitem__ or update) is not permitted.
 
     Attributes
     ----------
@@ -53,13 +60,6 @@ class OptionsDictionary(object):
     def __init__(self, parent_name=None, read_only=False):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        parent_name : str
-            Name or class name of System that owns this OptionsDictionary
-        read_only : bool
-            If True, setting (via __setitem__ or update) is not permitted.
         """
         self._dict = {}
         self._parent_name = parent_name
@@ -319,10 +319,10 @@ class OptionsDictionary(object):
         allow_none : bool
             If True, allow None as a value regardless of values or types.
         recordable : bool
-            If True, add to recorder
+            If True, add to recorder.
         deprecation : str or None
             If None, it is not deprecated. If a str, use as a DeprecationWarning
-            during __setitem__ and __getitem__
+            during __setitem__ and __getitem__.
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
@@ -373,7 +373,6 @@ class OptionsDictionary(object):
         ----------
         name : str
             The name of a key, the entry of which will be removed from the internal dictionary.
-
         """
         if name in self._dict:
             del self._dict[name]
@@ -477,6 +476,13 @@ class OptionsDictionary(object):
     def items(self):
         """
         Yield name and value of options.
+
+        Yields
+        ------
+        key : str
+            Name of option.
+        value : int or bool or float or string
+            Value of the option.
         """
         for key, val in self._dict.items():
             try:
