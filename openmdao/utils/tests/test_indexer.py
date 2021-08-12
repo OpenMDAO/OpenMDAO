@@ -400,7 +400,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
 
     def test_flat_shaped_src_inds(self):
         src = np.arange(24).reshape((8,3))  # 2D source
-        ind = indexer([[1,3,5,4], [22, -4, 11, 3]], flat=True)
+        ind = indexer([[1,3,5,4], [22, -4, 11, 3]], flat_src=True)
 
         assert_equal(ind(), [[1,3,5,4], [22, -4, 11, 3]])
 

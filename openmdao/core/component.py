@@ -486,7 +486,8 @@ class Component(System):
             err_prefix = f"{self.msginfo}: When specifying src_indices for input '{name}'"
             new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
-                src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
+                src_indices = indexer(src_indices, flat_src=flat_src_indices,
+                                      new_style=new_style_idx)
             except Exception as err:
                 raise TypeError(f"{err_prefix}: {err}")
         if units is not None:
@@ -929,9 +930,7 @@ class Component(System):
                                            "supplied manually.")
 
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
-                if meta_in['shape'] != inds.shape:
-                    inds = inds.reshape(meta_in['shape'])
-                meta_in['src_indices'] = indexer(inds)
+                meta_in['src_indices'] = indexer(inds, flat_src=True)
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1574,7 +1573,7 @@ class Component(System):
                     meta['flat_src_indices'] = flat_src_inds
 
                 if not isinstance(src_inds, Indexer):
-                    meta['src_indices'] = indexer(src_inds, flat=flat_src_inds)
+                    meta['src_indices'] = indexer(src_inds, flat_src=flat_src_inds)
                 else:
                     meta['src_indices'] = src_inds.copy()
 

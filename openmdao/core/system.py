@@ -2406,7 +2406,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _create_indexer(self, indices, typename, vname, flat=False):
+    def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
         Return an Indexer instance and it's size if possible.
 
@@ -2418,7 +2418,7 @@ class System(object):
             Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
         vname : str
             Name of the variable.
-        flat : bool
+        flat_src : bool
             If True, indices index into a flat array.
 
         Returns
@@ -2434,7 +2434,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer(indices, flat=flat, new_style=True)
+            idxer = indexer(indices, flat_src=flat_src, new_style=True)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -2728,7 +2728,7 @@ class System(object):
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                index = indexer[index]
+                index = indexer(index, flat_src=True)
                 resp['size'] = 1
             resp['indices'] = index
 
@@ -4563,7 +4563,10 @@ class System(object):
                                            "from all processes using "
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
-                    val = val.ravel()[src_indices.flat()]
+                    if src_indices._flat_src:
+                        val = val.ravel()[src_indices.flat()]
+                    else:
+                        val = val[src_indices()]
 
             if get_remote and self.comm.size > 1:
                 if distrib:

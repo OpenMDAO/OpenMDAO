@@ -551,7 +551,7 @@ class TestGroup(unittest.TestCase):
         p.model.list_outputs(hierarchical=False, print_arrays=True)
         p.model.list_inputs(hierarchical=False, print_arrays=True)
 
-        self.assertEqual(p['phase.comp2.x'], np.array([2., 3.]))
+        np.testing.assert_allclose(p['phase.comp2.x'], np.array([[2., 3.]]))
 
     def test_incompatible_src_indices_error(self):
         class ControlInterpComp(om.ExplicitComponent):
@@ -2523,7 +2523,7 @@ class TestSrcIndices(unittest.TestCase):
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[4 5] [7 9]] exceeds bounds for axis of dimension 9."
 
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
@@ -2541,7 +2541,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[4 5] [7 9]] exceeds bounds for axis of dimension 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[4, 5], [7, 9]],
@@ -2558,7 +2558,7 @@ class TestSrcIndices(unittest.TestCase):
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[-10   5] [  7   8]] exceeds bounds for axis of dimension 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[[-10, 5], [7, 8]],

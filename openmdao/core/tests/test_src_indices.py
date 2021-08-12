@@ -349,7 +349,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
                          "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]] and "
-                         "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
+                         "source shape (3, 3): Indexer [[4 5] [7 9]] exceeds bounds for axis of dimension 9.")
 
     def test_connect_src_indices_deprecated(self):
         class MyComp(om.ExplicitComponent):

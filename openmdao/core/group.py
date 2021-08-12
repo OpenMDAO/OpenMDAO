@@ -70,7 +70,7 @@ class _PromotesInfo(object):
                 self.src_indices = src_indices.copy()
                 self.src_indices.set_src_shape(self.root_shape)
             else:
-                self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat=flat)
+                self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat_src=flat)
         else:
             self.src_indices = None
         self.parent_sys = None  # pathname of promoting system
@@ -2205,7 +2205,7 @@ class Group(System):
                 err_prefix = f"{self.msginfo}: When promoting {promoted} from '{subsys_name}'"
                 new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
                 try:
-                    src_indices = indexer(src_indices, flat=flat_src_indices,
+                    src_indices = indexer(src_indices, flat_src=flat_src_indices,
                                           new_style=new_style_idx)
                 except Exception as err:
                     raise err.__class__(f"{err_prefix}: {err}")
@@ -2406,7 +2406,8 @@ class Group(System):
             err_prefix = f"{self.msginfo}: When connecting from '{src_name}' to '{tgt_name}'"
             new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
-                src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
+                src_indices = indexer(src_indices, flat_src=flat_src_indices,
+                                      new_style=new_style_idx)
             except Exception as err:
                 raise err.__class__(f"{err_prefix}: {err}")
 

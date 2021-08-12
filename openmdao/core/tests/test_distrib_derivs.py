@@ -163,7 +163,7 @@ class MPITests2(unittest.TestCase):
                                                    x=np.zeros((9, 3)),
                                                    y=np.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
-        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:], flat_src_indices=True)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
