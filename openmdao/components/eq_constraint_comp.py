@@ -117,31 +117,25 @@ class EQConstraintComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        if inputs._under_complex_step:
-            self._scale_factor = self._scale_factor.astype(complex)
-        else:
-            self._scale_factor = self._scale_factor.real
-
         for name, options in self._output_vars.items():
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
+            _scale_factor = np.ones((rhs.shape))
 
             # Compute scaling factors
             # scale factor that normalizes by the rhs, except near 0
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
 
-                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
-                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
-            else:
-                self._scale_factor[:] = 1.0
+                _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
             if options['use_mult']:
-                outputs[name] = (inputs[options['mult_name']] * lhs - rhs) * self._scale_factor
+                outputs[name] = (inputs[options['mult_name']] * lhs - rhs) * _scale_factor
             else:
-                outputs[name] = (lhs - rhs) * self._scale_factor
+                outputs[name] = (lhs - rhs) * _scale_factor
 
     def compute_partials(self, inputs, partials):
         """
@@ -154,11 +148,6 @@ class EQConstraintComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        if inputs._under_complex_step:
-            self._dscale_drhs = self._dscale_drhs.astype(complex)
-        else:
-            self._dscale_drhs = self._dscale_drhs.real
-
         for name, options in self._output_vars.items():
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
@@ -166,37 +155,36 @@ class EQConstraintComp(ExplicitComponent):
             lhs = inputs[lhs_name]
             rhs = inputs[rhs_name]
 
+            _scale_factor = np.ones((rhs.shape))
+            _dscale_drhs = np.zeros((rhs.shape))
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(cs_safe.abs(rhs) < 2)[0]
-                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)[0]
+                idxs_nz = np.where(cs_safe.abs(rhs) < 2)
+                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
 
                 # scale factor that normalizes by the rhs, except near 0
-                self._scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
-                self._scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-                self._dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
-                self._dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
-            else:
-                self._scale_factor[:] = 1.0
-                self._dscale_drhs[:] = 0.0
+                _dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+                _dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
             if options['use_mult']:
                 mult_name = options['mult_name']
                 mult = inputs[mult_name]
 
                 # Partials of output wrt mult
-                deriv = lhs * self._scale_factor
+                deriv = lhs * _scale_factor
                 partials[name, mult_name] = deriv.flatten()
             else:
                 mult = 1.0
 
             # Partials of output wrt rhs
-            deriv = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
+            deriv = (mult * lhs - rhs) * _dscale_drhs - _scale_factor
             partials[name, rhs_name] = deriv.flatten()
 
             # Partials of output wrt lhs
-            deriv = mult * self._scale_factor
+            deriv = mult * _scale_factor
             partials[name, lhs_name] = deriv.flatten()
 
     def add_eq_output(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
@@ -291,9 +279,6 @@ class EQConstraintComp(ExplicitComponent):
             self.add_input(options['mult_name'],
                            val=options['mult_val'] * np.ones(shape),
                            units=None)
-
-        self._scale_factor = np.ones(shape)
-        self._dscale_drhs = np.ones(shape)
 
         ar = np.arange(np.prod(shape))
         self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)

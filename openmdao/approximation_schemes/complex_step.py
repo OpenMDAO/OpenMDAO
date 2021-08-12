@@ -170,7 +170,7 @@ class ComplexStep(ApproximationScheme):
         """
         return array.imag
 
-    def _run_point(self, system, idx_info, delta, result_array, total):
+    def _run_point(self, system, idx_info, delta, result_array, total, idx_start=0):
         """
         Perturb the system inputs with a complex step, run, and return the results.
 
@@ -186,6 +186,8 @@ class ComplexStep(ApproximationScheme):
             An array used to store the results.
         total : bool
             If True total derivatives are being approximated, else partials.
+        idx_start : int
+            Vector index of the first element of this wrt variable.
 
         Returns
         -------
