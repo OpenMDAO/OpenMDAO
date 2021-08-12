@@ -114,9 +114,6 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        # Assert that normalization is happening
-        assert_almost_equal(prob.model.balance._scale_factor, 1.0 / np.abs(2))
-
         cpd = prob.check_partials(out_stream=None)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
@@ -173,8 +170,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.run_model()
 
         assert_almost_equal(prob['balance.x'], np.sqrt(1.5), decimal=7)
-
-        assert_almost_equal(prob.model.balance._scale_factor, 1.0)
 
         cpd = prob.check_partials(out_stream=None)
 
@@ -853,6 +848,71 @@ class TestBalanceComp(unittest.TestCase):
         self.assertTrue(p.get_val('bal.x').shape == init.shape)
         self.assertTrue(p.get_val('bal.lhs:x').shape == init.shape)
         self.assertTrue(p.get_val('bal.rhs:x').shape == init.shape)
+
+
+    def test_multidimentional_shape_normalize(self):
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', use_mult=True, shape=(5,3), normalize=True)
+        bal.add_balance('z', val=4*np.ones(5,), shape=(5,), normalize=True)
+
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones((5,3)), 'shape': (5,3)}, y={'val': np.ones((5,3)), 'shape': (5,3)})
+        exec_comp2 = om.ExecComp('y=x**2', x={'val': np.ones((5,)), 'shape': (5,)}, y={'val': np.ones((5,)), 'shape': (5,)})
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        prob.model.add_subsystem(name='exec2', subsys=exec_comp2)
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.connect('balance.z', 'exec2.x')
+        prob.model.connect('exec2.y', 'balance.rhs:z')
+
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+
+        prob.setup()
+
+        prob.set_val('balance.rhs:x', np.ones((5,3)))
+        prob.set_val('balance.mult:x', np.ones((5,3)))
+
+        prob['balance.x'] = 1.0
+
+        prob.run_model()
+
+    def test_multidimentional_shape(self):
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', use_mult=True, shape=(5,3), normalize=False)
+        bal.add_balance('z', val=4*np.ones(5,), shape=(5,), normalize=False)
+
+        exec_comp = om.ExecComp('y=x**2', x={'val': np.ones((5,3)), 'shape': (5,3)}, y={'val': np.ones((5,3)), 'shape': (5,3)})
+        exec_comp2 = om.ExecComp('y=x**2', x={'val': np.ones((5,)), 'shape': (5,)}, y={'val': np.ones((5,)), 'shape': (5,)})
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        prob.model.add_subsystem(name='exec2', subsys=exec_comp2)
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.connect('balance.z', 'exec2.x')
+        prob.model.connect('exec2.y', 'balance.rhs:z')
+
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
+
+        prob.setup()
+
+        prob.set_val('balance.rhs:x', np.ones((5,3)))
+        prob.set_val('balance.mult:x', np.ones((5,3)))
+
+        prob['balance.x'] = 1.0
+
+        prob.run_model()
 
 
 if __name__ == '__main__':  # pragma: no cover

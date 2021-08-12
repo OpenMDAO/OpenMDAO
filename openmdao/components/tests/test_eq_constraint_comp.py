@@ -540,6 +540,80 @@ class TestEQConstraintComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_multidimentional_shape_normalize(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n = 15
+
+        defect_comp = model.add_subsystem('eq_comp', om.EQConstraintComp())
+
+        defect_comp.add_eq_output(name='diff_r',
+                                  shape=(n, 3),
+                                  eq_units='km',
+                                  lhs_name='r1', rhs_name='r2',
+                                  use_mult=False,
+                                  normalize=True,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
+
+        defect_comp.add_eq_output(name='diff_k',
+                                  shape=(n,),
+                                  eq_units='km',
+                                  lhs_name='k1', rhs_name='k2',
+                                  use_mult=False,
+                                  normalize=True,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
+
+
+        prob.setup()
+
+        prob.set_val('eq_comp.r1', np.random.rand(n, 3) * 10)
+        prob.set_val('eq_comp.r2', np.random.rand(n, 3) * 10)
+
+        prob.set_val('eq_comp.k1', np.random.rand(n) * 10)
+        prob.set_val('eq_comp.k2', np.random.rand(n) * 10)
+
+        prob.run_model()
+
+    def test_multidimentional_shape(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n = 15
+
+        defect_comp = model.add_subsystem('eq_comp', om.EQConstraintComp())
+
+        defect_comp.add_eq_output(name='diff_r',
+                                  shape=(n, 3),
+                                  eq_units='km',
+                                  lhs_name='r1', rhs_name='r2',
+                                  use_mult=False,
+                                  normalize=False,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
+
+        defect_comp.add_eq_output(name='diff_k',
+                                  shape=(n,),
+                                  eq_units='km',
+                                  lhs_name='k1', rhs_name='k2',
+                                  use_mult=False,
+                                  normalize=False,
+                                  add_constraint=True,
+                                  ref=100.0, ref0=None, adder=None, scaler=None)
+
+
+        prob.setup()
+
+        prob.set_val('eq_comp.r1', np.random.rand(n, 3) * 10)
+        prob.set_val('eq_comp.r2', np.random.rand(n, 3) * 10)
+
+        prob.set_val('eq_comp.k1', np.random.rand(n) * 10)
+        prob.set_val('eq_comp.k2', np.random.rand(n) * 10)
+
+        prob.run_model()
+
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
