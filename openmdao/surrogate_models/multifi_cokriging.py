@@ -193,14 +193,14 @@ class MultiFiCoKriging(object):
         Number of fidelity levels.
     normalize : bool, optional
         When true, normalize X and Y so that the mean is at zero.
-    regr : string or callable
+    regr : str or callable
         A regression function returning an array of outputs of the linear
         regression functional basis for Universal Kriging purpose.
         regr is assumed to be the same for all levels of code.
         Default assumes a simple constant regression trend.
         Available built-in regression models are:
         'constant', 'linear'
-    rho_regr : string or callable or None
+    rho_regr : str or callable or None
         A regression function returning an array of outputs of the linear
         regression functional basis. Defines the regression function for the
         autoregressive parameter rho.
@@ -308,14 +308,14 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        regr : string or callable, optional
+        regr : str or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis for Universal Kriging purpose.
             regr is assumed to be the same for all levels of code.
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
-        rho_regr : string or callable, optional
+        rho_regr : str or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis. Defines the regression function for the
             autoregressive parameter rho.

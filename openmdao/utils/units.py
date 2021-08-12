@@ -765,7 +765,7 @@ def update_library(filename):
 
     Parameters
     ----------
-    filename : string or file
+    filename : str or file
         Source of units configuration data.
     """
     if isinstance(filename, basestring):

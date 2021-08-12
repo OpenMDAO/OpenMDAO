@@ -173,7 +173,7 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
 
     Parameters
     ----------
-    json_data : string
+    json_data : str
         JSON encoded data
     abs2meta : dict
         Dictionary mapping absolute variable names to variable metadata

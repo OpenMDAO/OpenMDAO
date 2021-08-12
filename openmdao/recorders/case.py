@@ -958,7 +958,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key : str
             Absolute or promoted variable name.
 
         Returns
@@ -1000,7 +1000,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key : str
             Absolute or promoted variable name.
         value : any
             value for variable

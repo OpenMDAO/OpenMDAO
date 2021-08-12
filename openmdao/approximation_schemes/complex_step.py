@@ -49,10 +49,10 @@ class ComplexStep(ApproximationScheme):
             Absolute name pairing of (of, wrt) for the derivative.
         system : System
             Containing System.
-        vector : ndarray or None
-            Direction for difference when using directional derivatives.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)

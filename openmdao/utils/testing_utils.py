@@ -86,7 +86,7 @@ def require_pyoptsparse(optimizer=None):
 
     Parameters
     ----------
-    optimizer : String
+    optimizer : str
         Pyoptsparse optimizer string. Default is None, which just checks for pyoptsparse.
 
     Returns

@@ -116,7 +116,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the input.
         val : float or ndarray
             Initial value for the input.
@@ -162,7 +162,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the variable output.
         val : float or ndarray
             Initial value for the output. While the value is overwritten during execution, it is
@@ -492,10 +492,10 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         step : float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
+        step_calc : str
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.

@@ -580,7 +580,7 @@ class LatinHypercubeGenerator(DOEGenerator):
     _samples : int
         The number of evenly spaced levels between each design variable
         lower and upper bound.
-    _criterion : string
+    _criterion : str
         the pyDOE criterion to use.
     _iterations : int
         The number of iterations to use for maximin and correlations algorithms.

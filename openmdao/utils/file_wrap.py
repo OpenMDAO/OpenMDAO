@@ -45,7 +45,7 @@ class _SubHelper(object):
 
     Attributes
     ----------
-    _newtext : string
+    _newtext : str
         text to insert.
     _replace_location : int
         location in the file where replacement is to occur.
@@ -76,7 +76,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        newtext : string
+        newtext : str
             text to insert.
         location : int
             location in the file where replacement is to occur.
@@ -91,7 +91,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        newtext : string
+        newtext : str
             text to insert.
         start_location : int
             location
@@ -111,7 +111,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        text : string
+        text : str
             text to insert.
 
         Returns
@@ -137,7 +137,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        text : string
+        text : str
             text to insert.
 
         Returns
@@ -173,7 +173,7 @@ class _ToInteger(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -199,7 +199,7 @@ class _ToFloat(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -225,7 +225,7 @@ class _ToNan(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -251,7 +251,7 @@ class _ToInf(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -274,9 +274,9 @@ class InputFileGenerator(object):
 
     Attributes
     ----------
-    _template_filename : string or None
+    _template_filename : str or None
         the name of the template file.
-    _output_filename : string or None
+    _output_filename : str or None
         the name of the output file.
     _delimiter : int
         delimiter.
@@ -312,7 +312,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the template file to be used.
         """
         self._template_filename = filename
@@ -327,7 +327,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the input file to be generated.
         """
         self._output_filename = filename
@@ -355,7 +355,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        anchor : string
+        anchor : str
             The text you want to search for.
 
         occurrence : integer, optional
@@ -594,15 +594,15 @@ class FileParser(object):
 
     Attributes
     ----------
-    _filename : string
+    _filename : str
         the name of the file.
     _data : list of string
         the contents of the file, by line
-    _delimiter : string
+    _delimiter : str
         the name of the file.
-    _end_of_line_comment_char : string
+    _end_of_line_comment_char : str
         end-of-line comment character to be ignored.
-    _full_line_comment_char : string
+    _full_line_comment_char : str
         comment character that signifies a line should be skipped.
     _current_row : int
         the current row of the file.
@@ -616,11 +616,11 @@ class FileParser(object):
 
         Parameters
         ----------
-        end_of_line_comment_char : string, optional
+        end_of_line_comment_char : str, optional
             end-of-line comment character to be ignored.
             (e.g., Python supports in-line comments with "#".)
 
-        full_line_comment_char : string, optional
+        full_line_comment_char : str, optional
             comment character that signifies a line should be skipped.
         """
         self._filename = None
@@ -641,7 +641,7 @@ class FileParser(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the input file to be generated.
         """
         self._filename = filename
@@ -665,7 +665,7 @@ class FileParser(object):
 
         Parameters
         ----------
-        delimiter : string
+        delimiter : str
             A string containing characters to be used as delimiters. The
             default value is ' \t', which means that spaces and tabs are not
             taken as data but instead mark the boundaries. Note that the
@@ -828,7 +828,7 @@ class FileParser(object):
 
         Parameters
         ----------
-        key : string
+        key : str
             the key to search for.
         field : integer
             Which field to transfer. Field 0 is the key.

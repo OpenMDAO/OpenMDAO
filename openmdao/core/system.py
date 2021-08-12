@@ -1463,7 +1463,7 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         prob_meta : dict
@@ -2474,7 +2474,7 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the design variable in the system.
         lower : float or ndarray, optional
             Lower boundary for the input
@@ -2498,7 +2498,7 @@ class System(object):
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2610,9 +2610,9 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
-        type_ : string
+        type_ : str
             The type of response. Supported values are 'con' and 'obj'
         lower : float or ndarray, optional
             Lower boundary for the variable
@@ -2642,7 +2642,7 @@ class System(object):
             and ref0.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2786,7 +2786,7 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         lower : float or ndarray, optional
             Lower boundary for the variable
@@ -2814,7 +2814,7 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2844,7 +2844,7 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
@@ -2864,7 +2864,7 @@ class System(object):
             value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool

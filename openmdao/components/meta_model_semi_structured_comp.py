@@ -77,7 +77,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the input.
         training_data : ndarray
             Training data grid sample points for this input variable. Must be of length m, where m
@@ -108,7 +108,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the output.
         training_data : ndarray
             Training data sample points for this output variable. Must be of length m, where m is

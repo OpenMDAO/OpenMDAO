@@ -333,7 +333,7 @@ class PETScKrylov(LinearSolver):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Names of systems relevant to the current solve.

@@ -730,10 +730,10 @@ class Driver(object):
 
         Parameters
         ----------
-        ctype : string
+        ctype : str
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-        lintype : string
+        lintype : str
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
         driver_scaling : bool
@@ -855,7 +855,7 @@ class Driver(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format : string
+        return_format : str
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.

@@ -5,6 +5,19 @@ class Transfer(object):
     """
     Base Transfer class.
 
+    Parameters
+    ----------
+    in_vec : <Vector>
+        Pointer to the input vector.
+    out_vec : <Vector>
+        Pointer to the output vector.
+    in_inds : int ndarray
+        Input indices for the transfer.
+    out_inds : int ndarray
+        Output indices for the transfer.
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the system that owns this transfer.
+
     Attributes
     ----------
     _in_inds : int ndarray
@@ -18,19 +31,6 @@ class Transfer(object):
     def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            pointer to the input vector.
-        out_vec : <Vector>
-            pointer to the output vector.
-        in_inds : int ndarray
-            input indices for the transfer.
-        out_inds : int ndarray
-            output indices for the transfer.
-        comm : MPI.Comm or <FakeComm>
-            communicator of the system that owns this transfer.
         """
         self._in_inds = in_inds
         self._out_inds = out_inds

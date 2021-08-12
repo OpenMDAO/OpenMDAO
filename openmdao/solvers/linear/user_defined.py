@@ -42,7 +42,7 @@ class LinearUserDefined(LinearSolver):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative mode, can be 'fwd' or 'rev'.
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.

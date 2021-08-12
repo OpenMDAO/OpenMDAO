@@ -860,7 +860,7 @@ class Problem(object):
             'system', 'unconnected_inputs') are run
         logger : object
             Object for logging config checks if check is True.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'auto', which will pick 'fwd' or 'rev' based on
             the direction resulting in the smallest number of linear solves required to
@@ -1049,10 +1049,10 @@ class Problem(object):
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
-        step_calc : string
+        step_calc : str
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
         force_dense : bool
@@ -1551,10 +1551,10 @@ class Problem(object):
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             None, which defaults to 'forward' for FD.
-        step_calc : string
+        step_calc : str
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
         show_progress : bool
@@ -1730,7 +1730,7 @@ class Problem(object):
         wrt : list of variable name strings or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format : string
+        return_format : str
             Format to return the derivatives. Can be 'dict', 'flat_dict', or 'array'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).

@@ -618,7 +618,7 @@ class ScipyOptimizeDriver(Driver):
         ----------
         x_new : ndarray
             Array containing input values at new design point.
-        name : string
+        name : str
             Name of the constraint to be evaluated.
         dbl : bool
             True if double sided constraint.
@@ -643,7 +643,7 @@ class ScipyOptimizeDriver(Driver):
         ----------
         x_new : ndarray
             Array containing input values at new design point.
-        name : string
+        name : str
             Name of the constraint to be evaluated.
         dbl : bool
             True if double sided constraint.
@@ -732,7 +732,7 @@ class ScipyOptimizeDriver(Driver):
         ----------
         x_new : ndarray
             Array containing input values at new design point.
-        name : string
+        name : str
             Name of the constraint to be evaluated.
         dbl : bool
             Denotes if a constraint is double-sided or not.

@@ -290,7 +290,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative direction.
         """
         if self._has_solver_ref and mode == 'fwd':
@@ -310,7 +310,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative direction.
         """
         if self._has_solver_ref and mode == 'fwd':

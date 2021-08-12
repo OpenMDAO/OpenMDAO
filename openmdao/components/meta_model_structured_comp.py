@@ -79,7 +79,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the input.
         val : float or ndarray
             Initial value for the input.
@@ -108,7 +108,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the output.
         val : float or ndarray
             Initial value for the output.

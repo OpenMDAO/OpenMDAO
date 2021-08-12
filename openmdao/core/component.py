@@ -1028,10 +1028,10 @@ class Component(System):
         step : float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
+        step_calc : str
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
