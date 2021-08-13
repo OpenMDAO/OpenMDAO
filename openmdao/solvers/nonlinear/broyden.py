@@ -29,6 +29,11 @@ class BroydenSolver(NonlinearSolver):
     """
     Broyden solver.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     delta_fxm : ndarray
@@ -64,11 +69,6 @@ class BroydenSolver(NonlinearSolver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(**kwargs)
 

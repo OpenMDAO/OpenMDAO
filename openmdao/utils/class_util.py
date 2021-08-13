@@ -30,12 +30,19 @@ def overrides_method(method_name, obj, base):
     return False
 
 
-class weak_method_wrapper(object):
+class WeakMethodWrapper(object):
     """
     A class to contain a weak ref to a method.
 
     weakerf.ref(obj.method) doesn't work, so this class will wrap a weak ref
     to the method's parent object, look the method up in that instance by name, and call it.
+
+    Parameters
+    ----------
+    obj : object
+        The instance object.
+    fname : str
+        The name of the method.
 
     Attributes
     ----------
@@ -48,13 +55,6 @@ class weak_method_wrapper(object):
     def __init__(self, obj, fname):
         """
         Initialize the wrapper.
-
-        Parameters
-        ----------
-        obj : object
-            The instance object.
-        fname : str
-            The name of the method.
         """
         self._ref = weakref.ref(obj)
         self.__name__ = fname

@@ -17,7 +17,7 @@ class InterpAlgorithm(object):
         Tuple containing x grid locations for this dimension.
     k : int
         Minimum number of points required for this algorithm.
-    last_index : integer
+    last_index : int
         Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
@@ -216,7 +216,7 @@ class InterpAlgorithm(object):
         x : ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx : int
             Interval index for x.
         slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating
@@ -257,7 +257,7 @@ class InterpAlgorithmSemi(object):
         Tuple containing x grid locations for this dimension.
     k : int
         Minimum number of points required for this algorithm.
-    last_index : integer
+    last_index : int
         Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.

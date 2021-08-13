@@ -121,7 +121,7 @@ class InterpAkima(InterpAlgorithm):
         x : ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx : int
             Interval index for x.
         slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating

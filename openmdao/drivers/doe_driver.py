@@ -153,7 +153,7 @@ class DOEDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         self.iter_count = 0

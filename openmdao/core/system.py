@@ -3868,7 +3868,7 @@ class System(object):
 
         Parameters
         ----------
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
@@ -3936,7 +3936,7 @@ class System(object):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         pass
@@ -3971,7 +3971,7 @@ class System(object):
         ----------
         recorder : <CaseRecorder>
            A recorder instance.
-        recurse : boolean
+        recurse : bool
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:

@@ -192,7 +192,7 @@ class DifferentialEvolutionDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         model = self._problem().model

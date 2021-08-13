@@ -658,7 +658,7 @@ class Problem(object):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         if self._mode is None:
@@ -849,7 +849,7 @@ class Problem(object):
 
         Parameters
         ----------
-        check : None, boolean, list of strings, or the string ‘all’
+        check : None, bool, list of strings, or the string ‘all’
             Determines what config checks, if any, are run after setup is complete.
             If None or False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',

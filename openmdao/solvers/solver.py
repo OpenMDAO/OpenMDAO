@@ -86,7 +86,7 @@ class SolverInfo(object):
         Returns
         -------
         tuple(str, list)
-            cache of current stack
+            Cache of current stack.
         """
         return (self.prefix, self.stack)
 
@@ -97,7 +97,7 @@ class SolverInfo(object):
         Parameters
         ----------
         cache : tuple(str, list)
-            cache of current stack
+            Cache of current stack.
         """
         self.prefix, self.stack = cache
 
@@ -108,6 +108,11 @@ class Solver(object):
 
     This class is subclassed by NonlinearSolver and LinearSolver,
     which are in turn subclassed by actual solver implementations.
+
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Solver options.
 
     Attributes
     ----------
@@ -145,11 +150,6 @@ class Solver(object):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Solver options.
         """
         self._system = None
         self._depth = 0
@@ -414,7 +414,7 @@ class Solver(object):
 
         Returns
         -------
-        boolean
+        bool
             Flag for indicating child linerization
         """
         return True

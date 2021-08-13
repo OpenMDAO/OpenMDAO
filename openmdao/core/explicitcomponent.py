@@ -446,7 +446,7 @@ class ExplicitComponent(Component):
         ----------
         jac : Jacobian or None
             Ignored.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if not (self._has_compute_partials or self._approx_schemes):

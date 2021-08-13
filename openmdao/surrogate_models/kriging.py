@@ -18,6 +18,11 @@ class KrigingSurrogate(SurrogateModel):
     Predictions are returned as a tuple of mean and RMSE. Based on Gaussian Processes
     for Machine Learning (GPML) by Rasmussen and Williams. (see also: scikit-learn).
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     alpha : ndarray
@@ -106,7 +111,7 @@ class KrigingSurrogate(SurrogateModel):
         Parameters
         ----------
         x : array-like
-            Training input locations
+            Training input locations.
         y : array-like
             Model responses at given inputs.
         """

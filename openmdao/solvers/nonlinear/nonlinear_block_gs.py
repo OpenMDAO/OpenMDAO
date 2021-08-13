@@ -10,6 +10,11 @@ class NonlinearBlockGS(NonlinearSolver):
     """
     Nonlinear block Gauss-Seidel solver.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _delta_outputs_n_1 : ndarray
@@ -25,11 +30,6 @@ class NonlinearBlockGS(NonlinearSolver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(**kwargs)
 

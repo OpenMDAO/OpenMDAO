@@ -239,7 +239,7 @@ class IndepVarComp(ExplicitComponent):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         # define this as empty for IndepVarComp to avoid overhead of ExplicitComponent._linearize.

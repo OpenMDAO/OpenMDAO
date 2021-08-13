@@ -278,7 +278,7 @@ class Vector(object):
 
         Returns
         -------
-        boolean
+        bool
             True or False.
         """
         return self._name2abs_name(name) is not None
@@ -294,7 +294,7 @@ class Vector(object):
 
         Returns
         -------
-        boolean
+        bool
             True or False.
         """
         return name in self._names

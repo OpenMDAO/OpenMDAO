@@ -149,7 +149,7 @@ def check_path(path, includes, excludes, include_all_path=False):
 
     Returns
     -------
-    boolean
+    bool
         True if path should be recorded, False if it's been excluded.
     """
     for ex_pattern in excludes:

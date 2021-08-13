@@ -273,7 +273,7 @@ class ImplicitComponent(Component):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         self._check_first_linearize()

@@ -37,7 +37,7 @@ class ProcAllocator(object):
 
     Attributes
     ----------
-    parallel : boolean
+    parallel : bool
         True means the comm is split across subsystems;
         False means the comm is passed to all subsystems.
     """

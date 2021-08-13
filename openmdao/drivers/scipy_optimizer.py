@@ -13,7 +13,7 @@ from scipy.optimize import minimize
 from openmdao.core.constants import INF_BOUND
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.class_util import weak_method_wrapper
+from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
@@ -232,7 +232,7 @@ class ScipyOptimizeDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem()
@@ -360,10 +360,10 @@ class ScipyOptimizeDriver(Driver):
                         # TODO linear constraint if meta['linear']
                         # TODO add option for Hessian
                         con = NonlinearConstraint(
-                            fun=signature_extender(weak_method_wrapper(self, '_con_val_func'),
+                            fun=signature_extender(WeakMethodWrapper(self, '_con_val_func'),
                                                    args),
                             lb=lb, ub=ub,
-                            jac=signature_extender(weak_method_wrapper(self, '_congradfunc'), args))
+                            jac=signature_extender(WeakMethodWrapper(self, '_congradfunc'), args))
                         constraints.append(con)
                 else:  # Type of constraints is list of dict
                     # Loop over every index separately,
@@ -374,9 +374,9 @@ class ScipyOptimizeDriver(Driver):
                             con_dict['type'] = 'eq'
                         else:
                             con_dict['type'] = 'ineq'
-                        con_dict['fun'] = weak_method_wrapper(self, '_confunc')
+                        con_dict['fun'] = WeakMethodWrapper(self, '_confunc')
                         if opt in _constraint_grad_optimizers:
-                            con_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
+                            con_dict['jac'] = WeakMethodWrapper(self, '_congradfunc')
                         con_dict['args'] = [name, False, j]
                         constraints.append(con_dict)
 
@@ -392,9 +392,9 @@ class ScipyOptimizeDriver(Driver):
                         if dblcon:
                             dcon_dict = {}
                             dcon_dict['type'] = 'ineq'
-                            dcon_dict['fun'] = weak_method_wrapper(self, '_confunc')
+                            dcon_dict['fun'] = WeakMethodWrapper(self, '_confunc')
                             if opt in _constraint_grad_optimizers:
-                                dcon_dict['jac'] = weak_method_wrapper(self, '_congradfunc')
+                                dcon_dict['jac'] = WeakMethodWrapper(self, '_congradfunc')
                             dcon_dict['args'] = [name, True, j]
                             constraints.append(dcon_dict)
 

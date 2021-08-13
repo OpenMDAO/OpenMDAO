@@ -60,7 +60,7 @@ def split_ep(entry_point):
     Returns
     -------
     tuple
-        (entry_point_name, module_name, target_name)
+        (entry_point_name, module_name, target_name).
     """
     epstr = str(entry_point)
     name, rest = epstr.split('=', 1)
@@ -296,7 +296,7 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     Returns
     -------
     dict
-        Nested dict of the form  dct[eptype][target] = (name, module, docs)
+        Nested dict of the form  dct[eptype][target] = (name, module, docs).
     """
     if pkg_resources is None:
         raise RuntimeError("You must install pkg_resources in order to list installed types.")
@@ -375,7 +375,7 @@ def find_plugins(types=None):
     Returns
     -------
     dict
-        Nested dict of the form  dct[eptype] = list of URLs
+        Nested dict of the form  dct[eptype] = list of URLs.
     """
     if not types:
         types = ['openmdao']

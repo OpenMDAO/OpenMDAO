@@ -108,7 +108,7 @@ class Jacobian(object):
 
         Returns
         -------
-        boolean
+        bool
             return whether sub-Jacobian has been defined.
         """
         return self._get_abs_key(key) in self._subjacs_info

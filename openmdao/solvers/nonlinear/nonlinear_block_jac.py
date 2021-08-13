@@ -7,6 +7,11 @@ from openmdao.utils.mpi import multi_proc_fail_check
 class NonlinearBlockJac(NonlinearSolver):
     """
     Nonlinear block Jacobi solver.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'NL: NLBJ'

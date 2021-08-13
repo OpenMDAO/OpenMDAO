@@ -110,7 +110,7 @@ def squared_exponential_correlation(theta, d):
 
     Returns
     -------
-    r : array_like
+    array_like
         An array with shape (n_eval, ) containing the values of the
         autocorrelation model.
     """
@@ -137,15 +137,14 @@ def l1_cross_distances(X, Y=None):
     Parameters
     ----------
     X : array_like
-        An array with shape (n_samples_X, n_features)
+        An array with shape (n_samples_X, n_features).
     Y : array_like
-        An array with shape (n_samples_Y, n_features)
+        An array with shape (n_samples_Y, n_features).
 
     Returns
     -------
     array with shape (n_samples * (n_samples - 1) / 2, n_features)
         The array of componentwise L1 cross-distances.
-
     """
     X = array2d(X)
 
@@ -323,6 +322,8 @@ class MultiFiCoKriging(object):
             Default assumes a simple constant regression trend.
             Available built-in regression models are:
             'constant', 'linear'
+        normalize : bool, optional
+            When true, normalize X and Y so that the mean is at zero.
         theta : double, array_like or list, optional
             Value of correlation parameters if they are known; no optimization is run.
             Default is None, so that optimization is run.
@@ -354,8 +355,6 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
-        normalize : bool, optional
-            When true, normalize X and Y so that the mean is at zero.
         """
         self.corr = squared_exponential_correlation
         self.regr = regr
@@ -382,7 +381,7 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : integer
+        lvl : int
             Level of fidelity
         theta : array_like
             An array containing the autocorrelation parameters at which the
@@ -414,7 +413,7 @@ class MultiFiCoKriging(object):
         X : list of double array_like elements
             A list of arrays with the input at which observations were made, from lowest
             fidelity to highest fidelity. Designs must be nested
-            with X[i] = np.vstack([..., X[i+1])
+            with X[i] = np.vstack([..., X[i+1]).
         y : list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from lowest fidelity to highest fidelity.
@@ -528,8 +527,8 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : integer
-            Level of fidelity
+        lvl : int
+            Level of fidelity.
         theta : array_like, optional
             An array containing the autocorrelation parameters at which the
             Gaussian Process model parameters should be determined.
@@ -606,7 +605,7 @@ class MultiFiCoKriging(object):
 
         Parameters
         ----------
-        lvl : integer
+        lvl : int
             Level of fidelity
         initial_range : float
             Initial range of the optimizer
@@ -668,7 +667,7 @@ class MultiFiCoKriging(object):
         X : array_like
             An array with shape (n_eval, n_features) giving the point(s) at
             which the prediction(s) should be made.
-        eval_MSE : boolean, optional
+        eval_MSE : bool, optional
             A boolean specifying whether the Mean Squared Error should be
             evaluated or not. Default assumes evalMSE is True.
 
@@ -895,6 +894,11 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
     See MultiFiCoKriging class.
 
+    Parameters
+    ----------
+    **kwargs : keyword args
+        Some implementations of record_derivatives need additional args.
+
     Attributes
     ----------
     model : MultiFiCoKriging
@@ -904,11 +908,6 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : keyword args
-            Some implementations of record_derivatives need additional args.
         """
         super().__init__(**kwargs)
         self.model = None
@@ -1001,7 +1000,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         X : list of double array_like elements
             A list of arrays with the input at which observations were made, from highest
             fidelity to lowest fidelity. Designs must be nested
-            with X[i] = np.vstack([..., X[i+1])
+            with X[i] = np.vstack([..., X[i+1]).
         Y : list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from highest fidelity to lowest fidelity.

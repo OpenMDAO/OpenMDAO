@@ -120,6 +120,11 @@ class Monitor(object):
 
     Callable object given to KSP as a callback for printing the residual.
 
+    Parameters
+    ----------
+    solver : object
+        the openmdao solver.
+
     Attributes
     ----------
     _solver : _solver
@@ -133,11 +138,6 @@ class Monitor(object):
     def __init__(self, solver):
         """
         Store pointer to the openmdao solver and initialize norms.
-
-        Parameters
-        ----------
-        solver : object
-            the openmdao solver.
         """
         self._solver = solver
         self._norm = 1.0
@@ -168,12 +168,17 @@ class PETScKrylov(LinearSolver):
     """
     LinearSolver that uses PetSC KSP to solve for a system's derivatives.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        dictionary of options set by the instantiating class/script.
+
     Attributes
     ----------
     precon : Solver
         Preconditioner for linear solve. Default is None for no preconditioner.
     _ksp : dist
-        dictionary of KSP instances (keyed on vector name).
+        Dictionary of KSP instances (keyed on vector name).
     """
 
     SOLVER = 'LN: PETScKrylov'
@@ -181,11 +186,6 @@ class PETScKrylov(LinearSolver):
     def __init__(self, **kwargs):
         """
         Declare the solver options.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            dictionary of options set by the instantiating class/script.
         """
         super().__init__(**kwargs)
 
@@ -312,7 +312,7 @@ class PETScKrylov(LinearSolver):
 
         Returns
         -------
-        boolean
+        bool
             Flag for indicating child linerization
         """
         precon = self.precon
@@ -388,7 +388,7 @@ class PETScKrylov(LinearSolver):
         mat : PETSc.Mat
             PETSc matrix object.
         in_vec : PETSc.Vector
-            Incoming vector
+            Incoming vector.
         result : PETSc.Vector
             Empty vector in which the preconditioned in_vec is stored.
         """

@@ -373,7 +373,7 @@ class ExperimentalDriver(object):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         with Recording(self._get_name(), self.iter_count, self) as rec:

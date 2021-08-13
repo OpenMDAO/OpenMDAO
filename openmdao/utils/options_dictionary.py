@@ -411,7 +411,7 @@ class OptionsDictionary(object):
 
         Returns
         -------
-        boolean
+        bool
             whether key is in the local dict.
         """
         return key in self._dict
