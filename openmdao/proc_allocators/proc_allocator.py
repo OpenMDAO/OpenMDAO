@@ -7,6 +7,13 @@ class ProcAllocationError(Exception):
     """
     Exception containing subsystem index information for use at higher levels.
 
+    Parameters
+    ----------
+    msg : str
+        The message string.
+    sub_inds : list of int
+        Indices of subsystems in _subsystems_allprocs in parent.
+
     Attributes
     ----------
     msg : str
@@ -18,13 +25,6 @@ class ProcAllocationError(Exception):
     def __init__(self, msg, sub_inds=None):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        msg : str
-            The message string.
-        sub_inds : list of int
-            Indices of subsystems in _subsystems_allprocs in parent.
         """
         super().__init__(msg)
         self.msg = msg
@@ -34,6 +34,11 @@ class ProcAllocationError(Exception):
 class ProcAllocator(object):
     """
     Algorithm for allocating processors to a given system's subsystems.
+
+    Parameters
+    ----------
+    parallel : bool
+        If True, split subsystem comm.
 
     Attributes
     ----------
@@ -45,11 +50,6 @@ class ProcAllocator(object):
     def __init__(self, parallel=False):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        parallel : bool
-            If True, split subsystem comm.
         """
         self.parallel = parallel
 

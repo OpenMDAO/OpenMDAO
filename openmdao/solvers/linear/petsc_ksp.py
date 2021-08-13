@@ -123,16 +123,16 @@ class Monitor(object):
     Parameters
     ----------
     solver : object
-        the openmdao solver.
+        The openmdao solver.
 
     Attributes
     ----------
     _solver : _solver
-        the openmdao solver.
+        The openmdao solver.
     _norm : float
-        the current norm.
+        The current norm.
     _norm0 : float
-        the norm for the first iteration.
+        The norm for the first iteration.
     """
 
     def __init__(self, solver):
@@ -171,7 +171,7 @@ class PETScKrylov(LinearSolver):
     Parameters
     ----------
     **kwargs : dict
-        dictionary of options set by the instantiating class/script.
+        Dictionary of options set by the instantiating class/script.
 
     Attributes
     ----------

@@ -187,18 +187,30 @@ class Jacobian(object):
     def __iter__(self):
         """
         Yield next name pair of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         yield from self._subjacs_info.keys()
 
     def keys(self):
         """
         Yield next name pair of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         yield from self._subjacs_info.keys()
 
     def items(self):
         """
         Yield name pair and value of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         for key, meta in self._subjacs_info.items():
             yield key, meta['val']
@@ -395,7 +407,6 @@ class Jacobian(object):
             Column index.
         column : ndarray
             Column value.
-
         """
         if self._colnames is None:
             self._setup_index_maps(system)

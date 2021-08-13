@@ -180,6 +180,57 @@ class MultiFiCoKriging(object):
     """
     Integrate the Multi-Fidelity Co-Kriging method described in [LeGratiet2013].
 
+    Parameters
+    ----------
+    regr : str or callable, optional
+        A regression function returning an array of outputs of the linear
+        regression functional basis for Universal Kriging purpose.
+        regr is assumed to be the same for all levels of code.
+        Default assumes a simple constant regression trend.
+        Available built-in regression models are:
+        'constant', 'linear'.
+    rho_regr : str or callable, optional
+        A regression function returning an array of outputs of the linear
+        regression functional basis. Defines the regression function for the
+        autoregressive parameter rho.
+        rho_regr is assumed to be the same for all levels of code.
+        Default assumes a simple constant regression trend.
+        Available built-in regression models are:
+        'constant', 'linear'.
+    normalize : bool, optional
+        When true, normalize X and Y so that the mean is at zero.
+    theta : double, array_like or list, optional
+        Value of correlation parameters if they are known; no optimization is run.
+        Default is None, so that optimization is run.
+        if double: value is replicated for all features and all levels.
+        if array_like: an array with shape (n_features, ) for
+        isotropic calculation. It is replicated for all levels.
+        if list: a list of nlevel arrays specifying value for each level.
+    theta0 : double, array_like or list, optional
+        Starting point for the maximum likelihood estimation of the
+        best set of parameters.
+        Default is None and meaning use of the default 0.5*np.ones(n_features)
+        if double: value is replicated for all features and all levels.
+        if array_like: an array with shape (n_features, ) for
+        isotropic calculation. It is replicated for all levels.
+        if list: a list of nlevel arrays specifying value for each level.
+    thetaL : double, array_like or list, optional
+        Lower bound on the autocorrelation parameters for maximum
+        likelihood estimation.
+        Default is None meaning use of the default 1e-5*np.ones(n_features).
+        if double: value is replicated for all features and all levels.
+        if array_like: An array with shape matching theta0's. It is replicated
+        for all levels of code.
+        if list: a list of nlevel arrays specifying value for each level.
+    thetaU : double, array_like or list, optional
+        Upper bound on the autocorrelation parameters for maximum
+        likelihood estimation.
+        Default is None meaning use of default value 50*np.ones(n_features).
+        if double: value is replicated for all features and all levels.
+        if array_like: An array with shape matching theta0's. It is replicated
+        for all levels of code.
+        if list: a list of nlevel arrays specifying value for each level.
+
     Attributes
     ----------
     corr : object
@@ -249,31 +300,11 @@ class MultiFiCoKriging(object):
     _nfev : int
         Number of function evaluations.
 
-    Examples
-    --------
-    >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
-    >>> import numpy as np
-    >>> # Xe: DOE for expensive code (nested in Xc)
-    >>> # Xc: DOE for cheap code
-    >>> # ye: expensive response
-    >>> # yc: cheap response
-    >>> Xe = np.array([[0],[0.4],[1]])
-    >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
-    >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
-    >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
-    >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
-    >>> model.fit([Xc, Xe], [yc, ye])
-    >>> # Prediction on x=0.05
-    >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
-    True
-
-
     Notes
     -----
     Implementation is based on the Package Scikit-Learn
     (Author: Vincent Dubourg, vincent.dubourg@gmail.com) which translates
     the DACE Matlab toolbox, see [NLNS2002]_.
-
 
     References
     ----------
@@ -293,6 +324,24 @@ class MultiFiCoKriging(object):
     .. [TBKH2011] Toal, D. J., Bressloff, N. W., Keane, A. J., & Holden, C. M. E. (2011).
        "The development of a hybridized particle swarm for kriging hyperparameter
        tuning." `Engineering optimization`, 43(6), 675-699.
+
+    Examples
+    --------
+    >>> from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
+    >>> import numpy as np
+    >>> # Xe: DOE for expensive code (nested in Xc)
+    >>> # Xc: DOE for cheap code
+    >>> # ye: expensive response
+    >>> # yc: cheap response
+    >>> Xe = np.array([[0],[0.4],[1]])
+    >>> Xc = np.vstack((np.array([[0.1],[0.2],[0.3],[0.5],[0.6],[0.7],[0.8],[0.9]]),Xe))
+    >>> ye = ((Xe*6-2)**2)*np.sin((Xe*6-2)*2)
+    >>> yc = 0.5*((Xc*6-2)**2)*np.sin((Xc*6-2)*2)+(Xc-0.5)*10. - 5
+    >>> model = MultiFiCoKriging(theta0=1, thetaL=1e-5, thetaU=50.)
+    >>> model.fit([Xc, Xe], [yc, ye])
+    >>> # Prediction on x=0.05
+    >>> np.abs(float(model.predict([0.05])[0])- ((0.05*6-2)**2)*np.sin((0.05*6-2)*2)) < 0.05
+    True
     """
 
     _regression_types = {
@@ -304,57 +353,6 @@ class MultiFiCoKriging(object):
                  theta=None, theta0=None, thetaL=None, thetaU=None):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        regr : str or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis for Universal Kriging purpose.
-            regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        rho_regr : str or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis. Defines the regression function for the
-            autoregressive parameter rho.
-            rho_regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        normalize : bool, optional
-            When true, normalize X and Y so that the mean is at zero.
-        theta : double, array_like or list, optional
-            Value of correlation parameters if they are known; no optimization is run.
-            Default is None, so that optimization is run.
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        theta0 : double, array_like or list, optional
-            Starting point for the maximum likelihood estimation of the
-            best set of parameters.
-            Default is None and meaning use of the default 0.5*np.ones(n_features)
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaL : double, array_like or list, optional
-            Lower bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of the default 1e-5*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaU : double, array_like or list, optional
-            Upper bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of default value 50*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
         """
         self.corr = squared_exponential_correlation
         self.regr = regr

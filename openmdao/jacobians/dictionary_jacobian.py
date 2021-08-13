@@ -233,7 +233,6 @@ class _CheckingJacobian(DictionaryJacobian):
             Column index.
         column : ndarray
             Column value.
-
         """
         if self._colnames is None:
             self._setup_index_maps(system)

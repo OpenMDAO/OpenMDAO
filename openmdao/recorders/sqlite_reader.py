@@ -29,6 +29,15 @@ class SqliteCaseReader(BaseCaseReader):
     """
     A CaseReader specific to files created with SqliteRecorder.
 
+    Parameters
+    ----------
+    filename : str
+        The path to the filename containing the recorded data.
+    pre_load : bool
+        If True, load all the data into memory during initialization.
+    metadata_filename : str
+        The path to the filename containing the recorded metadata, if separate.
+
     Attributes
     ----------
     problem_metadata : dict
@@ -71,15 +80,6 @@ class SqliteCaseReader(BaseCaseReader):
     def __init__(self, filename, pre_load=False, metadata_filename=None):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The path to the filename containing the recorded data.
-        pre_load : bool
-            If True, load all the data into memory during initialization.
-        metadata_filename : str
-            The path to the filename containing the recorded metadata, if separate.
         """
         super().__init__(filename, pre_load)
 
@@ -469,16 +469,16 @@ class SqliteCaseReader(BaseCaseReader):
         Parameters
         ----------
         tree : dict
-            Nested dictionary of system information
+            Nested dictionary of system information.
         path : str or None
-            Pathname of root system (None for the root model)
+            Pathname of root system (None for the root model).
         paths : list
-            List to which pathnames are appended
+            List to which pathnames are appended.
 
         Returns
         -------
         list
-            List of pathnames of systems
+            List of pathnames of systems.
         """
         if tree is None:
             tree = self.problem_metadata['tree']
@@ -500,9 +500,9 @@ class SqliteCaseReader(BaseCaseReader):
         Parameters
         ----------
         run_number : int
-            Run_driver or run_model iteration to inspect
+            Run_driver or run_model iteration to inspect.
         system : str or None
-            Pathname of system (None for all systems)
+            Pathname of system (None for all systems).
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -510,7 +510,7 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         dict
-            {system: {key: val}}
+            {system: {key: val}}.
         """
         dct = {}
 
@@ -564,9 +564,9 @@ class SqliteCaseReader(BaseCaseReader):
         Parameters
         ----------
         run_number : int
-            Run_driver or run_model iteration to inspect
+            Run_driver or run_model iteration to inspect.
         solver : str or None
-            Pathname of solver (None for all solvers)
+            Pathname of solver (None for all solvers).
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -574,7 +574,7 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         dict
-            {solver: {key: val}}
+            {solver: {key: val}}.
         """
         dct = {}
 
@@ -621,8 +621,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-            case name}
+        source : 'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+                 case name
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
@@ -856,10 +856,10 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, case_name}
+        source : 'problem', 'driver', component pathname, solver pathname, case_name
             Identifies which cases to return.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
+            If True, will enable iterating over all successors in case hierarchy.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -867,7 +867,7 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         list or dict
-            The cases identified by source
+            The cases identified by source.
         """
         case_ids = self.list_cases(source, recurse, flat, out_stream=None)
         if isinstance(case_ids, list):
@@ -915,7 +915,7 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         dict
-            The case identified by case_id
+            The case identified by case_id.
         """
         if isinstance(case_id, int):
             # it's a global index rather than a coordinate
@@ -952,6 +952,33 @@ class SqliteCaseReader(BaseCaseReader):
 class CaseTable(object):
     """
     Base class for wrapping case tables in a recording database.
+
+    Parameters
+    ----------
+    fname : str
+        The name of the recording file from which to instantiate the case reader.
+    ver : int
+        The version of the format assumed when loading the file.
+    table : str
+        The name of the table in the database.
+    index : str
+        The name of the case index column in the table.
+    giter : list of tuple
+        The global iterations table.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
 
     Attributes
     ----------
@@ -992,33 +1019,6 @@ class CaseTable(object):
                  auto_ivc_map, var_info):
         """
         Initialize.
-
-        Parameters
-        ----------
-        fname : str
-            The name of the recording file from which to instantiate the case reader.
-        ver : int
-            The version of the format assumed when loading the file.
-        table : str
-            The name of the table in the database.
-        index : str
-            The name of the case index column in the table.
-        giter : list of tuple
-            The global iterations table.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
         """
         self._filename = fname
         self._format_version = ver
@@ -1099,9 +1099,9 @@ class CaseTable(object):
         Parameters
         ----------
         source : str, optional
-            If not None, only cases that have the specified source will be returned
+            If not None, only cases that have the specified source will be returned.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
+            If True, will enable iterating over all successors in case hierarchy.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -1233,6 +1233,10 @@ class CaseTable(object):
         ----------
         cache : bool
             If True, cases will be cached for faster access by key.
+
+        Yields
+        ------
+        case
         """
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
@@ -1346,35 +1350,35 @@ class CaseTable(object):
 class DriverCases(CaseTable):
     """
     Cases specific to the entries that might be recorded in a Driver iteration.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the recording file from which to instantiate the case reader.
+    format_version : int
+        The version of the format assumed when loading the file.
+    giter : list of tuple
+        The global iterations table.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
                  auto_ivc_map, var_info):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the recording file from which to instantiate the case reader.
-        format_version : int
-            The version of the format assumed when loading the file.
-        giter : list of tuple
-            The global iterations table.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
                          'driver_iterations', 'iteration_coordinate', giter,
@@ -1392,6 +1396,10 @@ class DriverCases(CaseTable):
         ----------
         cache : bool
             If True, cases will be cached for faster access by key.
+
+        Yields
+        ------
+        case
         """
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
@@ -1526,35 +1534,35 @@ class DriverCases(CaseTable):
 class SystemCases(CaseTable):
     """
     Cases specific to the entries that might be recorded in a System iteration.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the recording file from which to instantiate the case reader.
+    format_version : int
+        The version of the format assumed when loading the file.
+    giter : list of tuple
+        The global iterations table.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
                  auto_ivc_map, var_info):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the recording file from which to instantiate the case reader.
-        format_version : int
-            The version of the format assumed when loading the file.
-        giter : list of tuple
-            The global iterations table.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
                          'system_iterations', 'iteration_coordinate', giter,
@@ -1565,35 +1573,35 @@ class SystemCases(CaseTable):
 class SolverCases(CaseTable):
     """
     Cases specific to the entries that might be recorded in a Solver iteration.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the recording file from which to instantiate the case reader.
+    format_version : int
+        The version of the format assumed when loading the file.
+    giter : list of tuple
+        The global iterations table.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
                  auto_ivc_map, var_info):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the recording file from which to instantiate the case reader.
-        format_version : int
-            The version of the format assumed when loading the file.
-        giter : list of tuple
-            The global iterations table.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
                          'solver_iterations', 'iteration_coordinate', giter,
@@ -1632,35 +1640,35 @@ class SolverCases(CaseTable):
 class ProblemCases(CaseTable):
     """
     Cases specific to the entries that might be recorded in a Driver iteration.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the recording file from which to instantiate the case reader.
+    format_version : int
+        The version of the format assumed when loading the file.
+    giter : list of tuple
+        The global iterations table.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute variable names to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     """
 
     def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, conns,
                  auto_ivc_map, var_info):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the recording file from which to instantiate the case reader.
-        format_version : int
-            The version of the format assumed when loading the file.
-        giter : list of tuple
-            The global iterations table.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute variable names to variable metadata.
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names to absolute names.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
         """
         super().__init__(filename, format_version,
                          'problem_cases', 'case_name', giter,

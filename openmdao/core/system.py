@@ -3564,9 +3564,9 @@ class System(object):
         Parameters
         ----------
         explicit : bool, optional
-            include outputs from explicit components. Default is True.
+            Include outputs from explicit components. Default is True.
         implicit : bool, optional
-            include outputs from implicit components. Default is True.
+            Include outputs from implicit components. Default is True.
         val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional

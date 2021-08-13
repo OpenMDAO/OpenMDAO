@@ -508,6 +508,11 @@ class NonlinearSolver(Solver):
     """
     Base class for nonlinear solvers.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _err_cache : dict
@@ -517,11 +522,6 @@ class NonlinearSolver(Solver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(**kwargs)
         self._err_cache = OrderedDict()
@@ -768,6 +768,11 @@ class LinearSolver(Solver):
     """
     Base class for linear solvers.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _rel_systems : set of str
@@ -779,11 +784,6 @@ class LinearSolver(Solver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         self._rel_systems = None
         self._assembled_jac = None
@@ -937,6 +937,11 @@ class LinearSolver(Solver):
 class BlockLinearSolver(LinearSolver):
     """
     A base class for LinearBlockGS and LinearBlockJac.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     def _declare_options(self):
