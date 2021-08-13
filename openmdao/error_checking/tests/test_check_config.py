@@ -1,7 +1,7 @@
 import errno
 import os
 import unittest
-from tempfile import mkdtemp
+from tempfile import mkdtemp, TemporaryFile
 from shutil import rmtree
 
 import numpy as np
@@ -473,6 +473,52 @@ class TestCheckConfig(unittest.TestCase):
         prob['comp.x'] = 75.0
 
         prob.final_setup()
+
+    def test_unserializable_option(self):
+        # Makes sure we get a warning if an option is not picklable.
+
+        class TestComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('file1')
+                self.options.declare('file2', recordable=False)
+
+            def setup(self):
+                self.options['file1'] = TemporaryFile()
+                self.options['file2'] = TemporaryFile()
+
+                self.add_input('x', 0.)
+                self.add_output('y', 0.)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', TestComp())
+
+        msg1 = "'comp' <class TestComp>: option 'file1' is not serializable " + \
+               "(cannot be pickled) but 'recordable=False' has not been set. " + \
+               "No options will be recorded for 'comp' unless 'recordable' is " + \
+               "set to False for this option."
+
+        msg2 = "'comp' <class TestComp>: option 'file2' is not serializable " + \
+               "(cannot be pickled) and will not be recorded."
+
+        # By default, a warning is only issued if 'recordable' is not set to False
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        testlogger.find_in('warning', msg1)
+        self.assertFalse(testlogger.contains('warning', msg2))
+
+        # When checking 'all_unserializable_options', a warning is issued even if recordable=False
+        testlogger = TestLogger()
+        prob.setup(check=['all_unserializable_options'], logger=testlogger)
+        prob.final_setup()
+
+        testlogger.find_in('warning', msg1)
+        testlogger.find_in('warning', msg2)
 
 
 class TestRecorderCheckConfig(unittest.TestCase):

@@ -4,6 +4,7 @@ from collections import defaultdict
 from distutils.version import LooseVersion
 
 import numpy as np
+import pickle
 
 from openmdao.core.group import Group
 from openmdao.core.component import Component
@@ -506,6 +507,60 @@ def _check_missing_recorders(problem, logger):
     logger.warning(msg)
 
 
+def _check_unserializable_options(problem, logger, check_recordable=True):
+    """
+    Check if there are any options that are not serializable, and therefore won't be recorded.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    check_recordable : bool
+        If False, warn about all unserializable options.
+        If True, warn only about unserializable options that do not have 'recordable' set to False.
+    """
+    from openmdao.recorders.case_recorder import PICKLE_VER
+
+    def _check_opts(obj):
+        if obj:
+            for key, val in obj.options.items():
+                try:
+                    pickle.dumps(val, PICKLE_VER)
+                except Exception:
+                    if obj.options._dict[key]['recordable']:
+                        msg = f"{obj.msginfo}: option '{key}' is not serializable " \
+                              "(cannot be pickled) but 'recordable=False' has not been set. " \
+                              f"No options will be recorded for '{obj.pathname}' unless " \
+                              "'recordable' is set to False for this option."
+                        logger.warning(msg)
+                    elif not check_recordable:
+                        msg = f"{obj.msginfo}: option '{key}' is not serializable " \
+                              "(cannot be pickled) and will not be recorded."
+                        logger.warning(msg)
+
+    # check options for all for Systems and Solvers
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        _check_opts(system)
+        _check_opts(system.nonlinear_solver)
+        _check_opts(system.linear_solver)
+
+
+def _check_all_unserializable_options(problem, logger):
+    """
+    Check if there are any options that are not serializable, and therefore won't be recorded.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    _check_unserializable_options(problem, logger, False)
+
+
 def _get_promoted_connected_ins(g):
     """
     Find all inputs that are promoted above the level where they are explicitly connected.
@@ -580,6 +635,7 @@ _default_checks = {
     'solvers': _check_solvers,
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
+    'unserializable_options': _check_unserializable_options,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
     'auto_ivc_warnings': _check_auto_ivc_warnings
 }
@@ -589,7 +645,11 @@ _all_checks.update({
     'cycles': _check_cycles_prob,
     'unconnected_inputs': _check_hanging_inputs,
     'promotions': _check_explicitly_connected_promoted_inputs,
+    'all_unserializable_options': _check_all_unserializable_options,
 })
+
+_all_non_redundant_checks = _all_checks.copy()
+del _all_non_redundant_checks['unserializable_options']
 
 
 #

@@ -25,7 +25,8 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.error_checking.check_config import _default_checks, _all_checks
+from openmdao.error_checking.check_config import _default_checks, _all_checks, \
+    _all_non_redundant_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
@@ -853,11 +854,12 @@ class Problem(object):
             Determines what config checks, if any, are run after setup is complete.
             If None or False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
-            'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
+            'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
+            'auto_ivc_warnings') are run
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
-            'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
-            'system', 'unconnected_inputs') are run
+            'dup_inputs', 'missing_recorders', 'all_unserializable_options', 'out_of_order',
+            'promotions', 'solvers', 'system', 'unconnected_inputs') are run
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -2039,7 +2041,7 @@ class Problem(object):
             logger = get_logger('check_config', out_file=out_file, use_format=True)
 
         if checks == 'all':
-            checks = sorted(_all_checks)
+            checks = sorted(_all_non_redundant_checks)
 
         for c in checks:
             if c not in _all_checks:
