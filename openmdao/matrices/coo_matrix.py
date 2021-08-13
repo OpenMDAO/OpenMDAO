@@ -62,7 +62,7 @@ class COOMatrix(Matrix):
                 if src_indices is None:
                     end += val.size
                 else:
-                    end += shape[0] * len(src_indices)
+                    end += shape[0] * src_indices.indexed_src_size
 
             elif rows is None:  # sparse matrix
                 end += val.data.size

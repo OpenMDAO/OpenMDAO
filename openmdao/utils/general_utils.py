@@ -175,7 +175,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
         if indices.src_ndim > 1 and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
-        indshape = shape2tuple(indices.shape)
+        indshape = shape2tuple(indices.indexed_src_shape)
         if shape is not None and indshape != shape:
             raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
                              (indshape, shape, name))

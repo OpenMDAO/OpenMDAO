@@ -1710,7 +1710,7 @@ class Problem(object):
             # Display whether indices were declared when response was added.
             of = key[0]
             if of in resp and resp[of]['indices'] is not None:
-                data[''][key]['indices'] = len(resp[of]['indices'])
+                data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         fd_args['method'] = method
 

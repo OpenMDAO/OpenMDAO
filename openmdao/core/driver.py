@@ -556,7 +556,7 @@ class Driver(object):
                         val = get(name, flat=True)[indices.as_array()]
                 else:
                     if indices is not None:
-                        size = len(indices)
+                        size = indices.indexed_src_size
                     val = np.empty(size)
 
                 if get_remote:

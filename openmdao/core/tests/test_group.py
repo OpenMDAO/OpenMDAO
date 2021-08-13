@@ -570,7 +570,7 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('comp1', ControlInterpComp())
                 self.add_subsystem('comp2', CollocationComp())
 
-                self.connect('comp1.x', 'comp2.x', src_indices=[1])
+                self.connect('comp1.x', 'comp2.x', src_indices=[1], flat_src_indices=True)
 
         p = om.Problem()
 
@@ -580,6 +580,7 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.run_model()
 
         self.assertEqual(str(context.exception), msg)
 

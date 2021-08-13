@@ -83,17 +83,6 @@ class Indexer(object):
         self._flat_src = flat_src
         self._new_style = True
 
-    def __len__(self):
-        """
-        Return the length of the flattened indices.
-
-        Returns
-        -------
-        int
-            Length of flattened indices.
-        """
-        return self.size
-
     def __call__(self):
         """
         Return the indices in their most efficient form.
@@ -151,16 +140,16 @@ class Indexer(object):
         return inst
 
     @property
-    def size(self):
+    def indexed_src_size(self):
         """
-        Return the size of the flattened indices.
+        Return the size of the result if the index were applied to the source.
 
         Returns
         -------
         int
             Size of flattened indices.
         """
-        return np.product(self.shape, dtype=int)
+        return np.product(self.indexed_src_shape, dtype=int)
 
     @property
     def src_ndim(self):
@@ -191,7 +180,7 @@ class Indexer(object):
         raise NotImplementedError("No implementation of 'flat' found.")
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the result if the indices were applied to a source array.
 
@@ -204,7 +193,7 @@ class Indexer(object):
         if s is None:
             raise RuntimeError(f"Can't get shape of {self} because source shape "
                                "is unknown.")
-        return s.shape
+        return s.indexed_src_shape
 
     def shaped_instance(self):
         """
@@ -370,19 +359,21 @@ class ShapedIntIndexer(Indexer):
         return super().copy(self._idx)
 
     @property
-    def size(self):
+    def indexed_src_size(self):
         """
-        Return the size of the flattened indices.
+        Return the size of the result if the index were applied to the source.
 
         Returns
         -------
         int
             Size of flattened indices.
         """
+        if not self._flat_src and self._src_shape is not None and len(self._src_shape) > 1:
+            return np.product(self._src_shape[1:])
         return 1
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the index ().
 
@@ -391,6 +382,8 @@ class ShapedIntIndexer(Indexer):
         tuple
             The shape of the index.
         """
+        if not self._flat_src and self._src_shape is not None and len(self._src_shape) > 1:
+            return self._src_shape[1:]
         return 1
 
     def as_array(self, copy=False, flat=True):
@@ -576,7 +569,7 @@ class ShapedSliceIndexer(Indexer):
         return self._slice
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the indices.
 
@@ -645,7 +638,7 @@ class SliceIndexer(ShapedSliceIndexer):
         return ShapedSliceIndexer(slc)
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the indices.
 
@@ -663,7 +656,7 @@ class SliceIndexer(ShapedSliceIndexer):
                 return (len(range(slc.start, slc.stop, step)),)
             raise RuntimeError(f"Can't get shape of {self} because source shape "
                                "is unknown.")
-        return s.shape
+        return s.indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -758,7 +751,7 @@ class ShapedArrayIndexer(Indexer):
         return super().copy(self._arr)
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the indices.
 
@@ -944,7 +937,7 @@ class ShapedMultiIndexer(Indexer):
         return super().copy(self._tup)
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the indices.
 
@@ -957,10 +950,10 @@ class ShapedMultiIndexer(Indexer):
         seen_arr = False
         for i in self._idx_list:
             if isinstance(i, ShapedSliceIndexer):
-                lens.append(len(i))
+                lens.append(i.indexed_src_size)
             elif isinstance(i, ShapedArrayIndexer) and not seen_arr:
                 # only first array idx counts toward shape
-                lens.append(len(i))
+                lens.append(i.indexed_src_size)
                 seen_arr = True
             # int indexers don't count toward shape (scalar array has shape ())
 
@@ -1352,7 +1345,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         return self._arr.shape[-1]
 
     @property
-    def shape(self):
+    def indexed_src_shape(self):
         """
         Return the shape of the indices.
 
@@ -1440,7 +1433,7 @@ class ListOfTuplesArrayIndexer(Indexer):
 
         try:
             self._shaped_inst = ShapedMultiIndexer(self._npy_inds,
-                                                   self.shape, flat_src=self._flat_src)
+                                                   self.indexed_src_shape, flat_src=self._flat_src)
         except Exception:
             self._shaped_inst = None
 

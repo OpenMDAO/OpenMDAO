@@ -2442,7 +2442,7 @@ class System(object):
         # size may not be available at this point, but get it if we can in order to allow
         # some earlier error checking
         try:
-            size = idxer.size
+            size = idxer.indexed_src_size
         except Exception:
             size = None
 
@@ -3005,8 +3005,7 @@ class System(object):
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()
-                        meta['size'] = len(indices)
-                        meta['global_size'] = len(indices)
+                        meta['size'] = meta['global_size'] = indices.indexed_src_size
                     else:
                         meta['global_size'] = vmeta['global_size']
 
@@ -3129,7 +3128,7 @@ class System(object):
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
                     indices = indices.shaped_instance()
-                    response['size'] = response['global_size'] = len(indices)
+                    response['size'] = response['global_size'] = indices.indexed_src_size
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
@@ -4502,7 +4501,7 @@ class System(object):
                     vshape = None
                     has_src_indices = False
             else:
-                shp = inds.shape
+                shp = inds.indexed_src_shape
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:

@@ -957,7 +957,7 @@ class Group(System):
                 if parent_src_shape is not None and pinfo.src_shape is not None:
                     if parent_src_shape != pinfo.src_shape:
                         if oldinfo.src_indices is not None:
-                            parent_src_shape = oldinfo.src_indices.shape
+                            parent_src_shape = oldinfo.src_indices.indexed_src_shape
                             oldprom = prom
                             oldpath = self.pathname
                         if parent_src_shape != pinfo.src_shape:
@@ -1984,18 +1984,19 @@ class Group(System):
                                           f"'{abs_in}': {err}", exc=err.__class__,
                                           category=SetupWarning, err=self._raise_connection_errors)
 
-                    if src_indices.size == 0:
+                    if src_indices.indexed_src_size == 0:
                         continue
 
-                    if src_indices.size != shape_to_len(in_shape):
+                    if src_indices.indexed_src_size != shape_to_len(in_shape):
                         # initial dimensions of indices shape must be same shape as target
-                        for idx_d, inp_d in zip(src_indices.shape, in_shape):
+                        for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
                                 msg = f"{self.msginfo}: The source indices " + \
                                       f"{meta_in['src_indices']} do not specify a " + \
                                       f"valid shape for the connection '{abs_out}' to " + \
                                       f"'{abs_in}'. The target shape is " + \
-                                      f"{in_shape} but indices are shape {src_indices.shape}."
+                                      f"{in_shape} but indices are shape " + \
+                                      f"{src_indices.indexed_src_shape}."
                                 if self._raise_connection_errors:
                                     raise ValueError(msg)
                                 else:
@@ -2898,7 +2899,7 @@ class Group(System):
                 else:
                     dist_sizes = None
                 if of in approx_of_idx:
-                    end += len(approx_of_idx[of])
+                    end += approx_of_idx[of].indexed_src_size
                     yield of, start, end, approx_of_idx[of].shaped_array().flat[:], dist_sizes
                 else:
                     end += abs2meta[of][szname]
@@ -2967,7 +2968,7 @@ class Group(System):
                         vec = None
                     if wrt in approx_wrt_idx:
                         sub_wrt_idx = approx_wrt_idx[wrt]
-                        size = len(sub_wrt_idx)
+                        size = sub_wrt_idx.indexed_src_size
                         sub_wrt_idx = sub_wrt_idx.flat()
                     else:
                         sub_wrt_idx = _full_slice
@@ -3229,7 +3230,8 @@ class Group(System):
                               f"{src_indices} do not specify a " + \
                               f"valid shape for the connection '{src}' to " + \
                               f"'{tgt}'. The target shape is " + \
-                              f"{meta['shape']} but indices have shape {src_indices.shape}."
+                              f"{meta['shape']} but indices have shape " + \
+                              f"{src_indices.indexed_src_shape}."
                         raise ValueError(msg)
             else:
                 if val is None:
