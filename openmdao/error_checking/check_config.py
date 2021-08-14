@@ -532,8 +532,8 @@ def _check_unserializable_options(problem, logger, check_recordable=True):
                     if obj.options._dict[key]['recordable']:
                         msg = f"{obj.msginfo}: option '{key}' is not serializable " \
                               "(cannot be pickled) but 'recordable=False' has not been set. " \
-                              f"No options will be recorded for '{obj.pathname}' unless " \
-                              "'recordable' is set to False for this option."
+                              f"No options will be recorded for this {obj.__class__.__name__} " \
+                              "unless 'recordable' is set to False for this option."
                         logger.warning(msg)
                     elif not check_recordable:
                         msg = f"{obj.msginfo}: option '{key}' is not serializable " \

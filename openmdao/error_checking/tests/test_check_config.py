@@ -493,16 +493,27 @@ class TestCheckConfig(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x']
 
+        class MySolver(om.NonlinearRunOnce):
+
+            def _declare_options(self):
+                self.options.declare('file3')
+
         prob = om.Problem()
         prob.model.add_subsystem('comp', TestComp())
+        prob.model.nonlinear_solver = MySolver(file3=TemporaryFile())
 
         msg1 = "'comp' <class TestComp>: option 'file1' is not serializable " + \
                "(cannot be pickled) but 'recordable=False' has not been set. " + \
-               "No options will be recorded for 'comp' unless 'recordable' is " + \
+               "No options will be recorded for this TestComp unless 'recordable' is " + \
                "set to False for this option."
 
         msg2 = "'comp' <class TestComp>: option 'file2' is not serializable " + \
                "(cannot be pickled) and will not be recorded."
+
+        msg3 = "MySolver in <model> <class Group>: option 'file3' is not serializable " + \
+               "(cannot be pickled) but 'recordable=False' has not been set. " + \
+               "No options will be recorded for this MySolver unless 'recordable' is " + \
+               "set to False for this option."
 
         # By default, a warning is only issued if 'recordable' is not set to False
         testlogger = TestLogger()
@@ -510,6 +521,7 @@ class TestCheckConfig(unittest.TestCase):
         prob.final_setup()
 
         testlogger.find_in('warning', msg1)
+        testlogger.find_in('warning', msg3)
         self.assertFalse(testlogger.contains('warning', msg2))
 
         # When checking 'all_unserializable_options', a warning is issued even if recordable=False
@@ -519,6 +531,7 @@ class TestCheckConfig(unittest.TestCase):
 
         testlogger.find_in('warning', msg1)
         testlogger.find_in('warning', msg2)
+        testlogger.find_in('warning', msg3)
 
 
 class TestRecorderCheckConfig(unittest.TestCase):
