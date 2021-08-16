@@ -479,6 +479,82 @@ n2_gui_test_scripts = {
             "selector": '[id^="persistentNodeInfo"] span.window-close-button',
             "button": "left"
         },
+        # Begin multi-window close test
+        {
+            "desc": "Hover to bring up Node Info window for p1.A",
+            "test": "hover",
+            "selector": "#p1_A",
+        },
+        {
+            "desc": "Click p1.A to make Node Info window persistent",
+            "test": "click",
+            "selector": "#p1_A",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window for p2.b",
+            "test": "hover",
+            "selector": "#p2_b",
+        },
+        {
+            "desc": "Click p2.b to make Node Info window persistent",
+            "test": "click",
+            "selector": "#p2_b",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window for lingrp.lin.A",
+            "test": "hover",
+            "selector": "#lingrp_lin_A",
+        },
+        {
+            "desc": "Click lingrp.lin.A to make Node Info window persistent",
+            "test": "click",
+            "selector": "#lingrp_lin_A",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window for lingrp.lin.b",
+            "test": "hover",
+            "selector": "#lingrp_lin_b",
+        },
+        {
+            "desc": "Click lingrp.lin.b to make Node Info window persistent",
+            "test": "click",
+            "selector": "#lingrp_lin_b",
+            "button": "left"
+        },
+        {
+            "desc": "Hover to bring up Node Info window for lingrp.lin.x",
+            "test": "hover",
+            "selector": "#lingrp_lin_x",
+        },
+        {
+            "desc": "Click lingrp.lin.x to make Node Info window persistent",
+            "test": "click",
+            "selector": "#lingrp_lin_x",
+            "button": "left"
+        },
+        {
+            "desc": "Check for 5 open persistent Node Info windows",
+            "test": "count",
+            "selector": "[id^='persistentNodeInfo']",
+            "count": 5
+        },
+        {
+            "desc": "Close All Node Info windows",
+            "test": "click",
+            "selector": '[id^="persistentNodeInfo"] span.window-close-button',
+            "button": "left",
+            "modifiers": ["Shift"]
+        },
+        {
+            "desc": "Check for 0 open persistent Node Info windows",
+            "test": "count",
+            "selector": "[id^='persistentNodeInfo']",
+            "count": 0
+        },
+        # End multi-window close test
         {
             "desc": "Turn off Node Info mode",
             "test": "click",
@@ -692,7 +768,9 @@ class n2_gui_test_case(unittest.TestCase):
                       options['selector'] + "'")
 
         hndl = await self.get_handle(options['selector'])
-        await hndl.click(button=options['button'])
+
+        mod_keys = [] if 'modifiers' not in options else options['modifiers']
+        await hndl.click(button=options['button'], modifiers=mod_keys)
 
     async def drag(self, options):
         """
