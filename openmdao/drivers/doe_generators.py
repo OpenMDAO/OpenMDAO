@@ -47,6 +47,11 @@ class ListGenerator(DOEGenerator):
     a list of DOE cases, each of which consists of a collection of name/value
     pairs specifying values for design variables.
 
+    Parameters
+    ----------
+    data : list
+        List of collections of name, value pairs for the design variables.
+
     Attributes
     ----------
     _data : list
@@ -56,11 +61,6 @@ class ListGenerator(DOEGenerator):
     def __init__(self, data=[]):
         """
         Initialize the ListGenerator.
-
-        Parameters
-        ----------
-        data : list
-            list of collections of name, value pairs for the design variables
         """
         super().__init__()
 
@@ -129,6 +129,11 @@ class CSVGenerator(DOEGenerator):
     design variable and the header row should have the names of the design
     variables.
 
+    Parameters
+    ----------
+    filename : str
+        The name of the file from which to read cases.
+
     Attributes
     ----------
     _filename : str
@@ -138,11 +143,6 @@ class CSVGenerator(DOEGenerator):
     def __init__(self, filename):
         """
         Initialize the CSVGenerator.
-
-        Parameters
-        ----------
-        filename : str
-               the name of the file from which to read cases
         """
         super().__init__()
 
@@ -208,6 +208,13 @@ class UniformGenerator(DOEGenerator):
     """
     DOE case generator implementing the Uniform method.
 
+    Parameters
+    ----------
+    num_samples : int, optional
+        The number of samples to run. Defaults to 1.
+    seed : int or None, optional
+        Seed for random number generator.
+
     Attributes
     ----------
     _num_samples : int
@@ -219,14 +226,6 @@ class UniformGenerator(DOEGenerator):
     def __init__(self, num_samples=1, seed=None):
         """
         Initialize the UniformGenerator.
-
-        Parameters
-        ----------
-        num_samples : int, optional
-            The number of samples to run. Defaults to 1.
-
-        seed : int or None, optional
-            Seed for random number generator.
         """
         super().__init__()
 
@@ -276,6 +275,14 @@ class _pyDOE_Generator(DOEGenerator):
     """
     Base class for DOE case generators implementing methods from pyDOE2.
 
+    Parameters
+    ----------
+    levels : int or dict, optional
+        The number of evenly spaced levels between each design variable
+        lower and upper bound.  Dictionary input is supported by Full Factorial or
+        Generalized Subset Design.
+        Defaults to 2.
+
     Attributes
     ----------
     _levels : int or dict(str, int)
@@ -287,14 +294,6 @@ class _pyDOE_Generator(DOEGenerator):
     def __init__(self, levels=_LEVELS):
         """
         Initialize the _pyDOE_Generator.
-
-        Parameters
-        ----------
-        levels : int or dict, optional
-            The number of evenly spaced levels between each design variable
-            lower and upper bound.  Dictionary input is supported by Full Factorial or
-            Generalized Subset Design.
-            Defaults to 2.
         """
         super().__init__()
         self._levels = levels
@@ -419,6 +418,14 @@ class _pyDOE_Generator(DOEGenerator):
 class FullFactorialGenerator(_pyDOE_Generator):
     """
     DOE case generator implementing the Full Factorial method.
+
+    Parameters
+    ----------
+    levels : int or dict, optional
+        The number of evenly spaced levels between each design variable
+        lower and upper bound.  Dictionary input is supported by Full Factorial or
+        Generalized Subset Design.
+        Defaults to 2.
     """
 
     def _generate_design(self, size):
@@ -442,6 +449,20 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
     """
     DOE case generator implementing the General Subset Design Factorial method.
 
+    Parameters
+    ----------
+    levels : int or dict
+        The number of evenly spaced levels between each design variable
+        lower and upper bound. Defaults to 2.
+    reduction : int
+        Reduction factor (bigger than 1). Larger `reduction` means fewer
+        experiments in the design and more possible complementary designs.
+    n : int, optional
+        Number of complementary GSD-designs. The complementary
+        designs are balanced analogous to fold-over in two-level fractional
+        factorial designs.
+        Defaults to 1.
+
     Attributes
     ----------
     _reduction : int
@@ -457,20 +478,6 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
     def __init__(self, levels, reduction, n=1):
         """
         Initialize the GeneralizedSubsetGenerator.
-
-        Parameters
-        ----------
-        levels : int or dict
-            The number of evenly spaced levels between each design variable
-            lower and upper bound. Defaults to 2.
-        reduction : int
-            Reduction factor (bigger than 1). Larger `reduction` means fewer
-            experiments in the design and more possible complementary designs.
-        n : int, optional
-            Number of complementary GSD-designs. The complementary
-            designs are balanced analogous to fold-over in two-level fractional
-            factorial designs.
-            Defaults to 1.
         """
         super().__init__(levels=levels)
         self._reduction = reduction
@@ -529,6 +536,11 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
     """
     DOE case generator implementing the Box-Behnken method.
 
+    Parameters
+    ----------
+    center : int, optional
+        The number of center points to include (default = None).
+
     Attributes
     ----------
     _center : int
@@ -538,11 +550,6 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
     def __init__(self, center=None):
         """
         Initialize the BoxBehnkenGenerator.
-
-        Parameters
-        ----------
-        center : int, optional
-            The number of center points to include (default = None).
         """
         super().__init__(levels=3)
         self._center = center
@@ -575,6 +582,20 @@ class LatinHypercubeGenerator(DOEGenerator):
     """
     DOE case generator implementing Latin hypercube method via pyDOE2.
 
+    Parameters
+    ----------
+    samples : int, optional
+        The number of samples to generate for each factor (Defaults to n).
+    criterion : str, optional
+        Allowable values are "center" or "c", "maximin" or "m",
+        "centermaximin" or "cm", and "correlation" or "corr". If no value
+        given, the design is simply randomized.
+    iterations : int, optional
+        The number of iterations in the maximin and correlations algorithms
+        (Defaults to 5).
+    seed : int, optional
+        Random seed to use if design is randomized. Defaults to None.
+
     Attributes
     ----------
     _samples : int
@@ -602,20 +623,6 @@ class LatinHypercubeGenerator(DOEGenerator):
         Initialize the LatinHypercubeGenerator.
 
         See : https://pythonhosted.org/pyDOE/randomized.html
-
-        Parameters
-        ----------
-        samples : int, optional
-            The number of samples to generate for each factor (Defaults to n)
-        criterion : str, optional
-            Allowable values are "center" or "c", "maximin" or "m",
-            "centermaximin" or "cm", and "correlation" or "corr". If no value
-            given, the design is simply randomized.
-        iterations : int, optional
-            The number of iterations in the maximin and correlations algorithms
-            (Defaults to 5).
-        seed : int, optional
-            Random seed to use if design is randomized. Defaults to None.
         """
         super().__init__()
 

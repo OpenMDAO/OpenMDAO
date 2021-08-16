@@ -29,6 +29,11 @@ class Jacobian(object):
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
 
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+
     Attributes
     ----------
     _system : <System>
@@ -52,11 +57,6 @@ class Jacobian(object):
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info

@@ -418,10 +418,10 @@ class ExperimentalDriver(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of : list of variable name str or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt : list of variable name str or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : str

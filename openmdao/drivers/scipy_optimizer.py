@@ -81,6 +81,11 @@ class ScipyOptimizeDriver(Driver):
         equality_constraints
         inequality_constraints
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     fail : bool
@@ -114,11 +119,6 @@ class ScipyOptimizeDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize the ScipyOptimizeDriver.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
 
@@ -798,7 +798,7 @@ def signature_extender(fcn, extra_args):
     fcn : callable
         Function, which takes the design vector as the first argument.
     extra_args : tuple or list
-        Extra arguments for the function
+        Extra arguments for the function.
 
     Returns
     -------

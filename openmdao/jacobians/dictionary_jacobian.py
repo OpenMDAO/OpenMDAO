@@ -9,6 +9,13 @@ class DictionaryJacobian(Jacobian):
     """
     No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
 
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _iter_keys : list of (vname, vname) tuples
@@ -18,13 +25,6 @@ class DictionaryJacobian(Jacobian):
     def __init__(self, system, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(system, **kwargs)
         self._iter_keys = {}

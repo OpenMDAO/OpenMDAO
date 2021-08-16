@@ -14,6 +14,11 @@ class ImplicitComponent(Component):
     """
     Class to inherit from when all output variables are implicit.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _inst_functs : dict
@@ -23,11 +28,6 @@ class ImplicitComponent(Component):
     def __init__(self, **kwargs):
         """
         Store some bound methods so we can detect runtime overrides.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -168,7 +168,7 @@ class ImplicitComponent(Component):
         rel_systems : set of str
             Set of names of relevant systems based on the current linear solve.
         mode : str
-            'fwd' or 'rev'.
+            Either 'fwd' or 'rev'.
         scope_out : set or None
             Set of absolute output names in the scope of this mat-vec product.
             If None, all are in the scope.
@@ -299,11 +299,11 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None
@@ -318,9 +318,9 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         pass
 
@@ -334,11 +334,11 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None
@@ -358,17 +358,17 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         d_inputs : Vector
-            see inputs; product must be computed only if var_name in d_inputs
+            See inputs; product must be computed only if var_name in d_inputs.
         d_outputs : Vector
-            see outputs; product must be computed only if var_name in d_outputs
+            See outputs; product must be computed only if var_name in d_outputs.
         d_residuals : Vector
-            see outputs
+            See outputs.
         mode : str
-            either 'fwd' or 'rev'
+            Either 'fwd' or 'rev'.
         """
         pass
 
@@ -389,11 +389,11 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         d_outputs : Vector
-            unscaled, dimensional quantities read via d_outputs[key]
+            Unscaled, dimensional quantities read via d_outputs[key].
         d_residuals : Vector
-            unscaled, dimensional quantities read via d_residuals[key]
+            Unscaled, dimensional quantities read via d_residuals[key].
         mode : str
-            either 'fwd' or 'rev'
+            Either 'fwd' or 'rev'.
         """
         if mode == 'fwd':
             d_outputs.set_vec(d_residuals)
@@ -409,11 +409,11 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+            Sub-jac components written to jacobian[output_name, input_name].
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None

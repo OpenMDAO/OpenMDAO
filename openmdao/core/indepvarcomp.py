@@ -11,21 +11,21 @@ from openmdao.utils.om_warnings import warn_deprecation
 class IndepVarComp(ExplicitComponent):
     """
     Class to use when all output variables are independent.
+
+    Parameters
+    ----------
+    name : str or None
+        Name of the variable.
+        If None, variables should be defined external to this class by calling add_output.
+    val : float or ndarray
+        Value of the variable if a single variable is being defined.
+    **kwargs : dict
+        Keyword arguments.
     """
 
     def __init__(self, name=None, val=1.0, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        name : str or None
-            name of the variable.
-            If None, variables should be defined external to this class by calling add_output.
-        val : float or ndarray
-            value of the variable if a single variable is being defined.
-        **kwargs : dict
-            keyword arguments.
         """
         super().__init__(**kwargs)
 
@@ -117,7 +117,7 @@ class IndepVarComp(ExplicitComponent):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
@@ -129,7 +129,7 @@ class IndepVarComp(ExplicitComponent):
         res_units : None
             This argument is deprecated because it was unused.
         desc : str
-            description of the variable
+            Description of the variable.
         lower : None
             This argument is deprecated because it was unused.
         upper : None
@@ -155,8 +155,7 @@ class IndepVarComp(ExplicitComponent):
         Returns
         -------
         dict
-            metadata for added variable
-
+            Metadata for added variable.
         """
         if res_units is not None:
             warn_deprecation(f"{self.msginfo}: The 'res_units' argument was used when adding "
@@ -208,20 +207,18 @@ class IndepVarComp(ExplicitComponent):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         desc : str
-            description of the variable.
+            Description of the variable.
         tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_outputs.
+            User defined tags that can be used to filter what gets listed when calling list_outputs.
 
         Returns
         -------
         dict
-            metadata for added variable
-
+            Metadata for added variable.
         """
         if tags is None:
             tags = {'indep_var'}

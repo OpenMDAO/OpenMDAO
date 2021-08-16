@@ -117,6 +117,11 @@ class pyOptSparseDriver(Driver):
 
         two_sided_constraints
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     fail : bool
@@ -151,11 +156,6 @@ class pyOptSparseDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         if Optimization is None:
             raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')

@@ -37,6 +37,11 @@ class SimpleGADriver(Driver):
     """
     Driver for a simple genetic algorithm.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     _concurrent_pop_size : int
@@ -55,11 +60,6 @@ class SimpleGADriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize the SimpleGADriver driver.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
 
@@ -393,9 +393,9 @@ class SimpleGADriver(Driver):
         Returns
         -------
         float
-            Objective value
+            Objective value.
         bool
-            Success flag, True if successful
+            Success flag, True if successful.
         int
             Case number, used for identification when run in parallel.
         """
@@ -502,6 +502,16 @@ class GeneticAlgorithm(object):
     This is the Simple Genetic Algorithm implementation based on 2009 AAE550: MDO Lecture notes of
     Prof. William A. Crossley. It can be used standalone or as part of the OpenMDAO Driver.
 
+    Parameters
+    ----------
+    objfun : function
+        Objective callback function.
+    comm : MPI communicator or None
+        The MPI communicator that will be used objective evaluation for each generation.
+    model_mpi : None or tuple
+        If the model in objfun is also parallel, then this will contain a tuple with the the
+        total number of population points to evaluate concurrently, and the color of the point
+        to evaluate on this rank.
 
     Attributes
     ----------
@@ -531,17 +541,6 @@ class GeneticAlgorithm(object):
     def __init__(self, objfun, comm=None, model_mpi=None):
         """
         Initialize genetic algorithm object.
-
-        Parameters
-        ----------
-        objfun : function
-            Objective callback function.
-        comm : MPI communicator or None
-            The MPI communicator that will be used objective evaluation for each generation.
-        model_mpi : None or tuple
-            If the model in objfun is also parallel, then this will contain a tuple with the the
-            total number of population points to evaluate concurrently, and the color of the point
-            to evaluate on this rank.
         """
         self.objfun = objfun
         self.comm = comm
@@ -561,7 +560,7 @@ class GeneticAlgorithm(object):
         Parameters
         ----------
         x0 : ndarray
-            Initial design values
+            Initial design values.
         vlb : ndarray
             Lower bounds array.
         vub : ndarray
@@ -578,14 +577,14 @@ class GeneticAlgorithm(object):
         random_state : np.random.RandomState, int
             Random state (or seed-number) which controls the seed and random draws.
         Pm : float or None
-            Mutation rate
+            Mutation rate.
         Pc : float
-            Crossover rate
+            Crossover rate.
 
         Returns
         -------
         ndarray
-            Best design point
+            Best design point.
         float
             Objective value at best design point.
         int
@@ -768,7 +767,7 @@ class GeneticAlgorithm(object):
         Parameters
         ----------
         old_gen : ndarray
-            Points in current generation
+            Points in current generation.
         fitness : ndarray
             Objective value of each point.
 
@@ -800,7 +799,7 @@ class GeneticAlgorithm(object):
         Parameters
         ----------
         old_gen : ndarray
-            Points in current generation
+            Points in current generation.
         obj_val : ndarray
             Objective value of each point.
 
@@ -840,8 +839,7 @@ class GeneticAlgorithm(object):
         Parameters
         ----------
         old_gen : ndarray
-            Points in current generation
-
+            Points in current generation.
         Pc : float
             Probability of crossover.
 
@@ -874,7 +872,7 @@ class GeneticAlgorithm(object):
         Parameters
         ----------
         current_gen : ndarray
-            Points in current generation
+            Points in current generation.
 
         Pm : float
             Probability of mutation.

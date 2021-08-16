@@ -48,6 +48,11 @@ class Driver(object):
     """
     Top-level container for the systems and drivers.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     fail : bool
@@ -102,11 +107,6 @@ class Driver(object):
     def __init__(self, **kwargs):
         """
         Initialize the driver.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
 
@@ -849,10 +849,10 @@ class Driver(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of : list of variable name str or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt : list of variable name str or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : str
@@ -1207,6 +1207,15 @@ class RecordingDebugging(Recording):
 
     Handles doing the case recording and also the Driver
     debugging printing.
+
+    Parameters
+    ----------
+    name : str
+        Name of object getting recorded.
+    iter_count : int
+        Current counter of iterations completed.
+    recording_requester : object
+        The object that wants to be recorded.
     """
 
     def __enter__(self):

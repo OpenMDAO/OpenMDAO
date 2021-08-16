@@ -18,6 +18,13 @@ class AssembledJacobian(Jacobian):
     """
     Assemble a global <Jacobian>.
 
+    Parameters
+    ----------
+    matrix_class : type
+        Class to use to create internal matrices.
+    system : System
+        Parent system to this jacobian.
+
     Attributes
     ----------
     _view_ranges : dict
@@ -43,13 +50,6 @@ class AssembledJacobian(Jacobian):
     def __init__(self, matrix_class, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        matrix_class : type
-            Class to use to create internal matrices.
-        system : System
-            Parent system to this jacobian.
         """
         global Component
         # avoid circular imports
@@ -432,16 +432,16 @@ class AssembledJacobian(Jacobian):
 class DenseJacobian(AssembledJacobian):
     """
     Assemble dense global <Jacobian>.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
     """
 
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         super().__init__(DenseMatrix, system=system)
 
@@ -449,16 +449,16 @@ class DenseJacobian(AssembledJacobian):
 class COOJacobian(AssembledJacobian):
     """
     Assemble sparse global <Jacobian> in Coordinate list format.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
     """
 
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         super().__init__(COOMatrix, system=system)
 
@@ -466,16 +466,16 @@ class COOJacobian(AssembledJacobian):
 class CSRJacobian(AssembledJacobian):
     """
     Assemble sparse global <Jacobian> in Compressed Row Storage format.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
     """
 
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         super().__init__(CSRMatrix, system=system)
 
@@ -483,15 +483,15 @@ class CSRJacobian(AssembledJacobian):
 class CSCJacobian(AssembledJacobian):
     """
     Assemble sparse global <Jacobian> in Compressed Col Storage format.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
     """
 
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         super().__init__(CSCMatrix, system=system)
