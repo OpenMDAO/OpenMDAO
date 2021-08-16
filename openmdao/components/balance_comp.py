@@ -190,7 +190,7 @@ class BalanceComp(ImplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
         jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+            Sub-jac components written to jacobian[output_name, input_name]
         """
         for name, options in self._state_vars.items():
             lhs_name = options['lhs_name']

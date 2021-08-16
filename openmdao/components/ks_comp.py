@@ -241,7 +241,7 @@ class KSComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]
         """
         opt = self.options
         width = opt['width']

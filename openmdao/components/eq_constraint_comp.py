@@ -146,7 +146,7 @@ class EQConstraintComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]
         """
         for name, options in self._output_vars.items():
             lhs_name = options['lhs_name']

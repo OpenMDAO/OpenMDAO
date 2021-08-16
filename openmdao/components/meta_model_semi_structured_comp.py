@@ -220,7 +220,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
 

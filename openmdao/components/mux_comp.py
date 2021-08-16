@@ -10,6 +10,11 @@ class MuxComp(ExplicitComponent):
     """
     Mux one or more inputs along a given axis.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Arguments to be passed to the component initialization method.
+
     Attributes
     ----------
     _vars : dict
@@ -21,11 +26,6 @@ class MuxComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Instantiate MuxComp and populate private members.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Arguments to be passed to the component initialization method.
         """
         super().__init__(**kwargs)
 
@@ -48,7 +48,7 @@ class MuxComp(ExplicitComponent):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
@@ -59,7 +59,7 @@ class MuxComp(ExplicitComponent):
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
         desc : str
-            description of the variable
+            Description of the variable.
         axis : int
             The axis along which the elements will be stacked.  Note that N-dimensional inputs
             cannot be stacked along an axis greater than N.

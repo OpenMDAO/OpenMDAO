@@ -297,7 +297,7 @@ class _AutoIndepVarComp(IndepVarComp):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         units : str or None

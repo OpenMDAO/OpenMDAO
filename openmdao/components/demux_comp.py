@@ -52,7 +52,7 @@ class DemuxComp(ExplicitComponent):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
@@ -62,7 +62,7 @@ class DemuxComp(ExplicitComponent):
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
         desc : str
-            description of the variable
+            Description of the variable.
         axis : int
             The axis along which the elements will be selected.  Note the axis must have length
             vec_size, otherwise a RuntimeError is raised at setup.

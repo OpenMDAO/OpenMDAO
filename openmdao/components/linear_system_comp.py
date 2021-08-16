@@ -153,7 +153,7 @@ class LinearSystemComp(ImplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
         J : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+            Sub-jac components written to jacobian[output_name, input_name]
         """
         x = outputs['x']
         size = self.options['size']

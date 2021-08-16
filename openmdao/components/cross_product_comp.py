@@ -200,7 +200,7 @@ class CrossProductComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]
         """
         for product in self._products:
             a = inputs[product['a_name']]
