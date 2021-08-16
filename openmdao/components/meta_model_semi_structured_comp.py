@@ -179,9 +179,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
         for out_name, interp in self.interps.items():
@@ -218,7 +218,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

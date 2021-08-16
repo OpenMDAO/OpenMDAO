@@ -153,9 +153,9 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
@@ -186,9 +186,9 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
@@ -241,9 +241,9 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """

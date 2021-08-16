@@ -100,9 +100,9 @@ class DistribStateImplicit(om.ImplicitComponent):
         Parameters
         ----------
         d_outputs: Vector
-            unscaled, dimensional quantities read via d_outputs[key]
+            Unscaled, dimensional quantities read via d_outputs[key]
         d_residuals: Vector
-            unscaled, dimensional quantities read via d_residuals[key]
+            Unscaled, dimensional quantities read via d_residuals[key]
         mode: str
             either 'fwd' or 'rev'
         """
@@ -269,9 +269,9 @@ class TestUserDefinedSolver(unittest.TestCase):
                 Parameters
                 ----------
                 d_outputs: Vector
-                    unscaled, dimensional quantities read via d_outputs[key]
+                    Unscaled, dimensional quantities read via d_outputs[key]
                 d_residuals: Vector
-                    unscaled, dimensional quantities read via d_residuals[key]
+                    Unscaled, dimensional quantities read via d_residuals[key]
                 mode: str
                     either 'fwd' or 'rev'
                 """

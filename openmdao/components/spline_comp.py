@@ -10,6 +10,11 @@ class SplineComp(ExplicitComponent):
     """
     Interpolation component that can use any of OpenMDAO's interpolation methods.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Interpolator options to pass onward.
+
     Attributes
     ----------
     interp_to_cp : dict
@@ -25,11 +30,6 @@ class SplineComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Interpolator options to pass onward.
         """
         super().__init__(**kwargs)
 
@@ -159,9 +159,9 @@ class SplineComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         for out_name, interp in self.interps.items():
             values = inputs[self.interp_to_cp[out_name]]
@@ -187,7 +187,7 @@ class SplineComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

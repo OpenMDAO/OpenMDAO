@@ -1013,7 +1013,6 @@ class Driver(object):
         coloring : str
             A coloring filename.  If no arg is passed, filename will be determined
             automatically.
-
         """
         if self.supports['simultaneous_derivatives']:
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:

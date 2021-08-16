@@ -239,7 +239,7 @@ class KSComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

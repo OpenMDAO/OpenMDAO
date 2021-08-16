@@ -385,9 +385,9 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
@@ -402,9 +402,9 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         command = self.options['command_solve']
         if command:

@@ -229,9 +229,9 @@ class AddSubtractComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         complexify = self.options['complex']
         for (output_name, input_names, vec_size, length, val, scaling_factors,

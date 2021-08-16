@@ -43,6 +43,32 @@ class InterpND(object):
     provided for all interpolation methods. Gradients with respect to grid values are also
     available optionally.
 
+    Parameters
+    ----------
+    method : str
+        Name of interpolation method.
+    points : ndarray or tuple of ndarray
+        The points defining the regular grid in n dimensions.
+        For 1D interpolation, this can be an ndarray of table locations.
+        For table interpolation, it can be a tuple or an ndarray. If it is a tuple, it should
+        contain one ndarray for each table dimension.
+        For spline evaluation, num_cp can be specified instead of points.
+    values : ndarray or tuple of ndarray or None
+        These must be specified for interpolation.
+        The data on the regular grid in n dimensions.
+    x_interp : ndarray or None
+        If we are always interpolating at a fixed set of locations, then they can be
+        specified here.
+    extrapolate : bool
+        If False, when interpolated values are requested outside of the domain of the input
+        data, a ValueError is raised. If True, then the methods are allowed to extrapolate.
+        Default is True (raise an exception).
+    num_cp : None or int
+        Optional. When specified, use a linear distribution of num_cp control points. If you
+        are using 'bsplines' as the method, then num_cp must be set instead of points.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     extrapolate : bool
@@ -90,32 +116,6 @@ class InterpND(object):
         For interpolation, specify values and points.
 
         For spline evaluation, specifiy x_interp and either points or num_cp.
-
-        Parameters
-        ----------
-        method : str
-            Name of interpolation method.
-        points : ndarray or tuple of ndarray
-            The points defining the regular grid in n dimensions.
-            For 1D interpolation, this can be an ndarray of table locations.
-            For table interpolation, it can be a tuple or an ndarray. If it is a tuple, it should
-            contain one ndarray for each table dimension.
-            For spline evaluation, num_cp can be specified instead of points.
-        values : ndarray or tuple of ndarray or None
-            These must be specified for interpolation.
-            The data on the regular grid in n dimensions.
-        x_interp : ndarray or None
-            If we are always interpolating at a fixed set of locations, then they can be
-            specified here.
-        extrapolate : bool
-            If False, when interpolated values are requested outside of the domain of the input
-            data, a ValueError is raised. If True, then the methods are allowed to extrapolate.
-            Default is True (raise an exception).
-        num_cp : None or int
-            Optional. When specified, use a linear distribution of num_cp control points. If you
-            are using 'bsplines' as the method, then num_cp must be set instead of points.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         if not isinstance(method, str):
             msg = "Argument 'method' should be a string."
@@ -219,7 +219,7 @@ class InterpND(object):
             Value of interpolant at all sample points.
         ndarray
             Value of derivative of interpolated output with respect to input x. (Only when
-            compute_derivative is True.)
+            compute_derivative is True).
         """
         self._compute_d_dx = compute_derivative
         self.table._compute_d_dx = compute_derivative
@@ -454,11 +454,11 @@ class InterpND(object):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at
+            The coordinates to sample the gridded data at.
 
         Returns
         -------
-        gradient : ndarray of shape (..., ndim)
+        ndarray
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
         if (self._xi is None) or (not np.array_equal(xi, self._xi)):

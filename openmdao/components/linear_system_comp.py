@@ -99,9 +99,9 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
@@ -121,9 +121,9 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A
@@ -149,9 +149,9 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         J : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
@@ -177,9 +177,9 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         d_outputs : Vector
-            unscaled, dimensional quantities read via d_outputs[key]
+            Unscaled, dimensional quantities read via d_outputs[key]
         d_residuals : Vector
-            unscaled, dimensional quantities read via d_residuals[key]
+            Unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
         """

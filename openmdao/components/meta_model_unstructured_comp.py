@@ -342,9 +342,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         vec_size = self.options['vec_size']
 
@@ -512,7 +512,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """

@@ -30,6 +30,17 @@ class InterpScipy(InterpAlgorithm):
     object, the interpolation order (*slinear*, *cubic*, and *quintic*) may be chosen at each
     evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     _d_dx : ndarray
@@ -46,17 +57,6 @@ class InterpScipy(InterpAlgorithm):
     def __init__(self, grid, values, interp=None, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
-            Array containing the table values for all dimensions.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.initialize()
