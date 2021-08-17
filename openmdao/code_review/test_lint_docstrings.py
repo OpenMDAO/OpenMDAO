@@ -525,9 +525,10 @@ class LintTestCase(unittest.TestCase):
 
                     try:
                         mod = importlib.import_module(module_name)
-                    except ImportError:
+                    except ImportError as err:
+                        # if print_info:
+                        print('Skipped:', err)
                         # e.g. PETSc is not installed
-                        failures[module_name] = [('EEE', f'Error when loading module {module_name}.')]
                         continue
 
                     classes = [x for x in dir(mod)
