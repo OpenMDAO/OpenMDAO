@@ -261,9 +261,6 @@ class _CheckingJacobian(DictionaryJacobian):
                     arr[:] = column[start:end]
                     arr[row_inds] = 0.
                     nzs = np.nonzero(arr)
-                    print(key, arr, start, end)
-                    print(column)
-                    print(row_inds, arr[row_inds])
                     if nzs[0].size > 0:
                         self._errors.append(f"{system.msginfo}: User specified sparsity (rows/cols)"
                                             f" for subjac '{of}' wrt '{wrt}' is incorrect. There "
