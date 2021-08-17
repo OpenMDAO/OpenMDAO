@@ -160,6 +160,12 @@ class MissingImports(object):
     discouraged according to the documentation, but implementing a MetaPathFinder
     seemed like overkill.  Use at your own risk.
 
+    Parameters
+    ----------
+    missing_imports : str or Sequence of str
+        A string or sequence of strings that denotes modules that should appear to be absent
+        for testing purposes.
+
     Attributes
     ----------
     missing_imports : str or Sequence of str
@@ -172,12 +178,6 @@ class MissingImports(object):
     def __init__(self, missing_imports):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        missing_imports : str or Sequence of str
-            A string or sequence of strings that denotes modules that should appear to be absent
-            for testing purposes.
         """
         if isinstance(missing_imports, str):
             self.missing_imports = set([missing_imports])
