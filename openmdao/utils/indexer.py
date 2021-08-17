@@ -68,6 +68,8 @@ class Indexer(object):
         If True, index is into a flat source array.
     _new_style : bool
         If False, this index uses the deprecated OpenMDAO specific format.
+    _dist_shape : tuple
+        Distributed shape of the source.
     """
 
     def __init__(self, flat_src=None):
@@ -335,43 +337,6 @@ class ShapedIntIndexer(Indexer):
         """
         return super().copy(self._idx)
 
-    # @property
-    # def indexed_src_size(self):
-    #     """
-    #     Return the size of the result if the index were applied to the source.
-
-    #     Returns
-    #     -------
-    #     int
-    #         Size of flattened indices.
-    #     """
-    #     if self._src_shape is None:
-    #         raise ValueError(f"Can't get indexed_src_size of {self} because it has "
-    #                          "no source shape.")
-
-    #     if not self._flat_src and len(self._src_shape) > 1:
-    #         return np.product(self._src_shape[1:])
-
-    #     return 1
-
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the index ().
-
-    #     Returns
-    #     -------
-    #     tuple
-    #         The shape of the index.
-    #     """
-    #     if self._src_shape is None:
-    #         raise ValueError(f"Can't get indexed_src_shape of {self} because it has "
-    #                          "no source shape.")
-    #     if not self._flat_src and len(self._src_shape) > 1:
-    #         return self._src_shape[1:]
-
-    #     return (1,)
-
     @property
     def min_src_dim(self):
         """
@@ -571,22 +536,6 @@ class ShapedSliceIndexer(Indexer):
         # slices are immutable, so ignore copy arg
         return self._slice
 
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the result of indexing into the source.
-
-    #     Returns
-    #     -------
-    #     int
-    #         The shape of the result.
-    #     """
-    #     s = self.shaped_instance()
-    #     if s is None:
-    #         raise ValueError(f"Can't get indexed_src_shape of {self} because source shape "
-    #                            "is unknown.")
-    #     return resolve_shape(self._src_shape, self._slice)
-
     @property
     def min_src_dim(self):
         """
@@ -659,27 +608,6 @@ class SliceIndexer(ShapedSliceIndexer):
         self._shaped_inst._flat_src = self._flat_src
 
         return self._shaped_inst
-
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the result of indexing into the source.
-
-    #     Returns
-    #     -------
-    #     int
-    #         The shape of the result.
-    #     """
-    #     s = self.shaped_instance()
-    #     if s is None:
-    #         slc = self._slice
-    #         # if both start and stop are negative we can figure out the shape
-    #         if slc.start is not None and slc.start < 0 and slc.stop is not None and slc.stop < 0:
-    #             step = 1 if slc.step is None else slc.step
-    #             return (len(range(slc.start, slc.stop, step)),)
-    #         raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
-    #                            "is unknown.")
-    #     return s.indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -772,26 +700,6 @@ class ShapedArrayIndexer(Indexer):
             A copy of this Indexer.
         """
         return super().copy(self._arr)
-
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the result of indexing into the source.
-
-    #     Returns
-    #     -------
-    #     tuple
-    #         The shape of the result.
-    #     """
-    #     s = self.shaped_instance()
-    #     if s is not None:
-    #         shp = shape2tuple(s._src_shape)
-    #         if len(shp) > 1:
-    #             return shape2tuple(resolve_shape(shp)[s()])
-    #         return self._orig_shape
-    #     else:
-    #         raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
-    #                            "is unknown.")
 
     @property
     def min_src_dim(self):
@@ -981,29 +889,6 @@ class ShapedMultiIndexer(Indexer):
             A copy of this Indexer.
         """
         return super().copy(self._tup)
-
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the result of indexing into the source.
-
-    #     Returns
-    #     -------
-    #     tuple
-    #         The shape of the result.
-    #     """
-    #     lens = []
-    #     seen_arr = False
-    #     for i in self._idx_list:
-    #         if isinstance(i, ShapedSliceIndexer):
-    #             lens.append(i.indexed_src_size)
-    #         elif isinstance(i, ShapedArrayIndexer) and not seen_arr:
-    #             # only first array idx counts toward shape
-    #             lens.append(i.indexed_src_size)
-    #             seen_arr = True
-    #         # int indexers don't count toward shape (scalar array has shape ())
-
-    #     return tuple(lens)
 
     @property
     def min_src_dim(self):
@@ -1611,7 +1496,7 @@ class IndexMaker(object):
 indexer = IndexMaker()
 
 
-def convert_ellipsis_idx(shape, idx):
+def _convert_ellipsis_idx(shape, idx):
     lst = [None] * len(shape)
     # number of full slice dimensions
     nfull = len(shape) - len(idx) + 1
@@ -1630,12 +1515,39 @@ def convert_ellipsis_idx(shape, idx):
 
 class resolve_shape(object):
     """
+    Class that computes the result shape from a source shape and an index.
+
+    Attributes
+    ----------
+    _shape : tuple
+        The shape of the source.
     """
 
     def __init__(self, shape):
+        """
+        Initialize attributes.
+
+        Parameters
+        ----------
+        shape : tuple or int
+            Shape of the source.
+        """
         self._shape = shape2tuple(shape)
 
     def __getitem__(self, idx):
+        """
+        Return the shape of the result of indexing into the source with index idx.
+
+        Parameters
+        ----------
+        idx : int, slice, tuple, ndarray
+            The index into the source.
+
+        Returns
+        -------
+        tuple
+            The shape after indexing.
+        """
         if not isinstance(idx, tuple):
             idx = (idx,)
             is_tup = False
@@ -1644,7 +1556,7 @@ class resolve_shape(object):
 
         for i in idx:
             if i is ...:
-                idx = convert_ellipsis_idx(self._shape, idx)
+                idx = _convert_ellipsis_idx(self._shape, idx)
                 break
 
         if len(self._shape) < len(idx):
@@ -1668,8 +1580,6 @@ class resolve_shape(object):
 
         if is_tup or len(lens) >= 1:
             return tuple(lens)
-        #elif len(lens) == 1:
-            #return lens[0]
         elif is_tup:
             return ()
         return (1,)

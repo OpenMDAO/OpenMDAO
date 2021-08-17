@@ -911,7 +911,7 @@ class MPITests3(unittest.TestCase):
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_constraint('f_xy', lower=0.0, indices=[3])
+        model.add_constraint('f_xy', lower=0.0, indices=[3], flat_indices=True)
 
         prob.setup(force_alloc_complex=True, mode='fwd')
 

@@ -1087,7 +1087,7 @@ class TestProblem(unittest.TestCase):
                                             y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'val': 1.0, 'units': 'mm', 'src_indices': [1,2]},
+                                            x={'val': np.ones(2), 'units': 'mm', 'src_indices': [1,2]},
                                             y={'val': np.zeros(2), 'units': 'mm'}),
                          promotes=['x'])
         G1.add_subsystem('C3', om.ExecComp('y=x*4.',

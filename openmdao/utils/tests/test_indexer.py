@@ -76,7 +76,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.flat()], np.array([5,3,7,1]))
 
         assert_equal(ind.min_src_dim, 1)
-        
+
         ind.set_src_shape(src.shape)
         assert_equal(ind.indexed_src_shape, (4,))
         assert_equal(ind.shaped_instance()(), np.array([5,3,7,1]))
@@ -96,7 +96,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.flat()], np.array([3, 4, 5]))
 
         assert_equal(ind.min_src_dim, 1)
-        
+
         ind.set_src_shape(src.shape)
         assert_equal(ind.indexed_src_shape, (3,))
         assert_equal(ind.shaped_instance()(), [3, 4, 5])
@@ -143,7 +143,7 @@ class IndexerTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        ind.set_src_shape(10)
+        ind.set_src_shape(src.shape)
         assert_equal(ind.shaped_array(), np.array([5,3,7,9]))
         assert_equal(src[ind.shaped_array()], np.array([5,3,7,9]))
         assert_equal(ind.shaped_instance()(), np.array([5,3,7,9]))
@@ -169,7 +169,7 @@ class IndexerTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        ind.set_src_shape(10)
+        ind.set_src_shape(src.shape)
         assert_equal(ind.indexed_src_shape, (3,))
         assert_equal(ind.indexed_src_shape, (3,))
         assert_equal(ind.min_src_dim, 1)

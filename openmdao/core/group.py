@@ -984,7 +984,8 @@ class Group(System):
                             # we don't know size of auto_ivcs yet. Assume same size as input.
                             oldinfo.src_indices.set_src_shape(abs2meta[tgt]['shape'])
                         else:
-                            oldinfo.src_indices.set_src_shape(model._var_allprocs_abs2meta['output'][src]['global_shape'])
+                            oldinfo.src_indices.set_src_shape(
+                                model._var_allprocs_abs2meta['output'][src]['global_shape'])
                     try:
                         pinfo = pinfo.convert_from(oldinfo)
                     except Exception as err:
@@ -1479,9 +1480,6 @@ class Group(System):
                     global_abs_in2out[abs_in] = abs_out
 
                     gmeta_in = all_abs2meta_in[abs_in]
-                    if (gmeta_in['shape'] is None and not (gmeta_in['shape_by_conn'] or
-                                                          gmeta_in['copy_shape'])):
-                        pass  # ???
 
                     # if connection is contained in a subgroup, add to conns
                     # to pass down to subsystems.
@@ -1960,7 +1958,7 @@ class Group(System):
                     issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
 
             # check shape compatibility
-            if abs_in in abs2meta_in:  #  and abs_out in abs2meta_out:
+            if abs_in in abs2meta_in:
                 meta_in = abs2meta_in[abs_in]
 
                 # get output shape from allprocs meta dict, since it may
