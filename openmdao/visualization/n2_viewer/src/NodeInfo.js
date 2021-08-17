@@ -641,9 +641,10 @@ class PersistentNodeInfo extends N2WindowDraggable {
     /** Override so that shift-click closes all PersistentNodeInfo windows. */
     close() {
         this.tooltipBox.style("visibility", "hidden");
+        window.getSelection().empty(); // Shift-clicking also selects text, so unselect it
 
         if (d3.event.shiftKey) {
-            const allPNIWin = d3.selectAll('[id^="persistentNodeInfo-"]')
+            const allPNIWin = d3.selectAll('[id^="persistentNodeInfo-"]');
 
             allPNIWin.select('.window-close-button')
                 .on('click', null)
