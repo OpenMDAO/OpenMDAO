@@ -550,7 +550,7 @@ def _check_unserializable_options(problem, logger, check_recordable=True):
         if nl:
             _check_opts(nl, 'nonlinear_solver')
             for name in ('linear_solver', 'linesearch'):
-                _check_opts(getattr(nl, name), name)
+                _check_opts(getattr(nl, name, None), name)
 
 
 def _check_all_unserializable_options(problem, logger):
