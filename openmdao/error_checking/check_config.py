@@ -523,28 +523,34 @@ def _check_unserializable_options(problem, logger, check_recordable=True):
     """
     from openmdao.recorders.case_recorder import PICKLE_VER
 
-    def _check_opts(obj):
+    def _check_opts(obj, name=None):
         if obj:
             for key, val in obj.options.items():
                 try:
                     pickle.dumps(val, PICKLE_VER)
                 except Exception:
+                    name_str = name + " " if name else ""
                     if obj.options._dict[key]['recordable']:
-                        msg = f"{obj.msginfo}: option '{key}' is not serializable " \
+                        msg = f"{obj.msginfo}: {name_str}option '{key}' is not serializable " \
                               "(cannot be pickled) but 'recordable=False' has not been set. " \
                               f"No options will be recorded for this {obj.__class__.__name__} " \
                               "unless 'recordable' is set to False for this option."
                         logger.warning(msg)
                     elif not check_recordable:
-                        msg = f"{obj.msginfo}: option '{key}' is not serializable " \
+                        msg = f"{obj.msginfo}: {name_str}option '{key}' is not serializable " \
                               "(cannot be pickled) and will not be recorded."
                         logger.warning(msg)
 
     # check options for all for Systems and Solvers
     for system in problem.model.system_iter(include_self=True, recurse=True):
         _check_opts(system)
-        _check_opts(system.nonlinear_solver)
-        _check_opts(system.linear_solver)
+        _check_opts(system.linear_solver, 'linear_solver')
+
+        nl = system.nonlinear_solver
+        if nl:
+            _check_opts(nl, 'nonlinear_solver')
+            for name in ('linear_solver', 'linesearch'):
+                _check_opts(getattr(nl, name), name)
 
 
 def _check_all_unserializable_options(problem, logger):
