@@ -37,8 +37,8 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+        _is_slicer_op
 from openmdao.utils.notebook_utils import notebook, tabulate
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -4513,9 +4513,6 @@ class System(object):
             else:
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
-        if name not in scope_sys._var_prom2inds:
-            shpname = 'global_shape' if get_remote else 'shape'
-
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
         sdistrib = smeta['distributed']
@@ -5321,3 +5318,17 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
+
+    def _resolve_src_shape(self, input_name):
+        """
+        Determine the source shape of source connected to the given input.
+
+        Parameters
+        ----------
+        input_name : str
+            Absolute name of the input variable.
+        """
+        gmeta = self._var_allprocs_abs2meta['input']
+        meta = self._var_abs2meta['input']
+        if input_name in meta and meta['input_name']['src_indices'] is not None:
+            pass

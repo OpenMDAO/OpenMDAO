@@ -143,9 +143,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         The value of a variable.
     shape : int or tuple or list or None
         The expected or desired shape of the value.
-    indices : int or list of ints or tuple of ints or int ndarray or None
-        The indices of a source variable, used to determine shape if shape is None.
-        If shape is not None, the shape of the indices must match shape.
+    indices : Indexer or None
+        The indices into a source variable.
 
     Returns
     -------
@@ -171,8 +170,9 @@ def ensure_compatible(name, value, shape=None, indices=None):
             shape = tuple(shape)
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
+
     if indices is not None and indices.shaped_instance() is not None:
-        if indices.src_ndim > 1 and shape is None:
+        if not indices._flat_src and len(indices.indexed_src_shape) > 1 and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
         indshape = shape2tuple(indices.indexed_src_shape)
@@ -195,8 +195,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
             value = np.atleast_1d(value).astype(np.float64)
             if value.shape != shape:
                 raise ValueError("Incompatible shape for '%s': "
-                                 "Expected %s but got %s." %
-                                 (name, shape, value.shape))
+                                    "Expected %s but got %s." %
+                                    (name, shape, value.shape))
 
     return value, shape
 
@@ -1067,12 +1067,11 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return my_src_inds
     elif my_src_inds is None:
         return parent_src_inds
-    ndims = my_src_inds.src_ndim
 
-    if ndims == 1:
-        return parent_src_inds.shaped_array()[my_src_inds()]
+    if my_src_inds._flat_src:
+        return parent_src_inds.shaped_array(flat=True)[my_src_inds()]
     else:
-        return parent_src_inds.shaped_array().reshape(my_src_shape)[my_src_inds()]
+        return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 
 
 def shape_from_idx(src_shape, src_inds, flat_src_inds):

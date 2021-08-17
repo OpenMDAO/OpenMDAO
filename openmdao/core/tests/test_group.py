@@ -580,7 +580,6 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
-            p.run_model()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -1158,28 +1157,6 @@ class TestGroup(unittest.TestCase):
         p.run_model()
         assert_near_equal(p['C1.x'], 10.)
         assert_near_equal(p['C1.y'], 20.)
-
-    def test_promote_src_indices_nonflat_error(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', 1.0, src_indices=[(3, 1)])
-                self.add_output('y', 1.0)
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])
-
-        p = om.Problem()
-
-        p.model.add_subsystem('indep',
-                              om.IndepVarComp('x', np.arange(12).reshape((4, 3))),
-                              promotes_outputs=['x'])
-        p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
-
-        with self.assertRaises(Exception) as context:
-            p.setup()
-        self.assertEqual(str(context.exception),
-                         "src_indices for 'x' is not flat, so its input shape "
-                         "must be provided.")
 
     @parameterized.expand(itertools.product(
         [((4, 3),  [(0, 0), (3, 1), (2, 1), (1, 1)]),

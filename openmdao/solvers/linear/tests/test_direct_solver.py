@@ -488,7 +488,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c1.y', 'c2.x')
         model.connect('c2.y', 'c3.x')
         model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x', src_indices=([0]))
+        model.connect('c4.y', 'c5.x', src_indices=[0], flat_src_indices=True)
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -517,7 +517,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c1.y', 'c2.x')
         model.connect('c2.y', 'c3.x')
         model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x', src_indices=([0]))
+        model.connect('c4.y', 'c5.x', src_indices=([0]), flat_src_indices=True)
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -546,7 +546,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c1.y', 'c2.x')
         model.connect('c2.y', 'c3.x')
         model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x', src_indices=([0]))
+        model.connect('c4.y', 'c5.x', src_indices=[0], flat_src_indices=True)
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
         model.options['assembled_jac_type'] = 'dense'

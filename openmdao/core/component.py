@@ -1,6 +1,6 @@
 """Define the Component class."""
 
-from collections import OrderedDict, Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
 
@@ -18,12 +18,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, _is_slicer_op, convert_src_inds, \
-    _slice_indices
+    find_matches, make_set, convert_src_inds
 from openmdao.utils.indexer import Indexer, indexer, _update_new_style
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, UnusedOptionWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -1559,7 +1558,6 @@ class Component(System):
                     try:
                         src_inds.set_src_shape(shape)
                     except Exception as err:
-                        parent_sys = f" {pinfo.parent_sys} " if pinfo.parent_sys else ""
                         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
                                            f"src_indices {src_inds} and source shape "
                                            f"{shape}: {err}")
@@ -1567,7 +1565,7 @@ class Component(System):
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
                                                 meta['src_indices'], src_shape)
-                elif src_inds.src_ndim == 1:
+                elif src_inds._flat_src:
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
