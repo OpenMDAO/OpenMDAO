@@ -2826,9 +2826,13 @@ class Group(System):
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
             None, in which case, the approximation method provides its default value.
         step_calc : str
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, in which case, the approximation method
-            provides its default value.
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
         """
         self._has_approx = True
         self._approx_schemes = OrderedDict()

@@ -2332,7 +2332,7 @@ class TestSqliteRecorder(unittest.TestCase):
         model_residuals = final_case.residuals
         solver_residuals = last_root_solver_case.residuals
         for key in model_residuals.keys():
-            assert_equal_arrays(model_residuals[key]., solver_residuals[key]. )
+            assert_equal_arrays(model_residuals[key], solver_residuals[key])
 
     def test_driver_record_outputs(self):
 

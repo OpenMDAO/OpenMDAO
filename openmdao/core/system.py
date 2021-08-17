@@ -4572,7 +4572,12 @@ class System(object):
             else:
                 if is_slice:
                     val.shape = src_shape
-                    val = val[tuple(src_indices)].ravel()
+                    try:
+                        val = val[tuple(src_indices)].ravel()
+                    except TypeError:
+                        # Single-dimension slices don't convert to tuple, but they don't need to.
+                        val = val[src_indices].ravel()
+
                 elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
