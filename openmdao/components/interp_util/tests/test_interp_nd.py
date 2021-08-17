@@ -805,6 +805,30 @@ class TestInterpNDPython(unittest.TestCase):
         msg = "Either 'values' or 'x_interp' must be specified."
         self.assertTrue(str(cm.exception).startswith(msg))
 
+    def test_derivative_hysteresis_bug(self):
+        alt = np.array([-1000, 0, 1000], dtype=float)
+        rho = np.array([0.00244752, 0.00237717, 0.00230839])
+
+        rho_interp = InterpND(method='slinear', points=alt, values=rho, extrapolate=True)
+
+        x = 0.0
+        _, dval1 = rho_interp.interpolate([x], compute_derivative=True)
+
+        x = 0.5
+        _, dval2 = rho_interp.interpolate([x], compute_derivative=True)
+
+        x = 0.0
+        _, dval3 = rho_interp.interpolate([x], compute_derivative=True)
+
+        x = -0.5
+        _, dval4 = rho_interp.interpolate([x], compute_derivative=True)
+
+        x = 0.0
+        _, dval5 = rho_interp.interpolate([x], compute_derivative=True)
+
+        assert_near_equal(dval3 - dval1, np.array([[0.0]]))
+        assert_near_equal(dval5 - dval1, np.array([[0.0]]))
+
 
 if __name__ == '__main__':
     unittest.main()
