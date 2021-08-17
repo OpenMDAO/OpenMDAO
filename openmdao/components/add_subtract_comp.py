@@ -29,6 +29,32 @@ class AddSubtractComp(ExplicitComponent):
     All input vectors must be of the same shape, specified by the options 'vec_size' and 'length'.
     Use scaling factor -1 for subtraction.
 
+    Parameters
+    ----------
+    output_name : str
+        (Required) name of the result variable in this component's namespace.
+    input_names : iterable of str
+        (Required) names of the input variables for this system.
+    vec_size : int
+        Length of the first dimension of the input and output vectors
+        (i.e number of rows, or vector length for a 1D vector)
+        Default is 1.
+    length : int
+        Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
+        Default is 1 which results in input/output vectors of size (vec_size,).
+    val : float or list or tuple or ndarray
+        The initial value of the variable being added in user-defined units. Default is 1.0.
+    scaling_factors : iterable of numeric
+        Scaling factors to apply to each input.
+        Use [1,1,...] for addition, [1,-1,...] for subtraction
+        Must be same length as input_names
+        Default is None which results in a scaling factor of 1 on
+        each input (element-wise addition).
+    **kwargs : str
+        Any other arguments to pass to the addition system
+        (same as add_output method for ExplicitComponent)
+        Examples include units (str or None), desc (str).
+
     Attributes
     ----------
     _equations : list
@@ -42,32 +68,6 @@ class AddSubtractComp(ExplicitComponent):
                  val=1.0, scaling_factors=None, **kwargs):
         """
         Allow user to create an addition/subtracton system with one-liner.
-
-        Parameters
-        ----------
-        output_name : str
-            (required) name of the result variable in this component's namespace.
-        input_names : iterable of str
-            (required) names of the input variables for this system
-        vec_size : int
-            Length of the first dimension of the input and output vectors
-            (i.e number of rows, or vector length for a 1D vector)
-            Default is 1
-        length : int
-            Length of the second dimension of the input and ouptut vectors (i.e. number of columns)
-            Default is 1 which results in input/output vectors of size (vec_size,)
-        scaling_factors : iterable of numeric
-            Scaling factors to apply to each input.
-            Use [1,1,...] for addition, [1,-1,...] for subtraction
-            Must be same length as input_names
-            Default is None which results in a scaling factor of 1 on
-            each input (element-wise addition)
-        val : float or list or tuple or ndarray
-            The initial value of the variable being added in user-defined units. Default is 1.0.
-        **kwargs : str
-            Any other arguments to pass to the addition system
-            (same as add_output method for ExplicitComponent)
-            Examples include units (str or None), desc (str)
         """
         super().__init__()
 
@@ -97,11 +97,6 @@ class AddSubtractComp(ExplicitComponent):
     def initialize(self):
         """
         Declare options.
-
-        Parameters
-        ----------
-        complex : bool
-            Set True to enable complex math (e.g. for complex step verification)
         """
         self.options.declare('complex', types=bool, default=False,
                              desc="Allocate as complex (e.g. for complex-step verification)")

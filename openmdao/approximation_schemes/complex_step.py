@@ -97,6 +97,13 @@ class ComplexStep(ApproximationScheme):
             System on which the execution is run.
         under_cs : bool
             True if we're currently under complex step at a higher level.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
         """
         if not self._wrt_meta:
             return

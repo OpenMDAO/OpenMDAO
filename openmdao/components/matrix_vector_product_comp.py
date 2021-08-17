@@ -28,6 +28,11 @@ class MatrixVectorProductComp(ExplicitComponent):
 
     The size of vectors x and b is determined by the number of rows in m at each point.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _products : list
@@ -38,11 +43,6 @@ class MatrixVectorProductComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize the Matrix Vector Product component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -84,12 +84,12 @@ class MatrixVectorProductComp(ExplicitComponent):
 
         Parameters
         ----------
+        b_name : str
+            The name of the vector product output.
         A_name : str
             The name of the matrix input.
         x_name : str
             The name of the vector input.
-        b_name : str
-            The name of the vector product output.
         A_units : str or None
             The units of the input matrix.
         x_units : str or None
@@ -226,7 +226,7 @@ class MatrixVectorProductComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         for product in self._products:
             A_name = product['A_name']

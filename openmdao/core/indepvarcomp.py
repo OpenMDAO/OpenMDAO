@@ -307,7 +307,7 @@ class _AutoIndepVarComp(IndepVarComp):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
 
         """
         # Add the output quickly.

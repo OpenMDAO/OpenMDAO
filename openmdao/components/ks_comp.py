@@ -27,9 +27,9 @@ def check_option(option, value):
     Parameters
     ----------
     option : str
-        The name of the option
+        The name of the option.
     value : any
-        The value of the option
+        The value of the option.
 
     Raises
     ------
@@ -130,6 +130,11 @@ class KSComp(ExplicitComponent):
     Kreisselmeier-Steinhauser Function. This new constraint is satisfied when it
     is less than or equal to zero.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     cite : str
@@ -140,11 +145,6 @@ class KSComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize the KS component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -241,7 +241,7 @@ class KSComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         opt = self.options
         width = opt['width']

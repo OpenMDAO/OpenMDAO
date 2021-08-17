@@ -189,7 +189,7 @@ class SplineComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         for out_name, interp in self.interps.items():
             cp_name = self.interp_to_cp[out_name]

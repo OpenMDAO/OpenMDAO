@@ -31,9 +31,9 @@ def check_option(option, value):
     Parameters
     ----------
     option : str
-        The name of the option
+        The name of the option.
     value : any
-        The value of the option
+        The value of the option.
 
     Raises
     ------
@@ -50,7 +50,11 @@ def array_idx_iter(shape):
     Parameters
     ----------
     shape : tuple
-        shape of the array.
+        Shape of the array.
+
+    Yields
+    ------
+    int
     """
     for p in product(*[range(s) for s in shape]):
         yield p
@@ -59,6 +63,21 @@ def array_idx_iter(shape):
 class ExecComp(ExplicitComponent):
     """
     A component defined by an expression string.
+
+    Parameters
+    ----------
+    exprs : str, tuple of str or list of str
+        An assignment statement or iter of them. These express how the
+        outputs are calculated based on the inputs.  In addition to
+        standard Python operators, a subset of numpy and scipy functions
+        is supported.
+
+    **kwargs : dict of named args
+        Initial values of variables can be set by setting a named
+        arg with the var name.  If the value is a dict it is assumed
+        to contain metadata.  To set the initial value in addition to
+        other metadata, assign the initial value to the 'val' entry
+        of the dict.
 
     Attributes
     ----------
@@ -150,21 +169,6 @@ class ExecComp(ExplicitComponent):
         tensordot(x, y)            Tensor dot product of x and y
         zeros(N)                   Create an array of zeros
         =========================  ====================================
-
-        Parameters
-        ----------
-        exprs : str, tuple of str or list of str
-            An assignment statement or iter of them. These express how the
-            outputs are calculated based on the inputs.  In addition to
-            standard Python operators, a subset of numpy and scipy functions
-            is supported.
-
-        **kwargs : dict of named args
-            Initial values of variables can be set by setting a named
-            arg with the var name.  If the value is a dict it is assumed
-            to contain metadata.  To set the initial value in addition to
-            other metadata, assign the initial value to the 'val' entry
-            of the dict.
 
         Notes
         -----
@@ -686,8 +690,7 @@ class ExecComp(ExplicitComponent):
         Parameters
         ----------
         inputs : `VecWrapper`
-            `VecWrapper` containing parameters. (p)
-
+            `VecWrapper` containing parameters (p).
         partials : `Jacobian`
             Contains sub-jacobians.
         """

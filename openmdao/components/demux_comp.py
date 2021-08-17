@@ -11,6 +11,11 @@ class DemuxComp(ExplicitComponent):
     """
     Demux one or more inputs along a given axis.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Arguments to be passed to the component initialization method.
+
     Attributes
     ----------
     _vars : dict
@@ -22,11 +27,6 @@ class DemuxComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Instantiate DemuxComp and populate private members.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Arguments to be passed to the component initialization method.
         """
         super().__init__(**kwargs)
 

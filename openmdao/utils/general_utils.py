@@ -570,9 +570,6 @@ def printoptions(*args, **kwds):
     >>> with printoptions(precision=2) as opts:
     ...      assert_equal(opts, np.get_printoptions())
 
-    See Also:
-        set_printoptions, get_printoptions
-
     Parameters
     ----------
     *args : list
@@ -583,6 +580,10 @@ def printoptions(*args, **kwds):
     Yields
     ------
     str or int
+
+    See Also
+    --------
+        set_printoptions, get_printoptions
     """
     opts = np.get_printoptions()
 

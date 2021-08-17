@@ -490,7 +490,7 @@ class ExplicitComponent(Component):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name].
+            Sub-jac components written to partials[output_name, input_name]..
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """

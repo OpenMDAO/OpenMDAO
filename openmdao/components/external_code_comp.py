@@ -16,6 +16,11 @@ class ExternalCodeDelegate(object):
     """
     Handles all the methods related to running a code externally.
 
+    Parameters
+    ----------
+    comp : ExternalCodeComp or ExternalCodeImplicitComp object
+        The external code object this delegate is associated with.
+
     Attributes
     ----------
     _comp : ExternalCodeComp or ExternalCodeImplicitComp object
@@ -25,11 +30,6 @@ class ExternalCodeDelegate(object):
     def __init__(self, comp):
         """
         Initialize.
-
-        Parameters
-        ----------
-        comp : ExternalCodeComp or ExternalCodeImplicitComp object
-            The external code object this delegate is associated with.
         """
         self._comp = comp
 
@@ -239,6 +239,11 @@ class ExternalCodeComp(ExplicitComponent):
     Default stdin is the 'null' device, default stdout is the console, and
     default stderr is ``external_code_comp_error.out``.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     stdin : str or file object
@@ -256,11 +261,6 @@ class ExternalCodeComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Intialize the ExternalCodeComp component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
         super().__init__(**kwargs)
@@ -316,6 +316,11 @@ class ExternalCodeImplicitComp(ImplicitComponent):
     Default stdin is the 'null' device, default stdout is the console, and
     default stderr is ``external_code_comp_error.out``.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     stdin : str or file object
@@ -333,11 +338,6 @@ class ExternalCodeImplicitComp(ImplicitComponent):
     def __init__(self, **kwargs):
         """
         Intialize the ExternalCodeComp component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         self._external_code_runner = ExternalCodeDelegate(self)
         super().__init__(**kwargs)
@@ -389,7 +389,7 @@ class ExternalCodeImplicitComp(ImplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         """
         command = self.options['command_apply']
         if command:

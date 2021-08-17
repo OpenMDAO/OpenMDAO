@@ -70,6 +70,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructuredComp` object behaves as
         a :class:`MetaModelUnStructured` object.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _input_sizes : list
@@ -85,11 +90,6 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -214,12 +214,12 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         desc : str
             Description of the variable.
         lower : float or list or tuple or ndarray or Iterable or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
         upper : float or list or tuple or ndarray or or Iterable None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.

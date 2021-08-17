@@ -150,7 +150,7 @@ class VectorMagnitudeComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name].
+            Sub-jac components written to partials[output_name, input_name]..
         """
         for magnitude in self._magnitudes:
             a = inputs[magnitude['in_name']]

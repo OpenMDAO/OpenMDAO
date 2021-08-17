@@ -2742,7 +2742,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         self.assertEqual(set(case.outputs.keys()), set(expected_outputs.keys()))
         for key in expected_outputs:
-            np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key])
+            np.testing.assert_almost_equal(case.outputs[key], expected_outputs[key].)
 
         # check that the recurse option also returns system and solver cases (all_solver_cases)
         all_driver_cases = cr.list_cases('driver', recurse=True, flat=True, out_stream=None)

@@ -24,6 +24,10 @@ class MetaModelStructuredComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
 
     Attributes
     ----------
@@ -42,11 +46,6 @@ class MetaModelStructuredComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -84,7 +83,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         val : float or ndarray
             Initial value for the input.
         training_data : ndarray
-            training data sample points for this input variable.
+            Training data sample points for this input variable.
         **kwargs : dict
             Additional agruments for add_input.
         """
@@ -113,7 +112,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         val : float or ndarray
             Initial value for the output.
         training_data : ndarray
-            training data sample points for this output variable.
+            Training data sample points for this output variable.
         **kwargs : dict
             Additional agruments for add_output.
         """
@@ -228,7 +227,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
 

@@ -22,6 +22,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     For a Float variable, the training data is an array of length m,
     where m is the number of training points.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     train : bool
@@ -47,11 +52,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -121,14 +121,14 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         val : float or ndarray
             Initial value for the input.
         training_data : float or ndarray
-            training data for this variable. Optional, can be set by the problem later.
+            Training data for this variable. Optional, can be set by the problem later.
         **kwargs : dict
             Additional agruments for add_input.
 
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         metadata = super().add_input(name, val, **kwargs)
         vec_size = self.options['vec_size']
@@ -177,7 +177,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
@@ -514,7 +514,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         vec_size = self.options['vec_size']
 

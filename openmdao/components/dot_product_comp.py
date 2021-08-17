@@ -18,6 +18,11 @@ class DotProductComp(ExplicitComponent):
 
     Vectors a and b must be of the same length, specified by the option 'length'.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _products : list
@@ -28,11 +33,6 @@ class DotProductComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize the Dot Product component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -91,7 +91,7 @@ class DotProductComp(ExplicitComponent):
             the output is (vec_size,).
         length : int
             The length of the vectors a and b.  Their shapes are
-            (vec_size, length)
+            (vec_size, length).
         """
         self._products.append({
             'a_name': a_name,
@@ -191,7 +191,7 @@ class DotProductComp(ExplicitComponent):
         inputs : Vector
             Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            Sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         for product in self._products:
             a = inputs[product['a_name']]
