@@ -1121,7 +1121,13 @@ class EllipsisIndexer(Indexer):
             True if we're treating the source as flat.
         """
         super().__init__(flat_src)
-        self._tup = tup
+        tlist = []
+        # convert any internal lists/tuples to arrays
+        for i, v in enumerate(tup):
+            if isinstance(v, (list, tuple)):
+                v = np.atleast_1d(v)
+            tlist.append(v)
+        self._tup = tuple(tlist)
 
     def __call__(self):
         """
