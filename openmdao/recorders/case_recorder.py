@@ -10,6 +10,10 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import check_path
 
 
+# default pickle protocol version for serialization
+PICKLE_VER = 4
+
+
 class CaseRecorder(object):
     """
     Base class for all case recorders and is not a functioning case recorder on its own.

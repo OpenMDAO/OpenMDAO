@@ -125,7 +125,7 @@ class InterpAlgorithm(object):
         highbound = len(grid) - 1
         inc = 1
 
-        while x < grid[last_index]:
+        while x <= grid[last_index]:
             high = last_index
             last_index -= inc
             if last_index < 0:

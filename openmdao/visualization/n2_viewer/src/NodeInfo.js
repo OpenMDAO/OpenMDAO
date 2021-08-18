@@ -579,6 +579,30 @@ class PersistentNodeInfo extends N2WindowDraggable {
             ._setupCopyButtons()
             .showCloseButton()
             .show();
+
+        this.tooltipBox = d3.select(".tool-tip");
+        this.closeButton
+            .on("mouseover", this.mouseOver.bind(this))
+            .on("mouseleave", this.mouseLeave.bind(this))
+            .on("mousemove", this.mouseMove.bind(this));
+    }
+
+    /** When the mouse enters the element, show the tool tip */
+    mouseOver() {
+        this.tooltipBox
+            .text('Shift-click to close all.')
+            .style("visibility", "visible");
+    }
+
+    /** When the mouse leaves the element, hide the tool tip */
+    mouseLeave() {
+        this.tooltipBox.style("visibility", "hidden");
+    }
+
+    /** Keep the tool-tip near the mouse */
+    mouseMove() {
+        this.tooltipBox.style("top", (d3.event.pageY - 30) + "px")
+            .style("left", (d3.event.pageX + 5) + "px");
     }
 
     /** Set up event handlers for any "Show More" buttons in the panel */
@@ -612,5 +636,29 @@ class PersistentNodeInfo extends N2WindowDraggable {
         }
 
         return this;
+    }
+
+    /** Override so that shift-click closes all PersistentNodeInfo windows. */
+    close() {
+        this.tooltipBox.style("visibility", "hidden");
+        window.getSelection().empty(); // Shift-clicking also selects text, so unselect it
+
+        if (d3.event.shiftKey) {
+            const allPNIWin = d3.selectAll('[id^="persistentNodeInfo-"]');
+
+            allPNIWin.select('.window-close-button')
+                .on('click', null)
+                .on("mouseover", null)
+                .on("mouseleave", null)
+                .on("mousemove", null);
+            allPNIWin.remove();
+        }
+        else {
+            this.closeButton
+                .on("mouseover", null)
+                .on("mouseleave", null)
+                .on("mousemove", null);
+            super.close();
+        }
     }
 }

@@ -18,7 +18,7 @@ import pickle
 import zlib
 
 from openmdao import __version__ as openmdao_version
-from openmdao.recorders.case_recorder import CaseRecorder
+from openmdao.recorders.case_recorder import CaseRecorder, PICKLE_VER
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -161,7 +161,7 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record on this processor when running in parallel.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=4, record_viewer_data=True):
+    def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
         """
