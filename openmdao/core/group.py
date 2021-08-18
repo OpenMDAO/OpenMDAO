@@ -2017,6 +2017,15 @@ class Group(System):
                             fail = True
                             continue
 
+                    if src_indices.size != shape_to_len(in_shape):
+                        msg = f"{self.msginfo}: src_indices shape " + \
+                              f"{src_indices.shape} does not match {abs_in} shape " + \
+                              f"{in_shape}."
+                        if self._raise_connection_errors:
+                            raise ValueError(msg)
+                        else:
+                            issue_warning(msg, category=SetupWarning)
+
     def _set_subsys_connection_errors(self, val=True):
         """
         Set flag in all subgroups indicating whether connection errors just issue a Warning.
