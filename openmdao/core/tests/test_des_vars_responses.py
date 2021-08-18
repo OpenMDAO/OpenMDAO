@@ -707,7 +707,7 @@ def constraintExample(inds):
     prob.model.add_design_var("exampleComp.y")
 
     # Declaring Constraints by Using True Dimensioned Array Indices
-    prob.model.add_constraint("exampleComp.c_xy", indices=inds, lower=[0.0, 75.0], upper=[25.0, 100.0])
+    prob.model.add_constraint("exampleComp.c_xy", indices=inds, flat_indices=False, lower=[0.0, 75.0], upper=[25.0, 100.0])
 
     # Declare Objective
     prob.model.add_objective("exampleComp.f_xy")

@@ -2450,7 +2450,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=None):
+                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=True):
         r"""
         Add a design variable to this system.
 
@@ -2764,7 +2764,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=None):
+                       cache_linear_solution=False, flat_indices=True):
         r"""
         Add a constraint variable to this system.
 
@@ -2825,7 +2825,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False, flat_indices=None):
+                      cache_linear_solution=False, flat_indices=True):
         r"""
         Add a response variable to this system.
 
