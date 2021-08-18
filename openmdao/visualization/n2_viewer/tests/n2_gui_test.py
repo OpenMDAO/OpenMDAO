@@ -2,10 +2,11 @@
 import asyncio
 from playwright.async_api import async_playwright
 import subprocess
-import unittest
 from aiounittest import async_test
 import os
 import sys
+
+from openmdao.utils.gui_testing_utils import _GuiTestCase
 
 try:
     from parameterized import parameterized
@@ -585,42 +586,7 @@ n2_gui_test_scripts = {
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
 
-class n2_gui_test_case(unittest.TestCase):
-
-    def handle_console_err(self, msg):
-        """ Invoked any time that an error or warning appears in the log. """
-        if msg.type == 'warning':
-            self.console_warning = True
-            print('    Console Warning: ' + msg.text)
-        elif msg.type == 'error':
-            self.console_error = True
-            print('    Console Error: ' + msg.text)
-
-    def handle_page_err(self, msg):
-        self.page_error = True
-        print('    Error on page: ', msg)
-        print(type(msg))
-
-    def handle_request_err(self, msg):
-        self.page_error = True
-        print('    Request error: ', msg)
-
-    def setup_error_handlers(self):
-        self.console_warning = False
-        self.console_error = False
-        self.page_error = False
-
-        self.page.on('console', lambda msg: self.handle_console_err(msg))
-        self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
-        self.page.on('requestfailed', lambda msg: self.handle_request_err(msg))
-
-    async def setup_browser(self, playwright):
-        """ Create a browser instance and print user agent info. """
-        self.browser = await playwright.chromium.launch(args = ['--start-fullscreen'])
-        self.page = await self.browser.new_page()
-    
-        await self.page.bring_to_front()
-        self.setup_error_handlers()
+class n2_gui_test_case(_GuiTestCase):
 
     def log_test(self, msg):
         global current_test
@@ -654,7 +620,7 @@ class n2_gui_test_case(unittest.TestCase):
 
         # Without wait_until: 'networkidle', processing will begin before
         # the page is fully rendered
-        await self.page.goto(url, wait_until = 'networkidle')
+        await self.page.goto(url, wait_until='networkidle')
 
     async def generic_toolbar_tests(self):
         """ Click most of the toolbar buttons to see if an error occurs """
@@ -673,8 +639,8 @@ class n2_gui_test_case(unittest.TestCase):
         sure it exactly matches the supplied value. Try several times
         because sometimes transition animations throw things off.
         """
-        max_tries = 3 # Max number of times to attempt to find a selector
-        max_time = 2000 # The timeout in ms for each search
+        max_tries = 3  # Max number of times to attempt to find a selector
+        max_time = 2000  # The timeout in ms for each search
 
         if (expected_found > 0):
             num_tries = 0
@@ -682,20 +648,22 @@ class n2_gui_test_case(unittest.TestCase):
             while (not found and num_tries < max_tries):
                 nth_selector = f':nth-match({selector}, {expected_found})'
                 try:
-                    await self.page.wait_for_selector(nth_selector, state='attached', timeout=max_time)
+                    await self.page.wait_for_selector(nth_selector, state='attached',
+                                                      timeout=max_time)
                     found = True
                 except:
                     num_tries += 1
-            
+
             num_tries = 0
             found = False
             while (not found and num_tries < max_tries):
-                    nth_selector = f':nth-match({selector}, {expected_found+1})'
-                    try:          
-                        await self.page.wait_for_selector(nth_selector, state='detached', timeout=max_time)
-                        found = True
-                    except:
-                        num_tries += 1
+                nth_selector = f':nth-match({selector}, {expected_found + 1})'
+                try:
+                    await self.page.wait_for_selector(nth_selector, state='detached',
+                                                      timeout=max_time)
+                    found = True
+                except:
+                    num_tries += 1
 
         else:
             num_tries = 0
@@ -703,11 +671,12 @@ class n2_gui_test_case(unittest.TestCase):
             while (not found and num_tries < max_tries):
                 nth_selector = f':nth-match({selector}, 1)'
                 try:
-                    await self.page.wait_for_selector(nth_selector, state='detached', timeout=max_time)
+                    await self.page.wait_for_selector(nth_selector, state='detached',
+                                                      timeout=max_time)
                     found = True
                 except:
-                        num_tries += 1
-    
+                    num_tries += 1
+
         hndl_list = await self.page.query_selector_all(selector)
         if (len(hndl_list) > expected_found):
             global current_test
@@ -723,16 +692,6 @@ class n2_gui_test_case(unittest.TestCase):
         sure it matches the specified value.
         """
         await self.assert_element_count('g#n2arrows > g', expected_arrows)
-
-    async def get_handle(self, selector):
-        """ Get handle for a specific element and assert that it exists. """
-        handle = await self.page.wait_for_selector(selector, state='attached', timeout=3055)
-
-        self.assertIsNotNone(handle,
-                             "Could not find element with selector '" +
-                             selector + "' in the N2 diagram.")
-
-        return handle
 
     async def hover(self, options, log_test=True):
         """
