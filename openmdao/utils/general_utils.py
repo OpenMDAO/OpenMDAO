@@ -598,6 +598,10 @@ def printoptions(*args, **kwds):
         np.set_printoptions(**opts)
 
 
+def _nothing():
+    yield None
+
+
 def do_nothing_context():
     """
     Do nothing.
@@ -609,15 +613,8 @@ def do_nothing_context():
     -------
     contextmanager
         A do nothing context manager.
-
-    Yields
-    ------
-    None
     """
-    def nothing():
-        yield None
-
-    return contextmanager(nothing)()
+    return contextmanager(_nothing)()
 
 
 def remove_whitespace(s, right=False, left=False):

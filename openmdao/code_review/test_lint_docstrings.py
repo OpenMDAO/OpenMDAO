@@ -515,7 +515,7 @@ class LintTestCase(unittest.TestCase):
                    and not os.path.isdir(file_name):
 
                     # To construct module name, remove part of abs path that
-                    # precedes 'dymos', and then replace '/' with '.' in the remainder.
+                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
                     mod1 = re.sub(r'.*openmdao', 'openmdao', dirpath).replace('/', '.')
 
                     # Then, get rid of the '.py' to get final part of module name.

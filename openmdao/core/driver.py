@@ -1214,7 +1214,7 @@ class RecordingDebugging(Recording):
     iter_count : int
         Current counter of iterations completed.
     recording_requester : object
-        The object that wants to be recorded.
+        Object to which this recorder is attached.
     """
 
     def __enter__(self):

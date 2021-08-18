@@ -78,9 +78,7 @@ class SqliteCaseReader(BaseCaseReader):
     """
 
     def __init__(self, filename, pre_load=False, metadata_filename=None):
-        """
-        Initialize.
-        """
+        """Initialize."""
         super().__init__(filename, pre_load)
 
         check_valid_sqlite3_db(filename)
@@ -621,8 +619,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : 'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-                 case name
+        source : 'problem', 'driver', component pathname, solver pathname, case_name
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
