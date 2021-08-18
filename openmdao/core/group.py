@@ -2029,7 +2029,8 @@ class Group(System):
                                     continue
 
                     # any remaining dimension of indices must match shape of source
-                    if len(src_indices.indexed_src_shape) > len(out_shape):
+                    if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
+                                                      len(out_shape)):
                         msg = f"{self.msginfo}: The source indices " + \
                               f"{meta_in['src_indices']} do not specify a " + \
                               f"valid shape for the connection '{abs_out}' to '{abs_in}'. " + \

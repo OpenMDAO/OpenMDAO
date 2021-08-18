@@ -1083,11 +1083,11 @@ class TestProblem(unittest.TestCase):
         prob = om.Problem()
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem('C1', om.ExecComp('y=x*2.',
-                                            x={'val': 1.0, 'units': 'cm', 'src_indices': [0]},
+                                            x={'val': 1.0, 'units': 'cm', 'src_indices': [0], 'flat_src_indices': True},
                                             y={'val': 0.0, 'units': 'cm'}),
                          promotes=['x'])
         G1.add_subsystem('C2', om.ExecComp('y=x*3.',
-                                            x={'val': np.ones(2), 'units': 'mm', 'src_indices': [1,2]},
+                                            x={'val': np.ones(2), 'units': 'mm', 'src_indices': [1,2], 'flat_src_indices': True},
                                             y={'val': np.zeros(2), 'units': 'mm'}),
                          promotes=['x'])
         G1.add_subsystem('C3', om.ExecComp('y=x*4.',

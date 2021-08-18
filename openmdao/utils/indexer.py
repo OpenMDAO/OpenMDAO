@@ -349,6 +349,20 @@ class ShapedIntIndexer(Indexer):
         """
         return 1
 
+    @property
+    def indexed_src_shape(self):
+        """
+        Return the shape of the index ().
+
+        Returns
+        -------
+        tuple
+            The shape of the index.
+        """
+        if self._flat_src:
+            return (1,)
+        return super().indexed_src_shape
+
     def as_array(self, copy=False, flat=True):
         """
         Return an index array into a flat array.
@@ -627,6 +641,22 @@ class SliceIndexer(ShapedSliceIndexer):
         """
         return self.shaped_array(copy=copy, flat=flat)
 
+    @property
+    def indexed_src_shape(self):
+        """
+        Return the shape of the result of indexing into the source.
+
+        Returns
+        -------
+        tuple
+            The shape of the index.
+        """
+        slc = self._slice
+        if self._flat_src and slc.start is not None and slc.stop is not None:
+            step = 1 if slc.step is None else slc.step
+            return (len(range(slc.start, slc.stop, step)),)
+        return super().indexed_src_shape
+
 
 class ShapedArrayIndexer(Indexer):
     """
@@ -820,6 +850,20 @@ class ArrayIndexer(ShapedArrayIndexer):
 
         return self._shaped_inst
 
+    @property
+    def indexed_src_shape(self):
+        """
+        Return the shape of the result of indexing into the source.
+
+        Returns
+        -------
+        tuple
+            The shape of the index.
+        """
+        if self._flat_src:
+            return self._orig_shape
+        return super().indexed_src_shape
+
 
 class ShapedMultiIndexer(Indexer):
     """
@@ -851,6 +895,7 @@ class ShapedMultiIndexer(Indexer):
         """
         super().__init__(flat_src)
         self._tup = tup
+        # _orig_shape is only used when converting from ListOfTuplesArrayIndexer
         self._orig_shape = orig_shape
         self._set_idx_list()
 
@@ -901,6 +946,20 @@ class ShapedMultiIndexer(Indexer):
             The number of dimensions expected in the source array.
         """
         return len(self._idx_list)
+
+    @property
+    def indexed_src_shape(self):
+        """
+        Return the shape of the result of indexing into the source.
+
+        Returns
+        -------
+        tuple
+            The shape of the index.
+        """
+        if self._orig_shape is not None:
+            return self._orig_shape
+        return super().indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -1366,17 +1425,19 @@ class ListOfTuplesArrayIndexer(Indexer):
         if self._shaped_inst is not None:
             return self._shaped_inst
 
+        orig_shape = self._arr.shape if self._flat_src else self._arr.shape[:-1]
+
         try:
             self._shaped_inst = ShapedMultiIndexer(self._npy_inds,
-                                                   self.indexed_src_shape, flat_src=self._flat_src)
+                                                   orig_shape, flat_src=self._flat_src)
         except Exception:
             self._shaped_inst = None
         else:
             self._shaped_inst.set_src_shape(self._src_shape)
 
-        self._shaped_inst._src_shape = self._src_shape
-        self._shaped_inst._dist_shape = self._dist_shape
-        self._shaped_inst._flat_src = self._flat_src
+            self._shaped_inst._src_shape = self._src_shape
+            self._shaped_inst._dist_shape = self._dist_shape
+            self._shaped_inst._flat_src = self._flat_src
 
         return self._shaped_inst
 

@@ -752,7 +752,7 @@ class DistribStateImplicit(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.add_input('a', val=10., units='m', src_indices=[0], distributed=True)
+        self.add_input('a', val=10., units='m', src_indices=[0], flat_src_indices=True, distributed=True)
 
         rank = self.comm.rank
 

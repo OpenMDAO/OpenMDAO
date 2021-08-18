@@ -419,7 +419,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.shaped_array(), np.array([1,3,5,4,22, 20, 11, 3]))
         assert_equal(ind.as_array(), np.array([1,3,5,4,22, -4, 11, 3]))
         assert_equal(ind.as_array(flat=False), np.array([[1,3,5,4], [22, -4, 11, 3]]))
-        assert_equal(ind.indexed_src_shape, (8,))
+        assert_equal(ind.indexed_src_shape, (2, 4))
         assert_equal(ind.min_src_dim, 1)
 
 if __name__ == '__main__':

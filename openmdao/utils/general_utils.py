@@ -171,16 +171,21 @@ def ensure_compatible(name, value, shape=None, indices=None):
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
 
-    if indices is not None and indices.shaped_instance() is not None:
-        if not indices._flat_src and len(indices.indexed_src_shape) > 1 and shape is None:
+    if indices is not None:  # and indices.shaped_instance() is not None:
+        if not indices._flat_src and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
-        indshape = shape2tuple(indices.indexed_src_shape)
-        if shape is not None and indshape != shape:
-            raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
-                             (indshape, shape, name))
-        if shape is None:
-            shape = indshape
+        try:
+            # indshape = indices.as_array().shape
+            indshape = indices.indexed_src_shape
+        except Exception:
+            pass  # use shape provided or shape of value and check vs. shape of indices later
+        else:
+            if shape is not None and indshape != shape:
+                raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
+                                 (indshape, shape, name))
+            if shape is None:
+                shape = indshape
 
     if shape is None:
         # shape is not determined, assume the shape of value was intended
