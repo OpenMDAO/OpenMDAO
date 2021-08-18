@@ -6,6 +6,8 @@ from aiounittest import async_test
 import os
 import sys
 
+from openmdao.utils.gui_testing_utils import _GuiTestCase
+
 try:
     from parameterized import parameterized
 except ImportError:
@@ -507,9 +509,8 @@ n2_gui_test_scripts = {
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
-from openmdao.utils.gui_testing_utils import gui_test_case
 
-class n2_gui_test_case(gui_test_case):
+class n2_gui_test_case(_GuiTestCase):
 
     def log_test(self, msg):
         global current_test
@@ -543,7 +544,7 @@ class n2_gui_test_case(gui_test_case):
 
         # Without wait_until: 'networkidle', processing will begin before
         # the page is fully rendered
-        await self.page.goto(url, wait_until = 'networkidle')
+        await self.page.goto(url, wait_until='networkidle')
 
     async def generic_toolbar_tests(self):
         """ Click most of the toolbar buttons to see if an error occurs """

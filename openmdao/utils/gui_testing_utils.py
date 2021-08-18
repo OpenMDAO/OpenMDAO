@@ -1,8 +1,9 @@
 """Define utils for use in testing GUIs with Playwright."""
+
 import unittest
 
 
-class gui_test_case(unittest.TestCase):
+class _GuiTestCase(unittest.TestCase):
     """
     Class that can be inherited from and used for GUI tests using Playwright.
     """
@@ -51,6 +52,7 @@ class gui_test_case(unittest.TestCase):
     def setup_error_handlers(self):
         """
         Set up the error handlers.
+
         """
         self.console_warning = False
         self.console_error = False
