@@ -855,7 +855,7 @@ class Problem(object):
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
             'dup_inputs', 'missing_recorders', 'all_unserializable_options', 'out_of_order',
-            'promotions', 'solvers', 'system', 'unconnected_inputs') are run
+            'promotions', 'solvers', 'system', 'unconnected_inputs') are run.
         logger : object
             Object for logging config checks if check is True.
         mode : str
