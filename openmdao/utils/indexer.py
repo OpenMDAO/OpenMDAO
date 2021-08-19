@@ -65,6 +65,10 @@ class Indexer(object):
         Cached shaped_instance if we've computed it before.
     _flat_src : bool
         If True, index is into a flat source array.
+    _check_dims : bool
+        If True, compare dim of src with dim of index to give ambiguity warning.
+    _dist_shape : tuple or None
+        Distributed shape.
     """
 
     def __init__(self):
@@ -74,6 +78,9 @@ class Indexer(object):
         self._src_shape = None
         self._shaped_inst = None
         self._flat_src = True
+        self._check_dims = True
+        self._dist_shape = None
+        self._orig_src_shape = None
 
     def __len__(self):
         """
@@ -141,6 +148,27 @@ class Indexer(object):
         inst = self.__class__(*args)
         inst.__dict__.update(self.__dict__)
         return inst
+
+    def _set_attrs(self, parent):
+        """
+        Copy certain attributes from the parent to self.
+
+        Parameters
+        ----------
+        parent : Indexer
+            Parent of this indexer.
+
+        Returns
+        -------
+        Indexer
+            This indexer.
+        """
+        self._src_shape = parent._src_shape
+        self._flat_src = parent._flat_src
+        self._check_dims = parent._check_dims
+        self._dist_shape = parent._dist_shape
+        self._orig_src_shape = parent._orig_src_shape
+        return self
 
     @property
     def size(self):
@@ -268,6 +296,7 @@ class Indexer(object):
         Indexer
             Self is returned to allow chaining.
         """
+        self._orig_src_shape = shape
         self._src_shape, self._dist_shape = self._get_shapes(shape, dist_shape)
         if shape is not None:
             self._check_bounds()
@@ -275,6 +304,13 @@ class Indexer(object):
         self._shaped_inst = None
 
         return self
+
+    def _chk_shape_dims(self, flat_src, iname, oname):
+        if self._orig_src_shape is None or flat_src or not self._check_dims:
+            return
+
+        if len(self._orig_src_shape) > len(shape2tuple(self.shape)):
+            raise RuntimeError(f"When connecting {oname} to {iname}: shape:{self.shape}, src_shape: {self._orig_src_shape}.")
 
     def to_json(self):
         """
@@ -459,7 +495,7 @@ class IntIndexer(ShapedIntIndexer):
                 self._shaped_inst = ShapedIntIndexer(self._idx + self._src_shape[0])
             return self._shaped_inst
 
-        return ShapedIntIndexer(self._idx)
+        return ShapedIntIndexer(self._idx)._set_attrs(self)
 
 
 class ShapedSliceIndexer(Indexer):
@@ -623,11 +659,11 @@ class SliceIndexer(ShapedSliceIndexer):
             if self._src_shape is None:
                 return None
             else:
-                self._shaped_inst = \
-                    ShapedSliceIndexer(slice(*self._slice.indices(self._src_shape[0])))
+                self._shaped_inst = ShapedSliceIndexer(
+                    slice(*self._slice.indices(self._src_shape[0])))._set_attrs(self)
                 return self._shaped_inst
 
-        return ShapedSliceIndexer(slc)
+        return ShapedSliceIndexer(slc)._set_attrs(self)
 
     @property
     def shape(self):
@@ -854,7 +890,7 @@ class ArrayIndexer(ShapedArrayIndexer):
 
         self._shaped_inst = ShapedArrayIndexer(sharr, orig_shape=self._orig_shape)
 
-        return self._shaped_inst
+        return self._shaped_inst._set_attrs(self)
 
 
 class ShapedMultiIndexer(Indexer):
@@ -871,7 +907,7 @@ class ShapedMultiIndexer(Indexer):
         List of Indexers.
     """
 
-    def __init__(self, tup, orig_shape=None, flat_src=False):
+    def __init__(self, tup, orig_shape=None, flat_src=False, check_dims=False):
         """
         Initialize attributes.
 
@@ -884,11 +920,14 @@ class ShapedMultiIndexer(Indexer):
             be used later if converted to an array.
         flat_src : bool
             True if our indices should be treated as indices into a flat source array.
+        check_dims : bool
+            If True, compare dim of src with dim of index to give ambiguity warning.
         """
         super().__init__()
         self._tup = tup
         self._orig_shape = orig_shape
         self._flat_src = flat_src
+        self._check_dims = check_dims
         self._set_idx_list()
 
     def _set_idx_list(self):
@@ -1087,11 +1126,12 @@ class MultiIndexer(ShapedMultiIndexer):
                                                    flat_src=self._flat_src)
         except Exception as err:
             self._shaped_inst = None
+            return
 
         if self._src_shape is not None:
             self._shaped_inst.set_src_shape(self._src_shape)
 
-        return self._shaped_inst
+        return self._shaped_inst._set_attrs(self)
 
 
 class EllipsisIndexer(Indexer):
@@ -1118,6 +1158,7 @@ class EllipsisIndexer(Indexer):
         super().__init__()
         self._tup = tup
         self._flat_src = flat_src
+        self._check_dims = False
 
     def __call__(self):
         """
@@ -1205,7 +1246,7 @@ class EllipsisIndexer(Indexer):
             idxer = indexer(tuple(lst))
         idxer.set_src_shape(self._src_shape)
         self._shaped_inst = idxer.shaped_instance()
-        return self._shaped_inst
+        return self._shaped_inst._set_attrs(self)
 
     def as_array(self, copy=False, flat=True):
         """
@@ -1289,6 +1330,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         tup = np.atleast_1d(tup)
         self._arr = tup
         self._flat_src = False
+        self._check_dims = False
 
         orig_shape = tup.shape[:-1]
         ndims = tup.shape[-1]
@@ -1417,14 +1459,14 @@ class ListOfTuplesArrayIndexer(Indexer):
 
         try:
             self._shaped_inst = ShapedMultiIndexer(self._npy_inds,
-                                                   self.shape)
+                                                   self.shape, check_dims=False)
         except Exception:
             self._shaped_inst = None
 
         if self._src_shape is not None:
             self._shaped_inst.set_src_shape(self._src_shape)
 
-        return self._shaped_inst
+        return self._shaped_inst._set_attrs(self)
 
     def as_array(self, copy=False, flat=True):
         """

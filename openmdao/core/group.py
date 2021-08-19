@@ -1554,6 +1554,8 @@ class Group(System):
                             continue
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
+                        # TODO: remove following line after implicit flat src deprecation release
+                        meta['orig_flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
@@ -1959,7 +1961,7 @@ class Group(System):
                 in_shape = meta_in['shape']
 
                 src_indices = meta_in['src_indices']
-                flat = meta_in['flat_src_indices']
+                flat = meta_in['orig_flat_src_indices']
 
                 if src_indices is None and out_shape != in_shape:
                     # out_shape != in_shape is allowed if there's no ambiguity in storage order
@@ -2025,6 +2027,8 @@ class Group(System):
                             raise ValueError(msg)
                         else:
                             issue_warning(msg, category=SetupWarning)
+
+                    src_indices._chk_shape_dims(flat, abs_in, abs_out)
 
     def _set_subsys_connection_errors(self, val=True):
         """

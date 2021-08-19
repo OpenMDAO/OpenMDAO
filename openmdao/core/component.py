@@ -535,6 +535,8 @@ class Component(System):
             'size': shape_to_len(shape),
             'src_indices': src_indices,
             'flat_src_indices': flat_src_indices,
+            # TODO: remove the following line after implicit flat src deprecation release
+            'orig_flat_src_indices': flat_src_indices,
             'add_input_src_indices': src_indices is not None,
             'units': units,
             'desc': desc,
@@ -1555,6 +1557,8 @@ class Component(System):
             else:
                 all_abs2meta_in[tgt]['has_src_indices'] = True
                 meta = abs2meta_in[tgt]
+                # TODO: remove the following line after implicit flat src deprecation release
+                meta['orig_flat_src_indices'] = flat_src_inds
                 shape = pinfo.root_shape if pinfo.root_shape is not None else parent_src_shape
                 if src_shape is None and shape is not None:
                     try:
