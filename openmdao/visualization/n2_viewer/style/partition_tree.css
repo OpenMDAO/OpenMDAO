@@ -194,6 +194,8 @@ body {
     padding: 5;
     background-color: #fff;
     border: solid 1px #dfdfdf;
+    transition: visibility 0s ease 0.75s;
+    -webkit-transition: visibility 0s ease 0.75s;
 }
 
 div.offgrid {

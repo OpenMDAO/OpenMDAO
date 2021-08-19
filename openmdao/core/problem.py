@@ -25,7 +25,8 @@ from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.error_checking.check_config import _default_checks, _all_checks
+from openmdao.error_checking.check_config import _default_checks, _all_checks, \
+    _all_non_redundant_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
@@ -853,11 +854,12 @@ class Problem(object):
             Determines what config checks, if any, are run after setup is complete.
             If None or False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
-            'missing_recorders', 'comp_has_no_outputs', 'auto_ivc_warnings') are run
+            'missing_recorders', 'unserializable_options', 'comp_has_no_outputs',
+            'auto_ivc_warnings') are run
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
-            'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
-            'system', 'unconnected_inputs') are run
+            'dup_inputs', 'missing_recorders', 'all_unserializable_options', 'out_of_order',
+            'promotions', 'solvers', 'system', 'unconnected_inputs') are run
         logger : object
             Object for logging config checks if check is True.
         mode : string
@@ -1020,7 +1022,7 @@ class Problem(object):
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -1052,9 +1054,16 @@ class Problem(object):
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
-            Default is 'abs'.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
+        minimum_step : float
+            Minimum step size allowed when using one of the relative step_calc options.
         force_dense : bool
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
@@ -1152,14 +1161,16 @@ class Problem(object):
                         # we now have individual vars like 'x'
                         # get the options for checking partials
                         fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
-                                                        form, step_calc, alloc_complex)
+                                                        form, step_calc, alloc_complex,
+                                                        minimum_step)
                         # compare the compute options to the check options
                         if fd_options['method'] != meta_with_defaults['method']:
                             all_same = False
                         else:
                             all_same = True
                             if fd_options['method'] == 'fd':
-                                option_names = ['form', 'step', 'step_calc', 'directional']
+                                option_names = ['form', 'step', 'step_calc', 'minimum_step',
+                                                'directional']
                             else:
                                 option_names = ['step', 'directional']
                             for name in option_names:
@@ -1445,7 +1456,8 @@ class Problem(object):
                 local_wrt = rel_key[1]
 
                 fd_options, could_not_cs = _get_fd_options(local_wrt, requested_method, local_opts,
-                                                           step, form, step_calc, alloc_complex)
+                                                           step, form, step_calc, alloc_complex,
+                                                           minimum_step)
 
                 if could_not_cs:
                     comps_could_not_cs.add(c_name)
@@ -1551,12 +1563,17 @@ class Problem(object):
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             None, which defaults to 'forward' for FD.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
-            Default is 'abs'.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
         show_progress : bool
             True to show progress of check_totals
 
@@ -2024,7 +2041,7 @@ class Problem(object):
             logger = get_logger('check_config', out_file=out_file, use_format=True)
 
         if checks == 'all':
-            checks = sorted(_all_checks)
+            checks = sorted(_all_non_redundant_checks)
 
         for c in checks:
             if c not in _all_checks:
@@ -2546,7 +2563,7 @@ def _format_error(error, tol):
 
 
 def _get_fd_options(var, global_method, local_opts, global_step, global_form, global_step_calc,
-                    alloc_complex):
+                    alloc_complex, global_minimum_step):
     local_wrt = var
 
     # Determine if fd or cs.
@@ -2571,12 +2588,14 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
         fd_options['form'] = None
         fd_options['step_calc'] = None
+        fd_options['minimum_step'] = None
 
     elif method == 'fd':
         defaults = FiniteDifference.DEFAULT_OPTIONS
 
         fd_options['form'] = global_form
         fd_options['step_calc'] = global_step_calc
+        fd_options['minimum_step'] = global_minimum_step
 
     if global_step and global_method == method:
         fd_options['step'] = global_step
@@ -2587,7 +2606,7 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
 
     # Precedence: component options > global options > defaults
     if local_wrt in local_opts:
-        for name in ['form', 'step', 'step_calc', 'directional']:
+        for name in ['form', 'step', 'step_calc', 'minimum_step', 'directional']:
             value = local_opts[local_wrt][name]
             if value is not None:
                 fd_options[name] = value

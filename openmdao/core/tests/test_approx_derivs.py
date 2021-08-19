@@ -20,9 +20,10 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_partials, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -2251,6 +2252,373 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 9)
+
+
+class TestFDRelative(unittest.TestCase):
+
+    def test_rel_element(self):
+        # Due to the 20 spread in orders of magnitude, accurate derivatives are only possible with
+        # rel_element calculation.
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x', method='fd', step=1e-6, step_calc='rel_element')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = 0.5 * x ** 2
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        x = np.array([1e10, 1.0, 1e-10])
+        prob.set_val('comp.x', x)
+
+        prob.run_model()
+
+        totals = prob.compute_totals(of='comp.y', wrt='comp.x')
+        deriv = np.diag(totals['comp.y', 'comp.x'])
+
+        # Testing absolute error due to wide range.
+        self.assertTrue(np.abs(deriv[0] - x[0]) < 1e4)
+        self.assertTrue(np.abs(deriv[1] - x[1]) < 1e-5)
+        self.assertTrue(np.abs(deriv[2] - x[2]) < 1e-10)
+
+    def test_rel_element_central(self):
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x', method='fd', step=1e-6, form='central',
+                                      step_calc='rel_element')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = 0.5 * x ** 2
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        x = np.array([1e10, 1.0, 1e-10])
+        prob.set_val('comp.x', x)
+
+        prob.run_model()
+
+        totals = prob.compute_totals(of='comp.y', wrt='comp.x')
+        deriv = np.diag(totals['comp.y', 'comp.x'])
+
+        # Central diff is super accurate on this.
+        assert_near_equal(deriv, x, 1e-6)
+
+    def test_minimum_step(self):
+        # Test that minimum_step prevents us from taking a zero step.
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_norm', np.ones((nn, )))
+                self.add_input('x_avg', np.ones((nn, )))
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x_norm', method='fd', step_calc='rel_legacy')
+                self.declare_partials('y', 'x_avg', method='fd', step_calc='rel_avg')
+                self.declare_partials('y', 'x_element', method='fd', step_calc='rel_element')
+
+            def compute(self, inputs, outputs):
+                x1 = inputs['x_norm']
+                x2 = inputs['x_avg']
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x1 ** 2 + 0.5 * x2 ** 2 + 0.5 * x3 ** 2
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        prob.set_val('comp.x_norm', np.zeros((3, )))
+        prob.set_val('comp.x_avg', np.zeros((3, )))
+        prob.set_val('comp.x_element', np.zeros((3, )))
+
+        prob.run_model()
+
+        totals = prob.compute_totals(of='comp.y', wrt=['comp.x_norm', 'comp.x_avg', 'comp.x_element'])
+
+        assert_near_equal(totals['comp.y', 'comp.x_norm'][0][0], 0.0, 1e-6)
+        assert_near_equal(totals['comp.y', 'comp.x_avg'][1][1], 0.0, 1e-6)
+        assert_near_equal(totals['comp.y', 'comp.x_element'][2][2], 0.0, 1e-6)
+
+    def test_set_minimum_step(self):
+        # Test that we can set a new minimum step size.
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_norm', np.ones((nn, )))
+                self.add_input('x_avg', np.ones((nn, )))
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x_norm', method='fd', step_calc='rel_legacy', minimum_step=1e-3)
+                self.declare_partials('y', 'x_avg', method='fd', step_calc='rel_avg', minimum_step=1e-4)
+                self.declare_partials('y', 'x_element', method='fd', step_calc='rel_element', minimum_step=1e-5)
+
+            def compute(self, inputs, outputs):
+                x1 = inputs['x_norm']
+                x2 = inputs['x_avg']
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x1 ** 2 + 0.5 * x2 ** 2 + 0.5 * x3 ** 2
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        prob.set_val('comp.x_norm', np.zeros((3, )))
+        prob.set_val('comp.x_avg', np.zeros((3, )))
+        prob.set_val('comp.x_element', np.zeros((3, )))
+
+        prob.run_model()
+
+        totals = prob.compute_totals(of='comp.y', wrt=['comp.x_norm', 'comp.x_avg', 'comp.x_element'])
+
+        assert_near_equal(totals['comp.y', 'comp.x_norm'][0][0], 0.0, 5e-4)
+        assert_near_equal(totals['comp.y', 'comp.x_avg'][1][1], 0.0, 5e-5)
+        assert_near_equal(totals['comp.y', 'comp.x_element'][2][2], 0.0, 5e-6)
+
+    def test_bad_step_calc(self):
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                self.declare_partials('y', 'x', method='fd', step_calc='junk')
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        msg = "'comp' <class FDComp>: 'junk' is not a valid setting for step_calc; must be one of ['abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element']."
+        self.assertEqual(cm.exception.args[0], msg)
+
+    def test_directional_and_rel_element(self):
+        # Directional currently not supported with rel_element.
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                nn = self.options['vec_size']
+                self.set_check_partial_options('x_element', method='fd', step_calc='rel_element', directional=True)
+
+            def compute(self, inputs, outputs):
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x3 ** 2
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                x3 = inputs['x_element']
+
+                if mode == 'fwd':
+                    if 'y' in d_outputs:
+                        if 'x_element' in d_inputs:
+                            d_outputs['y'] += x3 * d_inputs['x_element']
+                elif mode == 'rev':
+                    if 'y' in d_outputs:
+                        if 'x_element' in d_inputs:
+                            d_inputs['x_element'] += x3 * d_outputs['y']
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup(force_alloc_complex=True)
+
+        x = np.array([1e10, 1.0, 1e-10])
+        prob.set_val('comp.x_element', x)
+
+        with self.assertRaises(ValueError) as cm:
+            prob.check_partials()
+
+        msg = "<model> <class Group>: Option 'directional' is not supported when 'step_calc' is set to 'rel_element.'"
+        self.assertEqual(cm.exception.args[0], msg)
+
+    def test_check_settings_on_comp(self):
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                nn = self.options['vec_size']
+                self.declare_partials('*', '*', rows=np.arange(nn), cols=np.arange(nn))
+
+                self.set_check_partial_options('x_element', method='fd', step_calc='rel_element')
+
+            def compute(self, inputs, outputs):
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x3 ** 2
+
+            def compute_partials(self, inputs, partials):
+                x3 = inputs['x_element']
+                partials['y', 'x_element'] = x3
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        x = np.array([1e10, 1.0, 1e-10])
+        prob.set_val('comp.x_element', x)
+
+        prob.run_model()
+
+        partials = prob.check_partials(out_stream=None)
+
+        # Only will pass with rel_element as step_calc.
+        # Absolute error on largest element is high, just check relative.
+        assert_check_partials(partials, atol=1e10, rtol=1e-6)
+
+    def test_check_partials(self):
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                nn = self.options['vec_size']
+                self.declare_partials('*', '*', rows=np.arange(nn), cols=np.arange(nn))
+
+            def compute(self, inputs, outputs):
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x3 ** 2
+
+            def compute_partials(self, inputs, partials):
+                x3 = inputs['x_element']
+                partials['y', 'x_element'] = x3
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        x = np.array([1e10, 1.0, 1e-10])
+        prob.set_val('comp.x_element', x)
+
+        prob.run_model()
+
+        partials = prob.check_partials(out_stream=None, step_calc='rel_element')
+
+        # Only will pass with rel_element as step_calc.
+        # Absolute error on largest element is high, just check relative.
+        assert_check_partials(partials, atol=1e10, rtol=1e-6)
+
+        # This derivative requires rel_element to be accurate.
+        self.assertTrue(np.abs(partials['comp']['y', 'x_element']['J_fd'][2, 2]) < 1e-9)
+
+        totals = prob.check_totals(of='comp.y', wrt=['comp.x_element'], step_calc='rel_element', out_stream=None)
+
+        # This derivative requires rel_element to be accurate.
+        self.assertTrue(np.abs(totals['comp.y', 'comp.x_element']['J_fd'][2, 2]) < 1e-9)
+
+    def test_deprecation(self):
+        prob = om.Problem()
+        model = prob.model
+        comp = model.add_subsystem('comp', Paraboloid())
+
+        prob.setup()
+        prob.run_model()
+
+        msg = "When using 'rel' as the step_calc, the fd stepsize is currently " + \
+            "scaled by the norm of the vector variable. This is not ideal for" + \
+            " larger vectors, and this behavior is being changed in " + \
+            "OpenMDAO 3.12.0. To preserve the older way of doing this " + \
+            "calculation, set step_calc to 'rel_legacy'."
+
+        with assert_warning(OMDeprecationWarning, msg):
+            prob.check_partials(out_stream=None, method='fd', step_calc='rel')
 
 
 class ParallelFDParametricTestCase(unittest.TestCase):
