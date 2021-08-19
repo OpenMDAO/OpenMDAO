@@ -503,9 +503,20 @@ class LintTestCase(unittest.TestCase):
             else:
                 failures[key] = new_failures
 
-    def test_docstrings(self):
+    def _failure_dict(self, full_class_path, result):
         failures = {}
 
+        for error_tuple in result['errors']:
+            if error_tuple[0] not in ignore:
+                if full_class_path not in failures:
+                    failures[full_class_path] = []
+                msg = f"{error_tuple[0]}: {error_tuple[1]}"
+                failures[full_class_path].append(msg)
+
+        return failures
+
+    def test_docstrings(self):
+        failures = {}
         # Loop over directories
         for dirpath in sorted(directories):
 
@@ -526,7 +537,6 @@ class LintTestCase(unittest.TestCase):
                     try:
                         mod = importlib.import_module(module_name)
                     except ImportError as err:
-                        # if print_info:
                         print('Skipped:', err)
                         # e.g. PETSc is not installed
                         continue
@@ -543,12 +553,7 @@ class LintTestCase(unittest.TestCase):
                         except:
                             continue
 
-                        for error_tuple in result['errors']:
-                            if error_tuple[0] not in ignore:
-                                if full_class_path not in failures:
-                                    failures[full_class_path] = []
-                                msg = f"{error_tuple[0]}: {error_tuple[1]}"
-                                failures[full_class_path].append(msg)
+                        failures.update(self._failure_dict(full_class_path, result))
 
                         clss = getattr(mod, class_name)
 
@@ -567,12 +572,7 @@ class LintTestCase(unittest.TestCase):
                                 except:
                                     continue
 
-                                for error_tuple in result['errors']:
-                                    if error_tuple[0] not in ignore:
-                                        if full_method_path not in failures:
-                                            failures[full_method_path] = []
-                                        msg = f"{error_tuple[0]}: {error_tuple[1]}"
-                                        failures[full_method_path].append(msg)
+                                failures.update(self._failure_dict(full_class_path, result))
 
                     tree = ast.parse(inspect.getsource(mod))
 
@@ -590,12 +590,7 @@ class LintTestCase(unittest.TestCase):
                             except:
                                 continue
 
-                            for error_tuple in result['errors']:
-                                if error_tuple[0] not in ignore:
-                                    if full_function_path not in failures:
-                                        failures[full_function_path] = []
-                                    msg = f"{error_tuple[0]}: {error_tuple[1]}"
-                                    failures[full_function_path].append(msg)
+                            failures.update(self._failure_dict(full_class_path, result))
 
         if failures:
             msg = '\n'
@@ -607,96 +602,6 @@ class LintTestCase(unittest.TestCase):
                     msg += f'    {failure}\n'
             msg += f'Found {count} issues in docstrings'
             self.fail(msg)
-
-    # def test_docstrings(self):
-    #     print_info = False
-
-    #     failures = {}
-
-    #     # Loop over directories
-    #     for dir_name in directories:
-    #         dirpath = dir_name
-    #         if print_info:
-    #             print('-'*len(dir_name))
-    #             print(dir_name)
-    #             print('-'*len(dir_name))
-
-    #         # Loop over files
-    #         for file_name in os.listdir(dirpath):
-    #             if not file_name.startswith("_") and file_name[-3:] == '.py' and not os.path.isdir(file_name):
-    #                 if print_info:
-    #                     print(file_name)
-
-    #                 # to construct module name, remove part of abs path that
-    #                 # precedes 'openmdao', and then replace '/' with '.' in the remainder.
-    #                 mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
-
-    #                 # then, get rid of the '.py' to get final part of module name.
-    #                 mod2 = file_name[:-3]
-
-    #                 module_name = '{}.{}'.format(mod1, mod2)
-
-    #                 try:
-    #                     mod = importlib.import_module(module_name)
-    #                 except ImportError as err:
-    #                     if print_info:
-    #                         print('Skipped:', err)
-    #                     # e.g. PETSc is not installed
-    #                     continue
-
-    #                 # Loop over classes
-    #                 classes = [x for x in dir(mod)
-    #                            if not x.startswith('_') and inspect.isclass(getattr(mod, x)) and
-    #                            getattr(mod, x).__module__ == module_name]
-
-    #                 for class_name in classes:
-    #                     if print_info:
-    #                         print(' '*4, class_name)
-    #                     clss = getattr(mod, class_name)
-
-    #                     # skip namedtuples
-    #                     if issubclass(clss, tuple):
-    #                         continue
-
-    #                     self.check_class(dir_name, file_name, class_name, clss,
-    #                                      failures)
-
-    #                     # Loop over methods
-    #                     methods = [x for x in dir(clss)
-    #                                if (inspect.ismethod(getattr(clss, x)) or inspect.isfunction(getattr(clss, x))) and
-    #                                x in clss.__dict__]
-    #                     for method_name in methods:
-    #                         if print_info:
-    #                             print(' '*8, method_name)
-    #                         method = getattr(clss, method_name)
-
-    #                         self.check_method(dir_name, file_name, class_name,
-    #                                           method_name, method, failures)
-
-    #                 # Loop over functions
-    #                 tree = ast.parse(inspect.getsource(mod))
-
-    #                 if hasattr(tree, 'body'):
-    #                     funcs = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
-    #                 else:
-    #                     funcs = []
-
-    #                 for func_name in funcs:
-    #                     if not func_name.startswith('_'):
-    #                         func = getattr(mod, func_name)
-    #                         self.check_function(dir_name, file_name, func_name,
-    #                                             func, failures)
-
-    #     if failures:
-    #         msg = '\n'
-    #         count = 0
-    #         for key in failures:
-    #             msg += '{0}\n'.format(key)
-    #             count += len(failures[key])
-    #             for failure in failures[key]:
-    #                 msg += '    {0}\n'.format(failure)
-    #         msg += 'Found {0} issues in docstrings'.format(count)
-    #         self.fail(msg)
 
 
 if __name__ == '__main__':
