@@ -1027,6 +1027,22 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['row134_comp.x'], arr_large_4x4[(0, 2, 3), ...])
         assert_near_equal(p['row134_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...])**2)
 
+    def test_om_slice_get_val(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('c1', om.ExecComp('y=x', x=np.ones(2), y=np.ones(2)))
+        model.add_subsystem('c2', om.ExecComp('y=x', x=np.ones(2), y=np.ones(2)))
+
+        model.connect('c1.y', 'c2.x', om.slicer[:])
+
+        prob.setup()
+        prob.set_val('c1.x', 3.5*np.ones(2))
+        prob.run_model()
+
+        val = prob.get_val('c2.x')
+        assert_near_equal(val, np.array([3.5, 3.5]))
+
     def test_promote_not_found1(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),

@@ -14,6 +14,11 @@ class LinearSystemComp(ImplicitComponent):
     lu-decomposition. It can be vectorized to either solve for multiple right hand sides,
     or to solve multiple linear systems.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _lup : None or list(object)
@@ -23,11 +28,6 @@ class LinearSystemComp(ImplicitComponent):
     def __init__(self, **kwargs):
         """
         Intialize the LinearSystemComp component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
         self._lup = None
@@ -99,11 +99,11 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         """
         if self.options['vec_size'] > 1:
             if self.vec_size_A > 1:
@@ -121,9 +121,9 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A
@@ -149,11 +149,11 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         J : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+            Sub-jac components written to jacobian[output_name, input_name].
         """
         x = outputs['x']
         size = self.options['size']
@@ -177,11 +177,11 @@ class LinearSystemComp(ImplicitComponent):
         Parameters
         ----------
         d_outputs : Vector
-            unscaled, dimensional quantities read via d_outputs[key]
+            Unscaled, dimensional quantities read via d_outputs[key].
         d_residuals : Vector
-            unscaled, dimensional quantities read via d_residuals[key]
+            Unscaled, dimensional quantities read via d_residuals[key].
         mode : str
-            either 'fwd' or 'rev'
+            Either 'fwd' or 'rev'.
         """
         vec_size = self.options['vec_size']
         vec_size_A = self.vec_size_A

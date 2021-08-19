@@ -7,6 +7,15 @@ from openmdao.surrogate_models.nn_interpolators.nn_base import NNBase
 class LinearInterpolator(NNBase):
     """
     Interpolate values by forming a hyperplane between the points closest to the prescribed inputs.
+
+    Parameters
+    ----------
+    training_points : ndarray
+        Ndarray of shape (num_points x independent dims) containing training input locations.
+    training_values : ndarray
+        Ndarray of shape (num_points x dependent dims) containing training output values.
+    num_leaves : int
+        How many leaves the tree should have.
     """
 
     def _find_hyperplane(self, neighbor_idx):

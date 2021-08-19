@@ -12,7 +12,6 @@ def webview(outfile):
     ----------
     outfile : str
         Path to the HTML file to open.
-
     """
     if sys.platform == 'darwin':
         os.system('open %s' % outfile)

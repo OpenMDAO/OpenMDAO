@@ -1026,7 +1026,7 @@ class TestProblemCheckPartials(unittest.TestCase):
             comp.set_check_partial_options(wrt=['*'], step_calc='foo')
 
         self.assertEqual(str(cm.exception),
-                         "'comp' <class ParaboloidTricky>: The value of 'step_calc' must be one of ('abs', 'rel'), "
+                         "'comp' <class ParaboloidTricky>: The value of 'step_calc' must be one of ('abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element'), "
                          "but 'foo' was specified.")
 
         # check invalid wrt

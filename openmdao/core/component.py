@@ -59,6 +59,11 @@ class Component(System):
     """
     Base Component class; not to be directly instantiated.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Available here and in all descendants of this system.
+
     Attributes
     ----------
     _approx_schemes : OrderedDict
@@ -86,11 +91,6 @@ class Component(System):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            available here and in all descendants of this system.
         """
         super().__init__(**kwargs)
 
@@ -430,7 +430,7 @@ class Component(System):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
@@ -449,7 +449,7 @@ class Component(System):
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
         desc : str
-            description of the variable
+            Description of the variable.
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
@@ -468,7 +468,7 @@ class Component(System):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         # First, type check all arguments
         if not isinstance(name, str):
@@ -574,11 +574,11 @@ class Component(System):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : a picklable object
             The initial value of the variable being added.
         desc : str
-            description of the variable
+            Description of the variable.
         tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
@@ -586,7 +586,7 @@ class Component(System):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         # First, type check all arguments
         if not isinstance(name, str):
@@ -632,7 +632,7 @@ class Component(System):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
@@ -645,14 +645,14 @@ class Component(System):
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
         desc : str
-            description of the variable.
+            Description of the variable.
         lower : float or list or tuple or ndarray or Iterable or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
         upper : float or list or tuple or ndarray or or Iterable None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
@@ -680,7 +680,7 @@ class Component(System):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         # First, type check all arguments
         if (shape_by_conn or copy_shape) and (shape is not None or not isscalar(val)):
@@ -821,11 +821,11 @@ class Component(System):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : a picklable object
             The initial value of the variable being added.
         desc : str
-            description of the variable.
+            Description of the variable.
         tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
@@ -833,7 +833,7 @@ class Component(System):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
@@ -980,7 +980,7 @@ class Component(System):
                 info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
-                         method='exact', step=None, form=None, step_calc=None):
+                         method='exact', step=None, form=None, step_calc=None, minimum_step=None):
         """
         Declare information about this component's subjacobians.
 
@@ -1016,13 +1016,19 @@ class Component(System):
         step : float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, in which case the approximation method provides
-            its default value.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
+        minimum_step : float
+            Minimum step size allowed when using one of the relative step_calc options.
 
         Returns
         -------
@@ -1106,6 +1112,12 @@ class Component(System):
             else:
                 raise RuntimeError("{}: d({})/d({}): 'step' is not a valid option for "
                                    "'{}'".format(self.msginfo, of, wrt, method))
+        if minimum_step is not None:
+            if 'minimum_step' in default_opts:
+                meta['minimum_step'] = minimum_step
+            else:
+                raise RuntimeError("{}: d({})/d({}): 'minimum_step' is not a valid option for "
+                                   "'{}'".format(self.msginfo, of, wrt, method))
         if form:
             if 'form' in default_opts:
                 meta['form'] = form
@@ -1180,7 +1192,7 @@ class Component(System):
         meta['coloring'] = True
 
     def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
-                                  directional=False):
+                                  minimum_step=None, directional=False):
         """
         Set options that will be used for checking partial derivatives.
 
@@ -1199,8 +1211,15 @@ class Component(System):
             Step size for finite difference check. Leave undeclared to keep unchanged from previous
             or default value.
         step_calc : str
-            Type of step calculation for check, can be "abs" for absolute (default) or "rel" for
-            relative.  Leave undeclared to keep unchanged from previous or default value.
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
+        minimum_step : float
+            Minimum step size allowed when using one of the relative step_calc options.
         directional : bool
             Set to True to perform a single directional derivative for each vector variable in the
             pattern named in wrt.
@@ -1214,7 +1233,7 @@ class Component(System):
             msg = "{}: The value of 'step' must be numeric, but '{}' was specified."
             raise ValueError(msg.format(self.msginfo, step))
 
-        supported_step_calc = ('abs', 'rel')
+        supported_step_calc = ('abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element')
         if step_calc and step_calc not in supported_step_calc:
             msg = "{}: The value of 'step_calc' must be one of {}, but '{}' was specified."
             raise ValueError(msg.format(self.msginfo, supported_step_calc, step_calc))
@@ -1231,7 +1250,7 @@ class Component(System):
 
         wrt_list = [wrt] if isinstance(wrt, str) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
-                                              directional))
+                                              minimum_step, directional))
 
     def _get_check_partial_options(self):
         """
@@ -1242,7 +1261,8 @@ class Component(System):
         Returns
         -------
         dict(wrt: (options))
-            Dictionary keyed by name with tuples of options (method, form, step, step_calc)
+            Dictionary keyed by name with tuples of options (method, form, step, step_calc,
+            minimum_step, directional)
         """
         opts = {}
         of, wrt = self._get_partials_varlists()
@@ -1252,7 +1272,9 @@ class Component(System):
         if matrix_free:
             n_directional = 0
 
-        for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
+        for data_tup in self._declared_partial_checks:
+            wrt_list, method, form, step, step_calc, minimum_step, directional = data_tup
+
             for pattern in wrt_list:
                 matches = find_matches(pattern, wrt)
 
@@ -1265,9 +1287,11 @@ class Component(System):
                         opt = opts[match]
 
                         # New assignments take precedence
-                        keynames = ['method', 'form', 'step', 'step_calc', 'directional']
+                        keynames = ['method', 'form', 'step', 'step_calc', 'minimum_step',
+                                    'directional']
                         for name, value in zip(keynames,
-                                               [method, form, step, step_calc, directional]):
+                                               [method, form, step, step_calc, minimum_step,
+                                                directional]):
                             if value is not None:
                                 opt[name] = value
 
@@ -1276,6 +1300,7 @@ class Component(System):
                                        'form': form,
                                        'step': step,
                                        'step_calc': step_calc,
+                                       'minimum_step': minimum_step,
                                        'directional': directional}
 
                     if matrix_free and directional:

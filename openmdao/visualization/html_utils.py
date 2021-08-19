@@ -15,14 +15,15 @@ def head_and_body(head, body, attrs=None):
     head : str
         Head of HTML.
     body : str
-        Body of the HTML
+        Body of the HTML.
     attrs : dict or None
         Attributes of the html element.
         Defaults to None.
 
     Returns
     -------
-        str
+    str
+        HTML element.
     """
     # Wraps the head and body in tags
     doc_type = '<!doctype html>'
@@ -104,7 +105,8 @@ def write_div(content='', attrs=None, cls_attr=None, uid=None, indent=0, **kwarg
 
     Returns
     -------
-        str
+    str
+        HTML element enclosed in tags.
     """
     return write_tags('div', content=content, attrs=attrs, cls_attr=cls_attr, uid=uid,
                       new_lines=False, indent=indent, **kwargs)
@@ -313,7 +315,8 @@ def add_help(txt, diagram_filepath, header='Instructions', footer=''):
 
     Returns
     -------
-        str
+    str
+        String of HTML for the help dialog.
     """
     header_txt = write_tags(tag='span', cls_attr='close', content='&times;', uid="idSpanModalClose")
     header_txt += header
@@ -341,13 +344,14 @@ def add_title(txt, heading='h1', align='center'):
         Title text.
     heading : str
         Heading. Options are "h1" to "h6".
-        Defaults to "h1"
+        Defaults to "h1".
     align : str
-        Defaults to "center"
+        Defaults to "center".
 
     Returns
     -------
-        str
+    str
+        HTML element enclosed in tags.
     """
     title = write_tags(tag=heading, content=txt)
     style = "text-align: {}".format(align)
@@ -357,6 +361,11 @@ def add_title(txt, heading='h1', align='center'):
 class UIElement(object):
     """
     Abstract class for user interface elements.
+
+    Parameters
+    ----------
+    indent : int
+        Number of spaces to indent.
 
     Attributes
     ----------
@@ -369,11 +378,6 @@ class UIElement(object):
     def __init__(self, indent=0):
         """
         Initialize.
-
-        Parameters
-        ----------
-        indent : int
-            Number of spaces to indent.
         """
         self.items = []
         self.indent = indent
@@ -384,6 +388,11 @@ class ButtonGroup(UIElement):
     Button group, which consists of buttons and dropdowns.
 
     Write it to get the HTML for the button group.
+
+    Parameters
+    ----------
+    indent : int
+        Number of spaces to indent.
     """
 
     def add_button(self, title, content='', uid=None, **kwargs):
@@ -403,10 +412,10 @@ class ButtonGroup(UIElement):
 
         Returns
         -------
-            str
+        str
+            HTML for this button.
         """
-        button = add_button(title, content=content, uid=uid, indent=self.indent + _IND,
-                            **kwargs)
+        button = add_button(title, content=content, uid=uid, indent=self.indent + _IND, **kwargs)
         self.items.append(button)
         return button
 
@@ -455,7 +464,8 @@ class ButtonGroup(UIElement):
 
         Returns
         -------
-            str
+        str
+            HTML div enclosed in tags.
         """
         content = '\n\n'.join(self.items)
         return write_div(content=content, cls_attr="button-group")
@@ -465,8 +475,12 @@ class Toolbar(UIElement):
     """
     A toolbar consists of button groups.
 
-    Add button groups, and write it to get the HTML for the
-    toolbar.
+    Add button groups, and write it to get the HTML for the toolbar.
+
+    Parameters
+    ----------
+    indent : int
+        Number of spaces to indent.
     """
 
     def add_button_group(self):
@@ -475,7 +489,8 @@ class Toolbar(UIElement):
 
         Returns
         -------
-            ButtonGroup
+        ButtonGroup
+            ButtonGroup object.
         """
         button_group = ButtonGroup(indent=self.indent + 4)
         self.items.append(button_group)
@@ -501,6 +516,19 @@ class TemplateWriter(object):
     Opens an HTML template file, text can be inserted into the template, and writes a new HTML
     file with the replacements.
 
+    Parameters
+    ----------
+    filename : str
+        Name of template file.
+    embeddable : bool
+        If true, create file so that it can be embedded in a webpage.
+    title : str
+        Title of diagram.
+    styles : dict
+        Dictionary of CSS styles.
+    head_srcs : dict
+        Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
+
     Attributes
     ----------
     template : str
@@ -510,19 +538,6 @@ class TemplateWriter(object):
     def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            Name of template file.
-        embeddable : bool
-            If true, create file so that it can be embedded in a webpage.
-        title : str
-            Title of diagram.
-        styles : dict
-            Dictionary of CSS styles.
-        head_srcs : dict
-            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         # Load template
         with open(filename, "r", encoding="utf8") as f:
@@ -588,6 +603,19 @@ class DiagramWriter(TemplateWriter):
     The diagram has a toolbar, which can be edited by adding
     button groups, dropdowns, buttons, etc. to this class.
 
+    Parameters
+    ----------
+    filename : str
+        Name of template file.
+    embeddable : bool
+        If true, create file so that it can be embedded in a webpage.
+    title : str
+        Title of diagram.
+    styles : dict
+        Dictionary of CSS styles.
+    head_srcs : dict
+        Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
+
     Attributes
     ----------
     toolbar : Toolbar
@@ -599,19 +627,6 @@ class DiagramWriter(TemplateWriter):
     def __init__(self, filename, embeddable=False, title=None, styles=None, head_srcs=None):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            Name of template file.
-        embeddable : bool
-            If true, create file so that it can be embedded in a webpage.
-        title : str
-            Title of diagram.
-        styles : dict
-            Dictionary of CSS styles.
-        head_srcs : dict
-            Dictionary of JavaScript source files to be put into the <head> tag of the N2 page.
         """
         super().__init__(filename=filename, embeddable=embeddable, title=title, styles=styles,
                          head_srcs=head_srcs)
@@ -620,7 +635,7 @@ class DiagramWriter(TemplateWriter):
 
     def add_help(self, txt, diagram_filepath, header='Instructions', footer=''):
         """
-        Add a modal with instructions.
+        Add a model with instructions.
 
         Parameters
         ----------

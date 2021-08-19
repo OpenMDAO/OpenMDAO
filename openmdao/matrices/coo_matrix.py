@@ -13,6 +13,13 @@ class COOMatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
 
+    Parameters
+    ----------
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the top-level system that owns the <Jacobian>.
+    is_internal : bool
+        If True, this is the int_mtx of an AssembledJacobian.
+
     Attributes
     ----------
     _coo : coo_matrix
@@ -22,13 +29,6 @@ class COOMatrix(Matrix):
     def __init__(self, comm, is_internal):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm>
-            communicator of the top-level system that owns the <Jacobian>.
-        is_internal : bool
-            If True, this is the int_mtx of an AssembledJacobian.
         """
         super().__init__(comm, is_internal)
         self._coo = None

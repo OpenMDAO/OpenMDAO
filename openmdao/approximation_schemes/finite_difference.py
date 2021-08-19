@@ -4,25 +4,13 @@ from collections import namedtuple
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _is_group
+from openmdao.utils.om_warnings import warn_deprecation
 
-FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
 DEFAULT_ORDER = {
     'forward': 1,
     'backward': 1,
     'central': 2,
-}
-
-FD_COEFFS = {
-    ('forward', 1): FDForm(deltas=np.array([1.0]),
-                           coeffs=np.array([1.0]),
-                           current_coeff=-1.0),
-    ('backward', 1): FDForm(deltas=np.array([-1.0]),
-                            coeffs=np.array([-1.0]),
-                            current_coeff=1.0),
-    ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
-                           coeffs=np.array([0.5, -0.5]),
-                           current_coeff=0.),
 }
 
 
@@ -45,6 +33,20 @@ def _generate_fd_coeff(form, order, system):
         namedtuple containing the 'deltas', 'coeffs', and 'current_coeff'. These deltas and
         coefficients need to be scaled by the step size.
     """
+    FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
+
+    FD_COEFFS = {
+        ('forward', 1): FDForm(deltas=np.array([1.0]),
+                               coeffs=np.array([1.0]),
+                               current_coeff=-1.0),
+        ('backward', 1): FDForm(deltas=np.array([-1.0]),
+                                coeffs=np.array([-1.0]),
+                                current_coeff=1.0),
+        ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
+                               coeffs=np.array([0.5, -0.5]),
+                               current_coeff=0.),
+    }
+
     try:
         fd_form = FD_COEFFS[form, order]
     except KeyError:
@@ -81,6 +83,7 @@ class FiniteDifference(ApproximationScheme):
         'order': None,
         'step_calc': 'abs',
         'directional': False,
+        'minimum_step': 1e-12,
     }
 
     def __init__(self):
@@ -109,6 +112,7 @@ class FiniteDifference(ApproximationScheme):
         options.update(kwargs)
 
         if options['order'] is None:
+            # User-submitted options for method=='fd' are all checked here.
             form = options['form']
             if form in DEFAULT_ORDER:
                 options['order'] = DEFAULT_ORDER[options['form']]
@@ -116,6 +120,23 @@ class FiniteDifference(ApproximationScheme):
                 raise ValueError("{}: '{}' is not a valid form of finite difference; must be "
                                  "one of {}".format(system.msginfo, form,
                                                     list(DEFAULT_ORDER.keys())))
+
+            step_calc = options['step_calc']
+            step_calcs = ['abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element']
+            if step_calc not in step_calcs:
+                raise ValueError(f"{system.msginfo}: '{step_calc}' is not a valid setting for "
+                                 f"step_calc; must be one of {step_calcs}.")
+
+            elif options['directional'] and step_calc == 'rel_element':
+                raise ValueError(f"{system.msginfo}: Option 'directional' is not supported when "
+                                 "'step_calc' is set to 'rel_element.'")
+
+            elif step_calc == 'rel':
+                warn_deprecation("When using 'rel' as the step_calc, the fd stepsize is currently "
+                                 "scaled by the norm of the vector variable. This is not ideal for"
+                                 " larger vectors, and this behavior is being changed in "
+                                 "OpenMDAO 3.12.0. To preserve the older way of doing this "
+                                 "calculation, set step_calc to 'rel_legacy'.")
 
         options['vector'] = vector
         wrt = abs_key[1]
@@ -147,6 +168,7 @@ class FiniteDifference(ApproximationScheme):
         order = meta['order']
         step = meta['step']
         step_calc = meta['step_calc']
+        minimum_step = meta['minimum_step']
 
         # FD forms are written as a collection of changes to inputs (deltas) and the associated
         # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
@@ -158,15 +180,45 @@ class FiniteDifference(ApproximationScheme):
         # current_coeff = 0.
         fd_form = _generate_fd_coeff(form, order, system)
 
-        if step_calc == 'rel':
+        if step_calc != 'abs':
+            var_local = True
             if system._outputs._contains_abs(wrt):
-                step *= np.linalg.norm(system._outputs._abs_get_val(wrt))
+                wrt_val = system._outputs._abs_get_val(wrt)
             elif system._inputs._contains_abs(wrt):
-                step *= np.linalg.norm(system._inputs._abs_get_val(wrt))
+                wrt_val = system._inputs._abs_get_val(wrt)
+            else:
+                var_local = False
 
-        deltas = fd_form.deltas * step
-        coeffs = fd_form.coeffs / step
-        current_coeff = fd_form.current_coeff / step
+            if var_local:
+                # TODO - behavior or 'rel' will switch to 'rel_avg' in an upcoming release.
+                if step_calc == 'rel_legacy' or step_calc == 'rel':
+                    step *= np.linalg.norm(wrt_val)
+
+                    if step < minimum_step:
+                        step = minimum_step
+
+                elif step_calc == 'rel_avg':
+                    step *= np.sum(np.abs(wrt_val)) / len(wrt_val)
+
+                    if step < minimum_step:
+                        step = minimum_step
+
+                else:  # 'rel_element'
+                    step = np.abs(wrt_val) * step
+
+                    idx_zero = np.where(step < minimum_step)
+                    if idx_zero:
+                        step[idx_zero] = minimum_step
+
+        if step_calc == 'rel_element':
+            step_divide = 1.0 / step
+            deltas = np.outer(fd_form.deltas, step)
+            coeffs = np.outer(fd_form.coeffs, step_divide)
+            current_coeff = fd_form.current_coeff * step_divide
+        else:
+            deltas = fd_form.deltas * step
+            coeffs = fd_form.coeffs / step
+            current_coeff = fd_form.current_coeff / step
 
         return deltas, coeffs, current_coeff
 
@@ -180,6 +232,13 @@ class FiniteDifference(ApproximationScheme):
             System on which the execution is run.
         under_cs : bool
             True if we're currently under complex step at a higher level.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
         """
         if not self._wrt_meta:
             return
@@ -241,7 +300,7 @@ class FiniteDifference(ApproximationScheme):
         """
         return array.real
 
-    def _run_point(self, system, idx_info, data, results_array, total):
+    def _run_point(self, system, idx_info, data, results_array, total, idx_start=0):
         """
         Alter the specified inputs by the given deltas, run the system, and return the results.
 
@@ -257,6 +316,8 @@ class FiniteDifference(ApproximationScheme):
             Where the results will be stored.
         total : bool
             If True total derivatives are being approximated, else partials.
+        idx_start : int
+            Vector index of the first element of this wrt variable.
 
         Returns
         -------
@@ -264,8 +325,28 @@ class FiniteDifference(ApproximationScheme):
             Copy of the outputs or residuals array after running the perturbed system.
         """
         deltas, coeffs, current_coeff = data
+        rel_element = False
 
-        if current_coeff:
+        if isinstance(current_coeff, np.ndarray) and current_coeff.size > 0:
+            # rel_element - each element has its own relative step.
+            rel_element = True
+
+            if current_coeff[0]:
+                current_vec = system._outputs if total else system._residuals
+                # copy data from outputs (if doing total derivs) or residuals (if doing partials)
+                results_array[:] = current_vec.asarray()
+
+                for vec, idxs in idx_info:
+                    if vec is not None and idxs is not None:
+
+                        results_array *= current_coeff[idxs - idx_start[0]]
+                        # We don't allow mixed fd forms, so first one is all we need.
+                        break
+
+            else:
+                results_array[:] = 0.
+
+        elif current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
@@ -275,13 +356,22 @@ class FiniteDifference(ApproximationScheme):
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            results = self._run_sub_point(system, idx_info, delta, total)
-            results *= coeff
+            results = self._run_sub_point(system, idx_info, delta, total, idx_start=idx_start,
+                                          rel_element=rel_element)
+
+            if rel_element:
+                for vec, idxs in idx_info:
+                    if vec is not None and idxs is not None:
+                        results *= coeff[idxs - idx_start[0]]
+                        break
+            else:
+                results *= coeff
+
             results_array += results
 
         return results_array
 
-    def _run_sub_point(self, system, idx_info, delta, total):
+    def _run_sub_point(self, system, idx_info, delta, total, idx_start=0, rel_element=False):
         """
         Alter the specified inputs by the given delta, run the system, and return the results.
 
@@ -295,6 +385,10 @@ class FiniteDifference(ApproximationScheme):
             Perturbation amount.
         total : bool
             If True total derivatives are being approximated, else partials.
+        idx_start : int
+            Vector index of the first element of this wrt variable.
+        rel_element : bool
+            If True, then each element has a different delta.
 
         Returns
         -------
@@ -303,7 +397,14 @@ class FiniteDifference(ApproximationScheme):
         """
         for vec, idxs in idx_info:
             if vec is not None and idxs is not None:
-                vec.iadd(delta, idxs)
+
+                # Support rel_element stepsizing
+                if rel_element:
+                    local_delta = delta[idxs - idx_start[0]]
+                else:
+                    local_delta = delta
+
+                vec.iadd(local_delta, idxs)
 
         if total:
             system.run_solve_nonlinear()

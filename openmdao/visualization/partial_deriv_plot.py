@@ -11,9 +11,9 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
 
     Parameters
     ----------
-    of : string
+    of : str
         Variable whose derivatives will be computed.
-    wrt : string
+    wrt : str
         Variable with respect to which the derivatives will be computed.
     check_partials_data : dict of dicts of dicts
         First key:
@@ -26,10 +26,10 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
             forward - fd, adjoint - fd, forward - adjoint.
         For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
             Jacobian for the three different methods of computation.
-    title : string (Optional)
+    title : str (Optional)
         Title for the plot
-        If None, use the values of the arguments "of" and "wrt"
-    jac_method : string (Optional)
+        If None, use the values of the arguments "of" and "wrt".
+    jac_method : str (Optional)
         Method of computating Jacobian
         Is one of ['J_fwd', 'J_rev']. Optional, default is 'J_fwd'.
     tol : float (Optional)
@@ -39,17 +39,17 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
         If true, the plot will only show the presence of a non-zero derivative, not the value.
         Otherwise, plot the value. Default is true.
 
-    Raises
-    ------
-    KeyError
-        If one of the Jacobians is not available.
-
     Returns
     -------
     matplotlib.figure.Figure
         The top level container for all the plot elements in the plot.
     array of matplotlib.axes.Axes objects
         An array of Axes objects, one for each of the three subplots created.
+
+    Raises
+    ------
+    KeyError
+        If one of the Jacobians is not available.
     """
     # Get the first item in the dict, which will be the model
     model_name = list(check_partials_data)[0]

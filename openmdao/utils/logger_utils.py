@@ -49,12 +49,12 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
         Set to True to use the openmdao format "Level: message".
         (applied only when creating a new logger or setting a new stream).
     out_stream : 'stdout', 'stderr' or file-like
-        output stream to which logger output will be directed.
+        Output stream to which logger output will be directed.
     out_file : str or None
         If not None, add a FileHandler to write to this file.
     lock : bool
-        if True, do not allow the handler to be changed until unlocked.
-        if False, unlock the handler for the logger.
+        If True, do not allow the handler to be changed until unlocked.
+        If False, unlock the handler for the logger.
 
     Returns
     -------

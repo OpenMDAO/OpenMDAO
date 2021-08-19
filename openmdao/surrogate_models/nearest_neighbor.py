@@ -22,6 +22,11 @@ class NearestNeighbor(SurrogateModel):
     """
     Surrogate model that approximates values using a nearest neighbor approximation.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     interpolant : object
@@ -63,7 +68,7 @@ class NearestNeighbor(SurrogateModel):
         Parameters
         ----------
         x : array-like
-            Training input locations
+            Training input locations.
         y : array-like
             Model responses at given inputs.
         """

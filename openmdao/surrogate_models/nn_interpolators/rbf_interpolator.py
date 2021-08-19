@@ -11,6 +11,21 @@ class RBFInterpolator(NNBase):
     """
     Compactly Supported Radial Basis Function.
 
+    Parameters
+    ----------
+    training_points : ndarray
+        Ndarray of shape (num_points x independent dims) containing training input locations.
+    training_values : ndarray
+        Ndarray of shape (num_points x dependent dims) containing training output values.
+    num_leaves : int
+        How many leaves the tree should have.
+    num_neighbors : int
+        The number of neighbors to use for interpolation.
+    rbf_family : int
+        Specifies the order of the radial basis function to be used.
+        <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
+        order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
+
     Attributes
     ----------
     rbf_family : int
@@ -27,21 +42,6 @@ class RBFInterpolator(NNBase):
                  num_neighbors=5, rbf_family=2):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        training_points : ndarray
-            ndarray of shape (num_points x independent dims) containing training input locations.
-        training_values : ndarray
-            ndarray of shape (num_points x dependent dims) containing training output values.
-        num_leaves : int
-            How many leaves the tree should have.
-        num_neighbors : int
-            The number of neighbors to use for interpolation.
-        rbf_family : int
-            Specifies the order of the radial basis function to be used.
-            <-2> uses an 11th order, <-1> uses a 9th order, and any value from <0> to <4> uses an
-            order equal to <floor((dimensions-1)/2) + (3*comp) +1>.
         """
         super().__init__(training_points, training_values, num_leaves)
 

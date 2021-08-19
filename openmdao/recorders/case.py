@@ -25,6 +25,29 @@ class Case(object):
     """
     Case wraps the data from a single iteration of a recording to make it more easily accessible.
 
+    Parameters
+    ----------
+    source : str
+        The unique id of the system/solver/driver/problem that did the recording.
+    data : dict-like
+        Dictionary of data for a case.
+    prom2abs : {'input': dict, 'output': dict}
+        Dictionary mapping promoted names of all variables to absolute names.
+    abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names of all variables to promoted names.
+    abs2meta : dict
+        Dictionary mapping absolute names of all variables to variable metadata.
+    conns : dict
+        Dictionary of all model connections.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+    var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
+    data_format : int
+        A version number specifying the format of array data, if not numpy arrays.
+
     Attributes
     ----------
     source : str
@@ -76,29 +99,6 @@ class Case(object):
                  data_format=None):
         """
         Initialize.
-
-        Parameters
-        ----------
-        source : str
-            The unique id of the system/solver/driver/problem that did the recording.
-        data : dict-like
-            Dictionary of data for a case
-        prom2abs : {'input': dict, 'output': dict}
-            Dictionary mapping promoted names of all variables to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
-            Dictionary mapping absolute names of all variables to promoted names.
-        abs2meta : dict
-            Dictionary mapping absolute names of all variables to variable metadata.
-        conns : dict
-            Dictionary of all model connections.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
-        var_info : dict
-            Dictionary with information about variables (scaling, indices, execution order).
-        data_format : int
-            A version number specifying the format of array data, if not numpy arrays.
         """
         self.source = source
         self._format_version = data_format
@@ -448,7 +448,7 @@ class Case(object):
         Returns
         -------
         list
-            list of input names and other optional information about those inputs
+            List of input names and other optional information about those inputs.
         """
         meta = self._abs2meta
         inputs = []
@@ -530,9 +530,9 @@ class Case(object):
         Parameters
         ----------
         explicit : bool, optional
-            include outputs from explicit components. Default is True.
+            Include outputs from explicit components. Default is True.
         implicit : bool, optional
-            include outputs from implicit components. Default is True.
+            Include outputs from implicit components. Default is True.
         val : bool, optional
             When True, display/return output values. Default is True.
         prom_name : bool, optional
@@ -583,7 +583,7 @@ class Case(object):
         Returns
         -------
         list
-            list of output names and other optional information about those outputs
+            List of output names and other optional information about those outputs.
         """
         meta = self._abs2meta
         expl_outputs = []
@@ -787,6 +787,23 @@ class PromAbsDict(dict):
     """
     A dictionary that enables accessing values via absolute or promoted variable names.
 
+    Parameters
+    ----------
+    values : array or dict
+        Numpy structured array or dictionary of values.
+    prom2abs : dict
+        Dictionary mapping promoted names to absolute names.
+    abs2prom : dict
+        Dictionary mapping absolute names in the output vector to promoted names.
+    data_format : int
+        A version number specifying the OpenMDAO SQL case database version.
+    in_prom2abs : dict
+        Dictionary mapping promoted names in the input vector to absolute names.
+    auto_ivc_map : dict
+        Dictionary that maps all auto_ivc sources to either an absolute input name for single
+        connections or a promoted input name for multiple connections. This is for output
+        display.
+
     Attributes
     ----------
     _values : array or dict
@@ -808,23 +825,6 @@ class PromAbsDict(dict):
                  in_prom2abs=None, auto_ivc_map=None):
         """
         Initialize.
-
-        Parameters
-        ----------
-        values : array or dict
-            Numpy structured array or dictionary of values.
-        prom2abs : dict
-            Dictionary mapping promoted names to absolute names.
-        abs2prom : dict
-            Dictionary mapping absolute names in the output vector to promoted names.
-        data_format : int
-            A version number specifying the OpenMDAO SQL case database version.
-        in_prom2abs : dict
-           Dictionary mapping promoted names in the input vector to absolute names.
-        auto_ivc_map : dict
-            Dictionary that maps all auto_ivc sources to either an absolute input name for single
-            connections or a promoted input name for multiple connections. This is for output
-            display.
         """
         super().__init__()
 
@@ -958,7 +958,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key : str
             Absolute or promoted variable name.
 
         Returns
@@ -1000,7 +1000,7 @@ class PromAbsDict(dict):
 
         Parameters
         ----------
-        key : string
+        key : str
             Absolute or promoted variable name.
         value : any
             value for variable

@@ -19,6 +19,11 @@ class ExplicitComponent(Component):
     """
     Class to inherit from when all output variables are explicit.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _inst_functs : dict
@@ -30,11 +35,6 @@ class ExplicitComponent(Component):
     def __init__(self, **kwargs):
         """
         Store some bound methods so we can detect runtime overrides.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -168,7 +168,7 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         shape : int or tuple or list or None
@@ -181,14 +181,14 @@ class ExplicitComponent(Component):
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
         desc : str
-            description of the variable.
+            Description of the variable.
         lower : float or list or tuple or ndarray or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
         upper : float or list or tuple or ndarray or None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.
@@ -217,7 +217,7 @@ class ExplicitComponent(Component):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         if res_ref is None:
             res_ref = ref
@@ -446,7 +446,7 @@ class ExplicitComponent(Component):
         ----------
         jac : Jacobian or None
             Ignored.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if not (self._has_compute_partials or self._approx_schemes):
@@ -471,9 +471,9 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None
@@ -488,9 +488,9 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]..
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
@@ -508,13 +508,13 @@ class ExplicitComponent(Component):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         d_inputs : Vector
-            see inputs; product must be computed only if var_name in d_inputs
+            See inputs; product must be computed only if var_name in d_inputs.
         d_outputs : Vector
-            see outputs; product must be computed only if var_name in d_outputs
+            See outputs; product must be computed only if var_name in d_outputs.
         mode : str
-            either 'fwd' or 'rev'
+            Either 'fwd' or 'rev'.
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """

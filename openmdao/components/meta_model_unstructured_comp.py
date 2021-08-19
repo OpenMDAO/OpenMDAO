@@ -22,6 +22,11 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     For a Float variable, the training data is an array of length m,
     where m is the number of training points.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     train : bool
@@ -47,11 +52,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -116,19 +116,19 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the input.
         val : float or ndarray
             Initial value for the input.
         training_data : float or ndarray
-            training data for this variable. Optional, can be set by the problem later.
+            Training data for this variable. Optional, can be set by the problem later.
         **kwargs : dict
             Additional agruments for add_input.
 
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         metadata = super().add_input(name, val, **kwargs)
         vec_size = self.options['vec_size']
@@ -162,7 +162,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the variable output.
         val : float or ndarray
             Initial value for the output. While the value is overwritten during execution, it is
@@ -177,7 +177,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Returns
         -------
         dict
-            metadata for added variable
+            Metadata for added variable.
         """
         metadata = super().add_output(name, val, **kwargs)
         vec_size = self.options['vec_size']
@@ -342,9 +342,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         vec_size = self.options['vec_size']
 
@@ -492,13 +492,17 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         step : float
             Step size for approximation. Defaults to None, in which case the approximation
             method provides its default value.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
             to None, in which case the approximation method provides its default value.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, in which case the approximation method provides
-            its default value.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
         """
         if method == 'cs':
             raise ValueError('Complex step has not been tested for MetaModelUnStructuredComp')
@@ -512,9 +516,9 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         vec_size = self.options['vec_size']
 

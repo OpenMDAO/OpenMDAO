@@ -39,7 +39,7 @@ def sine_distribution(num_points, start=0.0, end=1.0, phase=np.pi):
     end : int or float
         Maximum value to interpolate at.
     phase : float
-        Phase of the sine wave
+        Phase of the sine wave.
 
     Returns
     -------

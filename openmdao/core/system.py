@@ -158,6 +158,13 @@ class System(object):
         my_idx: index among variables in this system, on this processor (I/O indices separate).
         io: indicates explicitly that input and output variables are combined in the same dict.
 
+    Parameters
+    ----------
+    num_par_fd : int
+        If FD is active, number of concurrent FD solves.
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the System options.
+
     Attributes
     ----------
     name : str
@@ -366,13 +373,6 @@ class System(object):
     def __init__(self, num_par_fd=1, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        num_par_fd : int
-            If FD is active, number of concurrent FD solves.
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
         self.pathname = None
@@ -559,6 +559,10 @@ class System(object):
             If True, include names of continuous variables.  Default is True.
         discrete : bool
             If True, include names of discrete variables.  Default is False.
+
+        Yields
+        ------
+        str
         """
         if cont:
             if local:
@@ -1267,11 +1271,6 @@ class System(object):
         """
         Return the full pathname to a coloring file.
 
-        Parameters
-        ----------
-        system : System
-            The System having its coloring saved or loaded.
-
         Returns
         -------
         str
@@ -1462,7 +1461,7 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         prob_meta : dict
@@ -2169,7 +2168,7 @@ class System(object):
 
         Returns
         -------
-        (inputs, outputs, residuals) : tuple of <Vector> instances
+        (inputs, outputs, residuals)
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
@@ -2343,7 +2342,7 @@ class System(object):
         Parameters
         ----------
         level : int
-            iprint level. Set to 2 to print residuals each iteration; set to 1
+            Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
         depth : int
@@ -2395,6 +2394,10 @@ class System(object):
         typ : type
             If not None, only yield Systems that match that are instances of the
             given type.
+
+        Yields
+        ------
+        type or None
         """
         if include_self and (typ is None or isinstance(self, typ)):
             yield self
@@ -2456,12 +2459,12 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the design variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the input
+            Lower boundary for the input.
         upper : upper or ndarray, optional
-            Upper boundary for the input
+            Upper boundary for the input.
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -2470,17 +2473,17 @@ class System(object):
             If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
-        units : str, optional
-            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        units : str, optional
+            Units to convert to before applying scaling.
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2592,16 +2595,16 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
-        type_ : string
-            The type of response. Supported values are 'con' and 'obj'
+        type_ : str
+            The type of response. Supported values are 'con' and 'obj'.
         lower : float or ndarray, optional
-            Lower boundary for the variable
+            Lower boundary for the variable.
         upper : upper or ndarray, optional
-            Upper boundary for the variable
+            Upper boundary for the variable.
         equals : equals or ndarray, optional
-            Equality constraint value for the variable
+            Equality constraint value for the variable.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : upper or ndarray, optional
@@ -2619,12 +2622,12 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2768,14 +2771,14 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the variable
+            Lower boundary for the variable.
         upper : float or ndarray, optional
-            Upper boundary for the variable
+            Upper boundary for the variable.
         equals : float or ndarray, optional
-            Equality constraint value for the variable
+            Equality constraint value for the variable.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -2785,7 +2788,7 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         units : str, optional
@@ -2796,7 +2799,7 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2826,7 +2829,7 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
@@ -2843,10 +2846,10 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2931,7 +2934,6 @@ class System(object):
         dict
             The design variables defined in the current system and, if
             recurse=True, its subsystems.
-
         """
         pro2abs_out = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -3068,7 +3070,6 @@ class System(object):
         dict
             The responses defined in the current system and, if
             recurse=True, its subsystems.
-
         """
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -3179,7 +3180,6 @@ class System(object):
         -------
         dict
             The constraints defined in the current system.
-
         """
         return OrderedDict((key, response) for (key, response) in
                            self.get_responses(recurse=recurse).items()
@@ -3202,7 +3202,6 @@ class System(object):
         -------
         dict
             The objectives defined in the current system.
-
         """
         return OrderedDict((key, response) for (key, response) in
                            self.get_responses(recurse=recurse).items()
@@ -3546,9 +3545,9 @@ class System(object):
         Parameters
         ----------
         explicit : bool, optional
-            include outputs from explicit components. Default is True.
+            Include outputs from explicit components. Default is True.
         implicit : bool, optional
-            include outputs from implicit components. Default is True.
+            Include outputs from implicit components. Default is True.
         val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
@@ -3803,7 +3802,6 @@ class System(object):
         Compute outputs.
 
         This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
-
         """
         with self._scaled_context_all():
             self._solve_nonlinear()
@@ -3850,7 +3848,7 @@ class System(object):
 
         Parameters
         ----------
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
@@ -3918,7 +3916,7 @@ class System(object):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         pass
@@ -3953,7 +3951,7 @@ class System(object):
         ----------
         recorder : <CaseRecorder>
            A recorder instance.
-        recurse : boolean
+        recurse : bool
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
