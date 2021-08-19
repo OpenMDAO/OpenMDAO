@@ -61,7 +61,7 @@ class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
     def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
-                 root_shape=None):
+                 root_shape=None, warn=True):
         self.flat = flat
         self.root_shape = src_shape if root_shape is None else root_shape
         self.src_shape = self.root_shape
@@ -71,6 +71,8 @@ class _PromotesInfo(object):
                 self.src_indices.set_src_shape(self.root_shape)
             else:
                 self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat=flat)
+            if not warn:
+                self.src_indices._check_dims = False
         else:
             self.src_indices = None
         self.parent_sys = None  # pathname of promoting system
@@ -106,7 +108,7 @@ class _PromotesInfo(object):
                                     self.src_indices, self.src_shape)
 
         return _PromotesInfo(src_inds, self.flat, self.src_shape, self.parent_sys, self.prom,
-                             parent.root_shape)
+                             parent.root_shape, warn=False)
 
     def compare(self, other):
         """
@@ -2028,7 +2030,7 @@ class Group(System):
                         else:
                             issue_warning(msg, category=SetupWarning)
 
-                    src_indices._chk_shape_dims(flat, abs_in, abs_out)
+                    src_indices._chk_shape_dims(flat, abs_in, abs_out, self.msginfo)
 
     def _set_subsys_connection_errors(self, val=True):
         """

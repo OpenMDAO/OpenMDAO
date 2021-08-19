@@ -8,6 +8,7 @@ from numbers import Integral
 
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.om_warnings import warn_deprecation
+from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
 
 
 def array2slice(arr):
@@ -69,6 +70,8 @@ class Indexer(object):
         If True, compare dim of src with dim of index to give ambiguity warning.
     _dist_shape : tuple or None
         Distributed shape.
+    _orig_src_shape : tuple or None
+        Original shape of the source, before possible flattening based on _flat_src flag.
     """
 
     def __init__(self):
@@ -80,6 +83,7 @@ class Indexer(object):
         self._flat_src = True
         self._check_dims = True
         self._dist_shape = None
+        # TODO: remove this after flat src deprecation branch
         self._orig_src_shape = None
 
     def __len__(self):
@@ -305,12 +309,18 @@ class Indexer(object):
 
         return self
 
-    def _chk_shape_dims(self, flat_src, iname, oname):
+    def _chk_shape_dims(self, flat_src, iname, oname, prefix):
         if self._orig_src_shape is None or flat_src or not self._check_dims:
             return
 
         if len(self._orig_src_shape) > len(shape2tuple(self.shape)):
-            raise RuntimeError(f"When connecting {oname} to {iname}: shape:{self.shape}, src_shape: {self._orig_src_shape}.")
+            issue_warning(f"connecting source '{oname}' of dimension {len(self._orig_src_shape)} "
+                          f"to '{iname}' using src_indices of dimension {len(self.shape)} without "
+                          "setting `flat_src_indices=True`.  The source is currently treated as "
+                          "flat, but this automatic flattening is deprecated and will be removed "
+                          "in a future release.  To keep the old behavior, set `flat_src_indices`"
+                          "=True in the connect(), promotes(), or add_input() call.",
+                          category=OMDeprecationWarning, prefix=prefix)
 
     def to_json(self):
         """

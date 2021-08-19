@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning
+from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -4159,6 +4159,35 @@ class TestConfigureUpdateMPI(TestConfigureUpdate):
     """
     N_PROCS = 2
 
+
+class TestFlatSrcDeprecation(unittest.TestCase):
+    def test_add_input(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', x={'val': 1.0, 'src_indices': [1]}),
+                              promotes_inputs=['x'])
+
+        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_connect(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.connect('indeps.x', 'C1.x', src_indices=[1])
+        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_promotes(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.promotes('C1', inputs=['x'], src_indices=[1])
+        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
 
 if __name__ == "__main__":
     unittest.main()
