@@ -12,6 +12,54 @@ class EQConstraintComp(ExplicitComponent):
     """
     A component that computes the difference between two inputs to test for equality.
 
+    Parameters
+    ----------
+    name : str
+        The name of the output variable to be created.
+    eq_units : str or None
+        Units for the left-hand-side and right-hand-side of the difference equation.
+    lhs_name : str or None
+        Optional name for the LHS variable associated with the difference equation.
+        If None, the default will be used:  'lhs:{name}'.
+    rhs_name : str or None
+        Optional name for the RHS variable associated with the difference equation.
+        If None, the default will be used:  'rhs:{name}'.
+    rhs_val : int, float, or np.array
+        Default value for the RHS of the given output.  Must be compatible
+        with the shape (optionally) given by the val or shape option in kwargs.
+    use_mult : bool
+        Specifies whether the LHS multiplier is to be used.  If True, then an additional
+        input `mult_name` is created, with the default value given by `mult_val`, that
+        multiplies lhs.  Default is False.
+    mult_name : str or None
+        Optional name for the LHS multiplier variable associated with the output
+        variable. If None, the default will be used: 'mult:{name}'.
+    mult_val : int, float, or np.array
+        Default value for the LHS multiplier of the given output.  Must be compatible
+        with the shape (optionally) given by the val or shape option in kwargs.
+    normalize : bool
+        Specifies whether or not the resulting output should be normalized by the RHS.  When
+        the RHS value is between [-2, 2], the normalization value is a quadratic function that
+        is close to one but still provides a C1 continuous function. When this option is True,
+        the user-provided ref/ref0 scaler/adder options below are typically unnecessary.
+    add_constraint : bool
+        Specifies whether to add an equality constraint.
+    ref : float or ndarray, optional
+        Value of response variable that scales to 1.0 in the driver. This option is only
+        meaningful when add_constraint=True.
+    ref0 : float or ndarray, optional
+        Value of response variable that scales to 0.0 in the driver. This option is only
+        meaningful when add_constraint=True.
+    adder : float or ndarray, optional
+        Value to add to the model value to get the scaled value for the driver. adder
+        is first in precedence. This option is only meaningful when add_constraint=True.
+    scaler : float or ndarray, optional
+        Value to multiply the model value to get the scaled value for the driver. scaler
+        is second in precedence. This option is only meaningful when add_constraint=True.
+    **kwargs : dict
+        Additional arguments to be passed for the creation of the output variable.
+        (see `add_output` method).
+
     Attributes
     ----------
     _output_vars : dict
@@ -48,54 +96,6 @@ class EQConstraintComp(ExplicitComponent):
           \end{cases}
 
         New output variables are created by calling `add_eq_output`.
-
-        Parameters
-        ----------
-        name : str
-            The name of the output variable to be created.
-        eq_units : str or None
-            Units for the left-hand-side and right-hand-side of the difference equation.
-        lhs_name : str or None
-            Optional name for the LHS variable associated with the difference equation.
-            If None, the default will be used:  'lhs:{name}'.
-        rhs_name : str or None
-            Optional name for the RHS variable associated with the difference equation.
-            If None, the default will be used:  'rhs:{name}'.
-        rhs_val : int, float, or np.array
-            Default value for the RHS of the given output.  Must be compatible
-            with the shape (optionally) given by the val or shape option in kwargs.
-        use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, then an additional
-            input `mult_name` is created, with the default value given by `mult_val`, that
-            multiplies lhs.  Default is False.
-        mult_name : str or None
-            Optional name for the LHS multiplier variable associated with the output
-            variable. If None, the default will be used: 'mult:{name}'.
-        mult_val : int, float, or np.array
-            Default value for the LHS multiplier of the given output.  Must be compatible
-            with the shape (optionally) given by the val or shape option in kwargs.
-        normalize : bool
-            Specifies whether or not the resulting output should be normalized by the RHS.  When
-            the RHS value is between [-2, 2], the normalization value is a quadratic function that
-            is close to one but still provides a C1 continuous function. When this option is True,
-            the user-provided ref/ref0 scaler/adder options below are typically unnecessary.
-        add_constraint : bool
-            Specifies whether to add an equality constraint.
-        ref : float or ndarray, optional
-            Value of response variable that scales to 1.0 in the driver. This option is only
-            meaningful when add_constraint=True.
-        ref0 : float or ndarray, optional
-            Value of response variable that scales to 0.0 in the driver. This option is only
-            meaningful when add_constraint=True.
-        adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value for the driver. adder
-            is first in precedence. This option is only meaningful when add_constraint=True.
-        scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
-            is second in precedence. This option is only meaningful when add_constraint=True.
-        **kwargs : dict
-            Additional arguments to be passed for the creation of the output variable.
-            (see `add_output` method).
         """
         super().__init__()
         self._output_vars = {}
@@ -113,9 +113,9 @@ class EQConstraintComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         for name, options in self._output_vars.items():
             lhs = inputs[options['lhs_name']]
@@ -144,9 +144,9 @@ class EQConstraintComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         for name, options in self._output_vars.items():
             lhs_name = options['lhs_name']

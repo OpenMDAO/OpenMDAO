@@ -15,6 +15,11 @@ class NewtonSolver(NonlinearSolver):
 
     The default linear solver is the linear_solver in the containing system.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     linear_solver : LinearSolver
@@ -29,11 +34,6 @@ class NewtonSolver(NonlinearSolver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(**kwargs)
 
@@ -147,7 +147,7 @@ class NewtonSolver(NonlinearSolver):
 
         Returns
         -------
-        boolean
+        bool
             Flag for indicating child linerization
         """
         return (self.options['solve_subsystems']

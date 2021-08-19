@@ -7,24 +7,10 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
 from openmdao.utils.om_warnings import warn_deprecation
 
 
-FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
-
 DEFAULT_ORDER = {
     'forward': 1,
     'backward': 1,
     'central': 2,
-}
-
-FD_COEFFS = {
-    ('forward', 1): FDForm(deltas=np.array([1.0]),
-                           coeffs=np.array([1.0]),
-                           current_coeff=-1.0),
-    ('backward', 1): FDForm(deltas=np.array([-1.0]),
-                            coeffs=np.array([-1.0]),
-                            current_coeff=1.0),
-    ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
-                           coeffs=np.array([0.5, -0.5]),
-                           current_coeff=0.),
 }
 
 
@@ -47,6 +33,20 @@ def _generate_fd_coeff(form, order, system):
         namedtuple containing the 'deltas', 'coeffs', and 'current_coeff'. These deltas and
         coefficients need to be scaled by the step size.
     """
+    FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
+
+    FD_COEFFS = {
+        ('forward', 1): FDForm(deltas=np.array([1.0]),
+                               coeffs=np.array([1.0]),
+                               current_coeff=-1.0),
+        ('backward', 1): FDForm(deltas=np.array([-1.0]),
+                                coeffs=np.array([-1.0]),
+                                current_coeff=1.0),
+        ('central', 2): FDForm(deltas=np.array([1.0, -1.0]),
+                               coeffs=np.array([0.5, -0.5]),
+                               current_coeff=0.),
+    }
+
     try:
         fd_form = FD_COEFFS[form, order]
     except KeyError:
@@ -232,6 +232,13 @@ class FiniteDifference(ApproximationScheme):
             System on which the execution is run.
         under_cs : bool
             True if we're currently under complex step at a higher level.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
         """
         if not self._wrt_meta:
             return

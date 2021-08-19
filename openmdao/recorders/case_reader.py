@@ -20,7 +20,7 @@ def CaseReader(filename, pre_load=True, metadata_filename=None):
 
     Returns
     -------
-    reader : BaseCaseReader
+    BaseCaseReader
         An instance of a CaseReader.
     """
     return SqliteCaseReader(filename, pre_load, metadata_filename)

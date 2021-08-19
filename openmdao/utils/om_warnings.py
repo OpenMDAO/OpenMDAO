@@ -156,7 +156,7 @@ _warnings = [_class for _, _class in
 # reset_warnings processes the warnings classes in the order returned by inspect.getmembers.
 # The order is alphabetized. But this causes problems.
 # To solve this problem, we sort the warnings classes so that parents come before their children
-def compare_class_hierarchy(class1, class2):
+def _compare_class_hierarchy(class1, class2):
     if issubclass(class1, class2):
         return 1
     elif issubclass(class2, class1):
@@ -165,7 +165,7 @@ def compare_class_hierarchy(class1, class2):
         return 0
 
 
-_warnings = sorted(_warnings, key=cmp_to_key(compare_class_hierarchy))
+_warnings = sorted(_warnings, key=cmp_to_key(_compare_class_hierarchy))
 
 
 def reset_warnings():
@@ -183,6 +183,10 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
     """
     Display a warning with the desired stack level and optional prefix.
 
+    Ex.
+
+    >>> om.issue_warning('some warning message', prefix=self.pathname, category=om.SetupWarning)
+
     Parameters
     ----------
     msg : str
@@ -193,11 +197,6 @@ def issue_warning(msg, prefix='', stacklevel=2, category=OpenMDAOWarning):
         Number of levels up the stack to identify as the warning location.
     category : class
         The class of warning to be issued.
-
-    Examples
-    --------
-    om.issue_warning('some warning message', prefix=self.pathname, category=om.SetupWarning)
-
     """
     old_format = warnings.formatwarning
     warnings.formatwarning = _warn_simple_format
@@ -280,6 +279,11 @@ class reset_warning_registry(object):
 
     From https://bugs.python.org/file40031/reset_warning_registry.py
 
+    Parameters
+    ----------
+    pattern : regex pattern
+        Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
+
     Attributes
     ----------
     _pattern : regex pattern
@@ -295,11 +299,6 @@ class reset_warning_registry(object):
     def __init__(self, pattern=None):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        pattern : regex pattern
-            Causes manager to only reset modules whose names match pattern. defaults to ``".*"``.
         """
         self._pattern = re.compile(pattern or ".*")
 

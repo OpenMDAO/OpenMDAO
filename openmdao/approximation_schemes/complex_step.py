@@ -49,10 +49,10 @@ class ComplexStep(ApproximationScheme):
             Absolute name pairing of (of, wrt) for the derivative.
         system : System
             Containing System.
-        vector : ndarray or None
-            Direction for difference when using directional derivatives.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
+        vector : ndarray or None
+            Direction for difference when using directional derivatives.
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
@@ -97,6 +97,13 @@ class ComplexStep(ApproximationScheme):
             System on which the execution is run.
         under_cs : bool
             True if we're currently under complex step at a higher level.
+
+        Yields
+        ------
+        int
+            column index
+        ndarray
+            solution array corresponding to the jacobian column at the given column index
         """
         if not self._wrt_meta:
             return

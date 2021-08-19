@@ -10,6 +10,13 @@ class BaseCaseReader(object):
     """
     Base class of all CaseReader implementations.
 
+    Parameters
+    ----------
+    filename : str
+        The path to the file containing the recorded data.
+    pre_load : bool
+        If True, load all the data into memory during initialization.
+
     Attributes
     ----------
     _format_version : int
@@ -27,13 +34,6 @@ class BaseCaseReader(object):
     def __init__(self, filename, pre_load=False):
         """
         Initialize.
-
-        Parameters
-        ----------
-        filename : str
-            The path to the file containing the recorded data.
-        pre_load : bool
-            If True, load all the data into memory during initialization.
         """
         self._format_version = None
         self._openmdao_version = None
@@ -87,11 +87,10 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-            case name}
+        source : 'problem', 'driver', component pathname, solver pathname, case_name
             Identifies which cases to return.
         recurse : bool, optional
-            If True, will enable iterating over all successors in case hierarchy
+            If True, will enable iterating over all successors in case hierarchy.
         flat : bool, optional
             If False and there are child cases, then a nested ordered dictionary
             is returned rather than an iterator.
@@ -99,7 +98,7 @@ class BaseCaseReader(object):
         Returns
         -------
         list or dict
-            The cases identified by source
+            The cases identified by source.
         """
         pass
 
@@ -117,7 +116,7 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            The case identified by case_id
+            The case identified by case_id.
         """
         pass
 
@@ -164,8 +163,7 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-            case name}
+        source : 'problem', 'driver', component pathname, solver pathname, case_name
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
@@ -190,9 +188,9 @@ class BaseCaseReader(object):
         Parameters
         ----------
         run_number : int
-            Run_driver or run_model iteration to inspect
+            Run_driver or run_model iteration to inspect.
         system : str or None
-            Pathname of system (None for all systems)
+            Pathname of system (None for all systems).
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -200,7 +198,7 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            {system: {key: val}}
+            {system: {key: val}}.
         """
         pass
 
@@ -211,9 +209,9 @@ class BaseCaseReader(object):
         Parameters
         ----------
         run_number : int
-            Run_driver or run_model iteration to inspect
+            Run_driver or run_model iteration to inspect.
         solver : str or None
-            Pathname of solver (None for all solvers)
+            Pathname of solver (None for all solvers).
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -221,6 +219,6 @@ class BaseCaseReader(object):
         Returns
         -------
         dict
-            {solver: {key: val}}
+            {solver: {key: val}}.
         """
         pass

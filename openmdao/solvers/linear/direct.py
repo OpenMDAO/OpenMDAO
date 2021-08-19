@@ -166,6 +166,11 @@ def format_nan_error(system, matrix):
 class DirectSolver(LinearSolver):
     """
     LinearSolver that uses linalg.solve or LU factor/solve.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'LN: Direct'

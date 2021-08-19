@@ -11,13 +11,24 @@ class InterpAlgorithm(object):
     """
     Base class for interpolation over data in an n-dimensional table.
 
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing ndarray of x grid locations for each table dimension.
+    values : ndarray
+        Array containing the values at all points in grid.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     grid : tuple(ndarray)
         Tuple containing x grid locations for this dimension.
     k : int
         Minimum number of points required for this algorithm.
-    last_index : integer
+    last_index : int
         Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
@@ -40,17 +51,6 @@ class InterpAlgorithm(object):
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing ndarray of x grid locations for each table dimension.
-        values : ndarray
-            Array containing the values at all points in grid.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.initialize()
@@ -216,7 +216,7 @@ class InterpAlgorithm(object):
         x : ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx : int
             Interval index for x.
         slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating
@@ -247,6 +247,26 @@ class InterpAlgorithmSemi(object):
     this dimension has its own InterpAlgorithmSemi object that interpolates the subsequent
     dimensions.
 
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing ndarray of x grid locations for each table dimension.
+    values : ndarray
+        Array containing the values at all points in grid.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    extrapolate : bool
+        When False, raise an error if extrapolation occurs in this dimension.
+    compute_d_dvalues : bool
+        When True, compute gradients with respect to the table values.
+    idx : list or None
+        Maps values to their indices in the training data input. Only used during recursive
+        calls.
+    idim : int
+        Integer corresponding to table depth. Used for error messages.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     idim : int
@@ -257,7 +277,7 @@ class InterpAlgorithmSemi(object):
         Tuple containing x grid locations for this dimension.
     k : int
         Minimum number of points required for this algorithm.
-    last_index : integer
+    last_index : int
         Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
@@ -278,26 +298,6 @@ class InterpAlgorithmSemi(object):
                  idim=0, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing ndarray of x grid locations for each table dimension.
-        values : ndarray
-            Array containing the values at all points in grid.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        extrapolate : bool
-            When False, raise an error if extrapolation occurs in this dimension.
-        compute_d_dvalues : bool
-            When True, compute gradients with respect to the table values.
-        idx : list or None
-            Maps values to their indices in the training data input. Only used during recursive
-            calls.
-        idim : int
-            Integer corresponding to table depth. Used for error messages.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.initialize()

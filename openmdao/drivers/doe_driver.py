@@ -20,6 +20,13 @@ class DOEDriver(Driver):
     """
     Design-of-Experiments Driver.
 
+    Parameters
+    ----------
+    generator : DOEGenerator, list or None
+        The case generator or a list of DOE cases.
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     _name : str
@@ -33,14 +40,6 @@ class DOEDriver(Driver):
     def __init__(self, generator=None, **kwargs):
         """
         Construct A DOEDriver.
-
-        Parameters
-        ----------
-        generator : DOEGenerator, list or None
-            The case generator or a list of DOE cases.
-
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         # if given a list, create a ListGenerator
         if isinstance(generator, list):
@@ -153,7 +152,7 @@ class DOEDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         self.iter_count = 0

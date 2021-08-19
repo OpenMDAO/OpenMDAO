@@ -25,7 +25,7 @@ def array2slice(arr):
     Returns
     -------
     slice or None
-        If slice conversion is possible, return the slice, else return None
+        If slice conversion is possible, return the slice, else return None.
     """
     if arr.ndim == 1 and arr.dtype.kind in ('i', 'u'):
         if arr.size > 1:  # see if 1D array will convert to slice
@@ -232,6 +232,11 @@ class ShapedIntIndexer(Indexer):
     """
     Int indexing class.
 
+    Parameters
+    ----------
+    idx : int
+        The index.
+
     Attributes
     ----------
     _idx : int
@@ -241,11 +246,6 @@ class ShapedIntIndexer(Indexer):
     def __init__(self, idx):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        idx : int
-            The index.
         """
         super().__init__()
         self._check_ind_type(idx, Integral)
@@ -345,7 +345,7 @@ class ShapedIntIndexer(Indexer):
         Returns
         -------
         int
-            int version of self.
+            Int version of self.
         """
         return self._idx
 
@@ -353,6 +353,11 @@ class ShapedIntIndexer(Indexer):
 class IntIndexer(ShapedIntIndexer):
     """
     Int indexing class that may or may not be 'shaped'.
+
+    Parameters
+    ----------
+    idx : int
+        The index.
     """
 
     def shaped_instance(self):
@@ -392,6 +397,11 @@ class ShapedSliceIndexer(Indexer):
     """
     Abstract slice class that is 'shaped'.
 
+    Parameters
+    ----------
+    slc : slice
+        The slice.
+
     Attributes
     ----------
     _slice : slice
@@ -401,11 +411,6 @@ class ShapedSliceIndexer(Indexer):
     def __init__(self, slc):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        slc : slice
-            The slice.
         """
         super().__init__()
         self._check_ind_type(slc, slice)
@@ -497,7 +502,7 @@ class ShapedSliceIndexer(Indexer):
         Returns
         -------
         list of int or int
-            list or int version of self.
+            List or int version of self.
         """
         return self.as_array().tolist()
 
@@ -505,6 +510,11 @@ class ShapedSliceIndexer(Indexer):
 class SliceIndexer(ShapedSliceIndexer):
     """
     Abstract slice class that may or may not be 'shaped'.
+
+    Parameters
+    ----------
+    slc : slice
+        The slice.
     """
 
     def shaped_instance(self):
@@ -562,6 +572,13 @@ class ShapedArrayIndexer(Indexer):
     """
     Abstract index array class that is 'shaped'.
 
+    Parameters
+    ----------
+    arr : ndarray
+        The index array.
+    convert : bool
+        If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
+
     Attributes
     ----------
     _arr : ndarray
@@ -573,13 +590,6 @@ class ShapedArrayIndexer(Indexer):
     def __init__(self, arr, convert=True):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        arr : ndarray
-            The index array.
-        convert : bool
-            If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
         """
         super().__init__()
 
@@ -678,7 +688,7 @@ class ShapedArrayIndexer(Indexer):
         Returns
         -------
         list of int or int
-            list or int version of self.
+            List or int version of self.
         """
         return self._arr.tolist()
 
@@ -686,6 +696,13 @@ class ShapedArrayIndexer(Indexer):
 class ArrayIndexer(ShapedArrayIndexer):
     """
     Abstract index array class that may or may not be 'shaped'.
+
+    Parameters
+    ----------
+    arr : ndarray
+        The index array.
+    convert : bool
+        If True, conversion of arrays to slices and ellipses to multi-indexers is allowed.
     """
 
     def shaped_instance(self):
@@ -737,6 +754,11 @@ class ShapedMultiIndexer(Indexer):
     """
     Abstract multi indexer class that is 'shaped'.
 
+    Parameters
+    ----------
+    tup : tuple
+        Tuple of indices/slices.
+
     Attributes
     ----------
     _tup : tuple
@@ -748,11 +770,6 @@ class ShapedMultiIndexer(Indexer):
     def __init__(self, tup):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        tup : tuple
-            Tuple of indices/slices.
         """
         super().__init__()
         self._tup = tup
@@ -878,7 +895,7 @@ class ShapedMultiIndexer(Indexer):
         Returns
         -------
         list of int or int
-            list or int version of self.
+            List or int version of self.
         """
         return self.as_array().tolist()
 
@@ -886,6 +903,11 @@ class ShapedMultiIndexer(Indexer):
 class MultiIndexer(ShapedMultiIndexer):
     """
     Abstract multi indexer class that may or may not be 'shaped'.
+
+    Parameters
+    ----------
+    tup : tuple
+        Tuple of indices/slices.
     """
 
     def shaped_instance(self):
@@ -913,6 +935,11 @@ class EllipsisIndexer(Indexer):
     """
     Abstract multi indexer class that is 'shaped'.
 
+    Parameters
+    ----------
+    tup : tuple
+        Tuple of indices/slices.
+
     Attributes
     ----------
     _tup : tuple
@@ -922,11 +949,6 @@ class EllipsisIndexer(Indexer):
     def __init__(self, tup):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        tup : tuple
-            Tuple of indices/slices.
         """
         super().__init__()
         self._tup = tup
@@ -1039,7 +1061,7 @@ class EllipsisIndexer(Indexer):
         Returns
         -------
         list of int or int
-            list or int version of self.
+            List or int version of self.
         """
         return self.as_array().tolist()
 
