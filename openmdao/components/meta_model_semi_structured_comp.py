@@ -126,6 +126,10 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
                 training_data = np.ones(n_train)
             super().add_input("%s_train" % name, val=training_data, **kwargs)
 
+        elif training_data is None:
+            msg = f"Training data is required for output '{name}'."
+            raise ValueError(msg)
+
         self.training_outputs[name] = training_data
 
     def _setup_var_data(self):

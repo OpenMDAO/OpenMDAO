@@ -1405,6 +1405,12 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
         self.assertEqual(str(cm.exception), msg)
 
+    def test_error_no_training_data(self):
+        comp = om.MetaModelStructuredComp(method='akima')
+        msg = "Training data is required for output 'f'."
+        with self.assertRaisesRegex(ValueError, msg):
+            comp.add_output('f')
+
 
 if __name__ == "__main__":
     unittest.main()
