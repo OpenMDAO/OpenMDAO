@@ -24,6 +24,10 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
 
     Attributes
     ----------
@@ -41,11 +45,6 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -77,7 +76,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the input.
         training_data : ndarray
             Training data grid sample points for this input variable. Must be of length m, where m
@@ -108,7 +107,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the output.
         training_data : ndarray
             Training data sample points for this output variable. Must be of length m, where m is
@@ -184,9 +183,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
         for out_name, interp in self.interps.items():
@@ -223,9 +222,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
 

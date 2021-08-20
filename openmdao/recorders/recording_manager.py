@@ -148,7 +148,6 @@ class RecordingManager(object):
         ----------
         recording_requester : object
             The object that needs its metadata recorded.
-
         """
         warn_deprecation("The 'record_metadata' function is deprecated. "
                          "All system and solver options are recorded automatically.")
@@ -183,7 +182,7 @@ class RecordingManager(object):
         Returns
         -------
         True/False: bool
-            True if RecordingManager is managing at least one recorder
+            True if RecordingManager is managing at least one recorder.
         """
         return True if self._recorders else False
 

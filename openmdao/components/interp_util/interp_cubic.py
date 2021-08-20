@@ -16,6 +16,17 @@ class InterpCubic(InterpAlgorithm):
     Continuity of derivatives between segments is assured, but a linear solution is
     required to attain this.
 
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     second_derivs : ndarray
@@ -25,17 +36,6 @@ class InterpCubic(InterpAlgorithm):
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
-            Array containing the table values for all dimensions.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp)
         self.second_derivs = None
@@ -104,7 +104,7 @@ class InterpCubic(InterpAlgorithm):
         x : ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx : int
             Interval index for x.
         slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating

@@ -35,12 +35,12 @@ def find_citations(prob):
     Parameters
     ----------
     prob : <Problem>
-        The Problem instance to be searched
+        The Problem instance to be searched.
 
     Returns
     -------
     dict
-        dict of citations keyed by class
+        Dict of citations keyed by class.
     """
     # dict keyed by the class so we don't report multiple citations
     # for the same class showing up in multiple instances
@@ -93,7 +93,7 @@ def print_citations(prob, classes=None, out_stream=_DEFAULT_OUT_STREAM):
     Parameters
     ----------
     prob : <Problem>
-        The Problem instance to be searched
+        The Problem instance to be searched.
     classes : list of str
         List of class names for classes to include in the displayed citations.
     out_stream : file-like object

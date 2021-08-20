@@ -24,6 +24,17 @@ class InterpBSplines(InterpAlgorithm):
     """
     Interpolate using B-spline.
 
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     _jac : ndarray
@@ -33,17 +44,6 @@ class InterpBSplines(InterpAlgorithm):
     def __init__(self, grid, values, interp=None, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
-            Array containing the table values for all dimensions.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, **kwargs)
 

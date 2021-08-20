@@ -11,22 +11,22 @@ from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, In
 class InterpLagrange3(InterpAlgorithm):
     """
     Interpolate using a third order Lagrange polynomial.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
     """
 
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
-        values : ndarray
-            Array containing the table values for all dimensions.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, **kwargs)
         self.k = 4
@@ -41,7 +41,7 @@ class InterpLagrange3(InterpAlgorithm):
         x : ndarray
             The coordinates to sample the gridded data at. First array element is the point to
             interpolate here. Remaining elements are interpolated on sub tables.
-        idx : integer
+        idx : int
             Interval index for x.
         slice_idx : list of <slice>
             Slice object containing indices of data points requested by parent interpolating
@@ -150,32 +150,32 @@ class InterpLagrange3(InterpAlgorithm):
 class InterpLagrange3Semi(InterpAlgorithmSemi):
     """
     Interpolate on a semi structured grid using a second order Lagrange polynomial.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing ndarray of x grid locations for each table dimension.
+    values : ndarray
+        Array containing the values at all points in grid.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    extrapolate : bool
+        When False, raise an error if extrapolation occurs in this dimension.
+    compute_d_dvalues : bool
+        When True, compute gradients with respect to the table values.
+    idx : list or None
+        Maps values to their indices in the training data input. Only used during recursive
+        calls.
+    idim : int
+        Integer corresponding to table depth. Used for error messages.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
     """
 
     def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
                  idim=0, **kwargs):
         """
         Initialize table and subtables.
-
-        Parameters
-        ----------
-        grid : tuple(ndarray)
-            Tuple containing ndarray of x grid locations for each table dimension.
-        values : ndarray
-            Array containing the values at all points in grid.
-        interp : class
-            Interpolation class to be used for subsequent table dimensions.
-        extrapolate : bool
-            When False, raise an error if extrapolation occurs in this dimension.
-        compute_d_dvalues : bool
-            When True, compute gradients with respect to the table values.
-        idx : list or None
-            Maps values to their indices in the training data input. Only used during recursive
-            calls.
-        idim : int
-            Integer corresponding to table depth. Used for error messages.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         super().__init__(grid, values, interp, extrapolate=extrapolate,
                          compute_d_dvalues=compute_d_dvalues, idx=idx, idim=idim, **kwargs)

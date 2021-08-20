@@ -264,6 +264,8 @@ class ApproximationScheme(object):
                             vec_idx = range(abs2meta['output'][wrt]['global_size'])
                     else:
                         vec_idx = LocalRangeIterable(system, wrt)
+                        if directional:
+                            vec_idx = [v for v in vec_idx if v is not None]
 
                     # Directional derivatives for quick partial checking.
                     # Place the indices in a list so that they are all stepped at the same time.

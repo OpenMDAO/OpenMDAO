@@ -31,6 +31,11 @@ class DifferentialEvolutionDriver(Driver):
 
     This algorithm requires that inputs are floating point numbers.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     _concurrent_pop_size : int
@@ -49,11 +54,6 @@ class DifferentialEvolutionDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize the DifferentialEvolutionDriver driver.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         super().__init__(**kwargs)
 
@@ -192,7 +192,7 @@ class DifferentialEvolutionDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         model = self._problem().model
@@ -315,9 +315,9 @@ class DifferentialEvolutionDriver(Driver):
         Returns
         -------
         float
-            Objective value
+            Objective value.
         bool
-            Success flag, True if successful
+            Success flag, True if successful.
         int
             Case number, used for identification when run in parallel.
         """
@@ -416,6 +416,17 @@ class DifferentialEvolution(object):
 
     TODO : add better references than: https://en.wikipedia.org/wiki/Differential_evolution
 
+    Parameters
+    ----------
+    objfun : function
+        Objective callback function.
+    comm : MPI communicator or None
+        The MPI communicator that will be used objective evaluation for each generation.
+    model_mpi : None or tuple
+        If the model in objfun is also parallel, then this will contain a tuple with the the
+        total number of population points to evaluate concurrently, and the color of the point
+        to evaluate on this rank.
+
     Attributes
     ----------
     comm : MPI communicator or None
@@ -435,17 +446,6 @@ class DifferentialEvolution(object):
     def __init__(self, objfun, comm=None, model_mpi=None):
         """
         Initialize genetic algorithm object.
-
-        Parameters
-        ----------
-        objfun : function
-            Objective callback function.
-        comm : MPI communicator or None
-            The MPI communicator that will be used objective evaluation for each generation.
-        model_mpi : None or tuple
-            If the model in objfun is also parallel, then this will contain a tuple with the the
-            total number of population points to evaluate concurrently, and the color of the point
-            to evaluate on this rank.
         """
         self.objfun = objfun
         self.comm = comm
@@ -461,7 +461,7 @@ class DifferentialEvolution(object):
         Parameters
         ----------
         x0 : ndarray
-            Initial design values
+            Initial design values.
         vlb : ndarray
             Lower bounds array.
         vub : ndarray
@@ -473,14 +473,14 @@ class DifferentialEvolution(object):
         random_state : np.random.RandomState, int
             Random state (or seed-number) which controls the seed and random draws.
         F : float
-            Differential rate
+            Differential rate.
         Pc : float
-            Crossover rate
+            Crossover rate.
 
         Returns
         -------
         ndarray
-            Best design point
+            Best design point.
         float
             Objective value at best design point.
         int

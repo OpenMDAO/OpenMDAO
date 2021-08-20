@@ -1,7 +1,7 @@
 import errno
 import os
 import unittest
-from tempfile import mkdtemp
+from tempfile import mkdtemp, TemporaryFile
 from shutil import rmtree
 
 import numpy as np
@@ -473,6 +473,89 @@ class TestCheckConfig(unittest.TestCase):
         prob['comp.x'] = 75.0
 
         prob.final_setup()
+
+    def test_unserializable_option(self):
+        # Makes sure we get a warning if an option is not picklable.
+
+        class TestComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('file1')
+                self.options.declare('file2', recordable=False)
+
+            def setup(self):
+                self.options['file1'] = TemporaryFile()
+                self.options['file2'] = TemporaryFile()
+
+                self.add_input('x', 0.)
+                self.add_output('y', 0.)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x']
+
+        class TestNewton(om.NewtonSolver):
+            def _declare_options(self):
+                super()._declare_options()
+                self.options.declare('file3')
+
+        class TestLinesearch(om.BoundsEnforceLS):
+            def _declare_options(self):
+                super()._declare_options()
+                self.options.declare('file4', recordable=False)
+
+        class TestKrylov(om.ScipyKrylov):
+            def _declare_options(self):
+                super()._declare_options()
+                self.options.declare('file5')
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', TestComp())
+        prob.model.nonlinear_solver = TestNewton(solve_subsystems=False, file3=TemporaryFile())
+        prob.model.nonlinear_solver.linesearch = TestLinesearch(file4=TemporaryFile())
+        prob.model.nonlinear_solver.linear_solver = TestKrylov(file5=TemporaryFile())
+
+        msg1 = "'comp' <class TestComp>: option 'file1' is not serializable " \
+               "(cannot be pickled) but 'recordable=False' has not been set. " \
+               "No options will be recorded for this TestComp unless " \
+               "'recordable' is set to False for this option."
+
+        msg2 = "'comp' <class TestComp>: option 'file2' is not serializable " \
+               "(cannot be pickled) and will not be recorded."
+
+        msg3 = "TestNewton in <model> <class Group>: nonlinear_solver option " \
+               "'file3' is not serializable (cannot be pickled) but 'recordable=False' " \
+               "has not been set. No options will be recorded for this TestNewton unless " \
+               "'recordable' is set to False for this option."
+
+        msg4 = "TestLinesearch in <model> <class Group>: linesearch option 'file4' is " \
+               "not serializable (cannot be pickled) and will not be recorded."
+
+        msg5 = "TestKrylov in <model> <class Group>: linear_solver option 'file5' " \
+               "is not serializable (cannot be pickled) but 'recordable=False' has " \
+               "not been set. No options will be recorded for this TestKrylov unless " \
+               "'recordable' is set to False for this option."
+
+        # By default, a warning is only issued if 'recordable' is not set to False
+        testlogger = TestLogger()
+        prob.setup(check=True, logger=testlogger)
+        prob.final_setup()
+
+        testlogger.find_in('warning', msg1)
+        testlogger.find_in('warning', msg3)
+        testlogger.find_in('warning', msg5)
+
+        self.assertFalse(testlogger.contains('warning', msg2))
+        self.assertFalse(testlogger.contains('warning', msg4))
+
+        # When checking 'all_unserializable_options', a warning is issued even if recordable=False
+        testlogger = TestLogger()
+        prob.setup(check=['all_unserializable_options'], logger=testlogger)
+        prob.final_setup()
+
+        testlogger.find_in('warning', msg1)
+        testlogger.find_in('warning', msg2)
+        testlogger.find_in('warning', msg3)
+        testlogger.find_in('warning', msg4)
+        testlogger.find_in('warning', msg5)
 
 
 class TestRecorderCheckConfig(unittest.TestCase):

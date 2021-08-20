@@ -13,6 +13,40 @@ class BalanceComp(ImplicitComponent):
     """
     A simple equation balance for solving implicit equations.
 
+    Parameters
+    ----------
+    name : str
+        The name of the state variable to be created.
+    eq_units : str or None
+        Units for the left-hand-side and right-hand-side of the equation to be balanced.
+    lhs_name : str or None
+        Optional name for the LHS variable associated with the implicit state variable.  If
+        None, the default will be used:  'lhs:{name}'.
+    rhs_name : str or None
+        Optional name for the RHS variable associated with the implicit state variable.  If
+        None, the default will be used:  'rhs:{name}'.
+    rhs_val : int, float, or np.array
+        Default value for the RHS of the given state.  Must be compatible
+        with the shape (optionally) given by the val or shape option in kwargs.
+    use_mult : bool
+        Specifies whether the LHS multiplier is to be used.  If True, then an additional
+        input `mult_name` is created, with the default value given by `mult_val`, that
+        multiplies lhs.  Default is False.
+    mult_name : str or None
+        Optional name for the LHS multiplier variable associated with the implicit state
+        variable. If None, the default will be used: 'mult:{name}'.
+    mult_val : int, float, or np.array
+        Default value for the LHS multiplier of the given state.  Must be compatible
+        with the shape (optionally) given by the val or shape option in kwargs.
+    normalize : bool
+        Specifies whether or not the resulting residual should be normalized by a quadratic
+        function of the RHS.
+    val : float, int, or np.ndarray
+        Set initial value for the state.
+    **kwargs : dict
+        Additional arguments to be passed for the creation of the implicit state variable.
+        (see `add_output` method).
+
     Attributes
     ----------
     _state_vars : dict
@@ -97,40 +131,6 @@ class BalanceComp(ImplicitComponent):
             prob.setup()
             prob.set_val('exec.x', 2)
             prob.run_model()
-
-        Parameters
-        ----------
-        name : str
-            The name of the state variable to be created.
-        eq_units : str or None
-            Units for the left-hand-side and right-hand-side of the equation to be balanced.
-        lhs_name : str or None
-            Optional name for the LHS variable associated with the implicit state variable.  If
-            None, the default will be used:  'lhs:{name}'.
-        rhs_name : str or None
-            Optional name for the RHS variable associated with the implicit state variable.  If
-            None, the default will be used:  'rhs:{name}'.
-        rhs_val : int, float, or np.array
-            Default value for the RHS of the given state.  Must be compatible
-            with the shape (optionally) given by the val or shape option in kwargs.
-        use_mult : bool
-            Specifies whether the LHS multiplier is to be used.  If True, then an additional
-            input `mult_name` is created, with the default value given by `mult_val`, that
-            multiplies lhs.  Default is False.
-        mult_name : str or None
-            Optional name for the LHS multiplier variable associated with the implicit state
-            variable. If None, the default will be used: 'mult:{name}'.
-        mult_val : int, float, or np.array
-            Default value for the LHS multiplier of the given state.  Must be compatible
-            with the shape (optionally) given by the val or shape option in kwargs.
-        normalize : bool
-            Specifies whether or not the resulting residual should be normalized by a quadratic
-            function of the RHS.
-        val : float, int, or np.ndarray
-            Set initial value for the state.
-        **kwargs : dict
-            Additional arguments to be passed for the creation of the implicit state variable.
-            (see `add_output` method).
         """
         if 'guess_func' in kwargs:
             super().__init__(guess_func=kwargs['guess_func'])
@@ -153,11 +153,11 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         """
         for name, options in self._state_vars.items():
             lhs = inputs[options['lhs_name']]
@@ -186,11 +186,11 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         jacobian : Jacobian
-            sub-jac components written to jacobian[output_name, input_name]
+            Sub-jac components written to jacobian[output_name, input_name].
         """
         for name, options in self._state_vars.items():
             lhs_name = options['lhs_name']
@@ -241,11 +241,11 @@ class BalanceComp(ImplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         """
         if self.options['guess_func'] is not None:
             self.options['guess_func'](inputs, outputs, residuals)

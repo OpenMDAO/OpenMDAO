@@ -28,12 +28,12 @@ def stack_outputs(outputs_dict):
     Parameters
     ----------
     outputs_dict : dict
-        Dictionary of outputs
+        Dictionary of outputs.
 
     Returns
     -------
     array
-        np.stack of values
+        Np.stack of values.
     """
     return np.stack([np.asarray(v) for v in outputs_dict.values()], axis=-1)
 
@@ -41,6 +41,15 @@ def stack_outputs(outputs_dict):
 class MetaModelVisualization(object):
     """
     Top-level container for the Meta Model Visualization.
+
+    Parameters
+    ----------
+    model : MetaModelComponent
+        Reference to meta model component.
+    resolution : int
+        Value used to calculate the size of contour plot meshgrid.
+    doc : Document or None
+        The bokeh document to build.
 
     Attributes
     ----------
@@ -121,15 +130,6 @@ class MetaModelVisualization(object):
     def __init__(self, model, resolution=50, doc=None):
         """
         Initialize parameters.
-
-        Parameters
-        ----------
-        model : MetaModelComponent
-            Reference to meta model component
-        resolution : int
-            Value used to calculate the size of contour plot meshgrid
-        doc : Document
-            The bokeh document to build.
         """
         self.prob = Problem()
         self.resolution = resolution
@@ -1037,7 +1037,7 @@ def view_metamodel(meta_model_comp, resolution, port_number, browser):
     port_number : int
         Bokeh plot port number.
     browser : bool
-        Boolean to show the browser
+        Boolean to show the browser.
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler

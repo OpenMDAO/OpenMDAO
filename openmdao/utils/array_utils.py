@@ -55,7 +55,7 @@ def evenly_distrib_idxs(num_divisions, arr_size):
     Returns
     -------
     tuple
-        a tuple of (sizes, offsets), where sizes and offsets contain values for all
+        A tuple of (sizes, offsets), where sizes and offsets contain values for all
         divisions.
     """
     base, leftover = divmod(arr_size, num_divisions)
@@ -88,6 +88,10 @@ def take_nth(rank, size, seq):
         Size of the array we're taking nth entries from.
     seq : iter
         Iterator containing the values being returned.
+
+    Yields
+    ------
+    generator
     """
     assert(rank < size)
     it = iter(seq)
@@ -243,7 +247,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     Parameters
     ----------
     data : ndarray
-        Array of values
+        Array of values.
     rows : index array
         Array of row indices.
     cols : index array
@@ -258,7 +262,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     Returns
     -------
     ndarray, ndarray, ndarray
-        Arrays to define a COO sparse jacobian of size num_nodes*nrow by num_nodes*ncol
+        Arrays to define a COO sparse jacobian of size num_nodes*nrow by num_nodes*ncol.
     """
     nnz = len(rows)
 
@@ -312,7 +316,7 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     Parameters
     ----------
     full_idxs : ndarray
-        Indices into the full array (which could be outs + ins or just ins)
+        Indices into the full array (which could be outs + ins or just ins).
     inputs : Vector
         Inputs vector.
     outputs : Vector
@@ -464,7 +468,6 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     -------
     coo_matrix
         A COO matrix with approximately the nonzero density desired.
-
     """
     assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
 
