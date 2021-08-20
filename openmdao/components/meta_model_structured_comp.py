@@ -128,10 +128,13 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         super().add_output(name, val * np.ones(n), **kwargs)
 
-        self.training_outputs[name] = training_data
-
         if self.options['training_data_gradients']:
+            if training_data is None:
+                shape = tuple([len(item) for item in self.inputs])
+                training_data = np.ones(shape)
             super().add_input("%s_train" % name, val=training_data, **kwargs)
+
+        self.training_outputs[name] = training_data
 
     def _setup_var_data(self):
         """
