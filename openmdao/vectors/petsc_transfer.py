@@ -112,8 +112,8 @@ class PETScTransfer(DefaultTransfer):
                     # is defined.
                     if meta_in['size'] > sizes_out[owner, idx_out]:
                         src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                elif src_indices.ndim == 1:
-                    src_indices = convert_neg(src_indices, meta_out['global_size'])
+                else:
+                    src_indices = src_indices.shaped_array()
 
                 # 1. Compute the output indices
                 # NOTE: src_indices are relative to a single, possibly distributed variable,

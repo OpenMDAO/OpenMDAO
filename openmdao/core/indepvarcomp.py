@@ -313,7 +313,7 @@ class _AutoIndepVarComp(IndepVarComp):
         # Add the output quickly.
         # We don't need to check for errors because we get the value straight from a
         # source, and ivc metadata is minimal.
-        value, shape, _ = ensure_compatible(name, val, None)
+        value, shape = ensure_compatible(name, val, None)
         metadata = {
             'val': value,
             'shape': shape,

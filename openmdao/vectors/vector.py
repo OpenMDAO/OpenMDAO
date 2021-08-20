@@ -6,6 +6,7 @@ import weakref
 import numpy as np
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
+from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
@@ -532,22 +533,25 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
+        if not isinstance(idxs, Indexer):
+            idxs = indexer(idxs, flat=flat)
+
         if flat:
             if isinstance(val, float):
-                self._views_flat[abs_name][idxs] = val
+                self._views_flat[abs_name][idxs()] = val
             else:
-                self._views_flat[abs_name][idxs] = np.asarray(val).flat
+                self._views_flat[abs_name][idxs.flat()] = np.asarray(val).flat
         else:
             value = np.asarray(val)
             try:
-                self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs()] = value
             except Exception as err:
                 try:
-                    value = value.reshape(self._views[abs_name][idxs].shape)
+                    value = value.reshape(self._views[abs_name][idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                      f"'{name}': {str(err)}.")
-                self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs()] = value
 
     def dot(self, vec):
         """

@@ -44,6 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 
@@ -540,21 +541,17 @@ class Problem(object):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
-                            src_indices = tlocmeta['src_indices']
                             flat = False
+                            src_indices = tlocmeta['src_indices']
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
-                                if inds is not None:
-                                    if _is_slicer_op(inds):
-                                        inds = _slice_indices(inds, np.prod(sshape), sshape)
-                                        flat = True
                                 src_indices = inds
+
                             if src_indices is None:
-                                model._outputs.set_var(src, value, None, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat)
                             else:
-                                if flat:
-                                    src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
+                                    src_indices = src_indices.shaped_array()
                                     ssizes = model._var_sizes['output']
                                     sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
@@ -566,13 +563,20 @@ class Problem(object):
                                                            "to out-of-process array entries.")
                                     if start > 0:
                                         src_indices = src_indices - start
-                                model._outputs.set_var(src, value, src_indices[indices], flat)
+                                    src_indices = indexer(src_indices)
+                                if indices is _full_slice:
+                                    model._outputs.set_var(src, value, src_indices, flat)
+                                else:
+                                    model._outputs.set_var(src, value, src_indices.apply(indices),
+                                                           True)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
                         value = np.asarray(value)
+                        if indices is not _full_slice:
+                            indices = indexer(indices)
                         model._outputs.set_var(src, value, indices)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value

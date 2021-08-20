@@ -723,7 +723,7 @@ def constraintExample(inds):
 class TestConstraintFancyIndex(unittest.TestCase):
 
     def test_fancy_index_arr(self):
-        prob = constraintExample([[0,1], [1,1]])
+        prob = constraintExample(([0,1], [1,1]))
         np.testing.assert_allclose(prob.get_val("exampleComp.f_xy"), [10.50322551])
         np.testing.assert_allclose(prob.get_val("exampleComp.c_xy")[:, 1], [25.00000002, 75.00000024])
 
