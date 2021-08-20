@@ -517,8 +517,6 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         prob.run_model()
 
-        print(prob.get_val('comp.f'))
-
         # we can verify all gradients by checking against finite-difference
         totals = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
                                    method='cs', out_stream=None);
