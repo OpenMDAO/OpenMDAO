@@ -6,6 +6,7 @@ import weakref
 import numpy as np
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
+from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
@@ -26,6 +27,19 @@ class Vector(object):
 
     - <DefaultVector>
     - <PETScVector>
+
+    Parameters
+    ----------
+    name : str
+        The name of the vector: 'nonlinear' or 'linear'.
+    kind : str
+        The kind of vector, 'input', 'output', or 'residual'.
+    system : <System>
+        Pointer to the owning system.
+    root_vector : <Vector>
+        Pointer to the vector owned by the root system.
+    alloc_complex : bool
+        Whether to allocate any imaginary storage to perform complex step. Default is False.
 
     Attributes
     ----------
@@ -82,19 +96,6 @@ class Vector(object):
     def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        name : str
-            The name of the vector: 'nonlinear' or 'linear'.
-        kind : str
-            The kind of vector, 'input', 'output', or 'residual'.
-        system : <System>
-            Pointer to the owning system.
-        root_vector : <Vector>
-            Pointer to the vector owned by the root system.
-        alloc_complex : bool
-            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         self._name = name
         self._typ = _type_map[kind]
@@ -182,7 +183,7 @@ class Vector(object):
         Returns
         -------
         listiterator (Python 3.x) or list (Python 2.x)
-            the variable names.
+            The variable names.
         """
         return self.__iter__()
 
@@ -193,7 +194,7 @@ class Vector(object):
         Returns
         -------
         list
-            the variable values.
+            The variable values.
         """
         if self._under_complex_step:
             return [v for n, v in self._views.items() if n in self._names]
@@ -278,7 +279,7 @@ class Vector(object):
 
         Returns
         -------
-        boolean
+        bool
             True or False.
         """
         return self._name2abs_name(name) is not None
@@ -294,7 +295,7 @@ class Vector(object):
 
         Returns
         -------
-        boolean
+        bool
             True or False.
         """
         return name in self._names
@@ -437,9 +438,9 @@ class Vector(object):
         Parameters
         ----------
         val : int or float
-            scalar.
+            Scalar.
         vec : <Vector>
-            this vector times val is added to self.
+            This vector times val is added to self.
         """
         raise NotImplementedError('add_scale_vec not defined for vector type %s' %
                                   type(self).__name__)
@@ -488,7 +489,7 @@ class Vector(object):
         Parameters
         ----------
         vec : <Vector>
-            the vector whose values self is set to.
+            The vector whose values self is set to.
         """
         raise NotImplementedError('set_vec not defined for vector type %s' %
                                   type(self).__name__)
@@ -502,8 +503,8 @@ class Vector(object):
         Parameters
         ----------
         val : float or ndarray
-            scalar or array to set data array to.
-        idxs : int or slice or tuple of ints and/or slices.
+            Scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
         raise NotImplementedError('set_arr not defined for vector type %s' %
@@ -519,7 +520,7 @@ class Vector(object):
             The name of the variable.
         val : float or ndarray
             Scalar or array to set data array to.
-        idxs : int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         flat : bool
             If True, set into flattened variable.
@@ -532,22 +533,25 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
+        if not isinstance(idxs, Indexer):
+            idxs = indexer(idxs, flat=flat)
+
         if flat:
             if isinstance(val, float):
-                self._views_flat[abs_name][idxs] = val
+                self._views_flat[abs_name][idxs()] = val
             else:
-                self._views_flat[abs_name][idxs] = np.asarray(val).flat
+                self._views_flat[abs_name][idxs.flat()] = np.asarray(val).flat
         else:
             value = np.asarray(val)
             try:
-                self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs()] = value
             except Exception as err:
                 try:
-                    value = value.reshape(self._views[abs_name][idxs].shape)
+                    value = value.reshape(self._views[abs_name][idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                      f"'{name}': {str(err)}.")
-                self._views[abs_name][idxs] = value
+                self._views[abs_name][idxs()] = value
 
     def dot(self, vec):
         """
@@ -572,7 +576,7 @@ class Vector(object):
         Returns
         -------
         float
-            norm of this vector.
+            Norm of this vector.
         """
         raise NotImplementedError('get_norm not defined for vector type %s' %
                                   type(self).__name__)

@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
-
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import  OMDeprecationWarning
 
 class Inner(om.Group):
     def setup(self):
@@ -69,6 +69,8 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(p.model.g1.get_val('a'), 4.)
         assert_near_equal(p['g1.y'], [5., 5., 5., 5.])
         assert_near_equal(p.model.g1.get_val('y'), [5., 5., 5., 5.])
+        assert_near_equal(p['g1.c2.y'], [5., 5., 5., 5.])
+        assert_near_equal(p['g1.c2.a'], [4., 4., 4., 4.])
         assert_near_equal(p['g1.c2.z'], [20., 20., 20., 20.])
 
     def test_multiple_inputs_different_src_indices(self):
@@ -306,7 +308,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
 
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,3))
 
         g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
@@ -317,6 +319,69 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0], "'G.g1' <class Group>: Promoted src_shape of (3, 3) for 'x' in 'G.g1.C1' differs from src_shape (3, 2) for 'x' in 'G'.")
+
+    def test_src_indices_on_promotes(self):
+        src_shape = (3, 3)
+        tgt_shape = (2, 2)
+        src_indices = [[4, 5], [7, 9]]
+        flat_src_indices = True
+
+        class MyComp(om.ExplicitComponent):
+            def __init__(self, input_shape):
+                super().__init__()
+                self._input_shape = input_shape
+            def setup(self):
+                self.add_input('x', val=np.zeros(self._input_shape))
+                self.add_output('y', val=np.zeros(self._input_shape))
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2.0 * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', shape=src_shape))
+        p.model.add_subsystem('C1', MyComp(tgt_shape))
+        p.model.promotes('C1', any=['x'],
+                            src_indices=src_indices,
+                            flat_src_indices=flat_src_indices)
+        p.model.set_input_defaults('x', src_shape=src_shape)
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]] and "
+                         "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
+
+    def test_connect_src_indices_deprecated(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
+        p.model.add_subsystem('C1', MyComp())
+
+        with assert_warning(OMDeprecationWarning, "<class Group>: When connecting "
+                            "from 'indep.x' to 'C1.x': 'src_indices=(1, 0, 2)' is "
+                            "specified in a deprecated format. In a future release, "
+                            "'src_indices' will be expected to use NumPy array indexing."):
+            p.model.connect('indep.x', 'C1.x', src_indices=(1, 0, 2))
+
+    def test_promotes_src_indices_deprecated(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)), promotes=['*'])
+        p.model.add_subsystem('C1', MyComp())
+
+        with assert_warning(OMDeprecationWarning, "<class Group>: When promoting ['x'] "
+                            "from 'C1': 'src_indices=(1, 0, 2)' is "
+                            "specified in a deprecated format. In a future release, "
+                            "'src_indices' will be expected to use NumPy array indexing."):
+            p.model.promotes('C1', inputs=['x'], src_indices=(1, 0, 2))
 
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
@@ -337,14 +402,14 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         # C1.x has a shape of 3, so we apply a slice of [:, 1] to our source which has a shape
         # of (3,2) to give us our final shape of 3.
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
 
         g2 = G.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
 
         # C2.x has a shape of 2, so we apply flat source indices of [1,5] to our source which has
         # a shape of (3,2) to give us our final shape of 2.
-        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2))
 
         p.setup()
 
@@ -368,7 +433,7 @@ class SrcIndicesMPITestCase(unittest.TestCase):
         g2 = par.add_subsystem('g2', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', shape=3))
         g2.add_subsystem('C2', om.ExecComp('y = 2*x', shape=2))
-        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2), flat_src_indices=True)
+        g1.promotes('C1', inputs=['x'], src_indices=om.slicer[:, 1], src_shape=(3,2))
         g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2), flat_src_indices=True)
 
         # we want the connection to x to have a shape of (3,2), which differs from the

@@ -8,6 +8,11 @@ class SurrogateModel(object):
     """
     Base class for surrogate models.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     options : <OptionsDictionary>
@@ -19,11 +24,6 @@ class SurrogateModel(object):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         self.trained = False
 
@@ -38,7 +38,7 @@ class SurrogateModel(object):
         Parameters
         ----------
         x : array-like
-            Training input locations
+            Training input locations..
         y : array-like
             Model responses at given inputs.
         """
@@ -90,6 +90,11 @@ class SurrogateModel(object):
 class MultiFiSurrogateModel(SurrogateModel):
     """
     Base class for surrogate models using multi-fidelity training data.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     def train(self, x, y):
@@ -115,7 +120,7 @@ class MultiFiSurrogateModel(SurrogateModel):
         x : list of double array_like elements
             A list of arrays with the input at which observations were made, from highest
             fidelity to lowest fidelity. Designs must be nested
-            with X[i] = np.vstack([..., X[i+1])
+            with X[i] = np.vstack([..., X[i+1]).
         y : list of double array_like elements
             A list of arrays with the observations of the scalar output to be predicted,
             from highest fidelity to lowest fidelity.

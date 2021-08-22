@@ -10,6 +10,11 @@ from openmdao.utils.mpi import MPI
 class DefaultAllocator(ProcAllocator):
     """
     Default processor allocator.
+
+    Parameters
+    ----------
+    parallel : bool
+        If True, split subsystem comm.
     """
 
     def _divide_procs(self, proc_info, comm):

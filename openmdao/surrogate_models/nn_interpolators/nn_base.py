@@ -10,25 +10,34 @@ class NNBase(object):
     """
     Base class for common functionality between nearest neighbor interpolants.
 
+    Parameters
+    ----------
+    training_points : ndarray
+        Ndarray of shape (num_points x independent dims) containing training input locations.
+    training_values : ndarray
+        Ndarray of shape (num_points x dependent dims) containing training output values.
+    num_leaves : int
+        How many leaves the tree should have.
+
     Attributes
     ----------
     _tpm : ndarray
-        ndarray of shape (1 x independent dims) containing the minimum in each dimension of
+        Ndarray of shape (1 x independent dims) containing the minimum in each dimension of
          the training input locations.
     _tpr : ndarray
-        ndarray of shape (1x independent dims) containing the range of each dimension of
+        Ndarray of shape (1x independent dims) containing the range of each dimension of
         the training input locations.
     _tvm : ndarray
-        ndarray of shape (1 x independent dims) containing the minimum in each dimension of
+        Ndarray of shape (1 x independent dims) containing the minimum in each dimension of
         the training output values.
     _tvr : ndarray
-        ndarray of shape (1x independent dims) containing the range of each dimension of
+        Ndarray of shape (1x independent dims) containing the range of each dimension of
         the training output values.
     _tp : ndarray
-        ndarray of shape (num_points x independent dims) containing normalized training
+        Ndarray of shape (num_points x independent dims) containing normalized training
         input locations.
     _tv : ndarray
-        ndarray of shape (num_points x independent dims) containing normalized training
+        Ndarray of shape (num_points x independent dims) containing normalized training
         output values.
     _indep_dims : int
         Number of independent dims
@@ -45,15 +54,6 @@ class NNBase(object):
     def __init__(self, training_points, training_values, num_leaves=2):
         """
         Initialize nearest neighbor interpolant by scaling input to the unit hypercube.
-
-        Parameters
-        ----------
-        training_points : ndarray
-            ndarray of shape (num_points x independent dims) containing training input locations.
-        training_values : ndarray
-            ndarray of shape (num_points x dependent dims) containing training output values.
-        num_leaves : int
-            How many leaves the tree should have.
         """
         # training_points and training_values are the known points and their
         # respective values which will be interpolated against.

@@ -89,7 +89,6 @@ def array_to_blob(array):
     -------
     blob :
         The blob created from the array.
-
     """
     out = BytesIO()
     np.save(out, array)
@@ -121,6 +120,17 @@ def blob_to_array(blob):
 class SqliteRecorder(CaseRecorder):
     """
     Recorder that saves cases in a sqlite db.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the recorder file.
+    append : bool, optional
+        Optional. If True, append to an existing case recorder file.
+    pickle_version : int, optional
+        The pickle protocol version to use when pickling metadata.
+    record_viewer_data : bool, optional
+        If True, record data needed for visualization.
 
     Attributes
     ----------
@@ -154,17 +164,6 @@ class SqliteRecorder(CaseRecorder):
     def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
-
-        Parameters
-        ----------
-        filepath : str
-            Path to the recorder file.
-        append : bool, optional
-            Optional. If True, append to an existing case recorder file.
-        pickle_version : int, optional
-            The pickle protocol version to use when pickling metadata.
-        record_viewer_data : bool, optional
-            If True, record data needed for visualization.
         """
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")

@@ -44,6 +44,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 
@@ -53,10 +54,6 @@ except ImportError:
     PETScVector = None
 
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
-
-
-ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
-MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
 _contains_all = ContainsAll()
 
@@ -77,6 +74,20 @@ CITATION = """@article{openmdao_2019,
 class Problem(object):
     """
     Top-level container for the systems and drivers.
+
+    Parameters
+    ----------
+    model : <System> or None
+        The top-level <System>. If not specified, an empty <Group> will be created.
+    driver : <Driver> or None
+        The driver for the problem. If not specified, a simple "Run Once" driver will be used.
+    comm : MPI.Comm or <FakeComm> or None
+        The global communicator.
+    name : str
+        Problem name. Can be used to specify a Problem instance when multiple Problems
+        exist.
+    **options : named args
+        All remaining named args are converted to options.
 
     Attributes
     ----------
@@ -127,20 +138,6 @@ class Problem(object):
     def __init__(self, model=None, driver=None, comm=None, name=None, **options):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        model : <System> or None
-            The top-level <System>. If not specified, an empty <Group> will be created.
-        driver : <Driver> or None
-            The driver for the problem. If not specified, a simple "Run Once" driver will be used.
-        comm : MPI.Comm or <FakeComm> or None
-            The global communicator.
-        name : str
-            Problem name. Can be used to specify a Problem instance when multiple Problems
-            exist.
-        **options : named args
-            All remaining named args are converted to options.
         """
         self.cite = CITATION
         self._name = name
@@ -422,12 +419,12 @@ class Problem(object):
         ----------
         name : str
             Promoted or relative variable name in the root system's namespace.
+        val : float or ndarray or list or None
+            Value to set this variable to.
         units : str, optional
             Units that value is defined in.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set to specified value.
-        val : float or ndarray or list or None
-            Value to set this variable to.
         **kwargs : dict
             Additional keyword argument for deprecated `value` arg.
         """
@@ -544,21 +541,17 @@ class Problem(object):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
-                            src_indices = tlocmeta['src_indices']
                             flat = False
+                            src_indices = tlocmeta['src_indices']
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
-                                if inds is not None:
-                                    if _is_slicer_op(inds):
-                                        inds = _slice_indices(inds, np.prod(sshape), sshape)
-                                        flat = True
                                 src_indices = inds
+
                             if src_indices is None:
-                                model._outputs.set_var(src, value, None, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat)
                             else:
-                                if flat:
-                                    src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
+                                    src_indices = src_indices.shaped_array()
                                     ssizes = model._var_sizes['output']
                                     sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
@@ -570,13 +563,20 @@ class Problem(object):
                                                            "to out-of-process array entries.")
                                     if start > 0:
                                         src_indices = src_indices - start
-                                model._outputs.set_var(src, value, src_indices[indices], flat)
+                                    src_indices = indexer(src_indices)
+                                if indices is _full_slice:
+                                    model._outputs.set_var(src, value, src_indices, flat)
+                                else:
+                                    model._outputs.set_var(src, value, src_indices.apply(indices),
+                                                           True)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
                         value = np.asarray(value)
+                        if indices is not _full_slice:
+                            indices = indexer(indices)
                         model._outputs.set_var(src, value, indices)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value
@@ -659,7 +659,7 @@ class Problem(object):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         if self._mode is None:
@@ -850,7 +850,7 @@ class Problem(object):
 
         Parameters
         ----------
-        check : None, boolean, list of strings, or the string ‘all’
+        check : None, bool, list of str, or the strs ‘all’
             Determines what config checks, if any, are run after setup is complete.
             If None or False, no checks are run
             If True, the default checks ('out_of_order', 'system', 'solvers', 'dup_inputs',
@@ -859,10 +859,10 @@ class Problem(object):
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
             'dup_inputs', 'missing_recorders', 'all_unserializable_options', 'out_of_order',
-            'promotions', 'solvers', 'system', 'unconnected_inputs') are run
+            'promotions', 'solvers', 'system', 'unconnected_inputs') are run.
         logger : object
             Object for logging config checks if check is True.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'auto', which will pick 'fwd' or 'rev' based on
             the direction resulting in the smallest number of linear solves required to
@@ -882,8 +882,8 @@ class Problem(object):
 
         Returns
         -------
-        self : <Problem>
-            this enables the user to instantiate and setup in one line.
+        <Problem>
+            This enables the user to instantiate and setup in one line.
         """
         model = self.model
         comm = self.comm
@@ -1051,7 +1051,7 @@ class Problem(object):
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
             'forward'.
         step_calc : str
@@ -1536,10 +1536,10 @@ class Problem(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of : list of variable name str or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt : list of variable name str or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         out_stream : file-like object
@@ -1559,7 +1559,7 @@ class Problem(object):
             next to them in output, making them easy to search for. Note at times there may be a
             significant relative error due to a minor absolute error.  Default is 1.0E-6.
         method : str
-            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'
+            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
         step : float
             Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
             'cs'.
@@ -1575,7 +1575,7 @@ class Problem(object):
             future will default to 'rel_avg'. Defaults to None, in which case the approximation
             method provides its default value.
         show_progress : bool
-            True to show progress of check_totals
+            True to show progress of check_totals.
 
         Returns
         -------
@@ -1741,13 +1741,13 @@ class Problem(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of : list of variable name str or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt : list of variable name str or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format : string
+        return_format : str
             Format to return the derivatives. Can be 'dict', 'flat_dict', or 'array'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
@@ -1764,7 +1764,7 @@ class Problem(object):
 
         Returns
         -------
-        derivs : object
+        object
             Derivatives in form requested by 'return_format'.
         """
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
@@ -1800,7 +1800,7 @@ class Problem(object):
         Parameters
         ----------
         level : int
-            iprint level. Set to 2 to print residuals each iteration; set to 1
+            Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
         depth : int
@@ -1831,7 +1831,7 @@ class Problem(object):
             When False, in the columnar display, just display norm of any ndarrays with size > 1.
             The norm is surrounded by vertical bars to indicate that it is a norm.
             When True, also display full values of the ndarray below the row. Format is affected
-            by the values set with numpy.set_printoptions
+            by the values set with numpy.set_printoptions.
             Default is False.
         driver_scaling : bool, optional
             When True, return values that are scaled according to either the adder and scaler or
@@ -1841,19 +1841,18 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'cache_linear_solution', 'units']
+            'cache_linear_solution', 'units'].
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
             'linear', 'parallel_deriv_color',
-            'cache_linear_solution', 'units']
+            'cache_linear_solution', 'units'].
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
-            'parallel_deriv_color', 'cache_linear_solution']
-
+            'parallel_deriv_color', 'cache_linear_solution'].
         """
         default_col_names = ['name', 'val', 'size']
 
@@ -2024,13 +2023,13 @@ class Problem(object):
         ----------
         logger : object
             Logging object.
-        checks : list of str or None or the string 'all'
+        checks : list of str or None or the str 'all'
             Determines what config checks are run.
             If None, no checks are run
             If list of str, run those config checks
             If ‘all’, all the checks ('auto_ivc_warnings', 'comp_has_no_outputs', 'cycles',
             'dup_inputs', 'missing_recorders', 'out_of_order', 'promotions', 'solvers',
-            'system', 'unconnected_inputs') are run
+            'system', 'unconnected_inputs') are run.
         out_file : str or None
             If not None, output will be written to this file in addition to stdout.
         """
@@ -2111,6 +2110,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
     """
     nan = float('nan')
     suppress_output = out_stream is None
+
+    ErrorTuple = namedtuple('ErrorTuple', ['forward', 'reverse', 'forward_reverse'])
+    MagnitudeTuple = namedtuple('MagnitudeTuple', ['forward', 'reverse', 'fd'])
 
     if compact_print:
         if print_reverse:

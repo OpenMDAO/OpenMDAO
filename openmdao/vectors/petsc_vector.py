@@ -26,6 +26,19 @@ class PETScVector(DefaultVector):
 
     Most methods use the DefaultVector's implementation.
 
+    Parameters
+    ----------
+    name : str
+        The name of the vector: 'nonlinear' or 'linear'.
+    kind : str
+        The kind of vector, 'input', 'output', or 'residual'.
+    system : <System>
+        Pointer to the owning system.
+    root_vector : <Vector>
+        Pointer to the vector owned by the root system.
+    alloc_complex : bool
+        Whether to allocate any imaginary storage to perform complex step. Default is False.
+
     Attributes
     ----------
     _dup_inds : ndarray of int
@@ -42,19 +55,6 @@ class PETScVector(DefaultVector):
     def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        name : str
-            The name of the vector: 'nonlinear' or 'linear'.
-        kind : str
-            The kind of vector, 'input', 'output', or 'residual'.
-        system : <System>
-            Pointer to the owning system.
-        root_vector : <Vector>
-            Pointer to the vector owned by the root system.
-        alloc_complex : bool
-            Whether to allocate any imaginary storage to perform complex step. Default is False.
         """
         super().__init__(name, kind, system, root_vector=root_vector,
                          alloc_complex=alloc_complex)
@@ -151,7 +151,7 @@ class PETScVector(DefaultVector):
         Returns
         -------
         float
-            norm of this vector.
+            Norm of this vector.
         """
         nodup = self._get_nodup()
         self._petsc.array = nodup.real

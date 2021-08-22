@@ -167,6 +167,10 @@ def multi_proc_fail_check(comm):
     ----------
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
+
+    Yields
+    ------
+    None
     """
     if MPI is None:
         yield
@@ -191,6 +195,8 @@ def multi_proc_exception_check(comm):
     """
     Raise an exception on all procs if it is raised on one.
 
+    Exception raised will be the one from the lowest rank where an exception occurred.
+
     Wrap this around code that you want to globally fail if it fails
     on any MPI process in comm.  If not running under MPI, don't
     handle any exceptions.
@@ -199,6 +205,10 @@ def multi_proc_exception_check(comm):
     ----------
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
+
+    Yields
+    ------
+    None
     """
     if MPI is None or comm is None or comm.size == 1:
         yield
@@ -214,17 +224,17 @@ def multi_proc_exception_check(comm):
         failed = comm.allreduce(fail)
         if failed:
             if fail:
-                msg = f"{exc[1]}"
+                msg = (f"{exc[1]}", exc[0])
             else:
                 msg = None
-            allmsgs = comm.allgather(msg)
-            if fail:
-                msg = f"Exception raised on rank {comm.rank}: {exc[1]}"
-                raise exc[0](msg).with_traceback(exc[2])
-            else:
-                for m in allmsgs:
-                    if m is not None:
-                        raise RuntimeError(f"Exception raised on other rank: {m}.")
+            for i, tup in enumerate(comm.allgather(msg)):
+                if tup is not None:
+                    if i == comm.rank:
+                        msg = f"Exception raised on rank {i}: {exc[1]}"
+                        raise exc[0](msg).with_traceback(exc[2])
+                    else:
+                        m, exc = tup
+                        raise exc(f"Exception raised on rank {i}: {m}")
 
 
 if MPI:

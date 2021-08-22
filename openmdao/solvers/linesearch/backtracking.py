@@ -45,6 +45,11 @@ class LinesearchSolver(NonlinearSolver):
     """
     Base class for line search solvers.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _do_subsolve : bool
@@ -179,6 +184,11 @@ class BoundsEnforceLS(LinesearchSolver):
 
     Not so much a linesearch; just check the bounds and if they are violated, then pull back to a
     non-violating point and evaluate.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'LS: BCHK'
@@ -234,6 +244,11 @@ class ArmijoGoldsteinLS(LinesearchSolver):
     """
     Backtracking line search that terminates using the Armijo-Goldstein condition.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _analysis_error_raised : bool
@@ -245,11 +260,6 @@ class ArmijoGoldsteinLS(LinesearchSolver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Options dictionary.
         """
         super().__init__(**kwargs)
 

@@ -2680,9 +2680,9 @@ class MatMultCompExact(om.ExplicitComponent):
         Parameters
         ----------
         inputs: Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials: Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         if self.sparse:
             partials['y', 'x'] = self.mat[self.rows, self.cols]

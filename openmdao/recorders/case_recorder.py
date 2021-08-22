@@ -18,6 +18,11 @@ class CaseRecorder(object):
     """
     Base class for all case recorders and is not a functioning case recorder on its own.
 
+    Parameters
+    ----------
+    record_viewer_data : bool, optional
+        If True, record data needed for visualization.
+
     Attributes
     ----------
     _record_viewer_data : bool
@@ -43,11 +48,6 @@ class CaseRecorder(object):
     def __init__(self, record_viewer_data=True):
         """
         Initialize.
-
-        Parameters
-        ----------
-        record_viewer_data : bool, optional
-            If True, record data needed for visualization.
         """
         self._record_viewer_data = record_viewer_data
 
@@ -157,10 +157,10 @@ class CaseRecorder(object):
         ----------
         recording_requester : object
             System, Solver, Driver in need of recording.
-        metadata : dict, optional
-            Dictionary containing execution metadata.
         data : dict
             Dictionary containing desvars, objectives, constraints, responses, and System vars.
+        metadata : dict, optional
+            Dictionary containing execution metadata.
         **kwargs : keyword args
             Some implementations of record_iteration need additional args.
         """

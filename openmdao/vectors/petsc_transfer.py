@@ -18,6 +18,19 @@ class PETScTransfer(DefaultTransfer):
     """
     PETSc Transfer implementation for running in parallel.
 
+    Parameters
+    ----------
+    in_vec : <Vector>
+        Pointer to the input vector.
+    out_vec : <Vector>
+        Pointer to the output vector.
+    in_inds : int ndarray
+        Input indices for the transfer.
+    out_inds : int ndarray
+        Output indices for the transfer.
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the system that owns this transfer.
+
     Attributes
     ----------
     _scatter : method
@@ -29,19 +42,6 @@ class PETScTransfer(DefaultTransfer):
     def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            pointer to the input vector.
-        out_vec : <Vector>
-            pointer to the output vector.
-        in_inds : int ndarray
-            input indices for the transfer.
-        out_inds : int ndarray
-            output indices for the transfer.
-        comm : MPI.Comm or <FakeComm>
-            communicator of the system that owns this transfer.
         """
         super().__init__(in_vec, out_vec, in_inds, out_inds, comm)
         in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
@@ -112,8 +112,8 @@ class PETScTransfer(DefaultTransfer):
                     # is defined.
                     if meta_in['size'] > sizes_out[owner, idx_out]:
                         src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
-                elif src_indices.ndim == 1:
-                    src_indices = convert_neg(src_indices, meta_out['global_size'])
+                else:
+                    src_indices = src_indices.shaped_array()
 
                 # 1. Compute the output indices
                 # NOTE: src_indices are relative to a single, possibly distributed variable,

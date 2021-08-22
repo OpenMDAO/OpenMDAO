@@ -88,7 +88,6 @@ allowed_meta_names = {
     'global_shape',
     'global_size',
     'src_indices',
-    'src_slice',
     'flat_src_indices',
     'type',
     'res_units',
@@ -158,6 +157,13 @@ class System(object):
         idx: global variable index among variables on all procs (I/O indices separate).
         my_idx: index among variables in this system, on this processor (I/O indices separate).
         io: indicates explicitly that input and output variables are combined in the same dict.
+
+    Parameters
+    ----------
+    num_par_fd : int
+        If FD is active, number of concurrent FD solves.
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the System options.
 
     Attributes
     ----------
@@ -367,13 +373,6 @@ class System(object):
     def __init__(self, num_par_fd=1, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        num_par_fd : int
-            If FD is active, number of concurrent FD solves.
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
         self.pathname = None
@@ -560,6 +559,10 @@ class System(object):
             If True, include names of continuous variables.  Default is True.
         discrete : bool
             If True, include names of discrete variables.  Default is False.
+
+        Yields
+        ------
+        str
         """
         if cont:
             if local:
@@ -786,7 +789,7 @@ class System(object):
         """
         try:
             prom2abs = self._problem_meta['prom2abs']
-        except StandardError:
+        except Exception:
             raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
                                "before Problem.setup has been called.")
 
@@ -1268,11 +1271,6 @@ class System(object):
         """
         Return the full pathname to a coloring file.
 
-        Parameters
-        ----------
-        system : System
-            The System having its coloring saved or loaded.
-
         Returns
         -------
         str
@@ -1463,7 +1461,7 @@ class System(object):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         prob_meta : dict
@@ -1522,26 +1520,7 @@ class System(object):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    high_dims = local_shape[1:]
-                    with multi_proc_exception_check(self.comm):
-                        if high_dims:
-                            high_size = np.prod(high_dims)
-                            dim_size_match = bool(global_size % high_size == 0)
-
-                            if dim_size_match is False:
-                                msg = (f"{self.msginfo}: All but the first dimension of the "
-                                       "shape's local parts in a distributed variable must match "
-                                       f"across processes. For output '{abs_name}', local shape "
-                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                       "higher dimension that differs in another rank.")
-
-                                raise RuntimeError(msg)
-
-                            dim1 = global_size // high_size
-                            mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                        else:
-                            mymeta['global_shape'] = (global_size,)
-
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -1946,9 +1925,9 @@ class System(object):
             if not to_match:
                 return
 
-            # always add '*' and so we won't report if it matches nothing (in the case where the
+            # always add '*' so we won't report if it matches nothing (in the case where the
             # system has no variables of that io type)
-            found = set(('*',))
+            found = {'*'}
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
@@ -2189,7 +2168,7 @@ class System(object):
 
         Returns
         -------
-        (inputs, outputs, residuals) : tuple of <Vector> instances
+        (inputs, outputs, residuals)
             Yields the inputs, outputs, and residuals nonlinear vectors.
         """
         if self._inputs is None:
@@ -2363,7 +2342,7 @@ class System(object):
         Parameters
         ----------
         level : int
-            iprint level. Set to 2 to print residuals each iteration; set to 1
+            Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
         depth : int
@@ -2415,6 +2394,10 @@ class System(object):
         typ : type
             If not None, only yield Systems that match that are instances of the
             given type.
+
+        Yields
+        ------
+        type or None
         """
         if include_self and (typ is None or isinstance(self, typ)):
             yield self
@@ -2426,7 +2409,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _create_indexer(self, indices, typename, vname):
+    def _create_indexer(self, indices, typename, vname, flat=False):
         """
         Return an Indexer instance and it's size if possible.
 
@@ -2438,6 +2421,8 @@ class System(object):
             Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
         vname : str
             Name of the variable.
+        flat : bool
+            If True, indices index into a flat array.
 
         Returns
         -------
@@ -2452,7 +2437,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer[indices]
+            idxer = indexer(indices, flat=flat, new_style=True)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -2460,7 +2445,7 @@ class System(object):
         # size may not be available at this point, but get it if we can in order to allow
         # some earlier error checking
         try:
-            size = idxer.size()
+            size = idxer.size
         except Exception:
             size = None
 
@@ -2474,12 +2459,12 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the design variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the input
+            Lower boundary for the input.
         upper : upper or ndarray, optional
-            Upper boundary for the input
+            Upper boundary for the input.
         ref : float or ndarray, optional
             Value of design var that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -2488,17 +2473,17 @@ class System(object):
             If an input is an array, these indicate which entries are of
             interest for this particular design variable.  These may be
             positive or negative integers.
-        units : str, optional
-            Units to convert to before applying scaling.
         adder : float or ndarray, optional
             Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        units : str, optional
+            Units to convert to before applying scaling.
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2610,16 +2595,16 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
-        type_ : string
-            The type of response. Supported values are 'con' and 'obj'
+        type_ : str
+            The type of response. Supported values are 'con' and 'obj'.
         lower : float or ndarray, optional
-            Lower boundary for the variable
+            Lower boundary for the variable.
         upper : upper or ndarray, optional
-            Upper boundary for the variable
+            Upper boundary for the variable.
         equals : equals or ndarray, optional
-            Equality constraint value for the variable
+            Equality constraint value for the variable.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : upper or ndarray, optional
@@ -2637,12 +2622,12 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2786,14 +2771,14 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         lower : float or ndarray, optional
-            Lower boundary for the variable
+            Lower boundary for the variable.
         upper : float or ndarray, optional
-            Upper boundary for the variable
+            Upper boundary for the variable.
         equals : float or ndarray, optional
-            Equality constraint value for the variable
+            Equality constraint value for the variable.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
         ref0 : float or ndarray, optional
@@ -2803,7 +2788,7 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
         units : str, optional
@@ -2814,7 +2799,7 @@ class System(object):
             negative integers.
         linear : bool
             Set to True if constraint is linear. Default is False.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2844,7 +2829,7 @@ class System(object):
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the response variable in the system.
         ref : float or ndarray, optional
             Value of response variable that scales to 1.0 in the driver.
@@ -2861,10 +2846,10 @@ class System(object):
             is first in precedence.  adder and scaler are an alterantive to using ref
             and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value for the driver. scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. adder and scaler are an alterantive to using ref
             and ref0.
-        parallel_deriv_color : string
+        parallel_deriv_color : str
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
         cache_linear_solution : bool
@@ -2949,7 +2934,6 @@ class System(object):
         dict
             The design variables defined in the current system and, if
             recurse=True, its subsystems.
-
         """
         pro2abs_out = self._var_allprocs_prom2abs_list['output']
         pro2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -3086,7 +3070,6 @@ class System(object):
         dict
             The responses defined in the current system and, if
             recurse=True, its subsystems.
-
         """
         prom2abs_out = self._var_allprocs_prom2abs_list['output']
         prom2abs_in = self._var_allprocs_prom2abs_list['input']
@@ -3197,7 +3180,6 @@ class System(object):
         -------
         dict
             The constraints defined in the current system.
-
         """
         return OrderedDict((key, response) for (key, response) in
                            self.get_responses(recurse=recurse).items()
@@ -3220,7 +3202,6 @@ class System(object):
         -------
         dict
             The objectives defined in the current system.
-
         """
         return OrderedDict((key, response) for (key, response) in
                            self.get_responses(recurse=recurse).items()
@@ -3564,9 +3545,9 @@ class System(object):
         Parameters
         ----------
         explicit : bool, optional
-            include outputs from explicit components. Default is True.
+            Include outputs from explicit components. Default is True.
         implicit : bool, optional
-            include outputs from implicit components. Default is True.
+            Include outputs from implicit components. Default is True.
         val : bool, optional
             When True, display output values. Default is True.
         prom_name : bool, optional
@@ -3821,7 +3802,6 @@ class System(object):
         Compute outputs.
 
         This calls _solve_nonlinear, but with the model assumed to be in an unscaled state.
-
         """
         with self._scaled_context_all():
             self._solve_nonlinear()
@@ -3868,7 +3848,7 @@ class System(object):
 
         Parameters
         ----------
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
@@ -3936,7 +3916,7 @@ class System(object):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         pass
@@ -3971,7 +3951,7 @@ class System(object):
         ----------
         recorder : <CaseRecorder>
            A recorder instance.
-        recurse : boolean
+        recurse : bool
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
@@ -4503,12 +4483,7 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            if 'src_slice' in vmeta:
-                smeta = self._var_allprocs_abs2meta['output'][src]
-                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
-                                             smeta['shape'])
-            else:
-                src_indices = None  # FIXME: remote var could have src_indices
+            src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
@@ -4518,19 +4493,14 @@ class System(object):
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
         if name in scope_sys._var_prom2inds:
-            src_shape, inds, flat = scope_sys._var_prom2inds[name]
+            src_shape, inds, _ = scope_sys._var_prom2inds[name]
             if inds is None:
                 if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
                     src_indices = None
                     vshape = None
                     has_src_indices = False
-                is_slice = _is_slicer_op(src_indices)
             else:
-                is_slice = _is_slicer_op(inds)
-                shp = shape_from_idx(src_shape, inds, flat)
-                if not flat and not _is_slicer_op(inds):
-                    inds = _flatten_src_indices(inds, shp,
-                                                src_shape, np.product(src_shape))
+                shp = inds.shape
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
@@ -4543,9 +4513,7 @@ class System(object):
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
 
         if name not in scope_sys._var_prom2inds:
-            is_slice = _is_slicer_op(src_indices)
             shpname = 'global_shape' if get_remote else 'shape'
-            src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
@@ -4572,20 +4540,13 @@ class System(object):
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if is_slice:
-                    val.shape = src_shape
-                    try:
-                        val = val[tuple(src_indices)].ravel()
-                    except TypeError:
-                        # Single-dimension slices don't convert to tuple, but they don't need to.
-                        val = val[src_indices].ravel()
-
-                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
+                if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
+                    src_indices = src_indices.shaped_array(copy=True)
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
                             src_indices = src_indices - start
@@ -4600,7 +4561,7 @@ class System(object):
                                            "from all processes using "
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
-                    val = val.ravel()[src_indices]
+                    val = val.ravel()[src_indices.flat()]
 
             if get_remote and self.comm.size > 1:
                 if distrib:
@@ -4644,41 +4605,6 @@ class System(object):
             val = self.convert2units(src, val, vmeta['units'])
 
         return val
-
-    def _get_src_inds_array(self, varname):
-        """
-        Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
-
-        Parameters
-        ----------
-        varname : str
-            Absolute name of the input variable.
-
-        Returns
-        -------
-        ndarray or None
-            The value of src_indices for the given input variable.
-        """
-        meta = self._var_abs2meta['input'][varname]
-        src_indices = meta['src_indices']
-        if src_indices is not None:
-            src_slice = meta['src_slice']
-            # if src_indices is still a slice, update it to an array
-            if src_slice is src_indices:
-                model = self._problem_meta['model_ref']()
-                src = model._conn_global_abs_in2out[varname]
-                try:
-                    global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
-                    global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
-                except KeyError:
-                    raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
-                                       f"src_slice for input '{varname}' because we don't know "
-                                       "the global shape of its source yet.")
-                src_indices = _slice_indices(src_slice, global_size, global_shape)
-
-                meta['src_indices'] = src_indices  # store converted value
-
-        return src_indices
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """
@@ -5262,6 +5188,50 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
+    def _get_full_dist_shape(self, abs_name, local_shape):
+        """
+        Get the full 'distributed' shape for a variable.
+
+        Variable name is absolute and variable is assumed to be continuous.
+
+        Parameters
+        ----------
+        abs_name : str
+            Absolute name of the variable.
+
+        local_shape : tuple
+            Local shape of the variable, used in error reporting.
+
+        Returns
+        -------
+        tuple
+            The distributed shape for the given variable.
+        """
+        io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+        meta = self._var_allprocs_abs2meta[io][abs_name]
+        var_idx = self._var_allprocs_abs2idx[abs_name]
+        global_size = np.sum(self._var_sizes[io][:, var_idx])
+
+        # assume that all but the first dimension of the shape of a
+        # distributed variable is the same on all procs
+        high_dims = meta['shape'][1:]
+        with multi_proc_exception_check(self.comm):
+            if high_dims:
+                high_size = np.prod(high_dims)
+
+                dim_size_match = bool(global_size % high_size == 0)
+                if dim_size_match is False:
+                    raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
+
+                dim1 = global_size // high_size
+                return tuple([dim1] + list(high_dims))
+
+        return (global_size,)
 
     def _get_jac_col_scatter(self):
         """

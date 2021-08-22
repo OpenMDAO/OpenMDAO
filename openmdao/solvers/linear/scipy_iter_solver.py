@@ -20,6 +20,11 @@ class ScipyKrylov(LinearSolver):
     """
     The Krylov iterative solvers in scipy.sparse.linalg.
 
+    Parameters
+    ----------
+    **kwargs : {}
+        Dictionary of options set by the instantiating class/script.
+
     Attributes
     ----------
     precon : Solver
@@ -31,11 +36,6 @@ class ScipyKrylov(LinearSolver):
     def __init__(self, **kwargs):
         """
         Declare the solver option.
-
-        Parameters
-        ----------
-        **kwargs : {}
-            dictionary of options set by the instantiating class/script.
         """
         super().__init__(**kwargs)
 
@@ -110,7 +110,7 @@ class ScipyKrylov(LinearSolver):
 
         Returns
         -------
-        boolean
+        bool
             Flag for indicating child linerization
         """
         precon = self.precon

@@ -90,6 +90,19 @@ class Coloring(object):
     """
     Container for all information relevant to a coloring.
 
+    Parameters
+    ----------
+    sparsity : ndarray
+        Full jacobian sparsity matrix (dense bool form).
+    row_vars : list of str or None
+        Names of variables corresponding to rows.
+    row_var_sizes : ndarray or None
+        Sizes of row variables.
+    col_vars : list of str or None
+        Names of variables corresponding to columns.
+    col_var_sizes : ndarray or None
+        Sizes of column variables.
+
     Attributes
     ----------
     _shape : tuple of int (nrows, ncols)
@@ -124,19 +137,6 @@ class Coloring(object):
                  col_var_sizes=None):
         """
         Initialize data structures.
-
-        Parameters
-        ----------
-        sparsity : ndarray
-            Full jacobian sparsity matrix (dense bool form).
-        row_vars : list of str or None
-            Names of variables corresponding to rows.
-        row_var_sizes : ndarray or None
-            Sizes of row variables.
-        col_vars : list of str or None
-            Names of variables corresponding to columns.
-        col_var_sizes : ndarray or None
-            Sizes of column variables.
         """
         self._shape = sparsity.shape
 
@@ -498,11 +498,6 @@ class Coloring(object):
     def summary(self):
         """
         Print a summary of this coloring.
-
-        Parameters
-        ----------
-        stream : file-like
-            Where the output will go.
         """
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
@@ -1176,7 +1171,7 @@ def MNCO_bidir(J):
     Parameters
     ----------
     J : coo_matrix
-        Jacobian sparsity matrix (boolean)
+        Jacobian sparsity matrix (boolean).
 
     Returns
     -------

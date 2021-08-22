@@ -40,7 +40,7 @@ class ResponseSurface(SurrogateModel):
         Parameters
         ----------
         x : array-like
-            Training input locations
+            Training input locations.
         y : array-like
             Model responses at given inputs.
         """

@@ -16,10 +16,17 @@ class Matrix(object):
 
     This class is used for global Jacobians.
 
+    Parameters
+    ----------
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the top-level system that owns the <Jacobian>.
+    is_internal : bool
+        If True, this is the int_mtx of an AssembledJacobian.
+
     Attributes
     ----------
     _comm : MPI.Comm or <FakeComm>
-        communicator of the top-level system that owns the <Jacobian>.
+        Communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
     _submats : dict
@@ -31,13 +38,6 @@ class Matrix(object):
     def __init__(self, comm, is_internal):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm>
-            communicator of the top-level system that owns the <Jacobian>.
-        is_internal : bool
-            If True, this is the int_mtx of an AssembledJacobian.
         """
         self._comm = comm
         self._matrix = None
@@ -170,7 +170,7 @@ def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     icols = []
     idxs = []
 
-    for i, idx in enumerate(src_indices):
+    for i, idx in enumerate(src_indices.shaped_array()):
         # pull out columns that match each index
         idxarr = np.nonzero(jcols == i)[0]
         idxs.append(idxarr)

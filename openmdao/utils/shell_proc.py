@@ -14,6 +14,18 @@ class CalledProcessError(subprocess.CalledProcessError):
     """
     :class:`subprocess.CalledProcessError` plus `errormsg` attribute.
 
+    Parameters
+    ----------
+    returncode : int
+        Error code for this error.
+    cmd : str or list
+        If a string, then this is the command line to execute, and the
+        :class:`subprocess.Popen` ``shell`` argument is set True.
+        Otherwise, this is a list of arguments; the first is the command
+        to execute.
+    errormsg : str
+        Error message for this error.
+
     Attributes
     ----------
     errormsg : str
@@ -23,18 +35,6 @@ class CalledProcessError(subprocess.CalledProcessError):
     def __init__(self, returncode, cmd, errormsg):
         """
         Initialize.
-
-        Parameters
-        ----------
-        returncode : int
-            Error code for this error.
-        cmd : str or list
-            If a string, then this is the command line to execute, and the
-            :class:`subprocess.Popen` ``shell`` argument is set True.
-            Otherwise, this is a list of arguments; the first is the command
-            to execute.
-        errormsg : str
-            Error message for this error.
         """
         super().__init__(returncode, cmd)
         self.errormsg = errormsg
@@ -60,6 +60,30 @@ class ShellProc(subprocess.Popen):
     Updates a copy of ``os.environ`` with `env` and opens files for any
     stream which is a :class:`str`.
 
+    Parameters
+    ----------
+    args : str or list
+        If a string, then this is the command line to execute and the
+        :class:`subprocess.Popen` ``shell`` argument is set True.
+        Otherwise, this is a list of arguments; the first is the command
+        to execute.
+    stdin : str, file, or int
+        Specify handling of stdin stream. If a string, a file
+        of that name is opened. Otherwise, see the :mod:`subprocess`
+        documentation.
+    stdout : str, file, or int
+        Specify handling of stdout stream. If a string, a file
+        of that name is opened. Otherwise, see the :mod:`subprocess`
+        documentation.
+    stderr : str, file, or int
+        Specify handling of stderr stream. If a string, a file
+        of that name is opened. Otherwise, see the :mod:`subprocess`
+        documentation.
+    env : dict
+        Environment variables for the command.
+    universal_newlines : bool
+        Set to True to turn on universal newlines.
+
     Attributes
     ----------
     _stdin_arg : str, file, or int
@@ -80,30 +104,6 @@ class ShellProc(subprocess.Popen):
                  universal_newlines=False):
         """
         Initialize.
-
-        Parameters
-        ----------
-        args : str or list
-            If a string, then this is the command line to execute and the
-            :class:`subprocess.Popen` ``shell`` argument is set True.
-            Otherwise, this is a list of arguments; the first is the command
-            to execute.
-        stdin : str, file, or int
-            Specify handling of stdin stream. If a string, a file
-            of that name is opened. Otherwise, see the :mod:`subprocess`
-            documentation.
-        stdout : str, file, or int
-            Specify handling of stdout stream. If a string, a file
-            of that name is opened. Otherwise, see the :mod:`subprocess`
-            documentation.
-        stderr : str, file, or int
-            Specify handling of stderr stream. If a string, a file
-            of that name is opened. Otherwise, see the :mod:`subprocess`
-            documentation.
-        env : dict
-            Environment variables for the command.
-        universal_newlines : bool
-            Set to True to turn on universal newlines.
         """
         environ = os.environ.copy()
         if env:
@@ -177,9 +177,9 @@ class ShellProc(subprocess.Popen):
         Returns
         -------
         int
-            Return Code
+            Return Code.
         str
-            Error Message
+            Error Message.
         """
         if sys.platform == 'win32':
             subprocess.Popen("TASKKILL /F /PID {pid} /T".format(pid=self.pid))
@@ -207,9 +207,9 @@ class ShellProc(subprocess.Popen):
         Returns
         -------
         int
-            Return Code
+            Return Code.
         str
-            Error Message
+            Error Message.
         """
         return_code = None
         try:
@@ -310,9 +310,9 @@ def call(args, stdin=None, stdout=None, stderr=None, env=None,
     Returns
     -------
     int
-        Return Code
+        Return Code.
     str
-        Error Message
+        Error Message.
     """
     process = ShellProc(args, stdin, stdout, stderr, env)
     return process.wait(poll_delay, timeout)

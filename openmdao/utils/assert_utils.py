@@ -31,6 +31,10 @@ def assert_warning(category, msg, contains_msg=False):
     contains_msg : bool
         Set to True to check that the warning text contains msg, rather than checking equality.
 
+    Yields
+    ------
+    None
+
     Raises
     ------
     AssertionError
@@ -68,6 +72,10 @@ def assert_warnings(expected_warnings):
     expected_warnings : iterable of (class, str)
         The category and text of the expected warnings.
 
+    Yields
+    ------
+    None
+
     Raises
     ------
     AssertionError
@@ -97,6 +105,10 @@ def assert_no_warning(category, msg=None):
         The class of the warning.
     msg : str or None
         The text of the warning. If None then only the warning class will be checked.
+
+    Yields
+    ------
+    None
 
     Raises
     ------
@@ -135,9 +147,9 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
             For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
                 Jacobian for the three different methods of computation.
     atol : float
-        absolute error. Default is 1e-6.
+        Absolute error. Default is 1e-6.
     rtol : float
-        relative error. Default is 1e-6.
+        Relative error. Default is 1e-6.
     """
     error_string = ''
     absrel_header = 'abs/rel'
