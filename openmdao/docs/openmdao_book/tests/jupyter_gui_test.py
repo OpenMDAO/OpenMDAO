@@ -1,9 +1,11 @@
 """Test Jupyter doc GUI mods specific to OpenMDAO using Playwright."""
 import asyncio
 from aiounittest import async_test
+import contextlib
 import http.server
 import os
 import pathlib
+import socket
 import sys
 import threading
 import unittest
@@ -14,41 +16,28 @@ if 'win32' in sys.platform:
     # Windows specific event-loop policy & cmd
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-HEADLESS = True  # Set to False if you want to see the browser
-PORT = 8010
+from openmdao.utils.gui_testing_utils import _GuiTestCase
 
+HEADLESS = True  # Set to False if you want to see the browser
+
+def get_free_port():
+    """
+    Get a free port.
+
+    Returns
+    -------
+    port : int
+        a free port
+    """
+    with contextlib.closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as _socket:
+        _socket.bind(('', 0))
+        _, port = _socket.getsockname()
+        return port
 
 # Only can test if the docs have been built
 @unittest.skipUnless(pathlib.Path(__file__).parent.parent.joinpath("_build").exists(),
                      "Cannot test without docs being built")
-class TestOpenMDAOJupyterBookDocs(unittest.TestCase):
-
-    def handle_console_err(self, msg):
-        """ Invoked any time that an error or warning appears in the log. """
-        if msg.type == 'warning':
-            self.console_warning = True
-            print('    Console Warning: ' + msg.text)
-        elif msg.type == 'error':
-            self.console_error = True
-            print('    Console Error: ' + msg.text)
-
-    def handle_page_err(self, msg):
-        self.page_error = True
-        print('    Error on page: ', msg)
-        print(type(msg))
-
-    def handle_request_err(self, msg):
-        self.page_error = True
-        print('    Request error: ', msg)
-
-    def setup_error_handlers(self):
-        self.console_warning = False
-        self.console_error = False
-        self.page_error = False
-
-        self.page.on('console', lambda msg: self.handle_console_err(msg))
-        self.page.on('pageerror', lambda msg: self.handle_page_err(msg))
-        self.page.on('requestfailed', lambda msg: self.handle_request_err(msg))
+class TestOpenMDAOJupyterBookDocs(_GuiTestCase):
 
     async def setup_browser(self, playwright):
         """ Create a browser instance and go to the home page."""
@@ -56,7 +45,7 @@ class TestOpenMDAOJupyterBookDocs(unittest.TestCase):
                                                         headless=HEADLESS)
         self.page = await self.browser.new_page()
 
-        url = f'http://localhost:{PORT}/index.html'
+        url = f'http://localhost:{self.port}/index.html'
 
         # Without wait_until: 'networkidle', processing will begin before
         # the page is fully rendered
@@ -75,7 +64,8 @@ class TestOpenMDAOJupyterBookDocs(unittest.TestCase):
         html_dir = pathlib.Path(__file__).parent.parent.joinpath("_build/html")
         os.chdir(html_dir)
 
-        server_address = ("", PORT)
+        self.port = get_free_port()
+        server_address = ("", self.port)
         self.server = http.server.HTTPServer(server_address, QuietHandler)
 
         self.thread = threading.Thread(target=self.server.serve_forever)
