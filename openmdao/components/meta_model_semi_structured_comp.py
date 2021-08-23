@@ -122,6 +122,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
             if training_data is None:
                 for item in self.training_inputs.values():
                     n_train = len(item)
+                    # Training datasets are all the same length, so grab the first.
                     break
                 training_data = np.ones(n_train)
             super().add_input("%s_train" % name, val=training_data, **kwargs)
