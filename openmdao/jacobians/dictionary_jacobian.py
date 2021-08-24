@@ -212,9 +212,14 @@ class _CheckingJacobian(DictionaryJacobian):
                         'cols': None,
                         'val': np.zeros((nrows, 1 if directional else ncols)),
                     }
-                elif directional and self._subjacs_info[key]['val'].shape[1] != 1:
-                    self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
-                    meta['val'] = np.atleast_2d(meta['val'][:, 0]).T
+                elif directional:
+                    shape = self._subjacs_info[key]['val'].shape
+                    if shape[-1] != 1:
+                        self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
+                        if len(shape) > 1:
+                            meta['val'] = np.atleast_2d(meta['val'][:, 0]).T
+                        else:
+                            meta['val'] = np.atleast_1d(meta['val'])
 
     def set_col(self, system, icol, column):
         """
@@ -243,6 +248,13 @@ class _CheckingJacobian(DictionaryJacobian):
 
         scratch = np.zeros(column.shape)
 
+        # If we are doing a directional derivative, then the sparsity will be violated.
+        # Skip sparsity check if that is the case.
+        options = system._get_check_partial_options()
+        loc_wrt = wrt.split('.')[-1]
+        directional = (options is not None and loc_wrt in options and
+                       options[loc_wrt]['directional'])
+
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in self._subjacs_info:
@@ -256,6 +268,10 @@ class _CheckingJacobian(DictionaryJacobian):
                         subjac['val'][match_inds] = column[start:end][row_inds]
                     else:
                         row_inds = np.zeros(0, dtype=INT_DTYPE)
+
+                    if directional:
+                        continue
+
                     arr = scratch[start:end]
                     arr[:] = column[start:end]
                     arr[row_inds] = 0.
