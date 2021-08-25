@@ -1,0 +1,5 @@
+<form class="bd-search d-flex align-items-center" action="{{ pathto('search') }}" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="{{ _(theme_search_bar_text) }}" aria-label="{{ theme_search_bar_text }}" autocomplete="off" >
+  <div><input type="checkbox" name="search_source" id="search-source" /> Include Source Docs </div>
+</form>
