@@ -1,0 +1,14 @@
+@import "sphinx-book-theme.css";
+
+.bd-search {
+    flex-direction: column;
+}
+
+.classifier {
+  margin-left: 0.8em;
+  font-weight: normal;
+}
+
+.topbar, .topbar-contents, .topbar-main {
+    height: 3em ;
+}
