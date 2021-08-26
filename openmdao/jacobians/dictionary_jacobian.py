@@ -183,6 +183,8 @@ class _CheckingJacobian(DictionaryJacobian):
             rows = meta['rows']
             if rows is None:
                 yield key, meta['val']
+            elif 'directional' in meta:
+                yield key, np.atleast_2d(meta['val']).T
             else:
                 dense = np.zeros(meta['shape'])
                 dense[rows, meta['cols']] = meta['val']
@@ -270,6 +272,7 @@ class _CheckingJacobian(DictionaryJacobian):
                         row_inds = np.zeros(0, dtype=INT_DTYPE)
 
                     if directional:
+                        subjac['directional'] = True
                         continue
 
                     arr = scratch[start:end]
