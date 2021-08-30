@@ -253,7 +253,7 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
                     val2, dx2, dvalue2 = val1, dx1, dvalue1
                     val1, dx1, dvalue1 = val0, dx0, dvalue0
                     val0, dx0, dvalue0 = val_a, dx_a, dvalue_a
-            elif flags == (True, False, False, False) and idx < ngrid-3:
+            elif flags == (True, False, False, False) and idx < ngrid - 3:
                 # We are near the left edge of our sub-region, so slide to the right.
                 idx += 1
                 val_a, dx_a, dvalue_a, flag_a = subtables[idx + 2].interpolate(x[1:])
