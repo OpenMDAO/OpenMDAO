@@ -1,6 +1,8 @@
 # Book settings
 # Learn more at https://jupyterbook.org/customize/config.html
 
+
+
 title: OpenMDAO
 author: The OpenMDAO Development Team
 logo: OpenMDAO_Logo.png
@@ -54,6 +56,9 @@ sphinx:
   config:
     html_baseurl: 'https://openmdao.org/newdocs/versions/latest/'
     sitemap_filename: 'sitemap.xml'
+    html_theme: 'om-theme'
+    html_theme_path: ['.'] # make sphinx search for themes in current dir
+
   extra_extensions:
   - 'sphinx.ext.autodoc'
   - 'sphinx.ext.autosummary'

@@ -24,6 +24,22 @@ class InterpNDSemi(object):
     """
     Interpolation on a semi-structured grid of arbitrary dimensions.
 
+    Parameters
+    ----------
+    points : ndarray
+        The points defining the semi-structured grid in n dimensions.
+    values : ndarray
+        Values (or initial values) for all points in the semi-structured grid.
+    method : str
+        Name of interpolation method.
+    extrapolate : bool
+        When False, raise an exception for any point that is extrapolated.
+        When True, raise a warning for any point that is extrapolated.
+        Note, default is True because semi-structured grids are often sparse in at least one
+        dimension.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
     Attributes
     ----------
     extrapolate : bool
@@ -58,22 +74,6 @@ class InterpNDSemi(object):
         Initialize an InterpNDSemi object.
 
         This object can be setup and used to interpolate on a curve or multi-dimensional table.
-
-        Parameters
-        ----------
-        method : str
-            Name of interpolation method.
-        points : ndarray
-            The points defining the semi-structured grid in n dimensions.
-        values : ndarray
-            Values (or initial values) for all points in the semi-structured grid.
-        extrapolate : bool
-            When False, raise an exception for any point that is extrapolated.
-            When True, raise a warning for any point that is extrapolated.
-            Note, default is True because semi-structured grids are often sparse in at least one
-            dimension.
-        **kwargs : dict
-            Interpolator-specific options to pass onward.
         """
         if not isinstance(method, str):
             msg = "Argument 'method' should be a string."
@@ -130,7 +130,7 @@ class InterpNDSemi(object):
             Value of interpolant at all sample points.
         ndarray
             Value of derivative of interpolated output with respect to input x. (Only when
-            compute_derivative is True.)
+            compute_derivative is True).
         """
         xnew = self._interpolate(x)
 
@@ -210,11 +210,11 @@ class InterpNDSemi(object):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at
+            The coordinates to sample the gridded data at.
 
         Returns
         -------
-        gradient : ndarray of shape (..., ndim)
+        ndarray
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
         if (self._xi is None) or (not np.array_equal(xi, self._xi)):

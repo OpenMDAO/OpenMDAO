@@ -15,7 +15,7 @@ optional_dependencies = {
         'nbconvert',
         'testflo',
         'ipyparallel',
-        'numpydoc>=0.9.1',
+        'numpydoc>=1.1',
         'tabulate',
         'jupyter-book',
         'jupyter-sphinx==0.3.1',
@@ -32,7 +32,7 @@ optional_dependencies = {
     ],
     'test': [
         'parameterized',
-        'numpydoc>=0.9.1',
+        'numpydoc>=1.1',
         'pycodestyle>=2.4.0',
         'pydocstyle==2.0.0',
         'testflo>=1.3.6'

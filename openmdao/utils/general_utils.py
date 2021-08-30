@@ -60,7 +60,7 @@ def ignore_errors(flag=None):
     Returns
     -------
     bool
-        The current value of _ignore_errors
+        The current value of _ignore_errors.
     """
     global _ignore_errors
     if flag is not None:
@@ -99,6 +99,10 @@ def ignore_errors_context(flag=True):
     ----------
     flag : bool
         If not None, set ignore_errors to this value.
+
+    Yields
+    ------
+    None
     """
     save = ignore_errors()
     ignore_errors(flag)
@@ -214,10 +218,10 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
 
     Parameters
     ----------
-    ref : float or ndarray, optional
-        Value of response variable that scales to 1.0 in the driver.
     ref0 : float or ndarray, optional
         Value of response variable that scales to 0.0 in the driver.
+    ref : float or ndarray, optional
+        Value of response variable that scales to 1.0 in the driver.
     adder : float or ndarray, optional
         Value to add to the model value to get the scaled value. Adder
         is first in precedence.
@@ -228,7 +232,7 @@ def determine_adder_scaler(ref0, ref, adder, scaler):
     Returns
     -------
     tuple
-        adder and scaler, properly formatted and based on ref/ref0 if provided.
+        Adder and scaler, properly formatted and based on ref/ref0 if provided.
 
     Raises
     ------
@@ -280,14 +284,14 @@ def set_pyoptsparse_opt(optname, fallback=True):
     optname : str
         Name of pyoptsparse optimizer that is requested by the test.
     fallback : bool
-        If True, fall back to SLSQP if optname can't be found
+        If True, fall back to SLSQP if optname can't be found.
 
     Returns
     -------
     object
         Pyoptsparse optimizer instance.
     str
-        Pyoptsparse optimizer string
+        Pyoptsparse optimizer string.
     """
     OPT = None
     opt = None
@@ -419,7 +423,11 @@ def all_ancestors(pathname, delim='.'):
     pathname : str
         Pathname of starting object.
     delim : str
-        Delimiter used to split the name
+        Delimiter used to split the name.
+
+    Yields
+    ------
+    str
     """
     parts = pathname.split(delim)
     for i in range(len(parts), 0, -1):
@@ -433,7 +441,7 @@ def find_matches(pattern, var_list):
     Parameters
     ----------
     pattern : str
-        String pattern
+        String pattern.
     var_list : list of str
         List of variable names to search for pattern.
 
@@ -465,7 +473,7 @@ def pad_name(name, pad_num=10, quotes=False):
     Returns
     -------
     str
-        Padded string
+        Padded string.
     """
     l_name = len(name)
     quotes_len = 2 if quotes else 0
@@ -491,14 +499,14 @@ def run_model(prob, ignore_exception=False):
     Parameters
     ----------
     prob : Problem
-        an instance of Problem
+        An instance of Problem.
     ignore_exception : bool
         Set to True to ignore an exception of any kind.
 
     Returns
     -------
     string
-        output from calling `run_model` on the Problem, captured from stdout
+        Output from calling `run_model` on the Problem, captured from stdout.
     """
     stdout = sys.stdout
     strout = StringIO()
@@ -522,14 +530,14 @@ def run_driver(prob):
     Parameters
     ----------
     prob : Problem
-        an instance of Problem
+        An instance of Problem.
 
     Returns
     -------
-    boolean
+    bool
         Failure flag; True if failed to converge, False is successful.
     string
-        output from calling `run_driver` on the Problem, captured from stdout
+        Output from calling `run_driver` on the Problem, captured from stdout.
     """
     stdout = sys.stdout
     strout = StringIO()
@@ -552,15 +560,6 @@ def printoptions(*args, **kwds):
     options at the end. See `numpy.set_printoptions` for the full description of
     available options. If any invalid options are specified, they will be ignored.
 
-    Parameters
-    ----------
-    *args : list
-        Variable-length argument list.
-    **kwds : dict
-        Arbitrary keyword arguments.
-
-    Examples
-    --------
     >>> with printoptions(precision=2):
     ...     print(np.array([2.0])) / 3
     [0.67]
@@ -568,9 +567,20 @@ def printoptions(*args, **kwds):
     >>> with printoptions(precision=2) as opts:
     ...      assert_equal(opts, np.get_printoptions())
 
+    Parameters
+    ----------
+    *args : list
+        Variable-length argument list.
+    **kwds : dict
+        Arbitrary keyword arguments.
+
+    Yields
+    ------
+    str or int
+
     See Also
     --------
-    set_printoptions, get_printoptions
+        set_printoptions, get_printoptions
     """
     opts = np.get_printoptions()
 
@@ -585,6 +595,10 @@ def printoptions(*args, **kwds):
         np.set_printoptions(**opts)
 
 
+def _nothing():
+    yield None
+
+
 def do_nothing_context():
     """
     Do nothing.
@@ -597,10 +611,7 @@ def do_nothing_context():
     contextmanager
         A do nothing context manager.
     """
-    def nothing():
-        yield None
-
-    return contextmanager(nothing)()
+    return contextmanager(_nothing)()
 
 
 def remove_whitespace(s, right=False, left=False):
@@ -667,7 +678,7 @@ def make_serializable(o):
     Parameters
     ----------
     o : object
-        the object to be converted
+        The object to be converted.
 
     Returns
     -------
@@ -707,7 +718,7 @@ def make_serializable_key(o):
     Parameters
     ----------
     o : object
-        the object to be converted
+        The object to be converted.
 
     Returns
     -------
@@ -735,7 +746,7 @@ def default_noraise(o):
     Parameters
     ----------
     o : object
-        the object to be converted
+        The object to be converted.
 
     Returns
     -------
@@ -1058,7 +1069,7 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
     parent_src_shape : tuple
         Shape of source expected by parent.
     my_src_inds : ndarray or fancy index
-        src_indices at the current system level, before conversion.
+        Src_indices at the current system level, before conversion.
     my_src_shape : tuple
         Expected source shape at the current system level.
 
@@ -1185,7 +1196,7 @@ def get_connection_owner(system, tgt):
     Returns
     -------
     tuple
-        (owning group, promoted source name, promoted target name)
+        (wning group, promoted source name, promoted target name).
     """
     from openmdao.core.group import Group
 
@@ -1230,6 +1241,16 @@ class LocalRangeIterable(object):
     The number of iterations for a distributed variable will be the full distributed size of the
     variable but None will be returned for any indices that are not local to the given rank.
 
+    Parameters
+    ----------
+    system : System
+        Containing System.
+    vname : str
+        Name of the variable.
+    use_vec_offset : bool
+        If True, return indices for the given variable within its vector, else just return
+        indices within the variable itself, i.e. range(var_size).
+
     Attributes
     ----------
     _inds : ndarray
@@ -1249,16 +1270,6 @@ class LocalRangeIterable(object):
     def __init__(self, system, vname, use_vec_offset=True):
         """
         Initialize the iterator.
-
-        Parameters
-        ----------
-        system : System
-            Containing System.
-        vname : str
-            Name of the variable.
-        use_vec_offset : bool
-            If True, return indices for the given variable within its vector, else just return
-            indices within the variable itself, i.e. range(var_size).
         """
         self._dist_size = 0
 

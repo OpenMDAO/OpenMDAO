@@ -13,6 +13,11 @@ class NonlinearRunOnce(NonlinearSolver):
     Simple solver that runs the containing system once.
 
     This is done without iteration or norm calculation.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'NL: RUNONCE'

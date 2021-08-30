@@ -24,6 +24,11 @@ class CrossProductComp(ExplicitComponent):
 
     otherwise.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _products : list
@@ -34,11 +39,6 @@ class CrossProductComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize the Cross Product component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -182,9 +182,9 @@ class CrossProductComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         for product in self._products:
             a = inputs[product['a_name']]
@@ -198,9 +198,9 @@ class CrossProductComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name].
         """
         for product in self._products:
             a = inputs[product['a_name']]

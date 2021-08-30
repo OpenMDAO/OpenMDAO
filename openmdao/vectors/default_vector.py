@@ -8,6 +8,19 @@ from openmdao.vectors.default_transfer import DefaultTransfer
 class DefaultVector(Vector):
     """
     Default NumPy vector.
+
+    Parameters
+    ----------
+    name : str
+        The name of the vector: 'nonlinear' or 'linear'.
+    kind : str
+        The kind of vector, 'input', 'output', or 'residual'.
+    system : <System>
+        Pointer to the owning system.
+    root_vector : <Vector>
+        Pointer to the vector owned by the root system.
+    alloc_complex : bool
+        Whether to allocate any imaginary storage to perform complex step. Default is False.
     """
 
     TRANSFER = DefaultTransfer
@@ -251,9 +264,9 @@ class DefaultVector(Vector):
         Parameters
         ----------
         val : int or float
-            scalar.
+            Scalar.
         vec : <Vector>
-            this vector times val is added to self.
+            This vector times val is added to self.
         """
         data = self.asarray()
         data += (val * vec.asarray())
@@ -265,7 +278,7 @@ class DefaultVector(Vector):
         Parameters
         ----------
         vec : <Vector>
-            the vector whose values self is set to.
+            The vector whose values self is set to.
         """
         data = self.asarray()
         data[:] = vec.asarray()
@@ -277,8 +290,8 @@ class DefaultVector(Vector):
         Parameters
         ----------
         val : float or ndarray
-            scalar or array to set data array to.
-        idxs : int or slice or tuple of ints and/or slices.
+            Scalar or array to set data array to.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -290,7 +303,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative direction.
         """
         if self._has_solver_ref and mode == 'fwd':
@@ -310,7 +323,7 @@ class DefaultVector(Vector):
 
         Parameters
         ----------
-        mode : string
+        mode : str
             Derivative direction.
         """
         if self._has_solver_ref and mode == 'fwd':
@@ -403,7 +416,7 @@ class DefaultVector(Vector):
         ----------
         val : ndarray
             Value to set into the data array.
-        idxs : int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -417,7 +430,7 @@ class DefaultVector(Vector):
         ----------
         val : ndarray
             Value to set into the data array.
-        idxs : int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -431,7 +444,7 @@ class DefaultVector(Vector):
         ----------
         val : ndarray
             Value to set into the data array.
-        idxs : int or slice or tuple of ints and/or slices.
+        idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
         data = self.asarray()
@@ -460,7 +473,7 @@ class DefaultVector(Vector):
         Returns
         -------
         float
-            norm of this vector.
+            Norm of this vector.
         """
         return np.linalg.norm(self.asarray())
 

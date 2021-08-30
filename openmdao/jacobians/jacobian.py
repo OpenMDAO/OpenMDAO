@@ -29,6 +29,11 @@ class Jacobian(object):
     This class provides a dictionary interface for sub-Jacobians and
     performs matrix-vector products when apply_linear is called.
 
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+
     Attributes
     ----------
     _system : <System>
@@ -52,11 +57,6 @@ class Jacobian(object):
     def __init__(self, system):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
         """
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
@@ -108,7 +108,7 @@ class Jacobian(object):
 
         Returns
         -------
-        boolean
+        bool
             return whether sub-Jacobian has been defined.
         """
         return self._get_abs_key(key) in self._subjacs_info
@@ -187,18 +187,30 @@ class Jacobian(object):
     def __iter__(self):
         """
         Yield next name pair of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         yield from self._subjacs_info.keys()
 
     def keys(self):
         """
         Yield next name pair of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         yield from self._subjacs_info.keys()
 
     def items(self):
         """
         Yield name pair and value of sub-Jacobian.
+
+        Yields
+        ------
+        str
         """
         for key, meta in self._subjacs_info.items():
             yield key, meta['val']
@@ -395,7 +407,6 @@ class Jacobian(object):
             Column index.
         column : ndarray
             Column value.
-
         """
         if self._colnames is None:
             self._setup_index_maps(system)

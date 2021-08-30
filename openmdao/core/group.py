@@ -61,7 +61,7 @@ class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
     def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
-                 root_shape=None):
+                 root_shape=None, warn=True):
         self.flat = flat
         self.root_shape = src_shape if root_shape is None else root_shape
         self.src_shape = src_shape if src_shape is not None else self.root_shape
@@ -145,6 +145,11 @@ class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Dict of arguments available here and in all descendants of this Group.
+
     Attributes
     ----------
     _mpi_proc_allocator : ProcAllocator
@@ -195,12 +200,6 @@ class Group(System):
     def __init__(self, **kwargs):
         """
         Set the solvers to nonlinear and linear block Gauss--Seidel by default.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            dict of arguments available here and in all descendants of this
-            Group.
         """
         self._mpi_proc_allocator = DefaultAllocator()
         self._proc_info = {}
@@ -528,7 +527,7 @@ class Group(System):
             Global name of the system, including the path.
         comm : MPI.Comm or <FakeComm>
             MPI communicator object.
-        mode : string
+        mode : str
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
         prob_meta : dict
@@ -1572,6 +1571,8 @@ class Group(System):
                             continue
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
+                        # TODO: remove following line after implicit flat src deprecation release
+                        meta['orig_flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
@@ -2190,7 +2191,7 @@ class Group(System):
             A Sequence of variable names (or tuples) to be promoted, regardless
             of if they are inputs or outputs. This is equivalent to the items
             passed via the `promotes=` argument to add_subsystem.  If given as a
-            tuple, we use the "promote as" standard of ('real name', 'promoted name')*[]:
+            tuple, we use the "promote as" standard of "('real name', 'promoted name')*[]:".
         inputs : Sequence of str or tuple
             A Sequence of input names (or tuples) to be promoted. Tuples are
             used for the "promote as" capability.
@@ -2297,7 +2298,7 @@ class Group(System):
         Parameters
         ----------
         name : str
-            Name of the subsystem being added
+            Name of the subsystem being added.
         subsys : <System>
             An instantiated, but not-yet-set up system object.
         promotes : iter of (str or tuple), optional
@@ -2327,7 +2328,7 @@ class Group(System):
         Returns
         -------
         <System>
-            the subsystem that was passed in. This is returned to
+            The subsystem that was passed in. This is returned to
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
@@ -2407,9 +2408,9 @@ class Group(System):
         Parameters
         ----------
         src_name : str
-            name of the source variable to connect
+            Name of the source variable to connect.
         tgt_name : str or [str, ... ] or (str, ...)
-            name of the target variable(s) to connect
+            Name of the target variable(s) to connect.
         src_indices : int or list of ints or tuple of ints or int ndarray or Iterable or None
             The global indices of the source variable to transfer data from.
             The shapes of the target and src_indices must match, and form of the
@@ -2617,11 +2618,11 @@ class Group(System):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         residuals : Vector
-            unscaled, dimensional residuals written to via residuals[key]
+            Unscaled, dimensional residuals written to via residuals[key].
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         discrete_outputs : dict or None
@@ -2728,7 +2729,7 @@ class Group(System):
         ----------
         jac : Jacobian or None
             If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : boolean
+        sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self._jacobian is None:
@@ -2792,17 +2793,21 @@ class Group(System):
         ----------
         method : str
             The type of approximation that should be used. Valid options include:
-            'fd': Finite Difference, 'cs': Complex Step
+            'fd': Finite Difference, 'cs': Complex Step.
         step : float
             Step size for approximation. Defaults to None, in which case, the approximation
             method provides its default value.
-        form : string
+        form : str
             Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults to
             None, in which case, the approximation method provides its default value.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for
-            relative. Defaults to None, in which case, the approximation method
-            provides its default value.
+        step_calc : str
+            Step type for computing the size of the finite difference step. It can be 'abs' for
+            absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+            'rel_element' for a size relative to each value in the vector input. In addition, it
+            can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+            compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+            future will default to 'rel_avg'. Defaults to None, in which case the approximation
+            method provides its default value.
         """
         self._has_approx = True
         self._approx_schemes = OrderedDict()

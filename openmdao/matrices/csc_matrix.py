@@ -9,6 +9,13 @@ from openmdao.matrices.coo_matrix import COOMatrix
 class CSCMatrix(COOMatrix):
     """
     Sparse matrix in Compressed Col Storage format.
+
+    Parameters
+    ----------
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the top-level system that owns the <Jacobian>.
+    is_internal : bool
+        If True, this is the int_mtx of an AssembledJacobian.
     """
 
     def _build(self, num_rows, num_cols, system=None):

@@ -48,6 +48,11 @@ class Driver(object):
     """
     Top-level container for the systems and drivers.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     fail : bool
@@ -102,11 +107,6 @@ class Driver(object):
     def __init__(self, **kwargs):
         """
         Initialize the driver.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
 
@@ -732,10 +732,10 @@ class Driver(object):
 
         Parameters
         ----------
-        ctype : string
+        ctype : str
             Default is 'all'. Optionally return just the inequality constraints
             with 'ineq' or the equality constraints with 'eq'.
-        lintype : string
+        lintype : str
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
         driver_scaling : bool
@@ -829,7 +829,7 @@ class Driver(object):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self):
@@ -851,13 +851,13 @@ class Driver(object):
 
         Parameters
         ----------
-        of : list of variable name strings or None
+        of : list of variable name str or None
             Variables whose derivatives will be computed. Default is None, which
             uses the driver's objectives and constraints.
-        wrt : list of variable name strings or None
+        wrt : list of variable name str or None
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
-        return_format : string
+        return_format : str
             Format to return the derivatives. Default is a 'flat_dict', which
             returns them in a dictionary whose keys are tuples of form (of, wrt). For
             the scipy optimizer, 'array' is also supported.
@@ -1015,7 +1015,6 @@ class Driver(object):
         coloring : str
             A coloring filename.  If no arg is passed, filename will be determined
             automatically.
-
         """
         if self.supports['simultaneous_derivatives']:
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
@@ -1209,6 +1208,15 @@ class RecordingDebugging(Recording):
 
     Handles doing the case recording and also the Driver
     debugging printing.
+
+    Parameters
+    ----------
+    name : str
+        Name of object getting recorded.
+    iter_count : int
+        Current counter of iterations completed.
+    recording_requester : object
+        Object to which this recorder is attached.
     """
 
     def __enter__(self):

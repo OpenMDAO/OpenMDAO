@@ -36,26 +36,24 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     Parameters
     ----------
     pathname : str
-        pathname to be printed. If None, defaults to 'model'
+        Pathname to be printed. If None, defaults to 'model'.
     var_list : list of str
         List of variable names in the order they are to be written.
     var_type : 'input', 'explicit' or 'implicit'
         Indicates type of variables, input or explicit/implicit output.
     var_dict : dict
-        dict storing vals and metadata for each var name
+        Dict storing vals and metadata for each var name.
     hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
     top_name : str
-        the name of the top level group when using hierarchical format.
+        The name of the top level group when using hierarchical format.
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
         When True, also display full values of the ndarray below the row. Format  is affected
-        by the values set with numpy.set_printoptions
-        Default is False.
+        by the values set with numpy.set_printoptions.
     out_stream : file-like object
         Where to send human readable output.
-        Set to None to suppress.
     """
     if out_stream is None:
         return
@@ -198,11 +196,9 @@ def write_source_table(source_dicts, out_stream):
     Parameters
     ----------
     source_dicts : dict or list of dicts
-        Dict of source and cases
+        Dict of source and cases.
     out_stream : file-like object
         Where to send human readable output.
-        Set to None to suppress.
-
     """
     if out_stream is None:
         return

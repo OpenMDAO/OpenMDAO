@@ -106,6 +106,15 @@ class Recording(object):
     But with properly-timed values for abs and rel,
     where solvers are concerned.
 
+    Parameters
+    ----------
+    name : str
+        Name of object getting recorded.
+    iter_count : int
+        Current counter of iterations completed.
+    recording_requester : object
+        The object that wants to be recorded.
+
     Attributes
     ----------
     name : str
@@ -127,15 +136,6 @@ class Recording(object):
     def __init__(self, name, iter_count, recording_requester):
         """
         Initialize Recording.
-
-        Parameters
-        ----------
-        name : str
-            Name of object getting recorded.
-        iter_count : int
-            Current counter of iterations completed.
-        recording_requester : object
-            The object that wants to be recorded.
         """
         self.name = name
         self.iter_count = iter_count

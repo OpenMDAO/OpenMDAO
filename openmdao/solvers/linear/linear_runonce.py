@@ -8,6 +8,11 @@ class LinearRunOnce(LinearBlockGS):
     Simple linear solver that performs a single iteration of Guass-Seidel.
 
     This is done without iteration or norm calculation.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'LN: RUNONCE'

@@ -1,6 +1,5 @@
 """Define the default Transfer class."""
 
-from itertools import product, chain
 from collections import defaultdict
 
 import numpy as np
@@ -8,7 +7,6 @@ import numpy as np
 from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets
-from openmdao.utils.general_utils import _is_slicer_op
 from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
@@ -24,6 +22,19 @@ def _merge(indices_list):
 class DefaultTransfer(Transfer):
     """
     Default NumPy transfer.
+
+    Parameters
+    ----------
+    in_vec : <Vector>
+        Pointer to the input vector.
+    out_vec : <Vector>
+        Pointer to the output vector.
+    in_inds : int ndarray
+        Input indices for the transfer.
+    out_inds : int ndarray
+        Output indices for the transfer.
+    comm : MPI.Comm or <FakeComm>
+        Communicator of the system that owns this transfer.
     """
 
     @staticmethod

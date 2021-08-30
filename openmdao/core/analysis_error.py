@@ -11,20 +11,20 @@ class AnalysisError(Exception):
 
     This exception indicates that a possibly recoverable numerical error occurred in an analysis
     code or a subsolver.
+
+    Parameters
+    ----------
+    error : str
+        Error message.
+    location : None or inspect.currentframe()
+        Inspect.currentframe of error being raised.
+    msginfo : str
+        Name of component that raise the AnalysisError.
     """
 
     def __init__(self, error, location=None, msginfo=None):
         """
         Initialize AnalysisError.
-
-        Parameters
-        ----------
-        error : str
-            Error message.
-        location : None or inspect.currentframe()
-            inspect.currentframe of error being raised.
-        msginfo : str
-            Name of component that raise the AnalysisError.
         """
         super().__init__(error)
         if location is not None:

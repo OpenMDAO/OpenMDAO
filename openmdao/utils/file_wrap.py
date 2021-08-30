@@ -45,7 +45,7 @@ class _SubHelper(object):
 
     Attributes
     ----------
-    _newtext : string
+    _newtext : str
         text to insert.
     _replace_location : int
         location in the file where replacement is to occur.
@@ -76,7 +76,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        newtext : string
+        newtext : str
             text to insert.
         location : int
             location in the file where replacement is to occur.
@@ -91,7 +91,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        newtext : string
+        newtext : str
             text to insert.
         start_location : int
             location
@@ -111,7 +111,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        text : string
+        text : str
             text to insert.
 
         Returns
@@ -137,7 +137,7 @@ class _SubHelper(object):
 
         Parameters
         ----------
-        text : string
+        text : str
             text to insert.
 
         Returns
@@ -173,7 +173,7 @@ class _ToInteger(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -199,7 +199,7 @@ class _ToFloat(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -225,7 +225,7 @@ class _ToNan(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -251,7 +251,7 @@ class _ToInf(TokenConverter):
 
         Parameters
         ----------
-        instring : string
+        instring : str
             the input string
         loc : int
             the location of the matching string
@@ -274,9 +274,9 @@ class InputFileGenerator(object):
 
     Attributes
     ----------
-    _template_filename : string or None
+    _template_filename : str or None
         the name of the template file.
-    _output_filename : string or None
+    _output_filename : str or None
         the name of the output file.
     _delimiter : int
         delimiter.
@@ -312,7 +312,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the template file to be used.
         """
         self._template_filename = filename
@@ -327,7 +327,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the input file to be generated.
         """
         self._output_filename = filename
@@ -355,10 +355,10 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        anchor : string
+        anchor : str
             The text you want to search for.
 
-        occurrence : integer, optional
+        occurrence : int, optional
             Find nth instance of text; default is 1 (first). Use -1 to
             find last occurrence. Reverse searches always start at the end
             of the file no matter the state of any previous anchor.
@@ -428,15 +428,13 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        value : float, integer, bool, string
+        value : float, int, bool, str
             New value to set at the location.
-
-        row : integer
+        row : int
             Number of lines offset from anchor line (0 is anchor line).
             This can be negative.
-
-        field : integer
-            Which word in line to replace, as denoted by delimiter(s)
+        field : int
+            Which word in line to replace, as denoted by delimiter(s).
         """
         j = self._current_row + row
         line = self._data[j]
@@ -456,20 +454,20 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        value : float, integer, bool, str
+        value : float, int, bool, str
             Array of values to insert.
-        row_start : integer
+        row_start : int
             Starting row for inserting the array. This is relative
             to the anchor, and can be negative.
-        field_start : integer
+        field_start : int
             Starting field in the given row_start as denoted by
             delimiter(s).
-        field_end : integer
+        field_end : int
             The final field the array uses in row_end.
-            We need this to figure out if the template is too small or large
-        row_end : integer, optional
+            We need this to figure out if the template is too small or large.
+        row_end : int, optional
             Use if the array wraps to cover additional lines.
-        sep : integer, optional
+        sep : int, optional
             Separator to use if we go beyond the template.
         """
         # Simplified input for single-line arrays
@@ -518,15 +516,15 @@ class InputFileGenerator(object):
         ----------
         value : ndarray
             Array of values to insert.
-        row_start : integer
+        row_start : int
             Starting row for inserting the array. This is relative
             to the anchor, and can be negative.
-        row_end : integer
+        row_end : int
             Final row for the array, relative to the anchor.
-        field_start : integer
-            starting field in the given row_start as denoted by
+        field_start : int
+            Starting field in the given row_start as denoted by
             delimiter(s).
-        field_end : integer
+        field_end : int
             The final field the array uses in row_end.
             We need this to figure out if the template is too small or large.
         """
@@ -556,7 +554,7 @@ class InputFileGenerator(object):
 
         Parameters
         ----------
-        row : integer
+        row : int
             Row number to clear, relative to current anchor.
         """
         self._data[self._current_row + row] = "\n"
@@ -568,13 +566,13 @@ class InputFileGenerator(object):
         Parameters
         ----------
         return_data : bool
-            if True, generated file data will be returned as a string
+            If True, generated file data will be returned as a string.
 
         Returns
         -------
         string
-            the generated file data if return_data is True or output filename
-            has not been provided, else None
+            The generated file data if return_data is True or output filename
+            has not been provided, else None.
         """
         if self._output_filename:
             with open(self._output_filename, 'w') as f:
@@ -592,17 +590,26 @@ class FileParser(object):
     """
     Utility to locate and read data from a file.
 
+    Parameters
+    ----------
+    end_of_line_comment_char : str, optional
+        End-of-line comment character to be ignored
+        (e.g., Python supports in-line comments with "#").
+
+    full_line_comment_char : str, optional
+        Comment character that signifies a line should be skipped.
+
     Attributes
     ----------
-    _filename : string
+    _filename : str
         the name of the file.
     _data : list of string
         the contents of the file, by line
-    _delimiter : string
+    _delimiter : str
         the name of the file.
-    _end_of_line_comment_char : string
+    _end_of_line_comment_char : str
         end-of-line comment character to be ignored.
-    _full_line_comment_char : string
+    _full_line_comment_char : str
         comment character that signifies a line should be skipped.
     _current_row : int
         the current row of the file.
@@ -613,15 +620,6 @@ class FileParser(object):
     def __init__(self, end_of_line_comment_char=None, full_line_comment_char=None):
         """
         Initialize attributes.
-
-        Parameters
-        ----------
-        end_of_line_comment_char : string, optional
-            end-of-line comment character to be ignored.
-            (e.g., Python supports in-line comments with "#".)
-
-        full_line_comment_char : string, optional
-            comment character that signifies a line should be skipped.
         """
         self._filename = None
         self._data = []
@@ -641,7 +639,7 @@ class FileParser(object):
 
         Parameters
         ----------
-        filename : string
+        filename : str
             Name of the input file to be generated.
         """
         self._filename = filename
@@ -665,7 +663,7 @@ class FileParser(object):
 
         Parameters
         ----------
-        delimiter : string
+        delimiter : str
             A string containing characters to be used as delimiters. The
             default value is ' \t', which means that spaces and tabs are not
             taken as data but instead mark the boundaries. Note that the
@@ -691,7 +689,7 @@ class FileParser(object):
         ----------
         anchor : str
             The text you want to search for.
-        occurrence : integer
+        occurrence : int
             Find nth instance of text; default is 1 (first). Use -1 to
             find last occurrence. Reverse searches always start at the end
             of the file no matter the state of any previous anchor.
@@ -762,14 +760,14 @@ class FileParser(object):
 
         Parameters
         ----------
-        row : integer
+        row : int
             Number of lines offset from anchor line (0 is anchor line).
             This can be negative.
 
         Returns
         -------
         string
-            line at the location requested
+            Line at the location requested.
         """
         return self._data[self._current_row + row].rstrip()
 
@@ -779,13 +777,13 @@ class FileParser(object):
 
         Parameters
         ----------
-        row : integer
+        row : int
             Number of lines offset from anchor line (0 is anchor line).
             This can be negative.
-        field : integer
+        field : int
             If the delimiter is a set of chars: which word in line to retrieve.
             If the delimiter is 'columns': character position to start.
-        fieldend : integer (optional)
+        fieldend : int (optional)
             If the delimiter is a set of chars: IGNORED.
             If the delimiter is 'columns': position of last character to return, or if
             omitted, the end of the line is used.
@@ -793,7 +791,7 @@ class FileParser(object):
         Returns
         -------
         string
-            data from the requested location in the file
+            Data from the requested location in the file.
         """
         j = self._current_row + row
 
@@ -828,22 +826,22 @@ class FileParser(object):
 
         Parameters
         ----------
-        key : string
-            the key to search for.
-        field : integer
+        key : str
+            The key to search for.
+        field : int
             Which field to transfer. Field 0 is the key.
-        occurrence : integer
+        occurrence : int
             Find nth instance of text; default is 1 (first value
             field). Use -1 to find last occurance. Position 0 is the key
             field, so it should not be used as a value for occurrence.
-        rowoffset : integer (optional)
+        rowoffset : int (optional)
             Optional row offset from the occurrence of key. This can
             also be negative.
 
         Returns
         -------
         string
-            data from the requested location in the file
+            Data from the requested location in the file.
         """
         if not isinstance(occurrence, int) or occurrence == 0:
             msg = "The value for occurrence must be a nonzero integer"
@@ -889,19 +887,19 @@ class FileParser(object):
 
         Parameters
         ----------
-        rowstart : integer
+        rowstart : int
             Row number to start, relative to the current anchor.
-        fieldstart : integer
+        fieldstart : int
             Field number to start.
-        rowend : integer, optional
+        rowend : int, optional
             Row number to end. If not set, then only one row is grabbed.
-        fieldend : integer
+        fieldend : int
             Field number to end.
 
         Returns
         -------
         string
-            data from the requested location in the file
+            Data from the requested location in the file.
         """
         j1 = self._current_row + rowstart
 
@@ -959,20 +957,20 @@ class FileParser(object):
 
         Parameters
         ----------
-        rowstart : integer
+        rowstart : int
             Row number to start, relative to the current anchor.
-        fieldstart : integer
+        fieldstart : int
             Field number to start.
-        rowend : integer
+        rowend : int
             Row number to end relative to current anchor.
-        fieldend : integer (optional)
+        fieldend : int (optional)
             Field number to end. If not specified, grabs all fields up to the
             end of the line.
 
         Returns
         -------
         string
-            data from the requested location in the file
+            Data from the requested location in the file.
         """
         if fieldend and (fieldstart > fieldend):
             msg = "fieldend must be greater than fieldstart"

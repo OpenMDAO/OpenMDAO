@@ -25,7 +25,7 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as c_mod
-from openmdao.utils.class_util import weak_method_wrapper
+from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 
@@ -117,6 +117,11 @@ class pyOptSparseDriver(Driver):
 
         two_sided_constraints
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Driver options.
+
     Attributes
     ----------
     fail : bool
@@ -151,11 +156,6 @@ class pyOptSparseDriver(Driver):
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Driver options.
         """
         if Optimization is None:
             raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
@@ -272,7 +272,7 @@ class pyOptSparseDriver(Driver):
 
         Returns
         -------
-        boolean
+        bool
             Failure flag; True if failed to converge, False is successful.
         """
         problem = self._problem()
@@ -319,7 +319,7 @@ class pyOptSparseDriver(Driver):
                     issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
-        opt_prob = Optimization(self.options['title'], weak_method_wrapper(self, '_objfunc'),
+        opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
                                 comm=comm)
 
         # Add all design variables
@@ -469,7 +469,7 @@ class pyOptSparseDriver(Driver):
             else:
 
                 # Use OpenMDAO's differentiator for the gradient
-                sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
+                sol = opt(opt_prob, sens=WeakMethodWrapper(self, '_gradfunc'),
                           storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
         except Exception as _:

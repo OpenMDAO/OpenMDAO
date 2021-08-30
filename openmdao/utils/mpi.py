@@ -167,6 +167,10 @@ def multi_proc_fail_check(comm):
     ----------
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
+
+    Yields
+    ------
+    None
     """
     if MPI is None:
         yield
@@ -201,6 +205,10 @@ def multi_proc_exception_check(comm):
     ----------
     comm : MPI communicator or None
         Communicator from the ParallelGroup that owns the calling solver.
+
+    Yields
+    ------
+    None
     """
     if MPI is None or comm is None or comm.size == 1:
         yield

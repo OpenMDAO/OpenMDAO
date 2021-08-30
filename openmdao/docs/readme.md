@@ -63,7 +63,7 @@ assert_near_equal(prob.get_val('paraboloid.x'), 6.6667, 1e-4);
 assert_near_equal(prob.get_val('paraboloid.y'), -7.33333, 1e-4);
 ```
 
-It's not necessary to show this in the documentaiton, so remove it using the same
+It's not necessary to show this in the documentation, so remove it using the same
 metadata tags above to hide.
 
 3. We will have Github actions to check for things like notebooks with output, missing import headers, and more.

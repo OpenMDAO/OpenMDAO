@@ -5,6 +5,11 @@ from openmdao.solvers.solver import BlockLinearSolver
 class LinearBlockJac(BlockLinearSolver):
     """
     Linear block Jacobi solver.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
     """
 
     SOLVER = 'LN: LNBJ'

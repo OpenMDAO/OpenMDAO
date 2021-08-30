@@ -17,7 +17,7 @@ from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.utils.om_warnings import PromotionWarning
+from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
 from openmdao.utils.name_maps import name2abs_names
 
 try:
@@ -518,40 +518,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "<model> <class Group>: src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
-
-    def test_compatible_src_indices(self):
-        class ControlInterpComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_output('x', shape=(3, 2))
-
-        class CollocationComp(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', shape=(1, 2))
-
-        class Phase(om.Group):
-
-            def setup(self):
-                self.add_subsystem('comp1', ControlInterpComp())
-                self.add_subsystem('comp2', CollocationComp())
-
-                self.connect('comp1.x', 'comp2.x', src_indices=[1])
-
-        p = om.Problem()
-
-        p.model.add_subsystem('phase', Phase())
-
-        p.setup()
-
-        p['phase.comp1.x'] = np.resize(range(6), (3,2))
-
-        p.run_model()
-
-        p.model.list_outputs(hierarchical=False, print_arrays=True)
-        p.model.list_inputs(hierarchical=False, print_arrays=True)
-
-        np.testing.assert_allclose(p['phase.comp2.x'], np.array([[2., 3.]]))
 
     def test_incompatible_src_indices_error(self):
         class ControlInterpComp(om.ExplicitComponent):
@@ -1060,6 +1026,22 @@ class TestGroup(unittest.TestCase):
 
         assert_near_equal(p['row134_comp.x'], arr_large_4x4[(0, 2, 3), ...])
         assert_near_equal(p['row134_comp.y'], np.sum(arr_large_4x4[(0, 2, 3), ...])**2)
+
+    def test_om_slice_get_val(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('c1', om.ExecComp('y=x', x=np.ones(2), y=np.ones(2)))
+        model.add_subsystem('c2', om.ExecComp('y=x', x=np.ones(2), y=np.ones(2)))
+
+        model.connect('c1.y', 'c2.x', om.slicer[:])
+
+        prob.setup()
+        prob.set_val('c1.x', 3.5*np.ones(2))
+        prob.run_model()
+
+        val = prob.get_val('c2.x')
+        assert_near_equal(val, np.array([3.5, 3.5]))
 
     def test_promote_not_found1(self):
         p = om.Problem()

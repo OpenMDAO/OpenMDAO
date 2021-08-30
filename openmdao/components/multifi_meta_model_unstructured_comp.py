@@ -70,6 +70,11 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     .. note:: when *nfi* ==1 a :class:`MultiFiMetaModelUnStructuredComp` object behaves as
         a :class:`MetaModelUnStructured` object.
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _input_sizes : list
@@ -85,11 +90,6 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -142,7 +142,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray or Iterable
             The initial value of the variable being added in user-defined units.
             Default is 1.0.
@@ -162,7 +162,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             Units in which this input variable will be provided to the component
             during execution. Default is None, which means it is unitless.
         desc : str
-            description of the variable
+            Description of the variable.
         """
         metadata = super().add_input(name, val, shape=shape, src_indices=src_indices,
                                      flat_src_indices=flat_src_indices, units=units,
@@ -197,7 +197,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
         Parameters
         ----------
         name : str
-            name of the variable in this component's namespace.
+            Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
         surrogate : SurrogateModel
@@ -212,14 +212,14 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             Units in which the residuals of this output will be given to the user when requested.
             Default is None, which means it has no units.
         desc : str
-            description of the variable.
+            Description of the variable.
         lower : float or list or tuple or ndarray or Iterable or None
-            lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no lower bound.
             Default is None.
         upper : float or list or tuple or ndarray or or Iterable None
-            upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
             consistent with the shape arg (if given), or (3) an array_like matching the shape of
             val, if val is array_like. A value of None means this output has no upper bound.
             Default is None.

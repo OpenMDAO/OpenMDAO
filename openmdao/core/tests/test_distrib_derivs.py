@@ -1336,6 +1336,9 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
         assert_near_equal(J[('C2.outvec', 'indep.x')],
                           np.eye(3)*np.append(2*np.ones(1), -3*np.ones(2)))
 
+        # Make sure that the code for handling element stepsize also works on a distributed model.
+        assert(prob.check_partials(step_calc='rel_element'))
+
 
 class DistribCompDenseJac(om.ExplicitComponent):
 

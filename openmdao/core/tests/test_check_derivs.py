@@ -1026,7 +1026,7 @@ class TestProblemCheckPartials(unittest.TestCase):
             comp.set_check_partial_options(wrt=['*'], step_calc='foo')
 
         self.assertEqual(str(cm.exception),
-                         "'comp' <class ParaboloidTricky>: The value of 'step_calc' must be one of ('abs', 'rel'), "
+                         "'comp' <class ParaboloidTricky>: The value of 'step_calc' must be one of ('abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element'), "
                          "but 'foo' was specified.")
 
         # check invalid wrt
@@ -1929,6 +1929,41 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.run_model()
 
         p.check_partials(out_stream=None)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestCheckPartialsDistribDirectional(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distrib_directional(self):
+        class Sum(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('u_g', shape_by_conn=True, distributed=True)
+                self.add_output('sum')
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+            def compute(self, inputs, outputs):
+                outputs['sum'] = self.comm.allreduce(np.sum(inputs['u_g']))
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode == 'fwd':
+                    d_outputs['sum'] += self.comm.allreduce(np.sum(d_inputs['u_g']))
+                if mode == 'rev':
+                    d_inputs['u_g'] += d_outputs['sum']
+
+        num_nodes = 5 + MPI.COMM_WORLD.rank
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('u_g', val= np.random.rand(3*num_nodes), distributed=True)
+
+        prob.model.add_subsystem('adder', Sum(), promotes=['*'])
+
+        prob.setup(force_alloc_complex=True, mode='rev')
+        prob.run_model()
+        # this test passes if this call doesn't raise an exception
+        partials = prob.check_partials(compact_print=True, method='cs')
+
 
 class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
     # Ensure check_partials options differs from the compute partials options

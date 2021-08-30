@@ -15,6 +15,11 @@ class VectorMagnitudeComp(ExplicitComponent):
 
     where a is of shape (vec_size, n)
 
+    Parameters
+    ----------
+    **kwargs : dict of keyword arguments
+        Keyword arguments that will be mapped into the Component options.
+
     Attributes
     ----------
     _magnitudes : list
@@ -25,11 +30,6 @@ class VectorMagnitudeComp(ExplicitComponent):
     def __init__(self, **kwargs):
         """
         Initialize the Vector Magnitude component.
-
-        Parameters
-        ----------
-        **kwargs : dict of keyword arguments
-            Keyword arguments that will be mapped into the Component options.
         """
         super().__init__(**kwargs)
 
@@ -74,7 +74,7 @@ class VectorMagnitudeComp(ExplicitComponent):
             the output is (vec_size,).
         length : int
             The length of the vectors a and b.  Their shapes are
-            (vec_size, length)
+            (vec_size, length).
         """
         self._magnitudes.append({
             'in_name': in_name,
@@ -133,9 +133,9 @@ class VectorMagnitudeComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         outputs : Vector
-            unscaled, dimensional output variables read via outputs[key]
+            Unscaled, dimensional output variables read via outputs[key].
         """
         for magnitude in self._magnitudes:
             a = inputs[magnitude['in_name']]
@@ -148,9 +148,9 @@ class VectorMagnitudeComp(ExplicitComponent):
         Parameters
         ----------
         inputs : Vector
-            unscaled, dimensional input variables read via inputs[key]
+            Unscaled, dimensional input variables read via inputs[key].
         partials : Jacobian
-            sub-jac components written to partials[output_name, input_name]
+            Sub-jac components written to partials[output_name, input_name]..
         """
         for magnitude in self._magnitudes:
             a = inputs[magnitude['in_name']]

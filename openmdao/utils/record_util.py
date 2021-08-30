@@ -19,8 +19,8 @@ def create_local_meta(name):
 
     Returns
     -------
-    local_meta : dict
-        Dictionary containing the metadata
+    dict
+        Dictionary containing the metadata.
     """
     local_meta = {
         'name': name,
@@ -46,8 +46,8 @@ def format_iteration_coordinate(coord, prefix=None):
 
     Returns
     -------
-    str :
-        iteration coordinate converted to a string
+    str
+        Iteration coordinate converted to a string.
     """
     separator = '|'
     iteration_number_separator = '-'
@@ -109,7 +109,7 @@ def check_valid_sqlite3_db(filename):
     Parameters
     ----------
     filename : str
-        The path to the file to be tested
+        The path to the file to be tested.
 
     Raises
     ------
@@ -139,17 +139,17 @@ def check_path(path, includes, excludes, include_all_path=False):
     Parameters
     ----------
     path : str
-        path proposed to be recorded
+        Path proposed to be recorded.
     includes : list
-        list of things to be included in recording list.
+        List of things to be included in recording list.
     excludes : list
-        list of things to be excluded from recording list.
+        List of things to be excluded from recording list.
     include_all_path : bool
-        If set to True, will return True unless it is in excludes
+        If set to True, will return True unless it is in excludes.
 
     Returns
     -------
-    boolean
+    bool
         True if path should be recorded, False if it's been excluded.
     """
     for ex_pattern in excludes:
@@ -173,10 +173,10 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
 
     Parameters
     ----------
-    json_data : string
-        JSON encoded data
+    json_data : str
+        JSON encoded data.
     abs2meta : dict
-        Dictionary mapping absolute variable names to variable metadata
+        Dictionary mapping absolute variable names to variable metadata.
     prom2abs : dict
         Dictionary mapping promoted input names to absolute. Needed to resolve auto_ivc outputs
         that are recorded with their promoted input name.
@@ -186,7 +186,7 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
     Returns
     -------
     array or dict
-        Variable names and values parsed from the JSON string
+        Variable names and values parsed from the JSON string.
     """
     values = json.loads(json_data)
     if values is None:
@@ -220,12 +220,12 @@ def dict_to_structured_array(values):
     Parameters
     ----------
     values : dict
-        dict of variable names and values
+        Dict of variable names and values.
 
     Returns
     -------
     array
-        numpy structured array containing the same names and values as the input values dict.
+        Numpy structured array containing the same names and values as the input values dict.
     """
     if values:
         dtype_tuples = []

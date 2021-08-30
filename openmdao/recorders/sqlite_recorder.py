@@ -18,7 +18,7 @@ import pickle
 import zlib
 
 from openmdao import __version__ as openmdao_version
-from openmdao.recorders.case_recorder import CaseRecorder
+from openmdao.recorders.case_recorder import CaseRecorder, PICKLE_VER
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -89,7 +89,6 @@ def array_to_blob(array):
     -------
     blob :
         The blob created from the array.
-
     """
     out = BytesIO()
     np.save(out, array)
@@ -122,6 +121,17 @@ class SqliteRecorder(CaseRecorder):
     """
     Recorder that saves cases in a sqlite db.
 
+    Parameters
+    ----------
+    filepath : str
+        Path to the recorder file.
+    append : bool, optional
+        Optional. If True, append to an existing case recorder file.
+    pickle_version : int, optional
+        The pickle protocol version to use when pickling metadata.
+    record_viewer_data : bool, optional
+        If True, record data needed for visualization.
+
     Attributes
     ----------
     _record_viewer_data : bool
@@ -151,20 +161,9 @@ class SqliteRecorder(CaseRecorder):
         Flag indicating whether to record on this processor when running in parallel.
     """
 
-    def __init__(self, filepath, append=False, pickle_version=4, record_viewer_data=True):
+    def __init__(self, filepath, append=False, pickle_version=PICKLE_VER, record_viewer_data=True):
         """
         Initialize the SqliteRecorder.
-
-        Parameters
-        ----------
-        filepath : str
-            Path to the recorder file.
-        append : bool, optional
-            Optional. If True, append to an existing case recorder file.
-        pickle_version : int, optional
-            The pickle protocol version to use when pickling metadata.
-        record_viewer_data : bool, optional
-            If True, record data needed for visualization.
         """
         if append:
             raise NotImplementedError("Append feature not implemented for SqliteRecorder")

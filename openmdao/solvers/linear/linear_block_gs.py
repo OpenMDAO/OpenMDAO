@@ -9,6 +9,11 @@ class LinearBlockGS(BlockLinearSolver):
     """
     Linear block Gauss-Seidel solver.
 
+    Parameters
+    ----------
+    **kwargs : dict
+        Options dictionary.
+
     Attributes
     ----------
     _delta_d_n_1 : ndarray
@@ -24,11 +29,6 @@ class LinearBlockGS(BlockLinearSolver):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            options dictionary.
         """
         super().__init__(**kwargs)
 
