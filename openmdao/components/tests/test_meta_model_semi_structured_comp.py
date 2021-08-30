@@ -500,6 +500,63 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
             assert_near_equal(prob.get_val('interp.f'), expected, 1e-3)
 
+    def test_lagrange3_edge_extrapolation_detection_bug(self):
+        import itertools
+
+        import numpy as np
+        import openmdao.api as om
+
+        grid = np.array(
+            [[0, 0],
+             [0, 1],
+             [0, 2],
+             [0, 3],
+             [0, 4],
+             [1, 0],
+             [1, 1],
+             [1, 2],
+             [1, 3],
+             [1, 4],
+             [2, 0],
+             [2, 1],
+             [2, 2],
+             [2, 3],
+             [2, 4],
+             [2, 5],
+             [3, 0],
+             [3, 1],
+             [3, 2],
+             [3, 3],
+             [3, 4],
+             [3, 5],
+             [4, 0],
+             [4, 1],
+             [4, 2],
+             [4, 3],
+             [4, 4],
+             [4, 5]])
+
+
+        values = 15.0 + 2 * np.random.random(grid.shape[0])
+
+        prob = om.Problem()
+        model = prob.model
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange3')
+        interp.add_input('x', training_data=grid[:, 0])
+        interp.add_input('y', training_data=grid[:, 1])
+        interp.add_output('f', training_data=values)
+
+        model.add_subsystem('interp', interp)
+
+        prob.setup()
+
+        prob.set_val('interp.x', 2.5)
+        prob.set_val('interp.y', 4.5)
+
+        # Should run without an Indexerror.
+        prob.run_model()
+
 
 if __name__ == "__main__":
     unittest.main()
