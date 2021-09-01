@@ -382,7 +382,7 @@ class GaussLobatto(object):
             idx = 0 if index is None else index
             obj_index = -size + idx
 
-            super(Phase, phase).add_objective(obj_path, index=obj_index)
+            super(Phase, phase).add_objective(obj_path, index=obj_index, flat_indices=True)
 
     def setup_states(self, phase):
         indep = StateIndependentsComp(state_options=phase.state_options)
@@ -397,7 +397,7 @@ class GaussLobatto(object):
             desvar_indices = list(range(size * 2))
 
             phase.add_design_var(name='states:{0}'.format(name),
-                                 indices=desvar_indices)
+                                 indices=desvar_indices, flat_indices=True)
 
     def setup_ode(self, phase):
         map_input_indices_to_disc = np.array([0, 1])

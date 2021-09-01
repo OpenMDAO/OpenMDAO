@@ -163,7 +163,7 @@ class MPITests2(unittest.TestCase):
                                                    x=np.zeros((9, 3)),
                                                    y=np.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
-        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:], flat_src_indices=True)
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -1131,7 +1131,8 @@ class MPITestsBug(unittest.TestCase):
                 end = start + sizes[rank]
 
                 self.add_input('x1', val=np.ones(sizes[rank]), distributed=True,
-                               src_indices=np.arange(start, end, dtype=int))
+                               src_indices=np.arange(start, end, dtype=int),
+                               flat_src_indices=True)
 
                 self.add_output('x0dot', val=np.ones(sizes[rank]), distributed=True)
 

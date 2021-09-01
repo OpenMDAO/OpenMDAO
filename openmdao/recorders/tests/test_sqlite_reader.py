@@ -2351,7 +2351,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.connect('x', 'l_conx.x')
         model.connect('y', ['r_con.y', 'theta_con.y', 'delta_theta_con.y'])
 
-        model.add_design_var('x', indices=[0, 3])
+        model.add_design_var('x', indices=[0, 3], flat_indices=True)
         model.add_design_var('y')
         model.add_design_var('r', lower=.5, upper=10)
 
