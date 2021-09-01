@@ -505,6 +505,7 @@ class TestColoringImplicit(unittest.TestCase):
 
 
 class TestColoringSemitotals(unittest.TestCase):
+
     def setUp(self):
         np.random.seed(11)
         self.startdir = os.getcwd()
@@ -518,110 +519,135 @@ class TestColoringSemitotals(unittest.TestCase):
         except OSError:
             pass
 
-    @parameterized.expand(itertools.product(
-        ['fd', 'cs'],
-        [1,2,19],
-        [1,2,11],
-        [True, False]
-        ), name_func=_test_func_name
-    )
-    def test_simple_semitotals(self, method, isplit, osplit, sparse_partials):
+    # semi-total coloring feature disabled.
+
+    #@parameterized.expand(itertools.product(
+        #['fd', 'cs'],
+        #[1,2,19],
+        #[1,2,11],
+        #[True, False]
+        #), name_func=_test_func_name
+    #)
+    #def test_simple_semitotals(self, method, isplit, osplit, sparse_partials):
+
+        #prob = Problem(coloring_dir=self.tempdir)
+        #model = prob.model
+
+        #sparsity = setup_sparsity(_BIGMASK)
+        #indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
+
+        #model.add_subsystem('indeps', indeps)
+        #sub = model.add_subsystem('sub', CounterGroup())
+        #sub.declare_coloring('*', method=method)
+        #comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
+                                                            #sparse_partials=sparse_partials))
+
+        #for conn in conns:
+            #model.connect(*conn)
+
+        #for i in range(isplit):
+            #model.add_design_var('indeps.x%d' % i)
+
+        #for i in range(osplit):
+            #model.sub.comp.add_constraint('y%d' % i)
+
+        #prob.setup(check=False, mode='fwd')
+        #prob.set_solver_print(level=0)
+        #prob.run_model()
+
+        #derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
+
+        #start_nruns = sub._nruns
+        #derivs = prob.driver._compute_totals()
+        #_check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+        #self.assertEqual(sub._nruns - start_nruns, 10)
+
+    #@parameterized.expand(itertools.product(
+        #['fd', 'cs'],
+        #[1,2,19],
+        #[1,2,11]
+        #), name_func=_test_func_name
+    #)
+    #def test_simple_semitotals_static(self, method, isplit, osplit):
+
+        #prob = Problem(coloring_dir=self.tempdir)
+        #model = prob.model
+
+        #sparsity = setup_sparsity(_BIGMASK)
+        #indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
+
+        #model.add_subsystem('indeps', indeps)
+        #sub = model.add_subsystem('sub', Group())
+        #comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit))
+
+        #for conn in conns:
+            #model.connect(*conn)
+
+        #for i in range(isplit):
+            #model.add_design_var('indeps.x%d' % i)
+
+        #for i in range(osplit):
+            #model.sub.comp.add_constraint('y%d' % i)
+
+        #prob.setup(check=False, mode='fwd')
+        #prob.set_solver_print(level=0)
+        #prob.run_model()
+        #coloring = sub._compute_approx_coloring(wrt_patterns='comp.x*', method=method)[0]
+        #sub._save_coloring(coloring)
+
+        ## now create a second problem and use the static coloring
+        #prob = Problem(coloring_dir=self.tempdir)
+        #model = prob.model
+
+        #indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
+
+        #model.add_subsystem('indeps', indeps)
+        #sub = model.add_subsystem('sub', Group())
+        #comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit))
+
+        #for conn in conns:
+            #model.connect(*conn)
+
+        #for i in range(isplit):
+            #model.add_design_var('indeps.x%d' % i)
+
+        #for i in range(osplit):
+            #model.sub.comp.add_constraint('y%d' % i)
+
+        #sub.declare_coloring(wrt='comp.x*', method=method)
+        #sub.use_fixed_coloring()
+
+        #prob.setup(check=False, mode='fwd')
+        #prob.set_solver_print(level=0)
+        #prob.run_model()
+
+        #start_nruns = comp._nruns
+        #derivs = prob.driver._compute_totals()
+
+        #nruns = comp._nruns - start_nruns
+        #self.assertEqual(nruns, 10)
+        #_check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+
+    def test_semitotals_unsupported(self):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = setup_sparsity(_BIGMASK)
-        indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
+        indeps, conns = setup_indeps(1, _BIGMASK.shape[1], 'indeps', 'sub.comp')
 
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
-        sub.declare_coloring('*', method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit,
-                                                            sparse_partials=sparse_partials))
-
+        sub.declare_coloring('*', method='fd')
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
+                                                            sparse_partials=False))
         for conn in conns:
             model.connect(*conn)
 
-        for i in range(isplit):
-            model.add_design_var('indeps.x%d' % i)
+        with self.assertRaises(RuntimeError) as err:
+            prob.setup(check=False)
 
-        for i in range(osplit):
-            model.sub.comp.add_constraint('y%d' % i)
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
-
-        start_nruns = sub._nruns
-        derivs = prob.driver._compute_totals()
-        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
-        self.assertEqual(sub._nruns - start_nruns, 10)
-
-    @parameterized.expand(itertools.product(
-        ['fd', 'cs'],
-        [1,2,19],
-        [1,2,11]
-        ), name_func=_test_func_name
-    )
-    def test_simple_semitotals_static(self, method, isplit, osplit):
-        prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model
-
-        sparsity = setup_sparsity(_BIGMASK)
-        indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
-
-        model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group())
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit))
-
-        for conn in conns:
-            model.connect(*conn)
-
-        for i in range(isplit):
-            model.add_design_var('indeps.x%d' % i)
-
-        for i in range(osplit):
-            model.sub.comp.add_constraint('y%d' % i)
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-        coloring = sub._compute_approx_coloring(wrt_patterns='comp.x*', method=method)[0]
-        sub._save_coloring(coloring)
-
-        # now create a second problem and use the static coloring
-        prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model
-
-        indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
-
-        model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group())
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=osplit))
-
-        for conn in conns:
-            model.connect(*conn)
-
-        for i in range(isplit):
-            model.add_design_var('indeps.x%d' % i)
-
-        for i in range(osplit):
-            model.sub.comp.add_constraint('y%d' % i)
-
-        sub.declare_coloring(wrt='comp.x*', method=method)
-        sub.use_fixed_coloring()
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()
-
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 10)
-        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+        expected_msg = "'sub' <class CounterGroup>: semi-total coloring is currently not supported."
+        self.assertEqual(str(err.exception), expected_msg)
 
 
 class TestColoring(unittest.TestCase):
@@ -1448,85 +1474,90 @@ class TestStaticColoringParallelCS(unittest.TestCase):
             except OSError:
                 pass
 
-    @parameterized.expand(itertools.product(
-        ['fd', 'cs'],
-        ), name_func=_test_func_name
-    )
-    def test_simple_semitotals_all_local_vars(self, method):
-        prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model
+    # semi-total coloring feature disabled.
 
-        mask = np.array(
-            [[1, 0, 0, 1, 1],
-                [0, 1, 0, 1, 1],
-                [0, 1, 0, 1, 1],
-                [1, 0, 0, 0, 0],
-                [0, 1, 1, 0, 0]]
-        )
-        if MPI.COMM_WORLD.rank == 0:
-            sparsity = setup_sparsity(mask)
-            MPI.COMM_WORLD.bcast(sparsity, root=0)
-        else:
-            sparsity = MPI.COMM_WORLD.bcast(None, root=0)
+    #@parameterized.expand(itertools.product(
+        #['fd', 'cs'],
+        #), name_func=_test_func_name
+    #)
+    #def test_simple_semitotals_all_local_vars(self, method):
 
-        isplit = 2
-        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        #raise unittest.SkipTest('Semi-total coloring currently not supported.')
 
-        model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
-        sub.approx_totals(method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
-        model.connect('indeps.x0', 'sub.comp.x0')
-        model.connect('indeps.x1', 'sub.comp.x1')
+        #prob = Problem(coloring_dir=self.tempdir)
+        #model = prob.model
 
-        model.sub.comp.add_constraint('y0')
-        model.sub.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0')
-        model.add_design_var('indeps.x1')
+        #mask = np.array(
+            #[[1, 0, 0, 1, 1],
+                #[0, 1, 0, 1, 1],
+                #[0, 1, 0, 1, 1],
+                #[1, 0, 0, 0, 0],
+                #[0, 1, 1, 0, 0]]
+        #)
+        #if MPI.COMM_WORLD.rank == 0:
+            #sparsity = setup_sparsity(mask)
+            #MPI.COMM_WORLD.bcast(sparsity, root=0)
+        #else:
+            #sparsity = MPI.COMM_WORLD.bcast(None, root=0)
 
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-        coloring = sub._compute_approx_coloring(wrt_patterns='*', method=method)[0]
-        sub._save_coloring(coloring)
+        #isplit = 2
+        #indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-        # make sure coloring file exists by the time we try to load the spec
-        MPI.COMM_WORLD.barrier()
-
-        # now create a second problem and use the static coloring
-        prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model
-
-        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
-
-        model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
+        #model.add_subsystem('indeps', indeps)
+        #sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
         #sub.approx_totals(method=method)
-        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
-        model.connect('indeps.x0', 'sub.comp.x0')
-        model.connect('indeps.x1', 'sub.comp.x1')
+        #comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
+        #model.connect('indeps.x0', 'sub.comp.x0')
+        #model.connect('indeps.x1', 'sub.comp.x1')
 
-        model.sub.comp.add_constraint('y0')
-        model.sub.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0')
-        model.add_design_var('indeps.x1')
+        #model.sub.comp.add_constraint('y0')
+        #model.sub.comp.add_constraint('y1')
+        #model.add_design_var('indeps.x0')
+        #model.add_design_var('indeps.x1')
 
-        sub.declare_coloring(wrt='*', method=method)
-        sub.use_fixed_coloring()
+        #prob.setup(check=False, mode='fwd')
+        #prob.set_solver_print(level=0)
+        #prob.run_model()
+        #coloring = sub._compute_approx_coloring(wrt_patterns='*', method=method)[0]
+        #sub._save_coloring(coloring)
 
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
+        ## make sure coloring file exists by the time we try to load the spec
+        #MPI.COMM_WORLD.barrier()
 
-        start_nruns = comp._nruns
-        #derivs = prob.driver._compute_totals()
-        sub._linearize(sub._jacobian)
-        nruns = comp._nruns - start_nruns
-        if sub._full_comm is not None:
-            nruns = sub._full_comm.allreduce(nruns)
+        ## now create a second problem and use the static coloring
+        #prob = Problem(coloring_dir=self.tempdir)
+        #model = prob.model
 
-        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
-        self.assertEqual(nruns, 3)
+        #indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+
+        #model.add_subsystem('indeps', indeps)
+        #sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
+        #sub.approx_totals(method=method)
+        #comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
+        #model.connect('indeps.x0', 'sub.comp.x0')
+        #model.connect('indeps.x1', 'sub.comp.x1')
+
+        #model.sub.comp.add_constraint('y0')
+        #model.sub.comp.add_constraint('y1')
+        #model.add_design_var('indeps.x0')
+        #model.add_design_var('indeps.x1')
+
+        #sub.declare_coloring(wrt='*', method=method)
+        #sub.use_fixed_coloring()
+
+        #prob.setup(check=False, mode='fwd')
+        #prob.set_solver_print(level=0)
+        #prob.run_model()
+
+        #start_nruns = comp._nruns
+        ##derivs = prob.driver._compute_totals()
+        #sub._linearize(sub._jacobian)
+        #nruns = comp._nruns - start_nruns
+        #if sub._full_comm is not None:
+            #nruns = sub._full_comm.allreduce(nruns)
+
+        #_check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+        #self.assertEqual(nruns, 3)
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
