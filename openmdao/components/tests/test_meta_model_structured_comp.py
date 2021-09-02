@@ -575,6 +575,61 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         assert_near_equal(prob['g'], val1, tol)
         self.run_and_check_derivs(prob)
 
+    def test_dynamic_training(self):
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+
+        class TableGen(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('k', 1.0)
+                self.add_output('values', np.zeros((25, 5, 10)))
+
+                # These are fixed locations.
+                self.P1, self.P2, self.P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+
+                self.declare_partials('values', 'k')
+
+            def compute(self, inputs, outputs):
+                P1, P2, P3 = self.P1, self.P2, self.P3
+                k = inputs['k']
+
+                outputs['values'] = np.sqrt(P1) + P2 * P3 * k
+
+            def compute_partials(self, inputs, partials):
+                P2, P3 = self.P2, self.P3
+                partials['values', 'k'] = P2 * P3
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('tab', TableGen())
+
+        interp = om.MetaModelStructuredComp(method='lagrange3', training_data_gradients=True)
+        interp.add_input('p1', 0.5, p1)
+        interp.add_input('p2', 0.0, p2)
+        interp.add_input('p3', 3.14, p3)
+
+        interp.add_output('f', 0.0)
+
+        model.add_subsystem('comp', interp)
+
+        model.connect('tab.values', 'comp.f_train')
+        prob.setup(force_alloc_complex=True)
+
+        # set inputs
+        prob.set_val('comp.p1', 55.12)
+        prob.set_val('comp.p2', -2.14)
+        prob.set_val('comp.p3', 0.323)
+
+        prob.run_model()
+
+        totals = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
+                                   method='cs', out_stream=None);
+
+        assert_near_equal(totals['comp.f', 'tab.k']['abs error'][0], 0.0, tolerance=1e-10)
+
     def test_training_gradient_setup_called_twice(self):
         model = om.Group()
         ivc = om.IndepVarComp()
@@ -1349,6 +1404,12 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
             comp.add_output('x1', np.zeros((3, 3)))
 
         self.assertEqual(str(cm.exception), msg)
+
+    def test_error_no_training_data(self):
+        comp = om.MetaModelStructuredComp(method='akima')
+        msg = "Training data is required for output 'f'."
+        with self.assertRaisesRegex(ValueError, msg):
+            comp.add_output('f')
 
 
 if __name__ == "__main__":

@@ -101,7 +101,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         self.pnames.append(name)
 
-    def add_output(self, name, training_data, **kwargs):
+    def add_output(self, name, training_data=None, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -118,10 +118,20 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         n = self.options['vec_size']
         super().add_output(name, np.ones(n), **kwargs)
 
-        self.training_outputs[name] = training_data
-
         if self.options['training_data_gradients']:
+            if training_data is None:
+                for item in self.training_inputs.values():
+                    n_train = len(item)
+                    # Training datasets are all the same length, so grab the first.
+                    break
+                training_data = np.ones(n_train)
             super().add_input("%s_train" % name, val=training_data, **kwargs)
+
+        elif training_data is None:
+            msg = f"Training data is required for output '{name}'."
+            raise ValueError(msg)
+
+        self.training_outputs[name] = training_data
 
     def _setup_var_data(self):
         """
