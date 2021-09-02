@@ -15,7 +15,7 @@ except ImportError:
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_no_warning
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.om_warnings import PromotionWarning, OMDeprecationWarning
 from openmdao.utils.name_maps import name2abs_names
@@ -4183,7 +4183,7 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('C1', om.ExecComp('y=2*x', x={'val': 1.0, 'src_indices': [1]}),
                               promotes_inputs=['x'])
 
-        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
+        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'. The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
 
@@ -4192,8 +4192,26 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
         p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
         p.model.connect('indeps.x', 'C1.x', src_indices=[1])
-        msg = "Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
+        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'. The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_connect_err_False(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.connect('indeps.x', 'C1.x', src_indices=[1], flat_src_indices=False)
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexing into a source array of dimension 2 using indices of dimension 1 and setting `flat_indices=False` when connecting to input 'C1.x'. The current version of OpenMDAO assumes a flat source if the indices appear flat, so `flat_indices=False` is not a valid option. This behavior is deprecated and will be removed in a later version."
+        self.assertEquals(cm.exception.args[0], msg)
+
+    def test_connect_no_warn_True(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.connect('indeps.x', 'C1.x', src_indices=[1], flat_src_indices=True)
+        with assert_no_warning(OMDeprecationWarning):
             p.setup()
 
     def test_promotes(self):
@@ -4201,28 +4219,87 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
         p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
         p.model.promotes('C1', inputs=['x'], src_indices=[1])
-        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
+        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'. The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
+            p.setup()
+
+    def test_promotes_err_False(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.promotes('C1', inputs=['x'], src_indices=[1], flat_src_indices=False)
+        with self.assertRaises(Exception) as cm:
+            p.setup()
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexing into a source array of dimension 2 using indices of dimension 1 and setting `flat_indices=False` when connecting to input 'C1.x'. The current version of OpenMDAO assumes a flat source if the indices appear flat, so `flat_indices=False` is not a valid option. This behavior is deprecated and will be removed in a later version."
+        self.assertEquals(cm.exception.args[0], msg)
+
+    def test_promotes_no_warn_True(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
+        p.model.promotes('C1', inputs=['x'], src_indices=[1], flat_src_indices=True)
+        with assert_no_warning(OMDeprecationWarning):
             p.setup()
 
     def test_add_dv(self):
         p = om.Problem()
-        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
         p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
-        p.model.connect('indeps.x', 'C1.x')
-        p.model.add_design_var('indeps.x', indices=[1])
-        msg = "<model> <class Group>: Indexing into source variable 'indeps.x' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_indices=True` when you set `indices`."
+        p.model.add_design_var('C1.x', indices=[1])
+        msg = "<model> <class Group>: Indexing into source variable 'C1.x' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`. The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_indices=True` when you set `indices`."
         p.setup()
         with assert_warning(OMDeprecationWarning, msg):
             p.final_setup()
 
+    def test_add_dv_err_False(self):
+        p = om.Problem()
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.add_design_var('C1.x', indices=[1], flat_indices=False)
+        p.setup()
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+        msg = "Indexing into source variable 'C1.x' of dimension 2 using indices of dimension 1 and setting `flat_indices=False`. The current version of OpenMDAO assumes a flat source if the indices appear flat, so `flat_indices=False` is not a valid option. This behavior is deprecated and will be removed in a later version."
+        self.assertEquals(cm.exception.args[0], msg)
+
+    def test_add_dv_no_warn_True(self):
+        p = om.Problem()
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.add_design_var('C1.x', indices=[1], flat_indices=True)
+        p.setup()
+        with assert_no_warning(OMDeprecationWarning):
+            p.final_setup()
+
     def test_add_con(self):
         p = om.Problem()
-        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
         p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
-        p.model.connect('indeps.x', 'C1.x')
-        p.model.add_constraint('C1.x', indices=[1])
-        msg = "<model> <class Group>: Indexing into source variable 'indeps.x' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_indices=True` when you set `indices`."
+        p.model.add_constraint('C1.y', indices=[1])
+        msg = "<model> <class Group>: Indexing into source variable 'C1.y' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`. The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_indices=True` when you set `indices`."
+        p.setup()
+        with assert_warning(OMDeprecationWarning, msg):
+            p.final_setup()
+
+    def test_add_con_err_False(self):
+        p = om.Problem()
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.add_constraint('C1.y', indices=[1], flat_indices=False)
+        p.setup()
+        msg = "Indexing into source variable 'C1.y' of dimension 2 using indices of dimension 1 and setting `flat_indices=False`. The current version of OpenMDAO assumes a flat source if the indices appear flat, so `flat_indices=False` is not a valid option. This behavior is deprecated and will be removed in a later version."
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+        self.assertEquals(cm.exception.args[0], msg)
+
+    def test_add_con_no_warn_True(self):
+        p = om.Problem()
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.add_constraint('C1.y', indices=[1], flat_indices=True)
+        p.setup()
+        with assert_no_warning(OMDeprecationWarning):
+            p.final_setup()
+
+    def test_add_obj(self):
+        p = om.Problem()
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.add_objective('C1.y', index=1)
+        msg = "<model> <class Group>: Indexing into source variable 'C1.y' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`. The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release. To keep the old behavior, set `flat_indices=True` when you set `indices`."
         p.setup()
         with assert_warning(OMDeprecationWarning, msg):
             p.final_setup()

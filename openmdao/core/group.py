@@ -61,7 +61,7 @@ class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
     def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys='', prom=None,
-                 root_shape=None, warn=True):
+                 root_shape=None):
         self.flat = flat
         self.root_shape = src_shape if root_shape is None else root_shape
         self.src_shape = self.root_shape
@@ -71,11 +71,6 @@ class _PromotesInfo(object):
                 self.src_indices.set_src_shape(self.root_shape)
             else:
                 self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat=flat)
-            if warn:
-                if flat is None:
-                    tgt = '' if prom is None else prom
-                    self.src_indices._check_flat_src_indices_warning(self.root_shape, tgt,
-                                                                     prefix=parent_sys)
         else:
             self.src_indices = None
         self.parent_sys = parent_sys  # pathname of promoting system
@@ -111,7 +106,7 @@ class _PromotesInfo(object):
                                     self.src_indices, self.src_shape)
 
         return _PromotesInfo(src_inds, True, self.src_shape, self.parent_sys, self.prom,
-                             parent.root_shape, warn=False)
+                             parent.root_shape)
 
     def compare(self, other):
         """
@@ -1986,9 +1981,8 @@ class Group(System):
                         shp = (out_shape if all_meta_out['distributed'] else
                                all_meta_out['global_shape'])
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
-                        if flat is None:
-                            src_indices._check_flat_src_indices_warning(shp, abs_in,
-                                                                        prefix=self.msginfo)
+                        src_indices._check_flat_src_indices_warning(flat, shp, abs_in,
+                                                                    prefix=self.msginfo)
                         src_indices = src_indices.shaped_instance()
                     except Exception as err:
                         conditional_error(f"{self.msginfo}: When connecting '{abs_out}' to "

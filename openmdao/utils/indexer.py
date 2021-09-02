@@ -336,32 +336,49 @@ class Indexer(object):
     def _appears_flat(self):
         return True
 
-    def _check_flat_indices_warning(self, src_shape, vname, prefix=''):
-        if src_shape is None or self._flat_src or not self._appears_flat():
+    def _check_flat_indices_warning(self, flat, src_shape, vname, prefix=''):
+        if src_shape is None or self._flat_src or flat or not self._appears_flat():
             return
         src_shape = shape2tuple(src_shape)
         if len(src_shape) > 1:
-            issue_warning(f"Indexing into source variable '{vname}' of dimension {len(src_shape)}"
-                          f" using indices of dimension {len(self.shape)} without "
-                          f"setting `flat_indices=True`.  The source is currently treated as "
-                          "flat, but this automatic flattening is deprecated and will be removed "
-                          f"in a future release.  To keep the old behavior, set `flat_indices"
-                          f"=True` when you set `indices`.",
-                          category=OMDeprecationWarning, prefix=prefix)
+            if flat is None:
+                issue_warning(f"Indexing into source variable '{vname}' of dimension "
+                              f"{len(src_shape)} using indices of dimension "
+                              f"{len(shape2tuple(self.shape))} without setting `flat_indices=True`."
+                              " The source is currently treated as flat, but this automatic "
+                              f"flattening is deprecated and will be removed in a future release. "
+                              "To keep the old behavior, set `flat_indices=True` when you set "
+                              "`indices`.",
+                              category=OMDeprecationWarning, prefix=prefix)
+            else:  # flat is False
+                raise IndexError(f"Indexing into source variable '{vname}' of dimension "
+                                 f"{len(src_shape)} using indices of dimension "
+                                 f"{len(shape2tuple(self.shape))} and setting "
+                                 "`flat_indices=False`. The current version of OpenMDAO assumes "
+                                 "a flat source if the indices appear flat, so `flat_indices=False`"
+                                 " is not a valid option. This behavior is "
+                                 "deprecated and will be removed in a later version.")
 
-    def _check_flat_src_indices_warning(self, src_shape, tgt, prefix=''):
-        if src_shape is None or self._flat_src or not self._appears_flat():
+    def _check_flat_src_indices_warning(self, flat, src_shape, tgt, prefix=''):
+        if src_shape is None or self._flat_src or flat or not self._appears_flat():
             return
         src_shape = shape2tuple(src_shape)
         if len(src_shape) > 1:
-            issue_warning(f"Indexing into a source array of dimension {len(src_shape)} "
-                          f"using indices of dimension {len(self.shape)} without "
-                          f"setting `flat_src_indices=True` when connecting to input '{tgt}'.  "
-                          "The source array is currently treated as "
-                          "flat, but this automatic flattening is deprecated and will be removed "
-                          f"in a future release.  To keep the old behavior, set `flat_src_indices"
-                          f"=True` when you set `src_indices`.",
-                          category=OMDeprecationWarning, prefix=prefix)
+            if flat is None:
+                issue_warning(f"Indexing into a source array of dimension {len(src_shape)} "
+                              f"using indices of dimension {len(self.shape)} without "
+                              f"setting `flat_src_indices=True` when connecting to input '{tgt}'. "
+                              "The source array is currently treated as flat, but this automatic "
+                              "flattening is deprecated and will be removed in a future release. "
+                              "To keep the old behavior, set `flat_src_indices=True` when you set "
+                              "`src_indices`.", category=OMDeprecationWarning, prefix=prefix)
+            else:  # flat is False
+                raise IndexError(f"Indexing into a source array of dimension {len(src_shape)} using"
+                                 f" indices of dimension {len(shape2tuple(self.shape))} and setting"
+                                 f" `flat_indices=False` when connecting to input '{tgt}'. The "
+                                 "current version of OpenMDAO assumes a flat source if the indices "
+                                 "appear flat, so `flat_indices=False` is not a valid option. This "
+                                 "behavior is deprecated and will be removed in a later version.")
 
 
 class ShapedIntIndexer(Indexer):

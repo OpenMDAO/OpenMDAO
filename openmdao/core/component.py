@@ -1592,8 +1592,6 @@ class Component(System):
                         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
                                            f"src_indices {src_inds} and source shape "
                                            f"{shape}: {err}")
-                if flat_src_inds is None:
-                    src_inds._check_flat_src_indices_warning(src_shape, tgt, prefix=self.msginfo)
                 meta['src_shape'] = src_shape
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
