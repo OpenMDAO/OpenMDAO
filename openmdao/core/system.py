@@ -6,7 +6,6 @@ import time
 
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterable
 from itertools import chain
 from enum import IntEnum
 
@@ -28,7 +27,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -37,9 +36,8 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
-from openmdao.utils.notebook_utils import notebook, tabulate
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+    _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 

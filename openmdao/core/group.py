@@ -3116,6 +3116,15 @@ class Group(System):
             self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
         self._setup_approx_partials()
 
+    def _setup_check(self):
+        """
+        Do any error checking on user's setup, before any other recursion happens.
+        """
+        info = self._coloring_info
+        if (info['static'] or info['dynamic']) and self.pathname != '':
+            msg = f"{self.msginfo}: semi-total coloring is currently not supported."
+            raise RuntimeError(msg)
+
     def _update_approx_coloring_meta(self, meta):
         """
         Update metadata for a subjac based on coloring metadata.

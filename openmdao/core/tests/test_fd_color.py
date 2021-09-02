@@ -505,6 +505,7 @@ class TestColoringImplicit(unittest.TestCase):
 
 
 class TestColoringSemitotals(unittest.TestCase):
+
     def setUp(self):
         np.random.seed(11)
         self.startdir = os.getcwd()
@@ -526,6 +527,9 @@ class TestColoringSemitotals(unittest.TestCase):
         ), name_func=_test_func_name
     )
     def test_simple_semitotals(self, method, isplit, osplit, sparse_partials):
+
+        raise unittest.SkipTest('Semi-total coloring currently not supported.')
+
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
@@ -565,6 +569,9 @@ class TestColoringSemitotals(unittest.TestCase):
         ), name_func=_test_func_name
     )
     def test_simple_semitotals_static(self, method, isplit, osplit):
+
+        raise unittest.SkipTest('Semi-total coloring currently not supported.')
+
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
@@ -622,6 +629,27 @@ class TestColoringSemitotals(unittest.TestCase):
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 10)
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity, method)
+
+    def test_semitotals_unsupported(self):
+        prob = Problem(coloring_dir=self.tempdir)
+        model = prob.model
+
+        sparsity = setup_sparsity(_BIGMASK)
+        indeps, conns = setup_indeps(1, _BIGMASK.shape[1], 'indeps', 'sub.comp')
+
+        model.add_subsystem('indeps', indeps)
+        sub = model.add_subsystem('sub', CounterGroup())
+        sub.declare_coloring('*', method='fd')
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, 'fd', isplit=1, osplit=1,
+                                                            sparse_partials=False))
+        for conn in conns:
+            model.connect(*conn)
+
+        with self.assertRaises(RuntimeError) as err:
+            prob.setup(check=False)
+
+        expected_msg = "'sub' <class CounterGroup>: semi-total coloring is currently not supported."
+        self.assertEqual(str(err.exception), expected_msg)
 
 
 class TestColoring(unittest.TestCase):
@@ -1448,11 +1476,17 @@ class TestStaticColoringParallelCS(unittest.TestCase):
             except OSError:
                 pass
 
+    # semi-total coloring feature disabled.
+
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
         ), name_func=_test_func_name
     )
     def test_simple_semitotals_all_local_vars(self, method):
+
+        MPI.COMM_WORLD.barrier()
+        raise unittest.SkipTest('Semi-total coloring currently not supported.')
+
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
