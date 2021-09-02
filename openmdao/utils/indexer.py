@@ -348,8 +348,7 @@ class Indexer(object):
                               " The source is currently treated as flat, but this automatic "
                               f"flattening is deprecated and will be removed in a future release. "
                               "To keep the old behavior, set `flat_indices=True` when you set "
-                              "`indices`.",
-                              category=OMDeprecationWarning, prefix=prefix)
+                              "`indices`.", category=OMDeprecationWarning, prefix=prefix)
             else:  # flat is False
                 raise IndexError(f"Indexing into source variable '{vname}' of dimension "
                                  f"{len(src_shape)} using indices of dimension "
