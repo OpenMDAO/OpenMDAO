@@ -3019,8 +3019,8 @@ class System(object):
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
                         if meta['flat_indices'] is None:
-                            indices._check_flat_warning('indices', vmeta['global_shape'], name,
-                                                        prefix=self.msginfo)
+                            indices._check_flat_indices_warning(vmeta['global_shape'], name,
+                                                                prefix=self.msginfo)
                         indices = indices.shaped_instance()
                         meta['size'] = len(indices)
                         meta['global_size'] = len(indices)
@@ -3144,9 +3144,9 @@ class System(object):
                 if response['indices'] is not None:
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
-                    if response['flat_indices'] is not None:
-                        indices._check_flat_warning('indices', meta['global_shape'], name,
-                                                    prefix=self.msginfo)
+                    if response['flat_indices'] is None:
+                        indices._check_flat_indices_warning(meta['global_shape'], name,
+                                                            prefix=self.msginfo)
                     indices = indices.shaped_instance()
                     response['size'] = response['global_size'] = len(indices)
                 else:

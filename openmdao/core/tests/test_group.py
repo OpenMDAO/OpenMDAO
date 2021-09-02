@@ -4183,7 +4183,7 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('C1', om.ExecComp('y=2*x', x={'val': 1.0, 'src_indices': [1]}),
                               promotes_inputs=['x'])
 
-        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
 
@@ -4192,7 +4192,7 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
         p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
         p.model.connect('indeps.x', 'C1.x', src_indices=[1])
-        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        msg = "Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
 
@@ -4201,7 +4201,7 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))), promotes=['x'])
         p.model.add_subsystem('C1', om.ExecComp('y=2*x'))
         p.model.promotes('C1', inputs=['x'], src_indices=[1])
-        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        msg = "<model> <class Group>: Indexing into a source array of dimension 2 using indices of dimension 1 without setting `flat_src_indices=True` when connecting to input 'C1.x'.  The source array is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices=True` when you set `src_indices`."
         with assert_warning(OMDeprecationWarning, msg):
             p.setup()
 
@@ -4211,9 +4211,20 @@ class TestFlatSrcDeprecation(unittest.TestCase):
         p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
         p.model.connect('indeps.x', 'C1.x')
         p.model.add_design_var('indeps.x', indices=[1])
-        msg = "<model> <class Group>: connecting source 'indeps.x' of dimension 2 to 'C1.x' using src_indices of dimension 1 without setting `flat_src_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_src_indices`=True in the connect(), promotes(), or add_input() call."
+        msg = "<model> <class Group>: Indexing into source variable 'indeps.x' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_indices=True` when you set `indices`."
+        p.setup()
         with assert_warning(OMDeprecationWarning, msg):
-            p.setup()
+            p.final_setup()
+
+    def test_add_con(self):
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.ones((3,3))))
+        p.model.add_subsystem('C1', om.ExecComp('y=2*x', shape=(3,3)))
+        p.model.connect('indeps.x', 'C1.x')
+        p.model.add_constraint('C1.x', indices=[1])
+        msg = "<model> <class Group>: Indexing into source variable 'indeps.x' of dimension 2 using indices of dimension 1 without setting `flat_indices=True`.  The source is currently treated as flat, but this automatic flattening is deprecated and will be removed in a future release.  To keep the old behavior, set `flat_indices=True` when you set `indices`."
+        p.setup()
+        with assert_warning(OMDeprecationWarning, msg):
             p.final_setup()
 
 

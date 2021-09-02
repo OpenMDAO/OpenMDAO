@@ -74,10 +74,8 @@ class _PromotesInfo(object):
             if warn:
                 if flat is None:
                     tgt = '' if prom is None else prom
-                    self.src_indices._check_flat_warning('src_indices', self.root_shape, tgt,
-                                                         prefix=parent_sys)
-            else:
-                self.src_indices._check_dims = False
+                    self.src_indices._check_flat_src_indices_warning(self.root_shape, tgt,
+                                                                     prefix=parent_sys)
         else:
             self.src_indices = None
         self.parent_sys = parent_sys  # pathname of promoting system
@@ -903,6 +901,7 @@ class Group(System):
         # create a dict mapping abs inputs to top level _PromotesInfo
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2prom = self._var_abs2prom['input']
         src_sizes = self._var_sizes['output']
         src_size_idxs = self._var_allprocs_abs2idx
 
@@ -933,7 +932,8 @@ class Group(System):
                 flat_src_inds = tmeta['flat_src_indices']
 
             try:
-                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape),
+                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape,
+                                            prom=abs2prom[tgt]),
                               src_shape, src, self.pathname)
             except Exception as err:
                 s, sprom, tprom = get_connection_owner(self, tgt)
@@ -1987,8 +1987,8 @@ class Group(System):
                                all_meta_out['global_shape'])
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         if flat is None:
-                            src_indices._check_flat_warning('src_indices', shp, abs_in,
-                                                            prefix=self.msginfo)
+                            src_indices._check_flat_src_indices_warning(shp, abs_in,
+                                                                        prefix=self.msginfo)
                         src_indices = src_indices.shaped_instance()
                     except Exception as err:
                         conditional_error(f"{self.msginfo}: When connecting '{abs_out}' to "
@@ -2036,8 +2036,6 @@ class Group(System):
                             raise ValueError(msg)
                         else:
                             issue_warning(msg, category=SetupWarning)
-
-                    src_indices._chk_shape_dims(flat, abs_in, abs_out, self.msginfo)
 
     def _set_subsys_connection_errors(self, val=True):
         """
