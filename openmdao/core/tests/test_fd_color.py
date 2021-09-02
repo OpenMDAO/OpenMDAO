@@ -1508,7 +1508,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
-        #sub.approx_totals(method=method)
+        sub.approx_totals(method=method)
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
@@ -1535,7 +1535,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', Group(num_par_fd=self.N_PROCS))
-        sub.approx_totals(method=method)
+        #sub.approx_totals(method=method)
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, method, isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
