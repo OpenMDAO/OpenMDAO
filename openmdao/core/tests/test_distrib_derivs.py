@@ -1640,8 +1640,6 @@ class TestDistribBugs(unittest.TestCase):
             model.connect('D1.out_dist', 'D2.in_dist')
             model.connect('D1.out_serial', 'D2.in_serial')
 
-        om.wing_dbg()
-
         prob = om.Problem(model)
         prob.setup(mode=mode, force_alloc_complex=True)
 
