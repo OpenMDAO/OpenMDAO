@@ -321,7 +321,7 @@ class Indexer(object):
             return None, None
 
         shape = shape2tuple(shape)
-        if self._flat_src:
+        if self._flat_src or self._appears_flat():
             shape = (np.product(shape),)
 
         if dist_shape is None:
@@ -337,7 +337,7 @@ class Indexer(object):
         return True
 
     def _check_flat_indices_warning(self, flat, src_shape, vname, prefix=''):
-        if src_shape is None or self._flat_src or flat or not self._appears_flat():
+        if src_shape is None or flat or not self._appears_flat():
             return
         src_shape = shape2tuple(src_shape)
         if len(src_shape) > 1:
@@ -1409,7 +1409,6 @@ class ListOfTuplesArrayIndexer(Indexer):
         """
         Initialize attributes.
         """
-        super().__init__(flat_src)
         tup = np.atleast_1d(tup)
         self._arr = tup
 
@@ -1418,6 +1417,7 @@ class ListOfTuplesArrayIndexer(Indexer):
         size = np.product(orig_shape)
         totsize = size * ndims
         self._npy_inds = tuple(tup.flat[i:totsize:ndims] for i in range(ndims))
+        super().__init__(flat_src)
 
     def __str__(self):
         """

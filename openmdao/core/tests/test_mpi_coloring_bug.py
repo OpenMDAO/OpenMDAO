@@ -422,7 +422,7 @@ class GaussLobatto(object):
         phase.add_subsystem('collocation_constraint',
                             CollocationComp(state_options=phase.state_options))
 
-        for name, options in phase.state_options.items():
+        for name in phase.state_options:
             phase.connect('state_interp.staterate_col:{0}'.format(name),
                           'collocation_constraint.f_approx:{0}'.format(name))
 

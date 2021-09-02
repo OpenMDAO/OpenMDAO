@@ -409,7 +409,7 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         # C2.x has a shape of 2, so we apply flat source indices of [1,5] to our source which has
         # a shape of (3,2) to give us our final shape of 2.
-        g2.promotes('C2', inputs=['x'], src_indices=[1,5], flat_src_indices=True, src_shape=(3,2))
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2))
 
         p.setup()
 
