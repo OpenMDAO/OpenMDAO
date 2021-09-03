@@ -4,6 +4,7 @@ A Case class.
 
 import sys
 import itertools
+import json
 
 from collections import OrderedDict
 
@@ -121,6 +122,8 @@ class Case(object):
         self.timestamp = data['timestamp']
         self.success = data['success']
         self.msg = data['msg']
+        self.major_iter = data['major_iter']
+        self.opt_progress = data['opt_progress']
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
@@ -179,6 +182,11 @@ class Case(object):
                 self.residuals = PromAbsDict(residuals, prom2abs['output'], abs2prom['output'],
                                              in_prom2abs=prom2abs['input'],
                                              auto_ivc_map=auto_ivc_map)
+
+        if 'opt_progress' in data.keys():
+            opt_progress = data['opt_progress']
+            if opt_progress is not None:
+                self.opt_progress = opt_progress
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
@@ -504,6 +512,25 @@ class Case(object):
                               'settings have record_inputs set to True\n')
 
         return inputs
+
+    def list_progress(self):
+        """
+        Return and optionally log a list of input names and other optional information.
+
+        Parameters
+        ----------
+        val : bool, optional
+            When True, display/return input values. Default is True.
+
+        Returns
+        -------
+        list
+            List of input names and other optional information about those inputs.
+        """
+        # I NEED TO FIND A WAY TO LOOP THROUGH ALL THE CASES
+        opt_progress = json.loads(self.opt_progress)
+
+        print('Hello')
 
     def list_outputs(self,
                      explicit=True, implicit=True,

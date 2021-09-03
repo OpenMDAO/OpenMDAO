@@ -236,7 +236,8 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("CREATE TABLE driver_iterations(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
-                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT)")
+                          "success INT, msg TEXT, inputs TEXT, outputs TEXT, residuals TEXT, "
+                          "major_iter INT, opt_progress TEXT)")
                 c.execute("CREATE TABLE driver_derivatives(id INTEGER PRIMARY KEY, "
                           "counter INT, iteration_coordinate TEXT, timestamp REAL, "
                           "success INT, msg TEXT, derivatives BLOB)")
@@ -472,9 +473,14 @@ class SqliteRecorder(CaseRecorder):
             outputs = data['output']
             inputs = data['input']
             residuals = data['residual']
+            opt_progress = {}
+
+            if hasattr(driver, "iterDict"):
+                for key, val in driver.iterDict.items():
+                    opt_progress[key] = val
 
             # convert to list so this can be dumped as JSON
-            for in_out_resid in (inputs, outputs, residuals):
+            for in_out_resid in (inputs, outputs, residuals, opt_progress):
                 if in_out_resid is None:
                     continue
                 for var in in_out_resid:
@@ -483,16 +489,22 @@ class SqliteRecorder(CaseRecorder):
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
             residuals_text = json.dumps(residuals)
+            if opt_progress:
+                major_iter = opt_progress['nMajor']
+            else:
+                major_iter = -1
+            opt_progress = json.dumps(opt_progress)
 
             with self.connection as c:
                 c = c.cursor()  # need a real cursor for lastrowid
 
                 c.execute("INSERT INTO driver_iterations(counter, iteration_coordinate, "
-                          "timestamp, success, msg, inputs, outputs, residuals) "
-                          "VALUES(?,?,?,?,?,?,?,?)",
+                          "timestamp, success, msg, inputs, outputs, residuals, major_iter, "
+                          "opt_progress) "
+                          "VALUES(?,?,?,?,?,?,?,?,?,?)",
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
-                           inputs_text, outputs_text, residuals_text))
+                           inputs_text, outputs_text, residuals_text, major_iter, opt_progress))
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, driver._get_name()))

@@ -320,7 +320,7 @@ class pyOptSparseDriver(Driver):
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
-                                comm=comm)
+                                comm=comm, callback=self.pyoptsparse_opt_callback)
 
         # Add all design variables
         input_meta = self._designvars
@@ -524,6 +524,9 @@ class pyOptSparseDriver(Driver):
             self._signal_cache = None   # to prevent memory leak test from failing
 
         return self.fail
+
+    def pyoptsparse_opt_callback(self, snopt_dict):
+        self.iterDict = snopt_dict
 
     def _objfunc(self, dv_dict):
         """

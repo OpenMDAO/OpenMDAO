@@ -63,8 +63,6 @@ class SqliteCaseReader(BaseCaseReader):
     _auto_ivc_map : dict
         Dictionary that maps all auto_ivc sources to either an absolute input name for single
         connections or a promoted input name for multiple connections. This is for output display.
-    _driver_cases : DriverCases
-        Helper object for accessing cases from the driver_iterations table.
     _deriv_cases : DerivCases
         Helper object for accessing cases from the driver_derivatives table.
     _system_cases : SystemCases
