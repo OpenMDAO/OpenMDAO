@@ -60,8 +60,8 @@ class _SysInfo(object):
 class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
-                 root_shape=None, warn=True):
+    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys='', prom=None,
+                 root_shape=None):
         self.flat = flat
         self.root_shape = src_shape if root_shape is None else root_shape
         self.src_shape = src_shape if src_shape is not None else self.root_shape
@@ -73,8 +73,8 @@ class _PromotesInfo(object):
                 self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat_src=flat)
         else:
             self.src_indices = None
-        self.parent_sys = None  # pathname of promoting system
-        self.prom = None  # local promoted name of input
+        self.parent_sys = parent_sys  # pathname of promoting system
+        self.prom = prom  # local promoted name of input
 
     def __iter__(self):
         yield self.src_indices
@@ -896,6 +896,7 @@ class Group(System):
         # create a dict mapping abs inputs to top level _PromotesInfo
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2prom = self._var_abs2prom['input']
         src_sizes = self._var_sizes['output']
         src_size_idxs = self._var_allprocs_abs2idx
 
@@ -926,7 +927,8 @@ class Group(System):
                 flat_src_inds = tmeta['flat_src_indices']
 
             try:
-                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape),
+                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape,
+                                            prom=abs2prom[tgt]),
                               src_shape, src, self.pathname)
             except Exception as err:
                 s, sprom, tprom = get_connection_owner(self, tgt)
@@ -1989,9 +1991,9 @@ class Group(System):
                 elif src_indices is not None:
 
                     try:
-                        src_indices.set_src_shape(out_shape if all_meta_out['distributed'] else
-                                                  all_meta_out['global_shape'],
-                                                  dist_shape=out_shape)
+                        shp = (out_shape if all_meta_out['distributed'] else
+                               all_meta_out['global_shape'])
+                        src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
                     except Exception as err:
                         s, sprom, tprom = get_connection_owner(self, abs_in)
@@ -3137,6 +3139,15 @@ class Group(System):
             meta = self._coloring_info
             self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
         self._setup_approx_partials()
+
+    def _setup_check(self):
+        """
+        Do any error checking on user's setup, before any other recursion happens.
+        """
+        info = self._coloring_info
+        if (info['static'] or info['dynamic']) and self.pathname != '':
+            msg = f"{self.msginfo}: semi-total coloring is currently not supported."
+            raise RuntimeError(msg)
 
     def _update_approx_coloring_meta(self, meta):
         """

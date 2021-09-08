@@ -1964,7 +1964,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # Design var z does not affect any quantities.
         prob.model.add_design_var('z', lower=-50, upper=50, indices=[2,5,6], flat_indices=True)
 
-        prob.model.add_objective('parab.f_xy', index=6)
+        prob.model.add_objective('parab.f_xy', index=6, flat_indices=True)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
 
@@ -1997,7 +1997,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.add_design_var('z', lower=-50, upper=50)
 
         # objective parab.f_z is not impacted by any quantities.
-        prob.model.add_objective('parab.f_z', index=6)
+        prob.model.add_objective('parab.f_z', index=6, flat_indices=True)
 
         prob.model.add_constraint('const.g', lower=0, upper=10.)
 

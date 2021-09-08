@@ -308,7 +308,7 @@ class ShapedIntIndexer(Indexer):
     idx : int
         The index.
     flat_src : bool
-        True if we're treating the source as flat.
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -446,8 +446,8 @@ class IntIndexer(ShapedIntIndexer):
     ----------
     idx : int
         The index.
-    flat_src : bool
-        True if we're treating the source as flat.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -482,7 +482,7 @@ class ShapedSliceIndexer(Indexer):
     slc : slice
         The slice.
     flat_src : bool
-        True if we're treating the source as flat.
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -621,8 +621,8 @@ class SliceIndexer(ShapedSliceIndexer):
     ----------
     slc : slice
         The slice.
-    flat_src : bool
-        True if we're treating the source as flat.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -695,7 +695,7 @@ class ShapedArrayIndexer(Indexer):
     orig_shape : tuple or None
         Original shape of the array.
     flat_src : bool
-        True if we're treating the source as flat.
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -852,8 +852,8 @@ class ArrayIndexer(ShapedArrayIndexer):
         The index array.
     orig_shape : tuple or None
         Original shape of the array.
-    flat_src : bool
-        True if we're treating the source as flat.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -1151,7 +1151,7 @@ class EllipsisIndexer(Indexer):
         The wrapped tuple of indices/slices (it contains an ellipsis).
     """
 
-    def __init__(self, tup, flat_src=False):
+    def __init__(self, tup, flat_src=None):
         """
         Initialize attributes.
         """
@@ -1310,7 +1310,7 @@ class ListOfTuplesArrayIndexer(Indexer):
     tup : tuple
         Tuple of indices/slices.
     flat_src : bool
-        True if we're treating the source as flat.
+        If True, source is treated as flat.
 
     Attributes
     ----------

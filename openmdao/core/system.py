@@ -6,7 +6,6 @@ import time
 
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterable
 from itertools import chain
 from enum import IntEnum
 
@@ -28,7 +27,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -39,7 +38,6 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Promot
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
         _is_slicer_op
-from openmdao.utils.notebook_utils import notebook, tabulate
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -2453,7 +2451,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=True):
+                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=False):
         r"""
         Add a design variable to this system.
 
@@ -2577,6 +2575,7 @@ class System(object):
                 dv['size'] = size
 
         dv['indices'] = indices
+        dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
 
         design_vars[name] = dv
@@ -2733,7 +2732,7 @@ class System(object):
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                index = indexer(index, flat_src=True)
+                index = indexer(index, flat_src=flat_indices)
                 resp['size'] = 1
             resp['indices'] = index
 
@@ -2757,8 +2756,8 @@ class System(object):
         resp['type'] = type_
         resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
-
         resp['parallel_deriv_color'] = parallel_deriv_color
+        resp['flat_indices'] = flat_indices
 
         # self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
 
@@ -2767,7 +2766,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=True):
+                       cache_linear_solution=False, flat_indices=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2828,7 +2827,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False, flat_indices=True):
+                      cache_linear_solution=False, flat_indices=False):
         r"""
         Add a response variable to this system.
 
@@ -3011,7 +3010,7 @@ class System(object):
                     vmeta = abs2meta_out[src_name]
                     meta['distributed'] = vmeta['distributed']
                     if indices is not None:
-                        # Index defined in this response.
+                        # Index defined in this design var.
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()

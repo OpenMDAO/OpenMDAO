@@ -2560,6 +2560,49 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         data = prob.check_partials()
 
+    def test_directional_sparse_deriv(self):
+
+        class FDComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int, default=1)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                self.add_input('x_element', np.ones((nn, )))
+                self.add_output('y', np.ones((nn, )))
+
+            def setup_partials(self):
+                nn = self.options['vec_size']
+                self.declare_partials('*', 'x_element', rows=np.arange(nn), cols=np.arange(nn))
+
+                self.set_check_partial_options('x_element', method='fd', step_calc='rel_avg', directional=True)
+
+            def compute(self, inputs, outputs):
+                x3 = inputs['x_element']
+                outputs['y'] = 0.5 * x3 ** 2
+
+            def compute_partials(self, inputs, partials):
+                x3 = inputs['x_element']
+                partials['y', 'x_element'] = x3
+
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', FDComp(vec_size=3))
+
+        prob.setup()
+
+        x = np.array([3, 4, 5])
+        prob.set_val('comp.x_element', x)
+
+        prob.run_model()
+
+        partials = prob.check_partials(out_stream=None)
+        assert_check_partials(partials, atol=1e-5, rtol=1e-5)
+
     def test_set_method_and_step_bug(self):
         # If a model-builder set his a component to fd, and the global method is cs with a specified
         # step size, that size is probably unusable, and can lead to false error in the check.
