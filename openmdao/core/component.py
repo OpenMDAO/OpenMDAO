@@ -1589,7 +1589,6 @@ class Component(System):
                     try:
                         src_inds.set_src_shape(shape)
                     except Exception as err:
-                        parent_sys = f" {pinfo.parent_sys} " if pinfo.parent_sys else ""
                         raise RuntimeError(f"{self.msginfo}: When promoting '{tgt}' with "
                                            f"src_indices {src_inds} and source shape "
                                            f"{shape}: {err}")

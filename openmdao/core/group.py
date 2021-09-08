@@ -60,8 +60,8 @@ class _SysInfo(object):
 class _PromotesInfo(object):
     __slots__ = ['src_indices', 'flat', 'src_shape', 'parent_sys', 'prom', 'root_shape']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys=None, prom=None,
-                 root_shape=None, warn=True):
+    def __init__(self, src_indices=None, flat=None, src_shape=None, parent_sys='', prom=None,
+                 root_shape=None):
         self.flat = flat
         self.root_shape = src_shape if root_shape is None else root_shape
         self.src_shape = self.root_shape
@@ -71,12 +71,10 @@ class _PromotesInfo(object):
                 self.src_indices.set_src_shape(self.root_shape)
             else:
                 self.src_indices = indexer(src_indices, src_shape=self.root_shape, flat=flat)
-            if not warn:
-                self.src_indices._check_dims = False
         else:
             self.src_indices = None
-        self.parent_sys = None  # pathname of promoting system
-        self.prom = None  # local promoted name of input
+        self.parent_sys = parent_sys  # pathname of promoting system
+        self.prom = prom  # local promoted name of input
 
     def __iter__(self):
         yield self.src_indices
@@ -107,8 +105,8 @@ class _PromotesInfo(object):
         src_inds = convert_src_inds(parent.src_indices, parent.src_shape,
                                     self.src_indices, self.src_shape)
 
-        return _PromotesInfo(src_inds, self.flat, self.src_shape, self.parent_sys, self.prom,
-                             parent.root_shape, warn=False)
+        return _PromotesInfo(src_inds, True, self.src_shape, self.parent_sys, self.prom,
+                             parent.root_shape)
 
     def compare(self, other):
         """
@@ -898,6 +896,7 @@ class Group(System):
         # create a dict mapping abs inputs to top level _PromotesInfo
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
+        abs2prom = self._var_abs2prom['input']
         src_sizes = self._var_sizes['output']
         src_size_idxs = self._var_allprocs_abs2idx
 
@@ -928,7 +927,8 @@ class Group(System):
                 flat_src_inds = tmeta['flat_src_indices']
 
             try:
-                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape),
+                tdict[tgt] = (_PromotesInfo(src_inds, flat_src_inds, src_shape,
+                                            prom=abs2prom[tgt]),
                               src_shape, src, self.pathname)
             except Exception as err:
                 s, sprom, tprom = get_connection_owner(self, tgt)
@@ -1978,9 +1978,11 @@ class Group(System):
                 elif src_indices is not None:
 
                     try:
-                        src_indices.set_src_shape(out_shape if all_meta_out['distributed'] else
-                                                  all_meta_out['global_shape'],
-                                                  dist_shape=out_shape)
+                        shp = (out_shape if all_meta_out['distributed'] else
+                               all_meta_out['global_shape'])
+                        src_indices.set_src_shape(shp, dist_shape=out_shape)
+                        src_indices._check_flat_src_indices_warning(flat, shp, abs_in,
+                                                                    prefix=self.msginfo)
                         src_indices = src_indices.shaped_instance()
                     except Exception as err:
                         conditional_error(f"{self.msginfo}: When connecting '{abs_out}' to "
@@ -2028,8 +2030,6 @@ class Group(System):
                             raise ValueError(msg)
                         else:
                             issue_warning(msg, category=SetupWarning)
-
-                    src_indices._chk_shape_dims(flat, abs_in, abs_out, self.msginfo)
 
     def _set_subsys_connection_errors(self, val=True):
         """
