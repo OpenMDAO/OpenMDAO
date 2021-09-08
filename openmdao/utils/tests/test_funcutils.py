@@ -119,9 +119,8 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return a.dot(b), y
 
-
             with self.assertRaises(Exception) as cm:
-                ininfo, outinfo = get_func_info(func)
+                get_func_info(func)
 
             msg = f"Annotated shape for return value 'y' of 99 doesn't match computed shape of {yshp}."
             self.assertEqual(cm.exception.args[0], msg)
