@@ -22,6 +22,10 @@ _allowed_add_output_args = {
 }
 
 
+def _isscalar(meta):
+    pass
+
+
 class ExplicitFuncComp(ExplicitComponent):
     """
     A component that wraps a python function.
@@ -51,6 +55,7 @@ class ExplicitFuncComp(ExplicitComponent):
         self._func = func
         self._inmeta = None
         self._outmeta = None
+        self._scalar_outs = []
 
     def setup(self):
         """
@@ -86,13 +91,13 @@ class ExplicitFuncComp(ExplicitComponent):
         arr = outputs.asarray()
         start = end = 0
         for o in outs:
-            end += o.size
-            arr[start:end] = np.asarray(o).flat
+            a = np.asarray(o)
+            end += a.size
+            arr[start:end] = a.flat
             start = end
 
 
 if __name__ == '__main__':
-    @jit
     def _some_func(x=np.zeros(4), y=np.ones(4), z=3):
         foo = 2. * x + 3. * y
         bar = 2 * (x + y)
