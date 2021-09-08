@@ -133,14 +133,13 @@ def get_func_info(func):
             raise RuntimeError("Couldn't determine function return names or number of return "
                                "values based on AST and no return value annotations were supplied.")
         issue_warning("Couldn't determine function return names based on AST.  Assuming number of "
-                      "return values matches number of return value annotations.",
-                      category=OpenMDAOWarning)
+                      "return values matches number of return value annotations.")
         outlist = list(outmeta.items())
     else:
         for o in onames:
             if o is not None and '.' in o:  # don't allow dots in return value names
                 issue_warning(f"Ignoring return name '{o}' because names containing '.' are not "
-                              "supported.", category=OpenMDAOWarning)
+                              "supported.")
                 o = None
             outlist.append([o, {}])
 
@@ -186,7 +185,7 @@ def get_func_info(func):
                 shp = meta['shape']
             except KeyError:
                 raise RuntimeError(f"Can't determine shape of input '{name}'.")
-            if need_shape and jax is not None:
+            if jax is not None:
                 args.append(jax.ShapedArray(shape2tuple(shp), dtype=np.float32))
 
     if need_shape:  # output shapes weren't provided by annotations
@@ -196,8 +195,23 @@ def get_func_info(func):
                                "but jax was not found.  Either install jax (pip install jax), or "
                                "add return value annotations that define the shapes of the "
                                "return values.")
-        v = jax.make_jaxpr(func)(*args)
-        for val, name in zip(v.out_avals, outs):
-            outs[name]['shape'] = val.shape
+
+    if jax is not None:  # compute shapes as a check against annotated value (if any)
+        try:
+            v = jax.make_jaxpr(func)(*args)
+        except Exception as err:
+            if need_shape:
+                raise RuntimeError("Jax failed to determine the output shapes based on the input "
+                                   f"shapes. The error was: {err}.")
+            issue_warning("Jax failed to determine the output shapes based on the input "
+                            "shapes in order to check the provided annotated values.  The jax "
+                            f"error was: {err}.")
+        else:
+            for val, name in zip(v.out_avals, outs):
+                oldshape = outs[name].get('shape')
+                if oldshape is not None and oldshape != val.shape:
+                    raise RuntimeError(f"Annotated shape for return value '{name}' of {oldshape} "
+                                       f"doesn't match computed shape of {val.shape}.")
+                outs[name]['shape'] = val.shape
 
     return ins, outs

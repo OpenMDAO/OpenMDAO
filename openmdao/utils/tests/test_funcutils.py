@@ -84,20 +84,47 @@ class FuncAPITestCase(unittest.TestCase):
             self.assertEqual(xshp, outinfo['x']['shape'])
             self.assertEqual(yshp, outinfo['y']['shape'])
 
-    # def test_annotation_all_shapes(self):
-    #     # input and output shape annotations
-    #     for s1, s2, s3, xshp, yshp in _shapes:
-    #         def func(a:{'shape': s1}, b:{'shape': s2}, c:{'shape': s3}) -> [('x', {'shape':xshp}), ('y', {'shape':yshp})]:
-    #             x = a.dot(b)
-    #             y = b.dot(c)
-    #             return x, y
+    def test_annotation_partial_return_names(self):
+        # input and output shape annotations
+        for s1, s2, s3, xshp, yshp in _shapes:
+            def func(a:{'shape': s1}, b:{'shape': s2}, c:{'shape': s3}) -> [('y', {'shape':yshp})]:
+                x = a.dot(b)
+                return x, b.dot(c)
 
-    #         ininfo, outinfo = get_func_info(func)
-    #         self.assertEqual(s1, ininfo['a']['shape'])
-    #         self.assertEqual(s2, ininfo['b']['shape'])
-    #         self.assertEqual(s3, ininfo['c']['shape'])
-    #         self.assertEqual(xshp, outinfo['x']['shape'])
-    #         self.assertEqual(yshp, outinfo['y']['shape'])
+            ininfo, outinfo = get_func_info(func)
+            self.assertEqual(s1, ininfo['a']['shape'])
+            self.assertEqual(s2, ininfo['b']['shape'])
+            self.assertEqual(s3, ininfo['c']['shape'])
+            self.assertEqual(xshp, outinfo['x']['shape'])
+            self.assertEqual(yshp, outinfo['y']['shape'])
+
+    def test_annotation_partial_return_names2(self):
+        # input and output shape annotations
+        for s1, s2, s3, xshp, yshp in _shapes:
+            def func(a:{'shape': s1}, b:{'shape': s2}, c:{'shape': s3}) -> [('x', {'shape':xshp})]:
+                y = b.dot(c)
+                return a.dot(b), y
+
+            ininfo, outinfo = get_func_info(func)
+            self.assertEqual(s1, ininfo['a']['shape'])
+            self.assertEqual(s2, ininfo['b']['shape'])
+            self.assertEqual(s3, ininfo['c']['shape'])
+            self.assertEqual(xshp, outinfo['x']['shape'])
+            self.assertEqual(yshp, outinfo['y']['shape'])
+
+    def test_annotation_partial_return_names_err(self):
+        # input and output shape annotations
+        for s1, s2, s3, xshp, yshp in _shapes:
+            def func(a:{'shape': s1}, b:{'shape': s2}, c:{'shape': s3}) -> [('x', {'shape':xshp}),('y', {'shape':99})]:
+                y = b.dot(c)
+                return a.dot(b), y
+
+
+            with self.assertRaises(Exception) as cm:
+                ininfo, outinfo = get_func_info(func)
+
+            msg = f"Annotated shape for return value 'y' of 99 doesn't match computed shape of {yshp}."
+            self.assertEqual(cm.exception.args[0], msg)
 
 
 if __name__ == '__main__':
