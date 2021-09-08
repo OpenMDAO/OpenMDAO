@@ -36,6 +36,45 @@ def _get_long_name(node):
     return '.'.join(parts[::-1])
 
 
+class _ReturnNamesCollector(ast.NodeVisitor):
+    """
+    An ast.NodeVisitor that records names of returned values (if any).
+
+    Each instance of this is single-use.  If needed multiple times create a new instance
+    each time.  It also assumes that the AST to be visited contains only a single function
+    definition.
+
+    Attributes
+    ----------
+    _ret_names : list
+        List containing name (or None) for each function return value.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._ret_names = []
+
+    def visit_Return(self, node):
+        """
+        Visit a Return node.
+
+        Parameters
+        ----------
+        node : ASTnode
+            The return node being visited.
+        """
+        if self._ret_names:
+            raise RuntimeError("_ReturnNamesCollector does not support multiple returns in a "
+                               "single function.  Either the given function contains multiple "
+                               "returns or this _ReturnNamesCollector instance has been used "
+                               "more than once, which is unsupported.")
+        if isinstance(node.value, ast.Tuple):
+            for n in node.value.elts:
+                self._ret_names.append(_get_long_name(n))
+        else:
+            self._ret_names.append(_get_long_name(node.value))
+
+
 class _SelfCallCollector(ast.NodeVisitor):
     """
     An ast.NodeVisitor that records calls to self.* methods.
