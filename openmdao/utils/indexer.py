@@ -365,7 +365,7 @@ class Indexer(object):
         if len(src_shape) > 1:
             if flat is None:
                 issue_warning(f"Indexing into a source array of dimension {len(src_shape)} "
-                              f"using indices of dimension {len(self.shape)} without "
+                              f"using indices of dimension {len(shape2tuple(self.shape))} without "
                               f"setting `flat_src_indices=True` when connecting to input '{tgt}'. "
                               "The source array is currently treated as flat, but this automatic "
                               "flattening is deprecated and will be removed in a future release. "
