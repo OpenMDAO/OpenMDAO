@@ -418,11 +418,11 @@ class IndexerMultiDimTestCase(unittest.TestCase):
 class ConversionTestCase(unittest.TestCase):
     def test_old_style(self):
         inds = om.to_numpy_style([(1,2), (3,2), (5,0), (4, 1)])
-        assert_near_equal(inds, (np.array([1, 3, 5, 4]), np.array([2,2,0,1])))
+        self.assertEqual(inds, ([1, 3, 5, 4], [2,2,0,1]))
 
         inds = om.to_numpy_style([[(0, 0), (-1, 1)],
                                     [(2, 1), (1, 1)]])
-        assert_near_equal(inds, (np.array([0, -1, 2, 1]), np.array([0, 1, 1, 1])))
+        self.assertEqual(inds, ([0, -1, 2, 1], [0, 1, 1, 1]))
 
 
 if __name__ == '__main__':

@@ -1680,10 +1680,11 @@ def to_numpy_style(inds):
         New style indices.
     """
     inds = indexer(inds, new_style=False)
-    print(inds)
     if isinstance(inds, ListOfTuplesArrayIndexer):
-        return inds._npy_inds
-    raise TypeError("Given indices are not old style OpenMDAO indices.")
+        return tuple(i.tolist() for i in inds._npy_inds)
+    elif isinstance(inds, ShapedArrayIndexer):
+        return inds().tolist()
+    raise TypeError("Indices are not old-style format.")
 
 
 # Since this is already user facing we'll leave it as is, and just use the output of
@@ -1723,6 +1724,7 @@ def _update_new_style(src_indices, new_style, prefix=""):
                     return True
             warn_deprecation(f"{prefix}: 'src_indices={src_indices}' is specified in"
                              " a deprecated format. In a future release, 'src_indices'"
-                             " will be expected to use NumPy array indexing.")
+                             " will be expected to use NumPy array indexing, so replace the "
+                             f"existing src_indices with {to_numpy_style(src_indices)}.")
 
     return new_style
