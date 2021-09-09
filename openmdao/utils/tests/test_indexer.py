@@ -3,7 +3,9 @@ import unittest
 import numpy as np
 from numpy.testing import assert_equal
 
+import openmdao.api as om
 from openmdao.utils.indexer import indexer
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -411,6 +413,17 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.as_array(flat=False), np.array([[1,3,5,4], [22, -4, 11, 3]]))
         assert_equal(ind.shape, (2,4))
         assert_equal(ind.src_ndim, 1)
+
+
+class ConversionTestCase(unittest.TestCase):
+    def test_old_style(self):
+        inds = om.to_numpy_style([(1,2), (3,2), (5,0), (4, 1)])
+        assert_near_equal(inds, (np.array([1, 3, 5, 4]), np.array([2,2,0,1])))
+
+        inds = om.to_numpy_style([[(0, 0), (-1, 1)],
+                                    [(2, 1), (1, 1)]])
+        assert_near_equal(inds, (np.array([0, -1, 2, 1]), np.array([0, 1, 1, 1])))
+
 
 if __name__ == '__main__':
     unittest.main()

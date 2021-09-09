@@ -1665,6 +1665,27 @@ class IndexMaker(object):
 indexer = IndexMaker()
 
 
+def to_numpy_style(inds):
+    """
+    Convert old style OpenMDAO-specific indices into numpy-like indices.
+
+    Parameters
+    ----------
+    inds : list of tuples
+        Old style indices.
+
+    Returns
+    -------
+    tuple of ndarrays
+        New style indices.
+    """
+    inds = indexer(inds, new_style=False)
+    print(inds)
+    if isinstance(inds, ListOfTuplesArrayIndexer):
+        return inds._npy_inds
+    raise TypeError("Given indices are not old style OpenMDAO indices.")
+
+
 # Since this is already user facing we'll leave it as is, and just use the output of
 # __getitem__ to initialize our Indexer object that will be used internally.
 class Slicer(object):
