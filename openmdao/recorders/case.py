@@ -119,11 +119,6 @@ class Case(object):
             self.parent = None
 
         self.counter = data['counter']
-        self.timestamp = data['timestamp']
-        self.success = data['success']
-        self.msg = data['msg']
-        self.major_iter = data['major_iter']
-        self.opt_progress = data['opt_progress']
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
@@ -512,25 +507,6 @@ class Case(object):
                               'settings have record_inputs set to True\n')
 
         return inputs
-
-    def list_progress(self):
-        """
-        Return and optionally log a list of input names and other optional information.
-
-        Parameters
-        ----------
-        val : bool, optional
-            When True, display/return input values. Default is True.
-
-        Returns
-        -------
-        list
-            List of input names and other optional information about those inputs.
-        """
-        # I NEED TO FIND A WAY TO LOOP THROUGH ALL THE CASES
-        opt_progress = json.loads(self.opt_progress)
-
-        print('Hello')
 
     def list_outputs(self,
                      explicit=True, implicit=True,
