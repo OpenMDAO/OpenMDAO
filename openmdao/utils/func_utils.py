@@ -18,41 +18,6 @@ from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.om_warnings import issue_warning
 
 
-def _get_annotations(func):
-    """
-    Retrieve annotation data for function inputs and return values.
-
-    Parameters
-    ----------
-    func : function
-        The function object.
-
-    Returns
-    -------
-    dict
-        Input metadata dictionary.
-    dict
-        Return value metadata dictionary.
-    """
-    annotations = getattr(func, '__annotations__', None)
-    inmeta = {}
-    outmeta = {}
-    if annotations is not None:
-        ret = None
-        # get input info
-        for name, meta in annotations.items():
-            if name == 'return':
-                ret = meta
-            else:
-                inmeta[name] = meta
-
-        if ret is not None:  # we have output annotations
-            for name, meta in ret:
-                outmeta[name] = meta
-
-    return inmeta, outmeta
-
-
 def _get_outnames_from_code(func):
     """
     Use ast to determine (if possible) the names of the given function's return values.
@@ -172,20 +137,28 @@ def get_func_info(func, comp_meta=None):
 
     sig = inspect.signature(func)
 
-    comp_shape = None if comp_meta is None else comp_meta['shape']
+    comp_units = None if comp_meta is None else comp_meta.get('units')
+    comp_shape = None if comp_meta is None else comp_meta.get('shape')
     if comp_shape is not None:
         comp_shape = shape2tuple(comp_shape)
 
     # first, retrieve inputs from the function signature
     for name, p in sig.parameters.items():
-        ins[name] = meta = {}
+        ins[name] = meta = {'val': None, 'units': comp_units}
         if p.annotation is not inspect.Parameter.empty:
             if isinstance(p.annotation, dict):
                 meta.update(p.annotation)
+                if comp_units is not None and 'units' in p.annotation:
+                    if comp_units != p.annotation['units']:
+                        raise ValueError(f"Input '{name}' has annotated units "
+                                         f"'{p.annotation['units']}', but units were specified as "
+                                         f"'{comp_units}' in the component.")
             else:
                 raise TypeError(f"Input '{name}' annotation should be a dict, but is type "
                                 f"'{type(p.annotation).__name__}'.")
-        meta['val'] = p.default if p.default is not inspect._empty else None
+        if p.default is not inspect._empty:
+            meta['val'] = p.default
+
         if meta['val'] is not None:
             if np.isscalar(meta['val']):
                 shape = ()

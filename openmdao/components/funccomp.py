@@ -6,12 +6,25 @@ try:
 except ImportError:
     jax = None
 
+import re
 import numpy as np
 from numpy import asarray, isscalar, ndarray, imag, complex as npcomplex
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.func_utils import get_func_info
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.units import valid_units
+
+
+# regex to check for variable names.
+namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
+
+# Names of metadata entries allowed for ExecComp variables.
+_allowed_meta = {'val', 'shape', 'units', 'res_units', 'desc',
+                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
+                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
+
+# Names that are not allowed for input or output variables (keywords for options)
+_disallowed_varnames = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
 
 
 _allowed_add_input_args = {
@@ -84,9 +97,9 @@ class ExplicitFuncComp(ExplicitComponent):
                                   'Default is None, which means shape may be provided for variables'
                                   ' individually.')
 
-        self.options.declare('shape_by_conn', types=bool, default=False,
-                             desc='If True, shape all inputs and outputs based on their '
-                                  'connection. Default is False.')
+        # self.options.declare('shape_by_conn', types=bool, default=False,
+        #                      desc='If True, shape all inputs and outputs based on their '
+        #                           'connection. Default is False.')
 
     def setup(self):
         """
@@ -94,6 +107,7 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         self._inmeta, self._outmeta = get_func_info(self._func, self.options)
         for name, meta in self._inmeta.items():
+            self._check_var_name(name)
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
             if kwargs['val'] is None:
                 kwargs['val'] = 1.0
@@ -105,6 +119,7 @@ class ExplicitFuncComp(ExplicitComponent):
                                    f"value in position {i} because it has no name.  Specify the "
                                    "name by returning a variable, for example 'return myvar', or "
                                    "include the name in the function's return value annotation.")
+            self._check_var_name(name)
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             self.add_output(name, **kwargs)
 
@@ -143,6 +158,15 @@ class ExplicitFuncComp(ExplicitComponent):
                     decl_partials(of=out, wrt=inp)
 
         super()._setup_partials()
+
+    def _check_var_name(self, name):
+        match = namecheck_rgx.match(name)
+        if match is None or match.group() != name:
+            raise NameError(f"{self.msginfo}: '{name}' is not a valid variable name." )
+
+        if name in _disallowed_varnames:
+            raise NameError(f"{self.msginfo}: cannot use variable name '{name}' because "
+                            "it's a reserved keyword.")
 
     def _compute_output_array(self, input_values, output_array):
         """

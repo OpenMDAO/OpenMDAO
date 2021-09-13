@@ -340,103 +340,97 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(C1._outputs['y'], 3.0, 0.00001)
 
-    # def test_units(self):
-    #     prob = om.Problem()
-    #     prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-    #     C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
-    #                                                     x={'val': 2.0, 'units': 'm'},
-    #                                                     y={'units': 'm'},
-    #                                                     z=2.0))
-    #     prob.model.connect('indep.x', 'C1.x')
+    def test_units(self):
+        prob = om.Problem()
 
-    #     prob.setup()
+        def func(x:{'units': 'm'}=2.0, z=2.0) -> [('y', {'units': 'm'})]:
+            y=x+z+1.
+            return y
 
-    #     prob.set_solver_print(level=0)
-    #     prob.run_model()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        prob.model.connect('indep.x', 'C1.x')
 
-    #     assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
+        prob.setup()
 
-    # def test_units_varname(self):
-    #     prob = om.Problem()
+        prob.set_solver_print(level=0)
+        prob.run_model()
 
-    #     with self.assertRaises(TypeError) as cm:
-    #         prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-    #                                                    x={'val': 2.0, 'units': 'm'},
-    #                                                    y={'units': 'm'},
-    #                                                    units=2.0))
+        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
 
-    #     self.assertEqual(str(cm.exception),
-    #                      "ExecComp: Value (2.0) of option 'units' has type 'float', "
-    #                      "but type 'str' was expected.")
+    def test_units_varname_str(self):
+        prob = om.Problem()
 
-    # def test_units_varname_str(self):
-    #     prob = om.Problem()
+        def func(x:{'units': 'm'}=2.0, units=2.0) -> [('y', {'units': 'm'})]:
+            y=x+units+1.
+            return y
 
-    #     with self.assertRaises(ValueError) as cm:
-    #         prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-    #                                                    x={'val': 2.0, 'units': 'm'},
-    #                                                    y={'units': 'm'},
-    #                                                    units='two'))
+        with self.assertRaises(ValueError) as cm:
+            prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, units='two'))
+        self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
 
-    #     self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
+    def test_units_varname_novalue(self):
+        prob = om.Problem()
 
-    # def test_units_varname_novalue(self):
-    #     prob = om.Problem()
-    #     prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-    #     C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
-    #                                                     x={'val': 2.0, 'units': 'm'},
-    #                                                     y={'units': 'm'}))
-    #     prob.model.connect('indep.x', 'C1.x')
+        def func(x:{'units': 'm'}=2.0, units=2.0) -> [('y', {'units': 'm'})]:
+            y=x+units+1.
+            return y
 
-    #     with self.assertRaises(NameError) as cm:
-    #         prob.setup()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        prob.model.connect('indep.x', 'C1.x')
 
-    #     self.assertEqual(str(cm.exception),
-    #                      "'C1' <class ExecComp>: cannot use variable name 'units' because it's a reserved keyword.")
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
 
-    # def test_common_units(self):
-    #     # all variables in the ExecComp have the same units
-    #     prob = om.Problem()
+        self.assertEqual(str(cm.exception),
+                         "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
 
-    #     prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-    #     prob.model.add_subsystem('comp', om.ExecComp('y=x+z+1.', units='m',
-    #                                                  x={'val': 2.0},
-    #                                                  z=2.0))
-    #     prob.model.connect('indep.x', 'comp.x')
+    def test_common_units(self):
+        # all variables in the ExecComp have the same units
+        prob = om.Problem()
 
-    #     prob.setup()
-    #     prob.run_model()
+        def func(x:{'val': 2.0}, z=2.0):
+            y=x+z+1.
+            return y
 
-    #     assert_near_equal(prob['comp.y'], 4.0, 0.00001)
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, units='m'))
+        prob.model.connect('indep.x', 'comp.x')
 
-    # def test_common_units_no_meta(self):
-    #     # make sure common units are assigned when no metadata is provided
-    #     prob = om.Problem()
+        prob.setup()
+        prob.run_model()
 
-    #     prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-    #     prob.model.add_subsystem('comp', om.ExecComp('y = x+1', units='m'))
+        assert_near_equal(prob['comp.y'], 4.0, 0.00001)
 
-    #     prob.model.connect('indep.x', 'comp.x')
+    def test_common_units_no_meta(self):
+        # make sure common units are assigned when no metadata is provided
+        prob = om.Problem()
 
-    #     prob.setup()
-    #     prob.run_model()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
+        prob.model.add_subsystem('comp', om.ExecComp('y = x+1', units='m'))
 
-    #     assert_near_equal(prob['comp.y'], 2001., 0.00001)
+        prob.model.connect('indep.x', 'comp.x')
 
-    # def test_conflicting_units(self):
-    #     prob = om.Problem()
-    #     prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-    #     C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
-    #                                                     x={'val': 2.0, 'units': 'km'},
-    #                                                     z=2.0))
-    #     prob.model.connect('indep.x', 'C1.x')
+        prob.setup()
+        prob.run_model()
 
-    #     with self.assertRaises(RuntimeError) as cm:
-    #         prob.setup()
+        assert_near_equal(prob['comp.y'], 2001., 0.00001)
 
-    #     self.assertEqual(str(cm.exception),
-    #                      "'C1' <class ExecComp>: units of 'km' have been specified for variable 'x', but "
-    #                      "units of 'm' have been specified for the entire component.")
+    def test_conflicting_units(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
+                                                        x={'val': 2.0, 'units': 'km'},
+                                                        z=2.0))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "'C1' <class ExecComp>: units of 'km' have been specified for variable 'x', but "
+                         "units of 'm' have been specified for the entire component.")
 
     def test_shape_and_value(self):
         p = om.Problem()
