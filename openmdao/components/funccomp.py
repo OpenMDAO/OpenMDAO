@@ -7,8 +7,10 @@ except ImportError:
     jax = None
 
 import numpy as np
+from numpy import asarray, isscalar, ndarray, imag, complex as npcomplex
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.func_utils import get_func_info
+from openmdao.core.constants import INT_DTYPE
 
 
 _allowed_add_input_args = {
@@ -20,10 +22,6 @@ _allowed_add_output_args = {
     'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
     'shape_by_conn', 'copy_shape', 'distributed',
 }
-
-
-def _isscalar(meta):
-    pass
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -55,7 +53,17 @@ class ExplicitFuncComp(ExplicitComponent):
         self._func = func
         self._inmeta = None
         self._outmeta = None
-        self._scalar_outs = []
+        # if complex step is used for derivatives, this is the stepsize
+        self.complex_stepsize = 1.e-40
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('has_diag_partials', types=bool, default=False,
+                             desc='If True, treat all array/array partials as diagonal if both '
+                                  'arrays have size > 1. All arrays with size > 1 must have the '
+                                  'same flattened size or an exception will be raised.')
 
     def setup(self):
         """
@@ -64,17 +72,75 @@ class ExplicitFuncComp(ExplicitComponent):
         self._inmeta, self._outmeta = get_func_info(self._func)
         for name, meta in self._inmeta.items():
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
+            if kwargs['val'] is None:
+                kwargs['val'] = 1.0
             self.add_input(name, **kwargs)
 
-        for name, meta in self._outmeta.items():
+        for i, (name, meta) in enumerate(self._outmeta.items()):
+            if name is None:
+                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return value in position "
+                                   f"{i} because it has no name.  Specify the name by returning a variable, for "
+                                   f"example 'return myvar', or include the name in the function's return value "
+                                   "annotation.")
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             self.add_output(name, **kwargs)
 
-    def setup_partials(self):
+    def _setup_partials(self):
         """
-        Set up our partial derivative sparsity.
+        Check that all partials are declared.
         """
-        pass
+        meta = self._var_rel2meta
+        decl_partials = super().declare_partials
+        hasdiag = self.options['has_diag_partials']
+        for i, (out, ometa) in enumerate(sorted(self._outmeta.items(), key=lambda x: x[0])):
+            oshp = ometa['shape']
+            if not oshp:
+                osize = 1
+            else:
+                osize = np.product(oshp) if isinstance(oshp, tuple) else oshp
+
+            inds = np.arange(osize, dtype=INT_DTYPE)
+            for inp, imeta in self._inmeta.items():
+                if hasdiag:
+                    ishp = imeta['shape']
+                    if not ishp:
+                        isize = 1
+                    else:
+                        isize = np.product(ishp) if isinstance(oshp, tuple) else ishp
+                    if osize != isize:
+                        raise RuntimeError(f"{self.msginfo}: has_diag_partials is True but "
+                                           f"partial({out}, {inp}) is not square "
+                                           f"(shape=({osize}, {isize})).")
+                    # partial will be declared as diagonal
+                    if osize > 1:
+                        decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                    else:
+                        decl_partials(of=out, wrt=inp)
+                else:
+                    decl_partials(of=out, wrt=inp)
+
+        super()._setup_partials()
+
+    def _compute_output_array(self, input_values, output_array):
+        """
+        Fill the given output array with our function result based on the given input values.
+
+        Parameters
+        ----------
+        input_values : tuple of ndarrays or floats
+            Unscaled, dimensional input variables.
+        output_array
+            The output array being filled.
+        """
+        start = end = 0
+        outs = self._func(*input_values)
+        if not isinstance(outs, tuple):
+            outs = (outs,)
+        for o in outs:
+            a = asarray(o) if isscalar(o) else o
+            end += a.size
+            output_array[start:end] = a.flat
+            start = end
 
     def compute(self, inputs, outputs):
         """
@@ -87,14 +153,74 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        outs = self._func(*inputs.values())
-        arr = outputs.asarray()
-        start = end = 0
-        for o in outs:
-            a = np.asarray(o)
-            end += a.size
-            arr[start:end] = a.flat
-            start = end
+        # this will update the outputs array in place
+        self._compute_output_array(inputs.values(), outputs.asarray())
+
+    def compute_partials(self, inputs, partials):
+        """
+        Use complex step method to update the given Jacobian.
+
+        Parameters
+        ----------
+        inputs : `VecWrapper`
+            `VecWrapper` containing parameters (p).
+        partials : `Jacobian`
+            Contains sub-jacobians.
+        """
+        step = self.complex_stepsize * 1j
+        inv_stepsize = 1.0 / self.complex_stepsize
+        has_diag_partials = self.options['has_diag_partials']
+
+        in_vals = [np.asarray(v, dtype=npcomplex) for v in inputs.values()]
+        result = np.zeros(len(self._outputs), dtype=npcomplex)
+        out_slices = self._outputs.get_slice_dict()
+
+        for ivar, inp in enumerate(inputs._abs_iter()):
+
+            if has_diag_partials or in_vals[ivar].size == 1:
+                # set a complex input value
+                in_vals[ivar] += step
+
+                # solve with complex input value
+                self._compute_output_array(in_vals, result)
+
+                for u, slc in out_slices.items():
+                    if (u, inp) in self._subjacs_info:
+                        partials[(u, inp)] = np.diag(imag(result[slc] * inv_stepsize))
+
+                # restore old input value
+                in_vals[ivar] -= step
+            else:
+                pval = in_vals[ivar]
+                if np.isscalar(pval):
+                    # set a complex input value
+                    in_vals[ivar] += step
+
+                    # solve with complex input value
+                    self._compute_output_array(in_vals, result)
+
+                    for u, slc in out_slices.items():
+                        if (u, inp) in self._subjacs_info:
+                            # set the column in the Jacobian entry
+                            partials[(u, inp)][:, i] = imag(result[slc] * inv_stepsize)
+
+                    # restore old input value
+                    in_vals[ivar] -= step
+                else:
+                    for i in range(pval.size):
+                        # set a complex input value
+                        in_vals[ivar].flat[i] += step
+
+                        # solve with complex input value
+                        self._compute_output_array(in_vals, result)
+
+                        for u, slc in out_slices.items():
+                            if (u, inp) in self._subjacs_info:
+                                # set the column in the Jacobian entry
+                                partials[(u, inp)][:, i] = imag(result[slc] * inv_stepsize)
+
+                        # restore old input value
+                        in_vals[ivar].flat[i] -= step
 
 
 if __name__ == '__main__':

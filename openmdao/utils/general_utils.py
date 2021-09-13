@@ -4,7 +4,6 @@ import os
 import re
 import sys
 import warnings
-import unittest
 from fnmatch import fnmatchcase
 from io import StringIO
 from numbers import Number
@@ -325,6 +324,7 @@ def set_pyoptsparse_opt(optname, fallback=True):
         OPT = OPTIMIZER = None
 
     if not fallback and OPTIMIZER != optname:
+        import unittest
         raise unittest.SkipTest("pyoptsparse is not providing %s" % optname)
 
     return OPT, OPTIMIZER

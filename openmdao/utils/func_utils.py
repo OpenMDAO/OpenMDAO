@@ -4,6 +4,7 @@ Utilities for working with function objects or function source code.
 
 try:
     import jax
+    import jax.numpy as jnp
 except ImportError:
     jax = None
 
@@ -12,9 +13,9 @@ import ast
 import textwrap
 import numpy as np
 
-from openmdao.utils.code_utils import _ReturnNamesCollector
+from openmdao.utils.code_utils import get_function_deps
 from openmdao.utils.general_utils import shape2tuple
-from openmdao.utils.om_warnings import issue_warning, OpenMDAOWarning
+from openmdao.utils.om_warnings import issue_warning
 
 
 def _get_annotations(func):
@@ -77,6 +78,60 @@ def _get_outnames_from_code(func):
     return scanner._ret_names
 
 
+def compute_out_shapes(func, ins, outs):
+    need_shape = False
+    for ometa in outs.values():
+        try:
+            ometa['shape']
+        except KeyError:
+            need_shape = True
+            break
+
+    args = []
+    for name, meta in ins.items():
+        if meta['val'] is not None:
+            args.append(meta['val'])
+        else:
+            try:
+                shp = meta['shape']
+            except KeyError:
+                raise RuntimeError(f"Can't determine shape of input '{name}'.")
+            if jax is not None:
+                args.append(jax.ShapedArray(shape2tuple(shp), dtype=np.float64))
+
+    if need_shape:  # output shapes weren't provided by annotations
+        if jax is None:
+            raise RuntimeError("Some return values have unknown shape, and jax is required to "
+                               "(possibly) determine the output shapes based on the input shapes, "
+                               "but jax was not found.  Either install jax (pip install jax), or "
+                               "add return value annotations that define the shapes of the "
+                               "return values.")
+
+    if jax is not None:  # compute shapes as a check against annotated value (if any)
+        if 'np' in func.__globals__:
+            func.__globals__['np'] = jnp
+        try:
+            v = jax.make_jaxpr(func)(*args)
+        except Exception as err:
+            if need_shape:
+                raise RuntimeError("Jax failed to determine the output shapes based on the input "
+                                   f"shapes. The error was: {err}.")
+            issue_warning("Jax failed to determine the output shapes based on the input "
+                            "shapes in order to check the provided annotated values.  The jax "
+                            f"error was: {err}.")
+        else:
+            for val, name in zip(v.out_avals, outs):
+                oldshape = outs[name].get('shape')
+                if oldshape is not None and oldshape != val.shape:
+                    raise RuntimeError(f"Annotated shape for return value '{name}' of {oldshape} "
+                                       f"doesn't match computed shape of {val.shape}.")
+                outs[name]['shape'] = val.shape
+        finally:
+            if 'np' in func.__globals__:
+                func.__globals__['np'] = np
+
+
+
 def get_func_info(func):
     """
     Retrieve metadata associated with function inputs and return values.
@@ -102,31 +157,37 @@ def get_func_info(func):
     # functions defined with regular numpy stuff internally will still work.
     ins = {}
 
+    sig = inspect.signature(func)
+
     # first, retrieve inputs from the function signature
-    params = inspect.signature(func).parameters
-    for name, p in params.items():
+    for name, p in sig.parameters.items():
         ins[name] = meta = {}
+        if p.annotation is not inspect.Parameter.empty:
+            if isinstance(p.annotation, dict):
+                meta.update(p.annotation)
+            else:
+                raise TypeError(f"Input '{name}' annotation should be a dict, but is type "
+                                f"'{type(p.annotation).__name__}'.")
         meta['val'] = p.default if p.default is not inspect._empty else None
         if meta['val'] is not None:
             if np.isscalar(meta['val']):
-                meta['shape'] = ()
+                shape = ()
             else:
-                meta['shape'] = meta['val'].shape
+                shape = meta['val'].shape
+            if 'shape' in meta and meta['shape'] != shape:
+                raise ValueError(f"Input '{name}' default value has shape {shape}, but shape "
+                                 f"was specified as {meta['shape']} in annotation.")
 
-    # grab any annotations
-    inmeta, outmeta = _get_annotations(func)
-    for name, meta in inmeta.items():
-        if name in ins:
-            m = ins[name]
-            m.update(meta)
-        else:
-            ins[name] = meta
+    outmeta = {}
+    if sig.return_annotation is not inspect.Signature.empty:
+        outmeta.update(sig.return_annotation)
 
-    # Parse the function code to possibly identify the names of the return values.
-    # This only succeeds if simple varible names are returned, e.g.,   return a, b, c
+    # Parse the function code to possibly identify the names of the return values and input/output
+    # dependencies. Return names will be non-None only if they are simple name, e.g.,
+    #  return a, b, c
     outlist = []
     try:
-        onames = _get_outnames_from_code(func)
+        ret_info = get_function_deps(func)
     except RuntimeError:
         #  this could happen if function is compiled or has multiple return lines
         if not outmeta:
@@ -136,12 +197,12 @@ def get_func_info(func):
                       "return values matches number of return value annotations.")
         outlist = list(outmeta.items())
     else:
-        for o in onames:
+        for o, deps in ret_info:
             if o is not None and '.' in o:  # don't allow dots in return value names
                 issue_warning(f"Ignoring return name '{o}' because names containing '.' are not "
                               "supported.")
                 o = None
-            outlist.append([o, {}])
+            outlist.append([o, {'deps': deps}])
 
     notfound = []
     for i, (oname, ometa) in enumerate(outmeta.items()):
@@ -168,50 +229,6 @@ def get_func_info(func):
 
     outs = {n: m for n, m in outlist}
 
-    need_shape = not outmeta
-    for ometa in outs.values():
-        try:
-            ometa['shape']
-        except KeyError:
-            need_shape = True
-            break
-
-    args = []
-    for name, meta in ins.items():
-        if meta['val'] is not None:
-            args.append(meta['val'])
-        else:
-            try:
-                shp = meta['shape']
-            except KeyError:
-                raise RuntimeError(f"Can't determine shape of input '{name}'.")
-            if jax is not None:
-                args.append(jax.ShapedArray(shape2tuple(shp), dtype=np.float32))
-
-    if need_shape:  # output shapes weren't provided by annotations
-        if jax is None:
-            raise RuntimeError("Some return values have unknown shape, and jax is required to "
-                               "(possibly) determine the output shapes based on the input shapes, "
-                               "but jax was not found.  Either install jax (pip install jax), or "
-                               "add return value annotations that define the shapes of the "
-                               "return values.")
-
-    if jax is not None:  # compute shapes as a check against annotated value (if any)
-        try:
-            v = jax.make_jaxpr(func)(*args)
-        except Exception as err:
-            if need_shape:
-                raise RuntimeError("Jax failed to determine the output shapes based on the input "
-                                   f"shapes. The error was: {err}.")
-            issue_warning("Jax failed to determine the output shapes based on the input "
-                            "shapes in order to check the provided annotated values.  The jax "
-                            f"error was: {err}.")
-        else:
-            for val, name in zip(v.out_avals, outs):
-                oldshape = outs[name].get('shape')
-                if oldshape is not None and oldshape != val.shape:
-                    raise RuntimeError(f"Annotated shape for return value '{name}' of {oldshape} "
-                                       f"doesn't match computed shape of {val.shape}.")
-                outs[name]['shape'] = val.shape
+    compute_out_shapes(func, ins, outs)
 
     return ins, outs

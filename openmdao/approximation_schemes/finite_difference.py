@@ -413,11 +413,10 @@ class FiniteDifference(ApproximationScheme):
             system.run_apply_nonlinear()
             self._results_tmp[:] = system._residuals.asarray()
 
-        system._residuals.set_val(self._starting_resids)
-
         # save results and restore starting inputs/outputs
         system._inputs.set_val(self._starting_ins)
         system._outputs.set_val(self._starting_outs)
+        system._residuals.set_val(self._starting_resids)
 
         return self._results_tmp
 
