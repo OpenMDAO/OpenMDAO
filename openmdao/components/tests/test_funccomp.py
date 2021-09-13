@@ -387,7 +387,7 @@ class TestFuncComp(unittest.TestCase):
                          "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
 
     def test_common_units(self):
-        # all variables in the ExecComp have the same units
+        # all variables in the ExplicitFuncComp have the same units
         prob = om.Problem()
 
         def func(x:{'val': 2.0}, z=2.0):
@@ -407,8 +407,12 @@ class TestFuncComp(unittest.TestCase):
         # make sure common units are assigned when no metadata is provided
         prob = om.Problem()
 
+        def func(x=2.0):
+            y=x+1.
+            return y
+
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', om.ExecComp('y = x+1', units='m'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, units='m'))
 
         prob.model.connect('indep.x', 'comp.x')
 
@@ -419,10 +423,13 @@ class TestFuncComp(unittest.TestCase):
 
     def test_conflicting_units(self):
         prob = om.Problem()
+
+        def func(x:{'val': 2.0, 'units': 'km'}, z=2.0):
+            y=x+z+1.
+            return y
+
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
-                                                        x={'val': 2.0, 'units': 'km'},
-                                                        z=2.0))
+        prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, units='m'))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(RuntimeError) as cm:
@@ -452,9 +459,10 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
-                                                x={'shape': (5,), 'val': 5},
-                                                y={'shape': (5,)}))
+        def func(x:{'shape': (5,), 'val': 5}):
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -467,7 +475,10 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,)))
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
 
         p.setup()
         p.run_model()
@@ -480,9 +491,10 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                                x={'val': np.zeros(5)},
-                                                y={'val': np.zeros(5)}))
+        def func(x:{'val': np.zeros(5)}):
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
 
         p.setup()
         p.run_model()
@@ -495,8 +507,10 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                                y={'shape': (10,)}))
+        def func(x) -> [('y', {'shape': (10,)})]:
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -509,8 +523,10 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                                x={'val': 5}))
+        def func(x:{'val': 5}):
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -541,9 +557,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_array(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x[1]',
-                                                        x=np.array([1., 2., 3.]),
-                                                        y=0.0))
+        def func(x=np.array([1., 2., 3.])):
+            y=x[1]
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -560,9 +577,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_array_lhs(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp(['y[0]=x[1]', 'y[1]=x[0]'],
-                                                        x=np.array([1., 2., 3.]),
-                                                        y=np.array([0., 0.])))
+        def func(x=np.array([1., 2., 3.])):
+            y=np.array([x[1], x[0]])
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -610,7 +628,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_complex_step(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp(['y=2.0*x+1.'], x=2.0))
+        def func(x=2.0):
+            y =2.0*x+1.
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -631,7 +652,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_complex_step2(self):
         prob = om.Problem(om.Group())
-        prob.model.add_subsystem('comp', om.ExecComp('y=x*x + x*2.0', x=2.0))
+        def func(x=2.0):
+            y=x*x + x*2.0
+            return y
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='fwd')
@@ -648,7 +672,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_complex_step(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*abs(x)', x=-2.0))
+        def func(x=-2.0):
+            y=2.0*abs(x)
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -671,7 +698,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_arctan_complex_step(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*arctan2(y, x)', x=np.array([1+2j]), y=1))
+        def func(x=np.array([1+2j])):
+            y=2.0*arctan2(y, x)
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -681,8 +711,10 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_array_complex_step(self):
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*abs(x)',
-                                                        x=np.ones(3)*-2.0, y=np.zeros(3)))
+        def func(x=np.ones(3)*-2.0):
+            y=2.0*abs(x)
+            return y
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -768,8 +800,13 @@ class TestFuncComp(unittest.TestCase):
         # with has_diag_partials set to the default of False and just scalars
         p = om.Problem()
         model = p.model
-        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],x1=1.0, x2=2.0)
-        model.add_subsystem('comp', comp)
+
+        def func(x1=1.0, x2=2.0):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func))
         p.setup()
         p.final_setup()
 
@@ -795,9 +832,13 @@ class TestFuncComp(unittest.TestCase):
         # make sure this works with arrays and when has_diag_partials is the default of False
         p = om.Problem()
         model = p.model
-        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'],
-                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5))
-        model.add_subsystem('comp', comp)
+
+        def func2(x1=np.ones(5), x2=np.ones(5)):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func2))
         p.setup()
         p.final_setup()
 
@@ -814,9 +855,13 @@ class TestFuncComp(unittest.TestCase):
         # with has_diag_partials True to make sure that still works with arrays
         p = om.Problem()
         model = p.model
-        comp = om.ExecComp(['y1=2.0*x1+1.', 'y2=3.0*x2-1.'], has_diag_partials=True,
-                           x1=np.ones(5), y1=np.ones(5), x2=np.ones(5), y2=np.ones(5) )
-        model.add_subsystem('comp', comp)
+
+        def func3(x1=np.ones(5), x2=np.ones(5)):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func3, has_diag_partials=True))
         p.setup()
         p.final_setup()
 
@@ -861,9 +906,11 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
-                                                has_diag_partials=True,
-                                                x=np.ones(5), y=np.ones(5)))
+        def func(x=np.ones(5)):
+            y=3.0*x + 2.5
+            return y
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=True))
 
         p.setup()
 
