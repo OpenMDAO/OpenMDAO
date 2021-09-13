@@ -262,6 +262,7 @@ class _FuncDepCollector(ast.NodeVisitor):
     _ret_info : list
         List containing name (or None) for each function return value.
     """
+
     def __init__(self, func):
         super().__init__()
         self._attrs = None
@@ -379,16 +380,6 @@ def get_function_deps(func):
 
 
 if __name__ == '__main__':
-    # import openmdao.api as om
+    import openmdao.api as om
 
-    # get_nested_calls(om.LinearBlockGS, 'solve')
-
-    def f(a, b, c):
-        d = a * 2.
-        e = d * sin(b)
-        f = e * c
-        return sin(e), f
-
-    deps = get_function_deps(f)
-    import pprint
-    pprint.pprint(deps)
+    get_nested_calls(om.LinearBlockGS, 'solve')

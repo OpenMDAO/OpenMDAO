@@ -53,8 +53,6 @@ class OptionsDictionary(object):
         If True, no options can be set after declaration.
     _all_recordable : bool
         Flag to determine if all options in UserOptions are recordable.
-    _deprecation_warning_issued : list
-        Option names that are deprecated and a warning has been issued for their use.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -66,8 +64,6 @@ class OptionsDictionary(object):
         self._read_only = read_only
 
         self._all_recordable = True
-
-        self._deprecation_warning_issued = []
 
     def __getstate__(self):
         """
@@ -217,10 +213,9 @@ class OptionsDictionary(object):
             The type of the exception to be raised.
         """
         if self._parent_name is None:
-            full_msg = msg
-        else:
-            full_msg = '{}: {}'.format(self._parent_name, msg)
-        raise exc_type(full_msg)
+            raise exc_type(msg)
+
+        raise exc_type(f"{self._parent_name}: {msg}")
 
     def _assert_valid(self, name, value):
         """
@@ -238,49 +233,41 @@ class OptionsDictionary(object):
             The default or user-set value to check for value, type, lower, and upper.
         """
         meta = self._dict[name]
-        values = meta['values']
-        types = meta['types']
-        lower = meta['lower']
-        upper = meta['upper']
 
         if not (value is None and meta['allow_none']):
+            values = meta['values']
+            lower = meta['lower']
+            upper = meta['upper']
+            types = meta['types']
+
             # If only values is declared
             if values is not None:
                 if value not in values:
                     if isinstance(value, str):
-                        value = "'{}'".format(value)
-                    self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
-                                                                                     values),
+                        value = f"'{value}'"
+                    self._raise(f"Value ({value}) of option '{name}' is not one of {values}.",
                                 ValueError)
             # If only types is declared
-            elif types is not None:
-                if not isinstance(value, types):
-                    vtype = type(value).__name__
+            elif types is not None and not isinstance(value, types):
+                vtype = type(value).__name__
 
-                    if isinstance(value, str):
-                        value = "'{}'".format(value)
+                if isinstance(value, str):
+                    value = f"'{value}'"
 
-                    if isinstance(types, (set, tuple, list)):
-                        typs = tuple([type_.__name__ for type_ in types])
-                        self._raise("Value ({}) of option '{}' has type '{}', but one of "
-                                    "types {} was expected.".format(value, name, vtype, typs),
-                                    exc_type=TypeError)
-                    else:
-                        self._raise("Value ({}) of option '{}' has type '{}', but type '{}' "
-                                    "was expected.".format(value, name, vtype, types.__name__),
-                                    exc_type=TypeError)
+                if isinstance(types, (set, tuple, list)):
+                    typs = tuple([type_.__name__ for type_ in types])
+                    self._raise(f"Value ({value}) of option '{name}' has type '{vtype}', but one "
+                                f"of types {typs} was expected.", exc_type=TypeError)
+                else:
+                    self._raise(f"Value ({value}) of option '{name}' has type '{vtype}', but type "
+                                f"'{types.__name__}' was expected.", exc_type=TypeError)
 
-            if upper is not None:
-                if value > upper:
-                    self._raise("Value ({}) of option '{}' "
-                                "exceeds maximum allowed value of {}.".format(value, name, upper),
-                                exc_type=ValueError)
-            if lower is not None:
-                if value < lower:
-                    self._raise("Value ({}) of option '{}' "
-                                "is less than minimum allowed value of {}.".format(value, name,
-                                                                                   lower),
-                                exc_type=ValueError)
+            if upper is not None and value > upper:
+                self._raise(f"Value ({value}) of option '{name}' exceeds maximum allowed value of "
+                            f"{upper}.", exc_type=ValueError)
+            if lower is not None and value < lower:
+                self._raise(f"Value ({value}) of option '{name}' is less than minimum allowed "
+                            f"value of {lower}.", exc_type=ValueError)
 
         # General function test
         if meta['check_valid'] is not None:
@@ -325,15 +312,15 @@ class OptionsDictionary(object):
             during __setitem__ and __getitem__.
         """
         if values is not None and not isinstance(values, (set, list, tuple)):
-            self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
-                        " list, or tuple - not %s." % (name, values), exc_type=TypeError)
+            self._raise(f"In declaration of option '{name}', the 'values' arg must be of type None,"
+                        f" list, or tuple - not {values}.", exc_type=TypeError)
 
         if types is not None and not isinstance(types, (type, set, list, tuple)):
-            self._raise("In declaration of option '%s', the 'types' arg must be None, a type "
-                        "or a tuple - not %s." % (name, types), exc_type=TypeError)
+            self._raise(f"In declaration of option '{name}', the 'types' arg must be None, a type "
+                        f"or a tuple - not {types}.", exc_type=TypeError)
 
         if types is not None and values is not None:
-            self._raise("'types' and 'values' were both specified for option '%s'." % name)
+            self._raise(f"'types' and 'values' were both specified for option '{name}'.")
 
         if types is bool:
             values = (True, False)
@@ -359,6 +346,7 @@ class OptionsDictionary(object):
             'allow_none': allow_none,
             'recordable': recordable,
             'deprecation': deprecation,
+            'need_deprecation': deprecation is not None,
         }
 
         # If a default is given, check for validity
@@ -431,15 +419,15 @@ class OptionsDictionary(object):
             meta = self._dict[name]
         except KeyError:
             # The key must have been declared.
-            msg = "Option '{}' cannot be set because it has not been declared."
-            self._raise(msg.format(name), exc_type=KeyError)
+            self._raise(f"Option '{name}' cannot be set because it has not been declared.",
+                        exc_type=KeyError)
 
-        if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
+        if meta['need_deprecation']:
             warn_deprecation(meta['deprecation'])
-            self._deprecation_warning_issued.append(name)
+            meta['need_deprecation'] = False
 
         if self._read_only:
-            self._raise("Tried to set read-only option '{}'.".format(name), exc_type=KeyError)
+            self._raise(f"Tried to set read-only option '{name}'.", exc_type=KeyError)
 
         self._assert_valid(name, value)
 
@@ -463,15 +451,16 @@ class OptionsDictionary(object):
         # If the option has been set in this system, return the set value
         try:
             meta = self._dict[name]
-            if meta['deprecation'] is not None and name not in self._deprecation_warning_issued:
-                warn_deprecation(meta['deprecation'])
-                self._deprecation_warning_issued.append(name)
-            if meta['has_been_set']:
-                return meta['val']
-            else:
-                self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)
+            self._raise(f"Option '{name}' cannot be found", exc_type=KeyError)
+
+        if meta['need_deprecation']:
+            warn_deprecation(meta['deprecation'])
+            meta['need_deprecation'] = False
+        if meta['has_been_set']:
+            return meta['val']
+        else:
+            self._raise(f"Option '{name}' is required but has not been set.")
 
     def items(self):
         """

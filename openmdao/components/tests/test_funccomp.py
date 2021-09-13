@@ -298,7 +298,7 @@ else:
     }
 
 
-class TestExecComp(unittest.TestCase):
+class TestFuncComp(unittest.TestCase):
 
     def test_mixed_type(self):
         prob = om.Problem()
@@ -588,7 +588,7 @@ class TestExecComp(unittest.TestCase):
         def func(x:{'shape': 2}):
             y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
             return y
-        
+
         prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.setup()
@@ -742,7 +742,7 @@ class TestExecComp(unittest.TestCase):
         # run with has_diag_partials=False
         p = om.Problem()
         model = p.model
-        
+
         def func(x:{'shape': 5}):
             y=3.0*x + 2.5
             return y

@@ -79,6 +79,18 @@ def _get_outnames_from_code(func):
 
 
 def compute_out_shapes(func, ins, outs):
+    """
+    Compute the shapes of outputs based on those of the inputs.
+
+    Parameters
+    ----------
+    func : function
+        The function whose outputs' shapes will be determined.
+    ins : dict
+        Dict of input metadata containing input shapes.
+    outs : dict
+        Dict of output metadata that will be updated with shape information.
+    """
     need_shape = False
     for ometa in outs.values():
         try:
@@ -117,8 +129,8 @@ def compute_out_shapes(func, ins, outs):
                 raise RuntimeError("Jax failed to determine the output shapes based on the input "
                                    f"shapes. The error was: {err}.")
             issue_warning("Jax failed to determine the output shapes based on the input "
-                            "shapes in order to check the provided annotated values.  The jax "
-                            f"error was: {err}.")
+                          "shapes in order to check the provided annotated values.  The jax "
+                          f"error was: {err}.")
         else:
             for val, name in zip(v.out_avals, outs):
                 oldshape = outs[name].get('shape')
@@ -131,8 +143,7 @@ def compute_out_shapes(func, ins, outs):
                 func.__globals__['np'] = np
 
 
-
-def get_func_info(func):
+def get_func_info(func, comp_meta=None):
     """
     Retrieve metadata associated with function inputs and return values.
 
@@ -145,6 +156,8 @@ def get_func_info(func):
     ----------
     func : function
         The function to be queried for input and return value info.
+    comp_meta : dict or None
+        Dict containing component wide options like shape and units.
 
     Returns
     -------
@@ -158,6 +171,10 @@ def get_func_info(func):
     ins = {}
 
     sig = inspect.signature(func)
+
+    comp_shape = None if comp_meta is None else comp_meta['shape']
+    if comp_shape is not None:
+        comp_shape = shape2tuple(comp_shape)
 
     # first, retrieve inputs from the function signature
     for name, p in sig.parameters.items():
@@ -174,9 +191,25 @@ def get_func_info(func):
                 shape = ()
             else:
                 shape = meta['val'].shape
-            if 'shape' in meta and meta['shape'] != shape:
-                raise ValueError(f"Input '{name}' default value has shape {shape}, but shape "
-                                 f"was specified as {meta['shape']} in annotation.")
+            meta_shape = meta['shape'] if 'shape' in meta else shape
+            cmpshape = shape if comp_shape is None else comp_shape
+            shapes = set([shape, meta_shape, cmpshape])
+
+            if len(shapes) > 1:
+                if shape != meta_shape:
+                    raise ValueError(f"Input '{name}' default value has shape {shape}, but shape "
+                                     f"was specified as {meta_shape} in annotation.")
+                if cmpshape != shape:
+                    raise ValueError(f"Input '{name}' default value has shape {shape}, but shape "
+                                     f"was specified as {cmpshape} in the component.")
+            meta['shape'] = shape
+        else:
+            if comp_shape is not None:
+                if'shape' not in meta or meta['shape'] is None:
+                    meta['shape'] = comp_shape
+                elif comp_shape != meta['shape']:
+                    raise ValueError(f"Input '{name}' has annotated shape {meta['shape']}, but "
+                                     f"shape was specified as {comp_shape} in the component.")
 
     outmeta = {}
     if sig.return_annotation is not inspect.Signature.empty:

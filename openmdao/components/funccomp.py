@@ -11,6 +11,7 @@ from numpy import asarray, isscalar, ndarray, imag, complex as npcomplex
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.func_utils import get_func_info
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.units import valid_units
 
 
 _allowed_add_input_args = {
@@ -22,6 +23,11 @@ _allowed_add_output_args = {
     'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
     'shape_by_conn', 'copy_shape', 'distributed',
 }
+
+
+def _check_units_option(option, value):
+    if value is not None and not valid_units(value):
+        raise ValueError(f"The units '{value}' are invalid.")
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -43,6 +49,8 @@ class ExplicitFuncComp(ExplicitComponent):
         Function input metadata.
     _outmeta : dict
         Function return value metadata.
+    complex_stepsize : float
+        Step size used for complex step.
     """
 
     def __init__(self, func, **kwargs):
@@ -65,11 +73,26 @@ class ExplicitFuncComp(ExplicitComponent):
                                   'arrays have size > 1. All arrays with size > 1 must have the '
                                   'same flattened size or an exception will be raised.')
 
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means units may be provided for variables'
+                                  ' individually.',
+                             check_valid=_check_units_option)
+
+        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
+                             desc='Shape to be assigned to all variables in this component. '
+                                  'Default is None, which means shape may be provided for variables'
+                                  ' individually.')
+
+        self.options.declare('shape_by_conn', types=bool, default=False,
+                             desc='If True, shape all inputs and outputs based on their '
+                                  'connection. Default is False.')
+
     def setup(self):
         """
         Define out inputs and outputs.
         """
-        self._inmeta, self._outmeta = get_func_info(self._func)
+        self._inmeta, self._outmeta = get_func_info(self._func, self.options)
         for name, meta in self._inmeta.items():
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
             if kwargs['val'] is None:
@@ -78,10 +101,10 @@ class ExplicitFuncComp(ExplicitComponent):
 
         for i, (name, meta) in enumerate(self._outmeta.items()):
             if name is None:
-                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return value in position "
-                                   f"{i} because it has no name.  Specify the name by returning a variable, for "
-                                   f"example 'return myvar', or include the name in the function's return value "
-                                   "annotation.")
+                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
+                                   f"value in position {i} because it has no name.  Specify the "
+                                   "name by returning a variable, for example 'return myvar', or "
+                                   "include the name in the function's return value annotation.")
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
             self.add_output(name, **kwargs)
 
@@ -186,7 +209,7 @@ class ExplicitFuncComp(ExplicitComponent):
 
                 for u, slc in out_slices.items():
                     if (u, inp) in self._subjacs_info:
-                        partials[(u, inp)] = np.diag(imag(result[slc] * inv_stepsize))
+                        partials[(u, inp)] = imag(result[slc] * inv_stepsize)
 
                 # restore old input value
                 in_vals[ivar] -= step
