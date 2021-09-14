@@ -4,10 +4,11 @@ import numpy as np
 from dymos.examples.hyper_sensitive.hyper_sensitive_ode import HyperSensitiveODE
 import subprocess
 import json
-import os
+import os, signal
 import time
+# from openmdao.visualization.dash_server import shut_this_down
 
-subprocess.Popen(["python", "server.py"])
+server_start = subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
 time.sleep(4)
 
 def solution():
@@ -69,16 +70,3 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 
 dm.run_problem(p)
 
-# if os.path.exists("cases.sql"):
-#     cr = om.CaseReader("cases.sql")
-#     cases = cr.get_cases()
-
-#     opt_data = {}
-#     for case in cases:
-#         if hasattr(case, 'opt_progress') and "{}" not in case.opt_progress:
-#             data = json.loads(case.opt_progress)
-#             for key, val in data.items():
-#                 if key not in opt_data:
-#                     opt_data[key] = [val]
-#                 else:
-#                     opt_data[key].append(val)

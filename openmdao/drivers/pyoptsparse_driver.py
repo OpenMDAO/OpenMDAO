@@ -476,6 +476,8 @@ class pyOptSparseDriver(Driver):
             if not self._exc_info:
                 raise()
 
+        self.opt_status = 1
+
         if self._exc_info:
             raise self._exc_info
 
