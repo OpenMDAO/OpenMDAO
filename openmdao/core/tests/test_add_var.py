@@ -46,7 +46,8 @@ class CompAddWithIndices(om.ExplicitComponent):
         with assert_warning(OMDeprecationWarning, "<model> <class CompAddWithIndices>:"
                             " When specifying src_indices for input 'x_b': 'src_indices=(0, 1)'"
                             " is specified in a deprecated format. In a future release,"
-                            " 'src_indices' will be expected to use NumPy array indexing."):
+                            " 'src_indices' will be expected to use NumPy array indexing, "  
+                            "so replace the existing src_indices with [0, 1]."):
             self.add_input('x_b', src_indices=(0, 1))
         self.add_input('x_c', src_indices=[0, 1])
         self.add_input('x_d', src_indices=np.arange(6))
