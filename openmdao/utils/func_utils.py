@@ -43,7 +43,7 @@ def _get_outnames_from_code(func):
     return scanner._ret_names
 
 
-def compute_out_shapes(func, ins, outs):
+def compute_out_shapes(func, ins, outs, use_jax=True):
     """
     Compute the shapes of outputs based on those of the inputs.
 
@@ -78,11 +78,11 @@ def compute_out_shapes(func, ins, outs):
 
     if need_shape:  # output shapes weren't provided by annotations
         if jax is None:
-            raise RuntimeError("Some return values have unknown shape, and jax is required to "
+            raise RuntimeError("Some return values have unknown shape. Jax can "
                                "(possibly) determine the output shapes based on the input shapes, "
                                "but jax was not found.  Either install jax (pip install jax), or "
-                               "add return value annotations that define the shapes of the "
-                               "return values.")
+                               "add return value annotations to the function that specify the "
+                               "shapes of return values.")
 
     if jax is not None:  # compute shapes as a check against annotated value (if any)
         if 'np' in func.__globals__:
@@ -91,11 +91,14 @@ def compute_out_shapes(func, ins, outs):
             v = jax.make_jaxpr(func)(*args)
         except Exception as err:
             if need_shape:
-                raise RuntimeError("Jax failed to determine the output shapes based on the input "
-                                   f"shapes. The error was: {err}.")
-            issue_warning("Jax failed to determine the output shapes based on the input "
-                          "shapes in order to check the provided annotated values.  The jax "
-                          f"error was: {err}.")
+                raise RuntimeError("Failed to determine the output shapes based on the input "
+                                   f"shapes. The error was: {err}.  To avoid this error, add "
+                                   "return value annotations to the function that specify the "
+                                   "shapes of the return values.")
+            if use_jax:
+                issue_warning("Failed to determine the output shapes based on the input "
+                              "shapes in order to check the provided annotated values.  The "
+                              f"error was: {err}.")
         else:
             for val, name in zip(v.out_avals, outs):
                 oldshape = outs[name].get('shape')
@@ -108,7 +111,7 @@ def compute_out_shapes(func, ins, outs):
                 func.__globals__['np'] = np
 
 
-def get_func_info(func, comp_meta=None):
+def get_func_info(func, comp_meta=None, default=1.0):
     """
     Retrieve metadata associated with function inputs and return values.
 
@@ -123,6 +126,8 @@ def get_func_info(func, comp_meta=None):
         The function to be queried for input and return value info.
     comp_meta : dict or None
         Dict containing component wide options like shape and units.
+    default : object
+        If True, set the default value of any input without one to this value.
 
     Returns
     -------
@@ -137,6 +142,7 @@ def get_func_info(func, comp_meta=None):
 
     sig = inspect.signature(func)
 
+    use_jax = False if comp_meta is None else comp_meta.get('use_jax')
     comp_units = None if comp_meta is None else comp_meta.get('units')
     comp_shape = None if comp_meta is None else comp_meta.get('shape')
     if comp_shape is not None:
@@ -144,7 +150,7 @@ def get_func_info(func, comp_meta=None):
 
     # first, retrieve inputs from the function signature
     for name, p in sig.parameters.items():
-        ins[name] = meta = {'val': None, 'units': comp_units}
+        ins[name] = meta = {'val': None, 'units': comp_units, 'shape': None}
         if p.annotation is not inspect.Parameter.empty:
             if isinstance(p.annotation, dict):
                 meta.update(p.annotation)
@@ -156,15 +162,21 @@ def get_func_info(func, comp_meta=None):
             else:
                 raise TypeError(f"Input '{name}' annotation should be a dict, but is type "
                                 f"'{type(p.annotation).__name__}'.")
+
         if p.default is not inspect._empty:
             meta['val'] = p.default
+
+        # assume a default value if necessary
+        if meta['val'] is None and meta['shape'] is None and comp_shape is None:
+            meta['val'] = default
 
         if meta['val'] is not None:
             if np.isscalar(meta['val']):
                 shape = ()
             else:
                 shape = meta['val'].shape
-            meta_shape = meta['shape'] if 'shape' in meta else shape
+
+            meta_shape = meta['shape'] if 'shape' in meta and meta['shape'] is not None else shape
             cmpshape = shape if comp_shape is None else comp_shape
             shapes = set([shape, meta_shape, cmpshape])
 
@@ -178,7 +190,7 @@ def get_func_info(func, comp_meta=None):
             meta['shape'] = shape
         else:
             if comp_shape is not None:
-                if'shape' not in meta or meta['shape'] is None:
+                if meta['shape'] is None:
                     meta['shape'] = comp_shape
                 elif comp_shape != meta['shape']:
                     raise ValueError(f"Input '{name}' has annotated shape {meta['shape']}, but "
@@ -235,6 +247,6 @@ def get_func_info(func, comp_meta=None):
 
     outs = {n: m for n, m in outlist}
 
-    compute_out_shapes(func, ins, outs)
+    compute_out_shapes(func, ins, outs, use_jax)
 
     return ins, outs

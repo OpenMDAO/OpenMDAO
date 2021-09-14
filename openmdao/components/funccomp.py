@@ -97,6 +97,9 @@ class ExplicitFuncComp(ExplicitComponent):
                                   'Default is None, which means shape may be provided for variables'
                                   ' individually.')
 
+        self.options.declare('use_jax', types=bool, default=False,
+                             desc='If True, use jax to compute derivatives.')
+
         # self.options.declare('shape_by_conn', types=bool, default=False,
         #                      desc='If True, shape all inputs and outputs based on their '
         #                           'connection. Default is False.')
@@ -105,7 +108,10 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Define out inputs and outputs.
         """
-        self._inmeta, self._outmeta = get_func_info(self._func, self.options)
+        try:
+            self._inmeta, self._outmeta = get_func_info(self._func, self.options)
+        except Exception as err:
+            raise err.__class__(f"{self.msginfo}: {err}")
         for name, meta in self._inmeta.items():
             self._check_var_name(name)
             kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
@@ -139,6 +145,9 @@ class ExplicitFuncComp(ExplicitComponent):
 
             inds = np.arange(osize, dtype=INT_DTYPE)
             for inp, imeta in self._inmeta.items():
+                if inp not in ometa['deps']:
+                    continue
+
                 if hasdiag:
                     ishp = imeta['shape']
                     if not ishp:
@@ -179,15 +188,19 @@ class ExplicitFuncComp(ExplicitComponent):
         output_array
             The output array being filled.
         """
-        start = end = 0
         outs = self._func(*input_values)
-        if not isinstance(outs, tuple):
-            outs = (outs,)
-        for o in outs:
-            a = asarray(o) if isscalar(o) else o
-            end += a.size
-            output_array[start:end] = a.flat
-            start = end
+        if isinstance(outs, tuple):
+            start = end = 0
+            for o in outs:
+                a = asarray(o) if isscalar(o) else o
+                end += a.size
+                output_array[start:end] = a.flat
+                start = end
+        else:
+            if isscalar(outs):
+                output_array[:] = outs
+            else:
+                output_array[:] = outs.flat
 
     def compute(self, inputs, outputs):
         """

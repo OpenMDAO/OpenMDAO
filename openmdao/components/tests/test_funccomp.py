@@ -20,6 +20,8 @@ except ImportError:
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
 from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.cs_safe import abs, arctan2
+
 
 _ufunc_test_data = {
     'min': {
@@ -432,12 +434,11 @@ class TestFuncComp(unittest.TestCase):
         prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, units='m'))
         prob.model.connect('indep.x', 'C1.x')
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(ValueError) as cm:
             prob.setup()
 
         self.assertEqual(str(cm.exception),
-                         "'C1' <class ExecComp>: units of 'km' have been specified for variable 'x', but "
-                         "units of 'm' have been specified for the entire component.")
+                         "'C1' <class ExplicitFuncComp>: Input 'x' has annotated units 'km', but units were specified as 'm' in the component.")
 
     def test_shape_and_value(self):
         p = om.Problem()
@@ -468,8 +469,7 @@ class TestFuncComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "'comp' <class ExecComp>: shape of (5,) has been specified for variable 'x', "
-                         "but a value of shape (1,) has been provided.")
+                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,) in annotation.")
 
     def test_common_shape(self):
         p = om.Problem()
@@ -516,8 +516,7 @@ class TestFuncComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "'comp' <class ExecComp>: shape of (10,) has been specified for variable 'y', "
-                         "but shape of (5,) has been specified for the entire component.")
+                         "'comp' <class ExplicitFuncComp>: Annotated shape for return value 'y' of (10,) doesn't match computed shape of (5,).")
 
     def test_common_shape_conflicting_value(self):
         p = om.Problem()
@@ -532,8 +531,7 @@ class TestFuncComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
-                         "'comp' <class ExecComp>: value of shape (1,) has been specified for variable 'x', "
-                         "but shape of (5,) has been specified for the entire component.")
+                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,) in the component.")
 
     def test_math(self):
         prob = om.Problem()
@@ -672,7 +670,7 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_complex_step(self):
         prob = om.Problem()
-        def func(x=-2.0):
+        def func(x=-2.0) -> [('y', {'shape': ()})]:
             y=2.0*abs(x)
             return y
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
@@ -698,20 +696,20 @@ class TestFuncComp(unittest.TestCase):
 
     def test_arctan_complex_step(self):
         prob = om.Problem()
-        def func(x=np.array([1+2j])):
-            y=2.0*arctan2(y, x)
-            return y
+        def func(x=np.array([1+2j]), y=1):
+            z=2.0*np.arctan2(y, x)
+            return z
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_near_equal(C1._outputs['y'], np.array([1.57079633]), 1e-8)
+        assert_near_equal(C1._outputs['z'], np.array([1.57079633]), 1e-8)
 
     def test_abs_array_complex_step(self):
         prob = om.Problem()
-        def func(x=np.ones(3)*-2.0):
+        def func(x=np.ones(3)*-2.0) -> [('y', {'shape': (3,)})]:
             y=2.0*abs(x)
             return y
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
@@ -794,7 +792,7 @@ class TestFuncComp(unittest.TestCase):
         self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
 
     def test_exec_comp_deriv_sparsity(self):
-        # Check to make sure that when an ExecComp has more than one
+        # Check to make sure that when an ExplicitFuncComp has more than one
         # expression that only the partials that are needed are declared and computed
 
         # with has_diag_partials set to the default of False and just scalars
@@ -927,7 +925,12 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp(['y1=x+1.', 'y2=x-1.']), promotes=['x'])
+        def func(x=1.):
+            y1=x+1.
+            y2=x-1.
+            return y1, y2
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
 
         prob.setup()
 
@@ -945,7 +948,11 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp(['y1, y2 = x+1., x-1.']), promotes=['x'])
+        def func(x=1.):
+            y1, y2 = x+1., x-1.
+            return y1, y2
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
 
         prob.setup()
 
@@ -962,9 +969,11 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp('y=x[1]',
-                                                x=np.array([1., 2., 3.]),
-                                                y=0.0))
+        def func(x=np.array([1., 2., 3.])):
+            y = x[1]
+            return y
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -978,7 +987,11 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp('z = sin(x)**2 + cos(y)**2'))
+        def func(x, y):
+            z = np.sin(x)**2 + np.cos(y)**2
+            return z
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -995,7 +1008,11 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp('y=sum(x)', x=np.array([1., 2., 3.])))
+        def func(x=np.array([1., 2., 3.])):
+            y = np.sum(x)
+            return y
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -1009,10 +1026,11 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'val': 0.0, 'units': 'inch'},
-                                                y={'val': 0.0, 'units': 'inch'},
-                                                z={'val': 0.0, 'units': 'inch'}))
+        def func(x:{'units': 'inch'}=0., y:{'units': 'inch'}=0.):
+            z = x + y
+            return z
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.setup()
 
@@ -1028,7 +1046,11 @@ class TestFuncComp(unittest.TestCase):
 
         model = om.Group()
 
-        xcomp = model.add_subsystem('comp', om.ExecComp('y=2*x', shape=(2,)))
+        def func(x):
+            y = 2.*x
+            return y
+
+        xcomp = model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(2,)))
 
         xcomp.options['units'] = 'm'
 
