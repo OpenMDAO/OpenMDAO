@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.12.0
 
-September 17, 2021
+September 15, 2021
 
 OpenMDAO 3.12.0 provides a transitional release as we change the way the specification of indices are handled.
 In the future, specification of indices will be similar to the way it is done in Numpy, as opposed to an OpenMDAO-specific method.
@@ -25,6 +25,7 @@ for more information.
 - Shift-click can now close all persistent Node Info windows in the N2 viewer. [#2226](https://github.com/OpenMDAO/OpenMDAO/pull/2226)
 - Update to src_indices indexing to behave like numpy indexing (old indexing is still there but deprecated) [#2235](https://github.com/OpenMDAO/OpenMDAO/pull/2235)
 - Added code to issue warnings in cases where apparently flat indices index into non-flat source arrays when the flat_src_indices or flat_indices flags have not been set to True. [#2248](https://github.com/OpenMDAO/OpenMDAO/pull/2248)
+- Added a converter from old OpenMDAO indexing format to the new numpy-like one. [#2267](https://github.com/OpenMDAO/OpenMDAO/pull/2267)
 
 ## Bug Fixes
 
