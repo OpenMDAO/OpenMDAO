@@ -6,6 +6,7 @@ import os
 import logging
 import weakref
 import time
+import subprocess
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -181,6 +182,8 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.declare('opt_dashboard', types=bool, default=False, desc="Show dashboard")
+
         self.options.update(options)
 
         # Case recording options
@@ -678,6 +681,9 @@ class Problem(object):
         self._run_counter += 1
         record_model_options(self, self._run_counter)
 
+        if self.options['opt_dashboard']:
+            subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
+            time.sleep(3)
         self.model._clear_iprint()
         return self.driver.run()
 

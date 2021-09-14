@@ -3,13 +3,11 @@ import dymos as dm
 import numpy as np
 from dymos.examples.hyper_sensitive.hyper_sensitive_ode import HyperSensitiveODE
 import subprocess
-import json
-import os, signal
 import time
 # from openmdao.visualization.dash_server import shut_this_down
 
-server_start = subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
-time.sleep(4)
+# server_start = subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
+# time.sleep(4)
 
 def solution():
     sqrt_two = np.sqrt(2)
@@ -27,6 +25,7 @@ tf = np.float128(10)
 
 # Initialize the problem and assign the driver
 p = om.Problem(model=om.Group())
+p.options['opt_dashboard'] = True
 p.driver = om.pyOptSparseDriver()
 p.driver.options['optimizer'] = 'SNOPT'
 p.driver.opt_settings['iSumm'] = 6
