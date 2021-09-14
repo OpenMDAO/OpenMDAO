@@ -33,7 +33,7 @@ for more information.
 - Added support for multidimensional shapes in EQConstraintComp and BalanceComp. [#2210](https://github.com/OpenMDAO/OpenMDAO/pull/2210)
 - Fixed bug where an exception was raised if you tried to get a value for an input that was connected to a source with a src_indices slice. [#2217](https://github.com/OpenMDAO/OpenMDAO/pull/2217)
 - Fixed a bug in the interpolation bracketing algorithm that caused a hysteresis in the analytic derivative when interpolating on one of the table's gridpoints. [#2230](https://github.com/OpenMDAO/OpenMDAO/pull/2230)
-- Fixed issue with directional derivs and distributed vars [#2233](https://github.com/OpenMDAO/OpenMDAO/pull/2233)
+- Fixed a bug that caused an IndexError to be raised when using a directional derivative during check_partials on an MPI model. [#2233](https://github.com/OpenMDAO/OpenMDAO/pull/2233)
 - Fixed a bug where an exception was raised if a directional derivative was used to check a sparsely declared subjacobian. [#2241](https://github.com/OpenMDAO/OpenMDAO/pull/2241)
 - Fixed for IndexError raised in the lagrange3 semi-structured interpolation. [#2243](https://github.com/OpenMDAO/OpenMDAO/pull/2243)
 - Disabled the option to use coloring on approximated semi-total derivatives. [#2245](https://github.com/OpenMDAO/OpenMDAO/pull/2245)
