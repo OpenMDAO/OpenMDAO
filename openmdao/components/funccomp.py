@@ -1,27 +1,26 @@
 """Define the FuncComponent class."""
 
 try:
+    import jax
     from jax import jvp, vjp, vmap, random, jit
     import jax.numpy as jnp
 except ImportError:
     jax = None
 
 import re
+import inspect
 import numpy as np
 from numpy import asarray, isscalar, ndarray, imag, complex as npcomplex
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.func_utils import get_func_info
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.units import valid_units
+from openmdao.utils.code_utils import get_function_deps
+from openmdao.utils.general_utils import shape2tuple
+from openmdao.utils.om_warnings import issue_warning
 
 
 # regex to check for variable names.
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
-
-# Names of metadata entries allowed for ExecComp variables.
-_allowed_meta = {'val', 'shape', 'units', 'res_units', 'desc',
-                 'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape'}
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_varnames = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
@@ -37,10 +36,47 @@ _allowed_add_output_args = {
     'shape_by_conn', 'copy_shape', 'distributed',
 }
 
+_meta_keep = {'units', 'shape', 'val'}
+_from_def = {'default_units': 'units', 'default_shape': 'shape'}
+
 
 def _check_units_option(option, value):
     if value is not None and not valid_units(value):
         raise ValueError(f"The units '{value}' are invalid.")
+
+
+def _copy_with_ignore(dct, keepers, warn=True):
+    """
+    Copy the entries in the given dict whose keys are in keepers.
+
+    Parameters
+    ----------
+    dct : dict
+        The dictionary to be copied.
+    keepers : set-like
+        Set of keys for entries we want to keep.
+    warn : bool
+        If True, issue a warning showing which keys were ignored.
+
+    Returns
+    -------
+    dict
+        A new dict containing 'keepers' entries.
+    set
+        The set of ignored keys.
+    """
+    kept = {}
+    ignored = set()
+    for k, v in dct.items():
+        if k in keepers:
+            kept[k] = v
+        else:
+            ignored.add(k)
+
+    if warn and ignored:
+        issue_warning(f"The following metadata entries were ignored: {sorted(ignored)}.")
+
+    return kept, ignored
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -86,16 +122,15 @@ class ExplicitFuncComp(ExplicitComponent):
                                   'arrays have size > 1. All arrays with size > 1 must have the '
                                   'same flattened size or an exception will be raised.')
 
-        self.options.declare('units', types=str, allow_none=True, default=None,
-                             desc='Units to be assigned to all variables in this component. '
-                                  'Default is None, which means units may be provided for variables'
-                                  ' individually.',
+        self.options.declare('default_units', types=str, allow_none=True, default=None,
+                             desc='Default units to assign to variables in this component. '
+                                  'Any units provided for individual variables will override this.',
                              check_valid=_check_units_option)
 
-        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
-                             desc='Shape to be assigned to all variables in this component. '
-                                  'Default is None, which means shape may be provided for variables'
-                                  ' individually.')
+        self.options.declare('default_shape', types=(int, tuple, list), allow_none=True,
+                             default=None,
+                             desc='Default shape to assign to variables in this component. '
+                                  'Any shape provided for individual variables will override this.')
 
         self.options.declare('use_jax', types=bool, default=False,
                              desc='If True, use jax to compute derivatives.')
@@ -108,13 +143,11 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Define out inputs and outputs.
         """
-        try:
-            self._inmeta, self._outmeta = get_func_info(self._func, self.options)
-        except Exception as err:
-            raise err.__class__(f"{self.msginfo}: {err}")
+        self._inmeta, self._outmeta = self._get_func_info(self._func, self.options)
+
         for name, meta in self._inmeta.items():
             self._check_var_name(name)
-            kwargs = {n: v for n, v in meta.items() if n in _allowed_add_input_args}
+            kwargs, _ = _copy_with_ignore(meta, _allowed_add_input_args, warn=True)
             if kwargs['val'] is None:
                 kwargs['val'] = 1.0
             self.add_input(name, **kwargs)
@@ -126,7 +159,10 @@ class ExplicitFuncComp(ExplicitComponent):
                                    "name by returning a variable, for example 'return myvar', or "
                                    "include the name in the function's return value annotation.")
             self._check_var_name(name)
-            kwargs = {n: v for n, v in meta.items() if n in _allowed_add_output_args}
+            kwargs, ignored = _copy_with_ignore(meta, _allowed_add_output_args, warn=False)
+            ignored.remove('deps')
+            if ignored:
+                issue_warning(f"The following metadata entries were ignored: {sorted(ignored)}.")
             self.add_output(name, **kwargs)
 
     def _setup_partials(self):
@@ -281,6 +317,259 @@ class ExplicitFuncComp(ExplicitComponent):
 
                         # restore old input value
                         in_vals[ivar].flat[i] -= step
+
+    def _compute_out_shapes(self, func, ins, outs, use_jax=True):
+        """
+        Compute the shapes of outputs based on those of the inputs.
+
+        Parameters
+        ----------
+        func : function
+            The function whose outputs' shapes will be determined.
+        ins : dict
+            Dict of input metadata containing input shapes.
+        outs : dict
+            Dict of output metadata that will be updated with shape information.
+        """
+        need_shape = False
+        for ometa in outs.values():
+            try:
+                ometa['shape']
+            except KeyError:
+                need_shape = True
+                break
+
+        args = []
+        for name, meta in ins.items():
+            if meta['val'] is not None:
+                args.append(meta['val'])
+            else:
+                try:
+                    shp = meta['shape']
+                except KeyError:
+                    raise RuntimeError(f"{self.msginfo}: Can't determine shape of input '{name}'.")
+                if jax is not None:
+                    args.append(jax.ShapedArray(shape2tuple(shp), dtype=np.float64))
+
+        if need_shape:  # output shapes weren't provided by annotations
+            if jax is None:
+                raise RuntimeError(f"{self.msginfo}: Some return values have unknown shape. Jax "
+                                   "can (possibly) determine the output shapes based on the input "
+                                   "shapes, but jax was not found.  Either install jax (pip "
+                                   "install jax), or add return value annotations to the function "
+                                   "that specify the shapes of return values.")
+
+        if jax is not None:  # compute shapes as a check against annotated value (if any)
+            # must replace numpy with jax numpy when making jaxpr.
+            if 'np' in func.__globals__:
+                func.__globals__['np'] = jnp
+            try:
+                v = jax.make_jaxpr(func)(*args)
+            except Exception as err:
+                if need_shape:
+                    raise RuntimeError(f"{self.msginfo}: Failed to determine the output shapes "
+                                       f"based on the input shapes. The error was: {err}.  To "
+                                       "avoid this error, add return value annotations that "
+                                       "specify the shapes of the return values to the function.")
+                if use_jax:
+                    issue_warning("Failed to determine the output shapes based on the input "
+                                  "shapes in order to check the provided annotated values.  The "
+                                  f"error was: {err}.", prefix=self.msginfo)
+            else:
+                for val, name in zip(v.out_avals, outs):
+                    oldshape = outs[name].get('shape')
+                    if oldshape is not None and oldshape != val.shape:
+                        raise RuntimeError(f"{self.msginfo}: Annotated shape for return value "
+                                           f"'{name}' of {oldshape} doesn't match computed shape "
+                                           f"of {val.shape}.")
+                    outs[name]['shape'] = val.shape
+            finally:
+                if 'np' in func.__globals__:
+                    func.__globals__['np'] = np
+
+
+    def _get_func_info(self, func, compmeta=None, default_val=1.0):
+        """
+        Retrieve metadata associated with function inputs and return values.
+
+        Return value metadata can come from annotations or (shape only) can be determined
+        using jax if the input shapes or values are known.  Return value names can be defined
+        in annotations or can be determined from the function itself provided that the return
+        values are internal function variable names.
+
+        Parameters
+        ----------
+        func : function
+            The function to be queried for input and return value info.
+        compmeta : dict or None
+            Dict containing component wide options like shape and units.
+        default_val : object
+            If True, set the default value of any input without one to this value.
+
+        Returns
+        -------
+        dict
+            Dictionary of metdata for inputs.
+        dict
+            Dictionary of metadata for return values.
+        """
+        ins = {}
+
+        if compmeta is None:
+            compmeta = {}
+        else:
+            # convert default_* names
+            compmeta = {_from_def.get(k, k): v for k, v in compmeta.items()}
+
+        funcmeta = func.__annotations__.get('_defaults_', {})
+        if funcmeta:
+            # convert default_* names
+            funcmeta = {_from_def.get(k, k): v for k, v in funcmeta.items()}
+
+        reduced = {k:v for k, v in funcmeta.items() if k in _meta_keep}
+        if len(reduced) < len(funcmeta):
+            issue_warning("The following metadata entries were ignored: "
+                          f"{sorted(set(funcmeta).difference(reduced))}.", prefix=self.msginfo)
+            funcmeta = reduced
+
+        use_jax = compmeta.get('use_jax', False)
+
+        # first, retrieve inputs from the function signature
+        sig = inspect.signature(func)
+        for name, p in sig.parameters.items():
+            ins[name] = meta = {'val': None, 'units': None, 'shape': None}
+            meta.update((k,v) for k, v in compmeta.items() if k in _meta_keep)  # start with component wide metadata
+            meta.update(funcmeta)  # override with function wide metadata
+            if p.annotation is not inspect.Parameter.empty:
+                if isinstance(p.annotation, dict):
+                    # Finally, override with variable specific metadata
+                    meta.update(p.annotation)
+                else:
+                    raise TypeError(f"{self.msginfo}: Input '{name}' annotation should be a dict, "
+                                    f"but is type '{type(p.annotation).__name__}'.")
+
+            if p.default is not inspect._empty:
+                if meta['val'] is not None:
+                    issue_warning(f"Default value for function input '{name}' overrides 'val' set "
+                                  "in the annotation.", prefix=self.msginfo)
+                meta['val'] = p.default
+
+            # assume a default value if necessary
+            if meta['val'] is None and meta['shape'] is None:
+                meta['val'] = default_val
+
+            if meta['val'] is not None:
+                if np.isscalar(meta['val']):
+                    shape = ()
+                else:
+                    shape = meta['val'].shape
+
+                if meta['shape'] is not None:
+                    meta['shape'] = shape2tuple(meta['shape'])
+                    if shape != meta['shape']:
+                        raise ValueError(f"{self.msginfo}: Input '{name}' default value has shape "
+                                         f"{shape}, but shape was specified as {meta['shape']}.")
+
+                meta['shape'] = shape
+
+        outmeta = {}
+        if sig.return_annotation is not inspect.Signature.empty:
+            outmeta.update(sig.return_annotation)
+
+        # Parse the function code to possibly identify the names of the return values and input/output
+        # dependencies. Return names will be non-None only if they are simple name, e.g.,
+        #  return a, b, c
+        outlist = []
+        try:
+            ret_info = get_function_deps(func)
+        except RuntimeError:
+            #  this could happen if function is compiled or has multiple return lines
+            if not outmeta:
+                raise RuntimeError(f"{self.msginfo}: Couldn't determine function return names or "
+                                   "number of return values based on AST and no return value "
+                                   "annotations were supplied.")
+            issue_warning("Couldn't determine function return names based on AST.  Assuming number "
+                          "of return values matches number of return value annotations.",
+                          prefix=self.msginfo)
+            outlist = list(outmeta.items())
+        else:
+            for o, deps in ret_info:
+                if o is not None and '.' in o:  # don't allow dots in return value names
+                    issue_warning(f"Ignoring return name '{o}' because names containing '.' are "
+                                  "not supported.", prefix=self.msginfo)
+                    o = None
+                outlist.append([o, {'deps': deps}])
+
+        notfound = []
+        for i, (oname, ometa) in enumerate(outmeta.items()):
+            for n, meta in outlist:
+                if n == oname:
+                    if meta is not ometa:
+                        meta.update(ometa)
+                    break
+            else:  # didn't find oname
+                notfound.append(oname)
+
+        if notfound:  # try to fill in the unnamed slots with annotated output data
+            inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with name of None
+            if len(notfound) != len(inones):
+                raise RuntimeError(f"{self.msginfo}: Number of unnamed return values "
+                                   f"({len(inones)}) doesn't match number of unmatched annotated "
+                                   f"return values ({len(notfound)}).")
+
+            # number of None return slots equals number of annotated entries not found in outlist
+            for i_olist, name_notfound in zip(inones, notfound):
+                annotated_meta = outmeta[name_notfound]
+                _, ret_meta = outlist[i_olist]
+                ret_meta.update(annotated_meta)
+                outlist[i_olist] = (name_notfound, ret_meta)
+
+        outs = {n: m for n, m in outlist}
+
+        self._compute_out_shapes(func, ins, outs, use_jax)
+
+        return ins, outs
+
+
+class func_meta(object):
+    """
+    Update a function's annotation data with uniform defaults.
+
+    Parameters
+    ----------
+    fn : function
+        The function being annotated.
+
+    Returns
+    -------
+    function
+        The original function with updated annotation data.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Copy the named args passed in.
+        """
+        self._kwargs = kwargs.copy()
+
+    def __call__(self, fn):
+        """
+        Update the function's annotation data with our named args.
+
+        Parameters
+        ----------
+        fn : function
+            Update the annotation data for this function.
+
+        Returns
+        -------
+        function
+            The original function with modified annotation data.
+        """
+        if '_defaults_' in fn.__annotations__:
+            raise RuntimeError("Can't annotate function. Preexisting '_defaults_' entry found.")
+        fn.__annotations__['_defaults_'] = self._kwargs
+        return fn
 
 
 if __name__ == '__main__':

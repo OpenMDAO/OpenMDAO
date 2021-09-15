@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from openmdao.utils.func_utils import get_func_info
+from openmdao.components.funccomp import ExplicitFuncComp
 from openmdao.utils.general_utils import shape2tuple
 
 
@@ -20,7 +20,9 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return x, y
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(shape2tuple(s1), ininfo['a']['shape'])
             self.assertEqual(shape2tuple(s2), ininfo['b']['shape'])
             self.assertEqual(shape2tuple(s3), ininfo['c']['shape'])
@@ -34,7 +36,9 @@ class FuncAPITestCase(unittest.TestCase):
             y = b * c
             return x, y
 
-        ininfo, outinfo = get_func_info(func)
+        comp = om.ExplicitFuncComp(func)
+
+        ininfo, outinfo = comp._get_func_info(func)
         self.assertEqual((3,2), ininfo['a']['shape'])
         self.assertEqual((), ininfo['b']['shape'])
         self.assertEqual((1,4), ininfo['c']['shape'])
@@ -49,7 +53,9 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return x, y
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(s1, ininfo['a']['shape'])
             self.assertEqual(s2, ininfo['b']['shape'])
             self.assertEqual(s3, ininfo['c']['shape'])
@@ -64,7 +70,9 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return x, y
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(s1, ininfo['a']['shape'])
             self.assertEqual(s2, ininfo['b']['shape'])
             self.assertEqual(shape2tuple(s3), ininfo['c']['shape'])
@@ -77,7 +85,9 @@ class FuncAPITestCase(unittest.TestCase):
             def func(a:{'shape': s1}, b:{'shape': s2}, c:{'shape': s3}) -> [('x', {'shape':xshp}), ('y', {'shape':yshp})]:
                 return a.dot(b), b.dot(c)
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(s1, ininfo['a']['shape'])
             self.assertEqual(s2, ininfo['b']['shape'])
             self.assertEqual(s3, ininfo['c']['shape'])
@@ -91,7 +101,9 @@ class FuncAPITestCase(unittest.TestCase):
                 x = a.dot(b)
                 return x, b.dot(c)
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(s1, ininfo['a']['shape'])
             self.assertEqual(s2, ininfo['b']['shape'])
             self.assertEqual(s3, ininfo['c']['shape'])
@@ -105,7 +117,9 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return a.dot(b), y
 
-            ininfo, outinfo = get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
+
+            ininfo, outinfo = comp._get_func_info(func)
             self.assertEqual(s1, ininfo['a']['shape'])
             self.assertEqual(s2, ininfo['b']['shape'])
             self.assertEqual(s3, ininfo['c']['shape'])
@@ -119,10 +133,12 @@ class FuncAPITestCase(unittest.TestCase):
                 y = b.dot(c)
                 return a.dot(b), y
 
-            with self.assertRaises(Exception) as cm:
-                get_func_info(func)
+            comp = om.ExplicitFuncComp(func)
 
-            msg = f"Annotated shape for return value 'y' of 99 doesn't match computed shape of {yshp}."
+            with self.assertRaises(Exception) as cm:
+                comp._get_func_info(func)
+
+            msg = f"<class ExplicitFuncComp>: Annotated shape for return value 'y' of 99 doesn't match computed shape of {yshp}."
             self.assertEqual(cm.exception.args[0], msg)
 
 

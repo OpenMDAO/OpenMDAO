@@ -23,283 +23,6 @@ from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.cs_safe import abs, arctan2
 
 
-_ufunc_test_data = {
-    'min': {
-        'str': 'f=min(x)',
-        'check_func': np.min,
-        'args': { 'f': {'val': np.zeros(6)},
-                  'x': {'val': np.random.random(6)}}},
-    'max': {
-        'str': 'f=max(x)',
-        'check_func': np.max,
-        'args': { 'f': {'val': np.zeros(6)},
-                  'x': {'val': np.random.random(6)}}},
-    'diff': {
-        'str': 'f=diff(x)',
-        'check_func': np.diff,
-        'args': { 'f': {'val': np.zeros(5)},
-                  'x': {'val': np.random.random(6)}}},
-    'abs': {
-        'str': 'f=abs(x)',
-        'check_func': np.abs,
-        'args': { 'f': {'val': np.zeros(6)},
-                  'x': {'val': np.random.random(6)}}},
-    'acos': {
-        'str': 'f=acos(x)',
-        'check_func': np.arccos,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) - 0.5}}},
-    'arccos': {
-        'str': 'f=arccos(x)',
-        'check_func': np.arccos,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) - 0.5}}},
-    'arccosh': {
-        'str': 'f=arccosh(x)',
-        'check_func': np.arccosh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': 1.1 + np.random.random(6)}}},
-    'acosh': {
-        'str': 'f=acosh(x)',
-        'check_func': np.arccosh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': 1.1 + np.random.random(6)}}},
-    'arange': {
-        'str': 'f=arange(0,10,2)',
-        'check_val': np.arange(0, 10, 2),
-        'args': {'f': {'val': np.zeros(5)}}},
-    'arcsin': {
-        'str': 'f=arcsin(x)',
-        'check_func': np.arcsin,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) - .5}}},
-    'arcsinh': {
-        'str': 'f=arcsinh(x)',
-        'check_func': np.arcsinh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'asinh': {
-        'str': 'f=asinh(x)',
-        'check_func': np.arcsinh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'asin': {
-        'str': 'f=asin(x)',
-        'check_func': np.arcsin,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) - .5}}},
-    'arctan': {
-        'str': 'f=arctan(x)',
-        'check_func': np.arctan,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'arctan2': {
-        'str': 'f=arctan2(y, x)',
-        'check_val': np.array([-2.35619449, -0.78539816,  0.78539816,  2.35619449]),
-        'args': {'f': {'val': np.zeros(4)},
-                 'x': {'val': np.array([-1, +1, +1, -1])},
-                 'y': {'val': np.array([-1, -1, +1, +1])}}},
-    'atan': {
-        'str': 'f=atan(x)',
-        'check_func': np.arctan,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'cos': {
-        'str': 'f=cos(x)',
-        'check_func': np.cos,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'cosh': {
-        'str': 'f=cosh(x)',
-        'check_func': np.cosh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'dot': {
-        'str': 'f=dot(x, y)',
-        'check_func': np.dot,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'e': {
-        'str': 'f=e',
-        'check_val': np.e,
-        'args': {'f': {'val': 0.0}}},
-    'erf': {
-        'str': 'f=erf(x)',
-        'check_func': scipy.special.erf,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'erfc': {
-        'str': 'f=erfc(x)',
-        'check_func': scipy.special.erfc,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'exp': {
-        'str': 'f=exp(x)',
-        'check_func': np.exp,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'expm1': {
-        'str': 'f=expm1(x)',
-        'check_func': np.expm1,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'fmax': {
-        'str': 'f=fmax(x, y)',
-        'check_func': np.fmax,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'fmin': {
-        'str': 'f=fmin(x, y)',
-        'check_func': np.fmin,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'inner': {
-        'str': 'f=inner(x, y)',
-        'check_func': np.inner,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'isinf': {
-        'str': 'f=isinf(x)',
-        'check_func': np.isinf,
-        'args': {'f': {'val': np.zeros(3)},
-                 'x': {'val': [0, np.inf, 5.0]}}},
-    'isnan': {
-        'str': 'f=isnan(x)',
-        'check_func': np.isnan,
-        'args': {'f': {'val': np.zeros(3)},
-                 'x': {'val': [0, np.nan, np.nan]}}},
-    'kron': {
-        'str': 'f=kron(x, y)',
-        'check_func': np.kron,
-        'args': {'f': {'val': np.zeros(36)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'linspace': {
-        'str': 'f=linspace(0,10,50)',
-        'check_val': np.linspace(0, 10, 50),
-        'args': {'f': {'val': np.zeros(50)}}},
-    'log': {
-        'str': 'f=log(x)',
-        'check_func': np.log,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) + 0.1}}},
-    'log10': {
-        'str': 'f=log10(x)',
-        'check_func': np.log10,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6) + 0.1}}},
-    'log1p': {
-        'str': 'f=log1p(x)',
-        'check_func': np.log1p,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'matmul': {
-        'str': 'f=matmul(x, y)',
-        'check_func': np.matmul,
-        'args': {'f': {'val': np.zeros((3, 1))},
-                 'x': {'val': np.random.random((3, 3))},
-                 'y': {'val': np.random.random((3, 1))}}},
-    'maximum': {
-        'str': 'f=maximum(x, y)',
-        'check_func': np.maximum,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'minimum': {
-        'str': 'f=minimum(x, y)',
-        'check_func': np.minimum,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'ones': {
-        'str': 'f=ones(21)',
-        'check_val': np.ones(21),
-         'args': {'f': {'val': np.zeros(21)}}},
-    'outer': {
-        'str': 'f=outer(x, y)',
-        'check_func': np.outer,
-        'args': {'f': {'val': np.zeros((6, 6))},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6)}}},
-    'pi': {
-        'str': 'f=pi',
-        'check_val': np.pi,
-        'args': {'f': {'val': 0.0}}},
-    'power': {
-        'str': 'f=power(x, y)',
-        'check_func': np.power,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)},
-                 'y': {'val': np.random.random(6) + 1.0}}},
-    'prod': {
-        'str': 'f=prod(x)',
-        'check_func': np.prod,
-        'args': {'f': {'val': 0.0},
-                 'x': {'val': np.random.random(6)}}},
-    'sin': {
-        'str': 'f=sin(x)',
-        'check_func': np.sin,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'sinh': {
-        'str': 'f=sinh(x)',
-        'check_func': np.sinh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'sum': {
-        'str': 'f=sum(x)',
-        'check_func': np.sum,
-        'args': {'f': {'val': 0.0},
-                 'x': {'val': np.random.random(6)}}},
-    'tan': {
-        'str': 'f=tan(x)',
-        'check_func': np.tan,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'tanh': {
-        'str': 'f=tanh(x)',
-        'check_func': np.tanh,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}}},
-    'tensordot': {
-        'str': 'f=tensordot(x, y)',
-        'check_func': np.tensordot,
-        'args': {'f': {'val': 0.0},
-                 'x': {'val': np.random.random((6, 6))},
-                 'y': {'val': np.random.random((6, 6))}}},
-    'zeros': {
-        'str': 'f=zeros(21)',
-        'check_val': np.zeros(21),
-        'args': {'f': {'val': np.zeros(21)}}},
-}
-
-
-# 'factorial' will raise a RuntimeError or a deprecation warning depending on scipy version
-if LooseVersion(scipy.__version__) >= LooseVersion("1.5.0"):
-    _ufunc_test_data['factorial'] = {
-        'str': 'f=factorial(x)',
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}},
-        'error': (RuntimeError,
-                  "The 'factorial' function is not supported for SciPy "
-                  f"versions >= 1.5, current version: {scipy.__version__}")
-    }
-else:
-    _ufunc_test_data['factorial'] = {
-        'str': 'f=factorial(x)',
-        'check_func': scipy.special.factorial,
-        'args': {'f': {'val': np.zeros(6)},
-                 'x': {'val': np.random.random(6)}},
-        'warning': (OMDeprecationWarning,
-                    "The 'factorial' function is deprecated. "
-                    "It is no longer supported for SciPy versions >= 1.5.")
-    }
-
-
 class TestFuncComp(unittest.TestCase):
 
     def test_mixed_type(self):
@@ -342,10 +65,50 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(C1._outputs['y'], 3.0, 0.00001)
 
+    def test_default_val(self):
+        prob = om.Problem()
+        def func(x):  # x defaults to 1.0
+            y = x + 1.
+            return y
+
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+
+        prob.setup()
+
+        # Conclude setup but don't run model.
+        prob.final_setup()
+
+        self.assertTrue('x' in C1._inputs)
+        self.assertTrue('y' in C1._outputs)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], 2.0, 0.00001)
+
     def test_units(self):
         prob = om.Problem()
 
         def func(x:{'units': 'm'}=2.0, z=2.0) -> [('y', {'units': 'm'})]:
+            y=x+z+1.
+            return y
+
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
+
+    def test_units_decorator(self):
+        prob = om.Problem()
+
+        @om.func_meta(default_units='m')
+        def func(x=2.0, z=2.0):
             y=x+z+1.
             return y
 
@@ -368,7 +131,7 @@ class TestFuncComp(unittest.TestCase):
             return y
 
         with self.assertRaises(ValueError) as cm:
-            prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, units='two'))
+            prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, default_units='two'))
         self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
 
     def test_units_varname_novalue(self):
@@ -397,7 +160,7 @@ class TestFuncComp(unittest.TestCase):
             return y
 
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, units='m'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, default_units='m'))
         prob.model.connect('indep.x', 'comp.x')
 
         prob.setup()
@@ -414,7 +177,7 @@ class TestFuncComp(unittest.TestCase):
             return y
 
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, units='m'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, default_units='m'))
 
         prob.model.connect('indep.x', 'comp.x')
 
@@ -422,23 +185,6 @@ class TestFuncComp(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['comp.y'], 2001., 0.00001)
-
-    def test_conflicting_units(self):
-        prob = om.Problem()
-
-        def func(x:{'val': 2.0, 'units': 'km'}, z=2.0):
-            y=x+z+1.
-            return y
-
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, units='m'))
-        prob.model.connect('indep.x', 'C1.x')
-
-        with self.assertRaises(ValueError) as cm:
-            prob.setup()
-
-        self.assertEqual(str(cm.exception),
-                         "'C1' <class ExplicitFuncComp>: Input 'x' has annotated units 'km', but units were specified as 'm' in the component.")
 
     def test_shape_and_value(self):
         p = om.Problem()
@@ -469,7 +215,7 @@ class TestFuncComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,) in annotation.")
+                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,).")
 
     def test_common_shape(self):
         p = om.Problem()
@@ -478,7 +224,24 @@ class TestFuncComp(unittest.TestCase):
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_decorator_shape(self):
+        p = om.Problem()
+        model = p.model
+
+        @om.func_meta(default_shape=(5,))
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         p.setup()
         p.run_model()
@@ -494,7 +257,7 @@ class TestFuncComp(unittest.TestCase):
         def func(x:{'val': np.zeros(5)}):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
 
         p.setup()
         p.run_model()
@@ -510,28 +273,13 @@ class TestFuncComp(unittest.TestCase):
         def func(x) -> [('y', {'shape': (10,)})]:
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
+        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
 
         with self.assertRaises(Exception) as context:
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
                          "'comp' <class ExplicitFuncComp>: Annotated shape for return value 'y' of (10,) doesn't match computed shape of (5,).")
-
-    def test_common_shape_conflicting_value(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x:{'val': 5}):
-            y =3.0*x + 2.5
-            return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(5,)))
-
-        with self.assertRaises(Exception) as context:
-            p.setup()
-
-        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
-                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,) in the component.")
 
     def test_math(self):
         prob = om.Problem()
@@ -1050,9 +798,9 @@ class TestFuncComp(unittest.TestCase):
             y = 2.*x
             return y
 
-        xcomp = model.add_subsystem('comp', om.ExplicitFuncComp(func, shape=(2,)))
+        xcomp = model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(2,)))
 
-        xcomp.options['units'] = 'm'
+        xcomp.options['default_units'] = 'm'
 
         prob = om.Problem(model)
         prob.setup()
