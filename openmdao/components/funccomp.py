@@ -421,10 +421,12 @@ class ExplicitFuncComp(ExplicitComponent):
             # convert default_* names
             compmeta = {_from_def.get(k, k): v for k, v in compmeta.items()}
 
-        funcmeta = func.__annotations__.get('_defaults_', {})
-        if funcmeta:
+        funcmetalist = func.__annotations__.get(':meta', {}).get('func_meta')
+        funcmeta = {}
+        if funcmetalist:
             # convert default_* names
-            funcmeta = {_from_def.get(k, k): v for k, v in funcmeta.items()}
+            for meta in funcmetalist:
+                funcmeta.update({_from_def.get(k, k): v for k, v in meta.items()})
 
         reduced = {k:v for k, v in funcmeta.items() if k in _meta_keep}
         if len(reduced) < len(funcmeta):
@@ -438,7 +440,8 @@ class ExplicitFuncComp(ExplicitComponent):
         sig = inspect.signature(func)
         for name, p in sig.parameters.items():
             ins[name] = meta = {'val': None, 'units': None, 'shape': None}
-            meta.update((k,v) for k, v in compmeta.items() if k in _meta_keep)  # start with component wide metadata
+            # start with component wide metadata
+            meta.update((k,v) for k, v in compmeta.items() if k in _meta_keep)
             meta.update(funcmeta)  # override with function wide metadata
             if p.annotation is not inspect.Parameter.empty:
                 if isinstance(p.annotation, dict):
@@ -464,13 +467,15 @@ class ExplicitFuncComp(ExplicitComponent):
                 else:
                     shape = meta['val'].shape
 
-                if meta['shape'] is not None:
+                if meta['shape'] is None:
+                    meta['shape'] = shape
+                else:
                     meta['shape'] = shape2tuple(meta['shape'])
-                    if shape != meta['shape']:
+                    if not shape:  # val is a scalar so reshape with the given meta['shape']
+                        meta['val'] = np.ones(meta['shape']) * meta['val']
+                    elif shape != meta['shape']:
                         raise ValueError(f"{self.msginfo}: Input '{name}' default value has shape "
                                          f"{shape}, but shape was specified as {meta['shape']}.")
-
-                meta['shape'] = shape
 
         outmeta = {}
         if sig.return_annotation is not inspect.Signature.empty:
@@ -531,26 +536,43 @@ class ExplicitFuncComp(ExplicitComponent):
         return ins, outs
 
 
+def _multi_callable(annotations, subname, kwgs):
+    """
+    Update the function annotation data in 'subname' with our named args.
+
+    Parameters
+    ----------
+    annotations : dict
+        Function annotation dict.
+    subname : str
+        Name of subdict within annotations dict.
+    kwgs : dict
+        Keyword args dict passed into decorator.
+    """
+    if ':meta' not in annotations:
+        annotations[':meta'] = {}
+    if subname not in annotations[':meta']:
+        annotations[':meta'][subname] = []
+    lst = annotations[':meta'][subname]
+    # decorators are called inside out, so put new one in first entry
+    annotations[':meta'][subname] = [kwgs] + lst
+
+
 class func_meta(object):
     """
     Update a function's annotation data with uniform defaults.
 
     Parameters
     ----------
-    fn : function
-        The function being annotated.
-
-    Returns
-    -------
-    function
-        The original function with updated annotation data.
+    **kwargs : dict
+        Named args passed to the decorator.
     """
 
     def __init__(self, **kwargs):
         """
         Copy the named args passed in.
         """
-        self._kwargs = kwargs.copy()
+        self._kwargs = kwargs
 
     def __call__(self, fn):
         """
@@ -566,30 +588,73 @@ class func_meta(object):
         function
             The original function with modified annotation data.
         """
-        if '_defaults_' in fn.__annotations__:
-            raise RuntimeError("Can't annotate function. Preexisting '_defaults_' entry found.")
-        fn.__annotations__['_defaults_'] = self._kwargs
+        _multi_callable(fn.__annotations__, 'func_meta', self._kwargs)
         return fn
 
 
-if __name__ == '__main__':
-    def _some_func(x=np.zeros(4), y=np.ones(4), z=3):
-        foo = 2. * x + 3. * y
-        bar = 2 * (x + y)
-        baz = z * 3. + 1.
-        return foo, bar, baz
+class declare_partials(object):
+    """
+    Store declare_partials info in function's annotation dict.
 
-    import openmdao.api as om
+    Parameters
+    ----------
+    **kwargs : dict
+        Named args passed to the decorator.
+    """
 
-    p = om.Problem()
-    p.model.add_subsystem('comp', ExplicitFuncComp(_some_func))
-    p.setup()
-    p['comp.x'] = np.arange(4, dtype=float) + 1.
-    p['comp.y'] = np.arange(4, dtype=float) + 2.
-    p['comp.z'] = 99.
+    def __init__(self, **kwargs):
+        """
+        Copy the named args passed in.
+        """
+        self._kwargs = kwargs
 
-    p.run_model()
+    def __call__(self, fn):
+        """
+        Update the function's 'declare_partials' data with our named args.
 
-    print('comp.foo', p['comp.foo'])
-    print('comp.bar', p['comp.bar'])
-    print('comp.baz', p['comp.baz'])
+        Parameters
+        ----------
+        fn : function
+            Update the annotation data for this function.
+
+        Returns
+        -------
+        function
+            The original function with modified annotation data.
+        """
+        _multi_callable(fn.__annotations__, 'declare_partials', self._kwargs)
+        return fn
+
+
+class declare_coloring(object):
+    """
+    Store declare_coloring info in function's annotation dict.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Named args passed to the decorator.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Copy the named args passed in.
+        """
+        self._kwargs = kwargs
+
+    def __call__(self, fn):
+        """
+        Update the function's 'declare_coloring' data with our named args.
+
+        Parameters
+        ----------
+        fn : function
+            Update the annotation data for this function.
+
+        Returns
+        -------
+        function
+            The original function with modified annotation data.
+        """
+        _multi_callable(fn.__annotations__, 'declare_coloring', self._kwargs)
+        return fn

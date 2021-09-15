@@ -202,7 +202,7 @@ class TestFuncComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
-    def test_conflicting_shape(self):
+    def test_shaped_scalar_val(self):
         p = om.Problem()
         model = p.model
 
@@ -211,11 +211,10 @@ class TestFuncComp(unittest.TestCase):
             return y
         model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
+        p.setup()
+        p.run_model()
 
-        self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "'comp' <class ExplicitFuncComp>: Input 'x' default value has shape (), but shape was specified as (5,).")
+        self.assertAlmostEqual(p['comp.x'].shape, (5,))
 
     def test_common_shape(self):
         p = om.Problem()
