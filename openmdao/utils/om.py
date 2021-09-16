@@ -46,7 +46,7 @@ from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
     split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec, \
-        _find_plugins_setup_parser, _find_plugins_exec
+    _find_plugins_setup_parser, _find_plugins_exec
 from openmdao.utils.general_utils import ignore_errors
 from openmdao.utils.om_warnings import warn_deprecation
 
