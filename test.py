@@ -19,6 +19,7 @@ class OptViewer():
         thread = Thread(target = self.run_problem)
         thread.start()
 
+    def start_visualization(self):
         io_loop = IOLoop.current()
         server = Server(applications = {'/optimizer_progress': Application(FunctionHandler(self.make_document))}, io_loop = io_loop, port = 5003)
         server.start()
