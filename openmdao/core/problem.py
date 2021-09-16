@@ -681,9 +681,9 @@ class Problem(object):
         self._run_counter += 1
         record_model_options(self, self._run_counter)
 
-        if self.options['opt_dashboard']:
-            subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
-            time.sleep(3)
+        # if self.options['opt_dashboard']:
+        #     subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
+        #     time.sleep(3)
         self.model._clear_iprint()
         return self.driver.run()
 

@@ -2,12 +2,8 @@ import openmdao.api as om
 import dymos as dm
 import numpy as np
 from dymos.examples.hyper_sensitive.hyper_sensitive_ode import HyperSensitiveODE
-import subprocess
-import time
-# from openmdao.visualization.dash_server import shut_this_down
+from test import OptViewer
 
-# server_start = subprocess.Popen(["python", "openmdao/visualization/dash_server.py"])
-# time.sleep(4)
 
 def solution():
     sqrt_two = np.sqrt(2)
@@ -67,5 +63,6 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 # Solve the problem.
 #
 
-dm.run_problem(p)
+OptViewer(p)
+
 
