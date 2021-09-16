@@ -2,7 +2,7 @@ import openmdao.api as om
 import dymos as dm
 import numpy as np
 from dymos.examples.hyper_sensitive.hyper_sensitive_ode import HyperSensitiveODE
-from test import OptViewer
+from openmdao.visualization.opt_progress_viewer import OptViewer
 
 
 def solution():
@@ -63,6 +63,7 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 # Solve the problem.
 #
 
-OptViewer(p)
+# OptViewer()
+dm.run_problem(p, opt_progress_viz=True)
 
 
