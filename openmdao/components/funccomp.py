@@ -207,7 +207,7 @@ class ExplicitFuncComp(ExplicitComponent):
     def _check_var_name(self, name):
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            raise NameError(f"{self.msginfo}: '{name}' is not a valid variable name." )
+            raise NameError(f"{self.msginfo}: '{name}' is not a valid variable name.")
 
         if name in _disallowed_varnames:
             raise NameError(f"{self.msginfo}: cannot use variable name '{name}' because "
@@ -387,7 +387,6 @@ class ExplicitFuncComp(ExplicitComponent):
                 if 'np' in func.__globals__:
                     func.__globals__['np'] = np
 
-
     def _get_func_info(self, func, compmeta=None, default_val=1.0):
         """
         Retrieve metadata associated with function inputs and return values.
@@ -428,7 +427,7 @@ class ExplicitFuncComp(ExplicitComponent):
             for meta in funcmetalist:
                 funcmeta.update({_from_def.get(k, k): v for k, v in meta.items()})
 
-        reduced = {k:v for k, v in funcmeta.items() if k in _meta_keep}
+        reduced = {k: v for k, v in funcmeta.items() if k in _meta_keep}
         if len(reduced) < len(funcmeta):
             issue_warning("The following metadata entries were ignored: "
                           f"{sorted(set(funcmeta).difference(reduced))}.", prefix=self.msginfo)
@@ -441,7 +440,7 @@ class ExplicitFuncComp(ExplicitComponent):
         for name, p in sig.parameters.items():
             ins[name] = meta = {'val': None, 'units': None, 'shape': None}
             # start with component wide metadata
-            meta.update((k,v) for k, v in compmeta.items() if k in _meta_keep)
+            meta.update((k, v) for k, v in compmeta.items() if k in _meta_keep)
             meta.update(funcmeta)  # override with function wide metadata
             if p.annotation is not inspect.Parameter.empty:
                 if isinstance(p.annotation, dict):
@@ -481,9 +480,9 @@ class ExplicitFuncComp(ExplicitComponent):
         if sig.return_annotation is not inspect.Signature.empty:
             outmeta.update(sig.return_annotation)
 
-        # Parse the function code to possibly identify the names of the return values and input/output
-        # dependencies. Return names will be non-None only if they are simple name, e.g.,
-        #  return a, b, c
+        # Parse the function code to possibly identify the names of the return values and
+        # input/output dependencies. Return names will be non-None only if they are simple name,
+        # e.g., return a, b, c
         outlist = []
         try:
             ret_info = get_function_deps(func)
@@ -516,7 +515,7 @@ class ExplicitFuncComp(ExplicitComponent):
                 notfound.append(oname)
 
         if notfound:  # try to fill in the unnamed slots with annotated output data
-            inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with name of None
+            inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with no name
             if len(notfound) != len(inones):
                 raise RuntimeError(f"{self.msginfo}: Number of unnamed return values "
                                    f"({len(inones)}) doesn't match number of unmatched annotated "
@@ -566,6 +565,11 @@ class func_meta(object):
     ----------
     **kwargs : dict
         Named args passed to the decorator.
+
+    Attributes
+    ----------
+    _kwargs : dict
+        Keyword args passed to the decorated function.
     """
 
     def __init__(self, **kwargs):
@@ -600,6 +604,11 @@ class declare_partials(object):
     ----------
     **kwargs : dict
         Named args passed to the decorator.
+
+    Attributes
+    ----------
+    _kwargs : dict
+        Keyword args passed to the decorated function.
     """
 
     def __init__(self, **kwargs):
@@ -634,6 +643,11 @@ class declare_coloring(object):
     ----------
     **kwargs : dict
         Named args passed to the decorator.
+
+    Attributes
+    ----------
+    _kwargs : dict
+        Keyword args passed to the decorated function.
     """
 
     def __init__(self, **kwargs):

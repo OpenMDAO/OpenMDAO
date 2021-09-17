@@ -469,14 +469,14 @@ class OptionsDictionary(object):
         Parameters
         ----------
         name : str
-            name of the option.
+            Name of the option.
         default : object
             Value returned if the named option doesn't exist in the option dict.
 
         Returns
         -------
-        value : -
-            value of the option, or the default if the option doesn't exist.
+        object
+            Value of the option, or the default if the option doesn't exist.
         """
         if name in self._dict:
             return self._dict[name]['val']
