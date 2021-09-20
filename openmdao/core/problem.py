@@ -787,10 +787,7 @@ class Problem(object):
 
         # clean up driver and model resources
         if self.opt_viz:
-            # We could shut down the server automatically but this might not be advantageous if it
-            # doesn't allow for future dropdown menus to update. Leaving in both options for now.
-            self.opt_view.io_loop.stop()
-            print("Press ctrl/cmd + c to shutdown Bokeh server")
+            print("Press CTRL + c to shutdown Bokeh server")
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 

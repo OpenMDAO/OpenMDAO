@@ -8,6 +8,8 @@ from bokeh.server.server import Server
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
 from bokeh.plotting import figure, ColumnDataSource
+from bokeh.layouts import row
+from bokeh.models import Select
 from threading import Thread
 
 class OptViewer(object):
@@ -59,14 +61,26 @@ class OptViewer(object):
         Setup the Bokeh plot layout and set callback to update with new values.
         """
         self.source = ColumnDataSource(dict(
-            iterations=[], feasibility=[]
+            x_vals=[], y_vals=[]
         ))
 
-        p = figure(title="Iterations vs Feasibility", x_axis_label='Iterations', y_axis_label='Feasibility')
-        p.line(x="iterations", y="feasibility", line_width=2, source=self.source)
+        self.y_input_select = Select(title="Metric:", value="feasibility",
+                                     options=["feasibility", "optimality"])
+        self.y_input_select.on_change('value', self._y_input_update)
 
-        doc.add_root(p)
+        self.plot = figure(title=f"Iterations vs {self.y_input_select.value}",
+                           x_axis_label='Iterations', y_axis_label=self.y_input_select.value)
+        self.plot.line(x="x_vals", y="y_vals", line_width=2, source=self.source)
+
+        doc.add_root(row(self.plot, self.y_input_select))
         doc.add_periodic_callback(self._update, 1000)
+        doc.title = "Optimization Progess Visualization"
+
+    def _y_input_update(self, attr, old, new):
+        self.y_input_select.value = new
+        self.plot.yaxis.axis_label = new
+        self.plot.title.text = f"Iterations vs {new}"
+        self._update()
 
     def _update(self):
         """
@@ -76,14 +90,14 @@ class OptViewer(object):
 
         if opt_data:
             new_data = dict(
-                iterations=opt_data["nMajor"],
-                feasibility=opt_data["feasibility"],
+                x_vals=opt_data["nMajor"],
+                y_vals=opt_data[self.y_input_select.value],
             )
         else:
             new_data = dict(
-                iterations=[],
-                feasibility=[],
+                x_vals=[],
+                y_vals=[],
             )
 
-        if opt_data and len(self.source.data['iterations']) != len(new_data['iterations']):
-            self.source.data = new_data
+        # if opt_data and len(self.source.data['x_vals']) != len(new_data['x_vals']):
+        self.source.data = new_data
