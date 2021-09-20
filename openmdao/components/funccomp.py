@@ -557,7 +557,7 @@ def _multi_callable(annotations, subname, kwgs):
     annotations[':meta'][subname] = [kwgs] + lst
 
 
-class func_meta(object):
+def func_meta(**kwargs):
     """
     Update a function's annotation data with uniform defaults.
 
@@ -566,37 +566,18 @@ class func_meta(object):
     **kwargs : dict
         Named args passed to the decorator.
 
-    Attributes
-    ----------
-    _kwargs : dict
-        Keyword args passed to the decorated function.
+    Returns
+    -------
+    function
+        A function wrapper that updates the function's annotations dict.
     """
-
-    def __init__(self, **kwargs):
-        """
-        Copy the named args passed in.
-        """
-        self._kwargs = kwargs
-
-    def __call__(self, fn):
-        """
-        Update the function's annotation data with our named args.
-
-        Parameters
-        ----------
-        fn : function
-            Update the annotation data for this function.
-
-        Returns
-        -------
-        function
-            The original function with modified annotation data.
-        """
-        _multi_callable(fn.__annotations__, 'func_meta', self._kwargs)
+    def _wrap(fn):
+        _multi_callable(fn.__annotations__, 'func_meta', kwargs)
         return fn
+    return _wrap
 
 
-class declare_partials(object):
+def declare_partials(**kwargs):
     """
     Store declare_partials info in function's annotation dict.
 
@@ -605,37 +586,18 @@ class declare_partials(object):
     **kwargs : dict
         Named args passed to the decorator.
 
-    Attributes
-    ----------
-    _kwargs : dict
-        Keyword args passed to the decorated function.
+    Returns
+    -------
+    function
+        A function wrapper that updates the function's annotations dict.
     """
-
-    def __init__(self, **kwargs):
-        """
-        Copy the named args passed in.
-        """
-        self._kwargs = kwargs
-
-    def __call__(self, fn):
-        """
-        Update the function's 'declare_partials' data with our named args.
-
-        Parameters
-        ----------
-        fn : function
-            Update the annotation data for this function.
-
-        Returns
-        -------
-        function
-            The original function with modified annotation data.
-        """
-        _multi_callable(fn.__annotations__, 'declare_partials', self._kwargs)
+    def _wrap(fn):
+        _multi_callable(fn.__annotations__, 'declare_partials', kwargs)
         return fn
+    return _wrap
 
 
-class declare_coloring(object):
+def declare_coloring(**kwargs):
     """
     Store declare_coloring info in function's annotation dict.
 
@@ -644,31 +606,13 @@ class declare_coloring(object):
     **kwargs : dict
         Named args passed to the decorator.
 
-    Attributes
-    ----------
-    _kwargs : dict
-        Keyword args passed to the decorated function.
+    Returns
+    -------
+    function
+        A function wrapper that updates the function's annotations dict.
     """
-
-    def __init__(self, **kwargs):
-        """
-        Copy the named args passed in.
-        """
-        self._kwargs = kwargs
-
-    def __call__(self, fn):
-        """
-        Update the function's 'declare_coloring' data with our named args.
-
-        Parameters
-        ----------
-        fn : function
-            Update the annotation data for this function.
-
-        Returns
-        -------
-        function
-            The original function with modified annotation data.
-        """
-        _multi_callable(fn.__annotations__, 'declare_coloring', self._kwargs)
+    def _wrap(fn):
+        _multi_callable(fn.__annotations__, 'declare_coloring', kwargs)
         return fn
+    return _wrap
+
