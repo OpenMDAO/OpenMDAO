@@ -247,6 +247,11 @@ def get_input_meta(func):
     ----------
     func : callable
         Callable object we're retrieving metadata from.
+
+    Returns
+    -------
+    iter of (name, dict)
+        An iterator of (input_name, input_meta) tuples.
     """
     return _get_fwrapper(func).get_input_meta()
 
@@ -259,6 +264,11 @@ def get_output_meta(func):
     ----------
     func : callable
         Callable object we're retrieving metadata from.
+
+    Returns
+    -------
+    iter of (name, dict)
+        An iterator of (output_name, output_meta) tuples.
     """
     return _get_fwrapper(func).get_output_meta()
 
@@ -271,6 +281,11 @@ def get_declare_partials(func):
     ----------
     func : callable
         Callable object we're retrieving metadata from.
+
+    Returns
+    -------
+    iter of dict
+        An iterator of keyword args for each declare_partials call.
     """
     return _get_fwrapper(func).get_declare_partials()
 
@@ -283,6 +298,11 @@ def get_declare_coloring(func):
     ----------
     func : callable
         Callable object we're retrieving metadata from.
+
+    Returns
+    -------
+    iter of dict
+        An iterator of keyword args for each declare_coloring call.
     """
     return _get_fwrapper(func).get_declare_colorings()
 
@@ -317,6 +337,32 @@ class _MetaWrappedFunc(object):
     Storage class for function metadata.
 
     Metadata is assumed to be added from decorator calls, so ordering is reversed.
+
+    Parameters
+    ----------
+    func : function
+        The function to be wrapped.
+
+    Attributes
+    ----------
+    _f : function
+        The wrapped function.
+    _defaults : dict
+        Dict of default metadata values that could apply to any variable.
+    _metadata : dict
+        Dict of metadata values that must apply to all variables.
+    _inputs : dict
+        Dict of metadata dicts keyed to input name.
+    _outputs : dict
+        Dict of metadata dicts keyed to output name.
+    _declare_partials : list
+        List of keyword args, one entry for each call to declare_partials.
+    _declare_colorings : list
+        List of keyword args, one entry for each call to declare_coloring.
+    _call_setup : bool
+        If True, call the setup functions for input and output metadata.
+    _use_jax : bool
+        If True, use jax to compute output shapes based on input shapes.
     """
 
     def __init__(self, func):
@@ -326,8 +372,8 @@ class _MetaWrappedFunc(object):
 
         # populate _inputs dict with input names based on function signature so we can error
         # check vs. inputs added via add_input
-        sig = inspect.signature(func)
-        self._inputs = {n: {'val': None if p.default is inspect._empty else p.default} for n, p in sig.parameters.items()}
+        self._inputs = {n: {'val': None if p.default is inspect._empty else p.default}
+                        for n, p in inspect.signature(func).parameters.items()}
         self._outputs = {}
         self._declare_partials = []
         self._declare_colorings = []
@@ -335,17 +381,63 @@ class _MetaWrappedFunc(object):
         self._use_jax = False
 
     def __call__(self, *args, **kwargs):
+        r"""
+        Call the wrapped function.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args.
+        **kwargs : dict
+            Keyword args.
+
+        Returns
+        -------
+        object
+            The return of the wrapped function.
+        """
         return self._f(*args, **kwargs)
 
     def set_defaults(self, **kwargs):
+        r"""
+        Add metadata that may apply to any inputs or outputs of the wrapped function.
+
+        Any variable specific metadata will override any metadata specified here.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Metadata names and their values.
+        """
         self._defaults.update(kwargs)
         return self
 
     def set_metadata(self, **kwargs):
+        r"""
+        Add metadata that applies to all variables of the wrapped function.
+
+        If a variable has specific metadata that doesn't match any metadata specified here,
+        an exception will be raised.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Metadata names and their values.
+        """
         self._metadata.update(kwargs)
         return self
 
     def add_input(self, name, **kwargs):
+        r"""
+        Add metadata for an input of the wrapped function.
+
+        Parameters
+        ----------
+        name : str
+            Name of the input variable.
+        **kwargs : dict
+            Keyword args to store.
+        """
         if name not in self._inputs:
             raise NameError(f"'{name}' is not an input to this function.")
         meta = self._inputs[name]
@@ -359,11 +451,30 @@ class _MetaWrappedFunc(object):
         return self
 
     def add_inputs(self, *kwargs):
+        r"""
+        Add metadata for multiple inputs of the wrapped function.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword args to store.  The value corresponding to each key is a dict containing the
+            metadata for the input name that matches that key.
+        """
         for name, meta in kwargs.items():
             self.add_input(name, meta)
         return self
 
     def add_output(self, name, **kwargs):
+        r"""
+        Add metadata for an output of the wrapped function.
+
+        Parameters
+        ----------
+        name : str
+            Name of the output variable.
+        **kwargs : dict
+            Keyword args to store.
+        """
         if name in self._inputs:
             raise RuntimeError(f"'{name}' already registered as an input")
         if name in self._outputs:
@@ -372,6 +483,15 @@ class _MetaWrappedFunc(object):
         return self
 
     def add_outputs(self, *kwargs):
+        r"""
+        Add metadata for multiple outputs of the wrapped function.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword args to store.  The value corresponding to each key is a dict containing the
+            metadata for the output name that matches that key.
+        """
         # because individual add_output calls come from stacked decorators, their order is reversed.
         # The args to add_outputs are in the correct order, so in order to stay consistent
         # with the ordering of add_output, we reverse the order of the args.
@@ -381,7 +501,7 @@ class _MetaWrappedFunc(object):
 
     def declare_option(self, name, **kwargs):
         r"""
-        Declare an option.
+        Collect name and keyword args to later declare an option on an OpenMDAO component.
 
         Parameters
         ----------
@@ -394,71 +514,154 @@ class _MetaWrappedFunc(object):
         self._inputs[name]['is_option'] = True
 
     def declare_partials(self, **kwargs):
+        r"""
+        Collect args to be passed to declare_partials on an OpenMDAO component.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword args to store.
+        """
         self._declare_partials.append(kwargs)
         if 'method' in kwargs and kwargs['method'] == 'jax':
             self._use_jax = True
-        return self
 
     def declare_coloring(self, **kwargs):
+        r"""
+        Collect args to be passed to declare_coloring on an OpenMDAO component.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword args to store.
+        """
         self._declare_colorings.append(kwargs)
-        return self
 
     def get_input_meta(self):
+        """
+        Get an iterator of (name, metdata_dict) for each input variable.
+
+        Returns
+        -------
+        iter of (str, dict)
+            Iterator of (name, metdata_dict) for each input variable.
+        """
         if self._call_setup:
             self._setup()
         return list(self._inputs.items())
 
     def get_output_meta(self):
+        """
+        Get an iterator of (name, metdata_dict) for each output variable.
+
+        Returns
+        -------
+        iter of (str, dict)
+            Iterator of (name, metdata_dict) for each output variable.
+        """
         if self._call_setup:
             self._setup()
-        return list(reversed(self._outputs.items()))
+        return reversed(self._outputs.items())
 
     def get_declare_partials(self):
-        return list(reversed(self._declare_partials.items()))
+        """
+        Get an iterator of keyword args passed to each declare_partials decorator call.
+
+        Returns
+        -------
+        iter of dict
+            Iterator of dicts containing the keyword args for each call in top to bottom order.
+        """
+        return reversed(self._declare_partials.items())
 
     def get_declare_colorings(self):
-        return list(reversed(self._declare_coloring.items()))
+        """
+        Get an iterator of keyword args passed to each declare_coloring decorator call.
+
+        Returns
+        -------
+        iter of dict
+            Iterator of dicts containing the keyword args for each call in top to bottom order.
+        """
+        return reversed(self._declare_coloring.items())
 
     def _check_vals_equal(self, name, val1, val2):
+        """
+        Compare two values that could be a mix of ndarray and other types.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable (for error reporting).
+        val1 : object
+            First value.
+        val2 : object
+            Second value.
+        """
         # == is more prone to raise exceptions when ndarrays are involved, so use !=
         neq = val1 != val2
         if (isinstance(neq, np.ndarray) and np.any(neq)) or neq:
             raise RuntimeError(f"Conflicting metadata entries for '{name}'.")
 
-    def _resolve_meta(self, name, dct):
+    def _resolve_meta(self, key, meta):
         """
-        Update the value of the metadata corresponding to name based on defaults, etc.
+        Update the value of the metadata corresponding to key based on self._metadata.
+
+        Parameters
+        ----------
+        key : str
+            The metadata entry key.
+        meta : dict
+            The metadata dict to be updated.
         """
-        if name in self._metadata:
-            mval = self._metadata[name]
-            if name in dct:
-                val = dct[name]
+        if key in self._metadata:
+            mval = self._metadata[key]
+            if key in meta:
+                val = meta[key]
                 # check for conflict with func metadata
                 if val is None:
-                    dct[name] = mval
+                    meta[key] = mval
                 else:
-                    self._check_vals_equal(name, val, mval)
+                    self._check_vals_equal(key, val, mval)
             else:
-                dct[name] = mval
+                meta[key] = mval
 
-    def _resolve_default(self, name, dct):
-        if (name not in dct or dct[name] is None) and name in self._defaults:
-            dct[name] = self._defaults[name]
+    def _resolve_default(self, key, meta):
+        """
+        Update the value of the metadata corresponding to key based on self._defaults.
+
+        Parameters
+        ----------
+        key : str
+            The metadata entry key.
+        meta : dict
+            The metadata dict to be updated.
+        """
+        if (key not in meta or meta[key] is None) and key in self._defaults:
+            meta[key] = self._defaults[key]
 
     def _setup(self):
+        """
+        Set up input and output variable metadata dicts.
+        """
         self._call_setup = False
         overrides = set(self._defaults)
         overrides.update(self._metadata)
-        overrides = overrides - {'val', 'shape'}
 
         self._setup_inputs(overrides)
         self._setup_outputs(overrides)
 
     def _setup_inputs(self, overrides):
         """
-        Populate metadata associated with function inputs.
+        Set up the input variable metadata dicts.
+
+        Parameters
+        ----------
+        overrides : set
+            Set of names of entries in self._defaults and self._metadata.
         """
         ins = self._inputs
+        overrides = overrides - {'val', 'shape'}
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
@@ -495,6 +698,14 @@ class _MetaWrappedFunc(object):
                 self._resolve_default(o, meta)
 
     def _setup_outputs(self, overrides):
+        """
+        Set up the output variable metadata dicts.
+
+        Parameters
+        ----------
+        overrides : set
+            Set of names of entries in self._defaults and self._metadata.
+        """
         outmeta = {}
 
         # Parse the function code to possibly identify the names of the return values and
@@ -549,9 +760,8 @@ class _MetaWrappedFunc(object):
 
         self._compute_out_shapes(self._inputs, outs)
 
-        full = overrides.union({'val', 'shape'})
         for meta in outs.values():
-            for o in full:
+            for o in overrides:
                 self._resolve_meta(o, meta)
                 self._resolve_default(o, meta)
 
@@ -626,6 +836,14 @@ class _MetaWrappedFunc(object):
 
 @contextmanager
 def jax_context(globals):
+    """
+    A context where np and numpy are replaced by their jax equivalents.
+
+    Parameters
+    ----------
+    globals : dict
+        The globals dict to have its numpy/np attributes updated.
+    """
     savenp = savenumpy = None
     if 'np' in globals and globals['np'] is np:
         savenp = globals['np']
@@ -662,10 +880,23 @@ def _get_fwrapper(func):
 
 
 def _get_long_name(node):
-    # If the node is an Attribute or Name node that is composed
-    # only of other Attribute or Name nodes, then return the full
-    # dotted name for this node. Otherwise, i.e., if this node
-    # contains Subscripts or Calls, return None.
+    """
+    Return a name (possibly dotted) corresponding to the give node or None.
+
+    If the node is a Name node or an Attribute node that is composed only of other Attribute or
+    Name nodes, then return the full dotted name for this node. Otherwise, i.e., if this node
+    contains other expressions.
+
+    Parameters
+    ----------
+    node : ASTnode
+        A node of an abstract syntax tree.
+
+    Returns
+    -------
+    str or None
+        Name corresponding to the given node.
+    """
     if isinstance(node, ast.Name):
         return node.id
     elif not isinstance(node, ast.Attribute):
