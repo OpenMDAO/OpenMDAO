@@ -5,12 +5,23 @@ API to associate metadata with and retrieve metadata from function objects.
 from numbers import Number
 import ast
 import inspect
+import textwrap
 import warnings
 import numpy as np
+from contextlib import contextmanager
 
+try:
+    import jax
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
+
+
+#
 # User API (decorators used to associate metadata with the function)
+#
 
-def in_var(name, **kwargs):
+def add_input(name, **kwargs):
     """
     Set metadata associated with one of a function's input variables.
 
@@ -25,11 +36,11 @@ def in_var(name, **kwargs):
         A function wrapper that updates the function's metadata.
     """
     def _wrap(func):
-        return _get_fwrapper(func).in_var(name, **kwargs)
+        return _get_fwrapper(func).add_input(name, **kwargs)
     return _wrap
 
 
-def out_var(name, **kwargs):
+def add_output(name, **kwargs):
     """
     Set metadata associated with one of a function's return values.
 
@@ -44,11 +55,11 @@ def out_var(name, **kwargs):
         A function wrapper that updates the function's metadata.
     """
     def _wrap(func):
-        return _get_fwrapper(func).in_var(name, **kwargs)
+        return _get_fwrapper(func).add_output(name, **kwargs)
     return _wrap
 
 
-def in_vars(**kwargs):
+def add_inputs(**kwargs):
     """
     Set metadata associated with a function's input variables.
 
@@ -63,11 +74,11 @@ def in_vars(**kwargs):
         A function wrapper that updates the function's metadata.
     """
     def _wrap(func):
-        return _get_fwrapper(func).in_vars(**kwargs)
+        return _get_fwrapper(func).add_inputs(**kwargs)
     return _wrap
 
 
-def out_vars(**kwargs):
+def add_outputs(**kwargs):
     """
     Set metadata associated with a function's output variables.
 
@@ -82,7 +93,27 @@ def out_vars(**kwargs):
         A function wrapper that updates the function's metadata.
     """
     def _wrap(func):
-        return _get_fwrapper(func).out_vars(**kwargs)
+        return _get_fwrapper(func).add_outputs(**kwargs)
+    return _wrap
+
+
+def output_names(names):
+    """
+    Set the names of a function's output variables.
+
+    Parameters
+    ----------
+    names : list of str
+        Names of outputs with order matching order of return values.
+
+    Returns
+    -------
+    function
+        A function wrapper that updates the function's metadata.
+    """
+    def _wrap(func):
+        kwargs = {n: {} for n in names}
+        return _get_fwrapper(func).add_outputs(**kwargs)
     return _wrap
 
 
@@ -124,6 +155,47 @@ def metadata(**kwargs):
     return _wrap
 
 
+def declare_option(name, default=None, values=None, types=None, desc='',
+                   upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
+                   deprecation=None):
+    r"""
+    Declare an option.
+
+    Parameters
+    ----------
+    name : str
+        Name of the option.
+    default : object or None
+        Optional default value that must be valid under the above 3 conditions.
+    values : set or list or tuple or None
+        Optional list of acceptable option values.
+    types : type or tuple of types or None
+        Optional type or list of acceptable option types.
+    desc : str
+        Optional description of the option.
+    upper : float or None
+        Maximum allowable value.
+    lower : float or None
+        Minimum allowable value.
+    check_valid : function or None
+        User-supplied function with arguments (name, value) that raises an exception
+        if the value is not valid.
+    allow_none : bool
+        If True, allow None as a value regardless of values or types.
+    recordable : bool
+        If True, add to recorder.
+    deprecation : str or None
+        If None, it is not deprecated. If a str, use as a DeprecationWarning
+        during __setitem__ and __getitem__.
+    """
+    def _wrap(func):
+        return _get_fwrapper(func).declare_option(name, default=default, values=values, types=types,
+                                                  desc=desc, upper=upper, lower=lower,
+                                                  check_valid=check_valid, allow_none=allow_none,
+                                                  recordable=recordable, deprecation=deprecation)
+    return _wrap
+
+
 def declare_partials(**kwargs):
     """
     Store declare_partials info in function's metadata.
@@ -162,26 +234,64 @@ def declare_coloring(**kwargs):
     return _wrap
 
 
+#
 # Dev API (for retrieving metadata from the function object)
+#
 
 
-def get_invar_meta(func):
-    return _get_fwrapper(func).get_invar_meta()
+def get_input_meta(func):
+    """
+    Get an iterator of (name, meta_dict) for each input variable.
+
+    Parameters
+    ----------
+    func : callable
+        Callable object we're retrieving metadata from.
+    """
+    return _get_fwrapper(func).get_input_meta()
 
 
-def get_outvar_meta(func):
-    return _get_fwrapper(func).get_outvar_meta()
+def get_output_meta(func):
+    """
+    Get an iterator of (name, meta_dict) for each output variable.
+
+    Parameters
+    ----------
+    func : callable
+        Callable object we're retrieving metadata from.
+    """
+    return _get_fwrapper(func).get_output_meta()
 
 
 def get_declare_partials(func):
+    """
+    Get an iterator of (**kwargs) to be passed to each call of declare_partials.
+
+    Parameters
+    ----------
+    func : callable
+        Callable object we're retrieving metadata from.
+    """
     return _get_fwrapper(func).get_declare_partials()
 
 
 def get_declare_coloring(func):
+    """
+    Get an iterator of (**kwargs) to be passed to each call of declare_coloring.
+
+    Parameters
+    ----------
+    func : callable
+        Callable object we're retrieving metadata from.
+    """
     return _get_fwrapper(func).get_declare_colorings()
 
 
-def shape2tuple(shape):
+#
+# Implementation details
+#
+
+def _shape2tuple(shape):
     """
     Return shape as a tuple.
 
@@ -213,11 +323,16 @@ class _MetaWrappedFunc(object):
         self._f = func
         self._defaults = {'val': 1.0}
         self._metadata = {}
-        self._invars = {}
-        self._outvars = {}
+
+        # populate _inputs dict with input names based on function signature so we can error
+        # check vs. inputs added via add_input
+        sig = inspect.signature(func)
+        self._inputs = {n: {} for n in sig.parameters}
+        self._outputs = {}
         self._declare_partials = []
         self._declare_colorings = []
         self._call_setup = True
+        self._use_jax = False
 
     def __call__(self, *args, **kwargs):
         return self._f(*args, **kwargs)
@@ -230,59 +345,74 @@ class _MetaWrappedFunc(object):
         self._metadata.update(kwargs)
         return self
 
-    def in_var(self, name, **kwargs):
-        self._check_already_registered(name)
-        self._invars[name] = kwargs
+    def add_input(self, name, **kwargs):
+        if name not in self._inputs:
+            raise NameError(f"'{name}' is not an input to this function.")
+        if self._inputs[name]:
+            raise RuntimeError(f"Metadata has already been added to function for input '{name}'.")
+        self._inputs[name].update(kwargs)
         return self
 
-    def in_vars(self, *kwargs):
-        # because individual in_var calls come from stacked decorators, we reverse their
-        # order, so we need to reverse what comes in from in_vars in order to stay consistent
-        # when retrieving in_var metadata.
+    def add_inputs(self, *kwargs):
+        for name, meta in kwargs.items():
+            self.add_input(name, meta)
+        return self
+
+    def add_output(self, name, **kwargs):
+        if name in self._inputs:
+            raise RuntimeError(f"'{name}' already registered as an input")
+        if name in self._outputs:
+            raise RuntimeError(f"'{name}' already registered as an output")
+        self._outputs[name] = kwargs
+        return self
+
+    def add_outputs(self, *kwargs):
+        # because individual add_output calls come from stacked decorators, their order is reversed.
+        # The args to add_outputs are in the correct order, so in order to stay consistent
+        # with the ordering of add_output, we reverse the order of the args.
         for name, meta in reversed(kwargs.items()):
-            self.in_var(name, meta)
+            self.add_output(name, meta)
         return self
 
-    def get_invar_meta(self):
-        if self._call_setup:
-            self._setup()
-        return list(reversed(self._invars.items()))
+    def declare_option(self, name, **kwargs):
+        r"""
+        Declare an option.
 
-    def out_var(self, name, **kwargs):
-        self._check_already_registered(name)
-        self._outvars[name] = kwargs
-        return self
-
-    def out_vars(self, *kwargs):
-        # see comment in in_vars about reversal
-        for name, meta in reversed(kwargs.items()):
-            self.out_var(name, meta)
-        return self
-
-    def get_outvar_meta(self):
-        if self._call_setup:
-            self._setup()
-        return list(reversed(self._outvars.items()))
+        Parameters
+        ----------
+        name : str
+            Name of the option variable.
+        **kwargs : dict
+            Keyword args to store.
+        """
+        self._inputs[name].update(kwargs)
+        self._inputs[name]['is_option'] = True
 
     def declare_partials(self, **kwargs):
         self._declare_partials.append(kwargs)
+        if 'method' in kwargs and kwargs['method'] == 'jax':
+            self._use_jax = True
         return self
-
-    def get_declare_partials(self):
-        return list(reversed(self._declare_partials.items()))
 
     def declare_coloring(self, **kwargs):
         self._declare_colorings.append(kwargs)
         return self
 
+    def get_input_meta(self):
+        if self._call_setup:
+            self._setup()
+        return list(self._inputs.items())
+
+    def get_output_meta(self):
+        if self._call_setup:
+            self._setup()
+        return list(reversed(self._outputs.items()))
+
+    def get_declare_partials(self):
+        return list(reversed(self._declare_partials.items()))
+
     def get_declare_colorings(self):
         return list(reversed(self._declare_coloring.items()))
-
-    def _check_already_registered(self, name):
-        if name in self._invars:
-            raise RuntimeError(f"'{name}' already registered as an input")
-        if name in self._outvars:
-            raise RuntimeError(f"'{name}' already registered as an output")
 
     def _check_vals_equal(self, name, val1, val2):
         # == is more prone to raise exceptions when ndarrays are involved, so use !=
@@ -304,10 +434,11 @@ class _MetaWrappedFunc(object):
             dct[name] = self._defaults[name]
 
     def _setup(self):
-        self._setup_invars()
-        self._setup_outvars()
+        self._call_setup = False
+        self._setup_inputs()
+        self._setup_outputs()
 
-    def _setup_invars(self):
+    def _setup_inputs(self):
         """
         Populate metadata associated with function inputs.
         """
@@ -320,15 +451,15 @@ class _MetaWrappedFunc(object):
             if p.default is not inspect._empty:
                 meta['val'] = p.default
 
-            if name in self._invars:
-                decmeta = self._invars[name]
+            if name in self._inputs:
+                decmeta = self._inputs[name]
                 if 'val' in decmeta and meta['val'] is not None:
                     self._check_vals_equal(name, decmeta['val'], meta['val'])
                 meta.update(decmeta)
 
             # assume a default value if necessary
             if meta['val'] is None and meta['shape'] is None:
-                meta['val'] = self.default_val
+                meta['val'] = self._defaults['val']
 
             if meta['val'] is not None:
                 if np.isscalar(meta['val']):
@@ -339,16 +470,16 @@ class _MetaWrappedFunc(object):
                 if meta['shape'] is None:
                     meta['shape'] = shape
                 else:
-                    meta['shape'] = shape2tuple(meta['shape'])
+                    meta['shape'] = _shape2tuple(meta['shape'])
                     if not shape:  # val is a scalar so reshape with the given meta['shape']
                         meta['val'] = np.ones(meta['shape']) * meta['val']
                     elif shape != meta['shape']:
                         raise ValueError(f"Input '{name}' default value has shape "
                                          f"{shape}, but shape was specified as {meta['shape']}.")
 
-        self._invars = ins
+        self._inputs = ins
 
-    def _setup_outvars(self):
+    def _setup_outputs(self):
         outmeta = {}
 
         # Parse the function code to possibly identify the names of the return values and
@@ -357,21 +488,26 @@ class _MetaWrappedFunc(object):
         outlist = []
         try:
             ret_info = get_function_deps(self._f)
+            # if we found return value names by inspection, they're in the correct order, but we
+            # reverse them here to be consistent with return value names defined using add_output,
+            # which are called as decorators (which execute in inside-out order, which is reversed
+            # from what a user would think).
+            ret_info.reverse()
         except RuntimeError:
             #  this could happen if function is compiled or has multiple return lines
-            if not self._outvars:
+            if not self._outputs:
                 raise RuntimeError(f"Couldn't determine function return names or "
                                    "number of return values based on AST and no return value "
                                    "annotations were supplied.")
             warnings.warn("Couldn't determine function return names based on AST.  Assuming number "
                           "of return values matches number of return value annotations.")
-            outlist = list(self._outvars.items())
+            outlist = list(self._outputs.items())
         else:
             for o, deps in ret_info:
                 outlist.append([o, {'deps': deps}])
 
         notfound = []
-        for oname, ometa in self._outvars.items():
+        for oname, ometa in self._outputs.items():
             for n, meta in outlist:
                 if n == oname:
                     if meta is not ometa:
@@ -383,7 +519,7 @@ class _MetaWrappedFunc(object):
         if notfound:  # try to fill in the unnamed slots with annotated output data
             inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with no name
             if len(notfound) != len(inones):
-                raise RuntimeError(f"{self.msginfo}: Number of unnamed return values "
+                raise RuntimeError(f"Number of unnamed return values "
                                    f"({len(inones)}) doesn't match number of unmatched annotated "
                                    f"return values ({len(notfound)}).")
 
@@ -396,18 +532,16 @@ class _MetaWrappedFunc(object):
 
         outs = {n: m for n, m in outlist}
 
-        self._compute_out_shapes(func, ins, outs, use_jax)
+        self._compute_out_shapes(self._inputs, outs)
 
-        self._outvars = outs
+        self._outputs = outs
 
-    def _compute_out_shapes(self, func, ins, outs, use_jax=True):
+    def _compute_out_shapes(self, ins, outs):
         """
         Compute the shapes of outputs based on those of the inputs.
 
         Parameters
         ----------
-        func : function
-            The function whose outputs' shapes will be determined.
         ins : dict
             Dict of input metadata containing input shapes.
         outs : dict
@@ -429,45 +563,58 @@ class _MetaWrappedFunc(object):
                 try:
                     shp = meta['shape']
                 except KeyError:
-                    raise RuntimeError(f"{self.msginfo}: Can't determine shape of input '{name}'.")
+                    raise RuntimeError(f"Can't determine shape of input '{name}'.")
                 if jax is not None:
-                    args.append(jax.ShapedArray(shape2tuple(shp), dtype=np.float64))
+                    args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
         if need_shape:  # output shapes weren't provided by annotations
             if jax is None:
-                raise RuntimeError(f"{self.msginfo}: Some return values have unknown shape. Jax "
+                raise RuntimeError(f"Some return values have unknown shape. Jax "
                                    "can (possibly) determine the output shapes based on the input "
                                    "shapes, but jax was not found.  Either install jax (pip "
                                    "install jax), or add return value annotations to the function "
                                    "that specify the shapes of return values.")
 
-        if jax is not None:  # compute shapes as a check against annotated value (if any)
+        # compute shapes as a check against annotated value (if any)
+        if jax is not None and self._use_jax:
             # must replace numpy with jax numpy when making jaxpr.
-            if 'np' in func.__globals__:
-                func.__globals__['np'] = jnp
-            try:
-                v = jax.make_jaxpr(func)(*args)
-            except Exception as err:
-                if need_shape:
-                    raise RuntimeError(f"{self.msginfo}: Failed to determine the output shapes "
-                                       f"based on the input shapes. The error was: {err}.  To "
-                                       "avoid this error, add return value annotations that "
-                                       "specify the shapes of the return values to the function.")
-                if use_jax:
+            with jax_context(self._f.__globals__):
+                try:
+                    v = jax.make_jaxpr(self._f)(*args)
+                except Exception as err:
+                    if need_shape:
+                        raise RuntimeError(f"Failed to determine the output shapes "
+                                           f"based on the input shapes. The error was: {err}.  To "
+                                           "avoid this error, add return value annotations that "
+                                           "specify the shapes of the return values to the "
+                                           "function.")
                     issue_warning("Failed to determine the output shapes based on the input "
-                                  "shapes in order to check the provided annotated values.  The "
-                                  f"error was: {err}.", prefix=self.msginfo)
-            else:
-                for val, name in zip(v.out_avals, outs):
-                    oldshape = outs[name].get('shape')
-                    if oldshape is not None and oldshape != val.shape:
-                        raise RuntimeError(f"{self.msginfo}: Annotated shape for return value "
-                                           f"'{name}' of {oldshape} doesn't match computed shape "
-                                           f"of {val.shape}.")
-                    outs[name]['shape'] = val.shape
-            finally:
-                if 'np' in func.__globals__:
-                    func.__globals__['np'] = np
+                                    "shapes in order to check the provided annotated values.  The"
+                                    f" error was: {err}.", prefix=self.msginfo)
+                else:
+                    for val, name in zip(v.out_avals, outs):
+                        oldshape = outs[name].get('shape')
+                        if oldshape is not None and _shape2tuple(oldshape) != val.shape:
+                            raise RuntimeError(f"Annotated shape for return value "
+                                               f"'{name}' of {oldshape} doesn't match computed "
+                                               f"shape of {val.shape}.")
+                        outs[name]['shape'] = val.shape
+
+
+@contextmanager
+def jax_context(globals):
+    savenp = savenumpy = None
+    if 'np' in globals and globals['np'] is np:
+        savenp = globals['np']
+    if 'numpy' in globals:
+        savenumpy = globals['numpy']
+    try:
+        yield
+    finally:
+        if savenp is not None:
+            globals['np'] = savenp
+        if savenumpy is not None:
+            globals['numpy'] = savenumpy
 
 
 def _get_fwrapper(func):
@@ -489,6 +636,29 @@ def _get_fwrapper(func):
     if isinstance(func, _MetaWrappedFunc):
         return func
     return _MetaWrappedFunc(func)
+
+
+def _get_long_name(node):
+    # If the node is an Attribute or Name node that is composed
+    # only of other Attribute or Name nodes, then return the full
+    # dotted name for this node. Otherwise, i.e., if this node
+    # contains Subscripts or Calls, return None.
+    if isinstance(node, ast.Name):
+        return node.id
+    elif not isinstance(node, ast.Attribute):
+        return None
+    val = node.value
+    parts = [node.attr]
+    while True:
+        if isinstance(val, ast.Attribute):
+            parts.append(val.attr)
+            val = val.value
+        elif isinstance(val, ast.Name):
+            parts.append(val.id)
+            break
+        else:  # it's more than just a simple dotted name
+            return None
+    return '.'.join(parts[::-1])
 
 
 class _FuncDepCollector(ast.NodeVisitor):
@@ -571,9 +741,9 @@ class _FuncDepCollector(ast.NodeVisitor):
             The return node being visited.
         """
         if self._ret_info:
-            raise RuntimeError("_ReturnNamesCollector does not support multiple returns in a "
+            raise RuntimeError("_FuncDepCollector does not support multiple returns in a "
                                "single function.  Either the given function contains multiple "
-                               "returns or this _ReturnNamesCollector instance has been used "
+                               "returns or this _FuncDepCollector instance has been used "
                                "more than once, which is unsupported.")
 
         if isinstance(node.value, ast.Tuple):

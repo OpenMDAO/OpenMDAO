@@ -1,25 +1,12 @@
-import itertools
 import unittest
 import math
-import os
-import shutil
-import tempfile
 
 import numpy as np
 from numpy.testing import assert_almost_equal
-import scipy
 from io import StringIO
 
-from distutils.version import LooseVersion
-
-try:
-    from parameterized import parameterized
-except ImportError:
-    from openmdao.utils.assert_utils import SkipParameterized as parameterized
-
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_warning
-from openmdao.utils.om_warnings import OMDeprecationWarning
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.cs_safe import abs, arctan2
 
 
