@@ -8,6 +8,7 @@ from io import StringIO
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.cs_safe import abs, arctan2
+import openmdao.func_api as omf
 
 
 class TestFuncComp(unittest.TestCase):
@@ -76,7 +77,9 @@ class TestFuncComp(unittest.TestCase):
     def test_units(self):
         prob = om.Problem()
 
-        def func(x:{'units': 'm'}=2.0, z=2.0) -> [('y', {'units': 'm'})]:
+        @omf.add_input('x', units='m')
+        @omf.add_output('y', units='m')
+        def func(x=2.0, z=2.0):
             y=x+z+1.
             return y
 
@@ -94,7 +97,7 @@ class TestFuncComp(unittest.TestCase):
     def test_units_decorator(self):
         prob = om.Problem()
 
-        @om.func_meta(default_units='m')
+        @omf.defaults(units='m')
         def func(x=2.0, z=2.0):
             y=x+z+1.
             return y
@@ -142,12 +145,14 @@ class TestFuncComp(unittest.TestCase):
         # all variables in the ExplicitFuncComp have the same units
         prob = om.Problem()
 
-        def func(x:{'val': 2.0}, z=2.0):
+        @omf.defaults(units='m')
+        @omf.add_input('x', val=2.0)
+        def func(x, z=2.0):
             y=x+z+1.
             return y
 
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, default_units='m'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
         prob.model.connect('indep.x', 'comp.x')
 
         prob.setup()
@@ -159,12 +164,13 @@ class TestFuncComp(unittest.TestCase):
         # make sure common units are assigned when no metadata is provided
         prob = om.Problem()
 
+        @omf.defaults(units='m')
         def func(x=2.0):
             y=x+1.
             return y
 
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func, default_units='m'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         prob.model.connect('indep.x', 'comp.x')
 
@@ -173,11 +179,12 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(prob['comp.y'], 2001., 0.00001)
 
-    def test_shape_and_value(self):
+    def test_shape_def(self):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'shape': (5,)}):
+        @omf.defaults(shape=(5,))
+        def func(x):
             y = 3.0*x + 2.5
             return y
         model.add_subsystem('comp', om.ExplicitFuncComp(func))
@@ -193,7 +200,9 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'shape': (5,), 'val': 5}):
+        @omf.add_input('x', shape=(5,), val=5)
+        @omf.add_output('y', shape=(5,))
+        def func(x):
             y =3.0*x + 2.5
             return y
         model.add_subsystem('comp', om.ExplicitFuncComp(func))
@@ -201,16 +210,17 @@ class TestFuncComp(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        self.assertAlmostEqual(p['comp.x'].shape, (5,))
+        self.assertEqual(p['comp.x'].shape, (5,))
 
     def test_common_shape(self):
         p = om.Problem()
         model = p.model
 
+        @omf.defaults(shape=(5,))
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         p.setup()
         p.run_model()
@@ -223,7 +233,7 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @om.func_meta(default_shape=(5,))
+        @omf.defaults(shape=(5,))
         def func(x):
             y =3.0*x + 2.5
             return y
@@ -240,10 +250,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'val': np.zeros(5)}):
+        @omf.defaults(shape=(5,))
+        @omf.add_input('x', val=np.zeros(5))
+        def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
 
         p.setup()
         p.run_model()
@@ -251,21 +263,6 @@ class TestFuncComp(unittest.TestCase):
         J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_common_shape_conflicting_shape(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x) -> [('y', {'shape': (10,)})]:
-            y =3.0*x + 2.5
-            return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(5,)))
-
-        with self.assertRaises(Exception) as context:
-            p.setup()
-
-        self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "'comp' <class ExplicitFuncComp>: Annotated shape for return value 'y' of (10,) doesn't match computed shape of (5,).")
 
     def test_math(self):
         prob = om.Problem()
@@ -309,6 +306,7 @@ class TestFuncComp(unittest.TestCase):
 
     def test_array_lhs(self):
         prob = om.Problem()
+        @omf.add_output('y', shape=2)
         def func(x=np.array([1., 2., 3.])):
             y=np.array([x[1], x[0]])
             return y
@@ -329,7 +327,8 @@ class TestFuncComp(unittest.TestCase):
 
     def test_simple_array_model(self):
         prob = om.Problem()
-        def func(x:{'shape': 2}):
+        @omf.defaults(shape=2)
+        def func(x):
             y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
             return y
 
@@ -345,7 +344,9 @@ class TestFuncComp(unittest.TestCase):
 
     def test_simple_array_model2(self):
         prob = om.Problem()
-        def func(x:{'shape': 2}):
+        @omf.add_input('x', shape=2)
+        @omf.add_output('y', shape=2)
+        def func(x):
             y = np.array([[2., 7.], [5., -3.]]).dot(x)
             return y
         prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
@@ -404,7 +405,8 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_complex_step(self):
         prob = om.Problem()
-        def func(x=-2.0) -> [('y', {'shape': ()})]:
+        @omf.add_output('y', shape=())
+        def func(x=-2.0):
             y=2.0*abs(x)
             return y
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
@@ -443,7 +445,8 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_array_complex_step(self):
         prob = om.Problem()
-        def func(x=np.ones(3)*-2.0) -> [('y', {'shape': (3,)})]:
+        @omf.add_output('y', shape=(3,))
+        def func(x=np.ones(3)*-2.0):
             y=2.0*abs(x)
             return y
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
@@ -480,7 +483,9 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'shape': 5}, A=np.arange(15).reshape((3,5))):
+        @omf.add_input('x', shape=5)
+        @omf.add_output('y', shape=3)
+        def func(x, A=np.arange(15).reshape((3,5))):
             y=A.dot(x)
             return y
 
@@ -501,7 +506,8 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'shape': 5}):
+        @omf.metadata(shape=5)
+        def func(x):
             y=3.0*x + 2.5
             return y
 
@@ -565,6 +571,7 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
+        @omf.defaults(shape=5)
         def func2(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
@@ -588,6 +595,7 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
+        @omf.defaults(shape=5)
         def func3(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
@@ -620,7 +628,9 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        def func(x:{'shape': (5,)}):
+        @omf.add_input('x', shape=(5,))
+        @omf.add_output('y', shape=(5,))
+        def func(x):
             y=3.0*x + 2.5
             return y
 
@@ -638,6 +648,7 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
+        @omf.defaults(shape=(5,))
         def func(x=np.ones(5)):
             y=3.0*x + 2.5
             return y
@@ -760,7 +771,8 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        def func(x:{'units': 'inch'}=0., y:{'units': 'inch'}=0.):
+        @omf.metadata(units='inch')
+        def func(x=0., y=0.):
             z = x + y
             return z
 
@@ -776,31 +788,11 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(prob.get_val('comp.z'), 24.0, 0.00001)
 
-    def test_feature_options(self):
-
-        model = om.Group()
-
-        def func(x):
-            y = 2.*x
-            return y
-
-        xcomp = model.add_subsystem('comp', om.ExplicitFuncComp(func, default_shape=(2,)))
-
-        xcomp.options['default_units'] = 'm'
-
-        prob = om.Problem(model)
-        prob.setup()
-
-        prob.set_val('comp.x', [100., 200.], units='cm')
-
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.y'), [2., 4.], 0.00001)
-
     def test_list_outputs_resids_tol(self):
         prob = om.Problem()
         model = prob.model
 
+        @omf.add_output('y', shape=2)
         def func(a=2.0, b=5.0, c=3.0, x=np.ones(2)):
             y = a * x ** 2 + b * x + c
             return y

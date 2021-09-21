@@ -321,13 +321,13 @@ class _MetaWrappedFunc(object):
 
     def __init__(self, func):
         self._f = func
-        self._defaults = {'val': 1.0}
+        self._defaults = {'val': 1.0, 'shape': ()}
         self._metadata = {}
 
         # populate _inputs dict with input names based on function signature so we can error
         # check vs. inputs added via add_input
         sig = inspect.signature(func)
-        self._inputs = {n: {} for n in sig.parameters}
+        self._inputs = {n: {'val': None if p.default is inspect._empty else p.default} for n, p in sig.parameters.items()}
         self._outputs = {}
         self._declare_partials = []
         self._declare_colorings = []
@@ -348,9 +348,14 @@ class _MetaWrappedFunc(object):
     def add_input(self, name, **kwargs):
         if name not in self._inputs:
             raise NameError(f"'{name}' is not an input to this function.")
-        if self._inputs[name]:
-            raise RuntimeError(f"Metadata has already been added to function for input '{name}'.")
-        self._inputs[name].update(kwargs)
+        meta = self._inputs[name]
+        for kw in kwargs:
+            if kw in meta and meta[kw] is not None:
+                raise RuntimeError("Metadata has already been added to function for input "
+                                   f"'{name}'.")
+        if meta.get('val') is not None and kwargs.get('val') is not None:
+            self._check_vals_equal(name, meta['val'], kwargs['val'])
+        meta.update(kwargs)
         return self
 
     def add_inputs(self, *kwargs):
@@ -424,62 +429,72 @@ class _MetaWrappedFunc(object):
         """
         Update the value of the metadata corresponding to name based on defaults, etc.
         """
-        if name in dct:
-            val = dct[name]
-            # check for conflict with func metadata
-            if name in self._metadata:
-                mval = self._metadata[name]
-                self._check_vals_equal(name, val, mval)
-        elif name in self._defaults:
+        if name in self._metadata:
+            mval = self._metadata[name]
+            if name in dct:
+                val = dct[name]
+                # check for conflict with func metadata
+                if val is None:
+                    dct[name] = mval
+                else:
+                    self._check_vals_equal(name, val, mval)
+            else:
+                dct[name] = mval
+
+    def _resolve_default(self, name, dct):
+        if (name not in dct or dct[name] is None) and name in self._defaults:
             dct[name] = self._defaults[name]
 
     def _setup(self):
         self._call_setup = False
-        self._setup_inputs()
-        self._setup_outputs()
+        overrides = set(self._defaults)
+        overrides.update(self._metadata)
+        overrides = overrides - {'val', 'shape'}
 
-    def _setup_inputs(self):
+        self._setup_inputs(overrides)
+        self._setup_outputs(overrides)
+
+    def _setup_inputs(self, overrides):
         """
         Populate metadata associated with function inputs.
         """
-        ins = {}  # need to remake the dict to ensure ordering is right
+        ins = self._inputs
 
         # first, retrieve inputs from the function signature
-        sig = inspect.signature(self._f)
-        for name, p in sig.parameters.items():
-            ins[name] = meta = {'val': None, 'shape': None}
-            if p.default is not inspect._empty:
-                meta['val'] = p.default
+        for name in inspect.signature(self._f).parameters:
+            meta = ins[name]
+            if meta.get('is_option'):
+                continue
 
-            if name in self._inputs:
-                decmeta = self._inputs[name]
-                if 'val' in decmeta and meta['val'] is not None:
-                    self._check_vals_equal(name, decmeta['val'], meta['val'])
-                meta.update(decmeta)
+            # set using defaults or metadata if val has not been set
+            self._resolve_meta('val', meta)
 
-            # assume a default value if necessary
-            if meta['val'] is None and meta['shape'] is None:
+            if 'val' in meta and meta['val'] is not None:
+                valshape = np.asarray(meta['val']).shape
+            else:
+                valshape = None
                 meta['val'] = self._defaults['val']
 
-            if meta['val'] is not None:
-                if np.isscalar(meta['val']):
-                    shape = ()
+            self._resolve_meta('shape', meta)
+
+            if meta.get('shape') is None:
+                if valshape is not None:
+                    meta['shape'] = valshape
                 else:
-                    shape = meta['val'].shape
+                    meta['shape'] = self._defaults['shape']
 
-                if meta['shape'] is None:
-                    meta['shape'] = shape
-                else:
-                    meta['shape'] = _shape2tuple(meta['shape'])
-                    if not shape:  # val is a scalar so reshape with the given meta['shape']
-                        meta['val'] = np.ones(meta['shape']) * meta['val']
-                    elif shape != meta['shape']:
-                        raise ValueError(f"Input '{name}' default value has shape "
-                                         f"{shape}, but shape was specified as {meta['shape']}.")
+            meta['shape'] = _shape2tuple(meta['shape'])
+            if not valshape:  # val is a scalar so reshape with the given meta['shape']
+                meta['val'] = np.ones(meta['shape']) * meta['val']
+            elif valshape != meta['shape']:
+                raise ValueError(f"Input '{name}' default value has shape "
+                                 f"{valshape}, but shape was specified as {meta['shape']}.")
 
-        self._inputs = ins
+            for o in overrides:
+                self._resolve_meta(o, meta)
+                self._resolve_default(o, meta)
 
-    def _setup_outputs(self):
+    def _setup_outputs(self, overrides):
         outmeta = {}
 
         # Parse the function code to possibly identify the names of the return values and
@@ -534,6 +549,12 @@ class _MetaWrappedFunc(object):
 
         self._compute_out_shapes(self._inputs, outs)
 
+        full = overrides.union({'val', 'shape'})
+        for meta in outs.values():
+            for o in full:
+                self._resolve_meta(o, meta)
+                self._resolve_default(o, meta)
+
         self._outputs = outs
 
     def _compute_out_shapes(self, ins, outs):
@@ -547,13 +568,12 @@ class _MetaWrappedFunc(object):
         outs : dict
             Dict of output metadata that will be updated with shape information.
         """
-        need_shape = False
-        for ometa in outs.values():
+        need_shape = []
+        for name, ometa in outs.items():
             try:
                 ometa['shape']
             except KeyError:
-                need_shape = True
-                break
+                need_shape.append(name)
 
         args = []
         for name, meta in ins.items():
@@ -566,14 +586,6 @@ class _MetaWrappedFunc(object):
                     raise RuntimeError(f"Can't determine shape of input '{name}'.")
                 if jax is not None:
                     args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
-
-        if need_shape:  # output shapes weren't provided by annotations
-            if jax is None:
-                raise RuntimeError(f"Some return values have unknown shape. Jax "
-                                   "can (possibly) determine the output shapes based on the input "
-                                   "shapes, but jax was not found.  Either install jax (pip "
-                                   "install jax), or add return value annotations to the function "
-                                   "that specify the shapes of return values.")
 
         # compute shapes as a check against annotated value (if any)
         if jax is not None and self._use_jax:
@@ -588,9 +600,9 @@ class _MetaWrappedFunc(object):
                                            "avoid this error, add return value annotations that "
                                            "specify the shapes of the return values to the "
                                            "function.")
-                    issue_warning("Failed to determine the output shapes based on the input "
-                                    "shapes in order to check the provided annotated values.  The"
-                                    f" error was: {err}.", prefix=self.msginfo)
+                    warnings.warn("Failed to determine the output shapes based on the input "
+                                  "shapes in order to check the provided annotated values. The"
+                                  f" error was: {err}.")
                 else:
                     for val, name in zip(v.out_avals, outs):
                         oldshape = outs[name].get('shape')
@@ -599,6 +611,17 @@ class _MetaWrappedFunc(object):
                                                f"'{name}' of {oldshape} doesn't match computed "
                                                f"shape of {val.shape}.")
                         outs[name]['shape'] = val.shape
+                    need_shape = []
+
+        if need_shape:  # output shapes weren't provided by user or by jax
+            if 'shape' in self._metadata:
+                shape = self._metadata['shape']
+            else:
+                shape = self._defaults['shape']
+            warnings.warn(f"Return values {need_shape} have unspecified shape so are assumed to "
+                          f"have shape {shape}.")
+            for name in need_shape:
+                outs[name]['shape'] = shape
 
 
 @contextmanager
