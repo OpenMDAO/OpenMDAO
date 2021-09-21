@@ -84,9 +84,9 @@ class InterpCubic(InterpAlgorithm):
         tmp = 6.0 * (vdiff[..., 1:] - vdiff[..., :n - 2]) / (grid[2:] - grid[:n - 2])
 
         for i in range(1, n - 1):
-            prtl = mu[i - 1] * sec_deriv[..., i - 1] + 2.0
-            sec_deriv[i] = (mu[i - 1] - 1.0) / prtl
-            temp[..., i] = (tmp[..., i - 1] - mu[i - 1] * temp[..., i - 1]) / prtl
+            prtl = 1.0 / (mu[i - 1] * sec_deriv[..., i - 1] + 2.0)
+            sec_deriv[i] = (mu[i - 1] - 1.0) * prtl
+            temp[..., i] = (tmp[..., i - 1] - mu[i - 1] * temp[..., i - 1]) * prtl
 
         sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape), dtype=dtype)
 
@@ -154,6 +154,7 @@ class InterpCubic(InterpAlgorithm):
             tshape = list(interp_values.shape)
             tshape.append(nx)
             derivs = np.empty(tuple(tshape), dtype=x.dtype)
+            print(nx, tshape)
 
             derivs[..., 0] = r_step * (values[..., idx + 1] - values[..., idx]) + \
                 (((3.0 * b * b - 1) * sec_deriv[..., idx + 1] -

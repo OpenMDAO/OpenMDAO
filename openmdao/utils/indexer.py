@@ -1665,6 +1665,28 @@ class IndexMaker(object):
 indexer = IndexMaker()
 
 
+def to_numpy_style(inds):
+    """
+    Convert old style OpenMDAO-specific indices into numpy-like indices.
+
+    Parameters
+    ----------
+    inds : list of tuples
+        Old style indices.
+
+    Returns
+    -------
+    tuple of ndarrays
+        New style indices.
+    """
+    inds = indexer(inds, new_style=False)
+    if isinstance(inds, ListOfTuplesArrayIndexer):
+        return tuple(i.tolist() for i in inds._npy_inds)
+    elif isinstance(inds, ShapedArrayIndexer):
+        return inds().tolist()
+    raise TypeError("Indices are not old-style format.")
+
+
 # Since this is already user facing we'll leave it as is, and just use the output of
 # __getitem__ to initialize our Indexer object that will be used internally.
 class Slicer(object):
@@ -1702,6 +1724,7 @@ def _update_new_style(src_indices, new_style, prefix=""):
                     return True
             warn_deprecation(f"{prefix}: 'src_indices={src_indices}' is specified in"
                              " a deprecated format. In a future release, 'src_indices'"
-                             " will be expected to use NumPy array indexing.")
+                             " will be expected to use NumPy array indexing, so replace the "
+                             f"existing src_indices with {to_numpy_style(src_indices)}.")
 
     return new_style

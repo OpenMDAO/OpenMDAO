@@ -13,6 +13,7 @@ from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear
+from openmdao.components.interp_util.interp_trilinear import InterpTrilinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
@@ -26,10 +27,11 @@ INTERP_METHODS = {
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
     'bsplines': InterpBSplines,
+    'trilinear': InterpTrilinear,
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic']
+                 'scipy_slinear', 'scipy_quintic', 'trilinear']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -307,16 +309,16 @@ class InterpND(object):
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
                                            i, np.NaN, self.grid[i][0], self.grid[i][-1])
 
-                eps = 1e-14 * self.grid[i][-1]
-                if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
-                                      np.all(p - eps <= self.grid[i][-1])):
-                    p1 = np.where(self.grid[i][0] > p)[0]
-                    p2 = np.where(p > self.grid[i][-1])[0]
-                    # First violating entry is enough to direct the user.
-                    violated_idx = set(p1).union(p2).pop()
-                    value = p[violated_idx]
-                    raise OutOfBoundsError("One of the requested xi is out of bounds",
-                                           i, value, self.grid[i][0], self.grid[i][-1])
+                #eps = 1e-14 * self.grid[i][-1]
+                #if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
+                                      #np.all(p - eps <= self.grid[i][-1])):
+                    #p1 = np.where(self.grid[i][0] > p)[0]
+                    #p2 = np.where(p > self.grid[i][-1])[0]
+                    ## First violating entry is enough to direct the user.
+                    #violated_idx = set(p1).union(p2).pop()
+                    #value = p[violated_idx]
+                    #raise OutOfBoundsError("One of the requested xi is out of bounds",
+                                           #i, value, self.grid[i][0], self.grid[i][-1])
 
         if self._compute_d_dvalues:
             # If the table grid or values are component inputs, then we need to create a new table

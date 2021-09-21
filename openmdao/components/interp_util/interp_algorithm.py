@@ -239,6 +239,226 @@ class InterpAlgorithm(object):
         pass
 
 
+class InterpAlgorithmFixed(object):
+    """
+    Base class for interpolation over data on a table with a fixed dimension.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple (x, y, z) of grid locations.
+    values : ndarray
+        Array containing the table values.
+    interp : class
+        Unused, but kept for API compatibility.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
+    Attributes
+    ----------
+    grid : tuple(ndarray)
+        Tuple (x, y, z) of grid locations.
+    k : int
+        Minimum number of points required for this algorithm.
+    dim : int
+        Required number of dimensions for this algorithm.
+    last_index : list of int
+        Indices of previous evaluation, used to start search for current index.
+    options : <OptionsDictionary>
+        Dictionary with general pyoptsparse options.
+    values : ndarray
+        Array containing the table values.
+    _compute_d_dvalues : bool
+        When set to True, compute gradients with respect to the grid values.
+    _compute_d_dx : bool
+        When set to True, compute gradients with respect to the interpolated point location.
+    _name : str
+        Algorithm name for error messages.
+    _vectorized :bool
+        If True, this method is vectorized and can simultaneously solve multiple interpolations.
+    """
+
+    def __init__(self, grid, values, interp, **kwargs):
+        """
+        Initialize interp algorithm.
+        """
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
+        self.initialize()
+        self.options.update(kwargs)
+
+        self.grid = grid
+        self.values = values
+
+        self.last_index = 0
+        self.k = None
+        self.dim = None
+        self._name = None
+        self._vectorized = False
+        self._compute_d_dvalues = False
+        self._compute_d_dx = True
+
+    def initialize(self):
+        """
+        Declare options.
+
+        Override to add options.
+        """
+        pass
+
+    def check_config(self):
+        """
+        Verify that we have enough points for this interpolation algorithm.
+        """
+        k = self.k
+        n_p = len(self.grid)
+        if n_p < k:
+            raise ValueError("There are %d points in a data dimension,"
+                             " but method %s requires at least %d "
+                             "points per dimension."
+                             "" % (n_p, self._name, k + 1))
+
+    def bracket(self, x):
+        """
+        Locate the interval of the new independents.
+
+        Uses the following algorithm:
+           1. Determine if the value is above or below the value at last_index
+           2. Bracket the value between last_index and last_index +- inc, where
+              inc has an increasing value of 1,2,4,8, etc.
+           3. Once the value is bracketed, use bisection method within that bracket.
+
+        The grid is assumed to increase in a monotonic fashion.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        integer
+            Grid interval index that contains x.
+        integer
+            Extrapolation flag, -1 if the bracket is below the first table element, 1 if the
+            bracket is above the last table element, 0 for normal interpolation.
+        """
+        for j in range(self.dim):
+            #self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],
+            #                                          self.last_index[j])
+            self.last_index[j] = np.searchsorted(self.grid[j], x[j], side='left') - 1
+
+        return self.last_index, None
+
+    def _bracket_dim(self, grid, x, last_index):
+        """
+        Bracketing algorithm applied on a single dimension.
+
+        Parameters
+        ----------
+        grid : ndarray
+            Grid values at this dimension.
+        x : float
+            Value of independent at this dimension.
+        last_index : float
+            Cached index of last interpolated value at this dimension.
+
+        """
+        high = last_index + 1
+        highbound = len(grid) - 1
+        inc = 1
+
+        while x <= grid[last_index]:
+            high = last_index
+            last_index -= inc
+            if last_index < 0:
+                last_index = 0
+
+                # Check if we're off of the bottom end.
+                if x < grid[0]:
+                    return last_index, -1
+                break
+
+            inc += inc
+
+        if high > highbound:
+            high = highbound
+
+        while x > grid[high]:
+            last_index = high
+            high += inc
+            if high >= highbound:
+
+                # Check if we're off of the top end
+                if x > grid[highbound]:
+                    last_index = highbound
+                    return last_index, 1
+
+                high = highbound
+                break
+            inc += inc
+
+        # Bisection
+        while high - last_index > 1:
+            low = (high + last_index) // 2
+            if x < grid[low]:
+                high = low
+            else:
+                last_index = low
+
+        return last_index, 0
+
+    def evaluate(self, x, slice_idx=None):
+        """
+        Interpolate on this grid.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to interpolate on this grid.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        idx, _ = self.bracket(x)
+        result, d_dx, d_values, d_grid = self.interpolate(x, idx)
+
+        return result, d_dx, d_values, d_grid
+
+    def interpolate(self, x, idx):
+        """
+        Compute the interpolated value.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        pass
+
+
 class InterpAlgorithmSemi(object):
     """
     Base class for interpolation over semi structured data in an n-dimensional table.
