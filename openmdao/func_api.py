@@ -31,532 +31,9 @@ _allowed_add_output_args = {
 _allowed_add_var_args = _allowed_add_input_args.union(_allowed_add_output_args)
 
 
-#
-# User API (decorators used to associate metadata with the function)
-#
-
-def add_input(name, val=None, shape=None, src_indices=None, flat_src_indices=None,
-              units=None, desc=None, tags=None, shape_by_conn=None, copy_shape=None,
-              distributed=None, new_style_idx=None):
+class OMWrappedFunc(object):
     """
-    Set metadata associated with one of a function's input variables.
-
-    Parameters
-    ----------
-    name : str
-        Name of the variable in this component's namespace.
-    val : float or list or tuple or ndarray or Iterable
-        The initial value of the variable being added in user-defined units.
-    shape : int or tuple or list or None
-        Shape of this variable, only required if src_indices not provided and
-        val is not an array. Default is None.
-    src_indices : int or list or tuple or int ndarray or Iterable or None
-        The global indices of the source variable to transfer data from.
-        A value of None implies this input depends on all entries of the source array.
-        Default is None. The shapes of the target and src_indices must match,
-        and the form of the entries within is determined by the value of 'flat_src_indices'.
-    flat_src_indices : bool
-        If True and the source is non-flat, each entry of src_indices is assumed to be an index
-        into the flattened source.  Ignored if the source is flat.
-    units : str or None
-        Units in which this input variable will be provided to the component
-        during execution. Default is None, which means it is unitless.
-    desc : str
-        Description of the variable.
-    tags : str or list of strs
-        User defined tags that can be used to filter what gets listed when calling
-        list_inputs and list_outputs.
-    shape_by_conn : bool
-        If True, shape this input to match its connected output.
-    copy_shape : str or None
-        If a str, that str is the name of a variable. Shape this input to match that of
-        the named variable.
-    distributed : bool
-        If True, this variable is a distributed variable, so it can have different sizes/values
-        across MPI processes.
-    new_style_idx : bool
-        If True, assume numpy compatible indexing.  Not setting this to True will result in a
-        deprecation warning for src_indices arrays with ndim > 1.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    loc = locals()
-    def _wrap(func):
-        return _get_fwrapper(func).add_input(**_get_kwargs(add_input, loc))
-    return _wrap
-
-
-def add_output(name, val=None, shape=None, units=None, res_units=None, desc=None,
-               lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
-               shape_by_conn=False, copy_shape=None, distributed=None):
-    """
-    Set metadata associated with one of a function's return values.
-
-    Parameters
-    ----------
-    name : str
-        Name of the variable in this component's namespace.
-    val : float or list or tuple or ndarray
-        The initial value of the variable being added in user-defined units. Default is 1.0.
-    shape : int or tuple or list or None
-        Shape of this variable, only required if val is not an array.
-        Default is None.
-    units : str or None
-        Units in which the output variables will be provided to the component during execution.
-        Default is None, which means it has no units.
-    res_units : str or None
-        Units in which the residuals of this output will be given to the user when requested.
-        Default is None, which means it has no units.
-    desc : str
-        Description of the variable.
-    lower : float or list or tuple or ndarray or Iterable or None
-        Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-        consistent with the shape arg (if given), or (3) an array_like matching the shape of
-        val, if val is array_like. A value of None means this output has no lower bound.
-        Default is None.
-    upper : float or list or tuple or ndarray or or Iterable None
-        Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-        consistent with the shape arg (if given), or (3) an array_like matching the shape of
-        val, if val is array_like. A value of None means this output has no upper bound.
-        Default is None.
-    ref : float or ndarray
-        Scaling parameter. The value in the user-defined units of this output variable when
-        the scaled value is 1. Default is 1.
-    ref0 : float or ndarray
-        Scaling parameter. The value in the user-defined units of this output variable when
-        the scaled value is 0. Default is 0.
-    res_ref : float or ndarray
-        Scaling parameter. The value in the user-defined res_units of this output's residual
-        when the scaled value is 1. Default is 1.
-    tags : str or list of strs or set of strs
-        User defined tags that can be used to filter what gets listed when calling
-        list_inputs and list_outputs.
-    shape_by_conn : bool
-        If True, shape this output to match its connected input(s).
-    copy_shape : str or None
-        If a str, that str is the name of a variable. Shape this output to match that of
-        the named variable.
-    distributed : bool
-        If True, this variable is a distributed variable, so it can have different sizes/values
-        across MPI processes.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    loc = locals()
-    def _wrap(func):
-        return _get_fwrapper(func).add_output(**_get_kwargs(add_output, loc))
-    return _wrap
-
-
-def add_inputs(**kwargs):
-    """
-    Set metadata associated with a function's input variables.
-
-    Parameters
-    ----------
-    **kwargs : dict
-        Named args passed to the decorator.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    _check_kwargs(kwargs, _allowed_add_input_args)
-    def _wrap(func):
-        return _get_fwrapper(func).add_inputs(**kwargs)
-    return _wrap
-
-
-def add_outputs(**kwargs):
-    """
-    Set metadata associated with a function's output variables.
-
-    Parameters
-    ----------
-    **kwargs : dict
-        Named args passed to the decorator.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    _check_kwargs(kwargs, _allowed_add_output_args)
-    def _wrap(func):
-        return _get_fwrapper(func).add_outputs(**kwargs)
-    return _wrap
-
-
-def output_names(names):
-    """
-    Set the names of a function's output variables.
-
-    Parameters
-    ----------
-    names : list of str
-        Names of outputs with order matching order of return values.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    def _wrap(func):
-        kwargs = {n: {} for n in names}
-        return _get_fwrapper(func).add_outputs(**kwargs)
-    return _wrap
-
-
-def defaults(**kwargs):
-    """
-    Update a function's metadata with uniform defaults.
-
-    Parameters
-    ----------
-    **kwargs : dict
-        Named args passed to the decorator.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    def _wrap(func):
-        return _get_fwrapper(func).set_defaults(**kwargs)
-    return _wrap
-
-
-def metadata(**kwargs):
-    """
-    Update a function's metadata with uniform values.
-
-    Parameters
-    ----------
-    **kwargs : dict
-        Named args passed to the decorator.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    def _wrap(func):
-        return _get_fwrapper(func).set_metadata(**kwargs)
-    return _wrap
-
-
-def declare_option(name, default=None, values=None, types=None, desc=None,
-                   upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
-                   deprecation=None):
-    r"""
-    Declare an option.
-
-    Parameters
-    ----------
-    name : str
-        Name of the option.
-    default : object or None
-        Optional default value that must be valid under the above 3 conditions.
-    values : set or list or tuple or None
-        Optional list of acceptable option values.
-    types : type or tuple of types or None
-        Optional type or list of acceptable option types.
-    desc : str
-        Optional description of the option.
-    upper : float or None
-        Maximum allowable value.
-    lower : float or None
-        Minimum allowable value.
-    check_valid : function or None
-        User-supplied function with arguments (name, value) that raises an exception
-        if the value is not valid.
-    allow_none : bool
-        If True, allow None as a value regardless of values or types.
-    recordable : bool
-        If True, add to recorder.
-    deprecation : str or None
-        If None, it is not deprecated. If a str, use as a DeprecationWarning
-        during __setitem__ and __getitem__.
-    """
-    loc = locals()
-    def _wrap(func):
-        return _get_fwrapper(func).declare_option(**_get_kwargs(declare_option, loc))
-    return _wrap
-
-
-def declare_partials(of, wrt, dependent=True, rows=None, cols=None, val=None,
-                     method='exact', step=None, form=None, step_calc=None, minimum_step=None):
-    """
-    Store declare_partials info in function's metadata.
-
-    Parameters
-    ----------
-    of : str or list of str
-        The name of the residual(s) that derivatives are being computed for.
-        May also contain a glob pattern.
-    wrt : str or list of str
-        The name of the variables that derivatives are taken with respect to.
-        This can contain the name of any input or output variable.
-        May also contain a glob pattern.
-    rows : ndarray of int or None
-        Row indices for each nonzero entry.  For sparse subjacobians only.
-    cols : ndarray of int or None
-        Column indices for each nonzero entry.  For sparse subjacobians only.
-    val : float or ndarray of float or scipy.sparse
-        Value of subjacobian.  If rows and cols are not None, this will
-        contain the values found at each (row, col) location in the subjac.
-    method : str
-        The type of approximation that should be used. Valid options include:
-        'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
-        defined analytic derivatives. Default is 'exact'.
-    step : float
-        Step size for approximation. Defaults to None, in which case the approximation
-        method provides its default value.
-    form : str
-        Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
-        to None, in which case the approximation method provides its default value.
-    step_calc : str
-        Step type for computing the size of the finite difference step. It can be 'abs' for
-        absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
-        'rel_element' for a size relative to each value in the vector input. In addition, it
-        can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
-        compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
-        future will default to 'rel_avg'. Defaults to None, in which case the approximation
-        method provides its default value.
-    minimum_step : float
-        Minimum step size allowed when using one of the relative step_calc options.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    loc = locals()
-    def _wrap(func):
-        return _get_fwrapper(func).declare_partials(**_get_kwargs(declare_partials, loc))
-    return _wrap
-
-
-def declare_coloring(wrt=None, method=None, form=None, step=None, per_instance=None,
-                     num_full_jacs=None, tol=None, orders=None, perturb_size=None,
-                     min_improve_pct=None, show_summary=None, show_sparsity=None):
-    """
-    Store declare_coloring info in function's metadata.
-
-    Parameters
-    ----------
-    wrt : str or list of str
-        The name or names of the variables that derivatives are taken with respect to.
-        This can contain input names, output names, or glob patterns.
-    method : str
-        Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-    form : str
-        Finite difference form, can be "forward", "central", or "backward". Leave
-        undeclared to keep unchanged from previous or default value.
-    step : float
-        Step size for finite difference. Leave undeclared to keep unchanged from previous
-        or default value.
-    per_instance : bool
-        If True, a separate coloring will be generated for each instance of a given class.
-        Otherwise, only one coloring for a given class will be generated and all instances
-        of that class will use it.
-    num_full_jacs : int
-        Number of times to repeat partial jacobian computation when computing sparsity.
-    tol : float
-        Tolerance used to determine if an array entry is nonzero during sparsity determination.
-    orders : int
-        Number of orders above and below the tolerance to check during the tolerance sweep.
-    perturb_size : float
-        Size of input/output perturbation during generation of sparsity.
-    min_improve_pct : float
-        If coloring does not improve (decrease) the number of solves more than the given
-        percentage, coloring will not be used.
-    show_summary : bool
-        If True, display summary information after generating coloring.
-    show_sparsity : bool
-        If True, display sparsity with coloring info after generating coloring.
-
-    Returns
-    -------
-    function
-        A function wrapper that updates the function's metadata.
-    """
-    loc = locals()
-    def _wrap(func):
-        return _get_fwrapper(func).declare_coloring(**_get_kwargs(declare_coloring, loc))
-    return _wrap
-
-
-def apply_decorators(func, *decorators):
-    r"""
-    Apply the given list of decorators to the given function.
-
-    Parameters
-    ----------
-    func : function
-        Function to be decorated.
-    *decorators : list
-        List of decorators to apply to the given function.
-
-    Returns
-    -------
-    callable
-        Decorated function.
-    """
-    for dec in decorators:
-        func = dec(func)
-    return func
-
-#
-# Dev API (for retrieving metadata from the function object)
-#
-
-
-def get_input_meta(func):
-    """
-    Get an iterator of (name, meta_dict) for each input variable.
-
-    Parameters
-    ----------
-    func : callable
-        Callable object we're retrieving metadata from.
-
-    Returns
-    -------
-    iter of (name, dict)
-        An iterator of (input_name, input_meta) tuples.
-    """
-    return _get_fwrapper(func).get_input_meta()
-
-
-def get_output_meta(func):
-    """
-    Get an iterator of (name, meta_dict) for each output variable.
-
-    Parameters
-    ----------
-    func : callable
-        Callable object we're retrieving metadata from.
-
-    Returns
-    -------
-    iter of (name, dict)
-        An iterator of (output_name, output_meta) tuples.
-    """
-    return _get_fwrapper(func).get_output_meta()
-
-
-def get_declare_partials(func):
-    """
-    Get an iterator of (**kwargs) to be passed to each call of declare_partials.
-
-    Parameters
-    ----------
-    func : callable
-        Callable object we're retrieving metadata from.
-
-    Returns
-    -------
-    iter of dict
-        An iterator of keyword args for each declare_partials call.
-    """
-    return _get_fwrapper(func).get_declare_partials()
-
-
-def get_declare_colorings(func):
-    """
-    Get an iterator of (**kwargs) to be passed to each call of declare_coloring.
-
-    Parameters
-    ----------
-    func : callable
-        Callable object we're retrieving metadata from.
-
-    Returns
-    -------
-    iter of dict
-        An iterator of keyword args for each declare_coloring call.
-    """
-    return _get_fwrapper(func).get_declare_colorings()
-
-
-#
-# Implementation details
-#
-
-def _get_kwargs(func, locals_dict, default=None):
-    """
-    Convert a function's args to a kwargs dict containing entries that are not identically default.
-
-    Parameters
-    ----------
-    func : function
-        The function whose args we want to convert to kwargs.
-    locals_dict : dict
-        The locals dict for the function.
-    default : object
-        Don't include arguments whose values are this object.
-
-    Returns
-    -------
-    dict
-        The non-default keyword args dict.
-    """
-    return {n: locals_dict[n] for n in inspect.signature(func).parameters
-            if locals_dict[n] is not default}
-
-
-def _check_kwargs(kwargs, allowed, fname):
-    """
-    Check contents of kwargs for args that aren't allowed.
-
-    Parameters
-    ----------
-    kwargs : dict
-        Original keyword args dict.
-    allowed : set
-        Set of allowed arg names.
-    fname : str
-        Function name (for error reporting).
-    """
-    errs = [n for n in kwargs if n not in allowed]
-    if errs:
-        raise RuntimeError(f"The following args passed to {fname} are not allowed: {errs}.")
-
-
-def _shape2tuple(shape):
-    """
-    Return shape as a tuple.
-
-    Parameters
-    ----------
-    shape : int or tuple
-        The given shape.
-
-    Returns
-    -------
-    tuple
-        The shape as a tuple.
-    """
-    if isinstance(shape, Number):
-        return (shape,)
-    elif shape is None:
-        return shape
-    return tuple(shape)
-
-
-class _MetaWrappedFunc(object):
-    """
-    Storage class for function metadata.
-
-    Metadata is assumed to be added from decorator calls, so ordering is reversed.
+    Function wrapper that holds function metadata useful to OpenMDAO.
 
     Parameters
     ----------
@@ -618,7 +95,7 @@ class _MetaWrappedFunc(object):
         """
         return self._f(*args, **kwargs)
 
-    def set_defaults(self, **kwargs):
+    def defaults(self, **kwargs):
         r"""
         Add metadata that may apply to any inputs or outputs of the wrapped function.
 
@@ -632,7 +109,7 @@ class _MetaWrappedFunc(object):
         self._defaults.update(kwargs)
         return self
 
-    def set_metadata(self, **kwargs):
+    def metadata(self, **kwargs):
         r"""
         Add metadata that applies to all variables of the wrapped function.
 
@@ -712,12 +189,26 @@ class _MetaWrappedFunc(object):
             Keyword args to store.  The value corresponding to each key is a dict containing the
             metadata for the output name that matches that key.
         """
-        # because individual add_output calls come from stacked decorators, their order is reversed.
-        # The args to add_outputs are in the correct order, so in order to stay consistent
-        # with the ordering of add_output, we reverse the order of the args.
-        for name, meta in reversed(kwargs.items()):
+        for name, meta in kwargs.items():
             self.add_output(name, meta)
         return self
+
+    def output_names(self, names):
+        """
+        Set the names of a function's output variables.
+
+        Parameters
+        ----------
+        names : list of str
+            Names of outputs with order matching order of return values.
+
+        Returns
+        -------
+        function
+            A function wrapper that updates the function's metadata.
+        """
+        kwargs = {n: {} for n in names}
+        return self.add_outputs(**kwargs)
 
     def declare_option(self, name, **kwargs):
         r"""
@@ -781,7 +272,7 @@ class _MetaWrappedFunc(object):
         """
         if self._call_setup:
             self._setup()
-        return reversed(self._outputs.items())
+        return self._outputs.items()
 
     def get_declare_partials(self):
         """
@@ -790,9 +281,9 @@ class _MetaWrappedFunc(object):
         Returns
         -------
         iter of dict
-            Iterator of dicts containing the keyword args for each call in top to bottom order.
+            Iterator of dicts containing the keyword args for each call.
         """
-        return reversed(self._declare_partials.items())
+        return self._declare_partials.items()
 
     def get_declare_colorings(self):
         """
@@ -801,9 +292,9 @@ class _MetaWrappedFunc(object):
         Returns
         -------
         iter of dict
-            Iterator of dicts containing the keyword args for each call in top to bottom order.
+            Iterator of dicts containing the keyword args for each call.
         """
-        return reversed(self._declare_coloring.items())
+        return self._declare_coloring.items()
 
     def _check_vals_equal(self, name, val1, val2):
         """
@@ -934,11 +425,6 @@ class _MetaWrappedFunc(object):
         outlist = []
         try:
             ret_info = get_function_deps(self._f)
-            # if we found return value names by inspection, they're in the correct order, but we
-            # reverse them here to be consistent with return value names defined using add_output,
-            # which are called as decorators (which execute in inside-out order, which is reversed
-            # from what a user would think).
-            ret_info.reverse()
         except RuntimeError:
             #  this could happen if function is compiled or has multiple return lines
             if not self._outputs:
@@ -1054,6 +540,88 @@ class _MetaWrappedFunc(object):
                 outs[name]['shape'] = shape
 
 
+def wrap(func):
+    """
+    Return a wrapped function object.
+
+    If arg is already a wrapped function object, return that.
+
+    Parameters
+    ----------
+    func : function or OMwrappedFunc
+        A plain or already wrapped function object.
+
+    Returns
+    -------
+    OMwrappedFunc
+        The wrapped function object.
+    """
+    if isinstance(func, OMWrappedFunc):
+        return func
+    return OMWrappedFunc(func)
+
+
+def _get_kwargs(func, locals_dict, default=None):
+    """
+    Convert a function's args to a kwargs dict containing entries that are not identically default.
+
+    Parameters
+    ----------
+    func : function
+        The function whose args we want to convert to kwargs.
+    locals_dict : dict
+        The locals dict for the function.
+    default : object
+        Don't include arguments whose values are this object.
+
+    Returns
+    -------
+    dict
+        The non-default keyword args dict.
+    """
+    return {n: locals_dict[n] for n in inspect.signature(func).parameters
+            if locals_dict[n] is not default}
+
+
+def _check_kwargs(kwargs, allowed, fname):
+    """
+    Check contents of kwargs for args that aren't allowed.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Original keyword args dict.
+    allowed : set
+        Set of allowed arg names.
+    fname : str
+        Function name (for error reporting).
+    """
+    errs = [n for n in kwargs if n not in allowed]
+    if errs:
+        raise RuntimeError(f"The following args passed to {fname} are not allowed: {errs}.")
+
+
+def _shape2tuple(shape):
+    """
+    Return shape as a tuple.
+
+    Parameters
+    ----------
+    shape : int or tuple
+        The given shape.
+
+    Returns
+    -------
+    tuple
+        The shape as a tuple.
+    """
+    if isinstance(shape, Number):
+        return (shape,)
+    elif shape is None:
+        return shape
+    return tuple(shape)
+
+
 @contextmanager
 def jax_context(globals):
     """
@@ -1078,27 +646,6 @@ def jax_context(globals):
             globals['np'] = savenp
         if savenumpy is not None:
             globals['numpy'] = savenumpy
-
-
-def _get_fwrapper(func):
-    """
-    Return a wrapped function object.
-
-    If arg is already a wrapped function object, return that.
-
-    Parameters
-    ----------
-    func : function or _MetaWrappedFunc
-        A plain or already wrapped function object.
-
-    Returns
-    -------
-    _MetaWrappedFunc
-        The wrapped function object.
-    """
-    if isinstance(func, _MetaWrappedFunc):
-        return func
-    return _MetaWrappedFunc(func)
 
 
 def _get_long_name(node):

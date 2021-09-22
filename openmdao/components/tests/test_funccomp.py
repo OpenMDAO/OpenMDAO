@@ -77,14 +77,13 @@ class TestFuncComp(unittest.TestCase):
     def test_units(self):
         prob = om.Problem()
 
-        @omf.add_input('x', units='m')
-        @omf.add_output('y', units='m')
         def func(x=2.0, z=2.0):
             y=x+z+1.
             return y
 
+        f = omf.wrap(func).add_input('x', units='m').add_output('y', units='m')
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
         prob.model.connect('indep.x', 'C1.x')
 
         prob.setup()
@@ -97,13 +96,13 @@ class TestFuncComp(unittest.TestCase):
     def test_units_decorator(self):
         prob = om.Problem()
 
-        @omf.defaults(units='m')
         def func(x=2.0, z=2.0):
             y=x+z+1.
             return y
 
+        f = omf.wrap(func).defaults(units='m')
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
         prob.model.connect('indep.x', 'C1.x')
 
         prob.setup()
@@ -145,14 +144,13 @@ class TestFuncComp(unittest.TestCase):
         # all variables in the ExplicitFuncComp have the same units
         prob = om.Problem()
 
-        @omf.defaults(units='m')
-        @omf.add_input('x', val=2.0)
         def func(x, z=2.0):
             y=x+z+1.
             return y
 
+        f = omf.wrap(func).defaults(units='m').add_input('x', val=2.0)
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
         prob.model.connect('indep.x', 'comp.x')
 
         prob.setup()
@@ -164,13 +162,13 @@ class TestFuncComp(unittest.TestCase):
         # make sure common units are assigned when no metadata is provided
         prob = om.Problem()
 
-        @omf.defaults(units='m')
         def func(x=2.0):
             y=x+1.
             return y
 
+        f = omf.wrap(func).defaults(units='m')
         prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.model.connect('indep.x', 'comp.x')
 
@@ -183,11 +181,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=(5,))
         def func(x):
             y = 3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).defaults(shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         p.setup()
         p.run_model()
@@ -200,12 +199,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.add_input('x', shape=(5,), val=5)
-        @omf.add_output('y', shape=(5,))
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).add_input('x', shape=(5,), val=5).add_output('y', shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         p.setup()
         p.run_model()
@@ -216,11 +215,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=(5,))
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).defaults(shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         p.setup()
         p.run_model()
@@ -233,11 +233,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=(5,))
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).defaults(shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         p.setup()
         p.run_model()
@@ -250,12 +251,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=(5,))
-        @omf.add_input('x', val=np.zeros(5))
         def func(x):
             y =3.0*x + 2.5
             return y
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).defaults(shape=(5,)).add_input('x', val=np.zeros(5))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         p.setup()
         p.run_model()
@@ -306,11 +307,12 @@ class TestFuncComp(unittest.TestCase):
 
     def test_array_lhs(self):
         prob = om.Problem()
-        @omf.add_output('y', shape=2)
         def func(x=np.array([1., 2., 3.])):
             y=np.array([x[1], x[0]])
             return y
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).add_output('y', shape=2)
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
 
@@ -327,12 +329,12 @@ class TestFuncComp(unittest.TestCase):
 
     def test_simple_array_model(self):
         prob = om.Problem()
-        @omf.defaults(shape=2)
         def func(x):
             y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
             return y
 
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        f = omf.wrap(func).defaults(shape=2)
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -344,12 +346,12 @@ class TestFuncComp(unittest.TestCase):
 
     def test_simple_array_model2(self):
         prob = om.Problem()
-        @omf.add_input('x', shape=2)
-        @omf.add_output('y', shape=2)
         def func(x):
             y = np.array([[2., 7.], [5., -3.]]).dot(x)
             return y
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).add_input('x', shape=2).add_output('y', shape=2)
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -405,11 +407,12 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_complex_step(self):
         prob = om.Problem()
-        @omf.add_output('y', shape=())
         def func(x=-2.0):
             y=2.0*abs(x)
             return y
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+
+        f = omf.wrap(func).add_output('y', shape=())
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -445,11 +448,11 @@ class TestFuncComp(unittest.TestCase):
 
     def test_abs_array_complex_step(self):
         prob = om.Problem()
-        @omf.add_output('y', shape=(3,))
         def func(x=np.ones(3)*-2.0):
             y=2.0*abs(x)
             return y
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        f = omf.wrap(func).add_output('y', shape=(3,))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -483,13 +486,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.add_input('x', shape=5)
-        @omf.add_output('y', shape=3)
         def func(x, A=np.arange(15).reshape((3,5))):
             y=A.dot(x)
             return y
 
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=True))
+        f = omf.wrap(func).add_input('x', shape=5).add_output('y', shape=3)
+        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
 
@@ -506,12 +508,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.metadata(shape=5)
         def func(x):
             y=3.0*x + 2.5
             return y
 
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=False))
+        f = omf.wrap(func).metadata(shape=5)
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=False))
         p.setup()
 
         declared_partials = comp._declared_partials[('y','x')]
@@ -521,7 +523,7 @@ class TestFuncComp(unittest.TestCase):
         # run with has_diag_partials=True
         p = om.Problem()
         model = p.model
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=True))
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
         p.setup()
         p.final_setup()
 
@@ -571,13 +573,13 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=5)
         def func2(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
             return y1, y2
 
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func2))
+        f = omf.wrap(func2).defaults(shape=5)
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f))
         p.setup()
         p.final_setup()
 
@@ -595,13 +597,13 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=5)
         def func3(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
             return y1, y2
 
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func3, has_diag_partials=True))
+        f = omf.wrap(func3).defaults(shape=5)
+        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
         p.setup()
         p.final_setup()
 
@@ -628,13 +630,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.add_input('x', shape=(5,))
-        @omf.add_output('y', shape=(5,))
         def func(x):
             y=3.0*x + 2.5
             return y
 
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=True))
+        f = omf.wrap(func).add_input('x', shape=(5,)).add_output('y', shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
         p.run_model()
@@ -648,12 +649,12 @@ class TestFuncComp(unittest.TestCase):
         p = om.Problem()
         model = p.model
 
-        @omf.defaults(shape=(5,))
         def func(x=np.ones(5)):
             y=3.0*x + 2.5
             return y
 
-        model.add_subsystem('comp', om.ExplicitFuncComp(func, has_diag_partials=True))
+        f = omf.wrap(func).defaults(shape=(5,))
+        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
 
@@ -771,12 +772,12 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        @omf.metadata(units='inch')
         def func(x=0., y=0.):
             z = x + y
             return z
 
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        f = omf.wrap(func).metadata(units='inch')
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.setup()
 
@@ -792,12 +793,12 @@ class TestFuncComp(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        @omf.add_output('y', shape=2)
         def func(a=2.0, b=5.0, c=3.0, x=np.ones(2)):
             y = a * x ** 2 + b * x + c
             return y
 
-        model.add_subsystem("quad_1", om.ExplicitFuncComp(func))
+        f = omf.wrap(func).add_output('y', shape=2)
+        model.add_subsystem("quad_1", om.ExplicitFuncComp(f))
 
         balance = model.add_subsystem("balance", om.BalanceComp())
         balance.add_balance("x_1", val=np.array([1, -1]), rhs_val=np.array([0., 0.]))

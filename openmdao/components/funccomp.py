@@ -90,7 +90,7 @@ class ExplicitFuncComp(ExplicitComponent):
         Initialize attributes.
         """
         super().__init__(**kwargs)
-        self._func = func
+        self._func = omf.wrap(func)
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
 
@@ -124,14 +124,12 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Define out inputs and outputs.
         """
-        self._func = omf._get_fwrapper(self._func) # ensure we have a function wrapper object
-
-        for name, meta in omf.get_input_meta(self._func):
+        for name, meta in self._func.get_input_meta():
             self._check_var_name(name)
             kwargs, _ = _copy_with_ignore(meta, omf._allowed_add_input_args, warn=True)
             self.add_input(name, **kwargs)
 
-        for i, (name, meta) in enumerate(omf.get_output_meta(self._func)):
+        for i, (name, meta) in enumerate(self._func.get_output_meta()):
             if name is None:
                 raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
                                    f"value in position {i} because it has no name.  Specify the "
@@ -150,7 +148,7 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         decl_partials = super().declare_partials
         hasdiag = self.options['has_diag_partials']
-        for out, ometa in omf.get_output_meta(self._func):
+        for out, ometa in self._func.get_output_meta():
             oshp = ometa['shape']
             if not oshp:
                 osize = 1
@@ -158,7 +156,7 @@ class ExplicitFuncComp(ExplicitComponent):
                 osize = np.product(oshp) if isinstance(oshp, tuple) else oshp
 
             inds = np.arange(osize, dtype=INT_DTYPE)
-            for inp, imeta in omf.get_input_meta(self._func):
+            for inp, imeta in self._func.get_input_meta():
                 if inp not in ometa['deps']:
                     continue
 
