@@ -293,7 +293,7 @@ class InterpAlgorithmFixed(object):
         self.k = None
         self.dim = None
         self._name = None
-        self._vectorized = False
+        self._vectorized = True
         self._compute_d_dvalues = False
         self._compute_d_dx = True
 
@@ -345,7 +345,7 @@ class InterpAlgorithmFixed(object):
         for j in range(self.dim):
             #self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],
             #                                          self.last_index[j])
-            self.last_index[j] = np.searchsorted(self.grid[j], x[j], side='left') - 1
+            self.last_index[j] = np.searchsorted(self.grid[j], x[..., j], side='left') - 1
 
         return self.last_index, None
 
@@ -429,6 +429,31 @@ class InterpAlgorithmFixed(object):
         """
         idx, _ = self.bracket(x)
         result, d_dx, d_values, d_grid = self.interpolate(x, idx)
+
+        return result, d_dx, d_values, d_grid
+
+    def evaluate_vectorized(self, x, slice_idx=None):
+        """
+        Interpolate on this grid.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to interpolate on this grid.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        idx, _ = self.bracket(x)
+        result, d_dx, d_values, d_grid = self.interpolate_vectorized(x, idx)
 
         return result, d_dx, d_values, d_grid
 
