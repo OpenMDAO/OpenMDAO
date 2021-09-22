@@ -9,6 +9,7 @@ import textwrap
 import warnings
 import numpy as np
 from contextlib import contextmanager
+from functools import wraps
 
 try:
     import jax
@@ -17,45 +18,139 @@ except ImportError:
     jax = None
 
 
+_allowed_add_input_args = {
+    'val', 'shape', 'src_indices', 'flat_src_indices', 'units', 'desc', 'tags', 'shape_by_conn',
+    'copy_shape', 'distributed', 'new_style_idx',
+}
+
+_allowed_add_output_args = {
+    'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
+    'shape_by_conn', 'copy_shape', 'distributed',
+}
+
+_allowed_add_var_args = _allowed_add_input_args.union(_allowed_add_output_args)
+
+
 #
 # User API (decorators used to associate metadata with the function)
 #
 
-def add_input(name, **kwargs):
+def add_input(name, val=None, shape=None, src_indices=None, flat_src_indices=None,
+              units=None, desc=None, tags=None, shape_by_conn=None, copy_shape=None,
+              distributed=None, new_style_idx=None):
     """
     Set metadata associated with one of a function's input variables.
 
     Parameters
     ----------
-    **kwargs : dict
-        Named args passed to the decorator.
+    name : str
+        Name of the variable in this component's namespace.
+    val : float or list or tuple or ndarray or Iterable
+        The initial value of the variable being added in user-defined units.
+    shape : int or tuple or list or None
+        Shape of this variable, only required if src_indices not provided and
+        val is not an array. Default is None.
+    src_indices : int or list or tuple or int ndarray or Iterable or None
+        The global indices of the source variable to transfer data from.
+        A value of None implies this input depends on all entries of the source array.
+        Default is None. The shapes of the target and src_indices must match,
+        and the form of the entries within is determined by the value of 'flat_src_indices'.
+    flat_src_indices : bool
+        If True and the source is non-flat, each entry of src_indices is assumed to be an index
+        into the flattened source.  Ignored if the source is flat.
+    units : str or None
+        Units in which this input variable will be provided to the component
+        during execution. Default is None, which means it is unitless.
+    desc : str
+        Description of the variable.
+    tags : str or list of strs
+        User defined tags that can be used to filter what gets listed when calling
+        list_inputs and list_outputs.
+    shape_by_conn : bool
+        If True, shape this input to match its connected output.
+    copy_shape : str or None
+        If a str, that str is the name of a variable. Shape this input to match that of
+        the named variable.
+    distributed : bool
+        If True, this variable is a distributed variable, so it can have different sizes/values
+        across MPI processes.
+    new_style_idx : bool
+        If True, assume numpy compatible indexing.  Not setting this to True will result in a
+        deprecation warning for src_indices arrays with ndim > 1.
 
     Returns
     -------
     function
         A function wrapper that updates the function's metadata.
     """
+    loc = locals()
     def _wrap(func):
-        return _get_fwrapper(func).add_input(name, **kwargs)
+        return _get_fwrapper(func).add_input(**_get_kwargs(add_input, loc))
     return _wrap
 
 
-def add_output(name, **kwargs):
+def add_output(name, val=None, shape=None, units=None, res_units=None, desc=None,
+               lower=None, upper=None, ref=None, ref0=None, res_ref=None, tags=None,
+               shape_by_conn=False, copy_shape=None, distributed=None):
     """
     Set metadata associated with one of a function's return values.
 
     Parameters
     ----------
-    **kwargs : dict
-        Named args passed to the decorator.
+    name : str
+        Name of the variable in this component's namespace.
+    val : float or list or tuple or ndarray
+        The initial value of the variable being added in user-defined units. Default is 1.0.
+    shape : int or tuple or list or None
+        Shape of this variable, only required if val is not an array.
+        Default is None.
+    units : str or None
+        Units in which the output variables will be provided to the component during execution.
+        Default is None, which means it has no units.
+    res_units : str or None
+        Units in which the residuals of this output will be given to the user when requested.
+        Default is None, which means it has no units.
+    desc : str
+        Description of the variable.
+    lower : float or list or tuple or ndarray or Iterable or None
+        Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+        consistent with the shape arg (if given), or (3) an array_like matching the shape of
+        val, if val is array_like. A value of None means this output has no lower bound.
+        Default is None.
+    upper : float or list or tuple or ndarray or or Iterable None
+        Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
+        consistent with the shape arg (if given), or (3) an array_like matching the shape of
+        val, if val is array_like. A value of None means this output has no upper bound.
+        Default is None.
+    ref : float or ndarray
+        Scaling parameter. The value in the user-defined units of this output variable when
+        the scaled value is 1. Default is 1.
+    ref0 : float or ndarray
+        Scaling parameter. The value in the user-defined units of this output variable when
+        the scaled value is 0. Default is 0.
+    res_ref : float or ndarray
+        Scaling parameter. The value in the user-defined res_units of this output's residual
+        when the scaled value is 1. Default is 1.
+    tags : str or list of strs or set of strs
+        User defined tags that can be used to filter what gets listed when calling
+        list_inputs and list_outputs.
+    shape_by_conn : bool
+        If True, shape this output to match its connected input(s).
+    copy_shape : str or None
+        If a str, that str is the name of a variable. Shape this output to match that of
+        the named variable.
+    distributed : bool
+        If True, this variable is a distributed variable, so it can have different sizes/values
+        across MPI processes.
 
     Returns
     -------
     function
         A function wrapper that updates the function's metadata.
     """
+    loc = locals()
     def _wrap(func):
-        return _get_fwrapper(func).add_output(name, **kwargs)
+        return _get_fwrapper(func).add_output(**_get_kwargs(add_output, loc))
     return _wrap
 
 
@@ -73,6 +168,7 @@ def add_inputs(**kwargs):
     function
         A function wrapper that updates the function's metadata.
     """
+    _check_kwargs(kwargs, _allowed_add_input_args)
     def _wrap(func):
         return _get_fwrapper(func).add_inputs(**kwargs)
     return _wrap
@@ -92,6 +188,7 @@ def add_outputs(**kwargs):
     function
         A function wrapper that updates the function's metadata.
     """
+    _check_kwargs(kwargs, _allowed_add_output_args)
     def _wrap(func):
         return _get_fwrapper(func).add_outputs(**kwargs)
     return _wrap
@@ -155,7 +252,7 @@ def metadata(**kwargs):
     return _wrap
 
 
-def declare_option(name, default=None, values=None, types=None, desc='',
+def declare_option(name, default=None, values=None, types=None, desc=None,
                    upper=None, lower=None, check_valid=None, allow_none=False, recordable=True,
                    deprecation=None):
     r"""
@@ -188,51 +285,134 @@ def declare_option(name, default=None, values=None, types=None, desc='',
         If None, it is not deprecated. If a str, use as a DeprecationWarning
         during __setitem__ and __getitem__.
     """
+    loc = locals()
     def _wrap(func):
-        return _get_fwrapper(func).declare_option(name, default=default, values=values, types=types,
-                                                  desc=desc, upper=upper, lower=lower,
-                                                  check_valid=check_valid, allow_none=allow_none,
-                                                  recordable=recordable, deprecation=deprecation)
+        return _get_fwrapper(func).declare_option(**_get_kwargs(declare_option, loc))
     return _wrap
 
 
-def declare_partials(**kwargs):
+def declare_partials(of, wrt, dependent=True, rows=None, cols=None, val=None,
+                     method='exact', step=None, form=None, step_calc=None, minimum_step=None):
     """
     Store declare_partials info in function's metadata.
 
     Parameters
     ----------
-    **kwargs : dict
-        Named args passed to the decorator.
+    of : str or list of str
+        The name of the residual(s) that derivatives are being computed for.
+        May also contain a glob pattern.
+    wrt : str or list of str
+        The name of the variables that derivatives are taken with respect to.
+        This can contain the name of any input or output variable.
+        May also contain a glob pattern.
+    rows : ndarray of int or None
+        Row indices for each nonzero entry.  For sparse subjacobians only.
+    cols : ndarray of int or None
+        Column indices for each nonzero entry.  For sparse subjacobians only.
+    val : float or ndarray of float or scipy.sparse
+        Value of subjacobian.  If rows and cols are not None, this will
+        contain the values found at each (row, col) location in the subjac.
+    method : str
+        The type of approximation that should be used. Valid options include:
+        'fd': Finite Difference, 'cs': Complex Step, 'exact': use the component
+        defined analytic derivatives. Default is 'exact'.
+    step : float
+        Step size for approximation. Defaults to None, in which case the approximation
+        method provides its default value.
+    form : str
+        Form for finite difference, can be 'forward', 'backward', or 'central'. Defaults
+        to None, in which case the approximation method provides its default value.
+    step_calc : str
+        Step type for computing the size of the finite difference step. It can be 'abs' for
+        absolute, 'rel_avg' for a size relative to the absolute value of the vector input, or
+        'rel_element' for a size relative to each value in the vector input. In addition, it
+        can be 'rel_legacy' for a size relative to the norm of the vector.  For backwards
+        compatibilty, it can be 'rel', which currently defaults to 'rel_legacy', but in the
+        future will default to 'rel_avg'. Defaults to None, in which case the approximation
+        method provides its default value.
+    minimum_step : float
+        Minimum step size allowed when using one of the relative step_calc options.
 
     Returns
     -------
     function
         A function wrapper that updates the function's metadata.
     """
+    loc = locals()
     def _wrap(func):
-        return _get_fwrapper(func).declare_partials(**kwargs)
+        return _get_fwrapper(func).declare_partials(**_get_kwargs(declare_partials, loc))
     return _wrap
 
 
-def declare_coloring(**kwargs):
+def declare_coloring(wrt=None, method=None, form=None, step=None, per_instance=None,
+                     num_full_jacs=None, tol=None, orders=None, perturb_size=None,
+                     min_improve_pct=None, show_summary=None, show_sparsity=None):
     """
     Store declare_coloring info in function's metadata.
 
     Parameters
     ----------
-    **kwargs : dict
-        Named args passed to the decorator.
+    wrt : str or list of str
+        The name or names of the variables that derivatives are taken with respect to.
+        This can contain input names, output names, or glob patterns.
+    method : str
+        Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+    form : str
+        Finite difference form, can be "forward", "central", or "backward". Leave
+        undeclared to keep unchanged from previous or default value.
+    step : float
+        Step size for finite difference. Leave undeclared to keep unchanged from previous
+        or default value.
+    per_instance : bool
+        If True, a separate coloring will be generated for each instance of a given class.
+        Otherwise, only one coloring for a given class will be generated and all instances
+        of that class will use it.
+    num_full_jacs : int
+        Number of times to repeat partial jacobian computation when computing sparsity.
+    tol : float
+        Tolerance used to determine if an array entry is nonzero during sparsity determination.
+    orders : int
+        Number of orders above and below the tolerance to check during the tolerance sweep.
+    perturb_size : float
+        Size of input/output perturbation during generation of sparsity.
+    min_improve_pct : float
+        If coloring does not improve (decrease) the number of solves more than the given
+        percentage, coloring will not be used.
+    show_summary : bool
+        If True, display summary information after generating coloring.
+    show_sparsity : bool
+        If True, display sparsity with coloring info after generating coloring.
 
     Returns
     -------
     function
         A function wrapper that updates the function's metadata.
     """
+    loc = locals()
     def _wrap(func):
-        return _get_fwrapper(func).declare_coloring(**kwargs)
+        return _get_fwrapper(func).declare_coloring(**_get_kwargs(declare_coloring, loc))
     return _wrap
 
+
+def apply_decorators(func, *decorators):
+    r"""
+    Apply the given list of decorators to the given function.
+
+    Parameters
+    ----------
+    func : function
+        Function to be decorated.
+    *decorators : list
+        List of decorators to apply to the given function.
+
+    Returns
+    -------
+    callable
+        Decorated function.
+    """
+    for dec in decorators:
+        func = dec(func)
+    return func
 
 #
 # Dev API (for retrieving metadata from the function object)
@@ -290,7 +470,7 @@ def get_declare_partials(func):
     return _get_fwrapper(func).get_declare_partials()
 
 
-def get_declare_coloring(func):
+def get_declare_colorings(func):
     """
     Get an iterator of (**kwargs) to be passed to each call of declare_coloring.
 
@@ -310,6 +490,46 @@ def get_declare_coloring(func):
 #
 # Implementation details
 #
+
+def _get_kwargs(func, locals_dict, default=None):
+    """
+    Convert a function's args to a kwargs dict containing entries that are not identically default.
+
+    Parameters
+    ----------
+    func : function
+        The function whose args we want to convert to kwargs.
+    locals_dict : dict
+        The locals dict for the function.
+    default : object
+        Don't include arguments whose values are this object.
+
+    Returns
+    -------
+    dict
+        The non-default keyword args dict.
+    """
+    return {n: locals_dict[n] for n in inspect.signature(func).parameters
+            if locals_dict[n] is not default}
+
+
+def _check_kwargs(kwargs, allowed, fname):
+    """
+    Check contents of kwargs for args that aren't allowed.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Original keyword args dict.
+    allowed : set
+        Set of allowed arg names.
+    fname : str
+        Function name (for error reporting).
+    """
+    errs = [n for n in kwargs if n not in allowed]
+    if errs:
+        raise RuntimeError(f"The following args passed to {fname} are not allowed: {errs}.")
+
 
 def _shape2tuple(shape):
     """
@@ -847,8 +1067,10 @@ def jax_context(globals):
     savenp = savenumpy = None
     if 'np' in globals and globals['np'] is np:
         savenp = globals['np']
+        globals['np'] = jnp
     if 'numpy' in globals:
         savenumpy = globals['numpy']
+        globals['numpy'] = jnp
     try:
         yield
     finally:

@@ -23,17 +23,6 @@ namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_varnames = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
 
-
-_allowed_add_input_args = {
-    'val', 'shape', 'src_indices', 'flat_src_indices', 'units', 'desc', 'tags', 'shape_by_conn',
-    'copy_shape', 'distributed', 'new_style_idx',
-}
-
-_allowed_add_output_args = {
-    'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
-    'shape_by_conn', 'copy_shape', 'distributed',
-}
-
 _meta_keep = {'units', 'shape', 'val'}
 _from_def = {'default_units': 'units', 'default_shape': 'shape'}
 
@@ -139,7 +128,7 @@ class ExplicitFuncComp(ExplicitComponent):
 
         for name, meta in omf.get_input_meta(self._func):
             self._check_var_name(name)
-            kwargs, _ = _copy_with_ignore(meta, _allowed_add_input_args, warn=True)
+            kwargs, _ = _copy_with_ignore(meta, omf._allowed_add_input_args, warn=True)
             self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(omf.get_output_meta(self._func)):
@@ -149,7 +138,7 @@ class ExplicitFuncComp(ExplicitComponent):
                                    "name by returning a variable, for example 'return myvar', or "
                                    "include the name in the function's return value annotation.")
             self._check_var_name(name)
-            kwargs, ignored = _copy_with_ignore(meta, _allowed_add_output_args, warn=False)
+            kwargs, ignored = _copy_with_ignore(meta, omf._allowed_add_output_args, warn=False)
             ignored.remove('deps')
             if ignored:
                 issue_warning(f"The following metadata entries were ignored: {sorted(ignored)}.")
