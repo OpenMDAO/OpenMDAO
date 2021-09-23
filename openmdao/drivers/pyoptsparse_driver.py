@@ -527,8 +527,12 @@ class pyOptSparseDriver(Driver):
 
         return self.fail
 
-    def pyoptsparse_opt_callback(self, snopt_dict):
+    def pyoptsparse_opt_callback(self, x={}, snopt_dict={}, status=-1):
         self.iterDict = snopt_dict
+        if isinstance(status, int):
+            self.iterDict['sol_status'] = status
+        elif isinstance(status, dict):
+            self.iterDict['sol_status'] = status['value']
 
     def _objfunc(self, dv_dict):
         """

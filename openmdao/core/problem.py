@@ -5,7 +5,6 @@ import pprint
 import os
 import logging
 import weakref
-from openmdao.visualization.opt_progress_viewer import OptViewer
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -175,8 +174,6 @@ class Problem(object):
         self._run_counter = -1
         self._system_options_recorded = False
         self._rec_mgr = RecordingManager()
-
-        self.opt_viz = False
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -682,9 +679,6 @@ class Problem(object):
         self._run_counter += 1
         record_model_options(self, self._run_counter)
 
-        if self.opt_viz:
-            self.opt_view = OptViewer()
-
         self.model._clear_iprint()
         return self.driver.run()
 
@@ -786,8 +780,6 @@ class Problem(object):
         self._rec_mgr.shutdown()
 
         # clean up driver and model resources
-        if self.opt_viz:
-            print("Press CTRL + c to shutdown Bokeh server")
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 

@@ -62,6 +62,16 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 # Solve the problem.
 #
 
-dm.run_problem(p, opt_progress_viz=True)
+om.OptViewer("cases.sql", 1000, 5002)
+dm.run_problem(p)
 
+# cr = om.CaseReader("cases.sql")
+
+# driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
+
+# for i in range(0,len(driver_cases)):
+#     case = cr.get_case(driver_cases[i])
+#     print(case.outputs)
+
+# print("Done")
 
