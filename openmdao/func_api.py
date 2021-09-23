@@ -19,13 +19,13 @@ except ImportError:
 
 
 _allowed_add_input_args = {
-    'val', 'shape', 'src_indices', 'flat_src_indices', 'units', 'desc', 'tags', 'shape_by_conn',
-    'copy_shape', 'distributed', 'new_style_idx',
+    'val', 'shape', 'units', 'desc', 'tags', 'shape_by_conn', 'copy_shape', 'distributed',
+    'new_style_idx'
 }
 
 _allowed_add_output_args = {
     'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
-    'shape_by_conn', 'copy_shape', 'distributed',
+    'shape_by_conn', 'copy_shape', 'distributed'
 }
 
 _allowed_add_var_args = _allowed_add_input_args.union(_allowed_add_output_args)
@@ -54,8 +54,8 @@ class OMWrappedFunc(object):
         Dict of metadata dicts keyed to output name.
     _declare_partials : list
         List of keyword args, one entry for each call to declare_partials.
-    _declare_colorings : list
-        List of keyword args, one entry for each call to declare_coloring.
+    _declare_coloring : dict
+        Keyword args for call to declare_coloring.
     _call_setup : bool
         If True, call the setup functions for input and output metadata.
     _use_jax : bool
@@ -73,7 +73,7 @@ class OMWrappedFunc(object):
                         for n, p in inspect.signature(func).parameters.items()}
         self._outputs = {}
         self._declare_partials = []
-        self._declare_colorings = []
+        self._declare_coloring = None
         self._call_setup = True
         self._use_jax = False
 
@@ -99,7 +99,7 @@ class OMWrappedFunc(object):
         r"""
         Add metadata that may apply to any inputs or outputs of the wrapped function.
 
-        Any variable specific metadata will override any metadata specified here.
+        Any variable specific metadata will override metadata specified here.
 
         Parameters
         ----------
@@ -107,21 +107,6 @@ class OMWrappedFunc(object):
             Metadata names and their values.
         """
         self._defaults.update(kwargs)
-        return self
-
-    def metadata(self, **kwargs):
-        r"""
-        Add metadata that applies to all variables of the wrapped function.
-
-        If a variable has specific metadata that doesn't match any metadata specified here,
-        an exception will be raised.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Metadata names and their values.
-        """
-        self._metadata.update(kwargs)
         return self
 
     def add_input(self, name, **kwargs):
@@ -147,7 +132,7 @@ class OMWrappedFunc(object):
         meta.update(kwargs)
         return self
 
-    def add_inputs(self, *kwargs):
+    def add_inputs(self, **kwargs):
         r"""
         Add metadata for multiple inputs of the wrapped function.
 
@@ -158,7 +143,7 @@ class OMWrappedFunc(object):
             metadata for the input name that matches that key.
         """
         for name, meta in kwargs.items():
-            self.add_input(name, meta)
+            self.add_input(name, **meta)
         return self
 
     def add_output(self, name, **kwargs):
@@ -179,7 +164,7 @@ class OMWrappedFunc(object):
         self._outputs[name] = kwargs
         return self
 
-    def add_outputs(self, *kwargs):
+    def add_outputs(self, **kwargs):
         r"""
         Add metadata for multiple outputs of the wrapped function.
 
@@ -190,16 +175,16 @@ class OMWrappedFunc(object):
             metadata for the output name that matches that key.
         """
         for name, meta in kwargs.items():
-            self.add_output(name, meta)
+            self.add_output(name, **meta)
         return self
 
-    def output_names(self, names):
-        """
+    def output_names(self, *names):
+        r"""
         Set the names of a function's output variables.
 
         Parameters
         ----------
-        names : list of str
+        *names : list of str
             Names of outputs with order matching order of return values.
 
         Returns
@@ -246,7 +231,9 @@ class OMWrappedFunc(object):
         **kwargs : dict
             Keyword args to store.
         """
-        self._declare_colorings.append(kwargs)
+        if self._declare_coloring is None:
+            self._declare_coloring = kwargs.copy()
+        raise RuntimeError("declare_coloring has already been called.")
 
     def get_input_meta(self):
         """
@@ -259,7 +246,19 @@ class OMWrappedFunc(object):
         """
         if self._call_setup:
             self._setup()
-        return list(self._inputs.items())
+        return self._inputs.items()
+
+    def get_input_names(self):
+        """
+        Get an iterator over input variable names.
+
+        Yields
+        ------
+        str
+            Name of each input variable.
+        """
+        for name, _ in self.get_input_meta():
+            yield name
 
     def get_output_meta(self):
         """
@@ -274,9 +273,21 @@ class OMWrappedFunc(object):
             self._setup()
         return self._outputs.items()
 
+    def get_output_names(self):
+        """
+        Get an iterator over output variable names.
+
+        Yields
+        ------
+        str
+            Name of each output variable.
+        """
+        for name, _ in self.get_output_meta():
+            yield name
+
     def get_declare_partials(self):
         """
-        Get an iterator of keyword args passed to each declare_partials decorator call.
+        Get an iterator of keyword args passed to each declare_partials call.
 
         Returns
         -------
@@ -285,16 +296,16 @@ class OMWrappedFunc(object):
         """
         return self._declare_partials.items()
 
-    def get_declare_colorings(self):
+    def get_declare_coloring(self):
         """
-        Get an iterator of keyword args passed to each declare_coloring decorator call.
+        Get keyword args passed to declare_coloring call.
 
         Returns
         -------
         iter of dict
             Iterator of dicts containing the keyword args for each call.
         """
-        return self._declare_coloring.items()
+        return self._declare_coloring
 
     def _check_vals_equal(self, name, val1, val2):
         """
@@ -430,9 +441,9 @@ class OMWrappedFunc(object):
             if not self._outputs:
                 raise RuntimeError(f"Couldn't determine function return names or "
                                    "number of return values based on AST and no return value "
-                                   "annotations were supplied.")
+                                   "metadata was supplied.")
             warnings.warn("Couldn't determine function return names based on AST.  Assuming number "
-                          "of return values matches number of return value annotations.")
+                          "of return values matches number of outputs defined in the metadata.")
             outlist = list(self._outputs.items())
         else:
             for o, deps in ret_info:
@@ -448,18 +459,17 @@ class OMWrappedFunc(object):
             else:  # didn't find oname
                 notfound.append(oname)
 
-        if notfound:  # try to fill in the unnamed slots with annotated output data
+        if notfound:  # try to fill in the unnamed slots with user-supplied output data
             inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with no name
             if len(notfound) != len(inones):
-                raise RuntimeError(f"Number of unnamed return values "
-                                   f"({len(inones)}) doesn't match number of unmatched annotated "
-                                   f"return values ({len(notfound)}).")
+                raise RuntimeError(f"There must be an unnamed return value for every unmatched "
+                                   f"output name {notfound} but only found {len(inones)}.")
 
-            # number of None return slots equals number of annotated entries not found in outlist
+            # number of None return slots equals number of entries not found in outlist
             for i_olist, name_notfound in zip(inones, notfound):
-                annotated_meta = outmeta[name_notfound]
+                m = self._outputs[name_notfound]
                 _, ret_meta = outlist[i_olist]
-                ret_meta.update(annotated_meta)
+                ret_meta.update(m)
                 outlist[i_olist] = (name_notfound, ret_meta)
 
         outs = {n: m for n, m in outlist}
@@ -470,6 +480,8 @@ class OMWrappedFunc(object):
             for o in overrides:
                 self._resolve_meta(o, meta)
                 self._resolve_default(o, meta)
+            if meta['shape'] is not None:
+                meta['shape'] = _shape2tuple(meta['shape'])
 
         self._outputs = outs
 
@@ -811,4 +823,5 @@ def get_function_deps(func):
 
         retdeps.append(depset)
 
-    return [(n[0] if simple else None, d) for ((n, simple), d) in zip(funcdeps._ret_info, retdeps)]
+    return [(n[0] if simple  and n[0] not in input_names else None, d)
+            for ((n, simple), d) in zip(funcdeps._ret_info, retdeps)]

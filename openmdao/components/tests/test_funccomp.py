@@ -512,7 +512,7 @@ class TestFuncComp(unittest.TestCase):
             y=3.0*x + 2.5
             return y
 
-        f = omf.wrap(func).metadata(shape=5)
+        f = omf.wrap(func).defaults(shape=5)
         comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=False))
         p.setup()
 
@@ -767,7 +767,7 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(prob['comp.y'], 6.0, 0.00001)
 
-    def test_feature_metadata(self):
+    def test_feature_defaults(self):
 
         prob = om.Problem()
         model = prob.model
@@ -776,7 +776,7 @@ class TestFuncComp(unittest.TestCase):
             z = x + y
             return z
 
-        f = omf.wrap(func).metadata(units='inch')
+        f = omf.wrap(func).defaults(units='inch')
         model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.setup()
