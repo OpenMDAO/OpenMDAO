@@ -28,7 +28,22 @@ _allowed_add_output_args = {
     'shape_by_conn', 'copy_shape', 'distributed'
 }
 
-_allowed_add_var_args = _allowed_add_input_args.union(_allowed_add_output_args)
+_allowed_defaults_args = _allowed_add_input_args.union(_allowed_add_output_args)
+
+_allowed_declare_options_args = {
+    'default', 'values', 'types', 'desc', 'upper', 'lower', 'check_valid', 'allow_none',
+    'recordable', 'deprecation'
+}
+
+_allowed_declare_partials_args = {
+    'of', 'wrt', 'dependent', 'rows', 'cols', 'val', 'method', 'step', 'form', 'step_calc',
+    'minimum_step'
+}
+
+_allowed_declare_coloring_args = {
+    'of', 'wrt', 'method', 'form', 'step', 'per_instance', 'num_full_jacs', 'tol', 'orders',
+    'perturb_size', 'min_improve_pct', 'show_summary', 'show_sparsity'
+}
 
 
 class OMWrappedFunc(object):
@@ -46,8 +61,6 @@ class OMWrappedFunc(object):
         The wrapped function.
     _defaults : dict
         Dict of default metadata values that could apply to any variable.
-    _metadata : dict
-        Dict of metadata values that must apply to all variables.
     _inputs : dict
         Dict of metadata dicts keyed to input name.
     _outputs : dict
@@ -65,7 +78,6 @@ class OMWrappedFunc(object):
     def __init__(self, func):
         self._f = func
         self._defaults = {'val': 1.0, 'shape': ()}
-        self._metadata = {}
 
         # populate _inputs dict with input names based on function signature so we can error
         # check vs. inputs added via add_input
@@ -106,6 +118,7 @@ class OMWrappedFunc(object):
         **kwargs : dict
             Metadata names and their values.
         """
+        _check_kwargs(kwargs, _allowed_defaults_args, 'defaults')
         self._defaults.update(kwargs)
         return self
 
@@ -121,14 +134,15 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         if name not in self._inputs:
-            raise NameError(f"'{name}' is not an input to this function.")
+            raise NameError(f"In add_input, '{name}' is not an input to this function.")
         meta = self._inputs[name]
         for kw in kwargs:
             if kw in meta and meta[kw] is not None:
-                raise RuntimeError("Metadata has already been added to function for input "
-                                   f"'{name}'.")
+                raise RuntimeError(f"In add_input, metadata '{kw}' has already been added to "
+                                   f"function for input '{name}'.")
         if meta.get('val') is not None and kwargs.get('val') is not None:
             self._check_vals_equal(name, meta['val'], kwargs['val'])
+        _check_kwargs(kwargs, _allowed_add_input_args, 'add_input')
         meta.update(kwargs)
         return self
 
@@ -158,9 +172,10 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         if name in self._inputs:
-            raise RuntimeError(f"'{name}' already registered as an input")
+            raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
         if name in self._outputs:
-            raise RuntimeError(f"'{name}' already registered as an output")
+            raise RuntimeError(f"In add_output, '{name}' already registered as an output.")
+        _check_kwargs(kwargs, _allowed_add_output_args, 'add_output')
         self._outputs[name] = kwargs
         return self
 
@@ -206,8 +221,10 @@ class OMWrappedFunc(object):
         **kwargs : dict
             Keyword args to store.
         """
+        _check_kwargs(kwargs, _allowed_declare_options_args, 'declare_option')
         self._inputs[name].update(kwargs)
         self._inputs[name]['is_option'] = True
+        return self
 
     def declare_partials(self, **kwargs):
         r"""
@@ -218,9 +235,11 @@ class OMWrappedFunc(object):
         **kwargs : dict
             Keyword args to store.
         """
+        _check_kwargs(kwargs, _allowed_declare_partials_args, 'declare_partials')
         self._declare_partials.append(kwargs)
         if 'method' in kwargs and kwargs['method'] == 'jax':
             self._use_jax = True
+        return self
 
     def declare_coloring(self, **kwargs):
         r"""
@@ -232,7 +251,9 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         if self._declare_coloring is None:
+            _check_kwargs(kwargs, _allowed_declare_coloring_args, 'declare_coloring')
             self._declare_coloring = kwargs.copy()
+            return self
         raise RuntimeError("declare_coloring has already been called.")
 
     def get_input_meta(self):
@@ -325,29 +346,6 @@ class OMWrappedFunc(object):
         if (isinstance(neq, np.ndarray) and np.any(neq)) or neq:
             raise RuntimeError(f"Conflicting metadata entries for '{name}'.")
 
-    def _resolve_meta(self, key, meta):
-        """
-        Update the value of the metadata corresponding to key based on self._metadata.
-
-        Parameters
-        ----------
-        key : str
-            The metadata entry key.
-        meta : dict
-            The metadata dict to be updated.
-        """
-        if key in self._metadata:
-            mval = self._metadata[key]
-            if key in meta:
-                val = meta[key]
-                # check for conflict with func metadata
-                if val is None:
-                    meta[key] = mval
-                else:
-                    self._check_vals_equal(key, val, mval)
-            else:
-                meta[key] = mval
-
     def _resolve_default(self, key, meta):
         """
         Update the value of the metadata corresponding to key based on self._defaults.
@@ -368,7 +366,6 @@ class OMWrappedFunc(object):
         """
         self._call_setup = False
         overrides = set(self._defaults)
-        overrides.update(self._metadata)
 
         self._setup_inputs(overrides)
         self._setup_outputs(overrides)
@@ -380,7 +377,7 @@ class OMWrappedFunc(object):
         Parameters
         ----------
         overrides : set
-            Set of names of entries in self._defaults and self._metadata.
+            Set of names of entries in self._defaults.
         """
         ins = self._inputs
         overrides = overrides - {'val', 'shape'}
@@ -391,16 +388,11 @@ class OMWrappedFunc(object):
             if meta.get('is_option'):
                 continue
 
-            # set using defaults or metadata if val has not been set
-            self._resolve_meta('val', meta)
-
             if 'val' in meta and meta['val'] is not None:
                 valshape = np.asarray(meta['val']).shape
             else:
                 valshape = None
                 meta['val'] = self._defaults['val']
-
-            self._resolve_meta('shape', meta)
 
             if meta.get('shape') is None:
                 if valshape is not None:
@@ -416,7 +408,6 @@ class OMWrappedFunc(object):
                                  f"{valshape}, but shape was specified as {meta['shape']}.")
 
             for o in overrides:
-                self._resolve_meta(o, meta)
                 self._resolve_default(o, meta)
 
     def _setup_outputs(self, overrides):
@@ -426,7 +417,7 @@ class OMWrappedFunc(object):
         Parameters
         ----------
         overrides : set
-            Set of names of entries in self._defaults and self._metadata.
+            Set of names of entries in self._defaults.
         """
         outmeta = {}
 
@@ -474,11 +465,11 @@ class OMWrappedFunc(object):
 
         outs = {n: m for n, m in outlist}
 
-        self._compute_out_shapes(self._inputs, outs)
+        if self._use_jax:
+            self._compute_out_shapes(self._inputs, outs)
 
         for meta in outs.values():
             for o in overrides:
-                self._resolve_meta(o, meta)
                 self._resolve_default(o, meta)
             if meta['shape'] is not None:
                 meta['shape'] = _shape2tuple(meta['shape'])
@@ -505,6 +496,15 @@ class OMWrappedFunc(object):
 
         args = []
         for name, meta in ins.items():
+            if 'is_option' in meta and meta['is_option']:
+                if 'default' in meta:
+                    val = meta['default']
+                elif 'values' in meta:
+                    val = meta['values'][0]
+                else:
+                    val = None
+                args.append(val)
+                continue
             if meta['val'] is not None:
                 args.append(meta['val'])
             else:
@@ -516,7 +516,7 @@ class OMWrappedFunc(object):
                     args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
         # compute shapes as a check against annotated value (if any)
-        if jax is not None and self._use_jax:
+        if jax is not None:
             # must replace numpy with jax numpy when making jaxpr.
             with jax_context(self._f.__globals__):
                 try:
@@ -542,10 +542,7 @@ class OMWrappedFunc(object):
                     need_shape = []
 
         if need_shape:  # output shapes weren't provided by user or by jax
-            if 'shape' in self._metadata:
-                shape = self._metadata['shape']
-            else:
-                shape = self._defaults['shape']
+            shape = self._defaults['shape']
             warnings.warn(f"Return values {need_shape} have unspecified shape so are assumed to "
                           f"have shape {shape}.")
             for name in need_shape:
@@ -610,7 +607,7 @@ def _check_kwargs(kwargs, allowed, fname):
     """
     errs = [n for n in kwargs if n not in allowed]
     if errs:
-        raise RuntimeError(f"The following args passed to {fname} are not allowed: {errs}.")
+        raise RuntimeError(f"In {fname}, metadata names {errs} are not allowed.")
 
 
 def _shape2tuple(shape):
