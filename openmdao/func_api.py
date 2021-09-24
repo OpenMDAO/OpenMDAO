@@ -315,7 +315,7 @@ class OMWrappedFunc(object):
         iter of dict
             Iterator of dicts containing the keyword args for each call.
         """
-        return self._declare_partials.items()
+        return self._declare_partials
 
     def get_declare_coloring(self):
         """
