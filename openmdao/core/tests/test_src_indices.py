@@ -364,8 +364,26 @@ class SrcIndicesTestCase(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, "<class Group>: When connecting "
                             "from 'indep.x' to 'C1.x': 'src_indices=(1, 0, 2)' is "
                             "specified in a deprecated format. In a future release, "
-                            "'src_indices' will be expected to use NumPy array indexing."):
+                            "'src_indices' will be expected to use NumPy array indexing, "  
+                            "so replace the existing src_indices with [1, 0, 2]."):
             p.model.connect('indep.x', 'C1.x', src_indices=(1, 0, 2))
+
+    def test_connect_src_indices_deprecated2(self):
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones((4,3))))
+        p.model.add_subsystem('C1', MyComp())
+
+        with assert_warning(OMDeprecationWarning, "<class Group>: When connecting "
+                            "from 'indep.x' to 'C1.x': 'src_indices=((1, 2), (1, 1), (3, 1))' is "
+                            "specified in a deprecated format. In a future release, "
+                            "'src_indices' will be expected to use NumPy array indexing, "  
+                            "so replace the existing src_indices with ([1, 1, 3], [2, 1, 1])."):
+            p.model.connect('indep.x', 'C1.x', src_indices=((1,2), (1, 1), (3,1)))
 
     def test_promotes_src_indices_deprecated(self):
         class MyComp(om.ExplicitComponent):
@@ -380,7 +398,8 @@ class SrcIndicesTestCase(unittest.TestCase):
         with assert_warning(OMDeprecationWarning, "<class Group>: When promoting ['x'] "
                             "from 'C1': 'src_indices=(1, 0, 2)' is "
                             "specified in a deprecated format. In a future release, "
-                            "'src_indices' will be expected to use NumPy array indexing."):
+                            "'src_indices' will be expected to use NumPy array indexing, "  
+                            "so replace the existing src_indices with [1, 0, 2]."):
             p.model.promotes('C1', inputs=['x'], src_indices=(1, 0, 2))
 
 

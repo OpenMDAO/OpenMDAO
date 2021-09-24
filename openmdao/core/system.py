@@ -2451,7 +2451,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False):
+                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=None):
         r"""
         Add a design variable to this system.
 
@@ -2488,6 +2488,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2568,11 +2570,12 @@ class System(object):
         dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
-            indices, size = self._create_indexer(indices, 'design var', name)
+            indices, size = self._create_indexer(indices, 'design var', name, flat=flat_indices)
             if size is not None:
                 dv['size'] = size
 
         dv['indices'] = indices
+        dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
 
         self._check_voi_meta_sizes('design var', dv,
@@ -2583,7 +2586,7 @@ class System(object):
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     cache_linear_solution=False):
+                     cache_linear_solution=False, flat_indices=None):
         r"""
         Add a response variable to this system.
 
@@ -2632,6 +2635,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -2720,7 +2725,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                indices, size = self._create_indexer(indices, resp_types[type_], name)
+                indices, size = self._create_indexer(indices, resp_types[type_], name,
+                                                     flat=flat_indices)
                 if size is not None:
                     resp['size'] = size
             resp['indices'] = indices
@@ -2729,7 +2735,7 @@ class System(object):
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                index = indexer[index]
+                index = indexer(index, flat=flat_indices)
                 resp['size'] = 1
             resp['indices'] = index
 
@@ -2753,8 +2759,8 @@ class System(object):
         resp['type'] = type_
         resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
-
         resp['parallel_deriv_color'] = parallel_deriv_color
+        resp['flat_indices'] = flat_indices
 
         self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
 
@@ -2763,7 +2769,7 @@ class System(object):
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False):
+                       cache_linear_solution=False, flat_indices=None):
         r"""
         Add a constraint variable to this system.
 
@@ -2804,6 +2810,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2817,11 +2825,12 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          cache_linear_solution=cache_linear_solution)
+                          cache_linear_solution=cache_linear_solution,
+                          flat_indices=flat_indices)
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False):
+                      cache_linear_solution=False, flat_indices=None):
         r"""
         Add a response variable to this system.
 
@@ -2854,6 +2863,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2886,7 +2897,8 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          cache_linear_solution=cache_linear_solution)
+                          cache_linear_solution=cache_linear_solution,
+                          flat_indices=flat_indices)
 
     def _check_voi_meta_sizes(self, typename, meta, names):
         """
@@ -3001,9 +3013,12 @@ class System(object):
                     vmeta = abs2meta_out[src_name]
                     meta['distributed'] = vmeta['distributed']
                     if indices is not None:
-                        # Index defined in this response.
+                        # Index defined in this design var.
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
+                        indices._check_flat_indices_warning(meta['flat_indices'],
+                                                            vmeta['global_shape'], name,
+                                                            prefix=self.msginfo)
                         indices = indices.shaped_instance()
                         meta['size'] = len(indices)
                         meta['global_size'] = len(indices)
@@ -3127,6 +3142,9 @@ class System(object):
                 if response['indices'] is not None:
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
+                    indices._check_flat_indices_warning(response['flat_indices'],
+                                                        meta['global_shape'], name,
+                                                        prefix=self.msginfo)
                     indices = indices.shaped_instance()
                     response['size'] = response['global_size'] = len(indices)
                 else:

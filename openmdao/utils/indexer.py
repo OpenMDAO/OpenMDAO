@@ -57,6 +57,11 @@ class Indexer(object):
     """
     Abstract indexing class.
 
+    Parameters
+    ----------
+    flat_src : bool or None
+        If True, treat source as flat.
+
     Attributes
     ----------
     _src_shape : tuple or None
@@ -66,22 +71,19 @@ class Indexer(object):
         Cached shaped_instance if we've computed it before.
     _flat_src : bool
         If True, index is into a flat source array.
-    _check_dims : bool
-        If True, compare dim of src with dim of index to give ambiguity warning.
     _dist_shape : tuple or None
         Distributed shape.
     _orig_src_shape : tuple or None
         Original shape of the source, before possible flattening based on _flat_src flag.
     """
 
-    def __init__(self):
+    def __init__(self, flat_src):
         """
         Initialize attributes.
         """
         self._src_shape = None
         self._shaped_inst = None
-        self._flat_src = True
-        self._check_dims = True
+        self._flat_src = flat_src
         self._dist_shape = None
         # TODO: remove this after flat src deprecation branch
         self._orig_src_shape = None
@@ -169,7 +171,6 @@ class Indexer(object):
         """
         self._src_shape = parent._src_shape
         self._flat_src = parent._flat_src
-        self._check_dims = parent._check_dims
         self._dist_shape = parent._dist_shape
         self._orig_src_shape = parent._orig_src_shape
         return self
@@ -309,19 +310,6 @@ class Indexer(object):
 
         return self
 
-    def _chk_shape_dims(self, flat_src, iname, oname, prefix):
-        if self._orig_src_shape is None or flat_src or not self._check_dims:
-            return
-
-        if len(self._orig_src_shape) > len(shape2tuple(self.shape)):
-            issue_warning(f"connecting source '{oname}' of dimension {len(self._orig_src_shape)} "
-                          f"to '{iname}' using src_indices of dimension {len(self.shape)} without "
-                          "setting `flat_src_indices=True`.  The source is currently treated as "
-                          "flat, but this automatic flattening is deprecated and will be removed "
-                          "in a future release.  To keep the old behavior, set `flat_src_indices`"
-                          "=True in the connect(), promotes(), or add_input() call.",
-                          category=OMDeprecationWarning, prefix=prefix)
-
     def to_json(self):
         """
         Return a JSON serializable version of self.
@@ -333,7 +321,7 @@ class Indexer(object):
             return None, None
 
         shape = shape2tuple(shape)
-        if self._flat_src:
+        if self._flat_src or self._appears_flat():
             shape = (np.product(shape),)
 
         if dist_shape is None:
@@ -345,6 +333,52 @@ class Indexer(object):
 
         return shape, dist_shape
 
+    def _appears_flat(self):
+        return True
+
+    def _check_flat_indices_warning(self, flat, src_shape, vname, prefix=''):
+        if src_shape is None or flat or not self._appears_flat():
+            return
+        src_shape = shape2tuple(src_shape)
+        if len(src_shape) > 1:
+            if flat is None:
+                issue_warning(f"Indexing into source variable '{vname}' of dimension "
+                              f"{len(src_shape)} using indices of dimension "
+                              f"{len(shape2tuple(self.shape))} without setting `flat_indices=True`."
+                              " The source is currently treated as flat, but this automatic "
+                              f"flattening is deprecated and will be removed in a future release. "
+                              "To keep the old behavior, set `flat_indices=True` when you set "
+                              "`indices`.", category=OMDeprecationWarning, prefix=prefix)
+            else:  # flat is False
+                raise IndexError(f"Indexing into source variable '{vname}' of dimension "
+                                 f"{len(src_shape)} using indices of dimension "
+                                 f"{len(shape2tuple(self.shape))} and setting "
+                                 "`flat_indices=False`. The current version of OpenMDAO assumes "
+                                 "a flat source if the indices appear flat, so `flat_indices=False`"
+                                 " is not a valid option. This behavior is "
+                                 "deprecated and will be removed in a later version.")
+
+    def _check_flat_src_indices_warning(self, flat, src_shape, tgt, prefix=''):
+        if src_shape is None or self._flat_src or flat or not self._appears_flat():
+            return
+        src_shape = shape2tuple(src_shape)
+        if len(src_shape) > 1:
+            if flat is None:
+                issue_warning(f"Indexing into a source array of dimension {len(src_shape)} "
+                              f"using indices of dimension {len(shape2tuple(self.shape))} without "
+                              f"setting `flat_src_indices=True` when connecting to input '{tgt}'. "
+                              "The source array is currently treated as flat, but this automatic "
+                              "flattening is deprecated and will be removed in a future release. "
+                              "To keep the old behavior, set `flat_src_indices=True` when you set "
+                              "`src_indices`.", category=OMDeprecationWarning, prefix=prefix)
+            else:  # flat is False
+                raise IndexError(f"Indexing into a source array of dimension {len(src_shape)} using"
+                                 f" indices of dimension {len(shape2tuple(self.shape))} and setting"
+                                 f" `flat_indices=False` when connecting to input '{tgt}'. The "
+                                 "current version of OpenMDAO assumes a flat source if the indices "
+                                 "appear flat, so `flat_indices=False` is not a valid option. This "
+                                 "behavior is deprecated and will be removed in a later version.")
+
 
 class ShapedIntIndexer(Indexer):
     """
@@ -354,6 +388,8 @@ class ShapedIntIndexer(Indexer):
     ----------
     idx : int
         The index.
+    flat_src : bool
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -361,11 +397,11 @@ class ShapedIntIndexer(Indexer):
         The integer index.
     """
 
-    def __init__(self, idx):
+    def __init__(self, idx, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
+        super().__init__(flat_src)
         self._check_ind_type(idx, Integral)
         self._idx = idx
 
@@ -489,6 +525,8 @@ class IntIndexer(ShapedIntIndexer):
     ----------
     idx : int
         The index.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -521,6 +559,8 @@ class ShapedSliceIndexer(Indexer):
     ----------
     slc : slice
         The slice.
+    flat_src : bool
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -528,11 +568,11 @@ class ShapedSliceIndexer(Indexer):
         The wrapped slice object.
     """
 
-    def __init__(self, slc):
+    def __init__(self, slc, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
+        super().__init__(flat_src)
         self._check_ind_type(slc, slice)
         self._slice = slc
 
@@ -660,6 +700,8 @@ class SliceIndexer(ShapedSliceIndexer):
     ----------
     slc : slice
         The slice.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -735,6 +777,8 @@ class ShapedArrayIndexer(Indexer):
         The index array.
     orig_shape : tuple or None
         Original shape of the array.
+    flat_src : bool
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -744,11 +788,11 @@ class ShapedArrayIndexer(Indexer):
         Original shape of the array.
     """
 
-    def __init__(self, arr, orig_shape=None):
+    def __init__(self, arr, orig_shape=None, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
+        super().__init__(flat_src)
 
         ndarr = np.asarray(arr)
 
@@ -891,6 +935,8 @@ class ArrayIndexer(ShapedArrayIndexer):
         The index array.
     orig_shape : tuple or None
         Original shape of the array.
+    flat_src : bool or None
+        If True, treat source as flat.
     """
 
     def shaped_instance(self):
@@ -932,8 +978,6 @@ class ShapedMultiIndexer(Indexer):
         The original shape of the array.
     flat_src : bool
         If True, treat source array as flat.
-    check_dims : bool
-        If True, check dimension of source for possible deprecation warning.
 
     Attributes
     ----------
@@ -945,15 +989,13 @@ class ShapedMultiIndexer(Indexer):
         List of Indexers.
     """
 
-    def __init__(self, tup, orig_shape=None, flat_src=False, check_dims=False):
+    def __init__(self, tup, orig_shape=None, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
+        super().__init__(flat_src)
         self._tup = tup
         self._orig_shape = orig_shape
-        self._flat_src = flat_src
-        self._check_dims = check_dims
         self._set_idx_list()
 
     def _set_idx_list(self):
@@ -1128,6 +1170,9 @@ class ShapedMultiIndexer(Indexer):
         """
         return self.as_array().tolist()
 
+    def _appears_flat(self):
+        return False
+
 
 class MultiIndexer(ShapedMultiIndexer):
     """
@@ -1141,8 +1186,6 @@ class MultiIndexer(ShapedMultiIndexer):
         The original shape of the array.
     flat_src : bool
         If True, treat source array as flat.
-    check_dims : bool
-        If True, check dimension of source for possible deprecation warning.
     """
 
     def shaped_instance(self):
@@ -1188,14 +1231,12 @@ class EllipsisIndexer(Indexer):
         The wrapped tuple of indices/slices (it contains an ellipsis).
     """
 
-    def __init__(self, tup, flat_src=False):
+    def __init__(self, tup, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
+        super().__init__(flat_src)
         self._tup = tup
-        self._flat_src = flat_src
-        self._check_dims = False
 
     def __call__(self):
         """
@@ -1338,6 +1379,9 @@ class EllipsisIndexer(Indexer):
         """
         return self.as_array().tolist()
 
+    def _appears_flat(self):
+        return False
+
 
 # the following class will go away when we drop support for our custom non-flat indexing format
 class ListOfTuplesArrayIndexer(Indexer):
@@ -1348,6 +1392,8 @@ class ListOfTuplesArrayIndexer(Indexer):
     ----------
     tup : tuple
         Tuple of indices/slices.
+    flat_src : bool
+        If True, source is treated as flat.
 
     Attributes
     ----------
@@ -1359,21 +1405,19 @@ class ListOfTuplesArrayIndexer(Indexer):
         Tuple containing the equivalent numpy compatible index arrays.
     """
 
-    def __init__(self, tup):
+    def __init__(self, tup, flat_src=None):
         """
         Initialize attributes.
         """
-        super().__init__()
         tup = np.atleast_1d(tup)
         self._arr = tup
-        self._flat_src = False
-        self._check_dims = False
 
         orig_shape = tup.shape[:-1]
         ndims = tup.shape[-1]
         size = np.product(orig_shape)
         totsize = size * ndims
         self._npy_inds = tuple(tup.flat[i:totsize:ndims] for i in range(ndims))
+        super().__init__(flat_src)
 
     def __str__(self):
         """
@@ -1495,8 +1539,7 @@ class ListOfTuplesArrayIndexer(Indexer):
             return self._shaped_inst
 
         try:
-            self._shaped_inst = ShapedMultiIndexer(self._npy_inds,
-                                                   self.shape, check_dims=False)
+            self._shaped_inst = ShapedMultiIndexer(self._npy_inds, self.shape)
         except Exception:
             self._shaped_inst = None
 
@@ -1534,13 +1577,16 @@ class ListOfTuplesArrayIndexer(Indexer):
         """
         return self.as_array().tolist()
 
+    def _appears_flat(self):
+        return len(self._npy_inds) == 1
+
 
 class IndexMaker(object):
     """
     A Factory for Indexer objects.
     """
 
-    def __call__(self, idx, src_shape=None, flat=False, new_style=True):
+    def __call__(self, idx, src_shape=None, flat=None, new_style=True):
         """
         Return an Indexer instance based on the passed indices/slices.
 
@@ -1550,7 +1596,7 @@ class IndexMaker(object):
             Some sort of index/indices/slice.
         src_shape : tuple or None
             Source shape if known.
-        flat : bool
+        flat : bool or None
             If True, indices are into a flat source.
         new_style : bool
             If True, indexer follows behavior of numpy indexing.
@@ -1563,17 +1609,17 @@ class IndexMaker(object):
         if idx is ...:
             idxer = EllipsisIndexer((idx,), flat_src=flat)
         elif isinstance(idx, int):
-            idxer = IntIndexer(idx)
+            idxer = IntIndexer(idx, flat_src=flat)
         elif isinstance(idx, slice):
-            idxer = SliceIndexer(idx)
+            idxer = SliceIndexer(idx, flat_src=flat)
 
         elif isinstance(idx, tuple):
             if idx and not new_style:
                 mat = np.atleast_1d(idx)
                 if mat.dtype == int and mat.ndim == 1:
-                    idxer = ArrayIndexer(mat)
+                    idxer = ArrayIndexer(mat, flat_src=flat)
                 else:
-                    idxer = ListOfTuplesArrayIndexer(mat)
+                    idxer = ListOfTuplesArrayIndexer(mat, flat_src=flat)
             else:
                 multi = len(idx) > 1
                 for i in idx:
@@ -1582,15 +1628,15 @@ class IndexMaker(object):
                         idxer = EllipsisIndexer(idx, flat_src=flat)
                         break
                 else:
-                    idxer = MultiIndexer(idx)
+                    idxer = MultiIndexer(idx, flat_src=flat)
                 if flat and multi:
                     raise RuntimeError("Can't use multdimensional index into a flat source.")
         else:
             arr = np.atleast_1d(idx)
             if flat or new_style or arr.ndim == 1:
-                idxer = ArrayIndexer(arr)
+                idxer = ArrayIndexer(arr, flat_src=flat)
             else:
-                idxer = ListOfTuplesArrayIndexer(arr)
+                idxer = ListOfTuplesArrayIndexer(arr, flat_src=flat)
 
         if src_shape is not None:
             if flat:
@@ -1617,6 +1663,28 @@ class IndexMaker(object):
 
 
 indexer = IndexMaker()
+
+
+def to_numpy_style(inds):
+    """
+    Convert old style OpenMDAO-specific indices into numpy-like indices.
+
+    Parameters
+    ----------
+    inds : list of tuples
+        Old style indices.
+
+    Returns
+    -------
+    tuple of ndarrays
+        New style indices.
+    """
+    inds = indexer(inds, new_style=False)
+    if isinstance(inds, ListOfTuplesArrayIndexer):
+        return tuple(i.tolist() for i in inds._npy_inds)
+    elif isinstance(inds, ShapedArrayIndexer):
+        return inds().tolist()
+    raise TypeError("Indices are not old-style format.")
 
 
 # Since this is already user facing we'll leave it as is, and just use the output of
@@ -1656,6 +1724,7 @@ def _update_new_style(src_indices, new_style, prefix=""):
                     return True
             warn_deprecation(f"{prefix}: 'src_indices={src_indices}' is specified in"
                              " a deprecated format. In a future release, 'src_indices'"
-                             " will be expected to use NumPy array indexing.")
+                             " will be expected to use NumPy array indexing, so replace the "
+                             f"existing src_indices with {to_numpy_style(src_indices)}.")
 
     return new_style
