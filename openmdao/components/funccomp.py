@@ -103,23 +103,6 @@ class ExplicitFuncComp(ExplicitComponent):
                                   'arrays have size > 1. All arrays with size > 1 must have the '
                                   'same flattened size or an exception will be raised.')
 
-        self.options.declare('default_units', types=str, allow_none=True, default=None,
-                             desc='Default units to assign to variables in this component. '
-                                  'Any units provided for individual variables will override this.',
-                             check_valid=_check_units_option)
-
-        self.options.declare('default_shape', types=(int, tuple, list), allow_none=True,
-                             default=None,
-                             desc='Default shape to assign to variables in this component. '
-                                  'Any shape provided for individual variables will override this.')
-
-        self.options.declare('use_jax', types=bool, default=False,
-                             desc='If True, use jax to compute derivatives.')
-
-        # self.options.declare('shape_by_conn', types=bool, default=False,
-        #                      desc='If True, shape all inputs and outputs based on their '
-        #                           'connection. Default is False.')
-
     def setup(self):
         """
         Define out inputs and outputs.

@@ -11,371 +11,74 @@ from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
 
 
-class TestFuncComp(unittest.TestCase):
+class TestFuncCompNoWrap(unittest.TestCase):
 
-    def test_mixed_type(self):
-        prob = om.Problem()
-        def func(x=np.arange(10, dtype=float)):
-            y = np.sum(x)
-            return y
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
-        prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(C1._outputs['y'], 45.0, 0.00001)
-
-    def test_simple(self):
-        prob = om.Problem()
+    def test_scalar_function(self):
         def func(x=2.0):
             y = x + 1.
             return y
 
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
         prob.set_solver_print(level=0)
         prob.run_model()
 
+        assert_near_equal(C1._inputs['x'], 2.0, 0.00001)
         assert_near_equal(C1._outputs['y'], 3.0, 0.00001)
 
-    def test_default_val(self):
+    def test_array_in_scalar_out(self):
+        def func(x=np.arange(10, dtype=float)):
+            y = np.sum(x)
+            return y
+
         prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._inputs['x'], np.arange(10, dtype=float), 0.00001)
+        assert_near_equal(C1._outputs['y'], 45.0, 0.00001)
+
+    def test_assumed_default_val(self):
         def func(x):  # x defaults to 1.0
             y = x + 1.
             return y
 
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
-        prob.set_solver_print(level=0)
         prob.run_model()
 
+        assert_near_equal(C1._inputs['x'], 1.0, 0.00001)
         assert_near_equal(C1._outputs['y'], 2.0, 0.00001)
 
-    def test_units(self):
-        prob = om.Problem()
-
-        def func(x=2.0, z=2.0):
-            y=x+z+1.
-            return y
-
-        f = omf.wrap(func).add_input('x', units='m').add_output('y', units='m')
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
-        prob.model.connect('indep.x', 'C1.x')
-
-        prob.setup()
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
-
-    def test_units_decorator(self):
-        prob = om.Problem()
-
-        def func(x=2.0, z=2.0):
-            y=x+z+1.
-            return y
-
-        f = omf.wrap(func).defaults(units='m')
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
-        prob.model.connect('indep.x', 'C1.x')
-
-        prob.setup()
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
-
-    def test_units_varname_str(self):
-        prob = om.Problem()
-
-        def func(x:{'units': 'm'}=2.0, units=2.0) -> [('y', {'units': 'm'})]:
-            y=x+units+1.
-            return y
-
-        with self.assertRaises(ValueError) as cm:
-            prob.model.add_subsystem('C1', om.ExplicitFuncComp(func, default_units='two'))
-        self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
-
-    def test_units_varname_novalue(self):
-        prob = om.Problem()
-
-        def func(x:{'units': 'm'}=2.0, units=2.0) -> [('y', {'units': 'm'})]:
-            y=x+units+1.
-            return y
-
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
-        prob.model.connect('indep.x', 'C1.x')
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
-
-        self.assertEqual(str(cm.exception),
-                         "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
-
-    def test_common_units(self):
-        # all variables in the ExplicitFuncComp have the same units
-        prob = om.Problem()
-
-        def func(x, z=2.0):
-            y=x+z+1.
-            return y
-
-        f = omf.wrap(func).defaults(units='m').add_input('x', val=2.0)
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-        prob.model.connect('indep.x', 'comp.x')
-
-        prob.setup()
-        prob.run_model()
-
-        assert_near_equal(prob['comp.y'], 4.0, 0.00001)
-
-    def test_common_units_no_meta(self):
-        # make sure common units are assigned when no metadata is provided
-        prob = om.Problem()
-
-        def func(x=2.0):
-            y=x+1.
-            return y
-
-        f = omf.wrap(func).defaults(units='m')
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        prob.model.connect('indep.x', 'comp.x')
-
-        prob.setup()
-        prob.run_model()
-
-        assert_near_equal(prob['comp.y'], 2001., 0.00001)
-
-    def test_shape_def(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x):
-            y = 3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        p.setup()
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_shaped_scalar_val(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x):
-            y =3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).add_input('x', shape=(5,), val=5).add_output('y', shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        p.setup()
-        p.run_model()
-
-        self.assertEqual(p['comp.x'].shape, (5,))
-
-    def test_common_shape(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x):
-            y =3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        p.setup()
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_decorator_shape(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x):
-            y =3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        p.setup()
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_common_shape_with_values(self):
-        p = om.Problem()
-        model = p.model
-
-        def func(x):
-            y =3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=(5,)).add_input('x', val=np.zeros(5))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        p.setup()
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_math(self):
-        prob = om.Problem()
-        def func(x=2.0):
-            y = np.sin(x)
-            return y
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
-
-        prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(C1._outputs['y'], math.sin(2.0), 0.00001)
-
     def test_array(self):
-        prob = om.Problem()
         def func(x=np.array([1., 2., 3.])):
             y=x[1]
             return y
+
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
         prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_near_equal(C1._outputs['y'], 2.0, 0.00001)
 
-    def test_array_lhs(self):
-        prob = om.Problem()
-        def func(x=np.array([1., 2., 3.])):
-            y=np.array([x[1], x[0]])
-            return y
-
-        f = omf.wrap(func).add_output('y', shape=2)
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
-
-        prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(C1._outputs['y'], np.array([2., 1.]), 0.00001)
-
-    def test_simple_array_model(self):
-        prob = om.Problem()
-        def func(x):
-            y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
-            return y
-
-        f = omf.wrap(func).defaults(shape=2)
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        prob.setup()
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        data = prob.check_partials(out_stream=None)
-
-        assert_check_partials(data, atol=1e-5, rtol=1e-5)
-
-    def test_simple_array_model2(self):
-        prob = om.Problem()
-        def func(x):
-            y = np.array([[2., 7.], [5., -3.]]).dot(x)
-            return y
-
-        f = omf.wrap(func).add_input('x', shape=2).add_output('y', shape=2)
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-
-        prob.setup()
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        data = prob.check_partials(out_stream=None)
-
-        assert_check_partials(data, atol=1e-5, rtol=1e-5)
-
     def test_complex_step(self):
-        prob = om.Problem()
         def func(x=2.0):
             y =2.0*x+1.
             return y
+
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
-
-        # Conclude setup but don't run model.
-        prob.final_setup()
-
-        self.assertTrue('x' in C1._inputs)
-        self.assertTrue('y' in C1._outputs)
-
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -386,33 +89,33 @@ class TestFuncComp(unittest.TestCase):
         assert_near_equal(C1._jacobian[('y', 'x')], [[2.0]], 0.00001)
 
     def test_complex_step2(self):
-        prob = om.Problem(om.Group())
         def func(x=2.0):
             y=x*x + x*2.0
             return y
+
+        prob = om.Problem(om.Group())
         prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False, mode='fwd')
+        prob.setup(mode='fwd')
         prob.run_model()
 
         J = prob.compute_totals(['comp.y'], ['comp.x'], return_format='flat_dict')
         assert_near_equal(J['comp.y', 'comp.x'], np.array([[6.0]]), 0.00001)
 
-        prob.setup(check=False, mode='rev')
+        prob.setup(mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['comp.y'], ['comp.x'], return_format='flat_dict')
         assert_near_equal(J['comp.y', 'comp.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
-        prob = om.Problem()
         def func(x=-2.0):
             y=2.0*abs(x)
             return y
 
-        f = omf.wrap(func).add_output('y', shape=())
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -434,10 +137,11 @@ class TestFuncComp(unittest.TestCase):
         assert_near_equal(C1._jacobian['y', 'x'], [[2.0]], 0.00001)
 
     def test_arctan_complex_step(self):
-        prob = om.Problem()
         def func(x=np.array([1+2j]), y=1):
             z=2.0*np.arctan2(y, x)
             return z
+
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
 
         prob.setup()
@@ -446,12 +150,367 @@ class TestFuncComp(unittest.TestCase):
 
         assert_near_equal(C1._outputs['z'], np.array([1.57079633]), 1e-8)
 
-    def test_abs_array_complex_step(self):
+    def test_feature_multi_output(self):
+
+        def func(x=1.):
+            y1=x+1.
+            y2=x-1.
+            return y1, y2
+
         prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
+
+        prob.setup()
+
+        prob.set_val('x', 2.0)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
+
+    def test_feature_multi_output2(self):
+        # verify that expressions can have multiple LHS variables.
+
+        def func(x=1.):
+            y1, y2 = x+1., x-1.
+            return y1, y2
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
+
+        prob.setup()
+
+        prob.set_val('x', 2.0)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
+        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
+
+    def test_feature_array(self):
+
+        def func(x=np.array([1., 2., 3.])):
+            y = x[1]
+            return y
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.y'), 2.0, 0.00001)
+
+    def test_feature_math(self):
+
+        def func(x, y):
+            z = np.sin(x)**2 + np.cos(y)**2
+            return z
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        prob.setup()
+
+        prob.set_val('comp.x', np.pi/2.0)
+        prob.set_val('comp.y', np.pi/2.0)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.z'), 1.0, 0.00001)
+
+    def test_feature_numpy(self):
+
+        def func(x=np.array([1., 2., 3.])):
+            y = np.sum(x)
+            return y
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(func))
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob['comp.y'], 6.0, 0.00001)
+
+
+class TestFuncCompWrapped(unittest.TestCase):
+
+    def test_units(self):
+        def func(x=2.0, z=2.0):
+            y=x+z+1.
+            return y
+
+        f = (omf.wrap(func)
+             .add_input('x', units='m')
+             .add_output('y', units='m'))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
+
+    def test_units_decorator(self):
+
+        def func(x=2.0, z=2.0):
+            y=x+z+1.
+            return y
+
+        f = omf.wrap(func).defaults(units='m')
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
+
+    def test_units_varname_novalue(self):
+
+        def func(x=2.0, units=2.0):
+            y=x+units+1.
+            return y
+
+        f = (omf.wrap(func)
+                .add_input('x', units='m')
+                .add_output('y', units='m'))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
+
+    def test_common_units(self):
+
+        def func(x, z=2.0):
+            y=x+z+1.
+            return y
+
+        f = (omf.wrap(func)
+             .defaults(units='m')
+             .add_input('x', val=2.0))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['comp.y'], 4.0, 0.00001)
+
+    def test_common_units_no_var_meta(self):
+        # make sure common units are assigned when no specific variable metadata is provided
+
+        def func(x=2.0):
+            y=x+1.
+            return y
+
+        f = omf.wrap(func).defaults(units='m')
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        prob.model.connect('indep.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob['comp.y'], 2001., 0.00001)
+
+    def test_shape_def(self):
+        def func(x):
+            y = 3.0*x + 2.5
+            return y
+
+        f = omf.wrap(func).defaults(shape=(5,))
+
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_shaped_scalar_val(self):
+
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+
+        f = (omf.wrap(func)
+             .add_input('x', shape=(5,), val=5)
+             .add_output('y', shape=(5,)))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(p['comp.x'].shape, (5,))
+
+    def test_common_shape(self):
+
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+
+        f = omf.wrap(func).defaults(shape=(5,))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_decorator_shape(self):
+
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+
+        f = omf.wrap(func).defaults(shape=(5,))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_common_shape_with_values(self):
+        p = om.Problem()
+        model = p.model
+
+        def func(x):
+            y =3.0*x + 2.5
+            return y
+
+        f = (omf.wrap(func)
+             .defaults(shape=(5,))
+             .add_input('x', val=np.zeros(5)))
+
+        model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_array_lhs(self):
+        def func(x=np.array([1., 2., 3.])):
+            y=np.array([x[1], x[0]])
+            return y
+
+        f = omf.wrap(func).add_output('y', shape=2)
+
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(C1._outputs['y'], np.array([2., 1.]), 0.00001)
+
+    def test_simple_array_model(self):
+        def func(x):
+            y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
+            return y
+
+        f = omf.wrap(func).defaults(shape=2)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        assert_check_partials(data, atol=1e-5, rtol=1e-5)
+
+    def test_simple_array_model2(self):
+        def func(x):
+            y = np.array([[2., 7.], [5., -3.]]).dot(x)
+            return y
+
+        f = (omf.wrap(func)
+             .add_input('x', shape=2)
+             .add_output('y', shape=2))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        assert_check_partials(data, atol=1e-5, rtol=1e-5)
+
+
+    def test_abs_array_complex_step(self):
         def func(x=np.ones(3)*-2.0):
             y=2.0*abs(x)
             return y
+
         f = omf.wrap(func).add_output('y', shape=(3,))
+
+        prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
@@ -483,15 +542,17 @@ class TestFuncComp(unittest.TestCase):
         assert_near_equal(C1._jacobian['y', 'x'], expect, 0.00001)
 
     def test_has_diag_partials_error(self):
-        p = om.Problem()
-        model = p.model
 
         def func(x, A=np.arange(15).reshape((3,5))):
             y=A.dot(x)
             return y
 
-        f = omf.wrap(func).add_input('x', shape=5).add_output('y', shape=3)
-        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
+        f = (omf.wrap(func)
+             .add_input('x', shape=5)
+             .add_output('y', shape=3))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
 
@@ -505,15 +566,15 @@ class TestFuncComp(unittest.TestCase):
         # Really check to see that the has_diag_partials argument had its intended effect
 
         # run with has_diag_partials=False
-        p = om.Problem()
-        model = p.model
 
         def func(x):
             y=3.0*x + 2.5
             return y
 
         f = omf.wrap(func).defaults(shape=5)
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=False))
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=False))
         p.setup()
 
         declared_partials = comp._declared_partials[('y','x')]
@@ -522,8 +583,7 @@ class TestFuncComp(unittest.TestCase):
 
         # run with has_diag_partials=True
         p = om.Problem()
-        model = p.model
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
         p.setup()
         p.final_setup()
 
@@ -538,15 +598,14 @@ class TestFuncComp(unittest.TestCase):
         # expression that only the partials that are needed are declared and computed
 
         # with has_diag_partials set to the default of False and just scalars
-        p = om.Problem()
-        model = p.model
 
         def func(x1=1.0, x2=2.0):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
             return y1, y2
 
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(func))
         p.setup()
         p.final_setup()
 
@@ -570,8 +629,6 @@ class TestFuncComp(unittest.TestCase):
         self.assertEqual(3.0, J)
 
         # make sure this works with arrays and when has_diag_partials is the default of False
-        p = om.Problem()
-        model = p.model
 
         def func2(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
@@ -579,7 +636,9 @@ class TestFuncComp(unittest.TestCase):
             return y1, y2
 
         f = omf.wrap(func2).defaults(shape=5)
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
         p.setup()
         p.final_setup()
 
@@ -594,8 +653,6 @@ class TestFuncComp(unittest.TestCase):
         self.assertTrue(np.all(3.0*np.identity(5) == J))
 
         # with has_diag_partials True to make sure that still works with arrays
-        p = om.Problem()
-        model = p.model
 
         def func3(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
@@ -603,7 +660,9 @@ class TestFuncComp(unittest.TestCase):
             return y1, y2
 
         f = omf.wrap(func3).defaults(shape=5)
-        comp = model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
         p.setup()
         p.final_setup()
 
@@ -627,15 +686,17 @@ class TestFuncComp(unittest.TestCase):
         self.assertTrue(np.all(3.0*np.identity(5) == J))
 
     def test_has_diag_partials_shape_only(self):
-        p = om.Problem()
-        model = p.model
 
         def func(x):
             y=3.0*x + 2.5
             return y
 
-        f = omf.wrap(func).add_input('x', shape=(5,)).add_output('y', shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
+        f = (omf.wrap(func)
+             .add_input('x', shape=(5,))
+             .add_output('y', shape=(5,)))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
         p.run_model()
@@ -646,15 +707,14 @@ class TestFuncComp(unittest.TestCase):
 
     def test_feature_has_diag_partials(self):
 
-        p = om.Problem()
-        model = p.model
-
         def func(x=np.ones(5)):
             y=3.0*x + 2.5
             return y
 
         f = omf.wrap(func).defaults(shape=(5,))
-        model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
 
         p.setup()
 
@@ -666,118 +726,17 @@ class TestFuncComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
-    def test_feature_multi_output(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        def func(x=1.):
-            y1=x+1.
-            y2=x-1.
-            return y1, y2
-
-        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
-
-        prob.setup()
-
-        prob.set_val('x', 2.0)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
-        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
-
-    def test_feature_multi_output2(self):
-        # verify that expressions can have multiple LHS variables.
-
-        prob = om.Problem()
-        model = prob.model
-
-        def func(x=1.):
-            y1, y2 = x+1., x-1.
-            return y1, y2
-
-        model.add_subsystem('comp', om.ExplicitFuncComp(func), promotes=['x'])
-
-        prob.setup()
-
-        prob.set_val('x', 2.0)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.y1'), 3.0, 0.00001)
-        assert_near_equal(prob.get_val('comp.y2'), 1.0, 0.00001)
-
-    def test_feature_array(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        def func(x=np.array([1., 2., 3.])):
-            y = x[1]
-            return y
-
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
-
-        prob.setup()
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.y'), 2.0, 0.00001)
-
-    def test_feature_math(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        def func(x, y):
-            z = np.sin(x)**2 + np.cos(y)**2
-            return z
-
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
-
-        prob.setup()
-
-        prob.set_val('comp.x', np.pi/2.0)
-        prob.set_val('comp.y', np.pi/2.0)
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('comp.z'), 1.0, 0.00001)
-
-    def test_feature_numpy(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        def func(x=np.array([1., 2., 3.])):
-            y = np.sum(x)
-            return y
-
-        model.add_subsystem('comp', om.ExplicitFuncComp(func))
-
-        prob.setup()
-
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        assert_near_equal(prob['comp.y'], 6.0, 0.00001)
-
     def test_feature_defaults(self):
 
-        prob = om.Problem()
-        model = prob.model
 
         def func(x=0., y=0.):
             z = x + y
             return z
 
         f = omf.wrap(func).defaults(units='inch')
-        model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
         prob.setup()
 
@@ -790,14 +749,15 @@ class TestFuncComp(unittest.TestCase):
         assert_near_equal(prob.get_val('comp.z'), 24.0, 0.00001)
 
     def test_list_outputs_resids_tol(self):
-        prob = om.Problem()
-        model = prob.model
 
         def func(a=2.0, b=5.0, c=3.0, x=np.ones(2)):
             y = a * x ** 2 + b * x + c
             return y
 
         f = omf.wrap(func).add_output('y', shape=2)
+
+        prob = om.Problem()
+        model = prob.model
         model.add_subsystem("quad_1", om.ExplicitFuncComp(f))
 
         balance = model.add_subsystem("balance", om.BalanceComp())
