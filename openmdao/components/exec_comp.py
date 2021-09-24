@@ -594,7 +594,7 @@ class ExecComp(ExplicitComponent):
             meta = self._var_rel2meta
             decl_partials = super().declare_partials
             for i, (outs, tup) in enumerate(self._exprs_info):
-                vs, _ = tup
+                vs, funcs = tup
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:

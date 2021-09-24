@@ -76,6 +76,9 @@ class OMWrappedFunc(object):
     """
 
     def __init__(self, func):
+        """
+        Initialize attributes.
+        """
         self._f = func
         self._defaults = {'val': 1.0, 'shape': ()}
 
@@ -634,7 +637,7 @@ def _shape2tuple(shape):
 @contextmanager
 def jax_context(globals):
     """
-    A context where np and numpy are replaced by their jax equivalents.
+    Create a context where np and numpy are replaced by their jax equivalents.
 
     Parameters
     ----------
@@ -820,5 +823,5 @@ def get_function_deps(func):
 
         retdeps.append(depset)
 
-    return [(n[0] if simple  and n[0] not in input_names else None, d)
+    return [(n[0] if simple and n[0] not in input_names else None, d)
             for ((n, simple), d) in zip(funcdeps._ret_info, retdeps)]

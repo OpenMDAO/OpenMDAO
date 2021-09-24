@@ -10,6 +10,8 @@ import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
 
+import networkx as nx
+
 
 def _get_long_name(node):
     # If the node is an Attribute or Name node that is composed
@@ -170,8 +172,6 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
     networkx.DiGraph
         A graph containing edges from methods to their sub-methods.
     """
-    import networkx as nx
-
     # moved this class def in here to keep the numpy doc scraper from barfing due to
     # stuff in nx.DiGraph.
     class OrderedDiGraph(nx.DiGraph):
