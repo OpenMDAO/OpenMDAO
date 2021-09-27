@@ -118,5 +118,3 @@ elif os.environ.get('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start
     setup(os.environ['OPENMDAO_PROF_MEM'])
     start()
-elif os.environ.get('WING_DBG'):
-    wing_dbg()

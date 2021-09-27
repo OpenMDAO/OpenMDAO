@@ -844,7 +844,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
         p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
         p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
-        p.model.add_design_var('indep.a', indices=om.slicer[1, ..., 1], flat_indices=False)
+        p.model.add_design_var('indep.a', indices=om.slicer[1, ..., 1])
 
         p.setup()
         p.run_model()
@@ -874,7 +874,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('indep', om.IndepVarComp('a', arr))
         p.model.add_subsystem('row1_comp', om.ExecComp('b=2*a', a=np.ones((3,5,3)), b=np.ones((3,5,3))))
         p.model.connect('indep.a', 'row1_comp.a', src_indices=om.slicer[..., 1])
-        p.model.add_constraint('indep.a', indices=om.slicer[1, ..., 1], flat_indices=False)
+        p.model.add_constraint('indep.a', indices=om.slicer[1, ..., 1])
 
         p.setup()
         p.run_model()

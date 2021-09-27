@@ -2759,8 +2759,6 @@ class System(object):
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
 
-        # self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
-
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
