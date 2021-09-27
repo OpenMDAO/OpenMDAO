@@ -31,7 +31,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismat
     _is_unitless, simplify_unit
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, Indexer, _update_new_style
+from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     SetupWarning, PromotionWarning, MPIWarning
 from openmdao.core.constants import _SetupStatus
@@ -1573,8 +1573,6 @@ class Group(System):
                             continue
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
-                        # TODO: remove following line after implicit flat src deprecation release
-                        meta['orig_flat_src_indices'] = flat
 
                     src_ind_inputs.add(abs_in)
 
@@ -2011,6 +2009,7 @@ class Group(System):
                         conditional_error(f"{s.msginfo}: When connecting '{src}' to '{tgt}': "
                                           f"{str(err)}", exc=err.__class__, category=SetupWarning,
                                           err=s._raise_connection_errors)
+                        continue
 
                     if src_indices.indexed_src_size == 0:
                         continue
@@ -2181,7 +2180,7 @@ class Group(System):
             self._vector_class.TRANSFER._setup_discrete_transfers(self)
 
     def promotes(self, subsys_name, any=None, inputs=None, outputs=None,
-                 src_indices=None, flat_src_indices=None, src_shape=None, new_style_idx=False):
+                 src_indices=None, flat_src_indices=None, src_shape=None):
         """
         Promote a variable in the model tree.
 
@@ -2213,9 +2212,6 @@ class Group(System):
             to the number of dimensions of the source.
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
-        new_style_idx : bool
-            If True, assume numpy compatible indexing.  Not setting this to True will result in a
-            deprecation warning for src_indices arrays with ndim > 1.
         """
         if isinstance(any, str):
             raise RuntimeError(f"{self.msginfo}: Trying to promote any='{any}', "
@@ -2239,13 +2235,11 @@ class Group(System):
         else:
             if src_indices is not None:
                 promoted = inputs if inputs else any
-                err_prefix = f"{self.msginfo}: When promoting {promoted} from '{subsys_name}'"
-                new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
                 try:
-                    src_indices = indexer(src_indices, flat_src=flat_src_indices,
-                                          new_style=new_style_idx)
+                    src_indices = indexer(src_indices, flat_src=flat_src_indices)
                 except Exception as err:
-                    raise err.__class__(f"{err_prefix}: {err}")
+                    raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
+                                        f"'{subsys_name}': {err}")
 
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "
@@ -2402,8 +2396,7 @@ class Group(System):
 
         return subsys
 
-    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None,
-                new_style_idx=False):
+    def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
         Connect source src_name to target tgt_name in this namespace.
 
@@ -2421,9 +2414,6 @@ class Group(System):
             If True, each entry of src_indices is assumed to be an index into the
             flattened source.  Otherwise it must be a tuple or list of size equal
             to the number of dimensions of the source.
-        new_style_idx : bool
-            If True, assume numpy compatible indexing.  Not setting this to True will result in a
-            deprecation warning for src_indices arrays with ndim > 1.
         """
         # if src_indices argument is given, it should be valid
         if isinstance(src_indices, str):
@@ -2440,13 +2430,11 @@ class Group(System):
             return
 
         if src_indices is not None:
-            err_prefix = f"{self.msginfo}: When connecting from '{src_name}' to '{tgt_name}'"
-            new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
-                src_indices = indexer(src_indices, flat_src=flat_src_indices,
-                                      new_style=new_style_idx)
+                src_indices = indexer(src_indices, flat_src=flat_src_indices)
             except Exception as err:
-                raise err.__class__(f"{err_prefix}: {err}")
+                raise err.__class__(f"{self.msginfo}: When connecting from '{src_name}' to "
+                                    f"'{tgt_name}': {err}")
 
         # target should not already be connected
         for manual_connections in [self._manual_connections, self._static_manual_connections]:

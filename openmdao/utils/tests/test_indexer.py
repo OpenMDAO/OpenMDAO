@@ -3,7 +3,9 @@ import unittest
 import numpy as np
 from numpy.testing import assert_equal
 
+import openmdao.api as om
 from openmdao.utils.indexer import indexer
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -358,69 +360,20 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.indexed_src_shape, (2,3))
         assert_equal(ind.min_src_dim, 3)
 
-    def test_nonflat_1D_src_inds(self):
-        # test using our special format where the src inds are basically an array of a certain shape
-        # containing tuples that indicate the indices into each dimension of the source.
-        src = np.arange(24).reshape((8,3))  # 2D source
-        ind = indexer([(1,2), (3,2), (5,0), (4, 1)], new_style=False)
-
-        assert_equal(ind(), (np.array([1, 3, 5, 4]), np.array([2, 2, 0, 1])))
-
-        ind.set_src_shape(src.shape)
-
-        assert_equal(ind.shaped_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(flat=False), np.array([5,11,15,13]))
-        assert_equal(ind.indexed_src_shape, (4,))
-        assert_equal(ind.min_src_dim, 2)
-
-    def test_nonflat_2D_src_inds(self):
-        # test using our special format where the src inds are basically an array of a certain shape
-        # containing tuples that indicate the indices into each dimension of the source.
-        src = np.arange(24).reshape((8,3))  # 2D source
-        ind = indexer([((1,2), (3,2)),
-                       ((5,0), (4, 1))], new_style=False)
-
-        assert_equal(ind(), (np.array([1, 3, 5, 4]), np.array([2, 2, 0, 1])))
-
-        ind.set_src_shape(src.shape)
-
-        assert_equal(ind.shaped_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(flat=False), np.array([[5,11],[15,13]]))
-        assert_equal(ind.indexed_src_shape, (2,2))
-        assert_equal(ind.min_src_dim, 2)
-
-    def test_nonflat_2D_neg_src_inds(self):
-        # test using our special format where the src inds are basically an array of a certain shape
-        # containing tuples that indicate the indices into each dimension of the source.
-        src = np.arange(24).reshape((8,3))  # 2D source
-        ind = indexer([((1,2), (3,2)),
-                       ((5,0), (4, -2))], new_style=False)
-
-        assert_equal(ind(), (np.array([1, 3, 5, 4]), np.array([ 2,  2,  0, -2])))
-
-        ind.set_src_shape(src.shape)
-
-        assert_equal(ind.shaped_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(), np.array([5,11,15,13]))
-        assert_equal(ind.as_array(flat=False), np.array([[5,11],[15,13]]))
-        assert_equal(ind.indexed_src_shape, (2,2))
-        assert_equal(ind.min_src_dim, 2)
-
     def test_flat_shaped_src_inds(self):
         src = np.arange(24).reshape((8,3))  # 2D source
-        ind = indexer([[1,3,5,4], [22, -4, 11, 3]], flat_src=True)
+        ind = indexer([1,3,5,4,22, -4, 11, 3], flat_src=True)
 
-        assert_equal(ind(), [[1,3,5,4], [22, -4, 11, 3]])
+        assert_equal(ind(), [1,3,5,4,22, -4, 11, 3])
 
         ind.set_src_shape(src.shape)
 
         assert_equal(ind.shaped_array(), np.array([1,3,5,4,22, 20, 11, 3]))
         assert_equal(ind.as_array(), np.array([1,3,5,4,22, -4, 11, 3]))
-        assert_equal(ind.as_array(flat=False), np.array([[1,3,5,4], [22, -4, 11, 3]]))
-        assert_equal(ind.indexed_src_shape, (2, 4))
+        assert_equal(ind.as_array(flat=False), np.array([1,3,5,4,22, -4, 11, 3]))
+        assert_equal(ind.indexed_src_shape, (8,))
         assert_equal(ind.min_src_dim, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

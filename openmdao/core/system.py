@@ -2435,7 +2435,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer(indices, flat_src=flat_src, new_style=True)
+            idxer = indexer(indices, flat_src=flat_src)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")

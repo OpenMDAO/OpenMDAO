@@ -180,12 +180,11 @@ def ensure_compatible(name, value, shape=None, indices=None):
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
         try:
-            # indshape = indices.as_array().shape
             indshape = indices.indexed_src_shape
         except Exception:
             pass  # use shape provided or shape of value and check vs. shape of indices later
         else:
-            if shape is not None and indshape != shape:
+            if shape is not None and np.product(indshape) != np.product(shape):
                 raise ValueError("Shape of indices %s does not match shape of %s for '%s'." %
                                  (indshape, shape, name))
             if shape is None:

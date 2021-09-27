@@ -678,7 +678,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
 
-        self.assertEqual(str(context.exception), msg)
+        self.assertEqual(context.exception.args[0], msg)
 
     def test_desvar_indice_slice(self):
 
@@ -1121,7 +1121,7 @@ class TestGroup(unittest.TestCase):
     def test_promote_src_indices_nonflat_to_scalars(self):
         class MyComp(om.ExplicitComponent):
             def setup(self):
-                self.add_input('x', 1.0, src_indices=[(3, 1)], shape=(1,))
+                self.add_input('x', 1.0, src_indices=[[3],[1]], shape=(1,))
                 self.add_output('y', 1.0)
 
             def compute(self, inputs, outputs):
@@ -1141,10 +1141,10 @@ class TestGroup(unittest.TestCase):
         assert_near_equal(p['C1.y'], 20.)
 
     @parameterized.expand(itertools.product(
-        [((4, 3),  [(0, 0), (3, 1), (2, 1), (1, 1)]),
-         ((1, 12), [(0, 0), (0, 10), (0, 7), (0, 4)]),
+        [((4, 3),  [[0,3,2,1],[0,1,1,1]]),
+         ((1, 12), [[0,0,0,0],[0,10,7,4]]),
          ((12,),   [0, 10, 7, 4]),
-         ((12, 1), [(0, 0), (10, 0), (7, 0), (4, 0)])],
+         ((12, 1), [[0,10,7,4],[0,0,0,0]])],
         [(2, 2), (4,), (4, 1), (1, 4)],
     ), name_func=lambda f, n, p: 'test_promote_src_indices_'+'_'.join(str(a) for a in p.args))
     def test_promote_src_indices_param(self, src_info, tgt_shape):
@@ -1153,18 +1153,11 @@ class TestGroup(unittest.TestCase):
 
         class MyComp(om.ExplicitComponent):
             def setup(self):
+                sidxs = idxvals
                 if len(tgt_shape) == 1:
                     tshape = None  # don't need to set shape if input is flat
-                    sidxs = idxvals
                 else:
                     tshape = tgt_shape
-                    sidxs = []
-                    i = 0
-                    for r in range(tgt_shape[0]):
-                        sidxs.append([])
-                        for c in range(tgt_shape[1]):
-                            sidxs[-1].append(idxvals[i])
-                            i += 1
 
                 self.add_input('x', np.ones(4).reshape(tgt_shape),
                                src_indices=sidxs, flat_src_indices=flat, shape=tshape)
@@ -2404,9 +2397,9 @@ class TestConnect(unittest.TestCase):
         p.model.add_subsystem('IV', om.IndepVarComp('x', np.arange(12).reshape((4, 3))))
         p.model.add_subsystem('C1', om.ExecComp('y=sum(x)*2.0', x=np.zeros((2, 2))))
 
-        p.model.connect('IV.x', 'C1.x', src_indices=[(1, 1)])
+        p.model.connect('IV.x', 'C1.x', src_indices=[[1], [1]])
 
-        msg = "<model> <class Group>: The source indices [[1 1]] do not specify a valid shape " + \
+        msg = "<model> <class Group>: The source indices [[1] [1]] do not specify a valid shape " + \
               "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
               "indices are shape (1,)."
 
@@ -2421,10 +2414,10 @@ class TestConnect(unittest.TestCase):
             p.setup()
 
     def test_bad_indices_dimensions(self):
-        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
+        self.sub.connect('src.x', 'arr.x', src_indices=[[2,2],[-1,2],[2,2]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer [[ 2 -1  2] [ 2  2  2]] expects 3 dimensions."
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Can't set source shape to (5, 3) because indexer [[ 2  2] [-1  2] [ 2  2]] expects 3 dimensions."
         try:
             self.prob.setup()
         except ValueError as err:
@@ -2439,10 +2432,10 @@ class TestConnect(unittest.TestCase):
 
     def test_bad_indices_index(self):
         # the index value within src_indices is outside the valid range for the source
-        self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
+        self.sub.connect('src.x', 'arr.x', src_indices=[[2, 4],[-1, 4]],
                          flat_src_indices=False)
 
-        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': Indexer [[ 2 -1] [ 4  4]] exceeds bounds for axis of dimension 3."
+        msg = "'sub' <class Group>: When connecting 'src.x' to 'arr.x': index 4 is out of bounds for source dimension of size 3."
 
         try:
             self.prob.setup()
@@ -2479,15 +2472,15 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape(self):
         self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                            src_indices=[[4, 5], [7, 8]],
+                            src_indices=[4, 5, 7, 8],
                             flat_src_indices=True)
 
     def test_src_indices_shape_bad_idx_flat(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[4 5] [7 9]] exceeds bounds for axis of dimension 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
 
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[4, 5], [7, 9]],
+                                src_indices=[4, 7, 5, 9],
                                 flat_src_indices=True)
         except Exception as err:
             self.assertEqual(str(err), msg)
@@ -2496,15 +2489,15 @@ class TestSrcIndices(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[4, 5], [7, 9]],
+                                src_indices=[4, 5, 7, 9],
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_promotes(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[4 5] [7 9]] exceeds bounds for axis of dimension 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[4, 5], [7, 9]],
+                                src_indices=[4, 5, 7, 9],
                                 flat_src_indices=True, promotes=['x'])
         except Exception as err:
             self.assertEqual(str(err), msg)
@@ -2513,15 +2506,15 @@ class TestSrcIndices(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[4, 5], [7, 9]],
+                                src_indices=[4, 5, 7, 9],
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
-        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': Indexer [[-10   5] [  7   8]] exceeds bounds for axis of dimension 9."
+        msg = "<model> <class Group>: When connecting 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9."
         try:
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[-10, 5], [7, 8]],
+                                src_indices=[-10, 5, 7, 8],
                                 flat_src_indices=True)
         except Exception as err:
             self.assertEqual(str(err), msg)
@@ -2530,7 +2523,7 @@ class TestSrcIndices(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
-                                src_indices=[[-10, 5], [7, 8]],
+                                src_indices=[-10, 5, 7, 8],
                                 flat_src_indices=True,
                                 raise_connection_errors=False)
 
@@ -3428,8 +3421,7 @@ class TestFeatureConnect(unittest.TestCase):
 
         # connect C1.x to entries (0,0), (-1,1), (2,1), (1,1) of indep.x
         p.model.connect('indep.x', 'C1.x',
-                        src_indices=[[(0, 0), (-1, 1)],
-                                     [(2, 1), (1, 1)]], flat_src_indices=False)
+                        src_indices=[[0, -1, 2, 1],[0, 1, 1, 1]], flat_src_indices=False)
 
         p.setup()
         p.run_model()
@@ -3490,14 +3482,8 @@ class TestFeatureSrcIndices(unittest.TestCase):
             def setup(self):
                 # We want to pull the following 4 values out of the source:
                 # [(0,0), (3,1), (2,1), (1,1)].
-                # Because our input is also non-flat we arrange the
-                # source index tuples into an array having the same shape
-                # as our input.  If we didn't set flat_src_indices to False,
-                # we could specify src_indices as a 1D array of indices into
-                # the flattened source.
                 self.add_input('x', np.ones((2, 2)),
-                               src_indices=[[(0, 0), (3, 1)],
-                                            [(2, 1), (1, 1)]],
+                               src_indices=[[0,3,2,1],[0,1,1,1]],
                                flat_src_indices=False)
                 self.add_output('y', 1.0)
 
