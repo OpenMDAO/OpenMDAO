@@ -62,7 +62,7 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 # Solve the problem.
 #
 
-om.OptViewer("cases.sql", 1000, 5002)
+# om.OptViewer("cases.sql", 1000, 5002)
 dm.run_problem(p)
 
 # cr = om.CaseReader("cases.sql")
