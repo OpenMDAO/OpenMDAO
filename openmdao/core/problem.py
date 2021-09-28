@@ -1913,6 +1913,11 @@ class Problem(object):
         """
         abs2prom = self.model._var_abs2prom
 
+        # Gets the current numpy print options for consistent decimal place
+        #   printing between arrays and floats
+        print_options = np.get_printoptions()
+        np_precision = print_options['precision']
+
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
@@ -1933,6 +1938,14 @@ class Problem(object):
 
                 elif col_name == 'val':
                     row[col_name] = vals[name]
+                elif col_name == 'min':
+                    min_val = min(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(min_val, np_precision)
+                elif col_name == 'max':
+                    max_val = max(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(max_val, np_precision)
                 else:
                     row[col_name] = meta[col_name]
             rows.append(row)
@@ -1950,7 +1963,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                 else:
                     out = str(cell)
                 max_width[col_name] = max(len(out), max_width[col_name])
@@ -1971,7 +1985,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                     have_array_values.append(col_name)
                 else:
                     out = str(cell)
