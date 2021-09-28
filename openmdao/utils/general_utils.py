@@ -946,7 +946,7 @@ def common_subpath(pathnames):
 
 def _is_slicer_op(indices):
     """
-    Check if an array of indices contains a colon or ellipsis operator.
+    Check if an indexer contains a slice or ellipsis operator.
 
     Parameters
     ----------
@@ -1086,76 +1086,6 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return parent_src_inds.shaped_array(flat=True)[my_src_inds()]
     else:
         return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
-
-
-def shape_from_idx(src_shape, src_inds, flat_src_inds):
-    """
-    Get the shape of the result if the given src_inds were applied to an array of the given shape.
-
-    Parameters
-    ----------
-    src_shape : tuple
-        Expected shape of source variable.
-    src_inds : ndarray or fancy index
-        Indices into the source variable.
-    flat_src_inds : bool
-        If True, src_inds index into a flat array.
-
-    Returns
-    -------
-    tuple
-        Shape of the input.
-    """
-    if _is_slicer_op(src_inds):
-        if isinstance(src_inds, slice):
-            src_inds = [src_inds]
-
-        for entry in src_inds:
-            if entry is Ellipsis:
-                shp = np.empty(src_shape, dtype=bool)[src_inds].shape
-                if flat_src_inds:
-                    return (np.product(shp),)
-                return shp
-
-        if len(src_inds) != len(src_shape):
-            raise ValueError(f"src_indices {src_inds} have the wrong number of dimensions, "
-                             f"{len(src_inds)}, to index into an array of shape {src_shape}")
-
-        ret = []
-        full_slice = slice(None)
-        for i, dimsize in enumerate(src_shape):
-            slc = src_inds[i]
-            if isinstance(slc, slice):
-                if slc == full_slice:
-                    ret.append(dimsize)
-                elif (slc.start is None or slc.start < 0 or slc.stop is None or
-                      slc.stop < 0 or (slc.step is not None and slc.step < 0)):
-                    ret.append(np.empty(dimsize, dtype=bool)[slc].size)
-                else:
-                    step = slc.step
-                    if step in (None, 1):
-                        ret.append(slc.stop - slc.start)
-                    else:
-                        ret.append(1 + (slc.stop - slc.start - 1) // slc.step)
-            elif isinstance(slc, Number):
-                ret.append(1)
-            else:  # list/tuple/array
-                ret.append(len(slc))
-        return tuple(ret)
-    else:
-        if src_inds.ndim == 1:
-            flat_src_inds = True
-        if flat_src_inds:
-            return src_inds.shape
-        elif src_inds.size > 0:
-            dims = src_inds.shape[-1]
-        else:
-            return (0,)
-
-        if len(src_shape) != dims:
-            raise ValueError(f"non-flat src_indices {src_inds} have the wrong number of dimensions,"
-                             f" {dims}, to index into an array of shape {src_shape}")
-        return tuple(src_inds.shape[:-1])
 
 
 def shape2tuple(shape):
