@@ -1910,6 +1910,12 @@ class Problem(object):
             If True, then show the promoted names of the variables.
         col_spacing : int
             Number of spaces between columns in the table.
+        precision : int
+            Number of decimal places to round to.
+        min : bool
+            If True, print the minimum value of the array.
+        max : bool
+            If True, print the maximum value of the array.
         """
         abs2prom = self.model._var_abs2prom
 
