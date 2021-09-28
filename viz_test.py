@@ -36,7 +36,7 @@ p.driver.recording_options['record_desvars'] = True
 # Setup the trajectory and its phase
 traj = p.model.add_subsystem('traj', dm.Trajectory())
 
-transcription = dm.Radau(num_segments=30, order=3, compressed=False)
+transcription = dm.Radau(num_segments=100, order=3, compressed=False)
 
 phase = traj.add_phase('phase0',
                        dm.Phase(ode_class=HyperSensitiveODE, transcription=transcription))
@@ -65,13 +65,4 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 om.OptViewer("cases.sql", 1000, 5002)
 dm.run_problem(p)
 
-# cr = om.CaseReader("cases.sql")
-
-# driver_cases = cr.list_cases('driver', recurse=False, out_stream=None)
-
-# for i in range(0,len(driver_cases)):
-#     case = cr.get_case(driver_cases[i])
-#     print(case.outputs)
-
-# print("Done")
 

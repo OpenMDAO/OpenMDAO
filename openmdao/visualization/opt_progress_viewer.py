@@ -27,6 +27,7 @@ class OptViewer(object):
         self.port = port
         self.update_freq = update_freq
         self.live_updating = None
+        self.init_call_made = False
         self.opt_complete = False
 
         thread = Thread(target = self._start_visualization)
@@ -49,6 +50,10 @@ class OptViewer(object):
         if not self.opt_complete:
             self.case_select.options = list(self.cr.list_cases(out_stream=None))
             self.variable_select.options = self.cr.list_source_vars('driver', out_stream=None)['outputs']
+
+        if not self.init_call_made:
+            self.case_select.value = self.case_select.options[0]
+            self.variable_select.value = self.variable_select.options[0]
 
     def _parse_case(self):
         if isinstance(self.data, str):
@@ -104,24 +109,33 @@ class OptViewer(object):
         self.convergence_plot.line(x="x_vals", y="y_vals", line_width=2, source=self.source)
 
         # Case select a design variables
-        self.case_select = Select(title="Case:", value="None",
-                                     options=["None"])
+        self.case_select = Select(title="Case:")
         self.case_select.on_change('value', self._case_select_update)
+        self.case_select.width = 500
+        self.case_select.align = "end"
 
-        self.variable_select = Select(title="Variable:", value="None",
-                                     options=["None"])
+        self.variable_select = Select(title="Variable:")
         self.variable_select.on_change('value', self._variable_select_update)
+        self.variable_select.width = 500
+        self.variable_select.align = "end"
 
         self.prob_variables_plot = figure(title="Problem Variables",
                                        x_axis_label="Variable Length",
                                        y_axis_label=self.variable_select.value)
         self.prob_variables_plot.line(x="x_vals", y="y_vals", line_width=2, source=self.var_data)
+        self.prob_variables_plot.min_border_left = 100
+
 
         # Doc layout
         self.doc = doc
         self.doc.title = "Optimization Progress Visualization"
-        self.doc.add_root(column(row(self.convergence_plot, self.convergence_plot_y_input_select),
-                            row(self.prob_variables_plot, self.case_select, self.variable_select)))
+        plot1 = column(self.convergence_plot, self.convergence_plot_y_input_select)
+        plot2 = column(self.prob_variables_plot, self.case_select, self.variable_select)
+
+        self.doc.add_root(row(plot1, plot2))
+        # self.doc.sizing_mode = 'scale_both'
+        # self.doc.add_root(column(row(self.convergence_plot, self.convergence_plot_y_input_select),
+        #                     row(self.prob_variables_plot, column(self.case_select, self.variable_select))))
         self.live_updating = doc.add_periodic_callback(self._update, self.update_freq)
 
     def _case_select_update(self, attr, old, new):
@@ -140,8 +154,8 @@ class OptViewer(object):
 
     def _update_variables_plot(self):
         case = self.cr.get_case(self.case_select.value)
-
         variable = case.outputs[self.variable_select.value]
+
         new_data = dict(
             x_vals=list(range(len(variable))),
             y_vals=variable,
@@ -161,6 +175,7 @@ class OptViewer(object):
             )
             try:
                 self._parse_cases_for_variables()
+                self.init_call_made = True
             except KeyError:
                 pass
         else:
