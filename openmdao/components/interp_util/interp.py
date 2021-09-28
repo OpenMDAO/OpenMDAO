@@ -6,7 +6,7 @@ implementations.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_akima import InterpAkima
+from openmdao.components.interp_util.interp_akima import InterpAkima, InterpAkima1D
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
@@ -23,6 +23,7 @@ INTERP_METHODS = {
     'lagrange3': InterpLagrange3,
     'cubic': InterpCubic,
     'akima': InterpAkima,
+    'akima1D' : InterpAkima1D,
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
@@ -31,7 +32,7 @@ INTERP_METHODS = {
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic', 'trilinear']
+                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -274,7 +275,7 @@ class InterpND(object):
         result = self._evaluate_spline(values)
         if result.shape[0] == 1:
             # Not vectorized, so drop the extra dimension.
-            result = result.flatten()
+            result = result.ravel()
 
         if compute_derivative:
             d_dvalues = self.spline_gradient()
@@ -309,16 +310,16 @@ class InterpND(object):
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
                                            i, np.NaN, self.grid[i][0], self.grid[i][-1])
 
-                #eps = 1e-14 * self.grid[i][-1]
-                #if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
-                                      #np.all(p - eps <= self.grid[i][-1])):
-                    #p1 = np.where(self.grid[i][0] > p)[0]
-                    #p2 = np.where(p > self.grid[i][-1])[0]
-                    ## First violating entry is enough to direct the user.
-                    #violated_idx = set(p1).union(p2).pop()
-                    #value = p[violated_idx]
-                    #raise OutOfBoundsError("One of the requested xi is out of bounds",
-                                           #i, value, self.grid[i][0], self.grid[i][-1])
+                eps = 1e-14 * self.grid[i][-1]
+                if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
+                                      np.all(p - eps <= self.grid[i][-1])):
+                    p1 = np.where(self.grid[i][0] > p)[0]
+                    p2 = np.where(p > self.grid[i][-1])[0]
+                    # First violating entry is enough to direct the user.
+                    violated_idx = set(p1).union(p2).pop()
+                    value = p[violated_idx]
+                    raise OutOfBoundsError("One of the requested xi is out of bounds",
+                                           i, value, self.grid[i][0], self.grid[i][-1])
 
         if self._compute_d_dvalues:
             # If the table grid or values are component inputs, then we need to create a new table
@@ -342,7 +343,7 @@ class InterpND(object):
             for j in range(n_nodes):
                 val, d_x, d_values, d_grid = table.evaluate(xi[j, :])
                 result[j] = val
-                derivs_x[j, :] = d_x.flatten()
+                derivs_x[j, :] = d_x.ravel()
                 if d_values is not None:
                     if derivs_val is None:
                         dv_shape = [n_nodes]

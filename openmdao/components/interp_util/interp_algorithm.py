@@ -309,8 +309,11 @@ class InterpAlgorithmFixed(object):
         """
         Verify that we have enough points for this interpolation algorithm.
         """
+        grid = self.grid
+        if isinstance(grid, np.ndarray):
+            grid = (grid)
         k = self.k
-        n_p = len(self.grid)
+        n_p = len(grid[0])
         if n_p < k:
             raise ValueError("There are %d points in a data dimension,"
                              " but method %s requires at least %d "
@@ -343,9 +346,11 @@ class InterpAlgorithmFixed(object):
             bracket is above the last table element, 0 for normal interpolation.
         """
         for j in range(self.dim):
-            #self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],
-            #                                          self.last_index[j])
-            self.last_index[j] = np.searchsorted(self.grid[j], x[..., j], side='left') - 1
+            if self._vectorized:
+                self.last_index[j] = np.searchsorted(self.grid[j], x[..., j], side='left') - 1
+            else:
+                self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],
+                                                          self.last_index[j])
 
         return self.last_index, None
 
@@ -363,6 +368,7 @@ class InterpAlgorithmFixed(object):
             Cached index of last interpolated value at this dimension.
 
         """
+        last_index = max(last_index, 0)
         high = last_index + 1
         highbound = len(grid) - 1
         inc = 1
@@ -375,7 +381,7 @@ class InterpAlgorithmFixed(object):
 
                 # Check if we're off of the bottom end.
                 if x < grid[0]:
-                    return last_index, -1
+                    return -1, -1
                 break
 
             inc += inc
@@ -390,8 +396,7 @@ class InterpAlgorithmFixed(object):
 
                 # Check if we're off of the top end
                 if x > grid[highbound]:
-                    last_index = highbound
-                    return last_index, 1
+                    return highbound, 1
 
                 high = highbound
                 break
@@ -728,4 +733,5 @@ class InterpAlgorithmSemi(object):
         bool
             True if the coordinate is extrapolated in this dimension.
         """
-        pass
+        grid = self.grid[0]
+        values = self.values

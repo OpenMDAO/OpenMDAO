@@ -154,7 +154,6 @@ class InterpCubic(InterpAlgorithm):
             tshape = list(interp_values.shape)
             tshape.append(nx)
             derivs = np.empty(tuple(tshape), dtype=x.dtype)
-            print(nx, tshape)
 
             derivs[..., 0] = r_step * (values[..., idx + 1] - values[..., idx]) + \
                 (((3.0 * b * b - 1) * sec_deriv[..., idx + 1] -
