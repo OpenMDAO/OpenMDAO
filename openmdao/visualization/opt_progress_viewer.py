@@ -111,19 +111,19 @@ class OptViewer(object):
         # Case select a design variables
         self.case_select = Select(title="Case:")
         self.case_select.on_change('value', self._case_select_update)
-        self.case_select.width = 500
+        # self.case_select.width = 500
         self.case_select.align = "end"
 
         self.variable_select = Select(title="Variable:")
         self.variable_select.on_change('value', self._variable_select_update)
-        self.variable_select.width = 500
+        # self.variable_select.width = 500
         self.variable_select.align = "end"
 
         self.prob_variables_plot = figure(title="Problem Variables",
                                        x_axis_label="Variable Length",
                                        y_axis_label=self.variable_select.value)
         self.prob_variables_plot.line(x="x_vals", y="y_vals", line_width=2, source=self.var_data)
-        self.prob_variables_plot.min_border_left = 100
+        # self.prob_variables_plot.min_border_left = 200
 
 
         # Doc layout
@@ -132,7 +132,7 @@ class OptViewer(object):
         plot1 = column(self.convergence_plot, self.convergence_plot_y_input_select)
         plot2 = column(self.prob_variables_plot, self.case_select, self.variable_select)
 
-        self.doc.add_root(row(plot1, plot2))
+        self.doc.add_root(row(plot1, plot2, spacing=100))
         # self.doc.sizing_mode = 'scale_both'
         # self.doc.add_root(column(row(self.convergence_plot, self.convergence_plot_y_input_select),
         #                     row(self.prob_variables_plot, column(self.case_select, self.variable_select))))
