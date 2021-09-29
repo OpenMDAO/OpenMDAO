@@ -1841,13 +1841,13 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
             'linear', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
@@ -1910,12 +1910,6 @@ class Problem(object):
             If True, then show the promoted names of the variables.
         col_spacing : int
             Number of spaces between columns in the table.
-        precision : int
-            Number of decimal places to round to.
-        min : bool
-            If True, print the minimum value of the array.
-        max : bool
-            If True, print the maximum value of the array.
         """
         abs2prom = self.model._var_abs2prom
 
