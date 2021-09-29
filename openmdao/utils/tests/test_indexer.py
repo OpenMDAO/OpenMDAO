@@ -360,6 +360,26 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind.indexed_src_shape, (2,3))
         assert_equal(ind.min_src_dim, 3)
 
+    def test_mult_arr_shaped(self):
+        src = np.arange(9).reshape((3,3))
+        ind = indexer[[[0,0],[2,2]], [[0,2], [0, 2]]]  # shoud get a 2x2 array with corner values of the 3x3
+
+        assert_equal(ind(), ([[0,0],[2,2]], [[0,2], [0, 2]]))
+        with self.assertRaises(RuntimeError) as cm:
+            ind.indexed_src_shape
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of ([[0, 0], [2, 2]], [[0, 2], [0, 2]]) because source shape is unknown.")
+        with self.assertRaises(ValueError) as cm:
+            ind.as_array()
+        self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
+
+        ind.set_src_shape(src.shape)
+
+        assert_equal(ind.shaped_instance()(), ([[0,0],[2,2]], [[0,2], [0, 2]]))
+        assert_equal(ind.as_array(), np.arange(9, dtype=np.int32).reshape((3,3))[[[0,0],[2,2]], [[0,2], [0, 2]]].ravel())
+        assert_equal(ind.as_array(flat=False), np.arange(9, dtype=np.int32).reshape((3,3))[[[0,0],[2,2]], [[0,2], [0, 2]]])
+        assert_equal(ind.indexed_src_shape, (2,2))
+        assert_equal(ind.min_src_dim, 2)
+
     def test_flat_shaped_src_inds(self):
         src = np.arange(24).reshape((8,3))  # 2D source
         ind = indexer([1,3,5,4,22, -4, 11, 3], flat_src=True)

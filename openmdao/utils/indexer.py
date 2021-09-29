@@ -8,7 +8,6 @@ from numbers import Integral
 from itertools import zip_longest
 
 from openmdao.utils.general_utils import shape2tuple
-from openmdao.utils.om_warnings import warn_deprecation
 from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning
 
 
@@ -684,14 +683,12 @@ class SliceIndexer(ShapedSliceIndexer):
 
 class ShapedArrayIndexer(Indexer):
     """
-    Abstract index array class that is 'shaped'.
+    Abstract index array class that knows its source shape.
 
     Parameters
     ----------
     arr : ndarray
         The index array.
-    orig_shape : tuple or None
-        Original shape of the array.
     flat_src : bool
         If True, source is treated as flat.
 
@@ -699,11 +696,9 @@ class ShapedArrayIndexer(Indexer):
     ----------
     _arr : ndarray
         The wrapped index array object.
-    _orig_shape : tuple
-        Original shape of the array.
     """
 
-    def __init__(self, arr, orig_shape=None, flat_src=None):
+    def __init__(self, arr, flat_src=None):
         """
         Initialize attributes.
         """
@@ -716,9 +711,7 @@ class ShapedArrayIndexer(Indexer):
             raise TypeError(f"Can't create an index array using indices of "
                             f"non-integral type '{ndarr.dtype.type.__name__}'.")
 
-        self._orig_shape = shape2tuple(ndarr.shape if orig_shape is None else orig_shape)
-
-        self._arr = ndarr.flat[:]
+        self._arr = ndarr
 
     def __call__(self):
         """
@@ -729,9 +722,7 @@ class ShapedArrayIndexer(Indexer):
         int
             This index array.
         """
-        v = self._arr.view()
-        v.shape = self._orig_shape
-        return v
+        return self._arr
 
     def __str__(self):
         """
@@ -742,7 +733,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return _truncate(f"{self()}".replace('\n', ''))
+        return _truncate(f"{self._arr}".replace('\n', ''))
 
     def copy(self):
         """
@@ -784,10 +775,9 @@ class ShapedArrayIndexer(Indexer):
             The index array.
         """
         if flat:
-            arr = self._arr
+            arr = self._arr.flat[:]
         else:
-            arr = self._arr.view()
-            arr.shape = self._orig_shape
+            arr = self._arr
         if copy:
             return arr.copy()
         return arr
@@ -807,8 +797,8 @@ class ShapedArrayIndexer(Indexer):
             The index into a flat array.
         """
         if copy:
-            return self._arr.copy()
-        return self._arr
+            return self._arr.flat[:].copy()
+        return self._arr.flat[:]
 
     def _check_bounds(self):
         """
@@ -848,8 +838,6 @@ class ArrayIndexer(ShapedArrayIndexer):
     ----------
     arr : ndarray
         The index array.
-    orig_shape : tuple or None
-        Original shape of the array.
     flat_src : bool or None
         If True, treat source as flat.
     """
@@ -876,7 +864,7 @@ class ArrayIndexer(ShapedArrayIndexer):
         else:
             sharr = self._arr
 
-        self._shaped_inst = ShapedArrayIndexer(sharr, orig_shape=self._orig_shape)
+        self._shaped_inst = ShapedArrayIndexer(sharr)
         return self._shaped_inst._set_attrs(self)
 
     @property
@@ -889,9 +877,7 @@ class ArrayIndexer(ShapedArrayIndexer):
         tuple
             The shape of the index.
         """
-        if self._flat_src:
-            return self._orig_shape
-        return super().indexed_src_shape
+        return self._arr.shape
 
 
 class ShapedMultiIndexer(Indexer):
@@ -902,8 +888,6 @@ class ShapedMultiIndexer(Indexer):
     ----------
     tup : tuple
         Tuple of indices/slices.
-    orig_shape : tuple or None
-        The original shape of the array.
     flat_src : bool
         If True, treat source array as flat.
 
@@ -911,26 +895,28 @@ class ShapedMultiIndexer(Indexer):
     ----------
     _tup : tuple
         The wrapped tuple of indices/slices.
-    _orig_shape : tuple
-        Original shape.
     _idx_list : list
         List of Indexers.
     """
 
-    def __init__(self, tup, orig_shape=None, flat_src=False):
+    def __init__(self, tup, flat_src=False):
         """
         Initialize attributes.
         """
-        if flat_src:
+        if flat_src and len(tup) > 1:
             raise RuntimeError(f"Can't index into a flat array with an indexer expecting {len(tup)}"
                                " dimensions.")
         super().__init__(flat_src)
         self._tup = tup
-        self._orig_shape = orig_shape
         self._set_idx_list()
 
     def _set_idx_list(self):
-        self._idx_list = [indexer(i, flat_src=self._flat_src) for i in self._tup]
+        self._idx_list = []
+        for i in self._tup:
+            if isinstance(i, (np.ndarray, list)):  # need special handling here for ndim > 1 arrays
+                self._idx_list.append(ArrayIndexer(i, flat_src=self._flat_src))
+            else:
+                self._idx_list.append(indexer(i, flat_src=self._flat_src))
 
     def __call__(self):
         """
@@ -952,7 +938,7 @@ class ShapedMultiIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._tup}".replace('\n', '')
+        return str(self._tup)
 
     def copy(self):
         """
@@ -976,20 +962,6 @@ class ShapedMultiIndexer(Indexer):
             The number of dimensions expected in the source array.
         """
         return len(self._idx_list)
-
-    @property
-    def indexed_src_shape(self):
-        """
-        Return the shape of the result of indexing into the source.
-
-        Returns
-        -------
-        tuple
-            The shape of the index.
-        """
-        if self._orig_shape is not None:
-            return self._orig_shape
-        return super().indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -1015,10 +987,7 @@ class ShapedMultiIndexer(Indexer):
         if flat:
             return idxs[self()].ravel()
         else:
-            if self._orig_shape is None:
-                return idxs[self()]
-            else:
-                return idxs[self()].reshape(self._orig_shape)
+            return idxs[self()]
 
     def flat(self, copy=False):
         """
@@ -1052,9 +1021,7 @@ class ShapedMultiIndexer(Indexer):
         Indexer
             Self is returned to allow chaining.
         """
-        self._check_src_shape(shape)
-        orig_shape = shape
-        orig_dshape = dist_shape
+        self._check_src_shape(shape2tuple(shape))
         super().set_src_shape(shape, dist_shape)
         if shape is None:
             return self
@@ -1101,8 +1068,6 @@ class MultiIndexer(ShapedMultiIndexer):
     ----------
     tup : tuple
         Tuple of indices/slices.
-    orig_shape : tuple or None
-        The original shape of the array.
     flat_src : bool
         If True, treat source array as flat.
     """
@@ -1345,9 +1310,14 @@ class IndexMaker(object):
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:
-                idxer = ArrayIndexer(idx, flat_src=flat_src)
+                idxer = ArrayIndexer(arr, flat_src=flat_src)
             else:
-                idxer = MultiIndexer(arr, flat_src=flat_src)
+                issue_warning("Using a non-tuple sequence for multidimensional indexing is "
+                              "deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`. In the "
+                              "future this will be interpreted as an array index, "
+                              "`arr[np.array(seq)]`, which will result either in an error or a "
+                              "different result.")
+                idxer = MultiIndexer(tuple(idx), flat_src=flat_src)
 
         if src_shape is not None:
             if flat_src:
@@ -1449,6 +1419,7 @@ class resolve_shape(object):
 
         lens = []
         seen_arr = False
+        arr_shape = None  # to handle multi-indexing where individual sub-arrays have a shape
         for dim, ind in zip_longest(self._shape, idx):
             if ind is None:
                 lens.append(dim)
@@ -1456,12 +1427,21 @@ class resolve_shape(object):
                 lens.append(len(range(*ind.indices(dim))))
             elif isinstance(ind, np.ndarray):
                 if not seen_arr:
-                    # only first array idx counts toward shape
-                    lens.append(ind.size)
                     seen_arr = True
+                    if ind.ndim > 1:
+                        if arr_shape is not None and arr_shape != ind.shape:
+                            raise ValueError("Multi-index has index sub-arrays of different shapes "
+                                             f"({arr_shape} != {ind.shape}).")
+                        arr_shape = ind.shape
+                    else:
+                        # only first array idx counts toward shape
+                        lens.append(ind.size)
             # int indexers don't count toward shape (scalar array has shape ())
             elif not isinstance(ind, Integral):
                 raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
+
+        if arr_shape is not None:
+            return arr_shape
 
         if is_tup or len(lens) >= 1:
             return tuple(lens)

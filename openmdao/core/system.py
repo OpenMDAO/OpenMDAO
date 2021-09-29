@@ -5321,17 +5321,3 @@ class System(object):
             tarr -= toffset
 
         return sarr, tarr, tsize, has_dist_data
-
-    def _resolve_src_shape(self, input_name):
-        """
-        Determine the source shape of source connected to the given input.
-
-        Parameters
-        ----------
-        input_name : str
-            Absolute name of the input variable.
-        """
-        gmeta = self._var_allprocs_abs2meta['input']
-        meta = self._var_abs2meta['input']
-        if input_name in meta and meta['input_name']['src_indices'] is not None:
-            pass
