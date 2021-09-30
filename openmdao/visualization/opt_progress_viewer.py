@@ -1,5 +1,6 @@
-from ipywidgets import interact
 import json
+from openmdao.utils.notebook_utils import notebook
+from ipywidgets import interact
 
 import openmdao.api as om
 
@@ -18,6 +19,9 @@ class OptViewer(object):
             A path to the recorder file or CaseRecorder.
             Currently only sqlite database files recorded via SqliteRecorder are supported.
         """
+        if not notebook:
+            raise RuntimeError("OptView must be run in a notebook environment")
+
         self.data = data
 
         self.var_data = ColumnDataSource(dict(
