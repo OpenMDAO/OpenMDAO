@@ -90,7 +90,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
     else:
-        out_types = ('val', 'resids', 'units', 'shape', 'global_shape',' lower', 'upper', 
+        out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
                      'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
 
     # Figure out which columns will be displayed

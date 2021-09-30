@@ -3479,9 +3479,9 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
-        print_min: bool
+        print_min : bool
             When true, if the input value is an array, print its smallest value.
-        print_max: bool
+        print_max : bool
             When true, if the input value is an array, print its largest value.
 
         Returns
@@ -3630,9 +3630,9 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
-        print_min: bool
+        print_min : bool
             When true, if the input value is an array, print its smallest value.
-        print_max: bool
+        print_max : bool
             When true, if the input value is an array, print its largest value.
 
         Returns
