@@ -1,5 +1,4 @@
 from ipywidgets import interact
-import numpy as np
 import json
 
 import openmdao.api as om
