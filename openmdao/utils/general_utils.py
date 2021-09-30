@@ -1083,7 +1083,7 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
         return parent_src_inds
 
     if my_src_inds._flat_src:
-        return parent_src_inds.shaped_array(flat=True)[my_src_inds()]
+        return parent_src_inds.shaped_array(flat=True)[my_src_inds.flat()]
     else:
         return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 

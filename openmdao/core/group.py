@@ -93,6 +93,11 @@ class _PromotesInfo(object):
         return _PromotesInfo(self.src_indices, self.flat, self.src_shape, self.parent_sys,
                              self.prom, self.root_shape)
 
+    def set_src_shape(self, shape):
+        if self.src_indices is not None:
+            self.src_indices.set_src_shape(shape)
+        self.src_shape = shape
+
     def convert_from(self, parent):
         # return a new _PromotesInfo that converts our src_indices based on the parent
         if parent.src_indices is None:
@@ -985,6 +990,8 @@ class Group(System):
                         else:
                             oldinfo.src_indices.set_src_shape(
                                 model._var_allprocs_abs2meta['output'][src]['global_shape'])
+                    if pinfo.src_shape is None:
+                        pinfo.set_src_shape(oldinfo.src_shape)
                     try:
                         pinfo = pinfo.convert_from(oldinfo)
                     except Exception as err:
@@ -2231,13 +2238,12 @@ class Group(System):
                               category=UnusedOptionWarning)
 
         else:
-            if src_indices is not None:
-                promoted = inputs if inputs else any
-                try:
-                    src_indices = indexer(src_indices, flat_src=flat_src_indices)
-                except Exception as err:
-                    raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
-                                        f"'{subsys_name}': {err}")
+            promoted = inputs if inputs else any
+            try:
+                src_indices = indexer(src_indices, flat_src=flat_src_indices)
+            except Exception as err:
+                raise err.__class__(f"{self.msginfo}: When promoting {promoted} from "
+                                    f"'{subsys_name}': {err}")
 
             if outputs:
                 raise RuntimeError(f"{self.msginfo}: Trying to promote outputs {outputs} while "

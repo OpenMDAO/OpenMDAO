@@ -1304,9 +1304,9 @@ class IndexMaker(object):
                     idxer = EllipsisIndexer(idx, flat_src=flat_src)
                     break
             else:
-                idxer = MultiIndexer(idx)
+                idxer = MultiIndexer(idx, flat_src=flat_src)
             if flat_src and multi:
-                raise RuntimeError("Can't use multdimensional index into a flat source.")
+                raise RuntimeError("Can't use a multdimensional index into a flat source.")
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:

@@ -673,7 +673,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('indep', om.IndepVarComp('a', arr_order_3x3), promotes=['*'])
         model.add_subsystem('comp1', om.ExecComp('b=2*a', a=np.ones(3), b=np.ones(3)))
 
-        msg = "<class Group>: When promoting ['a'] from 'comp1': Can't use multdimensional index into a flat source."
+        msg = "<class Group>: When promoting ['a'] from 'comp1': Can't index into a flat array with an indexer expecting 2 dimensions."
 
         with self.assertRaises(Exception) as context:
             model.promotes('comp1', inputs=['a'], src_indices=om.slicer[:, 1], flat_src_indices=True)
