@@ -3631,9 +3631,9 @@ class System(object):
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
         print_min : bool
-            When true, if the input value is an array, print its smallest value.
+            When true, if the output value is an array, print its smallest value.
         print_max : bool
-            When true, if the input value is an array, print its largest value.
+            When true, if the output value is an array, print its largest value.
 
         Returns
         -------
