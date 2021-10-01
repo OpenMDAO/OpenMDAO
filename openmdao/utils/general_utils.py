@@ -175,7 +175,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
     elif not np.isscalar(value):
         shape = np.atleast_1d(value).shape
 
-    if indices is not None:  # and indices.shaped_instance() is not None:
+    if indices is not None:
         if not indices._flat_src and shape is None:
             raise RuntimeError("src_indices for '%s' is not flat, so its input "
                                "shape must be provided." % name)
