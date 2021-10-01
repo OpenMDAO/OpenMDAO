@@ -462,26 +462,6 @@ class OptionsDictionary(object):
         else:
             self._raise(f"Option '{name}' is required but has not been set.")
 
-    def get(self, name, default=None):
-        """
-        Get an option from the dict or the specified default if it doesn't exist in the dict.
-
-        Parameters
-        ----------
-        name : str
-            Name of the option.
-        default : object
-            Value returned if the named option doesn't exist in the option dict.
-
-        Returns
-        -------
-        object
-            Value of the option, or the default if the option doesn't exist.
-        """
-        if name in self._dict:
-            return self._dict[name]['val']
-        return default
-
     def items(self):
         """
         Yield name and value of options.
