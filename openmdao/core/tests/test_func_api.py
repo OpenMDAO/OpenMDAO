@@ -313,6 +313,22 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[1][0], 'y')
         self.assertEqual(outvar_meta[1][1]['shape'], (3,2))
 
+    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    def test_jax_out_shape_check(self):
+        def func(a=np.ones((3,3)), b=np.ones((3,3))):
+            x = a * b
+            y = (a / b)[:,[1,2]]
+            return x, y
+
+        f = (omf.wrap(func)
+                .add_outputs(x={}, y={'shape': (3,3)})
+                .declare_partials(of='*', wrt='*', method='jax'))
+        with self.assertRaises(Exception) as cm:
+            outvar_meta = list(f.get_output_meta())
+
+        msg = "Annotated shape for return value 'y' of (3, 3) doesn't match computed shape of (3, 2)."
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_bad_args(self):
         def func(a, opt):
             if opt == 'foo':
