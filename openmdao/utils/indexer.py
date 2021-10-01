@@ -1415,7 +1415,7 @@ class resolve_shape(object):
                 break
 
         if len(self._shape) < len(idx):
-            raise IndexError(f"Index {idx} dimension too large to index into shape {self._shape}.")
+            raise ValueError(f"Index {idx} dimension too large to index into shape {self._shape}.")
 
         lens = []
         seen_arr = False

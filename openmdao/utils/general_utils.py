@@ -181,7 +181,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
                                "shape must be provided." % name)
         try:
             indshape = indices.indexed_src_shape
-        except Exception:
+        except (RuntimeError, ValueError, TypeError):
             pass  # use shape provided or shape of value and check vs. shape of indices later
         else:
             if shape is not None and np.product(indshape) != np.product(shape):
