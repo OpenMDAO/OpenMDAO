@@ -30,6 +30,8 @@ class OptViewer(object):
 
         output_notebook()
 
+        self._make_plot()
+
     def _parse_cases(self):
         if isinstance(self.data, str):
             self.cr = om.CaseReader(self.data)
@@ -63,16 +65,17 @@ class OptViewer(object):
         cases = list(self.cr.list_cases(out_stream=None))
         variables = self.cr.list_source_vars('driver', out_stream=None)['outputs']
 
-        variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length", y_axis_label="Variable X")
-        v_line = variables_plot.line(x="x_vals", y="y_vals", line_width=2, source=self.var_data)
+        self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length", y_axis_label="Variable X")
+        v_line = self.variables_plot.line(x="x_vals", y="y_vals", line_width=2, source=self.var_data)
 
-        show(variables_plot, notebook_handle=True)
+        show(self.variables_plot, notebook_handle=True)
 
         interact(self.update, case=cases, variable=variables)
 
     def update(self, case, variable):
         case_val = self.cr.get_case(case)
         variable_val = case_val.outputs[variable]
+        self.variables_plot.yaxis.axis_label = variable
 
         new_data = dict(
             x_vals=list(range(len(variable_val))),
