@@ -356,8 +356,6 @@ class Vector(object):
             val = self._views_flat[name]
         else:
             val = self._views[name]
-            # if not val.shape:  # scalar
-            #     val = self._views_flat[name][0]
 
         if self._under_complex_step:
             return val
