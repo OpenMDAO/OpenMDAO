@@ -9,7 +9,6 @@ import textwrap
 import warnings
 import numpy as np
 from contextlib import contextmanager
-from functools import wraps
 
 try:
     import jax
