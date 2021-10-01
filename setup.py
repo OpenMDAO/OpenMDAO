@@ -195,7 +195,6 @@ setup(
             'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
             'eqconstraintcomp=openmdao.components.eq_constraint_comp:EQConstraintComp',
             'execcomp=openmdao.components.exec_comp:ExecComp',
-            'explicitfunccomp=openmdao.components.funccomp:ExplicitFuncComp',
             'externalcodecomp=openmdao.components.external_code_comp:ExternalCodeComp',
             'externalcodeimplicitcomp=openmdao.components.external_code_comp:ExternalCodeImplicitComp',
             'kscomp=openmdao.components.ks_comp:KSComp',

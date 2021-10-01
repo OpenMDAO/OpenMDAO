@@ -199,17 +199,11 @@ class Vector(object):
         if self._under_complex_step:
             for n, v in self._views.items():
                 if n in self._names:
-                    if v.shape:
-                        yield v
-                    else:
-                        yield self._views_flat[n][0]
+                    yield v
         else:
             for n, v in self._views_flat.items():
                 if n in self._names:
-                    if v.shape:
-                        yield v.real
-                    else:
-                        yield self._views_flat[n][0].real
+                    yield v.real
 
     def _name2abs_name(self, name):
         """
@@ -272,17 +266,10 @@ class Vector(object):
         arrs = self._views_flat if flat else self._views
 
         if self._under_complex_step:
-            for name, val in arrs.items():
-                if val.shape:
-                    yield name, val
-                else:
-                    yield name, self._views_flat[name][0]
+            yield from arrs.items()
         else:
             for name, val in arrs.items():
-                if val.shape:
-                    yield name, val.real
-                else:
-                    yield name, self._views_flat[name][0].real
+                yield name, val.real
 
     def _abs_iter(self):
         """
@@ -293,8 +280,7 @@ class Vector(object):
         str
             Name of each variable.
         """
-        for name in self._views:
-            yield name
+        yield from self._views
 
     def __contains__(self, name):
         """
@@ -370,8 +356,8 @@ class Vector(object):
             val = self._views_flat[name]
         else:
             val = self._views[name]
-            if not val.shape:  # scalar
-                val = self._views_flat[name][0]
+            # if not val.shape:  # scalar
+            #     val = self._views_flat[name][0]
 
         if self._under_complex_step:
             return val
