@@ -298,6 +298,21 @@ class TestFuncAPI(unittest.TestCase):
         meta = f.get_declare_coloring()
         self.assertEqual(meta, {'wrt': '*', 'method': 'cs'})
 
+    @unittest.skipIf(omf.jax is None, "jax is not installed")
+    def test_jax_out_shape_compute(self):
+        def func(a=np.ones((3,3)), b=np.ones((3,3))):
+            x = a * b
+            y = (a / b)[:,[1,2]]
+            return x, y
+
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='jax')
+        outvar_meta = list(f.get_output_meta())
+        self.assertEqual(list(f.get_output_names()), ['x', 'y'])
+        self.assertEqual(outvar_meta[0][0], 'x')
+        self.assertEqual(outvar_meta[0][1]['shape'], (3,3))
+        self.assertEqual(outvar_meta[1][0], 'y')
+        self.assertEqual(outvar_meta[1][1]['shape'], (3,2))
+
     def test_bad_args(self):
         def func(a, opt):
             if opt == 'foo':
