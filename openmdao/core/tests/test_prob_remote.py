@@ -297,6 +297,7 @@ class ProbRemoteTestCase(unittest.TestCase):
 
 
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
+@unittest.skipIf(os.environ.get("GITHUB_ACTION"), "Unreliable on GitHub Actions workflows.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "pyOptSparse is required.")
 class ProbRemote4TestCase(unittest.TestCase):
