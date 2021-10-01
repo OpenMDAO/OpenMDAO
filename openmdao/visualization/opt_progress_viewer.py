@@ -30,8 +30,6 @@ class OptViewer(object):
 
         output_notebook()
 
-        # self._make_plot()
-
     def _parse_cases(self):
         if isinstance(self.data, str):
             self.cr = om.CaseReader(self.data)
