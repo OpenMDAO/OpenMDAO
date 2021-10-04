@@ -3421,7 +3421,9 @@ class System(object):
                     excludes=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None):
+                    values=None,
+                    print_min=False,
+                    print_max=False):
         """
         Write a list of input names and other optional information to a specified stream.
 
@@ -3465,6 +3467,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the input value is an array, print its smallest value.
+        print_max : bool
+            When true, if the input value is an array, print its largest value.
 
         Returns
         -------
@@ -3502,9 +3508,18 @@ class System(object):
 
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
             for n, meta in inputs.items():
                 meta['val'] = self._abs_get_val(n, get_remote=True,
                                                 rank=None if all_procs else 0, kind='input')
+                if isinstance(meta['val'], np.ndarray):
+                    if print_min:
+                        meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                    if print_max:
+                        meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3542,7 +3557,9 @@ class System(object):
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None):
+                     values=None,
+                     print_min=False,
+                     print_max=False):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -3601,6 +3618,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool
+            When true, if the output value is an array, print its largest value.
 
         Returns
         -------
@@ -3637,12 +3658,22 @@ class System(object):
         # get values & resids
         if self._outputs is not None and (values or residuals or residuals_tol):
             to_remove = []
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
 
             for name, meta in outputs.items():
                 if values:
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
+
+                    if isinstance(meta['val'], np.ndarray):
+                        if print_min:
+                            meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                        if print_max:
+                            meta['max'] = np.round(np.max(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,

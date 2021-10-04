@@ -88,10 +88,10 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
     if var_type == 'input':
-        out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
+        out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max')
     else:
-        out_types = ('val', 'resids', 'units', 'shape', 'global_shape',
-                     'lower', 'upper', 'ref', 'ref0', 'res_ref', 'prom_name', 'desc')
+        out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max')
 
     # Figure out which columns will be displayed
     # Look at any one of the outputs, they should all be the same, so just look at first one
@@ -265,13 +265,16 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
 
     left_column_width = len(row)
     have_array_values = []  # keep track of which values are arrays
+    print_options = np.get_printoptions()
+    np_precision = print_options['precision']
     for column_name in column_names:
         row += column_spacing * ' '
+
         if isinstance(var_dict[column_name], np.ndarray) and \
                 var_dict[column_name].size > 1:
             have_array_values.append(column_name)
-            out = '|{}|'.format(
-                str(np.linalg.norm(var_dict[column_name])))
+            norm = np.linalg.norm(var_dict[column_name])
+            out = '|{}|'.format(str(np.round(norm, np_precision)))
         else:
             out = str(var_dict[column_name])
         row += '{:{align}{width}}'.format(out, align=align,
