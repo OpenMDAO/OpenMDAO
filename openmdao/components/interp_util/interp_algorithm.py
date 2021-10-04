@@ -73,7 +73,7 @@ class InterpAlgorithm(object):
         self._compute_d_dvalues = False
         self._compute_d_dx = True
         self._full_slice = None
-        self._supports_d_dvalues =True
+        self._supports_d_dvalues = True
 
     def initialize(self):
         """

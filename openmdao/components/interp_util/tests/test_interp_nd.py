@@ -844,7 +844,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             interp = InterpND(method='akima1D', points=p, values=f)
 
-        msg = "There are 3 points in a data dimension, but method 'akima_1D' requires at least 4 points per dimension."
+        msg = "There are 3 points in a data dimension, but method 'akima1D' requires at least 4 points per dimension."
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
