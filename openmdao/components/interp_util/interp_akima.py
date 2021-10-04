@@ -6,7 +6,7 @@ Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
-     InterpAlgorithmSemi, InterpAlgorithmFixed
+    InterpAlgorithmSemi, InterpAlgorithmFixed
 from openmdao.utils.array_utils import abs_complex, dv_abs_complex
 
 
@@ -1325,7 +1325,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         self.k = 4
         self.dim = 1
         self.last_index = [0]
-        self._name = 'akima_1D'
+        self._name = 'akima1D'
         self._vectorized = False
 
     def initialize(self):
@@ -1512,151 +1512,3 @@ class InterpAkima1D(InterpAlgorithmFixed):
             a = val3
 
         return a, b, c, d
-
-
-    def interpolate_vectorized(self, x, idx):
-        """
-        Compute the interpolated value.
-
-        This method must be defined by child classes.
-
-        Parameters
-        ----------
-        x : ndarray
-            The coordinates to interpolate on this grid.
-        idx : int
-            List of interval indices for x.
-
-        Returns
-        -------
-        ndarray
-            Interpolated values.
-        ndarray
-            Derivative of interpolated values with respect to independents.
-        ndarray
-            Derivative of interpolated values with respect to values.
-        ndarray
-            Derivative of interpolated values with respect to grid.
-        """
-        grid = self.grid[0]
-        idx = idx[0]
-        values = self.values
-        eps = self.options['eps']
-        delta_x = self.options['delta_x']
-        vec_size = len(x)
-
-        # Complex Step
-        if self.values.dtype == complex:
-            dtype = self.values.dtype
-        else:
-            dtype = x.dtype
-
-        c = 0.0
-        d = 0.0
-
-        # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
-        # reset idx to interval lower bracket (ient-2). if off lower end of table
-        # (idx = -1) reset to higher bracket.
-        ngrid = len(grid)
-        extrap_high = np.where(idx == ngrid - 1)
-        idx[extrap_high] = ngrid - 2
-        extrap_low = np.where(idx == - 1)
-        idx[extrap_low] = 0
-
-        deriv_dx = np.empty(vec_size, dtype=dtype)
-
-        # Calculate interval slope values
-        #
-        # m1 is the slope of interval (xi-2, xi-1)
-        # m2 is the slope of interval (xi-1, xi)
-        # m3 is the slope of interval (xi, xi+1)
-        # m4 is the slope of interval (xi+1, xi+2)
-        # m5 is the slope of interval (xi+2, xi+3)
-        #
-        # The values of m1, m2, m4 and m5 may be calculated from other slope values
-        # depending on the value of idx
-
-        val3 = values[idx]
-        val4 = values[idx + 1]
-        h = 1.0 / (grid[idx + 1] - grid[idx])
-        m3 = np.zeros(vec_size, dtype=dtype)
-        m3[:] = (val4 - val3) * h
-
-        if idx >= 1:
-            val2 = values[idx - 1]
-            m2 = np.zeros(vec_size, dtype=dtype)
-            m2[:] = (val3 - val2) / (grid[idx] - grid[idx - 1])
-
-            if idx >= 2:
-                m1 = np.zeros(vec_size, dtype=dtype)
-                m1[:] = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
-
-        if idx < ngrid - 2:
-            val5 = values[idx + 2]
-            m4 = np.zeros(vec_size, dtype=dtype)
-            m4[:] = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
-
-            if idx < ngrid - 3:
-                m5 = np.zeros(vec_size, dtype=dtype)
-                m5[:] = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
-
-        if idx == 0:
-            m2 = 2 * m3 - m4
-            m1 = 2 * m2 - m3
-
-        elif idx == 1:
-            m1 = 2 * m2 - m3
-
-        elif idx == ngrid - 3:
-            m5 = 2 * m4 - m3
-
-        elif idx == ngrid - 2:
-            m4 = 2 * m3 - m2
-            m5 = 2 * m4 - m3
-
-        # Calculate cubic fit coefficients
-        if delta_x > 0:
-            w2 = abs_smooth_1d(m4 - m3, delta_x=delta_x)
-            w31 = abs_smooth_1d(m2 - m1, delta_x=delta_x)
-        else:
-            w2 = abs_smooth_1d(m4 - m3)
-            w31 = abs_smooth_1d(m2 - m1)
-
-        # Special case to avoid divide by zero.
-        if w2 + w31 > eps:
-            b = (m2 * w2 + m3 * w31) / (w2 + w31)
-        else:
-            b = 0.5 * (m2 + m3)
-
-        if delta_x > 0:
-            w32 = abs_smooth_1d(m5 - m4, delta_x=delta_x)
-            w4 = abs_smooth_1d(m3 - m2, delta_x=delta_x)
-        else:
-            w32 = abs_smooth_1d(m5 - m4)
-            w4 = abs_smooth_1d(m3 - m2)
-
-        # Special case to avoid divide by zero.
-        if w32 + w4 > eps:
-            bp1 = (m3 * w32 + m4 * w4) / (w32 + w4)
-        else:
-            bp1 = 0.5 * (m3 + m4)
-
-        if extrap == 0:
-            a = val3
-            c = (3 * m3 - 2 * b - bp1) * h
-            d = (b + bp1 - 2 * m3) * h * h
-            dx = x[0] - grid[idx]
-
-        elif extrap == 1:
-            a = val4
-            b = bp1
-            dx = x[0] - grid[idx + 1]
-
-        else:
-            a = val3
-            dx = x[0] - grid[0]
-
-        deriv_dx[0] = b + dx * (2.0 * c + 3.0 * d * dx)
-
-        # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None

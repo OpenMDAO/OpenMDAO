@@ -23,7 +23,7 @@ INTERP_METHODS = {
     'lagrange3': InterpLagrange3,
     'cubic': InterpCubic,
     'akima': InterpAkima,
-    'akima1D' : InterpAkima1D,
+    'akima1D': InterpAkima1D,
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
@@ -326,10 +326,14 @@ class InterpND(object):
             # each iteration.
             interp = self._interp
             self.table = interp(self.grid, self.values, interp, **self._interp_options)
+            if not self.table._supports_d_dvalues:
+                raise RuntimeError(f'Method {self.table._name} does not support the '
+                                   '"training_data_gradients" option.')
+
             self.table._compute_d_dvalues = True
 
         table = self.table
-        if table._vectorized:
+        if table.vectorized(xi):
             result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
         else:

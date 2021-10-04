@@ -44,6 +44,8 @@ class InterpAlgorithm(object):
         Used to cache the full slice if training derivatives are computed.
     _name : str
         Algorithm name for error messages.
+    _supports_d_dvalues : bool
+        If True, this algorithm can compute the derivatives with respect to training values.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -71,6 +73,7 @@ class InterpAlgorithm(object):
         self._compute_d_dvalues = False
         self._compute_d_dx = True
         self._full_slice = None
+        self._supports_d_dvalues =True
 
     def initialize(self):
         """
@@ -93,6 +96,22 @@ class InterpAlgorithm(object):
                              " but method %s requires at least %d "
                              "points per dimension."
                              "" % (n_p, self._name, k + 1))
+
+    def vectorized(self, x):
+        """
+        Return whether this table will be run vectorized for the given requested input.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        bool
+            Returns True if this table can be run vectorized.
+        """
+        return self._vectorized
 
     def bracket(self, x):
         """
@@ -274,6 +293,8 @@ class InterpAlgorithmFixed(object):
         When set to True, compute gradients with respect to the interpolated point location.
     _name : str
         Algorithm name for error messages.
+    _supports_d_dvalues : bool
+        If True, this algorithm can compute the derivatives with respect to training values.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -295,6 +316,7 @@ class InterpAlgorithmFixed(object):
         self._name = None
         self._vectorized = True
         self._compute_d_dvalues = False
+        self._supports_d_dvalues = False
         self._compute_d_dx = True
 
     def initialize(self):
@@ -315,10 +337,29 @@ class InterpAlgorithmFixed(object):
         k = self.k
         n_p = len(grid[0])
         if n_p < k:
-            raise ValueError("There are %d points in a data dimension,"
-                             " but method %s requires at least %d "
-                             "points per dimension."
-                             "" % (n_p, self._name, k + 1))
+            raise ValueError(f"There are {n_p} points in a data dimension, but method "
+                             f"'{self._name}' requires at least {k} points per dimension.")
+        dim = self.dim
+        n_d = len(grid)
+        if n_d != dim:
+            raise ValueError(f"There are {n_d} dimensions, but method '{self._name}' only works"
+                             f" with a fixed table dimension of {dim}.")
+
+    def vectorized(self, x):
+        """
+        Return whether this table will be run vectorized for the given requested input.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        bool
+            Returns True if this table can be run vectorized.
+        """
+        return self._vectorized
 
     def bracket(self, x):
         """
@@ -420,6 +461,8 @@ class InterpAlgorithmFixed(object):
         ----------
         x : ndarray
             The coordinates to interpolate on this grid.
+        slice_idx : None
+            Only needed for API compatibility.
 
         Returns
         -------
@@ -445,6 +488,8 @@ class InterpAlgorithmFixed(object):
         ----------
         x : ndarray
             The coordinates to interpolate on this grid.
+        slice_idx : None
+            Only needed for API compatibility.
 
         Returns
         -------
@@ -542,6 +587,8 @@ class InterpAlgorithmSemi(object):
         is True.
     _name : str
         Algorithm name for error messages.
+    _supports_d_dvalues : bool
+        If True, this algorithm can compute the derivatives with respect to training values.
     """
 
     def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,
@@ -556,6 +603,7 @@ class InterpAlgorithmSemi(object):
         self.values = values
         self.extrapolate = extrapolate
         self.idim = idim
+        self._supports_d_dvalues = True
         self._compute_d_dvalues = compute_d_dvalues
 
         if len(grid.shape) > 1 and grid.shape[1] > 1:
@@ -628,6 +676,22 @@ class InterpAlgorithmSemi(object):
                              " but method %s requires at least %d "
                              "points per dimension."
                              "" % (n_p, self._name, k + 1))
+
+    def vectorized(self, x):
+        """
+        Return whether this table will be run vectorized for the given requested input.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        bool
+            Returns True if this table can be run vectorized.
+        """
+        return self._vectorized
 
     def bracket(self, x):
         """
@@ -733,5 +797,4 @@ class InterpAlgorithmSemi(object):
         bool
             True if the coordinate is extrapolated in this dimension.
         """
-        grid = self.grid[0]
-        values = self.values
+        pass
