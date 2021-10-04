@@ -355,6 +355,7 @@ class Driver(object):
                 if meta['distributed']:
 
                     dist_sizes = sizes[:, i]
+                    tot_size = np.sum(dist_sizes)
 
                     # Determine which indices are on our proc.
                     offsets = sizes2offsets(dist_sizes)
@@ -371,7 +372,8 @@ class Driver(object):
                                 local_indices = dist_inds - offsets[rank]
                                 distrib_indices = dist_inds
 
-                        dist_dict[vname] = (indexer(local_indices), true_sizes, distrib_indices)
+                        ind = indexer(local_indices, src_shape=(tot_size,), flat_src=True)
+                        dist_dict[vname] = (ind, true_sizes, distrib_indices)
                     else:
                         dist_dict[vname] = (_full_slice, dist_sizes,
                                             slice(offsets[rank], offsets[rank] + dist_sizes[rank]))
@@ -556,7 +558,7 @@ class Driver(object):
                         val = get(name, flat=True)[indices.as_array()]
                 else:
                     if indices is not None:
-                        size = len(indices)
+                        size = indices.indexed_src_size
                     val = np.empty(size)
 
                 if get_remote:

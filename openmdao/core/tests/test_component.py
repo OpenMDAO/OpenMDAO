@@ -58,7 +58,7 @@ class TestExplicitComponent(unittest.TestCase):
             comp.add_input('arr', val=np.ones((2, 2)), shape=([2]))
 
         with self.assertRaises(ValueError) as cm:
-            comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1])
+            comp.add_input('arr', val=np.ones((2, 2)), src_indices=[0, 1], flat_src_indices=True)
 
         msg = "Shape of indices (2,) does not match shape of (2, 2) for 'arr'."
         self.assertEqual(str(cm.exception), msg)

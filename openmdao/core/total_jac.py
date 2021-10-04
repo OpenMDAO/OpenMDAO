@@ -802,7 +802,7 @@ class _TotalJacInfo(object):
             meta = allprocs_abs2meta_out[name]
 
             if indices is not None:
-                sz = len(indices)
+                sz = indices.indexed_src_size
             else:
                 if self.get_remote:
                     sz = meta['global_size']
@@ -820,7 +820,7 @@ class _TotalJacInfo(object):
                         full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
-                                        np.arange(len(local_idx), dtype=INT_DTYPE))
+                                        np.arange(local_idx.indexed_src_size, dtype=INT_DTYPE))
                         name2jinds[name] = jac_inds[-1]
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])

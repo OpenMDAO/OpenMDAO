@@ -1,6 +1,6 @@
 """Define the Component class."""
 
-from collections import OrderedDict, Counter, defaultdict
+from collections import defaultdict
 from collections.abc import Iterable
 from itertools import product
 
@@ -18,12 +18,11 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, _is_slicer_op, convert_src_inds, \
-    _slice_indices
-from openmdao.utils.indexer import Indexer, indexer, _update_new_style
+    find_matches, make_set, convert_src_inds
+from openmdao.utils.indexer import Indexer, indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
-    DerivativesWarning, UnusedOptionWarning, warn_deprecation
+    DerivativesWarning, warn_deprecation
 
 _forbidden_chars = ['.', '*', '?', '!', '[', ']']
 _whitespace = {' ', '\t', '\r', '\n'}
@@ -423,7 +422,7 @@ class Component(System):
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc='', tags=None, shape_by_conn=False, copy_shape=None,
-                  distributed=None, new_style_idx=False):
+                  distributed=None):
         """
         Add an input variable to the component.
 
@@ -461,9 +460,6 @@ class Component(System):
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
-        new_style_idx : bool
-            If True, assume numpy compatible indexing.  Not setting this to True will result in a
-            deprecation warning for src_indices arrays with ndim > 1.
 
         Returns
         -------
@@ -483,12 +479,11 @@ class Component(System):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
                             "a '%s' was given" % (self.msginfo, type(shape)))
         if src_indices is not None:
-            err_prefix = f"{self.msginfo}: When specifying src_indices for input '{name}'"
-            new_style_idx = _update_new_style(src_indices, new_style_idx, err_prefix)
             try:
-                src_indices = indexer(src_indices, flat=flat_src_indices, new_style=new_style_idx)
+                src_indices = indexer(src_indices, flat_src=flat_src_indices)
             except Exception as err:
-                raise TypeError(f"{err_prefix}: {err}")
+                raise TypeError(f"{self.msginfo}: When specifying src_indices for input "
+                                f"'{name}': {err}")
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None.' % self.msginfo)
@@ -535,8 +530,6 @@ class Component(System):
             'size': shape_to_len(shape),
             'src_indices': src_indices,
             'flat_src_indices': flat_src_indices,
-            # TODO: remove the following line after implicit flat src deprecation release
-            'orig_flat_src_indices': flat_src_indices,
             'add_input_src_indices': src_indices is not None,
             'units': units,
             'desc': desc,
@@ -931,9 +924,7 @@ class Component(System):
                                            "supplied manually.")
 
                 inds = np.arange(offset, end, dtype=INT_DTYPE)
-                if meta_in['shape'] != inds.shape:
-                    inds = inds.reshape(meta_in['shape'])
-                meta_in['src_indices'] = indexer(inds)
+                meta_in['src_indices'] = indexer(inds, flat_src=True)
                 meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
@@ -1582,8 +1573,6 @@ class Component(System):
             else:
                 all_abs2meta_in[tgt]['has_src_indices'] = True
                 meta = abs2meta_in[tgt]
-                # TODO: remove the following line after implicit flat src deprecation release
-                meta['orig_flat_src_indices'] = flat_src_inds
                 shape = pinfo.root_shape if pinfo.root_shape is not None else parent_src_shape
                 if src_shape is None and shape is not None:
                     try:
@@ -1596,13 +1585,13 @@ class Component(System):
                 if meta.get('add_input_src_indices'):
                     src_inds = convert_src_inds(src_inds, src_shape,
                                                 meta['src_indices'], src_shape)
-                elif src_inds.src_ndim == 1:
+                elif src_inds._flat_src:
                     meta['flat_src_indices'] = True
                 elif meta['flat_src_indices'] is None:
                     meta['flat_src_indices'] = flat_src_inds
 
                 if not isinstance(src_inds, Indexer):
-                    meta['src_indices'] = indexer(src_inds, flat=flat_src_inds)
+                    meta['src_indices'] = indexer(src_inds, flat_src=flat_src_inds)
                 else:
                     meta['src_indices'] = src_inds.copy()
 

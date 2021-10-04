@@ -102,20 +102,13 @@ class DistribCoordComp(om.ExplicitComponent):
 
         if rank == 0:
             self.add_input('invec', np.zeros((5, 3)), distributed=True,
-                           src_indices=[[(0, 0), (0, 1), (0, 2)],
-                                        [(1, 0), (1, 1), (1, 2)],
-                                        [(2, 0), (2, 1), (2, 2)],
-                                        [(3, 0), (3, 1), (3, 2)],
-                                        [(4, 0), (4, 1), (4, 2)]])
+                           src_indices=[[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4],[0,1,2,0,1,2,0,1,2,0,1,2,0,1,2]])
             self.add_output('outvec', np.zeros((5, 3)), distributed=True)
         else:
             self.add_input('invec', np.zeros((4, 3)), distributed=True,
-                           src_indices=[[(5, 0), (5, 1), (5, 2)],
-                                        [(6, 0), (6, 1), (6, 2)],
-                                        [(7, 0), (7, 1), (7, 2)],
-                                        # use some negative indices here to
-                                        # make sure they work
-                                        [(-1, 0), (8, 1), (-1, 2)]])
+                           # use some negative indices here to
+                           # make sure they work
+                           src_indices=[[5,5,5,6,6,6,7,7,7,-1,8,-1],[0,1,2,0,1,2,0,1,2,0,1,2]])
             self.add_output('outvec', np.zeros((4, 3)), distributed=True)
 
     def compute(self, inputs, outputs):
@@ -752,7 +745,7 @@ class DistribStateImplicit(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.add_input('a', val=10., units='m', src_indices=[0], distributed=True)
+        self.add_input('a', val=10., units='m', src_indices=[0], flat_src_indices=True, distributed=True)
 
         rank = self.comm.rank
 
@@ -911,7 +904,7 @@ class MPITests3(unittest.TestCase):
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_constraint('f_xy', lower=0.0, indices=[3])
+        model.add_constraint('f_xy', lower=0.0, indices=[3], flat_indices=True)
 
         prob.setup(force_alloc_complex=True, mode='fwd')
 

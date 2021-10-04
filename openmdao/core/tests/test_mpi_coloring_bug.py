@@ -411,7 +411,7 @@ class GaussLobatto(object):
             src_idxs_mat = np.reshape(np.arange(size * 2, dtype=int),
                                       (2, size), order='C')
 
-            src_idxs = src_idxs_mat[map_input_indices_to_disc, :]
+            src_idxs = src_idxs_mat[map_input_indices_to_disc, :].flat[:]
 
             phase.connect('states:{0}'.format(name),
                           'state_interp.state_disc:{0}'.format(name),

@@ -31,8 +31,7 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices, \
-    LocalRangeIterable
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -1723,7 +1722,7 @@ class Problem(object):
             # Display whether indices were declared when response was added.
             of = key[0]
             if of in resp and resp[of]['indices'] is not None:
-                data[''][key]['indices'] = len(resp[of]['indices'])
+                data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         fd_args['method'] = method
 
