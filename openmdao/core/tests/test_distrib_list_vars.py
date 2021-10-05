@@ -20,6 +20,9 @@ try:
 except ImportError:
     PETScVector = None
 
+# Defaults to 8, which breaks most of these tests
+np.set_printoptions(precision=11)
+
 
 class DistributedAdder(om.ExplicitComponent):
     """
