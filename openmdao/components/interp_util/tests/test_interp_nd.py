@@ -1,5 +1,5 @@
 """
-Unit tests for the spline interpolator component.
+Unit tests for the standalone interpolator.
 """
 from copy import deepcopy
 import unittest
@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
-from openmdao.components.interp_util.interp_semi import InterpNDSemi, INTERP_METHODS
+from openmdao.components.interp_util.interp_semi import InterpNDSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
 
@@ -157,6 +157,10 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
             # complex step not supported on scipy methods
             if method.startswith('scipy'):
+                continue
+
+            if method in ['akima1D']:
+                # These methods are for fixed grids other than 3d.
                 continue
 
             interp = InterpND(method=method, points=(p1, p2, p3), values=f)
@@ -320,8 +324,8 @@ class TestInterpNDSemiPython(unittest.TestCase):
         self.assertTrue(cm.exception.args[0].endswith(msg))
 
 
-
 class TestInterpNDPython(unittest.TestCase):
+
     """Tests for the non-scipy interpolation algorithms."""
 
     def setUp(self):
@@ -828,6 +832,71 @@ class TestInterpNDPython(unittest.TestCase):
 
         assert_near_equal(dval3 - dval1, np.array([[0.0]]))
         assert_near_equal(dval5 - dval1, np.array([[0.0]]))
+
+
+class TestInterpNDFixedPython(unittest.TestCase):
+    """Tests for efficient fixed-grid interpolation."""
+
+    def test_error_messages(self):
+        p = np.array([0, 1, 2])
+        f = 2.0 * np.array([0, 1, 2])
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpND(method='akima1D', points=p, values=f)
+
+        msg = "There are 3 points in a data dimension, but method 'akima1D' requires at least 4 points per dimension."
+        self.assertTrue(str(cm.exception).startswith(msg))
+
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpND(method='trilinear', points=p, values=f)
+
+        msg = "There are 1 dimensions, but method 'trilinear' only works with a fixed table dimension of 3."
+        self.assertTrue(str(cm.exception).startswith(msg))
+
+    def test_trilinear(self):
+        # Test trilinear vs 3d slinear.
+
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 15)
+        p3 = np.linspace(0, 1, 12)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f_p = np.sqrt(P1) + P2 * P3
+
+        x1 = np.linspace(-2, 101, 5)
+        x2 = np.linspace(-10.5, 11, 5)
+        x3 = np.linspace(-0.2, 1.1, 5)
+        X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
+        x = np.zeros((125, 3))
+        x[:,0] = X1.ravel()
+        x[:,0] = X2.ravel()
+        x[:,0] = X3.ravel()
+
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
+        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-13)
+        assert_near_equal(df_dx, df_dx_base, 1e-13)
+
+    def test_akima1D(self):
+        # Test akima1D vs 1D akima.
+
+        p = np.linspace(0, 100, 25)
+        f_p = np.cos(p * np.pi * 0.5)
+        x = np.linspace(-1, 101, 33)
+
+        interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=p, values=f_p, method='akima', extrapolate=True)
+        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-13)
+        assert_near_equal(df_dx, df_dx_base, 1e-13)
 
 
 if __name__ == '__main__':

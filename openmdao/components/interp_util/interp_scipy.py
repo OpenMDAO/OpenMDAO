@@ -50,6 +50,8 @@ class InterpScipy(InterpAlgorithm):
         method.
     _ki : list
         Interpolation order to be used in each dimension.
+    _supports_d_dvalues : bool
+        If True, this algorithm can compute the derivatives with respect to table values.
     _xi : ndarray
         Cache of current evaluation point.
     """
@@ -66,6 +68,7 @@ class InterpScipy(InterpAlgorithm):
 
         interp_method = self.options['interp_method']
         self._name = interp_method
+        self._supports_d_dvalues = True
         self._full_slice = None
 
         self.grid = grid

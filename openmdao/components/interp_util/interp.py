@@ -6,13 +6,14 @@ implementations.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_akima import InterpAkima
+from openmdao.components.interp_util.interp_akima import InterpAkima, InterpAkima1D
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear
+from openmdao.components.interp_util.interp_trilinear import InterpTrilinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
@@ -22,14 +23,16 @@ INTERP_METHODS = {
     'lagrange3': InterpLagrange3,
     'cubic': InterpCubic,
     'akima': InterpAkima,
+    'akima1D': InterpAkima1D,
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
     'bsplines': InterpBSplines,
+    'trilinear': InterpTrilinear,
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic']
+                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -272,7 +275,7 @@ class InterpND(object):
         result = self._evaluate_spline(values)
         if result.shape[0] == 1:
             # Not vectorized, so drop the extra dimension.
-            result = result.flatten()
+            result = result.ravel()
 
         if compute_derivative:
             d_dvalues = self.spline_gradient()
@@ -323,10 +326,14 @@ class InterpND(object):
             # each iteration.
             interp = self._interp
             self.table = interp(self.grid, self.values, interp, **self._interp_options)
+            if not self.table._supports_d_dvalues:
+                raise RuntimeError(f'Method {self.table._name} does not support the '
+                                   '"training_data_gradients" option.')
+
             self.table._compute_d_dvalues = True
 
         table = self.table
-        if table._vectorized:
+        if table.vectorized(xi):
             result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
         else:
@@ -340,7 +347,7 @@ class InterpND(object):
             for j in range(n_nodes):
                 val, d_x, d_values, d_grid = table.evaluate(xi[j, :])
                 result[j] = val
-                derivs_x[j, :] = d_x.flatten()
+                derivs_x[j, :] = d_x.ravel()
                 if d_values is not None:
                     if derivs_val is None:
                         dv_shape = [n_nodes]
