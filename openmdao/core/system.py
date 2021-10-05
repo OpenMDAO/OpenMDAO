@@ -37,7 +37,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, Promot
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
     format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
-    _is_slicer_op
+        _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -2407,7 +2407,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _create_indexer(self, indices, typename, vname, flat=False):
+    def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
         Return an Indexer instance and it's size if possible.
 
@@ -2419,7 +2419,7 @@ class System(object):
             Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
         vname : str
             Name of the variable.
-        flat : bool
+        flat_src : bool
             If True, indices index into a flat array.
 
         Returns
@@ -2435,7 +2435,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer(indices, flat=flat, new_style=True)
+            idxer = indexer(indices, flat_src=flat_src)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -2443,7 +2443,7 @@ class System(object):
         # size may not be available at this point, but get it if we can in order to allow
         # some earlier error checking
         try:
-            size = idxer.size
+            size = idxer.indexed_src_size
         except Exception:
             size = None
 
@@ -2451,7 +2451,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=None):
+                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=False):
         r"""
         Add a design variable to this system.
 
@@ -2570,16 +2570,13 @@ class System(object):
         dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
-            indices, size = self._create_indexer(indices, 'design var', name, flat=flat_indices)
+            indices, size = self._create_indexer(indices, 'design var', name, flat_src=flat_indices)
             if size is not None:
                 dv['size'] = size
 
         dv['indices'] = indices
         dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
-
-        self._check_voi_meta_sizes('design var', dv,
-                                   ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
         design_vars[name] = dv
 
@@ -2726,7 +2723,7 @@ class System(object):
             resp['linear'] = linear
             if indices is not None:
                 indices, size = self._create_indexer(indices, resp_types[type_], name,
-                                                     flat=flat_indices)
+                                                     flat_src=flat_indices)
                 if size is not None:
                     resp['size'] = size
             resp['indices'] = indices
@@ -2735,7 +2732,7 @@ class System(object):
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                index = indexer(index, flat=flat_indices)
+                index = indexer(index, flat_src=flat_indices)
                 resp['size'] = 1
             resp['indices'] = index
 
@@ -2762,14 +2759,12 @@ class System(object):
         resp['parallel_deriv_color'] = parallel_deriv_color
         resp['flat_indices'] = flat_indices
 
-        self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
-
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False, flat_indices=None):
+                       cache_linear_solution=False, flat_indices=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2830,7 +2825,7 @@ class System(object):
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False, flat_indices=None):
+                      cache_linear_solution=False, flat_indices=False):
         r"""
         Add a response variable to this system.
 
@@ -3016,12 +3011,8 @@ class System(object):
                         # Index defined in this design var.
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
-                        indices._check_flat_indices_warning(meta['flat_indices'],
-                                                            vmeta['global_shape'], name,
-                                                            prefix=self.msginfo)
                         indices = indices.shaped_instance()
-                        meta['size'] = len(indices)
-                        meta['global_size'] = len(indices)
+                        meta['size'] = meta['global_size'] = indices.indexed_src_size
                     else:
                         meta['global_size'] = vmeta['global_size']
 
@@ -3142,11 +3133,8 @@ class System(object):
                 if response['indices'] is not None:
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
-                    indices._check_flat_indices_warning(response['flat_indices'],
-                                                        meta['global_shape'], name,
-                                                        prefix=self.msginfo)
                     indices = indices.shaped_instance()
-                    response['size'] = response['global_size'] = len(indices)
+                    response['size'] = response['global_size'] = indices.indexed_src_size
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
@@ -3433,7 +3421,9 @@ class System(object):
                     excludes=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None):
+                    values=None,
+                    print_min=False,
+                    print_max=False):
         """
         Write a list of input names and other optional information to a specified stream.
 
@@ -3477,6 +3467,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the input value is an array, print its smallest value.
+        print_max : bool
+            When true, if the input value is an array, print its largest value.
 
         Returns
         -------
@@ -3514,9 +3508,18 @@ class System(object):
 
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
             for n, meta in inputs.items():
                 meta['val'] = self._abs_get_val(n, get_remote=True,
                                                 rank=None if all_procs else 0, kind='input')
+                if isinstance(meta['val'], np.ndarray):
+                    if print_min:
+                        meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                    if print_max:
+                        meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3554,7 +3557,9 @@ class System(object):
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None):
+                     values=None,
+                     print_min=False,
+                     print_max=False):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -3613,6 +3618,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool
+            When true, if the output value is an array, print its largest value.
 
         Returns
         -------
@@ -3649,12 +3658,22 @@ class System(object):
         # get values & resids
         if self._outputs is not None and (values or residuals or residuals_tol):
             to_remove = []
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
 
             for name, meta in outputs.items():
                 if values:
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
+
+                    if isinstance(meta['val'], np.ndarray):
+                        if print_min:
+                            meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                        if print_max:
+                            meta['max'] = np.round(np.max(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -4516,7 +4535,7 @@ class System(object):
                     vshape = None
                     has_src_indices = False
             else:
-                shp = inds.shape
+                shp = inds.indexed_src_shape
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
@@ -4527,9 +4546,6 @@ class System(object):
                 self.comm.bcast(has_src_indices, root=self.comm.rank)
             else:
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
-
-        if name not in scope_sys._var_prom2inds:
-            shpname = 'global_shape' if get_remote else 'shape'
 
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
@@ -4577,7 +4593,10 @@ class System(object):
                                            "from all processes using "
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
-                    val = val.ravel()[src_indices.flat()]
+                    if src_indices._flat_src:
+                        val = val.ravel()[src_indices.flat()]
+                    else:
+                        val = val[src_indices()]
 
             if get_remote and self.comm.size > 1:
                 if distrib:

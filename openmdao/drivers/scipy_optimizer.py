@@ -321,7 +321,7 @@ class ScipyOptimizeDriver(Driver):
         if opt in _constraint_optimizers:
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
-                    meta['size'] = size = meta['indices'].size
+                    meta['size'] = size = meta['indices'].indexed_src_size
                 else:
                     size = meta['global_size'] if meta['distributed'] else meta['size']
                 upper = meta['upper']

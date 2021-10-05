@@ -16,7 +16,7 @@ class Outer(om.Group):
         self.add_subsystem('inner', Inner())
     def configure(self):
         self.promotes('inner', inputs=[('comp.x', 'desvar_x')],
-                      src_indices=np.array([[0, 1], [0, 1], [0, 1]]), flat_src_indices=True, src_shape=2)
+                      src_indices=np.array([0, 1, 0, 1, 0, 1]), flat_src_indices=True, src_shape=2)
 
 
 class SrcIndicesTestCase(unittest.TestCase):
@@ -323,7 +323,7 @@ class SrcIndicesTestCase(unittest.TestCase):
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
         tgt_shape = (2, 2)
-        src_indices = [[4, 5], [7, 9]]
+        src_indices = [4, 5, 7, 9]
         flat_src_indices = True
 
         class MyComp(om.ExplicitComponent):
@@ -348,59 +348,8 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
 
         self.assertEqual(cm.exception.args[0],
-                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [[4 5] [7 9]] and "
+                         "'C1' <class MyComp>: When promoting 'C1.x' with src_indices [4 5 7 9] and "
                          "source shape (3, 3): index 9 is out of bounds for source dimension of size 9.")
-
-    def test_connect_src_indices_deprecated(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(3))
-
-        p = om.Problem()
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)))
-        p.model.add_subsystem('C1', MyComp())
-
-        with assert_warning(OMDeprecationWarning, "<class Group>: When connecting "
-                            "from 'indep.x' to 'C1.x': 'src_indices=(1, 0, 2)' is "
-                            "specified in a deprecated format. In a future release, "
-                            "'src_indices' will be expected to use NumPy array indexing, "  
-                            "so replace the existing src_indices with [1, 0, 2]."):
-            p.model.connect('indep.x', 'C1.x', src_indices=(1, 0, 2))
-
-    def test_connect_src_indices_deprecated2(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(3))
-
-        p = om.Problem()
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones((4,3))))
-        p.model.add_subsystem('C1', MyComp())
-
-        with assert_warning(OMDeprecationWarning, "<class Group>: When connecting "
-                            "from 'indep.x' to 'C1.x': 'src_indices=((1, 2), (1, 1), (3, 1))' is "
-                            "specified in a deprecated format. In a future release, "
-                            "'src_indices' will be expected to use NumPy array indexing, "  
-                            "so replace the existing src_indices with ([1, 1, 3], [2, 1, 1])."):
-            p.model.connect('indep.x', 'C1.x', src_indices=((1,2), (1, 1), (3,1)))
-
-    def test_promotes_src_indices_deprecated(self):
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x', np.ones(3))
-
-        p = om.Problem()
-
-        p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)), promotes=['*'])
-        p.model.add_subsystem('C1', MyComp())
-
-        with assert_warning(OMDeprecationWarning, "<class Group>: When promoting ['x'] "
-                            "from 'C1': 'src_indices=(1, 0, 2)' is "
-                            "specified in a deprecated format. In a future release, "
-                            "'src_indices' will be expected to use NumPy array indexing, "  
-                            "so replace the existing src_indices with [1, 0, 2]."):
-            p.model.promotes('C1', inputs=['x'], src_indices=(1, 0, 2))
 
 
 class SrcIndicesFeatureTestCase(unittest.TestCase):
@@ -428,7 +377,7 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
 
         # C2.x has a shape of 2, so we apply flat source indices of [1,5] to our source which has
         # a shape of (3,2) to give us our final shape of 2.
-        g2.promotes('C2', inputs=['x'], src_indices=[1,5], src_shape=(3,2))
+        g2.promotes('C2', inputs=['x'], src_indices=[1,5], flat_src_indices=True, src_shape=(3,2))
 
         p.setup()
 

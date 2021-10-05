@@ -544,7 +544,7 @@ class Vector(object):
                              f"{self._kind} vector when it is read only.")
 
         if not isinstance(idxs, Indexer):
-            idxs = indexer(idxs, flat=flat)
+            idxs = indexer(idxs, flat_src=flat)
 
         if flat:
             if isinstance(val, float):

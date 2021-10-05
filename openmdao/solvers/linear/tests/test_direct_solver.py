@@ -202,7 +202,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         model.add_subsystem('indeps', om.IndepVarComp('x', np.arange(5).reshape((1,size,1))))
         model.add_subsystem('comp', om.ExecComp('y = x * 2.', x=np.zeros((size,)), y=np.zeros((size,))))
-        src_indices = [[0, i, 0] for i in range(size)]
+        src_indices = [[0]*size, np.arange(size, dtype=int), [0]*size]
         model.connect('indeps.x', 'comp.x', src_indices=src_indices)
 
         model.linear_solver = om.DirectSolver()
@@ -488,7 +488,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c1.y', 'c2.x')
         model.connect('c2.y', 'c3.x')
         model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x', src_indices=([0]), flat_src_indices=True)
+        model.connect('c4.y', 'c5.x', src_indices=[0], flat_src_indices=True)
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
 
@@ -546,7 +546,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.connect('c1.y', 'c2.x')
         model.connect('c2.y', 'c3.x')
         model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x', src_indices=([0]), flat_src_indices=True)
+        model.connect('c4.y', 'c5.x', src_indices=[0], flat_src_indices=True)
 
         model.linear_solver = om.DirectSolver(assemble_jac=True)
         model.options['assembled_jac_type'] = 'dense'
