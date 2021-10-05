@@ -807,7 +807,7 @@ def mat_factory(ninputs, noutputs):
 
 
 def ins2vec(*invals, insizes=()):
-    ivec = np.zeros(np.sum(insizes))
+    ivec = np.zeros(np.sum(insizes), dtype=invals[0].dtype)
     start = end = 0
     for i, sz in enumerate(insizes):
         end += sz
