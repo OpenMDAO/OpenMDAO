@@ -45,7 +45,7 @@ class InterpAlgorithm(object):
     _name : str
         Algorithm name for error messages.
     _supports_d_dvalues : bool
-        If True, this algorithm can compute the derivatives with respect to training values.
+        If True, this algorithm can compute the derivatives with respect to table values.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -294,7 +294,7 @@ class InterpAlgorithmFixed(object):
     _name : str
         Algorithm name for error messages.
     _supports_d_dvalues : bool
-        If True, this algorithm can compute the derivatives with respect to training values.
+        If True, this algorithm can compute the derivatives with respect to table values.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -588,7 +588,7 @@ class InterpAlgorithmSemi(object):
     _name : str
         Algorithm name for error messages.
     _supports_d_dvalues : bool
-        If True, this algorithm can compute the derivatives with respect to training values.
+        If True, this algorithm can compute the derivatives with respect to table values.
     """
 
     def __init__(self, grid, values, interp, extrapolate=True, compute_d_dvalues=False, idx=None,

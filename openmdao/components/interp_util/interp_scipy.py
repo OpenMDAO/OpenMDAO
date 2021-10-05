@@ -51,7 +51,7 @@ class InterpScipy(InterpAlgorithm):
     _ki : list
         Interpolation order to be used in each dimension.
     _supports_d_dvalues : bool
-        If True, this algorithm can compute the derivatives with respect to training values.
+        If True, this algorithm can compute the derivatives with respect to table values.
     _xi : ndarray
         Cache of current evaluation point.
     """

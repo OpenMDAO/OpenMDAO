@@ -65,8 +65,6 @@ class InterpTrilinear(InterpAlgorithmFixed):
         """
         Compute the interpolated value.
 
-        This method must be defined by child classes.
-
         Parameters
         ----------
         x : ndarray
@@ -219,8 +217,6 @@ class InterpTrilinear(InterpAlgorithmFixed):
     def interpolate_vectorized(self, x_vec, idx):
         """
         Compute the interpolated value.
-
-        This method must be defined by child classes.
 
         Parameters
         ----------
