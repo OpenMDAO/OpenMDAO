@@ -32,7 +32,7 @@ def _check_units_option(option, value):
         raise ValueError(f"The units '{value}' are invalid.")
 
 
-def _copy_with_ignore(dct, keepers, warn=True):
+def _copy_with_ignore(dct, keepers, ignore=()):
     """
     Copy the entries in the given dict whose keys are in keepers.
 
@@ -42,28 +42,26 @@ def _copy_with_ignore(dct, keepers, warn=True):
         The dictionary to be copied.
     keepers : set-like
         Set of keys for entries we want to keep.
-    warn : bool
-        If True, issue a warning showing which keys were ignored.
+    ignore : set or tuple
+        Ignore these keys.
 
     Returns
     -------
     dict
         A new dict containing 'keepers' entries.
-    set
-        The set of ignored keys.
     """
     kept = {}
-    ignored = set()
+    warn = set()
     for k, v in dct.items():
         if k in keepers:
             kept[k] = v
-        else:
-            ignored.add(k)
+        elif k not in ignore:
+            warn.add(k)
 
-    if warn and ignored:
-        issue_warning(f"The following metadata entries were ignored: {sorted(ignored)}.")
+    if warn:
+        issue_warning(f"The following metadata entries were ignored: {sorted(warn)}.")
 
-    return kept, ignored
+    return kept
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -107,59 +105,77 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Define out inputs and outputs.
         """
+        optignore = {'is_option'}
+        outignore = {'deps'}
+
         for name, meta in self._func.get_input_meta():
             self._check_var_name(name)
-            kwargs, _ = _copy_with_ignore(meta, omf._allowed_add_input_args, warn=True)
-            self.add_input(name, **kwargs)
+            if 'is_option' in meta and meta['is_option']:
+                kwargs = _copy_with_ignore(meta, omf._allowed_declare_options_args,
+                                           ignore=optignore)
+                self.options.declare(name, **kwargs)
+            else:
+                kwargs = _copy_with_ignore(meta, omf._allowed_add_input_args)
+                self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._func.get_output_meta()):
             if name is None:
                 raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
                                    f"value in position {i} because it has no name.  Specify the "
                                    "name by returning a variable, for example 'return myvar', or "
-                                   "include the name in the function's return value annotation.")
+                                   "include the name in the function's metadata.")
             self._check_var_name(name)
-            kwargs, ignored = _copy_with_ignore(meta, omf._allowed_add_output_args, warn=False)
-            ignored.remove('deps')
-            if ignored:
-                issue_warning(f"The following metadata entries were ignored: {sorted(ignored)}.")
+            kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=outignore)
             self.add_output(name, **kwargs)
 
     def _setup_partials(self):
         """
         Check that all partials are declared.
         """
-        decl_partials = super().declare_partials
-        hasdiag = self.options['has_diag_partials']
-        for out, ometa in self._func.get_output_meta():
-            oshp = ometa['shape']
-            if not oshp:
-                osize = 1
-            else:
-                osize = np.product(oshp) if isinstance(oshp, tuple) else oshp
+        kwargs = self._func.get_declare_coloring()
+        if kwargs is not None:
+            self.declare_coloring(**kwargs)
 
-            inds = np.arange(osize, dtype=INT_DTYPE)
-            for inp, imeta in self._func.get_input_meta():
-                if inp not in ometa['deps']:
-                    continue
+        for kwargs in self._func.get_declare_partials():
+            self.declare_partials(**kwargs)
+
+        else:  # user didn't declare partials, so delare partials based on I/O dependencies.
+            decl_partials = super().declare_partials
+            hasdiag = self.options['has_diag_partials']
+            for out, ometa in self._func.get_output_meta():
+                oshp = ometa['shape']
+                if not oshp:
+                    osize = 1
+                else:
+                    osize = np.product(oshp) if isinstance(oshp, tuple) else oshp
 
                 if hasdiag:
-                    ishp = imeta['shape']
-                    if not ishp:
-                        isize = 1
-                    else:
-                        isize = np.product(ishp) if isinstance(ishp, tuple) else ishp
-                    if osize != isize:
-                        raise RuntimeError(f"{self.msginfo}: has_diag_partials is True but "
-                                           f"partial({out}, {inp}) is not square "
-                                           f"(shape=({osize}, {isize})).")
-                    # partial will be declared as diagonal
-                    if osize > 1:
-                        decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                    inds = np.arange(osize, dtype=INT_DTYPE)
+
+                for inp, imeta in self._func.get_input_meta():
+                    if inp not in ometa['deps']:
+                        continue
+
+                    if 'is_option' in imeta and imeta['is_option']:
+                        continue
+
+                    if hasdiag:
+                        ishp = imeta['shape']
+                        if not ishp:
+                            isize = 1
+                        else:
+                            isize = np.product(ishp) if isinstance(ishp, tuple) else ishp
+                        if osize != isize:
+                            raise RuntimeError(f"{self.msginfo}: has_diag_partials is True but "
+                                               f"partial({out}, {inp}) is not square "
+                                               f"(shape=({osize}, {isize})).")
+                        # partial will be declared as diagonal
+                        if osize > 1:
+                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                        else:
+                            decl_partials(of=out, wrt=inp)
                     else:
                         decl_partials(of=out, wrt=inp)
-                else:
-                    decl_partials(of=out, wrt=inp)
 
         super()._setup_partials()
 
@@ -230,6 +246,7 @@ class ExplicitFuncComp(ExplicitComponent):
         result = np.zeros(len(self._outputs), dtype=npcomplex)
         out_slices = self._outputs.get_slice_dict()
 
+        icol = 0
         for ivar, inp in enumerate(inputs._abs_iter()):
 
             if has_diag_partials or in_vals[ivar].size == 1:
@@ -254,13 +271,11 @@ class ExplicitFuncComp(ExplicitComponent):
                     # solve with complex input value
                     self._compute_output_array(in_vals, result)
 
-                    for u, slc in out_slices.items():
-                        if (u, inp) in self._subjacs_info:
-                            # set the column in the Jacobian entry
-                            partials[(u, inp)][:, i] = imag(result[slc] * inv_stepsize)
+                    partials.set_col(self, icol, imag(result * inv_stepsize))
 
                     # restore old input value
                     in_vals[ivar] -= step
+                    icol += 1
                 else:
                     for i in range(pval.size):
                         # set a complex input value
@@ -269,10 +284,8 @@ class ExplicitFuncComp(ExplicitComponent):
                         # solve with complex input value
                         self._compute_output_array(in_vals, result)
 
-                        for u, slc in out_slices.items():
-                            if (u, inp) in self._subjacs_info:
-                                # set the column in the Jacobian entry
-                                partials[(u, inp)][:, i] = imag(result[slc] * inv_stepsize)
+                        partials.set_col(self, icol, imag(result * inv_stepsize))
 
                         # restore old input value
                         in_vals[ivar].flat[i] -= step
+                        icol += 1

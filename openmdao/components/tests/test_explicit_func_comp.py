@@ -780,5 +780,74 @@ class TestFuncCompWrapped(unittest.TestCase):
         self.assertTrue("x_1" in text)
 
 
+# coloring tests #
+
+def mat_factory(ninputs, noutputs):
+    insizes = np.random.randint(1, 4, ninputs)
+    outsizes = np.random.randint(1, 4, noutputs)
+
+    nrows = np.sum(outsizes)
+    ncols = np.sum(insizes)
+
+    # create a sparse matrix
+    mat = np.random.random((nrows, ncols)) < 0.2
+
+    # find any zero cols and insert a nonzero value in them
+    for col in np.where(np.count_nonzero(mat, axis=0) == 0)[0]:
+        mat[np.random.randint(nrows), col] = True
+
+    # find any zero rows and insert a nonzero value in them
+    for row in np.where(np.count_nonzero(mat, axis=1) == 0)[0]:
+        mat[row, np.random.randint(ncols)] = True
+
+    # now convert sparse matrix to randomized floats
+    fmat = np.random.random(mat.shape)
+    fmat[mat == 0] = 0.
+    return fmat, insizes, outsizes
+
+
+def ins2vec(*invals, insizes=()):
+    ivec = np.zeros(np.sum(insizes))
+    start = end = 0
+    for i, sz in enumerate(insizes):
+        end += sz
+        ivec[start:end] = invals[i]
+        start = end
+    return ivec
+
+
+def ovec2outs(ovec, outsizes):
+    start = end = 0
+    for sz in outsizes:
+        end += sz
+        yield ovec[start:end]
+        start = end
+
+
+class TestFuncCompColoring(unittest.TestCase):
+    def test_coloring1(self):
+        mat, insizes, outsizes = mat_factory(3, 2)
+        def func(a, b, c):
+            ivec = ins2vec(a, b, c, insizes=insizes)
+            ovec = mat.dot(ivec)
+            x, y = ovec2outs(ovec, outsizes)
+            return x, y
+
+        f = (omf.wrap(func)
+             .add_inputs(a={'shape': insizes[0]}, b={'shape': insizes[1]}, c={'shape': insizes[2]})
+             .add_outputs(x={'shape': outsizes[0]}, y={'shape': outsizes[1]})
+             .declare_partials(of='*', wrt='*')
+             .declare_coloring(wrt='*'))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='array')
+        print(J)
+
+
 if __name__ == "__main__":
     unittest.main()
