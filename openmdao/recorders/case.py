@@ -404,7 +404,9 @@ class Case(object):
                     includes=None,
                     excludes=None,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None):
+                    values=None,
+                    print_min=False,
+                    print_max=False):
         """
         Return and optionally log a list of input names and other optional information.
 
@@ -444,6 +446,10 @@ class Case(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool, optional
+            When true, if the input value is an array, print its smallest value.
+        print_max : bool, optional
+            When true, if the input value is an array, print its largest value.
 
         Returns
         -------
@@ -468,6 +474,9 @@ class Case(object):
             excludes = [excludes, ]
 
         if self.inputs is not None:
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
             for var_name in self.inputs.absolute_names():
                 # Filter based on tags
                 if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
@@ -484,6 +493,13 @@ class Case(object):
                 if values:
                     var_meta['val'] = val
                     var_meta['value'] = val
+                    if isinstance(val, np.ndarray):
+                        if print_min:
+                            var_meta['min'] = np.round(np.min(val), np_precision)
+
+                        if print_max:
+                            var_meta['max'] = np.round(np.max(val), np_precision)
+
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
                 if units:
@@ -523,7 +539,9 @@ class Case(object):
                      excludes=None,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None):
+                     values=None,
+                     print_min=False,
+                     print_max=False):
         """
         Return and optionally log a list of output names and other optional information.
 
@@ -579,6 +597,10 @@ class Case(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool, optional
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool, optional
+            When true, if the output value is an array, print its largest value.
 
         Returns
         -------
@@ -602,6 +624,9 @@ class Case(object):
 
         if isinstance(excludes, str):
             excludes = [excludes, ]
+
+        print_options = np.get_printoptions()
+        np_precision = print_options['precision']
 
         for var_name in self.outputs.absolute_names():
             if not list_autoivcs and var_name.startswith('_auto_ivc.'):
@@ -630,6 +655,12 @@ class Case(object):
             if values:
                 var_meta['val'] = val
                 var_meta['value'] = val
+                if isinstance(val, np.ndarray):
+                    if print_min:
+                        var_meta['min'] = np.round(np.min(val), np_precision)
+
+                    if print_max:
+                        var_meta['max'] = np.round(np.max(val), np_precision)
             if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals:

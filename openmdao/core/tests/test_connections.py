@@ -703,8 +703,8 @@ class TestConnectionsMPIBug(unittest.TestCase):
                 self.add_subsystem('linkages', Linkages())
 
             def configure(self):
-                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([[0, 3], [4, 6], [2, 1]]), flat_src_indices=True)
-                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([[0, 3], [4, 6], [2, 1]]), flat_src_indices=True)
+                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
+                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
         
         prob = om.Problem(model=Traj())
         prob.setup()
