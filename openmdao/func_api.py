@@ -719,7 +719,15 @@ class _FuncDepCollector(ast.NodeVisitor):
     def _do_assign(self, targets, rhs):
         lhs_attrs = []
         for t in targets:
-            lhs_attrs.append(_get_long_name(t))
+            if hasattr(t, 'elts'):
+                for e in t.elts:
+                    n = _get_long_name(e)
+                    if n is not None:
+                        lhs_attrs.append(n)
+            else:
+                n = _get_long_name(t)
+                if n is not None:
+                    lhs_attrs.append(n)
 
         self._attrs = set()
         self.visit(rhs)

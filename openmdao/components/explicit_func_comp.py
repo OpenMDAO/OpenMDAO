@@ -262,6 +262,7 @@ class ExplicitFuncComp(ExplicitComponent):
 
                 # restore old input value
                 in_vals[ivar] -= step
+                icol += in_vals[ivar].size
             else:
                 pval = in_vals[ivar]
                 if np.isscalar(pval):

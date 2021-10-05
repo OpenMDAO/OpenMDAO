@@ -6,7 +6,7 @@ from numpy.testing import assert_almost_equal
 from io import StringIO
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
 
@@ -108,6 +108,49 @@ class TestFuncCompNoWrap(unittest.TestCase):
 
         J = prob.compute_totals(['comp.y'], ['comp.x'], return_format='flat_dict')
         assert_near_equal(J['comp.y', 'comp.x'], np.array([[6.0]]), 0.00001)
+
+    def test_complex_step_multivars(self):
+        def func(a=2.0, b=3.0, c=5.0):
+            x = a**2 + c * 3.
+            y = b * -1.
+            z = 1.5 * a + b * b - c
+            return x, y, z
+
+        prob = om.Problem(om.Group())
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        prob.set_solver_print(level=0)
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+        assert_near_equal(J['comp.x', 'comp.a'], np.array([[4.0]]), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.array([[0.0]]), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.array([[3.0]]), 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.array([[0.0]]), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], np.array([[-1.0]]), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.array([[0.0]]), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.array([[1.5]]), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.array([[6.0]]), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], np.array([[-1.0]]), 0.00001)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+
+        J = prob.compute_totals(['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+        assert_near_equal(J['comp.x', 'comp.a'], np.array([[4.0]]), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.array([[0.0]]), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.array([[3.0]]), 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.array([[0.0]]), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], np.array([[-1.0]]), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.array([[0.0]]), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.array([[1.5]]), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.array([[6.0]]), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], np.array([[-1.0]]), 0.00001)
 
     def test_abs_complex_step(self):
         def func(x=-2.0):
@@ -409,7 +452,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
-    def test_decorator_shape(self):
+    def test_defaults_shape(self):
 
         def func(x):
             y =3.0*x + 2.5
@@ -502,6 +545,120 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         assert_check_partials(data, atol=1e-5, rtol=1e-5)
 
+    def test_complex_step_multivars(self):
+        def func(a=np.arange(1,4,dtype=float), b=np.arange(3,6,dtype=float), c=np.arange(5,8,dtype=float)):
+            x = a**2 + c * 3.
+            y = b * -1.
+            z = 1.5 * a + b * b - c
+            return x, y, z
+
+        f = (omf.wrap(func)
+             .defaults(shape=3))
+
+        prob = om.Problem(om.Group())
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        prob.set_solver_print(level=0)
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+        Jcomp = prob.model.comp._jacobian._subjacs_info
+        missingset = {('comp.x', 'comp.b'), ('comp.y', 'comp.a'), ('comp.y', 'comp.c')}
+        for key in missingset:
+            self.assertTrue(key not in Jcomp, f"Found {key} in comp partial jacobian but it shouldn't be there.")
+
+        for of in ['comp.x', 'comp.y', 'comp.z']:
+            for wrt in ['comp.a', 'comp.b', 'comp.c']:
+                if (of, wrt) not in missingset:
+                    self.assertTrue((of, wrt) in Jcomp, f"Didn't find {key} in comp partial jacobian.")
+
+        assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(3)*3., 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], -np.eye(3), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.zeros((3,3)), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.eye(3)*1.5, 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.diag(np.arange(3,6,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], -np.eye(3), 0.00001)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+
+        J = prob.compute_totals(['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+        Jcomp = prob.model.comp._jacobian._subjacs_info
+        missingset = {('comp.x', 'comp.b'), ('comp.y', 'comp.a'), ('comp.y', 'comp.c')}
+        for key in missingset:
+            self.assertTrue(key not in Jcomp, f"Found {key} in comp partial jacobian but it shouldn't be there.")
+
+        for of in ['comp.x', 'comp.y', 'comp.z']:
+            for wrt in ['comp.a', 'comp.b', 'comp.c']:
+                if (of, wrt) not in missingset:
+                    self.assertTrue((of, wrt) in Jcomp, f"Didn't find {key} in comp partial jacobian.")
+
+        assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(3)*3., 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], -np.eye(3), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.zeros((3,3)), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.eye(3)*1.5, 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.diag(np.arange(3,6,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], -np.eye(3), 0.00001)
+
+    def test_complex_step_multivars_coloring(self):
+        def func(a=np.arange(1,4,dtype=float), b=np.arange(3,6,dtype=float), c=np.arange(5,8,dtype=float)):
+            x = a**2 + c * 3.
+            y = b * -1.
+            z = 1.5 * a + b * b - c
+            return x, y, z
+
+        f = (omf.wrap(func)
+             .declare_coloring(wrt='*')
+             .defaults(shape=3))
+
+        prob = om.Problem(om.Group())
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        prob.set_solver_print(level=0)
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        J = prob.compute_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+
+        assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(3)*3., 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], -np.eye(3), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.zeros((3,3)), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.eye(3)*1.5, 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.diag(np.arange(3,6,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], -np.eye(3), 0.00001)
+
+        prob.setup(mode='rev')
+        prob.run_model()
+
+        J = prob.compute_totals(['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
+
+        assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(3)*3., 0.00001)
+
+        assert_near_equal(J['comp.y', 'comp.a'], np.zeros((3,3)), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.b'], -np.eye(3), 0.00001)
+        assert_near_equal(J['comp.y', 'comp.c'], np.zeros((3,3)), 0.00001)
+
+        assert_near_equal(J['comp.z', 'comp.a'], np.eye(3)*1.5, 0.00001)
+        assert_near_equal(J['comp.z', 'comp.b'], np.diag(np.arange(3,6,dtype=float)*2.), 0.00001)
+        assert_near_equal(J['comp.z', 'comp.c'], -np.eye(3), 0.00001)
 
     def test_abs_array_complex_step(self):
         def func(x=np.ones(3)*-2.0):
@@ -728,7 +885,6 @@ class TestFuncCompWrapped(unittest.TestCase):
 
     def test_feature_defaults(self):
 
-
         def func(x=0., y=0.):
             z = x + y
             return z
@@ -806,16 +962,6 @@ def mat_factory(ninputs, noutputs):
     return fmat, insizes, outsizes
 
 
-def ins2vec(*invals, insizes=()):
-    ivec = np.zeros(np.sum(insizes), dtype=invals[0].dtype)
-    start = end = 0
-    for i, sz in enumerate(insizes):
-        end += sz
-        ivec[start:end] = invals[i]
-        start = end
-    return ivec
-
-
 def ovec2outs(ovec, outsizes):
     start = end = 0
     for sz in outsizes:
@@ -828,7 +974,7 @@ class TestFuncCompColoring(unittest.TestCase):
     def test_coloring1(self):
         mat, insizes, outsizes = mat_factory(3, 2)
         def func(a, b, c):
-            ivec = ins2vec(a, b, c, insizes=insizes)
+            ivec = np.hstack([a, b, c])
             ovec = mat.dot(ivec)
             x, y = ovec2outs(ovec, outsizes)
             return x, y
@@ -836,17 +982,15 @@ class TestFuncCompColoring(unittest.TestCase):
         f = (omf.wrap(func)
              .add_inputs(a={'shape': insizes[0]}, b={'shape': insizes[1]}, c={'shape': insizes[2]})
              .add_outputs(x={'shape': outsizes[0]}, y={'shape': outsizes[1]})
-             .declare_partials(of='*', wrt='*')
-             .declare_coloring(wrt='*'))
+             .declare_coloring(wrt='*', show_summary=False)
+             )
 
         p = om.Problem()
         p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
 
-        p.setup()
+        p.setup(mode='fwd')
         p.run_model()
-
-        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='array')
-        print(J)
+        assert_check_totals(p.check_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
 
 if __name__ == "__main__":
