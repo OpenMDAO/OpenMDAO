@@ -1382,9 +1382,9 @@ class InterpAkima1D(InterpAlgorithmFixed):
         # variable is < first value in independent array
         ngrid = len(grid)
         if idx == ngrid - 1:
+            dx = x - grid[idx]
             idx = ngrid - 2
             extrap = 1
-            dx = x - grid[idx + 1]
         elif idx == -1:
             idx = 0
             extrap = -1

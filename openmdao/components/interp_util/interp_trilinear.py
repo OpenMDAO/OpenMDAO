@@ -57,12 +57,9 @@ class InterpTrilinear(InterpAlgorithmFixed):
         bool
             Returns True if this table can be run vectorized.
         """
-        if x.shape[0] > 1:
-            return True
-        else:
-            # If we only have 1 point, use the non-vectorized implementation, which has faster
-            # bracketing than the numpy version.
-            return False
+        # If we only have 1 point, use the non-vectorized implementation, which has faster
+        # bracketing than the numpy version.
+        return x.shape[0] > 1
 
     def interpolate(self, x, idx):
         """

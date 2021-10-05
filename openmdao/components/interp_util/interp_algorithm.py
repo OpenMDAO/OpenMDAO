@@ -255,7 +255,7 @@ class InterpAlgorithm(object):
             Derivative of interpolated values with respect to grid for this and subsequent table
             dimensions.
         """
-        pass
+        raise NotImplementedError()
 
 
 class InterpAlgorithmFixed(object):
@@ -333,7 +333,7 @@ class InterpAlgorithmFixed(object):
         """
         grid = self.grid
         if isinstance(grid, np.ndarray):
-            grid = (grid)
+            grid = (grid, )
         k = self.k
         n_p = len(grid[0])
         if n_p < k:
@@ -531,7 +531,7 @@ class InterpAlgorithmFixed(object):
         ndarray
             Derivative of interpolated values with respect to grid.
         """
-        pass
+        raise NotImplementedError()
 
 
 class InterpAlgorithmSemi(object):
@@ -797,4 +797,4 @@ class InterpAlgorithmSemi(object):
         bool
             True if the coordinate is extrapolated in this dimension.
         """
-        pass
+        raise NotImplementedError()
