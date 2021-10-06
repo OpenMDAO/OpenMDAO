@@ -259,9 +259,22 @@ class OMWrappedFunc(object):
         """
         _check_kwargs(kwargs, _allowed_declare_partials_args, 'declare_partials')
         _update_from_defaults(kwargs, self._partials_defaults)
-        self._declare_partials.append(kwargs)
+
+        jaxerr = False
         if 'method' in kwargs and kwargs['method'] == 'jax':
+            if self._declare_partials and not self._use_jax:
+                jaxerr = True
             self._use_jax = True
+        elif self._use_jax:
+            jaxerr = True
+
+        if jaxerr:
+            raise RuntimeError("If multiple calls to declare_partials() are made on the same "
+                               "function object and any set method='jax', then all must set "
+                               "method='jax'.")
+
+        self._declare_partials.append(kwargs)
+
         return self
 
     def declare_coloring(self, **kwargs):

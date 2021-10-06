@@ -294,6 +294,20 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(meta[0], {'of': 'x', 'wrt': ['a', 'b'], 'method': 'cs'})
         self.assertEqual(meta[1], {'of': 'y', 'wrt': ['a', 'b'], 'method': 'fd'})
 
+    def test_declare_partials_jax_mixed(self):
+        def func(a, b):
+            x = a * b
+            y = a / b
+            return x, y
+
+        with self.assertRaises(Exception) as cm:
+            f = (omf.wrap(func)
+                 .declare_partials(of='x', wrt=['a', 'b'], method='jax')
+                 .declare_partials(of='y', wrt=['a', 'b'], method='fd'))
+
+        self.assertEqual(cm.exception.args[0], 
+                         "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
+
     def test_declare_coloring(self):
         def func(a, b):
             x = a * b
