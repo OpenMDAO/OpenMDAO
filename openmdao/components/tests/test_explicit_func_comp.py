@@ -939,11 +939,11 @@ class TestFuncCompWrapped(unittest.TestCase):
 # coloring tests #
 
 def mat_factory(ninputs, noutputs):
-    insizes = np.random.randint(1, 4, ninputs)
-    outsizes = np.random.randint(1, 4, noutputs)
+    inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
+    outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
 
-    nrows = np.sum(outsizes)
-    ncols = np.sum(insizes)
+    nrows = np.sum(np.product(shp) for shp in outshapes)
+    ncols = np.sum(np.product(shp) for shp in inshapes)
 
     # create a sparse matrix
     mat = np.random.random((nrows, ncols)) < 0.2
@@ -956,10 +956,10 @@ def mat_factory(ninputs, noutputs):
     for row in np.where(np.count_nonzero(mat, axis=1) == 0)[0]:
         mat[row, np.random.randint(ncols)] = True
 
-    # now convert sparse matrix to randomized floats
+    # convert sparse matrix to randomized floats
     fmat = np.random.random(mat.shape)
     fmat[mat == 0] = 0.
-    return fmat, insizes, outsizes
+    return fmat, inshapes, outshapes
 
 
 def ovec2outs(ovec, outsizes):
@@ -972,7 +972,9 @@ def ovec2outs(ovec, outsizes):
 
 class TestFuncCompColoring(unittest.TestCase):
     def test_coloring1(self):
-        mat, insizes, outsizes = mat_factory(3, 2)
+        mat, inshapes, outshapes = mat_factory(3, 2)
+        outsizes = [np.prod(shp) for shp in outshapes]
+
         def func(a, b, c):
             ivec = np.hstack([a, b, c])
             ovec = mat.dot(ivec)
@@ -980,8 +982,8 @@ class TestFuncCompColoring(unittest.TestCase):
             return x, y
 
         f = (omf.wrap(func)
-             .add_inputs(a={'shape': insizes[0]}, b={'shape': insizes[1]}, c={'shape': insizes[2]})
-             .add_outputs(x={'shape': outsizes[0]}, y={'shape': outsizes[1]})
+             .add_inputs(a={'shape': inshapes[0]}, b={'shape': inshapes[1]}, c={'shape': inshapes[2]})
+             .add_outputs(x={'shape': outshapes[0]}, y={'shape': outshapes[1]})
              .declare_coloring(wrt='*', show_summary=False)
              )
 
@@ -991,6 +993,36 @@ class TestFuncCompColoring(unittest.TestCase):
         p.setup(mode='fwd')
         p.run_model()
         assert_check_totals(p.check_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+        p.setup(mode='rev')
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_coloring2(self):
+        mat, inshapes, outshapes = mat_factory(1,3)
+        outsizes = [np.prod(shp) for shp in outshapes]
+
+        def func(a):
+            ovec = mat.dot(a)
+            x, y, z = ovec2outs(ovec, outsizes)
+            return x, y, z
+
+        f = (omf.wrap(func)
+             .add_inputs(a={'shape': inshapes[0]})
+             .add_outputs(x={'shape': outshapes[0]}, y={'shape': outshapes[1]}, z={'shape': outshapes[2]})
+             .declare_coloring(wrt='*', show_summary=False)
+             )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
+        p.setup(mode='fwd')
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a'], out_stream=None))
+
+        p.setup(mode='rev')
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a'], out_stream=None))
 
 
 if __name__ == "__main__":

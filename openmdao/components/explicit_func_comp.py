@@ -81,6 +81,8 @@ class ExplicitFuncComp(ExplicitComponent):
         The callable wrapped by this component.
     complex_stepsize : float
         Step size used for complex step.
+    _manual_decl_partials : bool
+        If True, the user has manually declared partials.
     """
 
     def __init__(self, func, **kwargs):
@@ -91,6 +93,7 @@ class ExplicitFuncComp(ExplicitComponent):
         self._func = omf.wrap(func)
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
+        self._manual_decl_partials = False
 
     def initialize(self):
         """
@@ -128,6 +131,29 @@ class ExplicitFuncComp(ExplicitComponent):
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=outignore)
             self.add_output(name, **kwargs)
 
+    def declare_partials(self, *args, **kwargs):
+        """
+        Declare information about this component's subjacobians.
+
+        Parameters
+        ----------
+        *args : list
+            Positional args to be passed to base class version of declare_partials.
+        **kwargs : dict
+            Keyword args  to be passed to base class version of declare_partials.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the specified partial(s).
+        """
+        if 'method' not in kwargs or kwargs['method'] == 'exact':
+            raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method equal "
+                               "to 'cs', 'fd', or 'jax'.")
+
+        self._manual_decl_partials = True
+        return super().declare_partials(*args, **kwargs)
+
     def _setup_partials(self):
         """
         Check that all partials are declared.
@@ -140,6 +166,7 @@ class ExplicitFuncComp(ExplicitComponent):
             self.declare_partials(**kwargs)
 
         else:  # user didn't declare partials, so delare partials based on I/O dependencies.
+            # use super().declare_partials to avoid setting _manual_decl_partials to True
             decl_partials = super().declare_partials
             hasdiag = self.options['has_diag_partials']
             for out, ometa in self._func.get_output_meta():
@@ -238,6 +265,9 @@ class ExplicitFuncComp(ExplicitComponent):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
+        if self._manual_decl_partials:
+            return
+
         step = self.complex_stepsize * 1j
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
