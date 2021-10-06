@@ -38,6 +38,7 @@ See the documentation [here](http://openmdao.org/twodocs/versions/latest/other_u
 
 - Added docs for signing/verifying commits [#2273](https://github.com/OpenMDAO/OpenMDAO/pull/2273)
 - remove unused travis CI files [#2274](https://github.com/OpenMDAO/OpenMDAO/pull/2274)
+- Fix test that was failing due to varying precision in warning message. [#2287](https://github.com/OpenMDAO/OpenMDAO/pull/2287)
 
 ***********************************
 # Release Notes for OpenMDAO 3.12.0
