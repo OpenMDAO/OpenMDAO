@@ -1,13 +1,5 @@
-"""Define the PETSc Vector classe."""
-import sys
-import numpy as np
-from petsc4py import PETSc
-
-from openmdao.core.constants import INT_DTYPE
-from openmdao.vectors.default_vector import DefaultVector, _full_slice
-from openmdao.vectors.petsc_transfer import PETScTransfer
+"""Define the PETSc Vector class."""
 from openmdao.utils.mpi import MPI
-
 
 CITATION = '''@InProceedings{petsc-efficient,
     Author = "Satish Balay and William D. Gropp and Lois Curfman McInnes and Barry F. Smith",
@@ -22,6 +14,13 @@ CITATION = '''@InProceedings{petsc-efficient,
 if MPI is None:
     PETScVector = None
 else:
+    import numpy as np
+
+    from petsc4py import PETSc
+    from openmdao.core.constants import INT_DTYPE
+    from openmdao.vectors.default_vector import DefaultVector, _full_slice
+    from openmdao.vectors.petsc_transfer import PETScTransfer
+
     class PETScVector(DefaultVector):
         """
         PETSc Vector implementation for running in parallel.
