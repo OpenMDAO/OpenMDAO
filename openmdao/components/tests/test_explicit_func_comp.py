@@ -936,6 +936,17 @@ class TestFuncCompWrapped(unittest.TestCase):
         self.assertTrue("x_1" in text)
 
 
+# user defined compute_partials tests #
+
+class TestFuncCompUserPartials(unittest.TestCase):
+    def test_user_partials(self):
+        self.fail("no test")
+
+    def test_user_partials_sparse(self):
+        self.fail("no test")
+
+
+
 # coloring tests #
 
 def mat_factory(ninputs, noutputs):

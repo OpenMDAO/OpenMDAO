@@ -27,8 +27,6 @@ _allowed_add_output_args = {
     'shape_by_conn', 'copy_shape', 'distributed'
 }
 
-_allowed_defaults_args = _allowed_add_input_args.union(_allowed_add_output_args)
-
 _allowed_declare_options_args = {
     'default', 'values', 'types', 'desc', 'upper', 'lower', 'check_valid', 'allow_none',
     'recordable', 'deprecation'
@@ -79,7 +77,10 @@ class OMWrappedFunc(object):
         Initialize attributes.
         """
         self._f = func
-        self._defaults = {'val': 1.0, 'shape': ()}
+        self._input_defaults = {'val': 1.0, 'shape': ()}
+        self._output_defaults = {'val': 1.0, 'shape': ()}
+        self._partials_defaults = {}
+        self._coloring_defaults = {}
 
         # populate _inputs dict with input names based on function signature so we can error
         # check vs. inputs added via add_input
@@ -111,17 +112,36 @@ class OMWrappedFunc(object):
 
     def defaults(self, **kwargs):
         r"""
-        Add metadata that may apply to any inputs or outputs of the wrapped function.
+        Add default metadata that may apply to the wrapped function.
 
-        Any variable specific metadata will override metadata specified here.
+        Any variable specific or partials/coloring specific metadata will override any metadata
+        specified here.
 
         Parameters
         ----------
         **kwargs : dict
             Metadata names and their values.
         """
-        _check_kwargs(kwargs, _allowed_defaults_args, 'defaults')
-        self._defaults.update(kwargs)
+        input_kwargs = _filter_dict(kwargs, _allowed_add_input_args)
+        output_kwargs = _filter_dict(kwargs, _allowed_add_output_args)
+        partials_kwargs = _filter_dict(kwargs, _allowed_declare_partials_args)
+        coloring_kwargs = _filter_dict(kwargs, _allowed_declare_coloring_args)
+
+        combined = (set(input_kwargs)
+                    .union(output_kwargs)
+                    .union(partials_kwargs)
+                    .union(coloring_kwargs))
+
+        if len(kwargs) > len(combined):
+            invalids = (set(kwargs) - _allowed_add_input_args - _allowed_add_output_args -
+                        _allowed_declare_partials_args - _allowed_declare_coloring_args)
+            raise NameError(f"In defaults, metadata names {sorted(invalids)} are not allowed.")
+
+        self._input_defaults.update(input_kwargs)
+        self._output_defaults.update(output_kwargs)
+        self._partials_defaults.update(partials_kwargs)
+        self._coloring_defaults.update(coloring_kwargs)
+
         return self
 
     def add_input(self, name, **kwargs):
@@ -238,6 +258,7 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         _check_kwargs(kwargs, _allowed_declare_partials_args, 'declare_partials')
+        _update_from_defaults(kwargs, self._partials_defaults)
         self._declare_partials.append(kwargs)
         if 'method' in kwargs and kwargs['method'] == 'jax':
             self._use_jax = True
@@ -254,6 +275,7 @@ class OMWrappedFunc(object):
         """
         if self._declare_coloring is None:
             _check_kwargs(kwargs, _allowed_declare_coloring_args, 'declare_coloring')
+            _update_from_defaults(kwargs, self._coloring_defaults)
             self._declare_coloring = kwargs.copy()
             return self
         raise RuntimeError("declare_coloring has already been called.")
@@ -348,41 +370,20 @@ class OMWrappedFunc(object):
         if (isinstance(neq, np.ndarray) and np.any(neq)) or neq:
             raise RuntimeError(f"Conflicting metadata entries for '{name}'.")
 
-    def _resolve_default(self, key, meta):
-        """
-        Update the value of the metadata corresponding to key based on self._defaults.
-
-        Parameters
-        ----------
-        key : str
-            The metadata entry key.
-        meta : dict
-            The metadata dict to be updated.
-        """
-        if (key not in meta or meta[key] is None) and key in self._defaults:
-            meta[key] = self._defaults[key]
-
     def _setup(self):
         """
         Set up input and output variable metadata dicts.
         """
         self._call_setup = False
-        overrides = set(self._defaults)
 
-        self._setup_inputs(overrides)
-        self._setup_outputs(overrides)
+        self._setup_inputs()
+        self._setup_outputs()
 
-    def _setup_inputs(self, overrides):
+    def _setup_inputs(self):
         """
         Set up the input variable metadata dicts.
-
-        Parameters
-        ----------
-        overrides : set
-            Set of names of entries in self._defaults.
         """
         ins = self._inputs
-        overrides = overrides - {'val', 'shape'}
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
@@ -394,13 +395,13 @@ class OMWrappedFunc(object):
                 valshape = np.asarray(meta['val']).shape
             else:
                 valshape = None
-                meta['val'] = self._defaults['val']
+                meta['val'] = self._input_defaults['val']
 
             if meta.get('shape') is None:
                 if valshape is not None:
                     meta['shape'] = valshape
                 else:
-                    meta['shape'] = self._defaults['shape']
+                    meta['shape'] = self._input_defaults['shape']
 
             meta['shape'] = _shape2tuple(meta['shape'])
             if not valshape:  # val is a scalar so reshape with the given meta['shape']
@@ -409,17 +410,11 @@ class OMWrappedFunc(object):
                 raise ValueError(f"Input '{name}' default value has shape "
                                  f"{valshape}, but shape was specified as {meta['shape']}.")
 
-            for o in overrides:
-                self._resolve_default(o, meta)
+            _update_from_defaults(meta, self._input_defaults)
 
-    def _setup_outputs(self, overrides):
+    def _setup_outputs(self):
         """
         Set up the output variable metadata dicts.
-
-        Parameters
-        ----------
-        overrides : set
-            Set of names of entries in self._defaults.
         """
         outmeta = {}
 
@@ -468,11 +463,11 @@ class OMWrappedFunc(object):
         outs = {n: m for n, m in outlist}
 
         if self._use_jax:
+            # make sure jax used for all declared derivs
             self._compute_out_shapes(self._inputs, outs)
 
         for meta in outs.values():
-            for o in overrides:
-                self._resolve_default(o, meta)
+            _update_from_defaults(meta, self._output_defaults)
             if meta['shape'] is not None:
                 meta['shape'] = _shape2tuple(meta['shape'])
 
@@ -544,7 +539,7 @@ class OMWrappedFunc(object):
                     need_shape = []
 
         if need_shape:  # output shapes weren't provided by user or by jax
-            shape = self._defaults['shape']
+            shape = self._output_defaults['shape']
             warnings.warn(f"Return values {need_shape} have unspecified shape so are assumed to "
                           f"have shape {shape}.")
             for name in need_shape:
@@ -572,26 +567,24 @@ def wrap(func):
     return OMWrappedFunc(func)
 
 
-def _get_kwargs(func, locals_dict, default=None):
+def _update_from_defaults(meta, defaults):
     """
-    Convert a function's args to a kwargs dict containing entries that are not identically default.
+    Update values of the metadata corresponding to defaults.
 
     Parameters
     ----------
-    func : function
-        The function whose args we want to convert to kwargs.
-    locals_dict : dict
-        The locals dict for the function.
-    default : object
-        Don't include arguments whose values are this object.
-
-    Returns
-    -------
-    dict
-        The non-default keyword args dict.
+    meta : dict
+        The metadata dict to be updated.
+    defaults : dict
+        The defaults dict.
     """
-    return {n: locals_dict[n] for n in inspect.signature(func).parameters
-            if locals_dict[n] is not default}
+    for key, val in defaults.items():
+        if key not in meta or meta[key] is None:
+            meta[key] = val
+
+
+def _filter_dict(kwargs, allowed):
+    return {k: v for k, v in kwargs.items() if k in allowed}
 
 
 def _check_kwargs(kwargs, allowed, fname):

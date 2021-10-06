@@ -218,7 +218,9 @@ class TestFuncAPI(unittest.TestCase):
             return x
 
         f = (omf.wrap(func)
-                .defaults(units='cm', val=7.))
+                .defaults(units='cm', val=7., method='jax')
+                .declare_partials(of='x', wrt='a')
+                .declare_coloring(wrt='*'))
 
         invar_meta = list(f.get_input_meta())
         self.assertEqual(list(f.get_input_names()), ['a'])
@@ -232,6 +234,12 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[0][1]['shape'], ())
         self.assertEqual(outvar_meta[0][1]['units'], 'cm')
         self.assertEqual(outvar_meta[0][1]['deps'], {'a'})
+
+        partials_meta = list(f.get_declare_partials())
+        self.assertEqual(partials_meta[0]['method'], 'jax')
+
+        coloring_meta = f.get_declare_coloring()
+        self.assertEqual(coloring_meta['method'], 'jax')
 
     def test_defaults_override(self):
         def func(a=4.):
