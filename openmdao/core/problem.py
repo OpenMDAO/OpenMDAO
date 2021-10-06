@@ -147,7 +147,7 @@ class Problem(object):
             if MPI is None:
                 comm = FakeComm()
             else:
-                comm = MPI.COMM_WORLD              
+                comm = MPI.COMM_WORLD
 
         if model is None:
             self.model = Group()
