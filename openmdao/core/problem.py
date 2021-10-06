@@ -143,11 +143,11 @@ class Problem(object):
         self._warned = False
 
         if comm is None:
-            try:
-                from mpi4py import MPI
-                comm = MPI.COMM_WORLD
-            except ImportError:
+            # Importing mpi4py is attempted by openmdao.utils.mpi, no need to try again here.
+            if MPI is None:
                 comm = FakeComm()
+            else:
+                comm = MPI.COMM_WORLD              
 
         if model is None:
             self.model = Group()
