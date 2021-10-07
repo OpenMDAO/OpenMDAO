@@ -72,6 +72,7 @@ class ApproximationScheme(object):
         Get rid of any existing approx groups.
         """
         self._colored_approx_groups = None
+        print("RESETTING!")
         self._approx_groups = None
         self._during_sparsity_comp = False
 
@@ -134,6 +135,7 @@ class ApproximationScheme(object):
         if not isinstance(coloring, coloring_mod.Coloring):
             return
 
+        print("COLORED APPROX!")
         system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
         out_slices = system._outputs.get_slice_dict()
@@ -228,7 +230,9 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
+        print("INIT APPROX", len(self._approx_groups))
         for wrt, start, end, vec, _, _ in system._jac_wrt_iter(wrt_matches):
+            print("ITER", wrt, start, end)
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -321,6 +325,7 @@ class ApproximationScheme(object):
         ndarray
             solution array corresponding to the jacobian column at the given column index
         """
+        raise RuntimeError("NOOOOOO")
         total_or_semi = _is_group(system)
         total = system.pathname == ''
 
@@ -456,6 +461,7 @@ class ApproximationScheme(object):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
+                    print("RUNNING POINT:", vecidxs, app_data, results_array, total_or_semi, jcol_idxs)
                     result = self._run_point(system, [(vec, vecidxs)],
                                              app_data, results_array, total_or_semi,
                                              jcol_idxs)

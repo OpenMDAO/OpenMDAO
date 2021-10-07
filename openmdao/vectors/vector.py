@@ -201,7 +201,7 @@ class Vector(object):
                 if n in self._names:
                     yield v
         else:
-            for n, v in self._views_flat.items():
+            for n, v in self._views.items():
                 if n in self._names:
                     yield v.real
 

@@ -3074,6 +3074,7 @@ class Group(System):
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._wrt_meta = {}
+        print(self.msginfo, "_setup_approx_partials")
         approx._reset()
 
         approx_keys = self._get_approx_subjac_keys()
