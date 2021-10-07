@@ -26,7 +26,9 @@ p.driver.options['optimizer'] = 'SNOPT'
 p.driver.opt_settings['iSumm'] = 6
 p.driver.declare_coloring()
 
-p.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+recorder = om.SqliteRecorder("cases.sql")
+p.driver.add_recorder(recorder)
+p.add_recorder(recorder)
 
 p.driver.recording_options['includes'] = []
 p.driver.recording_options['record_objectives'] = True

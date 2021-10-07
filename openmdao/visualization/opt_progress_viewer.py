@@ -1,12 +1,17 @@
 import json
-from openmdao.utils.notebook_utils import notebook
-from bokeh.io import show
-from bokeh.models import Select, HoverTool
-from bokeh.layouts import row, column
-import openmdao.api as om
+import operator
+from functools import reduce
 
 from bokeh.io import show, output_notebook
+from bokeh.models import Select, HoverTool, MultiSelect
+from bokeh.layouts import row, column
 from bokeh.plotting import figure, ColumnDataSource
+
+from openmdao.utils.notebook_utils import notebook
+import openmdao.api as om
+
+import numpy as np
+
 
 class OptViewer(object):
 
@@ -25,13 +30,8 @@ class OptViewer(object):
 
         self.data = data
 
-        self.line_data = ColumnDataSource(dict(
-            x_vals=[], y_vals=[]
-        ))
-
-        self.circle_data = ColumnDataSource(dict(
-            x_vals=[], y_vals=[]
-        ))
+        self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[]))
+        self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[]))
 
         output_notebook()
 
@@ -69,7 +69,8 @@ class OptViewer(object):
 
         self.doc = doc
         source_options = self.cr.list_sources(out_stream=None)
-        case_options = list(self.cr.list_cases(out_stream=None))
+        self.case_options = [(str(i), case) for i, case in \
+                             enumerate(self.cr.list_cases(out_stream=None))]
         io_options = self.cr.list_source_vars(source_options[0], out_stream=None)
         for key in io_options:
             io_options[key].append("segment_length")
@@ -79,15 +80,16 @@ class OptViewer(object):
                 io_starting_option = val[0]
                 break
 
-        # Need to have a checkbox that triggers log scale
+
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
 
         circle_plot = self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
-        line_plot = self.variables_plot.line(x="x_vals", y="y_vals", line_width=2,
-                                          source=self.line_data)
+        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
+                                                   source=self.multi_line_data)
 
-        # Hover tool needs to be adjusted
+        # Hover tool needs to be adjusted or removed. It's a problem if any lines are overlapping
+        # each other
         ht = HoverTool(renderers=[line_plot, circle_plot],
             tooltips=[
                 ( 'x',  '@x_vals'),
@@ -98,29 +100,30 @@ class OptViewer(object):
         )
         self.variables_plot.add_tools(ht)
 
-
         self.source_select = Select(title="Source:", value=source_options[0],
-                                    options=self.cr.list_sources(out_stream=None))
+                                    options=source_options)
 
-        self.case_select = Select(title="Case:", value=case_options[0],
-                                  options=list(self.cr.list_cases(out_stream=None)))
+        self.case_select = MultiSelect(title="Case:", value=["0"], options=self.case_options)
         self.case_select.on_change('value', self._case_select_update)
+        self.case_select.height = 300
 
         self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=io_options)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
+
         self.variables_plot.yaxis.axis_label = io_starting_option
         self.variables_plot.xaxis.axis_label = io_starting_option
 
         self.io_select_x = Select(title="X Value:", value=io_starting_option, options=io_options)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
-        layout = row(self.variables_plot, column(self.source_select,
-                                                 self.case_select,
-                                                 self.io_select_y,
-                                                 self.io_select_x))
+        self.layout = row(self.variables_plot, column(self.source_select,
+                                                      self.case_select,
+                                                      self.io_select_y,
+                                                      self.io_select_x,
+                                                      ))
 
-        self.doc.add_root(layout)
         self.update()
+        self.doc.add_root(self.layout)
 
     def _case_select_update(self, attr, old, new):
         self.update()
@@ -133,28 +136,45 @@ class OptViewer(object):
         self.variables_plot.xaxis.axis_label = new
         self.update()
 
+    def flatten_list(self, list_to_flatten):
+        return reduce(operator.concat, list_to_flatten)
+
     def update(self):
-        case = self.cr.get_case(self.case_select.value)
-        # Need to adjust this to pull from inputs, outputs, and residuals
-        if self.io_select_y.value == "segment_length":
-            x_variable = case.outputs[self.io_select_x.value]
-            y_variable = list(range(len(x_variable)))
-        elif self.io_select_x.value == "segment_length":
-            y_variable = case.outputs[self.io_select_y.value]
-            x_variable = list(range(len(y_variable)))
-        else:
-            x_variable = case.outputs[self.io_select_x.value]
-            y_variable = case.outputs[self.io_select_y.value]
-
-
         new_data = dict(
-            x_vals=x_variable,
-            y_vals=y_variable,
+            x_vals=[],
+            y_vals=[]
         )
 
-        if len(new_data['x_vals']) >= 2:
-            self.line_data.data = new_data
+        self.multi_line_data.data = new_data
+
+        for i in self.case_select.value:
+            case = self.cr.get_case(self.case_options[int(i)][1])
+            # Need to adjust this to pull from inputs, outputs, and residuals
+            if self.io_select_y.value == "segment_length":
+                x_variable = case.outputs[self.io_select_x.value]
+                y_variable = list(range(len(x_variable)))
+            elif self.io_select_x.value == "segment_length":
+                y_variable = case.outputs[self.io_select_y.value]
+                x_variable = list(range(len(y_variable)))
+            else:
+                x_variable = case.outputs[self.io_select_x.value]
+                y_variable = case.outputs[self.io_select_y.value]
+
+            if isinstance(x_variable, np.ndarray):
+                new_data['x_vals'].append(x_variable.flatten().tolist())
+            else:
+                new_data['x_vals'].append(x_variable)
+
+            if isinstance(y_variable, np.ndarray):
+                new_data['y_vals'].append(y_variable.flatten().tolist())
+            else:
+                new_data['y_vals'].append(y_variable)
+
+        if len(new_data['x_vals'][0]) > 1:
+            self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": []}
         else:
+            for key, val in new_data.items():
+                new_data[key] = self.flatten_list(val)
             self.circle_data.data = new_data
-            self.line_data.data = {"x_vals": [], "y_vals": []}
+            self.multi_line_data.data = {"x_vals": [], "y_vals": []}
