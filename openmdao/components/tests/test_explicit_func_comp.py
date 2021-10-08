@@ -1012,30 +1012,24 @@ class TestFuncCompColoring(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], method='cs', out_stream=None))
 
     def test_coloring2(self):
-        np.random.seed(3241)
-        #mat, inshapes, outshapes = mat_factory(1,3)
-        #print(mat)
-        # mat = np.array([[0.14898778],
-        #                 [0.19860233],
-        #                 [0.81899035],
-        #                 [0.78498818],
-        #                 [0.68436335],
-        #                 [0.93677595],
-        #                 [0.33964473],
-        #                 [0.82057559],
-        #                 [0.62672187],
-        #                 [0.52089597],
-        #                 [0.28524249],
-        #                 [0.62003238]])
-        mat = np.array([[0.,         0.19612013],
-                        [0.,         0.59736448],
-                        [0.,         0.57934041],
-                        [0.39366543, 0.        ],
-                        [0.,         0.91662762],
-                        [0.22134179, 0.        ],
-                        [0.77683549, 0.        ]])
-        inshapes = [2]
-        outshapes = [2, 3, 2]
+        # this test uses a very narrow matrix so the attempt at partial coloring will abort.
+        # There used to be a bug where the total derivatives would be incorrect when this
+        # happened.
+        mat = np.array([[0.14898778],
+                        [0.19860233],
+                        [0.81899035],
+                        [0.78498818],
+                        [0.68436335],
+                        [0.93677595],
+                        [0.33964473],
+                        [0.82057559],
+                        [0.62672187],
+                        [0.52089597],
+                        [0.28524249],
+                        [0.62003238]])
+
+        inshapes = [1]
+        outshapes = [2, 3, 7]
         outsizes = [np.prod(shp) for shp in outshapes]
 
         def func(a):
@@ -1046,7 +1040,6 @@ class TestFuncCompColoring(unittest.TestCase):
         f = (omf.wrap(func)
              .add_inputs(a={'shape': inshapes[0]})
              .add_outputs(x={'shape': outshapes[0]}, y={'shape': outshapes[1]}, z={'shape': outshapes[2]})
-             .declare_partials(of='*', wrt='*', method='cs')
              .declare_coloring(wrt='*', method='cs', show_summary=False)
              )
 
