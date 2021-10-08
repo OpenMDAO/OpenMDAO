@@ -5,7 +5,8 @@ Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, InterpAlgorithmSemi
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
+    InterpAlgorithmSemi, InterpAlgorithmFixed
 from openmdao.utils.array_utils import abs_complex, dv_abs_complex
 
 
@@ -751,7 +752,7 @@ def abs_smooth_1d(x, x_deriv=None, delta_x=0):
         if x_deriv is not None:
             x_deriv = -x_deriv
 
-    elif x > delta_x:
+    elif x >= delta_x:
         pass
 
     else:
@@ -1292,3 +1293,222 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
 
         # Evaluate dependent value and exit
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, extrap
+
+
+class InterpAkima1D(InterpAlgorithmFixed):
+    """
+    Interpolate on a 1D grid using Akima.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple (x, y, z) of grid locations.
+    values : ndarray
+        Array containing the table values.
+    interp : class
+        Unused, but kept for API compatibility.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
+    Attributes
+    ----------
+    coeffs : dict of ndarray
+        Cache of all computed coefficients.
+    """
+
+    def __init__(self, grid, values, interp, **kwargs):
+        """
+        Initialize table and subtables.
+        """
+        super().__init__(grid, values, interp)
+        self.coeffs = {}
+        self.k = 4
+        self.dim = 1
+        self.last_index = [0]
+        self._name = 'akima1D'
+        self._vectorized = False
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('delta_x', default=0.,
+                             desc="half-width of the smoothing interval added in the valley of "
+                             "absolute-value function. This allows the derivatives with respect to"
+                             " the data points (dydxpt, dydypt) to also be C1 continuous. Set "
+                             "parameter to 0 to get the original Akima function (but only if you "
+                             "don't need dydxpt, dydypt")
+        self.options.declare('eps', default=1e-30,
+                             desc='Value that triggers division-by-zero safeguard.')
+
+    def interpolate(self, x, idx):
+        """
+        Compute the interpolated value.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        grid = self.grid[0]
+        x = x[0]
+        idx = idx[0]
+        query_idx = idx
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
+        # reset idx to interval lower bracket (ient-2). if off lower end of table
+        # (idx = 0) interval lower bracket already set but need to check if independent
+        # variable is < first value in independent array
+        ngrid = len(grid)
+        if idx == ngrid - 1:
+            dx = x - grid[idx]
+            idx = ngrid - 2
+            extrap = 1
+        elif idx == -1:
+            idx = 0
+            extrap = -1
+            dx = x - grid[0]
+        else:
+            extrap = 0
+            dx = x - grid[idx]
+
+        deriv_dx = np.empty(1, dtype=dtype)
+
+        if query_idx not in self.coeffs:
+            self.coeffs[query_idx] = self.compute_coeffs(idx, dtype, extrap)
+        a, b, c, d = self.coeffs[query_idx]
+
+        deriv_dx[0] = b + dx * (2.0 * c + 3.0 * d * dx)
+
+        # Evaluate dependent value and exit
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
+
+    def compute_coeffs(self, idx, dtype, extrap):
+        """
+        Compute the trilinear interpolation coefficients for this block.
+
+        Parameters
+        ----------
+        idx : int
+            List of interval indices for x.
+        dtype : numpy.dtype
+            Determines whether to allocate complex.
+        extrap : int
+            Extrapolation flag. -1 to extrapolate low, 1 to extrapolate high, zero otherwise.
+
+        Returns
+        -------
+        tuple
+            Akima coefficients a, b, c, d.
+        """
+        grid = self.grid[0]
+        ngrid = len(grid)
+        values = self.values
+        eps = self.options['eps']
+        delta_x = self.options['delta_x']
+
+        c = 0.0
+        d = 0.0
+
+        # Calculate interval slope values
+        #
+        # m1 is the slope of interval (xi-2, xi-1)
+        # m2 is the slope of interval (xi-1, xi)
+        # m3 is the slope of interval (xi, xi+1)
+        # m4 is the slope of interval (xi+1, xi+2)
+        # m5 is the slope of interval (xi+2, xi+3)
+        #
+        # The values of m1, m2, m4 and m5 may be calculated from other slope values
+        # depending on the value of idx
+
+        val3 = values[idx]
+        val4 = values[idx + 1]
+        h = 1.0 / (grid[idx + 1] - grid[idx])
+        m3 = np.zeros(1, dtype=dtype)
+        m3[:] = (val4 - val3) * h
+
+        if idx >= 1:
+            val2 = values[idx - 1]
+            m2 = np.zeros(1, dtype=dtype)
+            m2[:] = (val3 - val2) / (grid[idx] - grid[idx - 1])
+
+            if idx >= 2:
+                m1 = np.zeros(1, dtype=dtype)
+                m1[:] = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
+
+        if idx < ngrid - 2:
+            val5 = values[idx + 2]
+            m4 = np.zeros(1, dtype=dtype)
+            m4[:] = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+
+            if idx < ngrid - 3:
+                m5 = np.zeros(1, dtype=dtype)
+                m5[:] = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
+
+        if idx == 0:
+            m2 = 2 * m3 - m4
+            m1 = 2 * m2 - m3
+
+        elif idx == 1:
+            m1 = 2 * m2 - m3
+
+        elif idx == ngrid - 3:
+            m5 = 2 * m4 - m3
+
+        elif idx == ngrid - 2:
+            m4 = 2 * m3 - m2
+            m5 = 2 * m4 - m3
+
+        # Calculate cubic fit coefficients
+        w2 = abs_smooth_1d(m4 - m3, delta_x=delta_x)
+        w31 = abs_smooth_1d(m2 - m1, delta_x=delta_x)
+
+        # Special case to avoid divide by zero.
+        if w2 + w31 > eps:
+            b = (m2 * w2 + m3 * w31) / (w2 + w31)
+        else:
+            b = 0.5 * (m2 + m3)
+
+        w32 = abs_smooth_1d(m5 - m4, delta_x=delta_x)
+        w4 = abs_smooth_1d(m3 - m2, delta_x=delta_x)
+
+        # Special case to avoid divide by zero.
+        if w32 + w4 >= eps:
+            bp1 = (m3 * w32 + m4 * w4) / (w32 + w4)
+        else:
+            bp1 = 0.5 * (m3 + m4)
+
+        if extrap == 0:
+            a = val3
+            c = (3 * m3 - 2 * b - bp1) * h
+            d = (b + bp1 - 2 * m3) * h * h
+
+        elif extrap == 1:
+            a = val4
+            b = bp1
+
+        else:
+            a = val3
+
+        return a, b, c, d
