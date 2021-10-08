@@ -1365,7 +1365,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         """
         # If we only have 1 point, use the non-vectorized implementation, which has faster
         # bracketing than the numpy version.
-        return False #x.shape[0] > 1
+        return x.shape[0] > 1
 
     def interpolate(self, x, idx):
         """
@@ -1607,7 +1607,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
-            uncached = sorted(uncached)
             a, b, c, d = self.compute_coeffs_vectorized(uncached, dtype)
             uncached = np.array(list(uncached))
             self.vec_coeff[uncached, 0] = a
@@ -1748,14 +1747,16 @@ class InterpAkima1D(InterpAlgorithmFixed):
         # endpoints.
 
         if 1 in extrap:
-            a = np.hstack((a, val4[-1]))
-            b = np.hstack((b, bp1[-1]))
+            loc = np.argmax(idx)
+            a = np.hstack((a, val4[loc]))
+            b = np.hstack((b, bp1[loc]))
             c = np.hstack((c, 0.0))
             d = np.hstack((d, 0.0))
 
         if 0 in extrap:
-            a = np.hstack((val3[0], a))
-            b = np.hstack((b[0], b))
+            loc = np.argmin(idx)
+            a = np.hstack((val3[loc], a))
+            b = np.hstack((b[loc], b))
             c = np.hstack((0.0, c))
             d = np.hstack((0.0, d))
 

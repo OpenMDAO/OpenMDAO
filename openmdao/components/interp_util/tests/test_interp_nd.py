@@ -869,18 +869,18 @@ class TestInterpNDFixedPython(unittest.TestCase):
         x3 = np.linspace(-0.2, 1.1, 5)
         X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
         x = np.zeros((125, 3))
-        x[:,0] = X1.ravel()
-        x[:,0] = X2.ravel()
-        x[:,0] = X3.ravel()
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+        x[:, 2] = X3.ravel()
 
-        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=False)
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
-        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=False)
+        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
         f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
-        assert_near_equal(f, f_base, 1e-13)
-        assert_near_equal(df_dx, df_dx_base, 1e-13)
+        assert_near_equal(f, f_base, 1e-11)
+        assert_near_equal(df_dx, df_dx_base, 1e-11)
 
     def test_akima1D(self):
         # Test akima1D vs 1D akima.
@@ -888,7 +888,6 @@ class TestInterpNDFixedPython(unittest.TestCase):
         p = np.linspace(0, 100, 25)
         f_p = np.cos(p * np.pi * 0.5)
         x = np.linspace(-1, 101, 3)
-        x = np.array([3.0, 101.0])
 
         interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
