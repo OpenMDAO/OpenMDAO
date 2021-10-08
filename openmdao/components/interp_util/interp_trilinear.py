@@ -284,6 +284,21 @@ class InterpTrilinear(InterpAlgorithmFixed):
         vec_size = len(i_y)
         a = np.empty((vec_size, 8), dtype=dtype)
 
+        for j, i_n in enumerate(idx):
+
+            # extrapolate low
+            if -1 in i_n:
+                extrap_idx = np.where(i_n == -1)[0]
+                if len(extrap_idx) > 0:
+                    i_n[extrap_idx] = 0
+
+            # extrapolate high
+            ngrid = len(grid[j])
+            if ngrid - 1 in i_n:
+                extrap_idx = np.where(i_n == ngrid - 1)[0]
+                if len(extrap_idx) > 0:
+                    i_n[extrap_idx] = ngrid - 2
+
         x0 = grid[0][i_x]
         x1 = grid[0][i_x + 1]
         y0 = grid[1][i_y]

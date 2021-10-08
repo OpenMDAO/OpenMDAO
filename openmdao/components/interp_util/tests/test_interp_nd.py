@@ -879,8 +879,8 @@ class TestInterpNDFixedPython(unittest.TestCase):
         interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
         f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
-        assert_near_equal(f, f_base, 1e-13)
-        assert_near_equal(df_dx, df_dx_base, 1e-13)
+        assert_near_equal(f, f_base, 1e-11)
+        assert_near_equal(df_dx, df_dx_base, 1e-11)
 
     def test_akima1D(self):
         # Test akima1D vs 1D akima.
