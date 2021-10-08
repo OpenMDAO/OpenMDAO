@@ -459,6 +459,7 @@ class ApproximationScheme(object):
                     result = self._run_point(system, [(vec, vecidxs)],
                                              app_data, results_array, total_or_semi,
                                              jcol_idxs)
+
                     result = self._transform_result(result)
 
                     if direction is not None or mult != 1.0:

@@ -955,7 +955,6 @@ class System(object):
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
-                print(self.msginfo, "use_fixed_coloring")
                 approx._reset()
             return
 
@@ -1243,7 +1242,6 @@ class System(object):
 
         approx = self._get_approx_scheme(coloring._meta['method'])
         # force regen of approx groups during next compute_approximations
-        print(self.msginfo, "compute_approx_coloring (after compute coloring)")
         approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
