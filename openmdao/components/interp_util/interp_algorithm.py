@@ -387,7 +387,7 @@ class InterpAlgorithmFixed(object):
             bracket is above the last table element, 0 for normal interpolation.
         """
         for j in range(self.dim):
-            if self._vectorized:
+            if self.vectorized(x):
                 self.last_index[j] = np.searchsorted(self.grid[j], x[..., j], side='left') - 1
             else:
                 self.last_index[j], _ = self._bracket_dim(self.grid[j], x[j],

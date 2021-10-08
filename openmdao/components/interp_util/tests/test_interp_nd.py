@@ -873,11 +873,11 @@ class TestInterpNDFixedPython(unittest.TestCase):
         x[:,0] = X2.ravel()
         x[:,0] = X3.ravel()
 
-        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=False)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
-        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
-        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=False)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
         assert_near_equal(f, f_base, 1e-13)
         assert_near_equal(df_dx, df_dx_base, 1e-13)
@@ -887,16 +887,24 @@ class TestInterpNDFixedPython(unittest.TestCase):
 
         p = np.linspace(0, 100, 25)
         f_p = np.cos(p * np.pi * 0.5)
-        x = np.linspace(-1, 101, 33)
+        x = np.linspace(-1, 101, 3)
+        x = np.array([3.0, 101.0])
 
         interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=p, values=f_p, method='akima', extrapolate=True)
-        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
         assert_near_equal(f, f_base, 1e-13)
         assert_near_equal(df_dx, df_dx_base, 1e-13)
+
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 1e-13)
+            assert_near_equal(df_dx, df_dx_base[j, j], 1e-13)
 
 
 if __name__ == '__main__':
