@@ -1210,6 +1210,32 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         cpd = p.check_partials(compact_print=False, out_stream=None, method='cs')
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
+    def test_training_gradient_unsupported(self):
+        # If using a fixed table method
+        model = om.Group()
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True, extrapolate=True,
+                                          method='akima1D', vec_size=1)
+        comp.add_input('x', 0.0, np.array([.1, .2, .3, .4, .5, .6, .7]))
+        comp.add_output('f', 0.0, np.array([.3, .7, .5, .6, .3, .4, .2]))
+
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup(force_alloc_complex=True)
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_model()
+
+        msg = 'Method akima1D does not support the "training_data_gradients" option.'
+        actual_msg = str(cm.exception)
+        self.assertTrue(actual_msg.endswith(msg))
+
 
 @use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

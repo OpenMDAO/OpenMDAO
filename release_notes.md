@@ -1,4 +1,46 @@
 ***********************************
+# Release Notes for OpenMDAO 3.13.0
+
+October 06, 2021
+
+OpenMDAO 3.13.0 implements a change in the way indices are handled.
+See [POEM 053](https://github.com/OpenMDAO/POEMs/blob/master/POEM_053.md) and [POEM 054](https://github.com/OpenMDAO/POEMs/blob/master/POEM_054.md)
+for more information.
+
+We've also added some security to the OpenMDAO repository by requiring GPG-signed commits when accepting pull requests.
+This is an extra layer of security that helps prevent nefarious pull-requests from being made to the code-base.
+See the documentation [here](http://openmdao.org/twodocs/versions/latest/other_useful_docs/developer_docs/signing_commits.html) for more information.
+
+## New Deprecations
+
+- Behavior of `'rel'` step_calc for finite difference is changed and issues a deprecation warning if used, see [#2209](https://github.com/OpenMDAO/OpenMDAO/pull/2209) for more information.
+
+## Backwards Incompatible API Changes
+
+- When indexing into multi-dimensional arrays while connecting or adding design variables, constraints, or objectives, the indices will now behave like numpy indices.  Flattened behavior can be achieved using `flat_src_indices` (in connections) or `flat_indices` (in other methods).
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Completed the transition to numpy style indexing described in POEM_054. [#2279](https://github.com/OpenMDAO/OpenMDAO/pull/2279)
+- Added information on min and max values of array variables in our list methods per [POEM 055](https://github.com/OpenMDAO/POEMs/blob/master/POEM_055.md).  Thank you @andrewellis55 for the contribution. [#2280](https://github.com/OpenMDAO/OpenMDAO/pull/2280)
+- Added an implementation of the function metadata API per [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) [#2281](https://github.com/OpenMDAO/OpenMDAO/pull/2281)
+- Improved performance of cubic metamodel interpolation, and added interpolants `akima1d` and `trilinear` that are limited to fixed dimensions and no derivatives wrt the training data, but are significantly faster. These interpolants are currently under development so some changes to the API may occur. [#2285](https://github.com/OpenMDAO/OpenMDAO/pull/2285)
+
+## Bug Fixes
+
+- None
+
+## Miscellaneous
+
+- Added docs for signing/verifying commits [#2273](https://github.com/OpenMDAO/OpenMDAO/pull/2273)
+- remove unused travis CI files [#2274](https://github.com/OpenMDAO/OpenMDAO/pull/2274)
+- Fix test that was failing due to varying precision in warning message. [#2287](https://github.com/OpenMDAO/OpenMDAO/pull/2287)
+
+***********************************
 # Release Notes for OpenMDAO 3.12.0
 
 September 15, 2021
