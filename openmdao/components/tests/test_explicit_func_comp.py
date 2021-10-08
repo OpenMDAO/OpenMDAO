@@ -940,10 +940,42 @@ class TestFuncCompWrapped(unittest.TestCase):
 
 class TestFuncCompUserPartials(unittest.TestCase):
     def test_user_partials(self):
-        self.fail("no test")
+
+        def func3(x1=np.ones(5), x2=np.ones(5)):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        f = (omf.wrap(func3)
+                .defaults(shape=5)
+                .declare_partials(of='*', wrt='*', method='cs'))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        p.setup()
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
     def test_user_partials_sparse(self):
-        self.fail("no test")
+        def func3(x1=np.ones(5), x2=np.ones(5)):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        f = (omf.wrap(func3)
+                .defaults(shape=5)
+                .declare_partials(of=['y1'], wrt=['x1'], method='cs', 
+                                  rows=np.arange(5), cols=np.arange(5))
+                .declare_partials(of=['y2'], wrt=['x2'], method='cs', 
+                                  rows=np.arange(5), cols=np.arange(5)))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        p.setup()
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
 
 
@@ -951,9 +983,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
 
 def mat_factory(ninputs, noutputs):
     inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
-    #inshapes = [1 for i in range(ninputs)]
     outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
-    #outshapes = [(2,2) for i in range(noutputs)]
 
     nrows = np.sum(np.product(shp) for shp in outshapes)
     ncols = np.sum(np.product(shp) for shp in inshapes)
