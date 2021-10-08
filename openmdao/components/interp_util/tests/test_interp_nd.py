@@ -869,15 +869,15 @@ class TestInterpNDFixedPython(unittest.TestCase):
         x3 = np.linspace(-0.2, 1.1, 5)
         X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
         x = np.zeros((125, 3))
-        x[:,0] = X1.ravel()
-        x[:,0] = X2.ravel()
-        x[:,0] = X3.ravel()
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+        x[:, 2] = X3.ravel()
 
         interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
-        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
         assert_near_equal(f, f_base, 1e-13)
         assert_near_equal(df_dx, df_dx_base, 1e-13)
@@ -893,7 +893,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=p, values=f_p, method='akima', extrapolate=True)
-        f_base, df_dx_base = interp.interpolate(x, compute_derivative=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
         assert_near_equal(f, f_base, 1e-13)
         assert_near_equal(df_dx, df_dx_base, 1e-13)
