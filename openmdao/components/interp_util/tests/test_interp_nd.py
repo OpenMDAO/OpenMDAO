@@ -882,12 +882,20 @@ class TestInterpNDFixedPython(unittest.TestCase):
         assert_near_equal(f, f_base, 1e-11)
         assert_near_equal(df_dx, df_dx_base, 1e-11)
 
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 1e-11)
+            assert_near_equal(df_dx[0], df_dx_base[j, :], 1e-11)
+
     def test_akima1D(self):
         # Test akima1D vs 1D akima.
 
         p = np.linspace(0, 100, 25)
         f_p = np.cos(p * np.pi * 0.5)
-        x = np.linspace(-1, 101, 3)
+        x = np.linspace(-1, 101, 33)
 
         interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
@@ -896,14 +904,18 @@ class TestInterpNDFixedPython(unittest.TestCase):
         f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
 
         assert_near_equal(f, f_base, 1e-13)
-        assert_near_equal(df_dx, df_dx_base, 1e-13)
+        assert_near_equal(df_dx, df_dx_base.ravel(), 1e-13)
 
         # Test non-vectorized.
         for j, x_i in enumerate(x):
+            interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
             f, df_dx = interp.interpolate(x_i, compute_derivative=True)
 
             assert_near_equal(f, f_base[j], 1e-13)
-            assert_near_equal(df_dx, df_dx_base[j, j], 1e-13)
+
+            # Compare abs error since deriv is near zero in some spots.
+            abs_err = np.abs(df_dx[0] -  df_dx_base[j])
+            assert_near_equal(abs_err, 0.0, 1e-13)
 
 
 if __name__ == '__main__':

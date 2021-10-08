@@ -1365,7 +1365,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         """
         # If we only have 1 point, use the non-vectorized implementation, which has faster
         # bracketing than the numpy version.
-        return x.shape[0] > 1
+        return np.prod(x.shape) > self.dim
 
     def interpolate(self, x, idx):
         """
@@ -1607,8 +1607,9 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
+            uncached = sorted(uncached)
             a, b, c, d = self.compute_coeffs_vectorized(uncached, dtype)
-            uncached = np.array(list(uncached))
+            uncached = np.array(uncached)
             self.vec_coeff[uncached, 0] = a
             self.vec_coeff[uncached, 1] = b
             self.vec_coeff[uncached, 2] = c
@@ -1619,6 +1620,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         c = self.vec_coeff[idx_coeffs, 2]
         d = self.vec_coeff[idx_coeffs, 3]
 
+        deriv_dx = np.empty((), dtype=dtype)
         deriv_dx = b + dx * (2.0 * c + 3.0 * d * dx)
 
         # Evaluate dependent value and exit
@@ -1649,10 +1651,10 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
         idx = idx.copy()
         if 0 in idx:
-            idx.discard(0)
+            idx.remove(0)
             extrap.append(0)
         if ngrid in idx:
-            idx.discard(ngrid)
+            idx.remove(ngrid)
             extrap.append(1)
 
         idx = np.array(list(idx)) - 1
@@ -1747,16 +1749,14 @@ class InterpAkima1D(InterpAlgorithmFixed):
         # endpoints.
 
         if 1 in extrap:
-            loc = np.argmax(idx)
-            a = np.hstack((a, val4[loc]))
-            b = np.hstack((b, bp1[loc]))
+            a = np.hstack((a, val4[-1]))
+            b = np.hstack((b, bp1[-1]))
             c = np.hstack((c, 0.0))
             d = np.hstack((d, 0.0))
 
         if 0 in extrap:
-            loc = np.argmin(idx)
-            a = np.hstack((val3[loc], a))
-            b = np.hstack((b[loc], b))
+            a = np.hstack((val3[0], a))
+            b = np.hstack((b[0], b))
             c = np.hstack((0.0, c))
             d = np.hstack((0.0, d))
 
