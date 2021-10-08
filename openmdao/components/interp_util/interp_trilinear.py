@@ -293,10 +293,11 @@ class InterpTrilinear(InterpAlgorithmFixed):
         needed = set([item for item in zip(idx[0], idx[1], idx[2])])
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
-            uncached = np.array(list(uncached))
-            uncached_idx = (uncached[:, 0], uncached[:, 1], uncached[:, 2])
+            unc = np.array(list(uncached))
+            uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
             a = self.compute_coeffs_vectorized(uncached_idx, dtype)
-            self.vec_coeff[uncached[:, 0], uncached[:, 1], uncached[:, 2], ...] = a
+            self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
+            self.coeffs = self.coeffs.union(uncached)
         a = self.vec_coeff[idx[0], idx[1], idx[2], :]
 
         val = a[:, 0] + \
