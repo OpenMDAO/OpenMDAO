@@ -1421,7 +1421,6 @@ class _TotalJacInfo(object):
 
                 if model._approx_schemes:
                     for scheme in model._approx_schemes.values():
-                        print("compute_totals_approx with initialize=True")
                         scheme._reset()
                     method = list(model._approx_schemes)[0]
                     kwargs = model._owns_approx_jac_meta

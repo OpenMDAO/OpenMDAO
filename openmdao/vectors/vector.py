@@ -196,14 +196,21 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
+        flat = self._views_flat
         if self._under_complex_step:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield v
+                    if v.shape:
+                        yield v
+                    else:
+                        yield flat[n][0]
         else:
             for n, v in self._views.items():
                 if n in self._names:
-                    yield v.real
+                    if v.shape:
+                        yield v.real
+                    else:
+                        yield flat[n][0].real
 
     def _name2abs_name(self, name):
         """
@@ -266,10 +273,18 @@ class Vector(object):
         arrs = self._views_flat if flat else self._views
 
         if self._under_complex_step:
-            yield from arrs.items()
+            for tup in arrs.items():
+                if flat or tup[1].shape:
+                    yield tup
+                else:
+                    name, _ = tup
+                    yield name, self._views_flat[name][0]
         else:
             for name, val in arrs.items():
-                yield name, val.real
+                if flat or val.shape:
+                    yield name, val.real
+                else:
+                    yield name, self._views_flat[name][0].real
 
     def _abs_iter(self):
         """

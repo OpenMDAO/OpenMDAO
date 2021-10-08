@@ -1135,7 +1135,6 @@ class System(object):
                                                                         type(self).__name__))
                 info.update(coloring._meta)
                 # force regen of approx groups during next compute_approximations
-                print(self.msginfo, "compute_approx_coloring (reuse of class coloring)")
                 approx_scheme._reset()
             return [coloring]
 
@@ -1163,7 +1162,6 @@ class System(object):
         sparsity_start_time = time.time()
 
         # tell approx scheme to limit itself to only colored columns
-        print(self.msginfo, "compute_approx_coloring")
         approx_scheme._reset()
         approx_scheme._during_sparsity_comp = True
 
@@ -1187,7 +1185,6 @@ class System(object):
                     self._apply_nonlinear()
 
                 for scheme in self._approx_schemes.values():
-                    print(self.msginfo, "compute_approx_coloring (during num_full_jacs loop)")
                     scheme._reset()  # force a re-initialization of approx
                     scheme._during_sparsity_comp = True
 
@@ -1199,7 +1196,6 @@ class System(object):
 
         # revert uncolored approx back to normal
         for scheme in self._approx_schemes.values():
-            print(self.msginfo, "compute_approx_coloring (after getting sparsity)")
             scheme._reset()
 
         sparsity_time = time.time() - sparsity_start_time
@@ -1227,6 +1223,11 @@ class System(object):
             issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
             if not info['per_instance']:
                 coloring_mod._CLASS_COLORINGS[coloring_fname] = None
+
+            # make sure we have no leftover garbage from sparsity/coloring computations
+            self._inputs.set_val(starting_inputs)
+            self._outputs.set_val(starting_outputs)
+            self._residuals.set_val(starting_resids)
             return [None]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
@@ -1341,7 +1342,6 @@ class System(object):
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
-            print(self.msginfo, "get_static_coloring")
             approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
             info['coloring'] = coloring = static

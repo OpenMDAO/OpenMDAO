@@ -950,10 +950,10 @@ class TestFuncCompUserPartials(unittest.TestCase):
 # coloring tests #
 
 def mat_factory(ninputs, noutputs):
-    #inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
-    inshapes = [1 for i in range(ninputs)]
-    #outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
-    outshapes = [(2,2) for i in range(noutputs)]
+    inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
+    #inshapes = [1 for i in range(ninputs)]
+    outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
+    #outshapes = [(2,2) for i in range(noutputs)]
 
     nrows = np.sum(np.product(shp) for shp in outshapes)
     ncols = np.sum(np.product(shp) for shp in inshapes)
@@ -1012,21 +1012,30 @@ class TestFuncCompColoring(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'], method='cs', out_stream=None))
 
     def test_coloring2(self):
+        np.random.seed(3241)
         #mat, inshapes, outshapes = mat_factory(1,3)
-        mat = np.array([[0.14898778],
-                        [0.19860233],
-                        [0.81899035],
-                        [0.78498818],
-                        [0.68436335],
-                        [0.93677595],
-                        [0.33964473],
-                        [0.82057559],
-                        [0.62672187],
-                        [0.52089597],
-                        [0.28524249],
-                        [0.62003238]])
-        inshapes = [1]
-        outshapes = [(2, 2), (2, 2), (2, 2)]
+        #print(mat)
+        # mat = np.array([[0.14898778],
+        #                 [0.19860233],
+        #                 [0.81899035],
+        #                 [0.78498818],
+        #                 [0.68436335],
+        #                 [0.93677595],
+        #                 [0.33964473],
+        #                 [0.82057559],
+        #                 [0.62672187],
+        #                 [0.52089597],
+        #                 [0.28524249],
+        #                 [0.62003238]])
+        mat = np.array([[0.,         0.19612013],
+                        [0.,         0.59736448],
+                        [0.,         0.57934041],
+                        [0.39366543, 0.        ],
+                        [0.,         0.91662762],
+                        [0.22134179, 0.        ],
+                        [0.77683549, 0.        ]])
+        inshapes = [2]
+        outshapes = [2, 3, 2]
         outsizes = [np.prod(shp) for shp in outshapes]
 
         def func(a):
