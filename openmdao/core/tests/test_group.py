@@ -2375,31 +2375,6 @@ class TestConnect(unittest.TestCase):
 
         assert_near_equal(prob['G1.par1.c4.y'], 8.0)
 
-    def test_connected_desvar_input(self):
-        prob = om.Problem()
-        root = prob.model
-
-        prob.driver = om.ScipyOptimizeDriver()
-
-        root.add_subsystem('initial_comp', om.ExecComp(['x = 10']), promotes_outputs=['x'])
-
-        outer_group = root.add_subsystem('outer_group', om.Group(), promotes_inputs=['x'])
-        inner_group = outer_group.add_subsystem('inner_group', om.Group(), promotes_inputs=['x'])
-
-        c1 = inner_group.add_subsystem('c1',
-                                       om.ExecComp(['y = x * 2.0',
-                                                    'z = x ** 2']),
-                                       promotes_inputs=['x'])
-
-        c1.add_design_var('x', lower=0, upper=5)
-        c1.add_constraint('y', lower=1.5)
-        c1.add_objective('z')
-
-        prob.setup()
-
-        prob.run_driver()
-        prob.list_problem_vars()
-
     def test_bad_shapes(self):
         self.sub.connect('src.s', 'arr.x')
 
