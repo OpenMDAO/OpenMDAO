@@ -9,6 +9,7 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
+from openmdao.utils.coloring import compute_total_coloring
 
 
 class TestFuncCompNoWrap(unittest.TestCase):
@@ -936,6 +937,16 @@ class TestFuncCompWrapped(unittest.TestCase):
         self.assertTrue("x_1" in text)
 
 
+class ExplicitFuncCompCountRuns(om.ExplicitFuncComp):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.compute_count = 0
+
+    def compute(self, inputs, outputs):
+        super().compute(inputs, outputs)
+        self.compute_count += 1
+
+
 # user defined compute_partials tests #
 
 class TestFuncCompUserPartials(unittest.TestCase):
@@ -951,8 +962,9 @@ class TestFuncCompUserPartials(unittest.TestCase):
                 .declare_partials(of='*', wrt='*', method='cs'))
 
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-        p.setup()
+        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+
+        p.setup(mode='fwd')
         p.run_model()
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
@@ -965,18 +977,22 @@ class TestFuncCompUserPartials(unittest.TestCase):
 
         f = (omf.wrap(func3)
                 .defaults(shape=5)
-                .declare_partials(of=['y1'], wrt=['x1'], method='cs', 
+                .declare_partials(of=['y1'], wrt=['x1'], method='cs',
                                   rows=np.arange(5), cols=np.arange(5))
-                .declare_partials(of=['y2'], wrt=['x2'], method='cs', 
+                .declare_partials(of=['y2'], wrt=['x2'], method='cs',
                                   rows=np.arange(5), cols=np.arange(5)))
 
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
-        p.setup()
-        p.run_model()
+        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+
+        p.setup(mode='fwd')
+        p.run_driver()
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
+        coloring = compute_total_coloring(p, mode='fwd', of=['comp.y1', 'comp.y2'], wrt=['comp.x1', 'comp.x2'], use_abs_names=True)
+
+        self.assertEqual(coloring.total_solves(), 1)  # verify that sparsity had an effect
 
 
 # coloring tests #

@@ -165,7 +165,8 @@ class ExplicitFuncComp(ExplicitComponent):
         for kwargs in self._func.get_declare_partials():
             self.declare_partials(**kwargs)
 
-        else:  # user didn't declare partials, so delare partials based on I/O dependencies.
+        # user didn't declare partials, so delare partials based on I/O dependencies.
+        if not self._manual_decl_partials:
             # use super().declare_partials to avoid setting _manual_decl_partials to True
             decl_partials = super().declare_partials
             hasdiag = self.options['has_diag_partials']
