@@ -30,8 +30,7 @@ from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
 from openmdao.utils.record_util import create_local_meta
-from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, _slice_indices, \
-    LocalRangeIterable
+from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -43,6 +42,7 @@ from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.hooks import _setup_hooks
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 
@@ -541,21 +541,17 @@ class Problem(object):
                         pass  # special case, auto_ivc dist var with 0 local size
                     elif tmeta['has_src_indices']:
                         if tlocmeta:  # target is local
-                            src_indices = tlocmeta['src_indices']
                             flat = False
+                            src_indices = tlocmeta['src_indices']
                             if name in model._var_prom2inds:
                                 sshape, inds, flat = model._var_prom2inds[name]
-                                if inds is not None:
-                                    if _is_slicer_op(inds):
-                                        inds = _slice_indices(inds, np.prod(sshape), sshape)
-                                        flat = True
                                 src_indices = inds
+
                             if src_indices is None:
-                                model._outputs.set_var(src, value, None, flat)
+                                model._outputs.set_var(src, value, _full_slice, flat)
                             else:
-                                if flat:
-                                    src_indices = src_indices.ravel()
                                 if tmeta['distributed']:
+                                    src_indices = src_indices.shaped_array()
                                     ssizes = model._var_sizes['output']
                                     sidx = model._var_allprocs_abs2idx[src]
                                     ssize = ssizes[myrank, sidx]
@@ -567,13 +563,20 @@ class Problem(object):
                                                            "to out-of-process array entries.")
                                     if start > 0:
                                         src_indices = src_indices - start
-                                model._outputs.set_var(src, value, src_indices[indices], flat)
+                                    src_indices = indexer(src_indices)
+                                if indices is _full_slice:
+                                    model._outputs.set_var(src, value, src_indices, flat)
+                                else:
+                                    model._outputs.set_var(src, value, src_indices.apply(indices),
+                                                           True)
                         else:
                             raise RuntimeError(f"{model.msginfo}: Can't set {abs_name}: remote"
                                                " connected inputs with src_indices currently not"
                                                " supported.")
                     else:
                         value = np.asarray(value)
+                        if indices is not _full_slice:
+                            indices = indexer(indices)
                         model._outputs.set_var(src, value, indices)
                 elif src in model._discrete_outputs:
                     model._discrete_outputs[src] = value
@@ -1719,7 +1722,7 @@ class Problem(object):
             # Display whether indices were declared when response was added.
             of = key[0]
             if of in resp and resp[of]['indices'] is not None:
-                data[''][key]['indices'] = len(resp[of]['indices'])
+                data[''][key]['indices'] = resp[of]['indices'].indexed_src_size
 
         fd_args['method'] = method
 
@@ -1837,13 +1840,13 @@ class Problem(object):
             List of optional columns to be displayed in the desvars table.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         cons_opts : list of str
             List of optional columns to be displayed in the cons table.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'index', 'adder', 'scaler',
             'linear', 'parallel_deriv_color',
-            'cache_linear_solution', 'units'].
+            'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
             List of optional columns to be displayed in the objs table.
             Allowed values are:
@@ -1909,6 +1912,11 @@ class Problem(object):
         """
         abs2prom = self.model._var_abs2prom
 
+        # Gets the current numpy print options for consistent decimal place
+        #   printing between arrays and floats
+        print_options = np.get_printoptions()
+        np_precision = print_options['precision']
+
         # Get the values for all the elements in the tables
         rows = []
         for name, meta in meta.items():
@@ -1929,6 +1937,14 @@ class Problem(object):
 
                 elif col_name == 'val':
                     row[col_name] = vals[name]
+                elif col_name == 'min':
+                    min_val = min(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(min_val, np_precision)
+                elif col_name == 'max':
+                    max_val = max(vals[name])
+                    # Rounding to match float precision to numpy precision
+                    row[col_name] = np.round(max_val, np_precision)
                 else:
                     row[col_name] = meta[col_name]
             rows.append(row)
@@ -1946,7 +1962,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                 else:
                     out = str(cell)
                 max_width[col_name] = max(len(out), max_width[col_name])
@@ -1967,7 +1984,8 @@ class Problem(object):
             for col_name in col_names:
                 cell = row[col_name]
                 if isinstance(cell, np.ndarray) and cell.size > 1:
-                    out = '|{}|'.format(str(np.linalg.norm(cell)))
+                    norm = np.linalg.norm(cell)
+                    out = '|{}|'.format(str(np.round(norm, np_precision)))
                     have_array_values.append(col_name)
                 else:
                     out = str(cell)

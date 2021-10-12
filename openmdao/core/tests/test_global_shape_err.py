@@ -52,7 +52,7 @@ class GlobalShapeErr(unittest.TestCase):
 
     def test_global_shape_success(self):
         self.check_global_shape(1, False)
-    
+
     def test_global_shape_failure(self):
         self.check_global_shape(2, True)
 

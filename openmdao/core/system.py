@@ -6,7 +6,6 @@ import time
 
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterable
 from itertools import chain
 from enum import IntEnum
 
@@ -28,7 +27,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs, _flatten_src_indices
+from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
@@ -37,9 +36,8 @@ from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, PromotionWarning,\
     UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, ContainsAll, all_ancestors, _slice_indices, \
-    make_set, match_prom_or_abs, _is_slicer_op, shape_from_idx
-from openmdao.utils.notebook_utils import notebook, tabulate
+    format_as_float_or_array, ContainsAll, all_ancestors, make_set, match_prom_or_abs, \
+        _is_slicer_op
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -88,7 +86,6 @@ allowed_meta_names = {
     'global_shape',
     'global_size',
     'src_indices',
-    'src_slice',
     'flat_src_indices',
     'type',
     'res_units',
@@ -790,7 +787,7 @@ class System(object):
         """
         try:
             prom2abs = self._problem_meta['prom2abs']
-        except StandardError:
+        except Exception:
             raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
                                "before Problem.setup has been called.")
 
@@ -1521,26 +1518,7 @@ class System(object):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    high_dims = local_shape[1:]
-                    with multi_proc_exception_check(self.comm):
-                        if high_dims:
-                            high_size = np.prod(high_dims)
-                            dim_size_match = bool(global_size % high_size == 0)
-
-                            if dim_size_match is False:
-                                msg = (f"{self.msginfo}: All but the first dimension of the "
-                                       "shape's local parts in a distributed variable must match "
-                                       f"across processes. For output '{abs_name}', local shape "
-                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                       "higher dimension that differs in another rank.")
-
-                                raise RuntimeError(msg)
-
-                            dim1 = global_size // high_size
-                            mymeta['global_shape'] = tuple([dim1] + list(high_dims))
-                        else:
-                            mymeta['global_shape'] = (global_size,)
-
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -1945,9 +1923,9 @@ class System(object):
             if not to_match:
                 return
 
-            # always add '*' and so we won't report if it matches nothing (in the case where the
+            # always add '*' so we won't report if it matches nothing (in the case where the
             # system has no variables of that io type)
-            found = set(('*',))
+            found = {'*'}
 
             for match_type, key, tup in split_list(to_match):
                 s, pinfo = tup
@@ -2429,7 +2407,7 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
-    def _create_indexer(self, indices, typename, vname):
+    def _create_indexer(self, indices, typename, vname, flat_src=False):
         """
         Return an Indexer instance and it's size if possible.
 
@@ -2441,6 +2419,8 @@ class System(object):
             Type name of the variable.  Could be 'design var', 'objective' or 'constraint'.
         vname : str
             Name of the variable.
+        flat_src : bool
+            If True, indices index into a flat array.
 
         Returns
         -------
@@ -2455,7 +2435,7 @@ class System(object):
                 raise ValueError(f"{self.msginfo}: If specified, {typename} '{vname}' indices "
                                  "must be a sequence of integers.")
         try:
-            idxer = indexer[indices]
+            idxer = indexer(indices, flat_src=flat_src)
         except Exception as err:
             raise err.__class__(f"{self.msginfo}: Invalid indices {indices} for {typename} "
                                 f"'{vname}'.")
@@ -2463,7 +2443,7 @@ class System(object):
         # size may not be available at this point, but get it if we can in order to allow
         # some earlier error checking
         try:
-            size = idxer.size()
+            size = idxer.indexed_src_size
         except Exception:
             size = None
 
@@ -2471,7 +2451,7 @@ class System(object):
 
     def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
                        adder=None, scaler=None, units=None,
-                       parallel_deriv_color=None, cache_linear_solution=False):
+                       parallel_deriv_color=None, cache_linear_solution=False, flat_indices=False):
         r"""
         Add a design variable to this system.
 
@@ -2508,6 +2488,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2588,22 +2570,20 @@ class System(object):
         dv['cache_linear_solution'] = cache_linear_solution
 
         if indices is not None:
-            indices, size = self._create_indexer(indices, 'design var', name)
+            indices, size = self._create_indexer(indices, 'design var', name, flat_src=flat_indices)
             if size is not None:
                 dv['size'] = size
 
         dv['indices'] = indices
+        dv['flat_indices'] = flat_indices
         dv['parallel_deriv_color'] = parallel_deriv_color
-
-        self._check_voi_meta_sizes('design var', dv,
-                                   ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower'])
 
         design_vars[name] = dv
 
     def add_response(self, name, type_, lower=None, upper=None, equals=None,
                      ref=None, ref0=None, indices=None, index=None, units=None,
                      adder=None, scaler=None, linear=False, parallel_deriv_color=None,
-                     cache_linear_solution=False):
+                     cache_linear_solution=False, flat_indices=None):
         r"""
         Add a response variable to this system.
 
@@ -2652,6 +2632,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
         """
         # Name must be a string
         if not isinstance(name, str):
@@ -2740,7 +2722,8 @@ class System(object):
             resp['equals'] = equals
             resp['linear'] = linear
             if indices is not None:
-                indices, size = self._create_indexer(indices, resp_types[type_], name)
+                indices, size = self._create_indexer(indices, resp_types[type_], name,
+                                                     flat_src=flat_indices)
                 if size is not None:
                     resp['size'] = size
             resp['indices'] = indices
@@ -2749,7 +2732,7 @@ class System(object):
                 if not isinstance(index, Integral):
                     raise TypeError(f"{self.msginfo}: index must be of integral type, but type is "
                                     f"{type(index).__name__}")
-                index = indexer[index]
+                index = indexer(index, flat_src=flat_indices)
                 resp['size'] = 1
             resp['indices'] = index
 
@@ -2773,17 +2756,15 @@ class System(object):
         resp['type'] = type_
         resp['units'] = units
         resp['cache_linear_solution'] = cache_linear_solution
-
         resp['parallel_deriv_color'] = parallel_deriv_color
-
-        self._check_voi_meta_sizes(resp_types[resp['type']], resp, resp_size_checks[resp['type']])
+        resp['flat_indices'] = flat_indices
 
         responses[name] = resp
 
     def add_constraint(self, name, lower=None, upper=None, equals=None,
                        ref=None, ref0=None, adder=None, scaler=None, units=None,
                        indices=None, linear=False, parallel_deriv_color=None,
-                       cache_linear_solution=False):
+                       cache_linear_solution=False, flat_indices=False):
         r"""
         Add a constraint variable to this system.
 
@@ -2824,6 +2805,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2837,11 +2820,12 @@ class System(object):
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          cache_linear_solution=cache_linear_solution)
+                          cache_linear_solution=cache_linear_solution,
+                          flat_indices=flat_indices)
 
     def add_objective(self, name, ref=None, ref0=None, index=None, units=None,
                       adder=None, scaler=None, parallel_deriv_color=None,
-                      cache_linear_solution=False):
+                      cache_linear_solution=False, flat_indices=False):
         r"""
         Add a response variable to this system.
 
@@ -2874,6 +2858,8 @@ class System(object):
             If True, store the linear solution vectors for this variable so they can
             be used to start the next linear solution with an initial guess equal to the
             solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
 
         Notes
         -----
@@ -2906,7 +2892,8 @@ class System(object):
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index, units=units,
                           parallel_deriv_color=parallel_deriv_color,
-                          cache_linear_solution=cache_linear_solution)
+                          cache_linear_solution=cache_linear_solution,
+                          flat_indices=flat_indices)
 
     def _check_voi_meta_sizes(self, typename, meta, names):
         """
@@ -3021,12 +3008,11 @@ class System(object):
                     vmeta = abs2meta_out[src_name]
                     meta['distributed'] = vmeta['distributed']
                     if indices is not None:
-                        # Index defined in this response.
+                        # Index defined in this design var.
                         # update src shapes for Indexer objects
                         indices.set_src_shape(vmeta['global_shape'])
                         indices = indices.shaped_instance()
-                        meta['size'] = len(indices)
-                        meta['global_size'] = len(indices)
+                        meta['size'] = meta['global_size'] = indices.indexed_src_size
                     else:
                         meta['global_size'] = vmeta['global_size']
 
@@ -3148,7 +3134,7 @@ class System(object):
                     indices = response['indices']
                     indices.set_src_shape(meta['global_shape'])
                     indices = indices.shaped_instance()
-                    response['size'] = response['global_size'] = len(indices)
+                    response['size'] = response['global_size'] = indices.indexed_src_size
                 else:
                     response['size'] = sizes[owning_rank[name], abs2idx[name]]
                     response['global_size'] = meta['global_size']
@@ -3435,7 +3421,9 @@ class System(object):
                     excludes=None,
                     all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM,
-                    values=None):
+                    values=None,
+                    print_min=False,
+                    print_max=False):
         """
         Write a list of input names and other optional information to a specified stream.
 
@@ -3479,6 +3467,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the input value is an array, print its smallest value.
+        print_max : bool
+            When true, if the input value is an array, print its largest value.
 
         Returns
         -------
@@ -3516,9 +3508,18 @@ class System(object):
 
         if values and self._inputs is not None:
             # we want value from the input vector, not from the metadata
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
+
             for n, meta in inputs.items():
                 meta['val'] = self._abs_get_val(n, get_remote=True,
                                                 rank=None if all_procs else 0, kind='input')
+                if isinstance(meta['val'], np.ndarray):
+                    if print_min:
+                        meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                    if print_max:
+                        meta['max'] = np.round(np.max(meta['val']), np_precision)
 
         if not inputs or (not all_procs and self.comm.rank != 0):
             return []
@@ -3556,7 +3557,9 @@ class System(object):
                      all_procs=False,
                      list_autoivcs=False,
                      out_stream=_DEFAULT_OUT_STREAM,
-                     values=None):
+                     values=None,
+                     print_min=False,
+                     print_max=False):
         """
         Write a list of output names and other optional information to a specified stream.
 
@@ -3615,6 +3618,10 @@ class System(object):
             Set to None to suppress.
         values : bool, optional
             This argument has been deprecated and will be removed in 4.0.
+        print_min : bool
+            When true, if the output value is an array, print its smallest value.
+        print_max : bool
+            When true, if the output value is an array, print its largest value.
 
         Returns
         -------
@@ -3651,12 +3658,22 @@ class System(object):
         # get values & resids
         if self._outputs is not None and (values or residuals or residuals_tol):
             to_remove = []
+            print_options = np.get_printoptions()
+            np_precision = print_options['precision']
 
             for name, meta in outputs.items():
                 if values:
                     # we want value from the input vector, not from the metadata
                     meta['val'] = self._abs_get_val(name, get_remote=True,
                                                     rank=None if all_procs else 0, kind='output')
+
+                    if isinstance(meta['val'], np.ndarray):
+                        if print_min:
+                            meta['min'] = np.round(np.min(meta['val']), np_precision)
+
+                        if print_max:
+                            meta['max'] = np.round(np.max(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -4501,12 +4518,7 @@ class System(object):
             src_indices = vmeta['src_indices']
         else:
             vmeta = self._var_allprocs_abs2meta['input'][abs_name]
-            if 'src_slice' in vmeta:
-                smeta = self._var_allprocs_abs2meta['output'][src]
-                src_indices = _slice_indices(vmeta['src_slice'], smeta['global_size'],
-                                             smeta['shape'])
-            else:
-                src_indices = None  # FIXME: remote var could have src_indices
+            src_indices = None  # FIXME: remote var could have src_indices
 
         distrib = vmeta['distributed']
         vshape = vmeta['shape']
@@ -4516,19 +4528,14 @@ class System(object):
 
         # see if we have any 'intermediate' level src_indices when using a promoted name
         if name in scope_sys._var_prom2inds:
-            src_shape, inds, flat = scope_sys._var_prom2inds[name]
+            src_shape, inds, _ = scope_sys._var_prom2inds[name]
             if inds is None:
                 if len(abs_ins) > 1 or name != abs_ins[0]:  # using a promoted lookup
                     src_indices = None
                     vshape = None
                     has_src_indices = False
-                is_slice = _is_slicer_op(src_indices)
             else:
-                is_slice = _is_slicer_op(inds)
-                shp = shape_from_idx(src_shape, inds, flat)
-                if not flat and not _is_slicer_op(inds):
-                    inds = _flatten_src_indices(inds, shp,
-                                                src_shape, np.product(src_shape))
+                shp = inds.indexed_src_shape
                 src_indices = inds
                 has_src_indices = True
                 if len(abs_ins) > 1 or name != abs_name:
@@ -4539,11 +4546,6 @@ class System(object):
                 self.comm.bcast(has_src_indices, root=self.comm.rank)
             else:
                 has_src_indices = self.comm.bcast(None, root=self._owning_rank[abs_name])
-
-        if name not in scope_sys._var_prom2inds:
-            is_slice = _is_slicer_op(src_indices)
-            shpname = 'global_shape' if get_remote else 'shape'
-            src_shape = self._var_allprocs_abs2meta['output'][src][shpname]
 
         model_ref = self._problem_meta['model_ref']()
         smeta = model_ref._var_allprocs_abs2meta['output'][src]
@@ -4570,20 +4572,13 @@ class System(object):
             if src_indices is None:  # input is remote
                 val = np.zeros(0)
             else:
-                if is_slice:
-                    val.shape = src_shape
-                    try:
-                        val = val[tuple(src_indices)].ravel()
-                    except TypeError:
-                        # Single-dimension slices don't convert to tuple, but they don't need to.
-                        val = val[src_indices].ravel()
-
-                elif distrib and (sdistrib or dynshape or not slocal) and not get_remote:
+                if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
                     var_idx = self._var_allprocs_abs2idx[src]
                     # sizes for src var in each proc
                     sizes = self._var_sizes['output'][:, var_idx]
                     start = np.sum(sizes[:self.comm.rank])
                     end = start + sizes[self.comm.rank]
+                    src_indices = src_indices.shaped_array(copy=True)
                     if np.all(np.logical_and(src_indices >= start, src_indices < end)):
                         if src_indices.size > 0:
                             src_indices = src_indices - start
@@ -4598,7 +4593,10 @@ class System(object):
                                            "from all processes using "
                                            "`get_val(<name>, get_remote=True)`.")
                 else:
-                    val = val.ravel()[src_indices]
+                    if src_indices._flat_src:
+                        val = val.ravel()[src_indices.flat()]
+                    else:
+                        val = val[src_indices()]
 
             if get_remote and self.comm.size > 1:
                 if distrib:
@@ -4642,41 +4640,6 @@ class System(object):
             val = self.convert2units(src, val, vmeta['units'])
 
         return val
-
-    def _get_src_inds_array(self, varname):
-        """
-        Return src_indices, if any, for absolute input 'varname', converting from slice if needed.
-
-        Parameters
-        ----------
-        varname : str
-            Absolute name of the input variable.
-
-        Returns
-        -------
-        ndarray or None
-            The value of src_indices for the given input variable.
-        """
-        meta = self._var_abs2meta['input'][varname]
-        src_indices = meta['src_indices']
-        if src_indices is not None:
-            src_slice = meta['src_slice']
-            # if src_indices is still a slice, update it to an array
-            if src_slice is src_indices:
-                model = self._problem_meta['model_ref']()
-                src = model._conn_global_abs_in2out[varname]
-                try:
-                    global_size = model._var_allprocs_abs2meta['output'][src]['global_size']
-                    global_shape = model._var_allprocs_abs2meta['output'][src]['global_shape']
-                except KeyError:
-                    raise RuntimeError(f"{self.msginfo}: Can't compute src_indices array from "
-                                       f"src_slice for input '{varname}' because we don't know "
-                                       "the global shape of its source yet.")
-                src_indices = _slice_indices(src_slice, global_size, global_shape)
-
-                meta['src_indices'] = src_indices  # store converted value
-
-        return src_indices
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         """
@@ -5260,6 +5223,50 @@ class System(object):
             data.append(self._conn_global_abs_in2out[key])
 
         return hashlib.md5(str(data).encode()).hexdigest()
+
+    def _get_full_dist_shape(self, abs_name, local_shape):
+        """
+        Get the full 'distributed' shape for a variable.
+
+        Variable name is absolute and variable is assumed to be continuous.
+
+        Parameters
+        ----------
+        abs_name : str
+            Absolute name of the variable.
+
+        local_shape : tuple
+            Local shape of the variable, used in error reporting.
+
+        Returns
+        -------
+        tuple
+            The distributed shape for the given variable.
+        """
+        io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
+        meta = self._var_allprocs_abs2meta[io][abs_name]
+        var_idx = self._var_allprocs_abs2idx[abs_name]
+        global_size = np.sum(self._var_sizes[io][:, var_idx])
+
+        # assume that all but the first dimension of the shape of a
+        # distributed variable is the same on all procs
+        high_dims = meta['shape'][1:]
+        with multi_proc_exception_check(self.comm):
+            if high_dims:
+                high_size = np.prod(high_dims)
+
+                dim_size_match = bool(global_size % high_size == 0)
+                if dim_size_match is False:
+                    raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
+                                       "shape's local parts in a distributed variable must match "
+                                       f"across processes. For output '{abs_name}', local shape "
+                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
+                                       "higher dimension that differs in another rank.")
+
+                dim1 = global_size // high_size
+                return tuple([dim1] + list(high_dims))
+
+        return (global_size,)
 
     def _get_jac_col_scatter(self):
         """

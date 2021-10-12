@@ -278,7 +278,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
@@ -291,11 +291,11 @@ class TestConnectionsIndices(unittest.TestCase):
     def test_bad_length(self):
         # Should not be allowed because the length of src_indices is greater than
         # the shape of arraycomp.inp
-        self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 1, 0])
+        self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: The source indices [0 1 0] do not specify a valid shape " + \
+        expected = "<model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
-                   "(2,) but indices are (3,)."
+                   "(2,) but indices are shape (3,)."
 
         try:
             self.prob.setup()
@@ -314,20 +314,18 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp1'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5."
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except Exception as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
 
         self.prob.model._raise_connection_errors = False
 
-        with assert_warning(UserWarning, expected):
+        with assert_warning(om.SetupWarning, expected):
             self.prob.setup()
 
     def test_bad_value_bug(self):
@@ -335,13 +333,11 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source.  A bug prevented this from being checked.
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
-        expected = "<model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'idvp.arrout' to 'arraycomp.inp'. " + \
-                   "Index '100000' is out of range for source dimension of size 5."
+        expected = "<model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5."
 
         try:
             self.prob.setup()
-        except ValueError as err:
+        except IndexError as err:
             self.assertEqual(str(err), expected)
         else:
             self.fail('Exception expected.')
@@ -574,10 +570,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        rank = prob.comm.rank
-        expected = f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'p1.x' to 'c3.x'. " + \
-                   "Index '2' is out of range for source dimension of size 2."
+        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
         try:
             prob.setup()
         except Exception as err:
@@ -606,10 +599,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         model.add_subsystem('c3', TestComp())
         model.connect("p1.x", "c3.x")
 
-        rank = prob.comm.rank
-        expected = f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index " + \
-                   "for the connection 'p1.x' to 'c3.x'. " + \
-                   "Index '2' is out of range for source dimension of size 2."
+        expected = f"Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2."
 
         try:
             prob.setup()
@@ -637,16 +627,15 @@ class TestConnectionsError(unittest.TestCase):
         class TestComp(om.ExplicitComponent):
 
             def setup(self):
-                # read SRC_INDICES on each proc
                 self.add_input('x', shape=2, src_indices=[1, 2], val=-2038.0)
-                self.add_output('y', shape=1)
+                self.add_output('y', shape=2)
                 self.declare_partials('y', 'x')
 
             def compute(self, inputs, outputs):
-                outputs['y'] = np.sum(inputs['x'])
+                outputs['y'] = inputs['x']
 
             def compute_partials(self, inputs, J):
-                J['y', 'x'] = np.ones((2,))
+                J['y', 'x'] = np.eye(2)
 
         prob = om.Problem()
         model = prob.model
@@ -658,19 +647,16 @@ class TestConnectionsError(unittest.TestCase):
         else:
             setval = np.array([10.0, 20.0])
 
-        # no parallel or distributed comps, so default_vector is used (local xfer only)
         model.add_subsystem('p1', om.IndepVarComp('x', setval))
-        model.add_subsystem('c3', TestComp())
-        model.add_subsystem('c4', TestCompDist())
-        model.connect("p1.x", "c3.x")
+        model.add_subsystem('c3', TestComp())   # size 2 ---> size 2
+        model.add_subsystem('c4', TestCompDist())  # size 2 ---> size 1
+        model.connect("p1.x", "c3.x")  # size 2 to size 2
         model.connect("c3.y", "c4.x")
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
         self.assertEqual(str(context.exception),
-                         f"Exception raised on rank {rank}: <model> <class Group>: The source indices do not specify a valid index for "
-                         "the connection 'p1.x' to 'c3.x'. Index '2' is out of range for source "
-                         "dimension of size 2.")
+                         "Exception raised on rank 0: <model> <class Group>: When connecting 'p1.x' to 'c3.x': index 2 is out of bounds for source dimension of size 2.")
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
@@ -717,9 +703,9 @@ class TestConnectionsMPIBug(unittest.TestCase):
                 self.add_subsystem('linkages', Linkages())
 
             def configure(self):
-                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
-                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([[0, 3], [4, 6], [2, 1]]))
-
+                self.connect('phases.burn1.y', 'linkages.linkage.in1', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
+                self.connect('phases.burn2.y', 'linkages.linkage.in2', src_indices=np.array([0, 3, 4, 6, 2, 1]), flat_src_indices=True)
+        
         prob = om.Problem(model=Traj())
         prob.setup()
         prob.run_model()

@@ -192,7 +192,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             j += 1
 
         for out in outs:
-            comp.add_output(out['name'], outs[0]['values'].flatten())
+            comp.add_output(out['name'], training_data=outs[0]['values'].flatten())
 
         model.add_subsystem('comp', comp, promotes=["*"])
 
@@ -242,7 +242,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             j += 1
 
         for out in outs:
-            comp.add_output(out['name'], outs[0]['values'].flatten())
+            comp.add_output(out['name'], training_data=outs[0]['values'].flatten())
 
         model.add_subsystem('comp', comp, promotes=["*"])
 
@@ -292,7 +292,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             j += 1
 
         for out in outs:
-            comp.add_output(out['name'], outs[0]['values'].flatten())
+            comp.add_output(out['name'], training_data=outs[0]['values'].flatten())
 
         model.add_subsystem('comp', comp, promotes=["*"])
 
@@ -342,7 +342,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             j += 1
 
         for out in outs:
-            comp.add_output(out['name'], outs[0]['values'].flatten())
+            comp.add_output(out['name'], training_data=outs[0]['values'].flatten())
 
         model.add_subsystem('comp', comp, promotes=["*"])
 
@@ -364,7 +364,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         comp = om.MetaModelSemiStructuredComp(method='akima')
         comp.add_input('x', x)
         comp.add_input('y', y)
-        comp.add_output('f', f)
+        comp.add_output('f', training_data=f)
 
         prob = om.Problem()
         model = prob.model
@@ -375,6 +375,18 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, msg):
             prob.setup()
 
+    def test_error_no_training_data(self):
+        x = np.array([1.0, 1.0, 2.0, 2.0])
+        y = np.array([1.0, 2.0, 1.0, 2.0])
+
+        comp = om.MetaModelSemiStructuredComp(method='akima')
+        comp.add_input('x', x)
+        comp.add_input('y', y)
+
+        msg = "Training data is required for output 'f'."
+        with self.assertRaisesRegex(ValueError, msg):
+            comp.add_output('f')
+
     def test_list_input(self):
         x = [1.0, 1.0, 2.0, 2.0, 2.0]
         y = [1.0, 2.0, 1.0, 2.0, 3.0]
@@ -383,7 +395,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         comp = om.MetaModelSemiStructuredComp(method='slinear', training_data_gradients=True, extrapolate=False)
         comp.add_input('x', x)
         comp.add_input('y', y)
-        comp.add_output('f', f)
+        comp.add_output('f', training_data=f)
 
         prob = om.Problem()
         model = prob.model
@@ -417,10 +429,10 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
         interp.add_input('x', data_x)
         interp.add_input('y', data_y)
-        interp.add_output('f', data_values)
+        interp.add_output('f', training_data=data_values)
 
         # Sneak in a multi-output case.
-        interp.add_output('g', 2.0 * data_values)
+        interp.add_output('g', training_data=2.0 * data_values)
 
         model.add_subsystem('interp', interp)
 
@@ -441,7 +453,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
         interp.add_input('x', data_x)
         interp.add_input('y', data_y)
-        interp.add_output('f', np.zeros(len(data_x)))
+        interp.add_output('f', training_data=np.zeros(len(data_x)))
 
         model.add_subsystem('interp', interp)
 
@@ -455,6 +467,61 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val('interp.f'), 3.39415716, 1e-7)
+
+    def test_dynamic_training(self):
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        P1 = P1.ravel()
+        P2 = P2.ravel()
+        P3 = P3.ravel()
+
+        class TableGen(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('k', 1.0)
+                self.add_output('values', np.zeros(len(P1)))
+
+                self.declare_partials('values', 'k')
+
+            def compute(self, inputs, outputs):
+                k = inputs['k']
+
+                outputs['values'] = np.sqrt(P1) + P2 * P3 * k
+
+            def compute_partials(self, inputs, partials):
+                partials['values', 'k'] = P2 * P3
+
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('tab', TableGen())
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange3', training_data_gradients=True)
+        interp.add_input('p1', P1)
+        interp.add_input('p2', P2)
+        interp.add_input('p3', P3)
+
+        interp.add_output('f')
+
+        model.add_subsystem('comp', interp)
+
+        model.connect('tab.values', 'comp.f_train')
+        prob.setup(force_alloc_complex=True)
+
+        prob.set_val('comp.p1', 55.12)
+        prob.set_val('comp.p2', -2.14)
+        prob.set_val('comp.p3', 0.323)
+
+        prob.run_model()
+
+        # we can verify all gradients by checking against finite-difference
+        totals = prob.check_totals(of='comp.f', wrt=['tab.k', 'comp.p1', 'comp.p2', 'comp.p3'],
+                                   method='cs', out_stream=None);
+
+        assert_near_equal(totals['comp.f', 'tab.k']['abs error'][0], 0.0, tolerance=1e-10)
 
     def test_detect_local_extrapolation(self):
         # Tests that we detect when any of our points we are using for interpolation are being extrapolated from
@@ -487,7 +554,7 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             interp = om.MetaModelSemiStructuredComp(method=method, vec_size=7)
             interp.add_input('x', grid[:, 0])
             interp.add_input('y', grid[:, 1])
-            interp.add_output('f', values)
+            interp.add_output('f', training_data=values)
 
             model.add_subsystem('interp', interp)
 
@@ -499,6 +566,63 @@ class TestMetaModelSemiStructured(unittest.TestCase):
             prob.run_model()
 
             assert_near_equal(prob.get_val('interp.f'), expected, 1e-3)
+
+    def test_lagrange3_edge_extrapolation_detection_bug(self):
+        import itertools
+
+        import numpy as np
+        import openmdao.api as om
+
+        grid = np.array(
+            [[0, 0],
+             [0, 1],
+             [0, 2],
+             [0, 3],
+             [0, 4],
+             [1, 0],
+             [1, 1],
+             [1, 2],
+             [1, 3],
+             [1, 4],
+             [2, 0],
+             [2, 1],
+             [2, 2],
+             [2, 3],
+             [2, 4],
+             [2, 5],
+             [3, 0],
+             [3, 1],
+             [3, 2],
+             [3, 3],
+             [3, 4],
+             [3, 5],
+             [4, 0],
+             [4, 1],
+             [4, 2],
+             [4, 3],
+             [4, 4],
+             [4, 5]])
+
+
+        values = 15.0 + 2 * np.random.random(grid.shape[0])
+
+        prob = om.Problem()
+        model = prob.model
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange3')
+        interp.add_input('x', training_data=grid[:, 0])
+        interp.add_input('y', training_data=grid[:, 1])
+        interp.add_output('f', training_data=values)
+
+        model.add_subsystem('interp', interp)
+
+        prob.setup()
+
+        prob.set_val('interp.x', 2.5)
+        prob.set_val('interp.y', 4.5)
+
+        # Should run without an Indexerror.
+        prob.run_model()
 
 
 if __name__ == "__main__":

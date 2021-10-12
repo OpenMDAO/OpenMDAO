@@ -1,4 +1,97 @@
 ***********************************
+# Release Notes for OpenMDAO 3.13.0
+
+October 06, 2021
+
+OpenMDAO 3.13.0 implements a change in the way indices are handled.
+See [POEM 053](https://github.com/OpenMDAO/POEMs/blob/master/POEM_053.md) and [POEM 054](https://github.com/OpenMDAO/POEMs/blob/master/POEM_054.md)
+for more information.
+
+We've also added some security to the OpenMDAO repository by requiring GPG-signed commits when accepting pull requests.
+This is an extra layer of security that helps prevent nefarious pull-requests from being made to the code-base.
+See the documentation [here](http://openmdao.org/twodocs/versions/latest/other_useful_docs/developer_docs/signing_commits.html) for more information.
+
+## New Deprecations
+
+- Behavior of `'rel'` step_calc for finite difference is changed and issues a deprecation warning if used, see [#2209](https://github.com/OpenMDAO/OpenMDAO/pull/2209) for more information.
+
+## Backwards Incompatible API Changes
+
+- When indexing into multi-dimensional arrays while connecting or adding design variables, constraints, or objectives, the indices will now behave like numpy indices.  Flattened behavior can be achieved using `flat_src_indices` (in connections) or `flat_indices` (in other methods).
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- Completed the transition to numpy style indexing described in POEM_054. [#2279](https://github.com/OpenMDAO/OpenMDAO/pull/2279)
+- Added information on min and max values of array variables in our list methods per [POEM 055](https://github.com/OpenMDAO/POEMs/blob/master/POEM_055.md).  Thank you @andrewellis55 for the contribution. [#2280](https://github.com/OpenMDAO/OpenMDAO/pull/2280)
+- Added an implementation of the function metadata API per [POEM 056](https://github.com/OpenMDAO/POEMs/blob/master/POEM_056.md) [#2281](https://github.com/OpenMDAO/OpenMDAO/pull/2281)
+- Improved performance of cubic metamodel interpolation, and added interpolants `akima1d` and `trilinear` that are limited to fixed dimensions and no derivatives wrt the training data, but are significantly faster. These interpolants are currently under development so some changes to the API may occur. [#2285](https://github.com/OpenMDAO/OpenMDAO/pull/2285)
+
+## Bug Fixes
+
+- None
+
+## Miscellaneous
+
+- Added docs for signing/verifying commits [#2273](https://github.com/OpenMDAO/OpenMDAO/pull/2273)
+- remove unused travis CI files [#2274](https://github.com/OpenMDAO/OpenMDAO/pull/2274)
+- Fix test that was failing due to varying precision in warning message. [#2287](https://github.com/OpenMDAO/OpenMDAO/pull/2287)
+
+***********************************
+# Release Notes for OpenMDAO 3.12.0
+
+September 15, 2021
+
+OpenMDAO 3.12.0 provides a transitional release as we change the way the specification of indices are handled.
+In the future, specification of indices will be similar to the way it is done in Numpy, as opposed to an OpenMDAO-specific method.
+See [POEM 053](https://github.com/OpenMDAO/POEMs/blob/master/POEM_053.md) and [POEM 054](https://github.com/OpenMDAO/POEMs/blob/master/POEM_054.md)
+for more information.
+
+## New Deprecations
+
+- Behavior of `'rel'` step_calc for finite difference is changed and issues a deprecation warning if used, see [#2209](https://github.com/OpenMDAO/OpenMDAO/pull/2209) for more information.
+
+## Backwards Incompatible API Changes
+
+- Disabled the option to use coloring on approximated semi-total derivatives. [#2245](https://github.com/OpenMDAO/OpenMDAO/pull/2245)
+
+## Backwards Incompatible Non-API Changes
+
+## New Features
+
+- Improved behavior of relative step_calc for finite difference in accordance with [POEM 051](https://github.com/OpenMDAO/POEMs/blob/master/POEM_051.md). [#2209](https://github.com/OpenMDAO/OpenMDAO/pull/2209)
+- Add a check to openmdao check to report any options in the model that are not serializable. [#2225](https://github.com/OpenMDAO/OpenMDAO/pull/2225)
+- Shift-click can now close all persistent Node Info windows in the N2 viewer. [#2226](https://github.com/OpenMDAO/OpenMDAO/pull/2226)
+- Update to src_indices indexing to behave like numpy indexing (old indexing is still there but deprecated) [#2235](https://github.com/OpenMDAO/OpenMDAO/pull/2235)
+- Added code to issue warnings in cases where apparently flat indices index into non-flat source arrays when the flat_src_indices or flat_indices flags have not been set to True. [#2248](https://github.com/OpenMDAO/OpenMDAO/pull/2248)
+- Added a converter from old OpenMDAO indexing format to the new numpy-like one. [#2267](https://github.com/OpenMDAO/OpenMDAO/pull/2267)
+
+## Bug Fixes
+
+- Fixed the hang described in [#2191](https://github.com/OpenMDAO/OpenMDAO/pull/2191) so all procs will call multi_proc_exception_check()  [#2208](https://github.com/OpenMDAO/OpenMDAO/pull/2208)
+- Added support for multidimensional shapes in EQConstraintComp and BalanceComp. [#2210](https://github.com/OpenMDAO/OpenMDAO/pull/2210)
+- Fixed bug where an exception was raised if you tried to get a value for an input that was connected to a source with a src_indices slice. [#2217](https://github.com/OpenMDAO/OpenMDAO/pull/2217)
+- Fixed a bug in the interpolation bracketing algorithm that caused a hysteresis in the analytic derivative when interpolating on one of the table's gridpoints. [#2230](https://github.com/OpenMDAO/OpenMDAO/pull/2230)
+- Fixed a bug that caused an IndexError to be raised when using a directional derivative during check_partials on an MPI model. [#2233](https://github.com/OpenMDAO/OpenMDAO/pull/2233)
+- Fixed a bug where an exception was raised if a directional derivative was used to check a sparsely declared subjacobian. [#2241](https://github.com/OpenMDAO/OpenMDAO/pull/2241)
+- Fixed for IndexError raised in the lagrange3 semi-structured interpolation. [#2243](https://github.com/OpenMDAO/OpenMDAO/pull/2243)
+- Disabled the option to use coloring on approximated semi-total derivatives. [#2245](https://github.com/OpenMDAO/OpenMDAO/pull/2245)
+- Fixed case where openmdao check for deprecated indexing was calling len(self.shape) on an indexer with a shape that wasn't a tuple. [#2264](https://github.com/OpenMDAO/OpenMDAO/pull/2264)
+
+## Miscellaneous
+
+- Updates to github workflow. [#2211](https://github.com/OpenMDAO/OpenMDAO/pull/2211)
+- The documentation for distributed variables has been rewritten to demonstrate how to use them after recent refactors. [#2218](https://github.com/OpenMDAO/OpenMDAO/pull/2218)
+- Refactor playwright code to enable re-use with other GUI testing [#2228](https://github.com/OpenMDAO/OpenMDAO/pull/2228)
+- Replaced custom linting with Numpydoc.validate linting [#2231](https://github.com/OpenMDAO/OpenMDAO/pull/2231)
+- Some improvements to MetaModelStructuredComp documentation for dynamically generated training values. [#2236](https://github.com/OpenMDAO/OpenMDAO/pull/2236)
+- Provide a way for users to exclude search results from source docs [#2237](https://github.com/OpenMDAO/OpenMDAO/pull/2237)
+- Modified the code that uploads documentation to be able to handle extra arguments (e.g. port number). [#2244](https://github.com/OpenMDAO/OpenMDAO/pull/2244)
+
+***********************************
 # Release Notes for OpenMDAO 3.11.0
 
 August 03, 2021

@@ -5,12 +5,10 @@ import itertools
 
 import unittest
 import numpy as np
-import math
 
 from io import StringIO
 
 from numpy.testing import assert_almost_equal
-import scipy
 try:
     from scipy.sparse import load_npz
 except ImportError:
@@ -18,7 +16,7 @@ except ImportError:
 
 import openmdao.api as om
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz, compute_total_coloring
+from openmdao.utils.coloring import _compute_coloring, array_viz, compute_total_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder

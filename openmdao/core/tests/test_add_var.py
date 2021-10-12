@@ -4,7 +4,8 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 
 class CompAddWithDefault(om.ExplicitComponent):
@@ -41,11 +42,11 @@ class CompAddWithIndices(om.ExplicitComponent):
     """Component for tests for declaring only indices."""
 
     def setup(self):
-        self.add_input('x_a', src_indices=0)
-        self.add_input('x_b', src_indices=(0, 1))
-        self.add_input('x_c', src_indices=[0, 1])
-        self.add_input('x_d', src_indices=np.arange(6))
-        self.add_input('x_e', src_indices=np.arange(6).reshape((3, 2)), shape=(3,2))
+        self.add_input('x_a', src_indices=0, flat_src_indices=True)
+        self.add_input('x_b', src_indices=[0, 1], flat_src_indices=True)
+        self.add_input('x_c', src_indices=[0, 1], flat_src_indices=True)
+        self.add_input('x_d', src_indices=np.arange(6), flat_src_indices=True)
+        self.add_input('x_e', src_indices=np.arange(6), shape=(3, 2), flat_src_indices=True)
 
         self.add_output('y')
 
@@ -54,10 +55,10 @@ class CompAddWithShapeAndIndices(om.ExplicitComponent):
     """Component for tests for declaring shape and array indices."""
 
     def setup(self):
-        self.add_input('x_a', shape=2, src_indices=(0,1))
-        self.add_input('x_b', shape=(2,), src_indices=(0,1))
-        self.add_input('x_c', shape=(2, 2), src_indices=np.arange(4).reshape((2, 2)))
-        self.add_input('x_d', shape=[2, 2], src_indices=np.arange(4).reshape((2, 2)))
+        self.add_input('x_a', shape=2, src_indices=[0, 1])
+        self.add_input('x_b', shape=(2,), src_indices=[0, 1])
+        self.add_input('x_c', shape=(2, 2), src_indices=np.arange(4), flat_src_indices=True)
+        self.add_input('x_d', shape=[2, 2], src_indices=np.arange(4), flat_src_indices=True)
 
 
 class CompAddArrayWithScalar(om.ExplicitComponent):
@@ -66,8 +67,8 @@ class CompAddArrayWithScalar(om.ExplicitComponent):
     def setup(self):
         self.add_input('x_a', val=2.0, shape=(6))
         self.add_input('x_b', val=2.0, shape=(3, 2))
-        self.add_input('x_c', val=2.0, src_indices=np.arange(6))
-        self.add_input('x_d', val=2.0, src_indices=np.arange(6).reshape((3,2)), shape=(3,2))
+        self.add_input('x_c', val=2.0, src_indices=np.arange(6), flat_src_indices=True)
+        self.add_input('x_d', val=2.0, src_indices=np.arange(6), shape=(3,2), flat_src_indices=True)
 
         self.add_output('y_a', val=3.0, shape=(6))
         self.add_output('y_b', val=3.0, shape=(3, 2))
@@ -78,7 +79,8 @@ class CompAddWithArrayIndices(om.ExplicitComponent):
 
     def setup(self):
         self.add_input('x_a', val=2.0 * np.ones(6), src_indices=np.arange(6))
-        self.add_input('x_b', val=2.0 * np.ones((3, 2)), src_indices=np.arange(6).reshape((3, 2)))
+        self.add_input('x_b', val=2.0 * np.ones((3, 2)), src_indices=np.arange(6),
+                       flat_src_indices=True)
 
         self.add_output('y')
 
