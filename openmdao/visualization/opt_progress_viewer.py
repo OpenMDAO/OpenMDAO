@@ -71,11 +71,11 @@ class OptViewer(object):
         source_options = self.cr.list_sources(out_stream=None)
         self.case_options = [(str(i), case) for i, case in \
                              enumerate(self.cr.list_cases(out_stream=None))]
-        io_options = self.cr.list_source_vars(source_options[0], out_stream=None)
-        for key in io_options:
-            io_options[key].append("segment_length")
+        self.io_options = self.cr.list_source_vars(source_options[0], out_stream=None)
+        for key in self.io_options:
+            self.io_options[key].append("segment_length")
 
-        for val in io_options.values():
+        for val in self.io_options.values():
             if val and val[0] != "segment_length":
                 io_starting_option = val[0]
                 break
@@ -84,21 +84,9 @@ class OptViewer(object):
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
 
-        circle_plot = self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
-        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
+        self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
+        self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
                                                    source=self.multi_line_data)
-
-        # Hover tool needs to be adjusted or removed. It's a problem if any lines are overlapping
-        # each other
-        ht = HoverTool(renderers=[line_plot, circle_plot],
-            tooltips=[
-                ( 'x',  '@x_vals'),
-                ( 'y',  '@y_vals' )
-            ],
-
-            mode='vline',
-        )
-        self.variables_plot.add_tools(ht)
 
         self.source_select = Select(title="Source:", value=source_options[0],
                                     options=source_options)
@@ -107,13 +95,13 @@ class OptViewer(object):
         self.case_select.on_change('value', self._case_select_update)
         self.case_select.height = 300
 
-        self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=io_options)
+        self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=self.io_options)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
         self.variables_plot.yaxis.axis_label = io_starting_option
         self.variables_plot.xaxis.axis_label = io_starting_option
 
-        self.io_select_x = Select(title="X Value:", value=io_starting_option, options=io_options)
+        self.io_select_x = Select(title="X Value:", value=io_starting_option, options=self.io_options)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
         self.layout = row(self.variables_plot, column(self.source_select,
@@ -149,16 +137,27 @@ class OptViewer(object):
 
         for i in self.case_select.value:
             case = self.cr.get_case(self.case_options[int(i)][1])
-            # Need to adjust this to pull from inputs, outputs, and residuals
-            if self.io_select_y.value == "segment_length":
-                x_variable = case.outputs[self.io_select_x.value]
+
+            for key, val in self.io_options.items():
+                if self.io_select_y.value in val:
+                    y_io = getattr(case, key)
+
+                if self.io_select_x.value in val:
+                    x_io = getattr(case, key)
+
+            if self.io_select_y.value == "segment_length" and \
+                self.io_select_x.value == "segment_length":
+                x_variable = list(range(1))
+                y_variable = list(range(1))
+            elif self.io_select_y.value == "segment_length":
+                x_variable = x_io[self.io_select_x.value]
                 y_variable = list(range(len(x_variable)))
             elif self.io_select_x.value == "segment_length":
-                y_variable = case.outputs[self.io_select_y.value]
+                y_variable = y_io[self.io_select_y.value]
                 x_variable = list(range(len(y_variable)))
             else:
-                x_variable = case.outputs[self.io_select_x.value]
-                y_variable = case.outputs[self.io_select_y.value]
+                x_variable = x_io[self.io_select_x.value]
+                y_variable = y_io[self.io_select_y.value]
 
             if isinstance(x_variable, np.ndarray):
                 new_data['x_vals'].append(x_variable.flatten().tolist())
