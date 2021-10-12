@@ -1435,7 +1435,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         Parameters
         ----------
         idx : int
-            List of interval indices for x.
+            Interval indices for x.
         dtype : numpy.dtype
             Determines whether to allocate complex.
         extrap : int
@@ -1452,9 +1452,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
         eps = self.options['eps']
         delta_x = self.options['delta_x']
 
-        c = 0.0
-        d = 0.0
-
         # Calculate interval slope values
         #
         # m1 is the slope of interval (xi-2, xi-1)
@@ -1469,26 +1466,21 @@ class InterpAkima1D(InterpAlgorithmFixed):
         val3 = values[idx]
         val4 = values[idx + 1]
         h = 1.0 / (grid[idx + 1] - grid[idx])
-        m3 = np.zeros(1, dtype=dtype)
-        m3[:] = (val4 - val3) * h
+        m3 = (val4 - val3) * h
 
         if idx >= 1:
             val2 = values[idx - 1]
-            m2 = np.zeros(1, dtype=dtype)
-            m2[:] = (val3 - val2) / (grid[idx] - grid[idx - 1])
+            m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
 
             if idx >= 2:
-                m1 = np.zeros(1, dtype=dtype)
-                m1[:] = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
+                m1 = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
 
         if idx < ngrid - 2:
             val5 = values[idx + 2]
-            m4 = np.zeros(1, dtype=dtype)
-            m4[:] = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+            m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
 
             if idx < ngrid - 3:
-                m5 = np.zeros(1, dtype=dtype)
-                m5[:] = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
+                m5 = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
 
         if idx == 0:
             m2 = 2 * m3 - m4
@@ -1531,9 +1523,13 @@ class InterpAkima1D(InterpAlgorithmFixed):
         elif extrap == 1:
             a = val4
             b = bp1
+            c = 0.0
+            d = 0.0
 
         else:
             a = val3
+            c = 0.0
+            d = 0.0
 
         return a, b, c, d
 
@@ -1620,7 +1616,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
         c = self.vec_coeff[idx_coeffs, 2]
         d = self.vec_coeff[idx_coeffs, 3]
 
-        deriv_dx = np.empty((), dtype=dtype)
         deriv_dx = b + dx * (2.0 * c + 3.0 * d * dx)
 
         # Evaluate dependent value and exit
@@ -1628,7 +1623,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
     def compute_coeffs_vectorized(self, idx, dtype):
         """
-        Compute the trilinear interpolation coefficients for this block.
+        Compute the trilinear interpolation coefficients for requested blocks.
 
         Parameters
         ----------
@@ -1659,9 +1654,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
         idx = np.array(list(idx)) - 1
         vec_size = len(idx)
-
-        c = 0.0
-        d = 0.0
 
         # Calculate interval slope values
         #
