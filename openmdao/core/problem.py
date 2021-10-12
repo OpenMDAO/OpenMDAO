@@ -32,7 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
-from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -143,11 +143,15 @@ class Problem(object):
         self._warned = False
 
         if comm is None:
-            # Importing mpi4py is attempted by openmdao.utils.mpi, no need to try again here.
-            if MPI is None:
+            use_mpi = check_mpi_env()
+            if use_mpi is False:
                 comm = FakeComm()
             else:
-                comm = MPI.COMM_WORLD
+                try:
+                    from mpi4py import MPI
+                    comm = MPI.COMM_WORLD
+                except ImportError:
+                    comm = FakeComm()
 
         if model is None:
             self.model = Group()
