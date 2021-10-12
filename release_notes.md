@@ -24,6 +24,7 @@ OpenMDAO 3.13.1 is a patch release to fix a minor bug in the new trilinear inter
 ## Bug Fixes
 
 - Fixed a bug where extrapolation was mistakenly not handled in the Trilinear method. [#2300](https://github.com/OpenMDAO/OpenMDAO/pull/2300)
+- Prevent mpi4py & petsc4py from importing when they're not wanted [#2290](https://github.com/OpenMDAO/OpenMDAO/pull/2290)
 
 ## Miscellaneous
 
