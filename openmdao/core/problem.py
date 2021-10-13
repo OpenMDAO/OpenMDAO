@@ -5,6 +5,7 @@ import pprint
 import os
 import logging
 import weakref
+import time
 
 from collections import defaultdict, namedtuple, OrderedDict
 from fnmatch import fnmatchcase
@@ -180,8 +181,6 @@ class Problem(object):
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
-        self.options.declare('opt_dashboard', types=bool, default=False, desc="Show dashboard")
-
         self.options.update(options)
 
         # Case recording options
@@ -783,6 +782,7 @@ class Problem(object):
         self._rec_mgr.shutdown()
 
         # clean up driver and model resources
+        self.driver.cleanup()
         for system in self.model.system_iter(include_self=True, recurse=True):
             system.cleanup()
 

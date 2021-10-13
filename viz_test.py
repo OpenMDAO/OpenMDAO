@@ -20,7 +20,6 @@ tf = np.float128(10)
 
 # Initialize the problem and assign the driver
 p = om.Problem(model=om.Group())
-p.options['opt_dashboard'] = True
 p.driver = om.pyOptSparseDriver()
 p.driver.options['optimizer'] = 'SNOPT'
 p.driver.opt_settings['iSumm'] = 6
@@ -66,7 +65,7 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 #
 
 dm.run_problem(p)
-# om.OptViewer("cases.sql")
+# om.VarOptViewer("cases.sql")
 
 # import numpy as np
 

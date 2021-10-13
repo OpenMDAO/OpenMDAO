@@ -13,7 +13,7 @@ import openmdao.api as om
 import numpy as np
 
 
-class OptViewer(object):
+class VarOptViewer(object):
 
     def __init__(self, data, port=8888):
         """

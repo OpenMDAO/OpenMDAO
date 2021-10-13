@@ -4,7 +4,6 @@ A Case class.
 
 import sys
 import itertools
-import json
 
 from collections import OrderedDict
 
@@ -119,6 +118,9 @@ class Case(object):
             self.parent = None
 
         self.counter = data['counter']
+        self.timestamp = data['timestamp']
+        self.success = data['success']
+        self.msg = data['msg']
 
         # for a solver or problem case
         self.abs_err = data['abs_err'] if 'abs_err' in data.keys() else None
@@ -177,11 +179,6 @@ class Case(object):
                 self.residuals = PromAbsDict(residuals, prom2abs['output'], abs2prom['output'],
                                              in_prom2abs=prom2abs['input'],
                                              auto_ivc_map=auto_ivc_map)
-
-        if 'opt_progress' in data.keys():
-            opt_progress = data['opt_progress']
-            if opt_progress is not None:
-                self.opt_progress = opt_progress
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
