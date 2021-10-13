@@ -70,7 +70,7 @@ class VarOptViewer(object):
         self.doc = doc
         source_options = self.cr.list_sources(out_stream=None)
         self.case_options = [(str(i), case) for i, case in \
-                             enumerate(self.cr.list_cases(out_stream=None))]
+                             enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
         self.io_options = self.cr.list_source_vars(source_options[0], out_stream=None)
         for key in self.io_options:
             self.io_options[key].append("segment_length")
@@ -90,6 +90,7 @@ class VarOptViewer(object):
 
         self.source_select = Select(title="Source:", value=source_options[0],
                                     options=source_options)
+        self.source_select.on_change('value', self._source_update)
 
         self.case_select = MultiSelect(title="Case:", value=["0"], options=self.case_options)
         self.case_select.on_change('value', self._case_select_update)
@@ -112,6 +113,10 @@ class VarOptViewer(object):
 
         self.update()
         self.doc.add_root(self.layout)
+
+    def _source_update(self, attr, old, new):
+        self.case_select.options = [(str(i), case) for i, case in \
+                             enumerate(self.cr.list_cases(new, out_stream=None))]
 
     def _case_select_update(self, attr, old, new):
         self.update()
