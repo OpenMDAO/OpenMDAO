@@ -125,7 +125,10 @@ class VarOptViewer(object):
 
     def _source_update(self, attr, old, new):
         self.case_select.options = [(str(i), case) for i, case in \
-                             enumerate(self.cr.list_cases(new, out_stream=None))]
+                                    enumerate(self.cr.list_cases(new, out_stream=None))]
+        self.source_select.value = new
+        self.case_select.value = ['0']
+        self.update()
 
     def _case_select_update(self, attr, old, new):
         self.update()
