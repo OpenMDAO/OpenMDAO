@@ -115,13 +115,13 @@ class InterpLagrange3(InterpAlgorithm):
             q3 = subval[..., 2] * (c13 * c23 * c34)
             q4 = subval[..., 3] * (c14 * c24 * c34)
 
-            #dq1_dsub = subderiv[..., 0, :] * (c12 * c13 * c14)
-            #dq2_dsub = subderiv[..., 1, :] * (c12 * c23 * c24)
-            #dq3_dsub = subderiv[..., 2, :] * (c13 * c23 * c34)
-            #dq4_dsub = subderiv[..., 3, :] * (c14 * c24 * c34)
+            dq1_dsub = subderiv[..., 0, :] * (c12 * c13 * c14)
+            dq2_dsub = subderiv[..., 1, :] * (c12 * c23 * c24)
+            dq3_dsub = subderiv[..., 2, :] * (c13 * c23 * c34)
+            dq4_dsub = subderiv[..., 3, :] * (c14 * c24 * c34)
 
-            #derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) +
-                                     #dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
+            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) +
+                                     dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
 
         else:
             values = self.values[tuple(slice_idx)]
@@ -135,14 +135,14 @@ class InterpLagrange3(InterpAlgorithm):
             q3 = values[..., idx + 1] * (c13 * c23 * c34)
             q4 = values[..., idx + 2] * (c14 * c24 * c34)
 
-        #derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
-                               #p4 * (p2 + p3) + p2 * p3) - \
-            #q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
-                  #p4 * (p1 + p3) + p1 * p3) + \
-            #q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
-                  #p4 * (p2 + p1) + p2 * p1) - \
-            #q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
-                  #p1 * (p2 + p3) + p2 * p3)
+        derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
+                               p4 * (p2 + p3) + p2 * p3) - \
+            q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
+                  p4 * (p1 + p3) + p1 * p3) + \
+            q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
+                  p4 * (p2 + p1) + p2 * p1) - \
+            q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
+                  p1 * (p2 + p3) + p2 * p3)
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
             derivs, None, None
