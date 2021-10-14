@@ -969,6 +969,25 @@ class TestFuncCompUserPartials(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
 
+    def test_user_partials_not_all(self):
+
+        def func3(x1=np.ones(5), x2=np.ones(5)):
+            y1=2.0*x1+1.
+            y2=3.0*x2-1.
+            return y1, y2
+
+        f = (omf.wrap(func3)
+                .defaults(shape=5)
+                .declare_partials(of='y1', wrt='x1', method='cs'))
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+
+        p.setup(mode='fwd')
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
+
     def test_user_partials_sparse(self):
         def func3(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.

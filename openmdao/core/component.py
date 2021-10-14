@@ -1032,6 +1032,7 @@ class Component(System):
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
+        # lists aren't hashable so convert to tuples
         if isinstance(of, list):
             of = tuple(of)
         if isinstance(wrt, list):

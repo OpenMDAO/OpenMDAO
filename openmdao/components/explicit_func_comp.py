@@ -10,10 +10,12 @@ except ImportError:
 import re
 import numpy as np
 from numpy import asarray, isscalar, imag, complex as npcomplex
+from itertools import product
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.units import valid_units
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.general_utils import find_matches_iter
 import openmdao.func_api as omf
 
 
@@ -165,13 +167,46 @@ class ExplicitFuncComp(ExplicitComponent):
         for kwargs in self._func.get_declare_partials():
             self.declare_partials(**kwargs)
 
+        if self._manual_decl_partials:
+            all_ofs, all_wrts = self._get_partials_varlists()
+            matches = set()
+            methods = set()
+            for (of, wrt), meta in self._declared_partials.items():
+                methods.add(meta['method'])
+                if isinstance(of, str):
+                    ofs = find_matches_iter([of], all_ofs)
+                else:
+                    ofs = find_matches_iter(of, all_ofs)
+                if isinstance(wrt, str):
+                    wrts = find_matches_iter([wrt], all_wrts)
+                else:
+                    wrts = find_matches_iter(wrt, all_wrts)
+                matches.update(product(ofs, wrts))
+
+            if len(methods) == 1:
+                method = methods.pop()
+            elif 'jax' in methods:
+                method = 'jax'
+            else:
+                method = 'fd'
+
+            # add partial declarations for any partials that we know are nonzero based
+            # on dependencies inferred from the function source if they weren't declared
+            # manually.
+            for out, ometa in self._func.get_output_meta():
+                for inp in ometa['deps']:
+                    if out != inp and (out, inp) not in matches:
+                        self.declare_partials(of=out, wrt=inp, method=method)
+
         # user didn't declare partials, so delare partials based on I/O dependencies.
-        if not self._manual_decl_partials:
+        else:
             # use super().declare_partials to avoid setting _manual_decl_partials to True
             decl_partials = super().declare_partials
             hasdiag = self.options['has_diag_partials']
             for out, ometa in self._func.get_output_meta():
                 oshp = ometa['shape']
+                deps = ometa['deps']
+
                 if not oshp:
                     osize = 1
                 else:
@@ -181,7 +216,7 @@ class ExplicitFuncComp(ExplicitComponent):
                     inds = np.arange(osize, dtype=INT_DTYPE)
 
                 for inp, imeta in self._func.get_input_meta():
-                    if inp not in ometa['deps']:
+                    if inp not in deps:
                         continue
 
                     if 'is_option' in imeta and imeta['is_option']:

@@ -44,7 +44,6 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[1][1]['units'], 'km')
         self.assertEqual(outvar_meta[1][1]['deps'], {'b', 'c'})
 
-
     def test_inout_vars(self):
         def func(a, b, c):
             x = a * b
@@ -212,6 +211,21 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(deps[1][0], 'y')
         self.assertEqual(deps[1][1], {'a', 'b'})
 
+    def test_function_deps4(self):
+        def inner(b, v):
+            return b * v
+
+        def func(a, b, c):
+            y = b + 1.
+            x = inner(c, y)
+            return x, y
+
+        deps = omf.get_function_deps(func)
+        self.assertEqual(deps[0][0], 'x')
+        self.assertEqual(deps[0][1], {'b', 'c'})
+        self.assertEqual(deps[1][0], 'y')
+        self.assertEqual(deps[1][1], {'b'})
+
     def test_defaults(self):
         def func(a):
             x = a * 2.0
@@ -305,7 +319,7 @@ class TestFuncAPI(unittest.TestCase):
                  .declare_partials(of='x', wrt=['a', 'b'], method='jax')
                  .declare_partials(of='y', wrt=['a', 'b'], method='fd'))
 
-        self.assertEqual(cm.exception.args[0], 
+        self.assertEqual(cm.exception.args[0],
                          "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
 
     def test_declare_coloring(self):
