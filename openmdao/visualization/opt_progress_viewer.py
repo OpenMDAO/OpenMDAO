@@ -31,8 +31,8 @@ class VarOptViewer(object):
 
         self.data = data
 
-        self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=['#1f77b4'], cases=[]))
-        self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=['#1f77b4'], cases=[]))
+        self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
+        self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
 
         output_notebook()
 
@@ -185,9 +185,8 @@ class VarOptViewer(object):
 
         if len(new_data['x_vals'][0]) > 1:
 
-            new_data['color'] = self._line_color_list(self.multi_line_data.data)
+            new_data['color'] = self._line_color_list(new_data['x_vals'])
             new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
-            print(new_data['cases'])
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
@@ -197,12 +196,12 @@ class VarOptViewer(object):
             self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
 
-    def _line_color_list(self, attribute_data):
+    def _line_color_list(self, x_var_vals):
 
-        length = len(attribute_data['x_vals'])
+        length = len(x_var_vals)
         if length <= 3:
             colors = list(palette[3])
-            while len(colors)>length+1:
+            while len(colors)>length:
                 colors.pop()
         else:
             colors = list(palette[length])
