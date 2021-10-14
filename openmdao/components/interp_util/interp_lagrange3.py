@@ -5,7 +5,8 @@ Based on NPSS implementation.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, InterpAlgorithmSemi
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
+    InterpAlgorithmSemi, InterpAlgorithmFixed
 
 
 class InterpLagrange3(InterpAlgorithm):
@@ -89,12 +90,12 @@ class InterpLagrange3(InterpAlgorithm):
         xx3 = x[0] - p3
         xx4 = x[0] - p4
 
-        c12 = p1 - p2
-        c13 = p1 - p3
-        c14 = p1 - p4
-        c23 = p2 - p3
-        c24 = p2 - p4
-        c34 = p3 - p4
+        c12 = 1.0 / (p1 - p2)
+        c13 = 1.0 / (p1 - p3)
+        c14 = 1.0 / (p1 - p4)
+        c23 = 1.0 / (p2 - p3)
+        c24 = 1.0 / (p2 - p4)
+        c34 = 1.0 / (p3 - p4)
 
         if subtable is not None:
             # Interpolate between values that come from interpolating the subtables in the
@@ -109,18 +110,18 @@ class InterpLagrange3(InterpAlgorithm):
 
             subval, subderiv, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
-            q1 = subval[..., 0] / (c12 * c13 * c14)
-            q2 = subval[..., 1] / (c12 * c23 * c24)
-            q3 = subval[..., 2] / (c13 * c23 * c34)
-            q4 = subval[..., 3] / (c14 * c24 * c34)
+            q1 = subval[..., 0] * (c12 * c13 * c14)
+            q2 = subval[..., 1] * (c12 * c23 * c24)
+            q3 = subval[..., 2] * (c13 * c23 * c34)
+            q4 = subval[..., 3] * (c14 * c24 * c34)
 
-            dq1_dsub = subderiv[..., 0, :] / (c12 * c13 * c14)
-            dq2_dsub = subderiv[..., 1, :] / (c12 * c23 * c24)
-            dq3_dsub = subderiv[..., 2, :] / (c13 * c23 * c34)
-            dq4_dsub = subderiv[..., 3, :] / (c14 * c24 * c34)
+            #dq1_dsub = subderiv[..., 0, :] * (c12 * c13 * c14)
+            #dq2_dsub = subderiv[..., 1, :] * (c12 * c23 * c24)
+            #dq3_dsub = subderiv[..., 2, :] * (c13 * c23 * c34)
+            #dq4_dsub = subderiv[..., 3, :] * (c14 * c24 * c34)
 
-            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) +
-                                     dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
+            #derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) +
+                                     #dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
 
         else:
             values = self.values[tuple(slice_idx)]
@@ -129,19 +130,19 @@ class InterpLagrange3(InterpAlgorithm):
             nshape.append(1)
             derivs = np.empty(tuple(nshape), dtype=dtype)
 
-            q1 = values[..., idx - 1] / (c12 * c13 * c14)
-            q2 = values[..., idx] / (c12 * c23 * c24)
-            q3 = values[..., idx + 1] / (c13 * c23 * c34)
-            q4 = values[..., idx + 2] / (c14 * c24 * c34)
+            q1 = values[..., idx - 1] * (c12 * c13 * c14)
+            q2 = values[..., idx] * (c12 * c23 * c24)
+            q3 = values[..., idx + 1] * (c13 * c23 * c34)
+            q4 = values[..., idx + 2] * (c14 * c24 * c34)
 
-        derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
-                               p4 * (p2 + p3) + p2 * p3) - \
-            q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
-                  p4 * (p1 + p3) + p1 * p3) + \
-            q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
-                  p4 * (p2 + p1) + p2 * p1) - \
-            q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
-                  p1 * (p2 + p3) + p2 * p3)
+        #derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
+                               #p4 * (p2 + p3) + p2 * p3) - \
+            #q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
+                  #p4 * (p1 + p3) + p1 * p3) + \
+            #q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
+                  #p4 * (p2 + p1) + p2 * p1) - \
+            #q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
+                  #p1 * (p2 + p3) + p2 * p3)
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
             derivs, None, None
@@ -360,3 +361,120 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
             derivs, d_value, extrap
+
+
+class InterpLagrange3D(InterpAlgorithmFixed):
+    """
+    Interpolate on a fixed 3D grid using a third order Lagrange polynomial.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+    """
+    def __init__(self, grid, values, interp, **kwargs):
+        """
+        Initialize table and subtables.
+        """
+        super().__init__(grid, values, interp)
+        self.coeffs = {}
+        self.vec_coeff = None
+        self.k = 4
+        self.dim = 3
+        self.last_index = [0]
+        self._name = 'lagrange3D'
+        self._vectorized = False
+
+    def interpolate(self, x, idx):
+        """
+        Compute the interpolated value.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : int
+            Interval index for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
+        """
+        x, y, z = x
+        idx_key = tuple(idx)
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        if idx_key not in self.coeffs:
+            self.coeffs[idx_key] = self.compute_coeffs(idx, dtype)
+        a = self.coeffs[idx_key]
+
+        val = 0.0
+
+        d_x = np.empty((3, ), dtype=dtype)
+
+        return val, d_x, None, None
+
+    def compute_coeffs(self, idx, dtype):
+        """
+        Compute the tri-lagrange3 interpolation coefficients for this block.
+
+        Parameters
+        ----------
+        idx : int
+            List of interval indices for x.
+        dtype : numpy.dtype
+            Determines whether to allocate complex.
+
+        Returns
+        -------
+        ndarray
+            Interpolation coefficients.
+        """
+        grid = self.grid
+        values = self.values
+        a = np.empty(64, dtype=dtype)
+
+        i_x, i_y, i_z = idx
+
+        # Extrapolation
+        # Shift if we don't have 2 points on each side.
+        n = len(grid[0])
+        if i_x > n - 3:
+            i_x = n - 3
+        elif i_x < 1:
+            i_x = 1
+
+        n = len(grid[1])
+        if i_y > n - 3:
+            i_y = n - 3
+        elif i_y < 1:
+            i_y = 1
+
+        n = len(grid[2])
+        if i_z> n - 3:
+            i_z = n - 3
+        elif i_z < 1:
+            i_z = 1
+

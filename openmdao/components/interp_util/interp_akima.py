@@ -1322,7 +1322,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
     vec_coeff : None or ndarray
         Cache of all computed coefficients when running vectorized.
     """
-
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
