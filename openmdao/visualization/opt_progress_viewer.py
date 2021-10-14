@@ -6,6 +6,7 @@ from bokeh.io import show, output_notebook
 from bokeh.models import Select, HoverTool, MultiSelect
 from bokeh.layouts import row, column
 from bokeh.plotting import figure, ColumnDataSource
+from bokeh.palettes import Category20 as palette
 
 from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
@@ -30,8 +31,8 @@ class VarOptViewer(object):
 
         self.data = data
 
-        self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[]))
-        self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[]))
+        self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=['#1f77b4'], cases=[]))
+        self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=['#1f77b4'], cases=[]))
 
         output_notebook()
 
@@ -85,7 +86,7 @@ class VarOptViewer(object):
                                      y_axis_label="Variable X")
 
         self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
-        self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
+        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2, line_color='color',
                                                    source=self.multi_line_data)
 
         self.source_select = Select(title="Source:", value=source_options[0],
@@ -111,6 +112,14 @@ class VarOptViewer(object):
                                                       self.io_select_x,
                                                       ))
 
+        ht = HoverTool(renderers=[line_plot],
+             tooltips=[
+                 ( 'Case',  '@cases')
+             ],
+
+         )
+        self.variables_plot.add_tools(ht)
+
         self.update()
         self.doc.add_root(self.layout)
 
@@ -135,10 +144,10 @@ class VarOptViewer(object):
     def update(self):
         new_data = dict(
             x_vals=[],
-            y_vals=[]
+            y_vals=[],
+            color=[],
+            cases=[]
         )
-
-        self.multi_line_data.data = new_data
 
         for i in self.case_select.value:
             case = self.cr.get_case(self.case_options[int(i)][1])
@@ -175,10 +184,27 @@ class VarOptViewer(object):
                 new_data['y_vals'].append(y_variable)
 
         if len(new_data['x_vals'][0]) > 1:
+
+            new_data['color'] = self._line_color_list(self.multi_line_data.data)
+            new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+            print(new_data['cases'])
             self.multi_line_data.data = new_data
-            self.circle_data.data = {"x_vals": [], "y_vals": []}
+            self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
             for key, val in new_data.items():
                 new_data[key] = self.flatten_list(val)
             self.circle_data.data = new_data
-            self.multi_line_data.data = {"x_vals": [], "y_vals": []}
+            self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
+
+
+    def _line_color_list(self, attribute_data):
+
+        length = len(attribute_data['x_vals'])
+        if length <= 3:
+            colors = list(palette[3])
+            while len(colors)>length+1:
+                colors.pop()
+        else:
+            colors = list(palette[length])
+
+        return colors
