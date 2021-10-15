@@ -63,7 +63,7 @@ class VarOptViewer(object):
         if len(var_map[group]) > 1:
             compatible_vars = var_map[group].copy()
             compatible_vars.pop(compatible_vars.index(x_var))
-            return compatible_vars
+            return compatible_vars + ["segment_length"]
         else:
             return ["segment_length"]
 
@@ -161,10 +161,19 @@ class VarOptViewer(object):
         self.update()
 
     def _io_var_select_x_update(self, attr, old, new):
-        self.io_select_y.options = self.var_compatability_check(new, self.var_map)
-        self.io_select_y.value = self.io_select_y.options[0]
-        self.variables_plot.xaxis.axis_label = new
-        self.variables_plot.yaxis.axis_label = self.io_select_y.value
+
+
+        if self.io_select_x.value == "segment_length":
+            self.io_select_y.options = self.io_select_x.options
+            self.variables_plot.xaxis.axis_label = new
+            self.variables_plot.yaxis.axis_label = self.io_select_y.value
+        else:
+            self.io_select_y.options = self.var_compatability_check(new, self.var_map)
+            self.io_select_y.value = self.io_select_y.options[0]
+
+            self.variables_plot.xaxis.axis_label = new
+            self.variables_plot.yaxis.axis_label = self.io_select_y.value
+
         self.update()
 
     def flatten_list(self, list_to_flatten):
