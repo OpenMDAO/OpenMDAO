@@ -165,6 +165,17 @@ class Vector(object):
         """
         return self._len
 
+    def nvars(self):
+        """
+        Return the number of variables in this Vector.
+
+        Returns
+        -------
+        int
+            Number of variables in this Vector.
+        """
+        return len(self._names)
+
     def _copy_views(self):
         """
         Return a dictionary containing just the views.
