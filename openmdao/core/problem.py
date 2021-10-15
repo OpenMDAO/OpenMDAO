@@ -1348,6 +1348,7 @@ class Problem(object):
                                                 # apply the correction to undo the component's
                                                 # internal Allreduce.
                                                 derivs *= mult
+                                                partials_data[c_name][key]['j_rev_mult'] = mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
@@ -1499,6 +1500,7 @@ class Problem(object):
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
@@ -2240,6 +2242,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         def safe_norm(arr):
             return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
+        do_rev_mult = False
         for of, wrt in sorted_keys:
 
             if totals:
@@ -2262,6 +2265,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if do_rev:
                 reverse = derivative_info.get('J_rev')
+                if 'j_rev_mult' in derivative_info:
+                    do_rev_mult = True
+                    mult = derivative_info['j_rev_mult']
 
             fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
@@ -2502,7 +2508,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if not totals and matrix_free:
                         if out_stream:
                             if not directional:
-                                out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
+                                if do_rev_mult is True:
+                                    reverse /= mult
+                                out_buffer.write(f'    Raw Reverse Derivative (Jrev)\n')
                                 out_buffer.write(str(reverse) + '\n')
                                 out_buffer.write('\n')
 
