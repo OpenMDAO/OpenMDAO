@@ -44,6 +44,29 @@ class VarOptViewer(object):
         if isinstance(self.data, om.SqliteRecorder):
             self.cr = self.data
 
+    def var_hash_map(self, variables):
+
+        var_hash = {}
+        for variable in sorted(variables['outputs']):
+            group = variable.split(".")[-1].split(":")[0]
+
+            if group in var_hash:
+                var_hash[group].append(variable)
+            else:
+                var_hash[group] = [variable]
+
+        return var_hash
+
+    def var_compatability_check(self, x_var, var_map):
+        group = x_var.split('.')[-1].split(':')[0]
+
+        if len(var_map[group]) > 1:
+            compatible_vars = var_map[group].copy()
+            compatible_vars.pop(compatible_vars.index(x_var))
+            return compatible_vars
+        else:
+            return ["segment_length"]
+
     def _parse(self):
         """
         Parse the case recorder.
@@ -72,15 +95,15 @@ class VarOptViewer(object):
         source_options = self.cr.list_sources(out_stream=None)
         self.case_options = [(str(i), case) for i, case in \
                              enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
-        self.io_options = self.cr.list_source_vars(source_options[0], out_stream=None)
-        for key in self.io_options:
-            self.io_options[key].append("segment_length")
+        self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
+        self.var_map = self.var_hash_map(self.io_options_x)
+        for key in self.io_options_x:
+            self.io_options_x[key].append("segment_length")
 
-        for val in self.io_options.values():
+        for val in self.io_options_x.values():
             if val and val[0] != "segment_length":
                 io_starting_option = val[0]
                 break
-
 
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
@@ -97,29 +120,29 @@ class VarOptViewer(object):
         self.case_select.on_change('value', self._case_select_update)
         self.case_select.height = 300
 
-        self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=self.io_options)
+        self.io_select_x = Select(title="X Value:", value=io_starting_option, options=self.io_options_x)
+        self.io_select_x.on_change('value', self._io_var_select_x_update)
+
+        self.io_options_y = self.var_compatability_check(self.io_select_x.value, self.var_map)
+        self.io_select_y = Select(title="Y Value:", value=self.io_options_y[0], options=self.io_options_y)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
-        self.variables_plot.yaxis.axis_label = io_starting_option
+        self.variables_plot.yaxis.axis_label = self.io_options_y[0]
         self.variables_plot.xaxis.axis_label = io_starting_option
-
-        self.io_select_x = Select(title="X Value:", value=io_starting_option, options=self.io_options)
-        self.io_select_x.on_change('value', self._io_var_select_x_update)
 
         self.layout = row(self.variables_plot, column(self.source_select,
                                                       self.case_select,
-                                                      self.io_select_y,
                                                       self.io_select_x,
+                                                      self.io_select_y,
                                                       ))
 
         ht = HoverTool(renderers=[line_plot],
-             tooltips=[
-                 ( 'Case',  '@cases')
-             ],
-
-         )
+            tooltips=[
+                ( 'Case',  '@cases')
+            ],
+            mode = 'mouse'
+        )
         self.variables_plot.add_tools(ht)
-
         self.update()
         self.doc.add_root(self.layout)
 
@@ -138,7 +161,10 @@ class VarOptViewer(object):
         self.update()
 
     def _io_var_select_x_update(self, attr, old, new):
+        self.io_select_y.options = self.var_compatability_check(new, self.var_map)
+        self.io_select_y.value = self.io_select_y.options[0]
         self.variables_plot.xaxis.axis_label = new
+        self.variables_plot.yaxis.axis_label = self.io_select_y.value
         self.update()
 
     def flatten_list(self, list_to_flatten):
@@ -155,7 +181,7 @@ class VarOptViewer(object):
         for i in self.case_select.value:
             case = self.cr.get_case(self.case_options[int(i)][1])
 
-            for key, val in self.io_options.items():
+            for key, val in self.io_options_x.items():
                 if self.io_select_y.value in val:
                     y_io = getattr(case, key)
 
