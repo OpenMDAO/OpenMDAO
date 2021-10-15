@@ -28,12 +28,17 @@ def abs_smooth_complex(x, delta_x):
     ndarray
         Complex-step absolute value of the array.
     """
-    y = x**2 / (2.0 * delta_x) + delta_x / 2.0
-    idx_neg = np.where(x <= -delta_x)
-    idx_pos = np.where(x >= delta_x)
-    y[idx_neg] = -x[idx_neg]
-    y[idx_pos] = x[idx_pos]
-    return y
+    if delta_x > 0:
+        y = x**2 / (2.0 * delta_x) + delta_x / 2.0
+        idx_neg = np.where(x <= -delta_x)
+        idx_pos = np.where(x >= delta_x)
+        y[idx_neg] = -x[idx_neg]
+        y[idx_pos] = x[idx_pos]
+        return y
+    else:
+        idx_neg = np.where(x < 0)
+        x[idx_neg] = -x[idx_neg]
+        return x
 
 
 def dv_abs_smooth_complex(x, x_deriv, delta_x):
@@ -1314,6 +1319,8 @@ class InterpAkima1D(InterpAlgorithmFixed):
     ----------
     coeffs : dict of ndarray
         Cache of all computed coefficients.
+    vec_coeff : None or ndarray
+        Cache of all computed coefficients when running vectorized.
     """
 
     def __init__(self, grid, values, interp, **kwargs):
@@ -1322,6 +1329,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         """
         super().__init__(grid, values, interp)
         self.coeffs = {}
+        self.vec_coeff = None
         self.k = 4
         self.dim = 1
         self.last_index = [0]
@@ -1341,11 +1349,27 @@ class InterpAkima1D(InterpAlgorithmFixed):
         self.options.declare('eps', default=1e-30,
                              desc='Value that triggers division-by-zero safeguard.')
 
+    def vectorized(self, x):
+        """
+        Return whether this table will be run vectorized for the given requested input.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        bool
+            Returns True if this table can be run vectorized.
+        """
+        # If we only have 1 point, use the non-vectorized implementation, which has faster
+        # bracketing than the numpy version.
+        return np.prod(x.shape) > self.dim
+
     def interpolate(self, x, idx):
         """
         Compute the interpolated value.
-
-        This method must be defined by child classes.
 
         Parameters
         ----------
@@ -1411,7 +1435,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         Parameters
         ----------
         idx : int
-            List of interval indices for x.
+            Interval indices for x.
         dtype : numpy.dtype
             Determines whether to allocate complex.
         extrap : int
@@ -1428,9 +1452,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
         eps = self.options['eps']
         delta_x = self.options['delta_x']
 
-        c = 0.0
-        d = 0.0
-
         # Calculate interval slope values
         #
         # m1 is the slope of interval (xi-2, xi-1)
@@ -1445,26 +1466,21 @@ class InterpAkima1D(InterpAlgorithmFixed):
         val3 = values[idx]
         val4 = values[idx + 1]
         h = 1.0 / (grid[idx + 1] - grid[idx])
-        m3 = np.zeros(1, dtype=dtype)
-        m3[:] = (val4 - val3) * h
+        m3 = (val4 - val3) * h
 
         if idx >= 1:
             val2 = values[idx - 1]
-            m2 = np.zeros(1, dtype=dtype)
-            m2[:] = (val3 - val2) / (grid[idx] - grid[idx - 1])
+            m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
 
             if idx >= 2:
-                m1 = np.zeros(1, dtype=dtype)
-                m1[:] = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
+                m1 = (val2 - values[idx - 2]) / (grid[idx - 1] - grid[idx - 2])
 
         if idx < ngrid - 2:
             val5 = values[idx + 2]
-            m4 = np.zeros(1, dtype=dtype)
-            m4[:] = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+            m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
 
             if idx < ngrid - 3:
-                m5 = np.zeros(1, dtype=dtype)
-                m5[:] = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
+                m5 = (values[idx + 3] - val5) / (grid[idx + 3] - grid[idx + 2])
 
         if idx == 0:
             m2 = 2 * m3 - m4
@@ -1507,8 +1523,233 @@ class InterpAkima1D(InterpAlgorithmFixed):
         elif extrap == 1:
             a = val4
             b = bp1
+            c = 0.0
+            d = 0.0
 
         else:
             a = val3
+            c = 0.0
+            d = 0.0
+
+        return a, b, c, d
+
+    def interpolate_vectorized(self, x, idx):
+        """
+        Compute the interpolated value.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        grid = self.grid[0]
+        ngrid = len(grid)
+        idx_grid = idx[0]
+        idx_coeffs = idx_grid + 1
+        needed = set(idx_coeffs)
+        x = x.ravel()
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        if self.vec_coeff is None:
+            self.coeffs = set()
+            self.vec_coeff = np.empty((ngrid + 1, 4))
+
+        # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
+        # reset idx to interval lower bracket (ient-2). if off lower end of table
+        # (idx = 0) interval lower bracket already set but need to check if independent
+        # variable is < first value in independent array
+        dx = x - grid[idx_grid]
+
+        if ngrid in needed:
+            extrap_idx = np.where(idx_grid == ngrid - 1)[0]
+            if len(extrap_idx) > 0:
+                jj = idx_grid[extrap_idx]
+                dx[extrap_idx] = x[extrap_idx] - grid[jj]
+                if ngrid - 1 not in needed:
+                    # Right extrapolation shares the same computation as the last bin with a few
+                    # small differences in the final coeffs.
+                    needed.add(ngrid - 1)
+        elif ngrid - 1 in needed:
+            needed.add(ngrid)
+
+        if 0 in needed:
+            extrap_idx = np.where(idx_grid == -1)[0]
+            if len(extrap_idx) > 0:
+                dx[extrap_idx] = x[extrap_idx] - grid[0]
+                if 1 not in needed:
+                    # Left extrapolation shares the same computation as the first bin with a few
+                    # small differences in the final coeffs.
+                    needed.add(1)
+        elif 1 in needed:
+            needed.add(0)
+
+        uncached = needed.difference(self.coeffs)
+        if len(uncached) > 0:
+            uncached = sorted(uncached)
+            a, b, c, d = self.compute_coeffs_vectorized(uncached, dtype)
+            uncached = np.array(uncached)
+            self.vec_coeff[uncached, 0] = a
+            self.vec_coeff[uncached, 1] = b
+            self.vec_coeff[uncached, 2] = c
+            self.vec_coeff[uncached, 3] = d
+            self.coeffs = self.coeffs.union(uncached)
+        a = self.vec_coeff[idx_coeffs, 0]
+        b = self.vec_coeff[idx_coeffs, 1]
+        c = self.vec_coeff[idx_coeffs, 2]
+        d = self.vec_coeff[idx_coeffs, 3]
+
+        deriv_dx = b + dx * (2.0 * c + 3.0 * d * dx)
+
+        # Evaluate dependent value and exit
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
+
+    def compute_coeffs_vectorized(self, idx, dtype):
+        """
+        Compute the trilinear interpolation coefficients for requested blocks.
+
+        Parameters
+        ----------
+        idx : int
+            List of interval indices for x.
+        dtype : numpy.dtype
+            Determines whether to allocate complex.
+
+        Returns
+        -------
+        tuple
+            Akima coefficients a, b, c, d.
+        """
+        extrap = []
+        grid = self.grid[0]
+        ngrid = len(grid)
+        values = self.values
+        eps = self.options['eps']
+        delta_x = self.options['delta_x']
+
+        idx = idx.copy()
+        if 0 in idx:
+            idx.remove(0)
+            extrap.append(0)
+        if ngrid in idx:
+            idx.remove(ngrid)
+            extrap.append(1)
+
+        idx = np.array(list(idx)) - 1
+        vec_size = len(idx)
+
+        # Calculate interval slope values
+        #
+        # m1 is the slope of interval (xi-2, xi-1)
+        # m2 is the slope of interval (xi-1, xi)
+        # m3 is the slope of interval (xi, xi+1)
+        # m4 is the slope of interval (xi+1, xi+2)
+        # m5 is the slope of interval (xi+2, xi+3)
+        #
+        # The values of m1, m2, m4 and m5 may be calculated from other slope values
+        # depending on the value of idx
+
+        val3 = values[idx]
+        val4 = values[idx + 1]
+        h = 1.0 / (grid[idx + 1] - grid[idx])
+
+        m1 = np.zeros(vec_size, dtype=dtype)
+        m2 = np.zeros(vec_size, dtype=dtype)
+        m3 = (val4 - val3) * h
+        m4 = np.zeros(vec_size, dtype=dtype)
+        m5 = np.zeros(vec_size, dtype=dtype)
+
+        jj = np.where(idx >= 1)[0]
+        if len(jj) > 0:
+            loc = idx[jj]
+            m2[jj] = (val3[jj] - values[loc - 1]) / (grid[loc] - grid[loc - 1])
+
+            jj = np.where(idx >= 2)[0]
+            if len(jj) > 0:
+                loc = idx[jj]
+                m1[jj] = (values[loc - 1] - values[loc - 2]) / (grid[loc - 1] - grid[loc - 2])
+
+        jj = np.where(idx < ngrid - 2)[0]
+        if len(jj) > 0:
+            loc = idx[jj]
+            m4[jj] = (values[loc + 2] - val4[jj]) / (grid[loc + 2] - grid[loc + 1])
+
+            jj = np.where(idx < ngrid - 3)[0]
+            if len(jj) > 0:
+                loc = idx[jj]
+                m5[jj] = (values[loc + 3] - values[loc + 2]) / (grid[loc + 3] - grid[loc + 2])
+
+        jj = np.where(idx == 0)[0]
+        if len(jj) > 0:
+            m2[jj] = 2 * m3[jj] - m4[jj]
+            m1[jj] = 2 * m2[jj] - m3[jj]
+
+        jj = np.where(idx == 1)[0]
+        if len(jj) > 0:
+            m1[jj] = 2 * m2[jj] - m3[jj]
+
+        jj = np.where(idx == ngrid - 3)[0]
+        if len(jj) > 0:
+            m5[jj] = 2 * m4[jj] - m3[jj]
+
+        jj = np.where(idx == ngrid - 2)[0]
+        if len(jj) > 0:
+            m4[jj] = 2 * m3[jj] - m2[jj]
+            m5[jj] = 2 * m4[jj] - m3[jj]
+
+        # Calculate cubic fit coefficients
+        w2 = abs_smooth_complex(m4 - m3, delta_x=delta_x)
+        w31 = abs_smooth_complex(m2 - m1, delta_x=delta_x)
+
+        # Special case to avoid divide by zero.
+        b = 0.5 * (m2 + m3)
+        jj = np.where(w2 + w31 >= eps)[0]
+        if len(jj) > 0:
+            b[jj] = (m2[jj] * w2[jj] + m3[jj] * w31[jj]) / (w2[jj] + w31[jj])
+
+        w32 = abs_smooth_complex(m5 - m4, delta_x=delta_x)
+        w4 = abs_smooth_complex(m3 - m2, delta_x=delta_x)
+
+        # Special case to avoid divide by zero.
+        bp1 = 0.5 * (m3 + m4)
+        jj = np.where(w32 + w4 >= eps)[0]
+        if len(jj) > 0:
+            bp1[jj] = (m3[jj] * w32[jj] + m4[jj] * w4[jj]) / (w32[jj] + w4[jj])
+
+        a = val3
+        c = (3 * m3 - 2 * b - bp1) * h
+        d = (b + bp1 - 2 * m3) * h * h
+
+        # The coefficients for extrapolation are basically free, so always compute them with the
+        # endpoints.
+
+        if 1 in extrap:
+            a = np.hstack((a, val4[-1]))
+            b = np.hstack((b, bp1[-1]))
+            c = np.hstack((c, 0.0))
+            d = np.hstack((d, 0.0))
+
+        if 0 in extrap:
+            a = np.hstack((val3[0], a))
+            b = np.hstack((b[0], b))
+            c = np.hstack((0.0, c))
+            d = np.hstack((0.0, d))
 
         return a, b, c, d

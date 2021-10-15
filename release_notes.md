@@ -1,4 +1,36 @@
 ***********************************
+# Release Notes for OpenMDAO 3.13.1
+
+October 13, 2021
+
+OpenMDAO 3.13.1 is a patch release to fix a minor bug in the new trilinear interpolant.
+
+## New Deprecations
+
+- None
+- 
+## Backwards Incompatible API Changes
+
+- None
+
+## Backwards Incompatible Non-API Changes
+
+- None
+
+## New Features
+
+- The implementations for Trilinear and akima1D are now vectorized with coefficient caching. [#2300](https://github.com/OpenMDAO/OpenMDAO/pull/2300)
+
+## Bug Fixes
+
+- Fixed a bug where extrapolation was mistakenly not handled in the Trilinear method. [#2300](https://github.com/OpenMDAO/OpenMDAO/pull/2300)
+- Prevent mpi4py & petsc4py from importing when they're not wanted [#2290](https://github.com/OpenMDAO/OpenMDAO/pull/2290)
+
+## Miscellaneous
+
+- Remove reference to since-deleted code regarding 2-3 compatibility [#2299](https://github.com/OpenMDAO/OpenMDAO/pull/2299)
+
+***********************************
 # Release Notes for OpenMDAO 3.13.0
 
 October 06, 2021
