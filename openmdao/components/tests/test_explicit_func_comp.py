@@ -76,8 +76,10 @@ class TestFuncCompNoWrap(unittest.TestCase):
             y =2.0*x+1.
             return y
 
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs')
+
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -94,8 +96,10 @@ class TestFuncCompNoWrap(unittest.TestCase):
             y=x*x + x*2.0
             return y
 
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs')
+
         prob = om.Problem(om.Group())
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
         prob.set_solver_print(level=0)
 
         prob.setup(mode='fwd')
@@ -117,8 +121,10 @@ class TestFuncCompNoWrap(unittest.TestCase):
             z = 1.5 * a + b * b - c
             return x, y, z
 
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs')
+
         prob = om.Problem(om.Group())
-        prob.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
         prob.set_solver_print(level=0)
 
         prob.setup(mode='fwd')
@@ -158,8 +164,10 @@ class TestFuncCompNoWrap(unittest.TestCase):
             y=2.0*abs(x)
             return y
 
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs')
+
         prob = om.Problem()
-        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(func))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -404,7 +412,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             y = 3.0*x + 2.5
             return y
 
-        f = omf.wrap(func).defaults(shape=(5,))
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs').defaults(shape=(5,))
 
         p = om.Problem()
         model = p.model
@@ -441,7 +449,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             y =3.0*x + 2.5
             return y
 
-        f = omf.wrap(func).defaults(shape=(5,))
+        f = omf.wrap(func).defaults(shape=(5,)).declare_partials(of='*', wrt='*', method='cs')
 
         p = om.Problem()
         p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
@@ -459,7 +467,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             y =3.0*x + 2.5
             return y
 
-        f = omf.wrap(func).defaults(shape=(5,))
+        f = omf.wrap(func).defaults(shape=(5,)).declare_partials(of='*', wrt='*', method='cs')
 
         p = om.Problem()
         p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
@@ -481,6 +489,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         f = (omf.wrap(func)
              .defaults(shape=(5,))
+             .declare_partials(of='*', wrt='*', method='cs')
              .add_input('x', val=np.zeros(5)))
 
         model.add_subsystem('comp', om.ExplicitFuncComp(f))
@@ -513,7 +522,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             y = np.array([2.0*x[0]+7.0*x[1], 5.0*x[0]-3.0*x[1]])
             return y
 
-        f = omf.wrap(func).defaults(shape=2)
+        f = omf.wrap(func).declare_partials(of='*', wrt='*', method='cs').defaults(shape=2)
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExplicitFuncComp(f))
@@ -532,6 +541,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             return y
 
         f = (omf.wrap(func)
+             .declare_partials(of='*', wrt='*', method='cs')
              .add_input('x', shape=2)
              .add_output('y', shape=2))
 
@@ -554,6 +564,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             return x, y, z
 
         f = (omf.wrap(func)
+             .declare_partials(of='*', wrt='*', method='cs')
              .defaults(shape=3))
 
         prob = om.Problem(om.Group())
@@ -565,14 +576,6 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         J = prob.compute_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
         Jcomp = prob.model.comp._jacobian._subjacs_info
-        missingset = {('comp.x', 'comp.b'), ('comp.y', 'comp.a'), ('comp.y', 'comp.c')}
-        for key in missingset:
-            self.assertTrue(key not in Jcomp, f"Found {key} in comp partial jacobian but it shouldn't be there.")
-
-        for of in ['comp.x', 'comp.y', 'comp.z']:
-            for wrt in ['comp.a', 'comp.b', 'comp.c']:
-                if (of, wrt) not in missingset:
-                    self.assertTrue((of, wrt) in Jcomp, f"Didn't find {key} in comp partial jacobian.")
 
         assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
         assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
@@ -591,14 +594,6 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         J = prob.compute_totals(['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a', 'comp.b', 'comp.c'], return_format='flat_dict')
         Jcomp = prob.model.comp._jacobian._subjacs_info
-        missingset = {('comp.x', 'comp.b'), ('comp.y', 'comp.a'), ('comp.y', 'comp.c')}
-        for key in missingset:
-            self.assertTrue(key not in Jcomp, f"Found {key} in comp partial jacobian but it shouldn't be there.")
-
-        for of in ['comp.x', 'comp.y', 'comp.z']:
-            for wrt in ['comp.a', 'comp.b', 'comp.c']:
-                if (of, wrt) not in missingset:
-                    self.assertTrue((of, wrt) in Jcomp, f"Didn't find {key} in comp partial jacobian.")
 
         assert_near_equal(J['comp.x', 'comp.a'], np.diag(np.arange(1,4,dtype=float)*2.), 0.00001)
         assert_near_equal(J['comp.x', 'comp.b'], np.zeros((3,3)), 0.00001)
@@ -666,7 +661,7 @@ class TestFuncCompWrapped(unittest.TestCase):
             y=2.0*abs(x)
             return y
 
-        f = omf.wrap(func).add_output('y', shape=(3,))
+        f = omf.wrap(func).add_output('y', shape=(3,)).declare_partials(of='*', wrt='*', method='cs')
 
         prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
@@ -699,58 +694,6 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         assert_near_equal(C1._jacobian['y', 'x'], expect, 0.00001)
 
-    def test_has_diag_partials_error(self):
-
-        def func(x, A=np.arange(15).reshape((3,5))):
-            y=A.dot(x)
-            return y
-
-        f = (omf.wrap(func)
-             .add_input('x', shape=5)
-             .add_output('y', shape=3))
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
-
-        p.setup()
-
-        with self.assertRaises(Exception) as context:
-            p.final_setup()
-
-        self.assertEqual(str(context.exception),
-                         "'comp' <class ExplicitFuncComp>: has_diag_partials is True but partial(y, x) is not square (shape=(3, 5)).")
-
-    def test_has_diag_partials(self):
-        # Really check to see that the has_diag_partials argument had its intended effect
-
-        # run with has_diag_partials=False
-
-        def func(x):
-            y=3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=5)
-
-        p = om.Problem()
-        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=False))
-        p.setup()
-
-        declared_partials = comp._declared_partials[('y','x')]
-        self.assertTrue('rows' not in declared_partials )
-        self.assertTrue('cols' not in declared_partials )
-
-        # run with has_diag_partials=True
-        p = om.Problem()
-        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
-        p.setup()
-        p.final_setup()
-
-        declared_partials = comp._declared_partials[('y','x')]
-        self.assertTrue('rows' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['rows']))
-        self.assertTrue('cols' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y','x')]['cols']))
-
     def test_exec_comp_deriv_sparsity(self):
         # Check to make sure that when an ExplicitFuncComp has more than one
         # expression that only the partials that are needed are declared and computed
@@ -762,8 +705,12 @@ class TestFuncCompWrapped(unittest.TestCase):
             y2=3.0*x2-1.
             return y1, y2
 
+        f = (omf.wrap(func)
+             .declare_partials(of='y1', wrt='x1', method='cs')
+             .declare_partials(of='y2', wrt='x2', method='cs'))
+
         p = om.Problem()
-        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(func))
+        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
         p.setup()
         p.final_setup()
 
@@ -786,14 +733,17 @@ class TestFuncCompWrapped(unittest.TestCase):
         J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
         self.assertEqual(3.0, J)
 
-        # make sure this works with arrays and when has_diag_partials is the default of False
+        # make sure this works with arrays
 
         def func2(x1=np.ones(5), x2=np.ones(5)):
             y1=2.0*x1+1.
             y2=3.0*x2-1.
             return y1, y2
 
-        f = omf.wrap(func2).defaults(shape=5)
+        f = (omf.wrap(func2)
+             .defaults(shape=5)
+             .declare_partials(of='y1', wrt='x1', method='cs')
+             .declare_partials(of='y2', wrt='x2', method='cs'))
 
         p = om.Problem()
         comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
@@ -809,80 +759,6 @@ class TestFuncCompWrapped(unittest.TestCase):
         self.assertTrue(np.all(2.0*np.identity(5) == J))
         J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
         self.assertTrue(np.all(3.0*np.identity(5) == J))
-
-        # with has_diag_partials True to make sure that still works with arrays
-
-        def func3(x1=np.ones(5), x2=np.ones(5)):
-            y1=2.0*x1+1.
-            y2=3.0*x2-1.
-            return y1, y2
-
-        f = omf.wrap(func3).defaults(shape=5)
-
-        p = om.Problem()
-        comp = p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
-        p.setup()
-        p.final_setup()
-
-        declared_partials = comp._declared_partials
-        self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
-                              sorted(declared_partials.keys()))
-        self.assertTrue('cols' in declared_partials[('y1', 'x1')] )
-        self.assertTrue('rows' in declared_partials[('y1', 'x1')] )
-        self.assertTrue('cols' in declared_partials[('y2', 'x2')] )
-        self.assertTrue('rows' in declared_partials[('y2', 'x2')] )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y1','x1')]['cols']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials[('y2','x2')]['cols']))
-
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y1'], wrt=['comp.x1'], return_format='array')
-        self.assertTrue(np.all(2.0*np.identity(5) == J))
-        J = p.compute_totals(of=['comp.y2'], wrt=['comp.x2'], return_format='array')
-        self.assertTrue(np.all(3.0*np.identity(5) == J))
-
-    def test_has_diag_partials_shape_only(self):
-
-        def func(x):
-            y=3.0*x + 2.5
-            return y
-
-        f = (omf.wrap(func)
-             .add_input('x', shape=(5,))
-             .add_output('y', shape=(5,)))
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
-
-        p.setup()
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
-
-    def test_feature_has_diag_partials(self):
-
-        def func(x=np.ones(5)):
-            y=3.0*x + 2.5
-            return y
-
-        f = omf.wrap(func).defaults(shape=(5,))
-
-        p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, has_diag_partials=True))
-
-        p.setup()
-
-        p.set_val('comp.x', np.ones(5))
-
-        p.run_model()
-
-        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
-
-        assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_feature_defaults(self):
 
@@ -960,25 +836,6 @@ class TestFuncCompUserPartials(unittest.TestCase):
         f = (omf.wrap(func3)
                 .defaults(shape=5)
                 .declare_partials(of='*', wrt='*', method='cs'))
-
-        p = om.Problem()
-        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
-
-        p.setup(mode='fwd')
-        p.run_model()
-
-        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None))
-
-    def test_user_partials_not_all(self):
-
-        def func3(x1=np.ones(5), x2=np.ones(5)):
-            y1=2.0*x1+1.
-            y2=3.0*x2-1.
-            return y1, y2
-
-        f = (omf.wrap(func3)
-                .defaults(shape=5)
-                .declare_partials(of='y1', wrt='x1', method='cs'))
 
         p = om.Problem()
         comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
@@ -1119,6 +976,41 @@ class TestFuncCompColoring(unittest.TestCase):
         p.run_model()
         assert_check_totals(p.check_totals(of=['comp.x', 'comp.y', 'comp.z'], wrt=['comp.a'], out_stream=None))
 
+
+class TestComputePartials(unittest.TestCase):
+    def test_compute_partials(self):
+        def J_func(x, y, z, J):
+
+            # the following sub-jacs are 4x4 based on the sizes of foo, bar, x, and y, but the partials
+            # were declared specifying rows and cols (in this case sub-jacs are diagonal), so we only
+            # store the nonzero values of the sub-jacs, resulting in an actual size of 4 rather than 4x4.
+            J['foo', 'x'] = -3*np.log(z)/(3*x+2*y)**2
+            J['foo', 'y'] = -2*np.log(z)/(3*x+2*y)**2
+
+            J['bar', 'x'] = 2.*np.ones(4)
+            J['bar', 'y'] = np.ones(4)
+
+            # z is a scalar so the true size of this sub-jac is 4x1
+            J['foo', 'z'] = 1/(z*(3*x+2*y))
+
+        def func(x=np.zeros(4), y=np.ones(4), z=3):
+            foo = np.log(z)/(3*x+2*y)
+            bar = 2.*x + y
+            return foo, bar
+
+        f = (omf.wrap(func)
+                .defaults(units='m')
+                .add_output('foo', units='1/m', shape=4)
+                .add_output('bar', shape=4)
+                .declare_partials(of='foo', wrt=('x', 'y'), rows=np.arange(4), cols=np.arange(4))
+                .declare_partials(of='foo', wrt='z')
+                .declare_partials(of='bar', wrt=('x', 'y'), rows=np.arange(4), cols=np.arange(4)))
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, compute_partials=J_func))
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+        assert_check_totals(p.check_totals(of=['comp.foo', 'comp.bar'], wrt=['comp.x', 'comp.y', 'comp.z'], method='cs'))
 
 if __name__ == "__main__":
     unittest.main()

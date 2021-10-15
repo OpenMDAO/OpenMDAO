@@ -15,7 +15,6 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.units import valid_units
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.general_utils import find_matches_iter
 import openmdao.func_api as omf
 
 
@@ -23,7 +22,7 @@ import openmdao.func_api as omf
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_varnames = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only'}
+_disallowed_varnames = {'units', 'shape', 'shape_by_conn', 'run_root_only'}
 
 _meta_keep = {'units', 'shape', 'val'}
 _from_def = {'default_units': 'units', 'default_shape': 'shape'}
@@ -74,44 +73,32 @@ class ExplicitFuncComp(ExplicitComponent):
     ----------
     func : function
         The function to be wrapped by this Component.
+    compute_partials : function or None
+        If not None, call this function when computing partials.
     **kwargs : named args
         Args passed down to ExplicitComponent.
 
     Attributes
     ----------
     _func : callable
-        The callable wrapped by this component.
-    complex_stepsize : float
-        Step size used for complex step.
-    _manual_decl_partials : bool
-        If True, the user has manually declared partials.
+        The function wrapper used by this component.
+    _compute_partials : function or None
+        If not None, call this function when computing partials.
     """
 
-    def __init__(self, func, **kwargs):
+    def __init__(self, func, compute_partials=None, **kwargs):
         """
         Initialize attributes.
         """
         super().__init__(**kwargs)
         self._func = omf.wrap(func)
-        # if complex step is used for derivatives, this is the stepsize
-        self.complex_stepsize = 1.e-40
-        self._manual_decl_partials = False
-
-    def initialize(self):
-        """
-        Declare options.
-        """
-        self.options.declare('has_diag_partials', types=bool, default=False,
-                             desc='If True, treat all array/array partials as diagonal if both '
-                                  'arrays have size > 1. All arrays with size > 1 must have the '
-                                  'same flattened size or an exception will be raised.')
+        self._compute_partials = compute_partials
 
     def setup(self):
         """
         Define out inputs and outputs.
         """
         optignore = {'is_option'}
-        outignore = {'deps'}
 
         for name, meta in self._func.get_input_meta():
             self._check_var_name(name)
@@ -130,7 +117,7 @@ class ExplicitFuncComp(ExplicitComponent):
                                    "name by returning a variable, for example 'return myvar', or "
                                    "include the name in the function's metadata.")
             self._check_var_name(name)
-            kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=outignore)
+            kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args)
             self.add_output(name, **kwargs)
 
     def declare_partials(self, *args, **kwargs):
@@ -149,11 +136,11 @@ class ExplicitFuncComp(ExplicitComponent):
         dict
             Metadata dict for the specified partial(s).
         """
-        if 'method' not in kwargs or kwargs['method'] == 'exact':
+        if self._compute_partials is None and ('method' not in kwargs or
+                                               kwargs['method'] == 'exact'):
             raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method equal "
                                "to 'cs', 'fd', or 'jax'.")
 
-        self._manual_decl_partials = True
         return super().declare_partials(*args, **kwargs)
 
     def _setup_partials(self):
@@ -167,80 +154,25 @@ class ExplicitFuncComp(ExplicitComponent):
         for kwargs in self._func.get_declare_partials():
             self.declare_partials(**kwargs)
 
-        if self._manual_decl_partials:
-            all_ofs, all_wrts = self._get_partials_varlists()
-            matches = set()
-            methods = set()
-            for (of, wrt), meta in self._declared_partials.items():
-                methods.add(meta['method'])
-                if isinstance(of, str):
-                    ofs = find_matches_iter([of], all_ofs)
-                else:
-                    ofs = find_matches_iter(of, all_ofs)
-                if isinstance(wrt, str):
-                    wrts = find_matches_iter([wrt], all_wrts)
-                else:
-                    wrts = find_matches_iter(wrt, all_wrts)
-                matches.update(product(ofs, wrts))
-
-            if len(methods) == 1:
-                method = methods.pop()
-            elif 'jax' in methods:
-                method = 'jax'
-            else:
-                method = 'fd'
-
-            # add partial declarations for any partials that we know are nonzero based
-            # on dependencies inferred from the function source if they weren't declared
-            # manually.
-            for out, ometa in self._func.get_output_meta():
-                for inp in ometa['deps']:
-                    if out != inp and (out, inp) not in matches:
-                        self.declare_partials(of=out, wrt=inp, method=method)
-
-        # user didn't declare partials, so delare partials based on I/O dependencies.
-        else:
-            # use super().declare_partials to avoid setting _manual_decl_partials to True
-            decl_partials = super().declare_partials
-            hasdiag = self.options['has_diag_partials']
-            for out, ometa in self._func.get_output_meta():
-                oshp = ometa['shape']
-                deps = ometa['deps']
-
-                if not oshp:
-                    osize = 1
-                else:
-                    osize = np.product(oshp) if isinstance(oshp, tuple) else oshp
-
-                if hasdiag:
-                    inds = np.arange(osize, dtype=INT_DTYPE)
-
-                for inp, imeta in self._func.get_input_meta():
-                    if inp not in deps:
-                        continue
-
-                    if 'is_option' in imeta and imeta['is_option']:
-                        continue
-
-                    if hasdiag:
-                        ishp = imeta['shape']
-                        if not ishp:
-                            isize = 1
-                        else:
-                            isize = np.product(ishp) if isinstance(ishp, tuple) else ishp
-                        if osize != isize:
-                            raise RuntimeError(f"{self.msginfo}: has_diag_partials is True but "
-                                               f"partial({out}, {inp}) is not square "
-                                               f"(shape=({osize}, {isize})).")
-                        # partial will be declared as diagonal
-                        if osize > 1:
-                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
-                        else:
-                            decl_partials(of=out, wrt=inp)
-                    else:
-                        decl_partials(of=out, wrt=inp)
-
         super()._setup_partials()
+
+    def compute_partials(self, inputs, partials):
+        """
+        Compute sub-jacobian parts. The model is assumed to be in an unscaled state.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        partials : Jacobian
+            Sub-jac components written to partials[output_name, input_name].
+        """
+        if self._compute_partials is None:
+            return
+
+        args = list(inputs.values())
+        args.append(partials)
+        self._compute_partials(*args)
 
     def _check_var_name(self, name):
         match = namecheck_rgx.match(name)
@@ -289,70 +221,3 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         # this will update the outputs array in place
         self._compute_output_array(inputs.values(), outputs.asarray())
-
-    def compute_partials(self, inputs, partials):
-        """
-        Use complex step method to update the given Jacobian.
-
-        Parameters
-        ----------
-        inputs : `VecWrapper`
-            `VecWrapper` containing parameters (p).
-        partials : `Jacobian`
-            Contains sub-jacobians.
-        """
-        if self._manual_decl_partials:
-            return
-
-        step = self.complex_stepsize * 1j
-        inv_stepsize = 1.0 / self.complex_stepsize
-        has_diag_partials = self.options['has_diag_partials']
-
-        in_vals = [np.asarray(v, dtype=npcomplex) for v in inputs.values()]
-        result = np.zeros(len(self._outputs), dtype=npcomplex)
-        out_slices = self._outputs.get_slice_dict()
-
-        icol = 0
-        for ivar, inp in enumerate(inputs._abs_iter()):
-
-            if has_diag_partials or in_vals[ivar].size == 1:
-                # set a complex input value
-                in_vals[ivar] += step
-
-                # solve with complex input value
-                self._compute_output_array(in_vals, result)
-
-                for u, slc in out_slices.items():
-                    if (u, inp) in self._subjacs_info:
-                        partials[(u, inp)] = imag(result[slc] * inv_stepsize)
-
-                # restore old input value
-                in_vals[ivar] -= step
-                icol += in_vals[ivar].size
-            else:
-                pval = in_vals[ivar]
-                if np.isscalar(pval):
-                    # set a complex input value
-                    in_vals[ivar] += step
-
-                    # solve with complex input value
-                    self._compute_output_array(in_vals, result)
-
-                    partials.set_col(self, icol, imag(result * inv_stepsize))
-
-                    # restore old input value
-                    in_vals[ivar] -= step
-                    icol += 1
-                else:
-                    for i in range(pval.size):
-                        # set a complex input value
-                        in_vals[ivar].flat[i] += step
-
-                        # solve with complex input value
-                        self._compute_output_array(in_vals, result)
-
-                        partials.set_col(self, icol, imag(result * inv_stepsize))
-
-                        # restore old input value
-                        in_vals[ivar].flat[i] -= step
-                        icol += 1

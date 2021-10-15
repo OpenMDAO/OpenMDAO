@@ -456,35 +456,6 @@ def find_matches(pattern, var_list):
     return [name for name in var_list if fnmatchcase(name, pattern)]
 
 
-def find_matches_iter(patterns, var_list):
-    """
-    Yield variable names that match given patterns.
-
-    Parameters
-    ----------
-    pattern : iter of str
-        Glob patterns or variable names.
-    var_list : list of str
-        List of variable names to search for pattern.
-
-    Returns
-    -------
-    list
-        Variable names that match pattern.
-    """
-    if '*' in patterns:
-        yield from var_list
-        return
-
-    for pattern in patterns:
-        if pattern in var_list:
-            yield pattern
-        else:
-            for name in var_list:
-                if fnmatchcase(name, pattern):
-                    yield name
-
-
 def pad_name(name, pad_num=10, quotes=False):
     """
     Pad a string so that they all line up when stacked.

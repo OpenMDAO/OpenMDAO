@@ -436,7 +436,7 @@ class OMWrappedFunc(object):
         # e.g., return a, b, c
         outlist = []
         try:
-            ret_info = get_function_deps(self._f)
+            outlist = [(n, {}) for n in get_return_names(self._f)]
         except RuntimeError:
             #  this could happen if function is compiled or has multiple return lines
             if not self._outputs:
@@ -446,9 +446,6 @@ class OMWrappedFunc(object):
             warnings.warn("Couldn't determine function return names based on AST.  Assuming number "
                           "of return values matches number of outputs defined in the metadata.")
             outlist = list(self._outputs.items())
-        else:
-            for o, deps in ret_info:
-                outlist.append([o, {'deps': deps}])
 
         notfound = []
         for oname, ometa in self._outputs.items():
@@ -461,7 +458,7 @@ class OMWrappedFunc(object):
                 notfound.append(oname)
 
         if notfound:  # try to fill in the unnamed slots with user-supplied output data
-            inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with no name
+            inones = [i for i, t in enumerate(outlist) if t[0] is None]  # indices with no name
             if len(notfound) != len(inones):
                 raise RuntimeError(f"There must be an unnamed return value for every unmatched "
                                    f"output name {notfound} but only found {len(inones)}.")
@@ -701,9 +698,9 @@ def _get_long_name(node):
     return '.'.join(parts[::-1])
 
 
-class _FuncDepCollector(ast.NodeVisitor):
+class _FuncRetNameCollector(ast.NodeVisitor):
     """
-    An ast.NodeVisitor that records dependencies between inputs and outputs.
+    An ast.NodeVisitor that records return value names.
 
     Each instance of this is single-use.  If needed multiple times create a new instance
     each time.  It also assumes that the AST to be visited contains only a single function
@@ -717,67 +714,14 @@ class _FuncDepCollector(ast.NodeVisitor):
 
     def __init__(self, func):
         super().__init__()
-        self._attrs = None
-        self._deps = {}
         self._ret_info = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
 
-    def _do_assign(self, targets, rhs):
-        lhs_attrs = []
-        for t in targets:
-            if hasattr(t, 'elts'):
-                for e in t.elts:
-                    n = _get_long_name(e)
-                    if n is not None:
-                        lhs_attrs.append(n)
-            else:
-                n = _get_long_name(t)
-                if n is not None:
-                    lhs_attrs.append(n)
-
-        self._attrs = set()
-        self.visit(rhs)
-
-        for a in lhs_attrs:
-            if a not in self._deps:
-                self._deps[a] = set()
-            self._deps[a].update(self._attrs)
-
-        self._attrs = None
-
-    def visit_Attribute(self, node):
-        if self._attrs is not None:
-            self._attrs.add(_get_long_name(node))
-
-    def visit_Name(self, node):
-        if self._attrs is not None:
-            self._attrs.add(node.id)
-
-    def visit_Assign(self, node):
-        self._do_assign(node.targets, node.value)
-
-    def visit_AugAssign(self, node):
-        self._do_assign((node.target,), node.value)
-
-    def visit_AnnAssign(self, node):
-        if node.value is not None:
-            self._do_assign((node.target,), node.value)
-
-    def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
-        for arg in node.args:
-            self.visit(arg)
-
-        for kw in node.keywords:
-            self.visit(kw.value)
-
     def _get_return_attrs(self, node):
-        self._attrs = set()
-
-        self.visit(node)
-        # also include a boolean indicating if the return expr is a simple name
-        self._ret_info.append((tuple(self._attrs), isinstance(node, ast.Name)))
-
-        self._attrs = None
+        if isinstance(node, ast.Name):
+            self._ret_info.append(node.id)
+        else:
+            self._ret_info.append(None)
 
     def visit_Return(self, node):
         """
@@ -801,9 +745,9 @@ class _FuncDepCollector(ast.NodeVisitor):
             self._get_return_attrs(node.value)
 
 
-def get_function_deps(func):
+def get_return_names(func):
     """
-    Return dependency between return value(s) and inputs.
+    Return list of return value names.
 
     Parameters
     ----------
@@ -813,28 +757,8 @@ def get_function_deps(func):
     Returns
     -------
     list
-        List of the form (name or None, dependency_set) containing one entry for each return
-        value.  'name' will be the name of the return value if it has a simple name, otherwise
-        None.
+        List of names containing one entry for each return value.  Each name will be the
+        name of the return value if it has a simple name, otherwise None.
     """
     input_names = set(inspect.signature(func).parameters)
-    funcdeps = _FuncDepCollector(func)
-    deps = funcdeps._deps
-    retdeps = []
-    for names, _ in funcdeps._ret_info:
-        depset = set()
-        for n in names:
-            stack = [n]
-            seen = set()
-            while stack:
-                v = stack.pop()
-                seen.add(v)
-                if v in input_names:
-                    depset.add(v)
-                elif v in deps:
-                    stack.extend([d for d in deps[v] if d not in seen])
-
-        retdeps.append(depset)
-
-    return [(n[0] if simple and n[0] not in input_names else None, d)
-            for ((n, simple), d) in zip(funcdeps._ret_info, retdeps)]
+    return [n if n not in input_names else None for n in _FuncRetNameCollector(func)._ret_info]
