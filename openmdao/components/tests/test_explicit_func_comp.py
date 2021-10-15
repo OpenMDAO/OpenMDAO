@@ -978,7 +978,7 @@ class TestFuncCompColoring(unittest.TestCase):
 
 
 class TestComputePartials(unittest.TestCase):
-    def test_compute_partials(self):
+    def test_user_compute_partials_func(self):
         def J_func(x, y, z, J):
 
             # the following sub-jacs are 4x4 based on the sizes of foo, bar, x, and y, but the partials
