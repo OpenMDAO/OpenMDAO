@@ -1348,7 +1348,7 @@ class Problem(object):
                                                 # apply the correction to undo the component's
                                                 # internal Allreduce.
                                                 derivs *= mult
-                                                partials_data[c_name][key]['j_rev_mult'] = mult
+                                                partials_data[c_name][inp, out]['j_rev_mult'] = mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
@@ -2242,8 +2242,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
         def safe_norm(arr):
             return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
-        do_rev_mult = False
         for of, wrt in sorted_keys:
+            mult = None
 
             if totals:
                 fd_opts = global_options['']
@@ -2266,7 +2266,6 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             if do_rev:
                 reverse = derivative_info.get('J_rev')
                 if 'j_rev_mult' in derivative_info:
-                    do_rev_mult = True
                     mult = derivative_info['j_rev_mult']
 
             fwd_error = safe_norm(forward - fd)
@@ -2508,9 +2507,9 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if not totals and matrix_free:
                         if out_stream:
                             if not directional:
-                                if do_rev_mult is True:
+                                if mult is not None:
                                     reverse /= mult
-                                out_buffer.write(f'    Raw Reverse Derivative (Jrev)\n')
+                                out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                                 out_buffer.write(str(reverse) + '\n')
                                 out_buffer.write('\n')
 
