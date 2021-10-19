@@ -4,6 +4,7 @@ import os
 import weakref
 
 import numpy as np
+from numpy import isscalar
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
@@ -174,7 +175,7 @@ class Vector(object):
         int
             Number of variables in this Vector.
         """
-        return len(self._names)
+        return len(self._views)
 
     def _copy_views(self):
         """
@@ -545,6 +546,32 @@ class Vector(object):
         """
         raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
+
+    def set_vals(self, vals):
+        """
+        Set the data array of this vector using a value or iter of values, one for each variable.
+
+        The values must be in the same order as the variables appear in this Vector.
+
+        Parameters
+        ----------
+        vals : ndarray, float, or iter of ndarrays and/or floats
+            Values for each variable contained in this vector, in the proper order.
+        """
+        arr = self.asarray()
+
+        if self.nvars() == 1:
+            arr[:] = vals
+        else:
+            start = end = 0
+            for v in vals:
+                if isscalar(v):
+                    end += 1
+                    arr[start] = v
+                else:
+                    end += v.size
+                    arr[start:end] = v.flat
+                start = end
 
     def set_var(self, name, val, idxs=_full_slice, flat=False):
         """

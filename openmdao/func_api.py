@@ -24,7 +24,7 @@ _allowed_add_input_args = {
 
 _allowed_add_output_args = {
     'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
-    'shape_by_conn', 'copy_shape', 'distributed'
+    'shape_by_conn', 'copy_shape', 'distributed', 'resid'
 }
 
 _allowed_declare_options_args = {
@@ -194,7 +194,10 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         if name in self._inputs:
-            raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
+            if 'resid' in kwargs:
+                self._inputs[name]['state'] = True
+            else:
+                raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
         if name in self._outputs:
             raise RuntimeError(f"In add_output, '{name}' already registered as an output.")
         _check_kwargs(kwargs, _allowed_add_output_args, 'add_output')
@@ -304,7 +307,7 @@ class OMWrappedFunc(object):
         """
         if self._call_setup:
             self._setup()
-        return self._inputs.items()
+        return [it for it in self._inputs.items() if 'state' not in it[1]]
 
     def get_input_names(self):
         """
@@ -397,46 +400,30 @@ class OMWrappedFunc(object):
         Set up the input variable metadata dicts.
         """
         ins = self._inputs
+        outs = self._outputs
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
+            if name in outs:  # skip if this is a state
+                continue
+
             meta = ins[name]
+
             if meta.get('is_option'):
                 continue
 
-            if 'val' in meta and meta['val'] is not None:
-                valshape = np.asarray(meta['val']).shape
-            else:
-                valshape = None
-                meta['val'] = self._input_defaults['val']
-
-            if meta.get('shape') is None:
-                if valshape is not None:
-                    meta['shape'] = valshape
-                else:
-                    meta['shape'] = self._input_defaults['shape']
-
-            meta['shape'] = _shape2tuple(meta['shape'])
-            if not valshape:  # val is a scalar so reshape with the given meta['shape']
-                meta['val'] = np.ones(meta['shape']) * meta['val']
-            elif valshape != meta['shape']:
-                raise ValueError(f"Input '{name}' default value has shape "
-                                 f"{valshape}, but shape was specified as {meta['shape']}.")
-
+            self._default_to_shape(name, meta, self._input_defaults)
             _update_from_defaults(meta, self._input_defaults)
 
     def _setup_outputs(self):
         """
         Set up the output variable metadata dicts.
         """
-        outmeta = {}
-
-        # Parse the function code to possibly identify the names of the return values and
-        # input/output dependencies. Return names will be non-None only if they are a simple name,
-        # e.g., return a, b, c
+        # Parse the function code to possibly identify the names of the return values Return names
+        # will be non-None only if they are a simple name, e.g., return a, b, c
         outlist = []
         try:
-            outlist = [(n, {}) for n in get_return_names(self._f)]
+            outlist = [(n, {}) for n in self.get_return_names()]
         except RuntimeError:
             #  this could happen if function is compiled or has multiple return lines
             if not self._outputs:
@@ -447,12 +434,15 @@ class OMWrappedFunc(object):
                           "of return values matches number of outputs defined in the metadata.")
             outlist = list(self._outputs.items())
 
+        residmap = {n: n for n, _ in outlist}
         notfound = []
         for oname, ometa in self._outputs.items():
+            residmap[oname] = oname
             for n, meta in outlist:
-                if n == oname:
+                if n == oname or 'resid' in ometa and ometa['resid'] == n:
                     if meta is not ometa:
                         meta.update(ometa)
+                    residmap[n] = oname
                     break
             else:  # didn't find oname
                 notfound.append(oname)
@@ -470,18 +460,33 @@ class OMWrappedFunc(object):
                 ret_meta.update(m)
                 outlist[i_olist] = (name_notfound, ret_meta)
 
-        outs = {n: m for n, m in outlist}
+        outs = {residmap[n]: m for n, m in outlist}
 
         if self._use_jax:
             # make sure jax used for all declared derivs
             self._compute_out_shapes(self._inputs, outs)
 
-        for meta in outs.values():
+        for name, meta in outs.items():
+            self._default_to_shape(name, meta, self._output_defaults)
             _update_from_defaults(meta, self._output_defaults)
             if meta['shape'] is not None:
                 meta['shape'] = _shape2tuple(meta['shape'])
 
         self._outputs = outs
+
+    def get_return_names(self):
+        """
+        Return list of return value names.
+
+        Returns
+        -------
+        list
+            List of names containing one entry for each return value.  Each name will be the
+            name of the return value if it has a simple name, otherwise None.
+        """
+        input_names = set(self.get_input_names())
+        return [n if n not in input_names else None
+                for n in _FuncRetNameCollector(self._f)._ret_info]
 
     def _compute_out_shapes(self, ins, outs):
         """
@@ -554,6 +559,26 @@ class OMWrappedFunc(object):
                           f"have shape {shape}.")
             for name in need_shape:
                 outs[name]['shape'] = shape
+
+    def _default_to_shape(self, name, meta, defaults_dict):
+        if 'val' in meta and meta['val'] is not None:
+            valshape = np.asarray(meta['val']).shape
+        else:
+            valshape = None
+            meta['val'] = defaults_dict['val']
+
+        if meta.get('shape') is None:
+            if valshape is not None:
+                meta['shape'] = valshape
+            else:
+                meta['shape'] = defaults_dict['shape']
+
+        meta['shape'] = _shape2tuple(meta['shape'])
+        if not valshape:  # val is a scalar so reshape with the given meta['shape']
+            meta['val'] = np.ones(meta['shape']) * meta['val']
+        elif valshape != meta['shape']:
+            raise ValueError(f"Input '{name}' default value has shape "
+                             f"{valshape}, but shape was specified as {meta['shape']}.")
 
 
 def wrap(func):
@@ -743,22 +768,3 @@ class _FuncRetNameCollector(ast.NodeVisitor):
                 self._get_return_attrs(n)
         else:
             self._get_return_attrs(node.value)
-
-
-def get_return_names(func):
-    """
-    Return list of return value names.
-
-    Parameters
-    ----------
-    func : function
-        The function used to compute input/output dependencies.
-
-    Returns
-    -------
-    list
-        List of names containing one entry for each return value.  Each name will be the
-        name of the return value if it has a simple name, otherwise None.
-    """
-    input_names = set(inspect.signature(func).parameters)
-    return [n if n not in input_names else None for n in _FuncRetNameCollector(func)._ret_info]

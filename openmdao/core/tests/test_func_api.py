@@ -112,7 +112,7 @@ class TestFuncAPI(unittest.TestCase):
             x = a * b
             return x, c
 
-        self.assertEqual(omf.get_return_names(func), ['x', None])
+        self.assertEqual(omf.wrap(func).get_return_names(), ['x', None])
 
     def test_infer_outnames_replace_inpname(self):
         def func(a, b, c):

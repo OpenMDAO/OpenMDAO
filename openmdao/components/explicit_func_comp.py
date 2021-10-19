@@ -2,10 +2,11 @@
 
 import numpy as np
 from numpy import asarray, isscalar
+from itertools import chain
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import setup_func_comp_io, fill_vector
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -41,7 +42,27 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Define out inputs and outputs.
         """
-        setup_func_comp_io(self)
+        optignore = {'is_option'}
+
+        for name, meta in self._compute.get_input_meta():
+            _check_var_name(self, name)
+            if 'is_option' in meta and meta['is_option']:
+                kwargs = _copy_with_ignore(meta, omf._allowed_declare_options_args,
+                                           ignore=optignore)
+                self.options.declare(name, **kwargs)
+            else:
+                kwargs = _copy_with_ignore(meta, omf._allowed_add_input_args)
+                self.add_input(name, **kwargs)
+
+        for i, (name, meta) in enumerate(self._compute.get_output_meta()):
+            if name is None:
+                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
+                                   f"value in position {i} because it has no name.  Specify the "
+                                   "name by returning a variable, for example 'return myvar', or "
+                                   "include the name in the function's metadata.")
+            _check_var_name(self, name)
+            kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
+            self.add_output(name, **kwargs)
 
     def _compute_output_array(self, input_values, output_array):
         """
@@ -79,7 +100,7 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        fill_vector(outputs, self._compute(*input.values()))
+        outputs.set_vals(self._compute(*inputs.values()))
 
     def declare_partials(self, *args, **kwargs):
         """
