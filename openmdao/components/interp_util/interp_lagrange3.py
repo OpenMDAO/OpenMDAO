@@ -534,7 +534,6 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.zeros((4, 4, 4))
 
         i_x, i_y, i_z = idx
 
