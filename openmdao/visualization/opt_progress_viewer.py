@@ -6,10 +6,11 @@ from bokeh.io import show, output_notebook
 from bokeh.models import Select, HoverTool, MultiSelect
 from bokeh.layouts import row, column
 from bokeh.plotting import figure, ColumnDataSource
-from bokeh.palettes import Category20 as palette
+from bokeh.palettes import Category20, Turbo256
 
 from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
+from openmdao.utils.om_warnings import issue_warning
 
 import numpy as np
 
@@ -238,10 +239,16 @@ class VarOptViewer(object):
 
         length = len(x_var_vals)
         if length <= 3:
-            colors = list(palette[3])
+            colors = list(Category20[3])
             while len(colors)>length:
                 colors.pop()
         else:
-            colors = list(palette[length])
+            if length > 20:
+                print("Using larger color palette")
+                colors = list(Turbo256[:length])
+            elif length < 20:
+                colors = list(Category20[length])
+            else:
+                issue_warning("Cannot compare more than 256 cases")
 
         return colors

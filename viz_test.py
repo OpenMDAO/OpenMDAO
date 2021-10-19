@@ -65,6 +65,7 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 #
 
 dm.run_problem(p)
+
 # om.VarOptViewer("cases.sql")
 
 # import numpy as np
