@@ -96,7 +96,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
             dtype = x.dtype
 
         if idx_key not in self.coeffs:
-            self.coeffs[idx_key] = self.compute_coeffs(idx, dtype)
+            self.coeffs[idx_key] = self.compute_coeffs(idx)
         a = self.coeffs[idx_key]
 
         val = a[0] + \
@@ -111,7 +111,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs(self, idx, dtype):
+    def compute_coeffs(self, idx):
         """
         Compute the trilinear interpolation coefficients for this block.
 
@@ -119,8 +119,6 @@ class InterpTrilinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
-        dtype : numpy.dtype
-            Determines whether to allocate complex.
 
         Returns
         -------
@@ -129,7 +127,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
         """
         grid = self.grid
         values = self.values
-        a = np.empty(8, dtype=dtype)
+        a = np.empty(8)
 
         i_x, i_y, i_z = idx
 
@@ -295,7 +293,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
         if len(uncached) > 0:
             unc = np.array(list(uncached))
             uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
-            a = self.compute_coeffs_vectorized(uncached_idx, dtype)
+            a = self.compute_coeffs_vectorized(uncached_idx)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
             self.coeffs = self.coeffs.union(uncached)
         a = self.vec_coeff[idx[0], idx[1], idx[2], :]
@@ -312,7 +310,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
 
         return val, d_x, None, None
 
-    def compute_coeffs_vectorized(self, idx, dtype):
+    def compute_coeffs_vectorized(self, idx):
         """
         Compute the trilinear interpolation coefficients for this block.
 
@@ -320,8 +318,6 @@ class InterpTrilinear(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
-        dtype : numpy.dtype
-            Determines whether to allocate complex.
 
         Returns
         -------
@@ -333,7 +329,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
 
         i_x, i_y, i_z = idx
         vec_size = len(i_y)
-        a = np.empty((vec_size, 8), dtype=dtype)
+        a = np.empty((vec_size, 8))
 
         x0 = grid[0][i_x]
         x1 = grid[0][i_x + 1]

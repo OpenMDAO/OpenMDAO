@@ -917,6 +917,43 @@ class TestInterpNDFixedPython(unittest.TestCase):
             abs_err = np.abs(df_dx[0] -  df_dx_base[j])
             assert_near_equal(abs_err, 0.0, 1e-13)
 
+    def test_lagrange3D(self):
+        # Test lagrange3D vs 3d lagrange.
+
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 15)
+        p3 = np.linspace(0, 1, 12)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f_p = np.sqrt(P1) + P2 * P3
+
+        x1 = np.linspace(-2, 101, 5)
+        x2 = np.linspace(-10.5, 11, 5)
+        x3 = np.linspace(-0.2, 1.1, 5)
+        X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
+        x = np.zeros((125, 3))
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+        x[:, 2] = X3.ravel()
+
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3D', extrapolate=True)
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3', extrapolate=True)
+        f_base, df_dx_base = interp_base.interpolate(x, compute_derivative=True)
+
+        assert_near_equal(f, f_base, 1e-11)
+        assert_near_equal(df_dx, df_dx_base, 3e-11)
+
+        # Test non-vectorized.
+        for j, x_i in enumerate(x):
+            interp = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3D', extrapolate=True)
+            f, df_dx = interp.interpolate(x_i, compute_derivative=True)
+
+            assert_near_equal(f, f_base[j], 2e-10)
+            assert_near_equal(df_dx[0], df_dx_base[j, :], 2e-10)
+
 
 if __name__ == '__main__':
     unittest.main()

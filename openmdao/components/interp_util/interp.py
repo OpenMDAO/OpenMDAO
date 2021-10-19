@@ -10,7 +10,7 @@ from openmdao.components.interp_util.interp_akima import InterpAkima, InterpAkim
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
-from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
+from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, InterpLagrange3D
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear
 from openmdao.components.interp_util.interp_trilinear import InterpTrilinear
@@ -21,6 +21,7 @@ INTERP_METHODS = {
     'slinear': InterpLinear,
     'lagrange2': InterpLagrange2,
     'lagrange3': InterpLagrange3,
+    'lagrange3D': InterpLagrange3D,
     'cubic': InterpCubic,
     'akima': InterpAkima,
     'akima1D': InterpAkima1D,
@@ -32,7 +33,7 @@ INTERP_METHODS = {
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D']
+                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D', 'lagrange3D']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
