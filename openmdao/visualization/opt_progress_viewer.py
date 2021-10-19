@@ -223,14 +223,20 @@ class VarOptViewer(object):
                 new_data['y_vals'].append(y_variable)
 
         if len(new_data['x_vals'][0]) > 1:
-
             new_data['color'] = self._line_color_list(new_data['x_vals'])
             new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
             for key, val in new_data.items():
-                new_data[key] = self.flatten_list(val)
+                if len(val) > 1:
+                    new_data[key] = self.flatten_list(val)
+                else:
+                    new_data[key] = val
+            new_data['color'] = self._line_color_list(new_data['x_vals'])
+            new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+
             self.circle_data.data = new_data
             self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
