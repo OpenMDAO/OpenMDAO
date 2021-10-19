@@ -377,7 +377,15 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         Interpolation class to be used for subsequent table dimensions.
     **kwargs : dict
         Interpolator-specific options to pass onward.
+
+    Attributes
+    ----------
+    coeffs : dict of ndarray
+        Cache of all computed coefficients.
+    vec_coeff : None or ndarray
+        Cache of all computed coefficients when running vectorized.
     """
+
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
@@ -621,7 +629,6 @@ class InterpLagrange3D(InterpAlgorithmFixed):
                            -1.0 / (cz12 * cz23 * cz24),
                            1.0 / (cz13 * cz23 * cz34),
                            -1.0 / (cz14 * cz24 * cz34)]])
-
 
         termx[2, :] *= -termx[3, :]
         termy[2, :] *= -termy[3, :]
