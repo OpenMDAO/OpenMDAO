@@ -643,6 +643,11 @@ class InterpLagrange3D(InterpAlgorithmFixed):
 
         all_val = values[i_x - 1: i_x + 3, i_y - 1: i_y + 3, i_z - 1: i_z + 3]
 
+        # There are 64 coefficients to compute, and each of them is a sum of 64 terms. These come
+        # from multiplying the expression for lagrange interpolation, the  core of which is:
+        # (x-x1)(x-x2)(x-x3)(x-x4)(y-y1)(y-y2)(y-y3)(y-y4)(z-z1)(z-z2)(z-z3)(z-z4)
+        # and expressing it in terms of powers of x, y, and z.
+        # This can efficiently be done in a single call to einsum.
         a = np.einsum("mi,nj,pk,ijk->mnp", termx, termy, termz, all_val)
 
         return a
@@ -766,11 +771,6 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         dz[:, :, 0] = zz
         dz[:, :, 1] = zz
 
-        # There are 64 coefficients to compute, and each of them is a sum of 64 terms. These come
-        # from multiplying the expression for lagrange interpolation, the  core of which is:
-        # (x-x1)(x-x2)(x-x3)(x-x4)(y-y1)(y-y2)(y-y3)(y-y4)(z-z1)(z-z2)(z-z3)(z-z4)
-        # and expressing it in terms of powers of x, y, and z.
-        # This can efficiently be done in a single call to einsum.
         d_x = np.einsum('qim,qjm,qkm,qijkm->qm', dx, dy, dz, a)
 
         return val, d_x, None, None
