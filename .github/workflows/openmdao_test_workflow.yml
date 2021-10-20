@@ -33,7 +33,7 @@ jobs:
 
           # latest versions
           - NAME: Latest
-            PY: 3
+            PY: <3.9
             NUMPY: 1
             SCIPY: 1
             PETSc: 3
@@ -43,7 +43,7 @@ jobs:
 
           # minimal install
           - NAME: Minimal
-            PY: 3
+            PY: <3.9
             NUMPY: 1
             SCIPY: 1
             PYOPTSPARSE: 'conda-forge'
