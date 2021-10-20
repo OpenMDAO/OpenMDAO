@@ -918,7 +918,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
             assert_near_equal(abs_err, 0.0, 1e-13)
 
     def test_lagrange3D(self):
-        # Test lagrange3D vs 3d lagrange.
+        # Test lagrange3D vs 3d lagrange3.
 
         p1 = np.linspace(0, 100, 25)
         p2 = np.linspace(-10, 10, 15)
