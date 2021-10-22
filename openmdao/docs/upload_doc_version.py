@@ -9,7 +9,8 @@ def get_tag_info():
     Return the latest git tag, meaning, highest numerically, as a string, and the associated commit ID.
     """
     # using a pattern to only grab tags that are in version format "X.Y.Z"
-    git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'],  # nosec: trusted input
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = git_versions.communicate()
 
     cmd_out = cmd_out.decode('utf8')
@@ -25,7 +26,8 @@ def get_tag_info():
     # grab the highest tag that this repo knows about
     latest_tag = version_tags[-1]
 
-    cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'],  # nosec: trusted input
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = cmd.communicate()
 
     cmd_out = cmd_out.decode('utf8')
@@ -38,7 +40,8 @@ def get_commit_info():
     """
     Return the commit number of the most recent git commit as a string.
     """
-    git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'],  # nosec: trusted input
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = git_commit.communicate()
 
     cmd_out = cmd_out.decode('utf8')
@@ -92,10 +95,14 @@ def upload_doc_version(source_dir, destination, *args):
     # execute the rsync to upload docs
     cmd = f"rsync -r --delete-after -v {source_dir} {destination}"
     for arg in args:
-        cmd += f" {arg}"
+        if ";" in arg:
+            # reject potential additional commands
+            raise RuntimeError(f"Illegal argument: {arg}")
+        else:
+            cmd += f" {arg}"
 
     try:
-        subprocess.run(cmd, shell=True, check=True)
+        subprocess.run(cmd.split(), check=True)  # nosec: trusted input
     except:
         raise Exception('Doc transfer failed.')
     else:
@@ -104,6 +111,7 @@ def upload_doc_version(source_dir, destination, *args):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print(f"Source and Destination required: python {sys.argv[0]} [PATH]/_build/html [USER@]HOST:DIRECTORY")
+        print("Source and Destination required: "
+              f"python {sys.argv[0]} [PATH]/_build/html [USER@]HOST:DIRECTORY")
     else:
         upload_doc_version(*sys.argv[1:])

@@ -6,8 +6,10 @@ then takes a snapshot of the toolbar and saves it as a base64-encoded PNG.
 """
 
 import os
+import subprocess
 import asyncio
-import pyppeteer
+# import pyppeteer
+import playwright
 import base64
 
 MODEL_FILE = '../tests/gui_test_models/circuit.py'
@@ -23,14 +25,15 @@ async def main():
     """Create a browser instance and print user agent info."""
     print("Opening browser")
 
-    browser = await pyppeteer.launch({
-        'defaultViewport': {
-            'width': 1600,
-            'height': 900
-        },
-        'args': ['--start-fullscreen'],
-        'headless': True
-    })
+    # browser = await pyppeteer.launch({
+    #     'defaultViewport': {
+    #         'width': 1600,
+    #         'height': 900
+    #     },
+    #     'args': ['--start-fullscreen'],
+    #     'headless': True
+    # })
+    browser = await playwright.chromium.launch(args=['--start-fullscreen', '--headless'])
 
     page = await browser.newPage()
     await page.bringToFront()
@@ -86,15 +89,13 @@ async def main():
 
     do_add = input(f"Perform 'git add {OUTPUT_FILE}' (y/n)? ")
     if do_add[0].lower() == 'y':
-        os.system(f"git add -v {OUTPUT_FILE}")
-
+        cmd = f"git add -v {OUTPUT_FILE}"
+        subprocess.run(cmd.split())  # nosec: trusted input
 
 if os.path.exists("./update_toolbar_help.py"):
     print(f"Generating N2 from {MODEL_FILE}")
-    os.system(f"openmdao n2 -o {N2_FILE} --no_browser {MODEL_FILE}")
-
+    cmd = f"openmdao n2 -o {N2_FILE} --no_browser {MODEL_FILE}"
+    subprocess.run(cmd.split())  # nosec: trusted input
     asyncio.get_event_loop().run_until_complete(main())
 else:
     print("Only run from the directory where the script is located.")
-
-

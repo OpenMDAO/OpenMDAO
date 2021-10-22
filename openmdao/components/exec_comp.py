@@ -650,7 +650,7 @@ class ExecComp(ExplicitComponent):
         """
         for i, expr in enumerate(self._codes):
             try:
-                exec(expr, _expr_dict, _IODict(outputs, inputs))
+                exec(expr, _expr_dict, _IODict(outputs, inputs))  # nosec: limited to _expr_dict
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
