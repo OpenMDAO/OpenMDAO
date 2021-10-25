@@ -64,31 +64,6 @@ class ExplicitFuncComp(ExplicitComponent):
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)
 
-    def _compute_output_array(self, input_values, output_array):
-        """
-        Fill the given output array with our function result based on the given input values.
-
-        Parameters
-        ----------
-        input_values : tuple of ndarrays or floats
-            Unscaled, dimensional input variables.
-        output_array
-            The output array being filled.
-        """
-        outs = self._compute(*input_values)
-        if isinstance(outs, tuple):
-            start = end = 0
-            for o in outs:
-                a = asarray(o) if isscalar(o) else o
-                end += a.size
-                output_array[start:end] = a.flat
-                start = end
-        else:
-            if isscalar(outs):
-                output_array[:] = outs
-            else:
-                output_array[:] = outs.flat
-
     def compute(self, inputs, outputs):
         """
         Compute the result of calling our function with the given inputs.
