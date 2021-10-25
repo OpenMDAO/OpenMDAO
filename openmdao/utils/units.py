@@ -661,7 +661,7 @@ def add_unit(name, unit, comment=''):
     if comment:
         _UNIT_LIB.help.append((name, comment, unit))
     if isinstance(unit, str):
-        unit = eval(unit, {'__builtins__': None, 'pi': pi},  # nosec: need alternative
+        unit = eval(unit, {'__builtins__': None, 'pi': pi},  # nosec: scope limited
                     _UNIT_LIB.unit_table)
     unit.set_name(name)
     if name in _UNIT_LIB.unit_table:
@@ -879,7 +879,7 @@ def _find_unit(unit, error=False):
             unit = _UNIT_CACHE[name]
         except KeyError:
             try:
-                unit = eval(name, {'__builtins__': None},  # nosec: need alternative
+                unit = eval(name, {'__builtins__': None},  # nosec: scope limited
                             _UNIT_LIB.unit_table)
             except Exception:
 
@@ -897,7 +897,7 @@ def _find_unit(unit, error=False):
                     # check if this was a compound unit, so each
                     # substring might be a unit
                     try:
-                        eval(item, {'__builtins__': None},  # nosec: need alternative
+                        eval(item, {'__builtins__': None},  # nosec: scope limited
                              _UNIT_LIB.unit_table)
 
                     except Exception:  # maybe is a prefixed unit then
@@ -921,7 +921,7 @@ def _find_unit(unit, error=False):
                                 raise ValueError(f"The units '{name}' are invalid.")
                             return None
 
-                unit = eval(name, {'__builtins__': None},  # nosec: need alternative
+                unit = eval(name, {'__builtins__': None},  # nosec: scope limited
                             _UNIT_LIB.unit_table)
 
             _UNIT_CACHE[name] = unit

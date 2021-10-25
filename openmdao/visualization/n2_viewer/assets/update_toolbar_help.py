@@ -24,15 +24,6 @@ LINE_STR = '-' * 78
 async def main():
     """Create a browser instance and print user agent info."""
     print("Opening browser")
-
-    # browser = await pyppeteer.launch({
-    #     'defaultViewport': {
-    #         'width': 1600,
-    #         'height': 900
-    #     },
-    #     'args': ['--start-fullscreen'],
-    #     'headless': True
-    # })
     browser = await playwright.chromium.launch(args=['--start-fullscreen', '--headless'])
 
     page = await browser.newPage()

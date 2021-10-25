@@ -1182,10 +1182,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         msg = "Analysis Error: 'interp' <class MetaModelStructuredComp> "
         with assert_warning(UserWarning, msg, contains_msg=True):
-            try:
-              p.run_driver()
-            except Exception as err:
-              self.fail(f"WTF: {str(err)}")
+            p.run_driver()
 
     def test_slinear_backward_fd(self):
         # Verify that FD/CS direction for slinear is backward so that direction matches bracketing.
