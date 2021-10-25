@@ -22,7 +22,8 @@ import openmdao.func_api as omf
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_varnames = {'units', 'shape', 'shape_by_conn', 'run_root_only'}
+_disallowed_varnames = {'units', 'shape', 'shape_by_conn', 'run_root_only', 'distributed',
+                        'assembled_jac_type'}
 
 _meta_keep = {'units', 'shape', 'val'}
 _from_def = {'default_units': 'units', 'default_shape': 'shape'}
