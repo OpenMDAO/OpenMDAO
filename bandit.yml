@@ -1,0 +1,12 @@
+
+### deltas from default Bandit config file generated from bandit-config-generator
+
+# skip test IDs
+skips: ['B301', 'B404']  # pickle & import_subprocess
+
+# don't scan doc build directory
+exclude_dirs: ['*/docs/*/_build/*']
+
+# allow assert in tests
+assert_used:
+  skips: ['*/test_*py']

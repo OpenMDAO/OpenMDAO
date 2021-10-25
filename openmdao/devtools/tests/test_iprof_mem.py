@@ -71,19 +71,19 @@ class TestCmdlineMemory(unittest.TestCase):
 
     def _run_command(self, cmd):
         try:
-            output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
+            output = subprocess.check_output(cmd).decode('utf-8', 'ignore')
         except subprocess.CalledProcessError as err:
             msg = "Running command '{}' failed. " + \
                   "Output was: \n{}".format(cmd, err.output.decode('utf-8'))
             self.fail(msg)
 
     def test_mem(self):
-        self._run_command('openmdao mem %s' % self.tstfile)
-        self._run_command('openmdao mempost mem_trace.raw')
+        self._run_command(['openmdao', 'mem', self.tstfile])
+        self._run_command(['openmdao', 'mempost', 'mem_trace.raw'])
 
     def test_mem_tree(self):
-        self._run_command('openmdao mem -t %s' % self.tstfile)
-        self._run_command('openmdao mempost -t mem_trace.raw')
+        self._run_command(['openmdao', 'mem', '-t', self.tstfile])
+        self._run_command(['openmdao', 'mempost', '-t', 'mem_trace.raw'])
 
 
 if __name__ == "__main__":

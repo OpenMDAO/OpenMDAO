@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import os
+import subprocess
 import pathlib
 
 from copy_build_artifacts import copy_build_artifacts
@@ -22,8 +23,8 @@ def build_book(book_dir=BOOK_DIR, clean=True):
     save_cwd = os.getcwd()
     os.chdir(REPO_ROOT)
     if clean:
-        os.system(f'jupyter-book clean {book_dir}')
-    os.system(f'jupyter-book build -W {book_dir}')
+        subprocess.run(['jupyter-book', 'clean', book_dir])  # nosec: trusted input
+    subprocess.run(['jupyter-book', 'build', '-W', book_dir])  # nosec: trusted input
     copy_build_artifacts(book_dir)
     os.chdir(save_cwd)
 

@@ -406,4 +406,4 @@ def _itrace_exec(options, user_args):
     start()
 
     sys.argv[:] = [progname] + user_args
-    exec (code, globals_dict)
+    exec (code, globals_dict)  # nosec: just runs user's code with additional functionality

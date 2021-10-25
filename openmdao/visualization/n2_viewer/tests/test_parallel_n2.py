@@ -56,7 +56,7 @@ class N2ParallelTestCase(unittest.TestCase):
         if not DEBUG:
             try:
                 os.remove(OUTFILE)
-            except:
+            except OSError:
                 # Don't want the test to fail if the test file is already removed
                 pass
 
