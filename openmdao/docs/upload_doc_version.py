@@ -102,7 +102,7 @@ def upload_doc_version(source_dir, destination, *args):
             cmd += f" {arg}"
 
     try:
-        subprocess.run(cmd.split(), check=True)  # nosec: trusted input
+        subprocess.run(cmd, shell=True, check=True)  # nosec: trusted input
     except:
         raise Exception('Doc transfer failed.')
     else:
