@@ -186,8 +186,6 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         newton.options['iprint'] = 0
-
-        # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         p_opt.driver = om.ScipyOptimizeDriver()
@@ -270,6 +268,51 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         # need this since comp is implicit and doesn't have a solve_linear
         p.model.linear_solver = om.DirectSolver()
+
+        p.setup()
+
+        p.set_val('comp.a', 2.)
+        p.set_val('comp.b', -8.)
+        p.set_val('comp.c', 6.)
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_solve_linear_linearize(self):
+
+        def apply_nl(a, b, c, x):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        def linearize(a, b, c, x, partials):
+            partials['x', 'a'] = x ** 2
+            partials['x', 'b'] = x
+            partials['x', 'c'] = 1.0
+            partials['x', 'x'] = 2 * a * x + b
+
+            inv_jac = 1.0 / (2 * a * x + b)
+            return inv_jac
+
+        def solve_linear(d_x, mode, inv_jac):
+            if mode == 'fwd':
+                d_x = inv_jac * d_x
+                return d_x
+            elif mode == 'rev':
+                dR_x = inv_jac * d_x
+                return dR_x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f, solve_linear=solve_linear, linearize=linearize))
+
+        # need iterative nonlinear solver since implicit comp doesn't have one
+        newton = p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['iprint'] = 0
 
         p.setup()
 
