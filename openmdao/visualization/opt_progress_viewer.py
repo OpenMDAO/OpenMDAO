@@ -64,9 +64,9 @@ class VarOptViewer(object):
         if len(var_map[group]) > 1:
             compatible_vars = var_map[group].copy()
             compatible_vars.pop(compatible_vars.index(x_var))
-            return compatible_vars + ["segment_length"]
+            return compatible_vars + ["Number of Points"]
         else:
-            return ["segment_length"]
+            return ["Number of Points"]
 
     def _parse(self):
         """
@@ -99,10 +99,10 @@ class VarOptViewer(object):
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
         self.var_map = self.var_hash_map(self.io_options_x)
         for key in self.io_options_x:
-            self.io_options_x[key].append("segment_length")
+            self.io_options_x[key].append("Number of Points")
 
         for val in self.io_options_x.values():
-            if val and val[0] != "segment_length":
+            if val and val[0] != "Number of Points":
                 io_starting_option = val[0]
                 break
 
@@ -164,7 +164,7 @@ class VarOptViewer(object):
     def _io_var_select_x_update(self, attr, old, new):
 
 
-        if self.io_select_x.value == "segment_length":
+        if self.io_select_x.value == "Number of Points":
             self.io_select_y.options = self.io_select_x.options
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
@@ -198,33 +198,42 @@ class VarOptViewer(object):
                 if self.io_select_x.value in val:
                     x_io = getattr(case, key)
 
-            if self.io_select_y.value == "segment_length" and \
-                self.io_select_x.value == "segment_length":
+            if self.io_select_y.value == "Number of Points" and \
+                self.io_select_x.value == "Number of Points":
                 x_variable = list(range(1))
                 y_variable = list(range(1))
-            elif self.io_select_y.value == "segment_length":
-                x_variable = x_io[self.io_select_x.value]
+            elif self.io_select_y.value == "Number of Points":
+                x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = list(range(len(x_variable)))
-            elif self.io_select_x.value == "segment_length":
-                y_variable = y_io[self.io_select_y.value]
+            elif self.io_select_x.value == "Number of Points":
+                y_variable = y_io[self.io_select_y.value].flatten()
                 x_variable = list(range(len(y_variable)))
             else:
-                x_variable = x_io[self.io_select_x.value]
-                y_variable = y_io[self.io_select_y.value]
+                x_variable = x_io[self.io_select_x.value].flatten()
+                y_variable = y_io[self.io_select_y.value].flatten()
 
-            if isinstance(x_variable, np.ndarray):
-                new_data['x_vals'].append(x_variable.flatten().tolist())
-            else:
-                new_data['x_vals'].append(x_variable)
+            if not isinstance(new_data['x_vals'], np.ndarray):
+                new_data['x_vals'] = new_data['y_vals'] = np.empty((0, len(x_variable)), float)
 
-            if isinstance(y_variable, np.ndarray):
-                new_data['y_vals'].append(y_variable.flatten().tolist())
-            else:
-                new_data['y_vals'].append(y_variable)
+            new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
+            new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
 
-        if len(new_data['x_vals'][0]) > 1:
+        if new_data['x_vals'].shape[1] > 1:
+            x_len = new_data['x_vals'].shape[1]
+            y_len = new_data['y_vals'].shape[1]
+
+            new_data['x_vals'] = new_data['x_vals'].tolist()
+            new_data['y_vals'] = new_data['y_vals'].tolist()
             new_data['color'] = self._line_color_list(new_data['x_vals'])
             new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+
+            # Move this check outside of the if loop and then make it work if a user picks number of
+            # points for both x and y
+            if self.io_select_x.value == 'Number of Points':
+                new_data['x_vals'] = [[i] * x_len for i in range(0, len(new_data['cases']))]
+
+            if self.io_select_y.value == 'Number of Points':
+                new_data['y_vals'] = [[i] * y_len for i in range(0, len(new_data['cases']))]
 
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
