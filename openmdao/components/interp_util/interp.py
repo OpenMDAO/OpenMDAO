@@ -312,8 +312,7 @@ class InterpND(object):
                                            i, np.NaN, self.grid[i][0], self.grid[i][-1])
 
                 eps = 1e-14 * self.grid[i][-1]
-                if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
-                                      np.all(p - eps <= self.grid[i][-1])):
+                if np.any(p < self.grid[i][0] - eps) or np.any(p > self.grid[i][-1] + eps):
                     p1 = np.where(self.grid[i][0] > p)[0]
                     p2 = np.where(p > self.grid[i][-1])[0]
                     # First violating entry is enough to direct the user.
