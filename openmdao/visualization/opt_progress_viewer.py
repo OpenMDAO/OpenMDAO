@@ -1,12 +1,14 @@
 import json
 import operator
 from functools import reduce
+import warnings
 
 from bokeh.io import show, output_notebook
 from bokeh.models import Select, HoverTool, MultiSelect
 from bokeh.layouts import row, column
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.palettes import Category20, Turbo256
+from bokeh.util.warnings import BokehUserWarning
 
 from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
@@ -30,6 +32,7 @@ class VarOptViewer(object):
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
+        warnings.simplefilter(action='ignore', category=BokehUserWarning)
         self.data = data
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
@@ -61,12 +64,12 @@ class VarOptViewer(object):
     def var_compatability_check(self, x_var, var_map):
         group = x_var.split('.')[-1].split(':')[0]
 
-        if len(var_map[group]) > 1:
+        if group != "Number of Points" and len(var_map[group]) > 1:
             compatible_vars = var_map[group].copy()
             compatible_vars.pop(compatible_vars.index(x_var))
-            return compatible_vars + ["Number of Points"]
+            return compatible_vars + ["Number of Points"] + ["Case Iterations"]
         else:
-            return ["Number of Points"]
+            return ["Number of Points", "Case Iterations"]
 
     def _parse(self):
         """
@@ -98,14 +101,17 @@ class VarOptViewer(object):
                              enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
         self.var_map = self.var_hash_map(self.io_options_x)
+
         for key in self.io_options_x:
             self.io_options_x[key].append("Number of Points")
+            self.io_options_x[key].append("Case Iterations")
 
         for val in self.io_options_x.values():
-            if val and val[0] != "Number of Points":
+            if val and val[0] != "Number of Points" or val[0] != "Case Iterations":
                 io_starting_option = val[0]
                 break
 
+        print(io_starting_option)
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
 
@@ -162,9 +168,8 @@ class VarOptViewer(object):
         self.update()
 
     def _io_var_select_x_update(self, attr, old, new):
-
-
-        if self.io_select_x.value == "Number of Points":
+        if self.io_select_x.value == "Number of Points" or \
+            self.io_select_x.value == "Case Iterations":
             self.io_select_y.options = self.io_select_x.options
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
@@ -198,14 +203,20 @@ class VarOptViewer(object):
                 if self.io_select_x.value in val:
                     x_io = getattr(case, key)
 
-            if self.io_select_y.value == "Number of Points" and \
-                self.io_select_x.value == "Number of Points":
+            if self.io_select_y.value == "Number of Points" or \
+                self.io_select_y.value == "Case Iterations":
+                num_points_y = True
+            if self.io_select_x.value == "Number of Points" or \
+                self.io_select_x.value == "Case Iterations":
+                num_points_x = True
+
+            if num_points_y and num_points_x:
                 x_variable = list(range(1))
                 y_variable = list(range(1))
-            elif self.io_select_y.value == "Number of Points":
+            elif num_points_y:
                 x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = list(range(len(x_variable)))
-            elif self.io_select_x.value == "Number of Points":
+            elif num_points_x:
                 y_variable = y_io[self.io_select_y.value].flatten()
                 x_variable = list(range(len(y_variable)))
             else:
@@ -218,6 +229,7 @@ class VarOptViewer(object):
             new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
             new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
 
+        print(new_data)
         if new_data['x_vals'].shape[1] > 1:
             x_len = new_data['x_vals'].shape[1]
             y_len = new_data['y_vals'].shape[1]
@@ -229,11 +241,17 @@ class VarOptViewer(object):
 
             # Move this check outside of the if loop and then make it work if a user picks number of
             # points for both x and y
-            if self.io_select_x.value == 'Number of Points':
-                new_data['x_vals'] = [[i] * x_len for i in range(0, len(new_data['cases']))]
+            if num_points_x:
+                if len(new_data['cases']) == 1:
+                    issue_warning("Select two or more cases")
+                new_data['x_vals'] = np.full((x_len, len(new_data['cases'])),
+                                              [list(range(0,len(new_data['cases'])))])
 
-            if self.io_select_y.value == 'Number of Points':
-                new_data['y_vals'] = [[i] * y_len for i in range(0, len(new_data['cases']))]
+            if num_points_y:
+                if len(new_data['cases']) == 1:
+                    issue_warning("Select two or more cases")
+                new_data['y_vals'] = np.full((y_len, len(new_data['cases'])),
+                                              [list(range(0,len(new_data['cases'])))])
 
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
