@@ -427,5 +427,5 @@ def _iprof_py_file(options, user_args):
 
     _setup(options, finalize=False)
     start()
-    exec (code, globals_dict)
+    exec (code, globals_dict)  # nosec: just runs user's code with additional functionality
     _finalize_profile()

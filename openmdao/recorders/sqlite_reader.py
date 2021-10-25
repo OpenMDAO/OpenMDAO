@@ -1045,7 +1045,7 @@ class CaseTable(object):
         """
         with sqlite3.connect(self._filename) as con:
             cur = con.cursor()
-            cur.execute("SELECT count(*) FROM %s" % self._table_name)
+            cur.execute(f"SELECT count(*) FROM {self._table_name}")  # nosec: trusted input
             rows = cur.fetchall()
 
         con.close()
@@ -1070,8 +1070,8 @@ class CaseTable(object):
         if not self._keys:
             with sqlite3.connect(self._filename) as con:
                 cur = con.cursor()
-                cur.execute("SELECT %s FROM %s ORDER BY id ASC" %
-                            (self._index_name, self._table_name))
+                cur.execute(f"SELECT {self._index_name} FROM {self._table_name}"
+                            " ORDER BY id ASC")
                 rows = cur.fetchall()
 
             con.close()
@@ -1171,8 +1171,8 @@ class CaseTable(object):
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s WHERE %s='%s'" %
-                        (self._table_name, self._index_name, case_id))
+            cur.execute(f"SELECT * FROM {self._table_name} "  # nosec: trusted input
+                        f"WHERE {self._index_name}=?", (case_id, ))
             row = cur.fetchone()
 
         con.close()
@@ -1238,7 +1238,7 @@ class CaseTable(object):
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
+            cur.execute(f"SELECT * FROM {self._table_name} ORDER BY id ASC")  # nosec: trusted input
             # rows = cur.fetchall()
             for row in cur:
                 case_id = row[self._index_name]
@@ -1401,14 +1401,14 @@ class DriverCases(CaseTable):
         with sqlite3.connect(self._filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
-            cur.execute("SELECT * FROM %s ORDER BY id ASC" % self._table_name)
+            cur.execute(f"SELECT * FROM {self._table_name} ORDER BY id ASC")  # nosec: trusted input
             rows = cur.fetchall()
 
             for row in rows:
                 if self._format_version > 1:
                     # fetch associated derivative data, if available
-                    cur.execute("SELECT * FROM driver_derivatives WHERE iteration_coordinate='%s'"
-                                % row['iteration_coordinate'])
+                    cur.execute("SELECT * FROM driver_derivatives WHERE iteration_coordinate=?",
+                                (row['iteration_coordinate'], ))
                     derivs_row = cur.fetchone()
 
                     if derivs_row:

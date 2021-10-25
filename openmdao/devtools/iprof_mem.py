@@ -167,7 +167,7 @@ def _mem_prof_exec(options, user_args):
     # update sys.argv in case python script takes cmd line args
     sys.argv[:] = [progname] + user_args
 
-    exec (code, globals_dict)
+    exec (code, globals_dict)  # nosec: just runs user's code with additional functionality
 
     stop()
 
