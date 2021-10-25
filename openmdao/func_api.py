@@ -38,7 +38,7 @@ _allowed_declare_partials_args = {
 }
 
 _allowed_declare_coloring_args = {
-    'of', 'wrt', 'method', 'form', 'step', 'per_instance', 'num_full_jacs', 'tol', 'orders',
+    'wrt', 'method', 'form', 'step', 'per_instance', 'num_full_jacs', 'tol', 'orders',
     'perturb_size', 'min_improve_pct', 'show_summary', 'show_sparsity'
 }
 
@@ -195,7 +195,7 @@ class OMWrappedFunc(object):
         """
         if name in self._inputs:
             if 'resid' in kwargs:
-                self._inputs[name]['state'] = True
+                self._inputs[name]['resid'] = kwargs['resid']
             else:
                 raise RuntimeError(f"In add_output, '{name}' already registered as an input.")
         if name in self._outputs:
@@ -251,12 +251,18 @@ class OMWrappedFunc(object):
         self._inputs[name]['is_option'] = True
         return self
 
-    def declare_partials(self, **kwargs):
+    def declare_partials(self, of=('*'), wrt=('*'), **kwargs):
         r"""
         Collect args to be passed to declare_partials on an OpenMDAO component.
 
         Parameters
         ----------
+        of : str or list of str
+            Individual name/glob pattern or list of names/glob patterns to match
+            'of' variables.
+        wrt : str or list of str
+            Individual name/glob pattern or list of names/glob patterns to match
+            'with respect to' variables.
         **kwargs : dict
             Keyword args to store.
         """
@@ -276,6 +282,9 @@ class OMWrappedFunc(object):
                                "function object and any set method='jax', then all must set "
                                "method='jax'.")
 
+        kwargs = kwargs.copy()
+        kwargs['of'] = of
+        kwargs['wrt'] = wrt
         self._declare_partials.append(kwargs)
 
         return self
@@ -307,7 +316,7 @@ class OMWrappedFunc(object):
         """
         if self._call_setup:
             self._setup()
-        return [it for it in self._inputs.items() if 'state' not in it[1]]
+        return [it for it in self._inputs.items() if 'resid' not in it[1]]
 
     def get_input_names(self):
         """

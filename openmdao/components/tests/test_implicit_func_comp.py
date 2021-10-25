@@ -10,7 +10,7 @@ import openmdao.func_api as omf
 
 
 class TestImplicitFuncComp(unittest.TestCase):
-    def test_apply_linear(self):
+    def test_apply_nonlinear(self):
 
         x_=np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
@@ -138,3 +138,145 @@ class TestImplicitFuncComp(unittest.TestCase):
         abs_errors = data['lingrp.lin'][('x', 'x')]['abs error']
         self.assertTrue(len(abs_errors) > 0)
         self.assertTrue(abs_errors[0] < 1.e-6)
+
+    def test_component_model_w_linearize(self):
+
+        def apply_nonlinear(z, x, y1, y2, R_y1, R_y2):
+
+            z0 = z[0]
+            z1 = z[1]
+
+            return 0, (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
+
+        f = (omf.wrap(apply_nonlinear)
+                .add_input('z', val=np.array([-1., -1.]))
+                .add_input('x', val=2.)
+                .add_output('y1', resid='r_y1')
+                .add_output('y2', resid='r_y2')
+                .add_output('R_y1', resid='r_R_y1')
+                .add_output('R_y2', resid='r_R_y1')
+                .declare_partials('y1', 'y1')
+                .declare_partials('y2', ['z', 'y1', 'y2'])
+                .declare_partials('R_y1', ['R_y1', 'x', 'z', 'y1', 'y2'])
+                .declare_partials('R_y2', ['R_y2','z', 'y1', 'y2']))
+
+        def linearize(z, x, y1, y2, R_y1, R_y2, J):
+
+            J['y1', 'y1'] = -1.
+            J['R_y1','R_y1'] = -1
+
+            J['R_y1', 'x'] = [1]
+            J['R_y1', 'z'] = [2*z[0], 1]
+            J['R_y1', 'y1'] = -1.
+            J['R_y1', 'y2'] = -0.2
+
+            J['y2','y2'] = -1
+
+            J['R_y2','R_y2'] = -1
+            J['y2','z'] = [1, 1]
+            J['y2','y1'] = 0.5*y1**-0.5
+
+            J['R_y2','y2'] = -1
+            J['R_y2','z'] = [1, 1]
+            J['R_y2','y1'] = 0.5*y1**-0.5
+
+        p_opt = om.Problem()
+
+        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize) #, solve_nonlinear=solve_nonlinear)
+
+        newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        newton.options['iprint'] = 0
+
+        # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
+        p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        p_opt.driver = om.ScipyOptimizeDriver()
+        p_opt.driver.options['disp'] = False
+
+        p_opt.model.add_design_var('y1', lower=-10, upper=10)
+        p_opt.model.add_constraint('R_y1', equals=0)
+
+        # this objective doesn't really matter... just need something there
+        p_opt.model.add_objective('y2')
+
+        p_opt.setup()
+
+        # set
+        p_opt['y2'] = 5
+        p_opt['y1'] = 5
+
+        p_opt.run_driver()
+
+        np.testing.assert_almost_equal(p_opt['y1'], 2.109516506074582, decimal=5)
+        np.testing.assert_almost_equal(p_opt['y2'], -0.5475825303740725, decimal=5)
+        np.testing.assert_almost_equal(p_opt['x'], 2.0, decimal=5)
+        np.testing.assert_almost_equal(p_opt['z'], np.array([-1., -1.]), decimal=5)
+
+    def test_solve_nonlinear(self):
+
+        size = 3
+
+        def apply_nl(y, x):
+            A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])
+            R_x = y - A.dot(x)
+            return R_x
+
+        def solve_nl(y, x):
+            A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])
+            x = np.linalg.inv(A).dot(y)
+            return x
+
+        f = (omf.wrap(apply_nl)
+                .defaults(shape=size)
+                .add_output('x', resid='R_x')
+                .declare_partials(of='*', wrt='*', method='cs'))
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p',  om.IndepVarComp('x', val=np.ones(size)))
+        model.add_subsystem('comp', om.ImplicitFuncComp(f, solve_nonlinear=solve_nl))
+
+        model.connect('p.x', 'comp.y')
+
+        model.linear_solver = om.DirectSolver() # needed since comp has no solve_linear
+
+        model.add_design_var('p.x', lower=-11, upper=11)
+        model.add_constraint('p.x', upper=3.3)
+        model.add_objective('comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_check_totals(prob.check_totals(out_stream=None))
+
+    def test_solve_nonlinear2(self):
+
+        def apply_nl(a, b, c, x):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        def solve_nl(a, b, c, x):
+            x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+            return x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*', method='cs')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f, solve_nonlinear=solve_nl))
+
+        # need this since comp is implicit and doesn't have a solve_linear
+        p.model.linear_solver = om.DirectSolver()
+
+        p.setup()
+
+        p.set_val('comp.a', 2.)
+        p.set_val('comp.b', -8.)
+        p.set_val('comp.c', 6.)
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))

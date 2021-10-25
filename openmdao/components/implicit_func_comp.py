@@ -33,7 +33,7 @@ class ImplicitFuncComp(ImplicitComponent):
         The function wrapper used by this component.
     _solve_nonlinear_func : function or None
         Optional function to do a nonlinear solve.
-    _solve_nonlinear : method
+    solve_nonlinear : method
         Local override of _solve_nonlinear method.
     _solve_linear_func : function or None
         Optional function to do a linear solve.
@@ -59,7 +59,7 @@ class ImplicitFuncComp(ImplicitComponent):
         self._linearize_func = linearize
         self._linearize_info = None
         if solve_nonlinear:
-            self._solve_nonlinear = self._solve_nonlinear_
+            self.solve_nonlinear = self._solve_nonlinear_
         if linearize:
             self.linearize = self._linearize_
         if solve_linear:
@@ -147,11 +147,12 @@ class ImplicitFuncComp(ImplicitComponent):
         """
         residuals.set_vals(self._apply_nonlinear_func(*chain(inputs.values(), outputs.values())))
 
-    def _solve_nonlinear_(self):
+    def _solve_nonlinear_(self, inputs, outputs):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        self._solve_nonlinear_func(*chain(self._inputs.values(), self._outputs.values()))
+        self._outputs.set_vals(self._solve_nonlinear_func(*chain(inputs.values(),
+                                                                 outputs.values())))
 
     def _linearize_(self, inputs, outputs, jacobian):
         """
