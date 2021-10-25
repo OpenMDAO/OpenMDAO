@@ -8,7 +8,6 @@ then takes a snapshot of the toolbar and saves it as a base64-encoded PNG.
 import os
 import subprocess
 import asyncio
-# import pyppeteer
 import playwright
 import base64
 
