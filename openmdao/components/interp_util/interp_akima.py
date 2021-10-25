@@ -1420,7 +1420,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         deriv_dx = np.empty(1, dtype=dtype)
 
         if query_idx not in self.coeffs:
-            self.coeffs[query_idx] = self.compute_coeffs(idx, dtype, extrap)
+            self.coeffs[query_idx] = self.compute_coeffs(idx, extrap)
         a, b, c, d = self.coeffs[query_idx]
 
         deriv_dx[0] = b + dx * (2.0 * c + 3.0 * d * dx)
@@ -1428,7 +1428,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         # Evaluate dependent value and exit
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
 
-    def compute_coeffs(self, idx, dtype, extrap):
+    def compute_coeffs(self, idx, extrap):
         """
         Compute the trilinear interpolation coefficients for this block.
 
@@ -1436,8 +1436,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
         ----------
         idx : int
             Interval indices for x.
-        dtype : numpy.dtype
-            Determines whether to allocate complex.
         extrap : int
             Extrapolation flag. -1 to extrapolate low, 1 to extrapolate high, zero otherwise.
 
@@ -1604,7 +1602,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             uncached = sorted(uncached)
-            a, b, c, d = self.compute_coeffs_vectorized(uncached, dtype)
+            a, b, c, d = self.compute_coeffs_vectorized(uncached)
             uncached = np.array(uncached)
             self.vec_coeff[uncached, 0] = a
             self.vec_coeff[uncached, 1] = b
@@ -1621,7 +1619,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         # Evaluate dependent value and exit
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
 
-    def compute_coeffs_vectorized(self, idx, dtype):
+    def compute_coeffs_vectorized(self, idx):
         """
         Compute the trilinear interpolation coefficients for requested blocks.
 
@@ -1629,8 +1627,6 @@ class InterpAkima1D(InterpAlgorithmFixed):
         ----------
         idx : int
             List of interval indices for x.
-        dtype : numpy.dtype
-            Determines whether to allocate complex.
 
         Returns
         -------
@@ -1670,11 +1666,11 @@ class InterpAkima1D(InterpAlgorithmFixed):
         val4 = values[idx + 1]
         h = 1.0 / (grid[idx + 1] - grid[idx])
 
-        m1 = np.zeros(vec_size, dtype=dtype)
-        m2 = np.zeros(vec_size, dtype=dtype)
+        m1 = np.zeros(vec_size)
+        m2 = np.zeros(vec_size)
         m3 = (val4 - val3) * h
-        m4 = np.zeros(vec_size, dtype=dtype)
-        m5 = np.zeros(vec_size, dtype=dtype)
+        m4 = np.zeros(vec_size)
+        m5 = np.zeros(vec_size)
 
         jj = np.where(idx >= 1)[0]
         if len(jj) > 0:
