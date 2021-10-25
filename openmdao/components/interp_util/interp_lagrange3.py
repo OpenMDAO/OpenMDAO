@@ -694,7 +694,7 @@ class InterpLagrange3D(InterpAlgorithmFixed):
             grid = self.grid
             self.vec_coeff = np.empty((len(grid[0]), len(grid[1]), len(grid[2]), 4, 4, 4))
 
-        needed = set([item for item in zip(idx[0], idx[1], idx[2])])
+        needed = set(zip(idx[0], idx[1], idx[2]))
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
