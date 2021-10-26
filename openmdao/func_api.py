@@ -27,8 +27,6 @@ _allowed_add_output_args = {
     'shape_by_conn', 'copy_shape', 'distributed'
 }
 
-_allowed_defaults_args = _allowed_add_input_args.union(_allowed_add_output_args)
-
 _allowed_declare_options_args = {
     'default', 'values', 'types', 'desc', 'upper', 'lower', 'check_valid', 'allow_none',
     'recordable', 'deprecation'
@@ -79,7 +77,10 @@ class OMWrappedFunc(object):
         Initialize attributes.
         """
         self._f = func
-        self._defaults = {'val': 1.0, 'shape': ()}
+        self._input_defaults = {'val': 1.0, 'shape': ()}
+        self._output_defaults = {'val': 1.0, 'shape': ()}
+        self._partials_defaults = {}
+        self._coloring_defaults = {}
 
         # populate _inputs dict with input names based on function signature so we can error
         # check vs. inputs added via add_input
@@ -111,17 +112,36 @@ class OMWrappedFunc(object):
 
     def defaults(self, **kwargs):
         r"""
-        Add metadata that may apply to any inputs or outputs of the wrapped function.
+        Add default metadata that may apply to the wrapped function.
 
-        Any variable specific metadata will override metadata specified here.
+        Any variable specific or partials/coloring specific metadata will override any metadata
+        specified here.
 
         Parameters
         ----------
         **kwargs : dict
             Metadata names and their values.
         """
-        _check_kwargs(kwargs, _allowed_defaults_args, 'defaults')
-        self._defaults.update(kwargs)
+        input_kwargs = _filter_dict(kwargs, _allowed_add_input_args)
+        output_kwargs = _filter_dict(kwargs, _allowed_add_output_args)
+        partials_kwargs = _filter_dict(kwargs, _allowed_declare_partials_args)
+        coloring_kwargs = _filter_dict(kwargs, _allowed_declare_coloring_args)
+
+        combined = (set(input_kwargs)
+                    .union(output_kwargs)
+                    .union(partials_kwargs)
+                    .union(coloring_kwargs))
+
+        if len(kwargs) > len(combined):
+            invalids = (set(kwargs) - _allowed_add_input_args - _allowed_add_output_args -
+                        _allowed_declare_partials_args - _allowed_declare_coloring_args)
+            raise NameError(f"In defaults, metadata names {sorted(invalids)} are not allowed.")
+
+        self._input_defaults.update(input_kwargs)
+        self._output_defaults.update(output_kwargs)
+        self._partials_defaults.update(partials_kwargs)
+        self._coloring_defaults.update(coloring_kwargs)
+
         return self
 
     def add_input(self, name, **kwargs):
@@ -238,9 +258,23 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         _check_kwargs(kwargs, _allowed_declare_partials_args, 'declare_partials')
-        self._declare_partials.append(kwargs)
+        _update_from_defaults(kwargs, self._partials_defaults)
+
+        jaxerr = False
         if 'method' in kwargs and kwargs['method'] == 'jax':
+            if self._declare_partials and not self._use_jax:
+                jaxerr = True
             self._use_jax = True
+        elif self._use_jax:
+            jaxerr = True
+
+        if jaxerr:
+            raise RuntimeError("If multiple calls to declare_partials() are made on the same "
+                               "function object and any set method='jax', then all must set "
+                               "method='jax'.")
+
+        self._declare_partials.append(kwargs)
+
         return self
 
     def declare_coloring(self, **kwargs):
@@ -254,6 +288,7 @@ class OMWrappedFunc(object):
         """
         if self._declare_coloring is None:
             _check_kwargs(kwargs, _allowed_declare_coloring_args, 'declare_coloring')
+            _update_from_defaults(kwargs, self._coloring_defaults)
             self._declare_coloring = kwargs.copy()
             return self
         raise RuntimeError("declare_coloring has already been called.")
@@ -348,41 +383,20 @@ class OMWrappedFunc(object):
         if (isinstance(neq, np.ndarray) and np.any(neq)) or neq:
             raise RuntimeError(f"Conflicting metadata entries for '{name}'.")
 
-    def _resolve_default(self, key, meta):
-        """
-        Update the value of the metadata corresponding to key based on self._defaults.
-
-        Parameters
-        ----------
-        key : str
-            The metadata entry key.
-        meta : dict
-            The metadata dict to be updated.
-        """
-        if (key not in meta or meta[key] is None) and key in self._defaults:
-            meta[key] = self._defaults[key]
-
     def _setup(self):
         """
         Set up input and output variable metadata dicts.
         """
         self._call_setup = False
-        overrides = set(self._defaults)
 
-        self._setup_inputs(overrides)
-        self._setup_outputs(overrides)
+        self._setup_inputs()
+        self._setup_outputs()
 
-    def _setup_inputs(self, overrides):
+    def _setup_inputs(self):
         """
         Set up the input variable metadata dicts.
-
-        Parameters
-        ----------
-        overrides : set
-            Set of names of entries in self._defaults.
         """
         ins = self._inputs
-        overrides = overrides - {'val', 'shape'}
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
@@ -394,13 +408,13 @@ class OMWrappedFunc(object):
                 valshape = np.asarray(meta['val']).shape
             else:
                 valshape = None
-                meta['val'] = self._defaults['val']
+                meta['val'] = self._input_defaults['val']
 
             if meta.get('shape') is None:
                 if valshape is not None:
                     meta['shape'] = valshape
                 else:
-                    meta['shape'] = self._defaults['shape']
+                    meta['shape'] = self._input_defaults['shape']
 
             meta['shape'] = _shape2tuple(meta['shape'])
             if not valshape:  # val is a scalar so reshape with the given meta['shape']
@@ -409,17 +423,11 @@ class OMWrappedFunc(object):
                 raise ValueError(f"Input '{name}' default value has shape "
                                  f"{valshape}, but shape was specified as {meta['shape']}.")
 
-            for o in overrides:
-                self._resolve_default(o, meta)
+            _update_from_defaults(meta, self._input_defaults)
 
-    def _setup_outputs(self, overrides):
+    def _setup_outputs(self):
         """
         Set up the output variable metadata dicts.
-
-        Parameters
-        ----------
-        overrides : set
-            Set of names of entries in self._defaults.
         """
         outmeta = {}
 
@@ -428,7 +436,7 @@ class OMWrappedFunc(object):
         # e.g., return a, b, c
         outlist = []
         try:
-            ret_info = get_function_deps(self._f)
+            outlist = [(n, {}) for n in get_return_names(self._f)]
         except RuntimeError:
             #  this could happen if function is compiled or has multiple return lines
             if not self._outputs:
@@ -438,9 +446,6 @@ class OMWrappedFunc(object):
             warnings.warn("Couldn't determine function return names based on AST.  Assuming number "
                           "of return values matches number of outputs defined in the metadata.")
             outlist = list(self._outputs.items())
-        else:
-            for o, deps in ret_info:
-                outlist.append([o, {'deps': deps}])
 
         notfound = []
         for oname, ometa in self._outputs.items():
@@ -453,7 +458,7 @@ class OMWrappedFunc(object):
                 notfound.append(oname)
 
         if notfound:  # try to fill in the unnamed slots with user-supplied output data
-            inones = [i for i, (n, m) in enumerate(outlist) if n is None]  # indices with no name
+            inones = [i for i, t in enumerate(outlist) if t[0] is None]  # indices with no name
             if len(notfound) != len(inones):
                 raise RuntimeError(f"There must be an unnamed return value for every unmatched "
                                    f"output name {notfound} but only found {len(inones)}.")
@@ -468,11 +473,11 @@ class OMWrappedFunc(object):
         outs = {n: m for n, m in outlist}
 
         if self._use_jax:
+            # make sure jax used for all declared derivs
             self._compute_out_shapes(self._inputs, outs)
 
         for meta in outs.values():
-            for o in overrides:
-                self._resolve_default(o, meta)
+            _update_from_defaults(meta, self._output_defaults)
             if meta['shape'] is not None:
                 meta['shape'] = _shape2tuple(meta['shape'])
 
@@ -544,7 +549,7 @@ class OMWrappedFunc(object):
                     need_shape = []
 
         if need_shape:  # output shapes weren't provided by user or by jax
-            shape = self._defaults['shape']
+            shape = self._output_defaults['shape']
             warnings.warn(f"Return values {need_shape} have unspecified shape so are assumed to "
                           f"have shape {shape}.")
             for name in need_shape:
@@ -572,26 +577,24 @@ def wrap(func):
     return OMWrappedFunc(func)
 
 
-def _get_kwargs(func, locals_dict, default=None):
+def _update_from_defaults(meta, defaults):
     """
-    Convert a function's args to a kwargs dict containing entries that are not identically default.
+    Update values of the metadata corresponding to defaults.
 
     Parameters
     ----------
-    func : function
-        The function whose args we want to convert to kwargs.
-    locals_dict : dict
-        The locals dict for the function.
-    default : object
-        Don't include arguments whose values are this object.
-
-    Returns
-    -------
-    dict
-        The non-default keyword args dict.
+    meta : dict
+        The metadata dict to be updated.
+    defaults : dict
+        The defaults dict.
     """
-    return {n: locals_dict[n] for n in inspect.signature(func).parameters
-            if locals_dict[n] is not default}
+    for key, val in defaults.items():
+        if key not in meta or meta[key] is None:
+            meta[key] = val
+
+
+def _filter_dict(kwargs, allowed):
+    return {k: v for k, v in kwargs.items() if k in allowed}
 
 
 def _check_kwargs(kwargs, allowed, fname):
@@ -695,9 +698,9 @@ def _get_long_name(node):
     return '.'.join(parts[::-1])
 
 
-class _FuncDepCollector(ast.NodeVisitor):
+class _FuncRetNameCollector(ast.NodeVisitor):
     """
-    An ast.NodeVisitor that records dependencies between inputs and outputs.
+    An ast.NodeVisitor that records return value names.
 
     Each instance of this is single-use.  If needed multiple times create a new instance
     each time.  It also assumes that the AST to be visited contains only a single function
@@ -711,59 +714,14 @@ class _FuncDepCollector(ast.NodeVisitor):
 
     def __init__(self, func):
         super().__init__()
-        self._attrs = None
-        self._deps = {}
         self._ret_info = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
 
-    def _do_assign(self, targets, rhs):
-        lhs_attrs = []
-        for t in targets:
-            lhs_attrs.append(_get_long_name(t))
-
-        self._attrs = set()
-        self.visit(rhs)
-
-        for a in lhs_attrs:
-            if a not in self._deps:
-                self._deps[a] = set()
-            self._deps[a].update(self._attrs)
-
-        self._attrs = None
-
-    def visit_Attribute(self, node):
-        if self._attrs is not None:
-            self._attrs.add(_get_long_name(node))
-
-    def visit_Name(self, node):
-        if self._attrs is not None:
-            self._attrs.add(node.id)
-
-    def visit_Assign(self, node):
-        self._do_assign(node.targets, node.value)
-
-    def visit_AugAssign(self, node):
-        self._do_assign((node.target,), node.value)
-
-    def visit_AnnAssign(self, node):
-        if node.value is not None:
-            self._do_assign((node.target,), node.value)
-
-    def visit_Call(self, node):  # (func, args, keywords, starargs, kwargs)
-        for arg in node.args:
-            self.visit(arg)
-
-        for kw in node.keywords:
-            self.visit(kw.value)
-
     def _get_return_attrs(self, node):
-        self._attrs = set()
-
-        self.visit(node)
-        # also include a boolean indicating if the return expr is a simple name
-        self._ret_info.append((tuple(self._attrs), isinstance(node, ast.Name)))
-
-        self._attrs = None
+        if isinstance(node, ast.Name):
+            self._ret_info.append(node.id)
+        else:
+            self._ret_info.append(None)
 
     def visit_Return(self, node):
         """
@@ -787,9 +745,9 @@ class _FuncDepCollector(ast.NodeVisitor):
             self._get_return_attrs(node.value)
 
 
-def get_function_deps(func):
+def get_return_names(func):
     """
-    Return dependency between return value(s) and inputs.
+    Return list of return value names.
 
     Parameters
     ----------
@@ -799,28 +757,8 @@ def get_function_deps(func):
     Returns
     -------
     list
-        List of the form (name or None, dependency_set) containing one entry for each return
-        value.  'name' will be the name of the return value if it has a simple name, otherwise
-        None.
+        List of names containing one entry for each return value.  Each name will be the
+        name of the return value if it has a simple name, otherwise None.
     """
     input_names = set(inspect.signature(func).parameters)
-    funcdeps = _FuncDepCollector(func)
-    deps = funcdeps._deps
-    retdeps = []
-    for names, _ in funcdeps._ret_info:
-        depset = set()
-        for n in names:
-            stack = [n]
-            seen = set()
-            while stack:
-                v = stack.pop()
-                seen.add(v)
-                if v in input_names:
-                    depset.add(v)
-                elif v in deps:
-                    stack.extend([d for d in deps[v] if d not in seen])
-
-        retdeps.append(depset)
-
-    return [(n[0] if simple and n[0] not in input_names else None, d)
-            for ((n, simple), d) in zip(funcdeps._ret_info, retdeps)]
+    return [n if n not in input_names else None for n in _FuncRetNameCollector(func)._ret_info]

@@ -1222,6 +1222,11 @@ class System(object):
             issue_warning(msg, prefix=self.msginfo, category=DerivativesWarning)
             if not info['per_instance']:
                 coloring_mod._CLASS_COLORINGS[coloring_fname] = None
+
+            # make sure we have no leftover garbage from sparsity/coloring computations
+            self._inputs.set_val(starting_inputs)
+            self._outputs.set_val(starting_outputs)
+            self._residuals.set_val(starting_resids)
             return [None]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
