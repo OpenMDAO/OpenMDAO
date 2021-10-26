@@ -675,26 +675,35 @@ class InterpLagrange3D(InterpAlgorithmFixed):
             Derivative of interpolated values with respect to grid.
         """
         grid = self.grid
+        i_x, i_y, i_z = idx
 
-        for j, i_n in enumerate(idx):
+        # extrapolate low
+        extrap_idx = np.where(i_x < 1)[0]
+        i_x[extrap_idx] = 1
 
-            # extrapolate low
-            if -1 in i_n or 0 in i_n:
-                extrap_idx = np.where(i_n < 1)[0]
-                i_n[extrap_idx] = 1
+        extrap_idx = np.where(i_y < 1)[0]
+        i_y[extrap_idx] = 1
 
-            # extrapolate high
-            ngrid = len(grid[j])
-            if ngrid - 1 in i_n or ngrid - 2 in i_n:
-                extrap_idx = np.where(i_n > ngrid - 3)[0]
-                i_n[extrap_idx] = ngrid - 3
+        extrap_idx = np.where(i_z < 1)[0]
+        i_z[extrap_idx] = 1
+
+        # extrapolate high
+        nx, ny, nz = self.values.shape
+        extrap_idx = np.where(i_x > nx - 3)[0]
+        i_x[extrap_idx] = nx - 3
+
+        extrap_idx = np.where(i_y > ny - 3)[0]
+        i_y[extrap_idx] = ny - 3
+
+        extrap_idx = np.where(i_z > nz - 3)[0]
+        i_z[extrap_idx] = nz - 3
 
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
             self.vec_coeff = np.empty((len(grid[0]), len(grid[1]), len(grid[2]), 4, 4, 4))
 
-        needed = set(zip(idx[0], idx[1], idx[2]))
+        needed = set(zip(i_x, i_y, i_z))
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
@@ -702,11 +711,10 @@ class InterpLagrange3D(InterpAlgorithmFixed):
             a = self.compute_coeffs_vectorized(uncached_idx)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
             self.coeffs = self.coeffs.union(uncached)
-        a = self.vec_coeff[idx[0], idx[1], idx[2], :]
+        a = self.vec_coeff[i_x, i_y, i_z, :]
 
         # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
         # problems that arise from the scaling of each axis.
-        i_x, i_y, i_z = idx
         x = x_vec[:, 0] - grid[0][i_x - 1]
         y = x_vec[:, 1] - grid[1][i_y - 1]
         z = x_vec[:, 2] - grid[2][i_z - 1]
@@ -743,9 +751,9 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         # Compute derivatives using the 64 coefficients.
 
         a = np.empty((vec_size, 4, 4, 4, 3), dtype=dtype)
-        a[..., 0] = self.vec_coeff[idx[0], idx[1], idx[2], :]
-        a[..., 1] = self.vec_coeff[idx[0], idx[1], idx[2], :]
-        a[..., 2] = self.vec_coeff[idx[0], idx[1], idx[2], :]
+        a[..., 0] = self.vec_coeff[i_x, i_y, i_z, :]
+        a[..., 1] = self.vec_coeff[i_x, i_y, i_z, :]
+        a[..., 2] = self.vec_coeff[i_x, i_y, i_z, :]
 
         dx = np.empty((vec_size, 4, 3), dtype=dtype)
         dx[:, 0, 0] = 0.0
