@@ -251,7 +251,7 @@ class OMWrappedFunc(object):
         self._inputs[name]['is_option'] = True
         return self
 
-    def declare_partials(self, of=('*'), wrt=('*'), **kwargs):
+    def declare_partials(self, of=('*',), wrt=('*',), **kwargs):
         r"""
         Collect args to be passed to declare_partials on an OpenMDAO component.
 
