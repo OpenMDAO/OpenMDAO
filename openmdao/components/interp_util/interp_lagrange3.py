@@ -701,7 +701,7 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
-            self.vec_coeff = np.empty((len(grid[0]), len(grid[1]), len(grid[2]), 4, 4, 4))
+            self.vec_coeff = np.empty((nx, ny, nz, 4, 4, 4))
 
         needed = set(zip(i_x, i_y, i_z))
         uncached = needed.difference(self.coeffs)
