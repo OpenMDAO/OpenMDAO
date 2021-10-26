@@ -7,7 +7,7 @@ from io import StringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
 
