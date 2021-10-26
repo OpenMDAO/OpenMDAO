@@ -20,10 +20,9 @@ from openmdao.utils.om_warnings import issue_warning
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_varnames = {'units', 'shape', 'shape_by_conn', 'run_root_only'}
-
-_meta_keep = {'units', 'shape', 'val'}
-_from_def = {'default_units': 'units', 'default_shape': 'shape'}
+_disallowed_varnames = {
+    'units', 'shape', 'shape_by_conn', 'run_root_only', 'distributed', 'assembled_jac_type'
+}
 
 
 def _check_units_option(option, value):
@@ -42,7 +41,7 @@ def _copy_with_ignore(dct, keepers, ignore=()):
     keepers : set-like
         Set of keys for entries we want to keep.
     ignore : set or tuple
-        Ignore these keys.
+        Don't issue a warning for these non-keeper keys.
 
     Returns
     -------
