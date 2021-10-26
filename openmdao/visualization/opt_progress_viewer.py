@@ -107,11 +107,11 @@ class VarOptViewer(object):
             self.io_options_x[key].append("Case Iterations")
 
         for val in self.io_options_x.values():
-            if val and val[0] != "Number of Points" or val[0] != "Case Iterations":
-                io_starting_option = val[0]
-                break
+            for i in val:
+                if i != "Number of Points" and i != "Case Iterations":
+                    io_starting_option = i
+                    break
 
-        print(io_starting_option)
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
 
@@ -192,6 +192,18 @@ class VarOptViewer(object):
             color=[],
             cases=[]
         )
+        num_points_x = num_points_y = False
+        case_iter_x = case_iter_y = False
+
+        if self.io_select_y.value == "Number of Points":
+            num_points_y = True
+        if self.io_select_x.value == "Number of Points":
+            num_points_x = True
+
+        if self.io_select_y.value == "Case Iterations":
+            case_iter_y = True
+        if self.io_select_x.value == "Case Iterations":
+            case_iter_x = True
 
         for i in self.case_select.value:
             case = self.cr.get_case(self.case_options[int(i)][1])
@@ -203,20 +215,13 @@ class VarOptViewer(object):
                 if self.io_select_x.value in val:
                     x_io = getattr(case, key)
 
-            if self.io_select_y.value == "Number of Points" or \
-                self.io_select_y.value == "Case Iterations":
-                num_points_y = True
-            if self.io_select_x.value == "Number of Points" or \
-                self.io_select_x.value == "Case Iterations":
-                num_points_x = True
-
-            if num_points_y and num_points_x:
+            if (num_points_y and num_points_x) and (case_iter_x or case_iter_y):
                 x_variable = list(range(1))
                 y_variable = list(range(1))
-            elif num_points_y:
+            elif num_points_y or case_iter_y:
                 x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = list(range(len(x_variable)))
-            elif num_points_x:
+            elif num_points_x or case_iter_x:
                 y_variable = y_io[self.io_select_y.value].flatten()
                 x_variable = list(range(len(y_variable)))
             else:
@@ -229,7 +234,6 @@ class VarOptViewer(object):
             new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
             new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
 
-        print(new_data)
         if new_data['x_vals'].shape[1] > 1:
             x_len = new_data['x_vals'].shape[1]
             y_len = new_data['y_vals'].shape[1]
@@ -241,13 +245,13 @@ class VarOptViewer(object):
 
             # Move this check outside of the if loop and then make it work if a user picks number of
             # points for both x and y
-            if num_points_x:
+            if case_iter_x:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
                 new_data['x_vals'] = np.full((x_len, len(new_data['cases'])),
                                               [list(range(0,len(new_data['cases'])))])
 
-            if num_points_y:
+            if case_iter_y:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
                 new_data['y_vals'] = np.full((y_len, len(new_data['cases'])),
