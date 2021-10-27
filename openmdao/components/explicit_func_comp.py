@@ -6,7 +6,7 @@ from itertools import chain
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _setup_jax
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -104,12 +104,15 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
-        kwargs = self._compute.get_declare_coloring()
-        if kwargs is not None:
-            self.declare_coloring(**kwargs)
+        if self._compute._use_jax:
+            _setup_jax(self, self._compute)
+        else:
+            for kwargs in self._compute.get_declare_partials():
+                self.declare_partials(**kwargs)
 
-        for kwargs in self._compute.get_declare_partials():
-            self.declare_partials(**kwargs)
+            kwargs = self._compute.get_declare_coloring()
+            if kwargs is not None:
+                self.declare_coloring(**kwargs)
 
         super()._setup_partials()
 

@@ -70,3 +70,7 @@ def _check_var_name(comp, name):
     if name in _disallowed_varnames:
         raise NameError(f"{comp.msginfo}: cannot use variable name '{name}' because "
                         "it's a reserved keyword.")
+
+
+def _setup_jax(comp, func):
+    self.matrix_free = True
