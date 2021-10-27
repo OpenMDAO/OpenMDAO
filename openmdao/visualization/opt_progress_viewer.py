@@ -237,26 +237,30 @@ class VarOptViewer(object):
 
         if new_data['x_vals'].shape[1] > 1:
             x_len = new_data['x_vals'].shape[1]
+
             y_len = new_data['y_vals'].shape[1]
 
             new_data['x_vals'] = new_data['x_vals'].tolist()
             new_data['y_vals'] = new_data['y_vals'].tolist()
             new_data['color'] = self._line_color_list(new_data['x_vals'])
             new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+            case_len = len(new_data['cases'])
 
             # Move this check outside of the if loop and then make it work if a user picks number of
             # points for both x and y
             if case_iter_x:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['x_vals'] = np.full((x_len, len(new_data['cases'])),
-                                              [list(range(0,len(new_data['cases'])))])
+                # Need to transpose
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).tolist()
+                new_data['y_vals'] = np.array(new_data['y_vals']).tolist()
+                print(new_data['x_vals'], new_data['y_vals'])
 
-            if case_iter_y:
+            elif case_iter_y:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['y_vals'] = np.full((y_len, len(new_data['cases'])),
-                                              [list(range(0,len(new_data['cases'])))])
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).tolist()
+                new_data['x_vals'] = np.array(new_data['x_vals']).tolist()
 
             # For debugging purposes only. Delete for final release.
             self.x_vals = new_data['x_vals']
@@ -286,7 +290,6 @@ class VarOptViewer(object):
                 colors.pop()
         else:
             if length > 20:
-                print("Using larger color palette")
                 colors = list(Turbo256[:length])
             elif length < 20:
                 colors = list(Category20[length])
