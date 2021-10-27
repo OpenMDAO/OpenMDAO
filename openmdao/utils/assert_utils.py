@@ -244,6 +244,47 @@ def assert_check_partials(data, atol=1e-6, rtol=1e-6):
         raise ValueError(error_string)
 
 
+def assert_check_totals(totals_data, atol=1e-6, rtol=1e-6):
+    """
+    Raise assertion if any entry from the return from check_totals is above a tolerance.
+
+    Parameters
+    ----------
+    totals_data : Dict of Dicts of Tuples of Floats
+        First key:
+            is the (output, input) tuple of strings;
+        Second key:
+            is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+
+        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
+            forward - fd, adjoint - fd, forward - adjoint.
+    atol : float
+        Absolute error. Default is 1e-6.
+    rtol : float
+        Relative error. Default is 1e-6.
+    """
+    fails = []
+    for key, val in totals_data.items():
+        try:
+            val['J_fwd']
+            val['J_fd']
+        except Exception as err:
+            raise err.__class__(f"For key {key}: {err}")
+        try:
+            for i in range(3):
+                erel, eabs = val['rel error'][i], val['abs error'][i]
+                if erel is not None and not np.isnan(erel):
+                    assert_near_equal(erel, 0.0, rtol)
+                if eabs is not None:
+                    assert_near_equal(eabs, 0.0, atol)
+        except ValueError as err:
+            fails.append((key, val, err))
+    if fails:
+        raise ValueError('\n\n'.join(
+            [f"Totals differ for {key}:\nAnalytic:\n{val['J_fwd']}\nFD:\n{val['J_fd']}\n{err}"
+             for key, val, err in fails]))
+
+
 def assert_no_approx_partials(system, include_self=True, recurse=True):
     """
     Raise assertion error if any component within system is using approximated partials.

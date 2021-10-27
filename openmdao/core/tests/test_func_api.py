@@ -37,13 +37,10 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[0][1]['val'], 1.0)
         self.assertEqual(outvar_meta[0][1]['shape'], ())
         self.assertEqual(outvar_meta[0][1]['units'], 'cm')
-        self.assertEqual(outvar_meta[0][1]['deps'], {'b', 'a'})
 
         self.assertEqual(outvar_meta[1][1]['val'], 1.0)
         self.assertEqual(outvar_meta[1][1]['shape'], ())
         self.assertEqual(outvar_meta[1][1]['units'], 'km')
-        self.assertEqual(outvar_meta[1][1]['deps'], {'b', 'c'})
-
 
     def test_inout_vars(self):
         def func(a, b, c):
@@ -79,12 +76,10 @@ class TestFuncAPI(unittest.TestCase):
         np.testing.assert_allclose(outvar_meta[0][1]['val'], np.ones(3))
         self.assertEqual(outvar_meta[0][1]['shape'], (3,))
         self.assertEqual(outvar_meta[0][1]['units'], 'cm')
-        self.assertEqual(outvar_meta[0][1]['deps'], {'b', 'a'})
 
         np.testing.assert_allclose(outvar_meta[1][1]['val'], np.ones(3))
         self.assertEqual(outvar_meta[1][1]['shape'], (3,))
         self.assertEqual(outvar_meta[1][1]['units'], 'km')
-        self.assertEqual(outvar_meta[1][1]['deps'], {'b', 'c'})
 
     def test_nometa(self):
         def func(a, b, c):
@@ -108,21 +103,16 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(list(f.get_output_names()), ['x', 'y'])
         self.assertEqual(outvar_meta[0][1]['val'], 1.0)
         self.assertEqual(outvar_meta[0][1]['shape'], ())
-        self.assertEqual(outvar_meta[0][1]['deps'], {'b', 'a'})
 
         self.assertEqual(outvar_meta[1][1]['val'], 1.0)
         self.assertEqual(outvar_meta[1][1]['shape'], ())
-        self.assertEqual(outvar_meta[1][1]['deps'], {'b', 'c'})
 
     def test_infer_outnames(self):
         def func(a, b, c):
             x = a * b
             return x, c
 
-        deps = omf.get_function_deps(func)
-        self.assertEqual(deps[0], ('x', {'b', 'a'}))
-        # name of second return value is None since output cannot have same name as input
-        self.assertEqual(deps[1], (None, {'c'}))
+        self.assertEqual(omf.get_return_names(func), ['x', None])
 
     def test_infer_outnames_replace_inpname(self):
         def func(a, b, c):
@@ -161,56 +151,9 @@ class TestFuncAPI(unittest.TestCase):
 
         self.assertEqual(outvar_meta[0][1]['val'], 1.0)
         self.assertEqual(outvar_meta[0][1]['shape'], ())
-        self.assertEqual(outvar_meta[0][1]['deps'], {'b', 'a'})
 
         self.assertEqual(outvar_meta[1][1]['val'], 1.0)
         self.assertEqual(outvar_meta[1][1]['shape'], ())
-        self.assertEqual(outvar_meta[1][1]['deps'], {'b', 'c'})
-
-    def test_function_deps1(self):
-        def func(a, b, c):
-            x = a * b
-            foo = b + np.sin(c)
-            bar = np.cos(foo) + 7.
-            baz = np.sin(foo, bar)
-            y = baz + 1.
-            return x, y
-
-        deps = omf.get_function_deps(func)
-        self.assertEqual(deps[0][0], 'x')
-        self.assertEqual(deps[0][1], {'a', 'b'})
-        self.assertEqual(deps[1][0], 'y')
-        self.assertEqual(deps[1][1], {'b', 'c'})
-
-    def test_function_deps2(self):
-        def func(a, b, c):
-            x = a * b
-            foo = 4.
-            bar = np.cos(foo) + 7.
-            baz = np.sin(foo, bar)
-            y = baz + 1.
-            return x, y
-
-        deps = omf.get_function_deps(func)
-        self.assertEqual(deps[0][0], 'x')
-        self.assertEqual(deps[0][1], {'a', 'b'})
-        self.assertEqual(deps[1][0], 'y')
-        self.assertEqual(deps[1][1], set())
-
-    def test_function_deps3(self):
-        def func(a, b, c):
-            foo = sin(a) - cos(b)
-            bar = np.cos(foo) + 7.
-            baz = np.sin(foo, bar)
-            y = baz + 1.
-            x = y
-            return x, y
-
-        deps = omf.get_function_deps(func)
-        self.assertEqual(deps[0][0], 'x')
-        self.assertEqual(deps[0][1], {'a', 'b'})
-        self.assertEqual(deps[1][0], 'y')
-        self.assertEqual(deps[1][1], {'a', 'b'})
 
     def test_defaults(self):
         def func(a):
@@ -218,7 +161,9 @@ class TestFuncAPI(unittest.TestCase):
             return x
 
         f = (omf.wrap(func)
-                .defaults(units='cm', val=7.))
+                .defaults(units='cm', val=7., method='jax')
+                .declare_partials(of='x', wrt='a')
+                .declare_coloring(wrt='*'))
 
         invar_meta = list(f.get_input_meta())
         self.assertEqual(list(f.get_input_names()), ['a'])
@@ -231,7 +176,12 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[0][1]['val'], 7.0)
         self.assertEqual(outvar_meta[0][1]['shape'], ())
         self.assertEqual(outvar_meta[0][1]['units'], 'cm')
-        self.assertEqual(outvar_meta[0][1]['deps'], {'a'})
+
+        partials_meta = list(f.get_declare_partials())
+        self.assertEqual(partials_meta[0]['method'], 'jax')
+
+        coloring_meta = f.get_declare_coloring()
+        self.assertEqual(coloring_meta['method'], 'jax')
 
     def test_defaults_override(self):
         def func(a=4.):
@@ -253,7 +203,6 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(outvar_meta[0][1]['val'], 7.0)
         self.assertEqual(outvar_meta[0][1]['shape'], ())
         self.assertEqual(outvar_meta[0][1]['units'], 'inch')
-        self.assertEqual(outvar_meta[0][1]['deps'], {'a'})
 
     def test_declare_option(self):
         def func(a, opt):
@@ -285,6 +234,20 @@ class TestFuncAPI(unittest.TestCase):
         meta = list(f.get_declare_partials())
         self.assertEqual(meta[0], {'of': 'x', 'wrt': ['a', 'b'], 'method': 'cs'})
         self.assertEqual(meta[1], {'of': 'y', 'wrt': ['a', 'b'], 'method': 'fd'})
+
+    def test_declare_partials_jax_mixed(self):
+        def func(a, b):
+            x = a * b
+            y = a / b
+            return x, y
+
+        with self.assertRaises(Exception) as cm:
+            f = (omf.wrap(func)
+                 .declare_partials(of='x', wrt=['a', 'b'], method='jax')
+                 .declare_partials(of='y', wrt=['a', 'b'], method='fd'))
+
+        self.assertEqual(cm.exception.args[0],
+                         "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
 
     def test_declare_coloring(self):
         def func(a, b):
