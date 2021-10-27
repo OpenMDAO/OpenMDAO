@@ -48,28 +48,18 @@ class VarOptViewer(object):
         if isinstance(self.data, om.SqliteRecorder):
             self.cr = self.data
 
-    def var_hash_map(self, variables):
+    def var_compatability_check(self, variables, var_to_comp):
 
-        var_hash = {}
-        for variable in sorted(variables['outputs']):
-            group = variable.split(".")[-1].split(":")[0]
+        variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
+        variables.pop(variables.index("Number of Points"))
+        variables.pop(variables.index("Case Iterations"))
+        var_list = ["Number of Points", "Case Iterations"]
 
-            if group in var_hash:
-                var_hash[group].append(variable)
-            else:
-                var_hash[group] = [variable]
+        for variable in variables:
+            if len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
+                var_list.append(variable)
 
-        return var_hash
-
-    def var_compatability_check(self, x_var, var_map):
-        group = x_var.split('.')[-1].split(':')[0]
-
-        if group != "Number of Points" and len(var_map[group]) > 1:
-            compatible_vars = var_map[group].copy()
-            compatible_vars.pop(compatible_vars.index(x_var))
-            return compatible_vars + ["Number of Points"] + ["Case Iterations"]
-        else:
-            return ["Number of Points", "Case Iterations"]
+        return var_list
 
     def _parse(self):
         """
@@ -100,7 +90,6 @@ class VarOptViewer(object):
         self.case_options = [(str(i), case) for i, case in \
                              enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
-        self.var_map = self.var_hash_map(self.io_options_x)
 
         for key in self.io_options_x:
             self.io_options_x[key].append("Number of Points")
@@ -130,12 +119,11 @@ class VarOptViewer(object):
         self.io_select_x = Select(title="X Value:", value=io_starting_option, options=self.io_options_x)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
-        self.io_options_y = self.var_compatability_check(self.io_select_x.value, self.var_map)
-        self.io_select_y = Select(title="Y Value:", value=self.io_options_y[0], options=self.io_options_y)
+        self.io_options_y = self.io_options_x
+        self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=self.io_options_x)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
-        self.variables_plot.yaxis.axis_label = self.io_options_y[0]
-        self.variables_plot.xaxis.axis_label = io_starting_option
+        self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = io_starting_option
 
         self.layout = row(self.variables_plot, column(self.source_select,
                                                       self.case_select,
@@ -151,6 +139,9 @@ class VarOptViewer(object):
         )
         self.variables_plot.add_tools(ht)
         self.update()
+
+        self.io_select_y.options = self.var_compatability_check(self.io_options_x, self.io_select_x.value)
+
         self.doc.add_root(self.layout)
 
     def _source_update(self, attr, old, new):
@@ -174,7 +165,7 @@ class VarOptViewer(object):
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
         else:
-            self.io_select_y.options = self.var_compatability_check(new, self.var_map)
+            self.io_select_y.options = self.var_compatability_check(self.io_select_x.options, new)
             self.io_select_y.value = self.io_select_y.options[0]
 
             self.variables_plot.xaxis.axis_label = new
@@ -206,14 +197,14 @@ class VarOptViewer(object):
             case_iter_x = True
 
         for i in self.case_select.value:
-            case = self.cr.get_case(self.case_options[int(i)][1])
+            self.case = self.cr.get_case(self.case_options[int(i)][1])
 
             for key, val in self.io_options_x.items():
                 if self.io_select_y.value in val:
-                    y_io = getattr(case, key)
+                    y_io = getattr(self.case, key)
 
                 if self.io_select_x.value in val:
-                    x_io = getattr(case, key)
+                    x_io = getattr(self.case, key)
 
             if (num_points_y and num_points_x) and (case_iter_x or case_iter_y):
                 x_variable = list(range(1))
@@ -229,7 +220,8 @@ class VarOptViewer(object):
                 y_variable = y_io[self.io_select_y.value].flatten()
 
             if not isinstance(new_data['x_vals'], np.ndarray):
-                new_data['x_vals'] = new_data['y_vals'] = np.empty((0, len(x_variable)), float)
+                new_data['x_vals'] = np.empty((0, len(x_variable)), float)
+                new_data['y_vals'] = np.empty((0, len(y_variable)), float)
 
             new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
             new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
@@ -256,6 +248,10 @@ class VarOptViewer(object):
                     issue_warning("Select two or more cases")
                 new_data['y_vals'] = np.full((y_len, len(new_data['cases'])),
                                               [list(range(0,len(new_data['cases'])))])
+
+            # For debugging purposes only. Delete for final release.
+            self.x_vals = new_data['x_vals']
+            self.y_vals = new_data['y_vals']
 
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
@@ -289,3 +285,7 @@ class VarOptViewer(object):
                 issue_warning("Cannot compare more than 256 cases")
 
         return colors
+
+    def test_func(self):
+        # For debugging purposes only. Delete for final release.
+        return self.x_vals, self.y_vals
