@@ -251,15 +251,13 @@ class VarOptViewer(object):
             if case_iter_x:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                # Need to transpose
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).tolist()
+                new_data['x_vals'] = np.full((case_len, x_len), [[i] for i in range(0, case_len)]).T.tolist()
                 new_data['y_vals'] = np.array(new_data['y_vals']).tolist()
-                print(new_data['x_vals'], new_data['y_vals'])
 
             elif case_iter_y:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).tolist()
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T.tolist()
                 new_data['x_vals'] = np.array(new_data['x_vals']).tolist()
 
             # For debugging purposes only. Delete for final release.
