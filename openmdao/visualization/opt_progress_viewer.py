@@ -196,6 +196,11 @@ class VarOptViewer(object):
         if self.io_select_x.value == "Case Iterations":
             case_iter_x = True
 
+        if case_iter_x or case_iter_y:
+            if len(self.case_select.value) == 1:
+                current_val = int(self.case_select.value[0])
+                self.case_select.value.append(str(current_val + 1))
+
         for i in self.case_select.value:
             self.case = self.cr.get_case(self.case_options[int(i)][1])
 
@@ -209,6 +214,10 @@ class VarOptViewer(object):
             if (num_points_y and num_points_x) or (case_iter_x and case_iter_y):
                 x_variable = list(range(1))
                 y_variable = list(range(1))
+            elif (num_points_x and case_iter_y) or (num_points_y and case_iter_x):
+                x_variable = list(range(1))
+                y_variable = list(range(1))
+                print("Cannot compare Number of Points to Case Iterations")
             elif num_points_y or case_iter_y:
                 x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = list(range(len(x_variable)))
