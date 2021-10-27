@@ -42,7 +42,7 @@ optional_dependencies = {
 }
 
 if sys.version_info >= (3, 7):
-    optional_dependencies['test'].append('playwright')
+    optional_dependencies['test'].append('playwright<1.15')
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([

@@ -13,7 +13,7 @@ def download_matfile(group, name, outfile="matrix.out"):
     with open(outfile, "wb") as f:
         url = 'https://sparse.tamu.edu/mat/%s/%s.mat' % (group, name)
         print("Downloading", url)
-        f.write(urllib.request.urlopen(url).read())
+        f.write(urllib.request.urlopen(url).read())   # nosec: https, content vetted
 
     dct = scipy.io.loadmat(outfile)
     return dct

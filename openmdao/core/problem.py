@@ -32,7 +32,7 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import ContainsAll, pad_name, _is_slicer_op, LocalRangeIterable
-from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check
+from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
@@ -143,11 +143,15 @@ class Problem(object):
         self._warned = False
 
         if comm is None:
-            try:
-                from mpi4py import MPI
-                comm = MPI.COMM_WORLD
-            except ImportError:
+            use_mpi = check_mpi_env()
+            if use_mpi is False:
                 comm = FakeComm()
+            else:
+                try:
+                    from mpi4py import MPI
+                    comm = MPI.COMM_WORLD
+                except ImportError:
+                    comm = FakeComm()
 
         if model is None:
             self.model = Group()
@@ -1344,6 +1348,7 @@ class Problem(object):
                                                 # apply the correction to undo the component's
                                                 # internal Allreduce.
                                                 derivs *= mult
+                                                partials_data[c_name][inp, out]['j_rev_mult'] = mult
 
                                         key = inp, out
                                         deriv = partials_data[c_name][key]
@@ -1495,6 +1500,7 @@ class Problem(object):
                 if wrt in local_opts and local_opts[wrt]['directional']:
                     deriv = partials_data[c_name][rel_key]
                     deriv['J_fwd'] = np.atleast_2d(np.sum(deriv['J_fwd'], axis=1)).T
+
                     if comp.matrix_free:
                         deriv['J_rev'] = np.atleast_2d(np.sum(deriv['J_rev'], axis=0)).T
 
@@ -2237,6 +2243,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
         for of, wrt in sorted_keys:
+            mult = None
 
             if totals:
                 fd_opts = global_options['']
@@ -2258,6 +2265,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
 
             if do_rev:
                 reverse = derivative_info.get('J_rev')
+                if 'j_rev_mult' in derivative_info:
+                    mult = derivative_info['j_rev_mult']
 
             fwd_error = safe_norm(forward - fd)
             if do_rev_dp:
@@ -2498,6 +2507,8 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                     if not totals and matrix_free:
                         if out_stream:
                             if not directional:
+                                if mult is not None:
+                                    reverse /= mult
                                 out_buffer.write('    Raw Reverse Derivative (Jrev)\n')
                                 out_buffer.write(str(reverse) + '\n')
                                 out_buffer.write('\n')

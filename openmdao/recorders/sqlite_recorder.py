@@ -445,7 +445,7 @@ class SqliteRecorder(CaseRecorder):
 
             if self._record_metadata:
                 with self.metadata_connection as m:
-                    m.execute("UPDATE metadata SET " +
+                    m.execute("UPDATE metadata SET " +   # nosec: trusted input
                               "abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?, conns=?",
                               (abs2prom, prom2abs, abs2meta, var_settings_json, conns))
 

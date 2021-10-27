@@ -10,7 +10,7 @@ from openmdao.components.interp_util.interp_akima import InterpAkima, InterpAkim
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
-from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
+from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, InterpLagrange3D
 from openmdao.components.interp_util.interp_scipy import InterpScipy
 from openmdao.components.interp_util.interp_slinear import InterpLinear
 from openmdao.components.interp_util.interp_trilinear import InterpTrilinear
@@ -21,6 +21,7 @@ INTERP_METHODS = {
     'slinear': InterpLinear,
     'lagrange2': InterpLagrange2,
     'lagrange3': InterpLagrange3,
+    'lagrange3D': InterpLagrange3D,
     'cubic': InterpCubic,
     'akima': InterpAkima,
     'akima1D': InterpAkima1D,
@@ -32,7 +33,7 @@ INTERP_METHODS = {
 }
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D']
+                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D', 'lagrange3D']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -311,8 +312,7 @@ class InterpND(object):
                                            i, np.NaN, self.grid[i][0], self.grid[i][-1])
 
                 eps = 1e-14 * self.grid[i][-1]
-                if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
-                                      np.all(p - eps <= self.grid[i][-1])):
+                if np.any(p < self.grid[i][0] - eps) or np.any(p > self.grid[i][-1] + eps):
                     p1 = np.where(self.grid[i][0] > p)[0]
                     p2 = np.where(p > self.grid[i][-1])[0]
                     # First violating entry is enough to direct the user.
