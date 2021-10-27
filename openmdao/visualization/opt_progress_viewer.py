@@ -206,7 +206,7 @@ class VarOptViewer(object):
                 if self.io_select_x.value in val:
                     x_io = getattr(self.case, key)
 
-            if (num_points_y and num_points_x) and (case_iter_x or case_iter_y):
+            if (num_points_y and num_points_x) or (case_iter_x and case_iter_y):
                 x_variable = list(range(1))
                 y_variable = list(range(1))
             elif num_points_y or case_iter_y:
