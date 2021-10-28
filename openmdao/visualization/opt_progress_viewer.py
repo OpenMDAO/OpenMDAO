@@ -32,7 +32,7 @@ class VarOptViewer(object):
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
-        warnings.simplefilter(action='ignore', category=BokehUserWarning)
+        # warnings.simplefilter(action='ignore', category=BokehUserWarning)
         self.data = data
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
@@ -54,10 +54,13 @@ class VarOptViewer(object):
         var_list = []
 
         for variable in variables:
-            if len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
+            if hasattr(self.case, variable) and len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
                 var_list.append(variable)
 
-        return sorted(var_list)
+        if var_list:
+            return sorted(var_list)
+        else:
+            return ["Number of Points", "Case Iterations"]
 
     def _parse(self):
         """
@@ -139,10 +142,8 @@ class VarOptViewer(object):
             if isinstance(select.options, dict):
                 for key, val in select.options.items():
                     select.options[key] = val + ["Number of Points"] + ["Case Iterations"]
-            else:
+            elif isinstance(select.options, list):
                 select.options = select.options + ["Number of Points"] + ["Case Iterations"]
-
-        # self.io_select_y.options = ["Number of Points"]
 
         self.doc.add_root(self.layout)
 
@@ -239,11 +240,7 @@ class VarOptViewer(object):
 
         if new_data['x_vals'].shape[1] > 1:
             x_len = new_data['x_vals'].shape[1]
-
             y_len = new_data['y_vals'].shape[1]
-
-            new_data['x_vals'] = new_data['x_vals'].tolist()
-            new_data['y_vals'] = new_data['y_vals'].tolist()
             new_data['color'] = self._line_color_list(new_data['x_vals'])
             new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
             case_len = len(new_data['cases'])
@@ -253,20 +250,24 @@ class VarOptViewer(object):
             if case_iter_x:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['x_vals'] = np.full((case_len, x_len), [[i] for i in range(0, case_len)]).T.tolist()
-                new_data['y_vals'] = np.array(new_data['y_vals']).tolist()
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                new_data['y_vals'] = new_data['y_vals']
 
             elif case_iter_y:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T.tolist()
-                new_data['x_vals'] = np.array(new_data['x_vals']).tolist()
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
+                new_data['x_vals'] = new_data['x_vals']
 
             # For debugging purposes only. Delete for final release.
             self.x_vals = new_data['x_vals']
             self.y_vals = new_data['y_vals']
 
+            new_data['x_vals'] = new_data['x_vals'].tolist()
+            new_data['y_vals'] = new_data['y_vals'].tolist()
+
             self.multi_line_data.data = new_data
+            # print(new_data)
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
             for key, val in new_data.items():
