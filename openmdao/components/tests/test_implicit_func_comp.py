@@ -231,3 +231,51 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_solve_lin_nl_linearize_reordered_args(self):
+
+        def apply_nl(x, a, b, c):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        def solve_nl(x, a, b, c):
+            x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+            return x
+
+        def linearize(x, a, b, c, partials):
+            partials['x', 'a'] = x ** 2
+            partials['x', 'b'] = x
+            partials['x', 'c'] = 1.0
+            partials['x', 'x'] = 2 * a * x + b
+
+            inv_jac = 1.0 / (2 * a * x + b)
+            return inv_jac
+
+        def solve_linear(d_x, mode, inv_jac):
+            if mode == 'fwd':
+                d_x = inv_jac * d_x
+                return d_x
+            elif mode == 'rev':
+                dR_x = inv_jac * d_x
+                return dR_x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f,
+                                                          solve_linear=solve_linear,
+                                                          linearize=linearize,
+                                                          solve_nonlinear=solve_nl))
+
+        p.setup()
+
+        p.set_val('comp.a', 2.)
+        p.set_val('comp.b', -8.)
+        p.set_val('comp.c', 6.)
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))

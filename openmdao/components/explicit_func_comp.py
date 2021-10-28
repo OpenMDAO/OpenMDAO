@@ -47,6 +47,11 @@ class ExplicitFuncComp(ExplicitComponent):
         if self._compute._use_jax:
             self.options['use_jax'] = True
         self._compute_partials = compute_partials
+        if self.options['use_jax'] and self.options['use_jit']:
+            try:
+                self._compute._f = jit(self._compute._f)
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: failed jit compile of compute function: {err}")
 
     def _declare_options(self):
         """
@@ -101,11 +106,11 @@ class ExplicitFuncComp(ExplicitComponent):
     def _compute_jacvec_product_(self, inputs, dinputs, doutputs, mode):
         if mode == 'fwd':
             if self._jvp is None:
-                self._jvp = jax.linearize(self._compute._f, *self._inputs.values())[1]
+                self._jvp = jax.linearize(self._compute._f, *inputs.values())[1]
             doutputs.set_vals(self._jvp(*dinputs.values()))
         else:  # rev
             if self._vjp is None:
-                self._vjp = vjp(self._compute._f, *self._inputs.values())[1]
+                self._vjp = vjp(self._compute._f, *inputs.values())[1]
             dinputs.set_vals(self._vjp(tuple(doutputs.values())))
 
     def compute(self, inputs, outputs):

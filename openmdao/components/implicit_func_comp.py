@@ -145,14 +145,13 @@ class ImplicitFuncComp(ImplicitComponent):
         discrete_outputs : _DictValues or None
             Dict-like object containing discrete outputs.
         """
-        residuals.set_vals(self._apply_nonlinear_func(*chain(inputs.values(), outputs.values())))
+        residuals.set_vals(self._apply_nonlinear_func(*self._ordered_values(inputs, outputs)))
 
     def _solve_nonlinear_(self, inputs, outputs):
         """
         Compute outputs. The model is assumed to be in a scaled state.
         """
-        self._outputs.set_vals(self._solve_nonlinear_func(*chain(inputs.values(),
-                                                                 outputs.values())))
+        self._outputs.set_vals(self._solve_nonlinear_func(*self._ordered_values(inputs, outputs)))
 
     def _linearize_(self, inputs, outputs, jacobian):
         """
@@ -167,7 +166,7 @@ class ImplicitFuncComp(ImplicitComponent):
         jacobian : Jacobian
             Sub-jac components written to jacobian[output_name, input_name].
         """
-        self._linearize_info = self._linearize_func(*chain(inputs.values(), outputs.values(),
+        self._linearize_info = self._linearize_func(*chain(self._ordered_values(inputs, outputs),
                                                            (jacobian,)))
 
     def _solve_linear_(self, d_outputs, d_residuals, mode):
@@ -189,3 +188,32 @@ class ImplicitFuncComp(ImplicitComponent):
         else:  # rev
             d_residuals.set_vals(self._solve_linear_func(*chain(d_outputs.values(),
                                                                 (mode, self._linearize_info))))
+
+    def _ordered_values(self, inputs, outputs):
+        """
+        Yield function input args in their proper order.
+
+        In OpenMDAO, states are outputs, but for our some of our functions they are inputs, so
+        this function yields the values of the inputs and states in the same order that they
+        were originally given for the _apply_nonlinear_func.
+
+        Parameters
+        ----------
+        inputs : Vector
+            The input vector.
+        outputs : Vector
+            The output vector (contains the states).
+
+        Yields
+        ------
+        float or ndarray
+            Value of input or state variable.
+        """
+        inps = inputs.values()
+        outs = outputs.values()
+
+        for meta in self._apply_nonlinear_func._inputs.values():
+            if 'resid' in meta:  # it's a state
+                yield next(outs)
+            else:
+                yield next(inps)

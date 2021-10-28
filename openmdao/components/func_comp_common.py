@@ -83,6 +83,6 @@ def _add_options(comp):
     """
     comp.options.declare('use_jax', types=bool, default=False,
                          desc='If True, use jax to compute derivatives.')
-    comp.options.declare('use_jit', types=bool, default=True,
+    comp.options.declare('use_jit', types=bool, default=False,
                          desc='If True, attempt to use jit on the function. This is ignored if '
                               'use_jax is False.')

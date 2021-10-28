@@ -1014,7 +1014,7 @@ class TestComputePartials(unittest.TestCase):
 
 
 class TestJax(unittest.TestCase):
-    def test_fwd(self):
+    def check_derivs(self, mode, use_jit):
         def func(a, b, c):
             x = 2. * a * b + 3. * c
             y = 5. * a * c - 2.5 * b
@@ -1022,35 +1022,29 @@ class TestJax(unittest.TestCase):
 
         f = omf.wrap(func).defaults(shape=(3,2))
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
-        p.setup(mode='fwd')
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
         assert_near_equal(J['comp.x', 'comp.a'], np.eye(6) * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], np.eye(6) * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], np.eye(6) * 3.)
         assert_near_equal(J['comp.y', 'comp.a'], np.eye(6) * 5.)
         assert_near_equal(J['comp.y', 'comp.b'], np.eye(6) * -2.5)
         assert_near_equal(J['comp.y', 'comp.c'], np.eye(6) * 5.)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True)
 
     def test_rev(self):
-        def func(a, b, c):
-            x = 2. * a * b + 3. * c
-            y = 5. * a * c - 2.5 * b
-            return x, y
+        self.check_derivs('rev', use_jit=False)
 
-        f = omf.wrap(func).defaults(shape=(3,2))
-        p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
-        p.setup(mode='rev')
-        p.run_model()
-        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
-        assert_near_equal(J['comp.x', 'comp.a'], np.eye(6) * 2.)
-        assert_near_equal(J['comp.x', 'comp.b'], np.eye(6) * 2.)
-        assert_near_equal(J['comp.x', 'comp.c'], np.eye(6) * 3.)
-        assert_near_equal(J['comp.y', 'comp.a'], np.eye(6) * 5.)
-        assert_near_equal(J['comp.y', 'comp.b'], np.eye(6) * -2.5)
-        assert_near_equal(J['comp.y', 'comp.c'], np.eye(6) * 5.)
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True)
 
 if __name__ == "__main__":
     unittest.main()
