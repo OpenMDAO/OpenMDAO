@@ -72,5 +72,14 @@ def _check_var_name(comp, name):
                         "it's a reserved keyword.")
 
 
-def _setup_jax(comp, func):
-    self.matrix_free = True
+def _add_options(comp):
+    """
+    Add function component specific options to the given component.
+
+    Parameters
+    ----------
+    comp : ImplicitFuncComp or ExplicitFuncComp
+        The function component having options added.
+    """
+    comp.options.declare('use_jit', types=bool, default=True,
+                         desc='If True, attempt to use jit on the function.')

@@ -1012,5 +1012,19 @@ class TestComputePartials(unittest.TestCase):
         p.run_model()
         assert_check_totals(p.check_totals(of=['comp.foo', 'comp.bar'], wrt=['comp.x', 'comp.y', 'comp.z'], method='cs'))
 
+
+class TestJax(unittest.TestCase):
+    def test_fwd(self):
+        def func(a, b, c):
+            x = a* b + c
+            y = a * c + b
+            return x, y
+        
+        f = (omf.wrap(func)
+                .defaults(shape=(3,2))
+             )
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+
 if __name__ == "__main__":
     unittest.main()
