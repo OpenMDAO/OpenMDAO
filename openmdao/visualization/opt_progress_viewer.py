@@ -32,7 +32,7 @@ class VarOptViewer(object):
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
-        # warnings.simplefilter(action='ignore', category=BokehUserWarning)
+        warnings.simplefilter(action='ignore', category=BokehUserWarning)
         self.data = data
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
@@ -54,12 +54,12 @@ class VarOptViewer(object):
         var_list = []
 
         for variable in variables:
-            if hasattr(self.case, variable) and len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
+            if variable in self.case.outputs and len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
                 var_list.append(variable)
 
         if var_list:
-            return sorted(var_list)
-        else:
+            return sorted(var_list) + ["Number of Points"] + ["Case Iterations"]
+        elif variables != ["Number of Points", "Case Iterations"]:
             return ["Number of Points", "Case Iterations"]
 
     def _parse(self):
@@ -138,12 +138,8 @@ class VarOptViewer(object):
         self.update()
 
         self.io_select_y.options = self.var_compatability_check(self.io_options_x, self.io_select_x.value)
-        for select in [self.io_select_y, self.io_select_x]:
-            if isinstance(select.options, dict):
-                for key, val in select.options.items():
-                    select.options[key] = val + ["Number of Points"] + ["Case Iterations"]
-            elif isinstance(select.options, list):
-                select.options = select.options + ["Number of Points"] + ["Case Iterations"]
+        for key, val in self.io_select_x.options.items():
+            self.io_select_x.options[key] = val + ["Number of Points"] + ["Case Iterations"]
 
         self.doc.add_root(self.layout)
 
@@ -250,24 +246,23 @@ class VarOptViewer(object):
             if case_iter_x:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'] = new_data['y_vals']
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T.tolist()
+                new_data['y_vals'] = new_data['y_vals'].tolist()
 
             elif case_iter_y:
                 if len(new_data['cases']) == 1:
                     issue_warning("Select two or more cases")
-                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'] = new_data['x_vals']
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T.tolist()
+                new_data['x_vals'] = new_data['x_vals'].tolist()
+            else:
+                new_data['x_vals'] = new_data['x_vals'].tolist()
+                new_data['y_vals'] = new_data['y_vals'].tolist()
 
             # For debugging purposes only. Delete for final release.
             self.x_vals = new_data['x_vals']
             self.y_vals = new_data['y_vals']
 
-            new_data['x_vals'] = new_data['x_vals'].tolist()
-            new_data['y_vals'] = new_data['y_vals'].tolist()
-
             self.multi_line_data.data = new_data
-            # print(new_data)
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
             for key, val in new_data.items():
