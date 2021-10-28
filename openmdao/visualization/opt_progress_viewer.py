@@ -51,9 +51,7 @@ class VarOptViewer(object):
     def var_compatability_check(self, variables, var_to_comp):
 
         variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
-        variables.pop(variables.index("Number of Points"))
-        variables.pop(variables.index("Case Iterations"))
-        var_list = ["Number of Points", "Case Iterations"]
+        var_list = []
 
         for variable in variables:
             if len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
@@ -92,15 +90,10 @@ class VarOptViewer(object):
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
 
         for key in self.io_options_x:
-            self.io_options_x[key].append("Number of Points")
-            self.io_options_x[key].append("Case Iterations")
+            if self.io_options_x[key]:
+                io_starting_option = self.io_options_x[key][0]
             self.io_options_x[key] = sorted(self.io_options_x[key])
 
-        for val in self.io_options_x.values():
-            for i in val:
-                if i != "Number of Points" and i != "Case Iterations":
-                    io_starting_option = i
-                    break
 
         self.variables_plot = figure(title="Problem Variables", x_axis_label="Variable Length",
                                      y_axis_label="Variable X")
@@ -142,6 +135,14 @@ class VarOptViewer(object):
         self.update()
 
         self.io_select_y.options = self.var_compatability_check(self.io_options_x, self.io_select_x.value)
+        for select in [self.io_select_y, self.io_select_x]:
+            if isinstance(select.options, dict):
+                for key, val in select.options.items():
+                    select.options[key] = val + ["Number of Points"] + ["Case Iterations"]
+            else:
+                select.options = select.options + ["Number of Points"] + ["Case Iterations"]
+
+        # self.io_select_y.options = ["Number of Points"]
 
         self.doc.add_root(self.layout)
 
