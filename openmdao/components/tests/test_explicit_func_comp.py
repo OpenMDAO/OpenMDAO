@@ -1016,15 +1016,41 @@ class TestComputePartials(unittest.TestCase):
 class TestJax(unittest.TestCase):
     def test_fwd(self):
         def func(a, b, c):
-            x = a* b + c
-            y = a * c + b
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
             return x, y
-        
-        f = (omf.wrap(func)
-                .defaults(shape=(3,2))
-             )
+
+        f = omf.wrap(func).defaults(shape=(3,2))
         p = om.Problem()
-        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode='fwd')
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+        assert_near_equal(J['comp.x', 'comp.a'], np.eye(6) * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], np.eye(6) * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(6) * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], np.eye(6) * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], np.eye(6) * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], np.eye(6) * 5.)
+
+    def test_rev(self):
+        def func(a, b, c):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = omf.wrap(func).defaults(shape=(3,2))
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True))
+        p.setup(mode='rev')
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+        assert_near_equal(J['comp.x', 'comp.a'], np.eye(6) * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], np.eye(6) * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], np.eye(6) * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], np.eye(6) * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], np.eye(6) * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], np.eye(6) * 5.)
 
 if __name__ == "__main__":
     unittest.main()

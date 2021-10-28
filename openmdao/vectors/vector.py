@@ -573,7 +573,7 @@ class Vector(object):
                     arr[start] = v
                 else:
                     end += v.size
-                    arr[start:end] = v.flat
+                    arr[start:end] = v.ravel()
                 start = end
 
     def set_var(self, name, val, idxs=_full_slice, flat=False):

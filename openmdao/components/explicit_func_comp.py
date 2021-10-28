@@ -44,6 +44,8 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         super().__init__(**kwargs)
         self._compute = omf.wrap(compute)
+        if self._compute._use_jax:
+            self.options['use_jax'] = True
         self._compute_partials = compute_partials
 
     def _declare_options(self):
@@ -80,13 +82,15 @@ class ExplicitFuncComp(ExplicitComponent):
             self.add_output(name, **kwargs)
 
     def _linearize(self, jac=None, sub_do_ln=False):
-        if self._compute._use_jax:
+        if self.options['use_jax']:
             # self._jvp = functools.partial(jvp, self._compute._f, tuple(self._inputs.values()))
             # self._jvp((jnp.eye(N)[:, 2],))[1]
             # y, out_tangents = vmap(self._jvp, out_axes=(None, 0))((jnp.eye(N),))
-    
-            self._jvp = jax.linearize(self._compute._f, tuple(self._inputs.values()))
-            self._vjp = vjp(self._compute._f, *self._inputs.values())[1]
+
+            # force _jvp and _vjp to be re-initialized the next time compute_jacvec_product
+            # is called
+            self._jvp = None
+            self._vjp = None
         else:
             super()._linearize(jac, sub_do_ln)
 
@@ -96,11 +100,13 @@ class ExplicitFuncComp(ExplicitComponent):
 
     def _compute_jacvec_product_(self, inputs, dinputs, doutputs, mode):
         if mode == 'fwd':
-            # update doutputs
+            if self._jvp is None:
+                self._jvp = jax.linearize(self._compute._f, *self._inputs.values())[1]
             doutputs.set_vals(self._jvp(*dinputs.values()))
         else:  # rev
-            # update dinputs
-            dinputs.set_vals(self._vjp(*doutputs.values()))
+            if self._vjp is None:
+                self._vjp = vjp(self._compute._f, *self._inputs.values())[1]
+            dinputs.set_vals(self._vjp(tuple(doutputs.values())))
 
     def compute(self, inputs, outputs):
         """
@@ -142,7 +148,7 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
-        if self._compute._use_jax:
+        if self.options['use_jax']:
             self._setup_jax()
         else:
             for kwargs in self._compute.get_declare_partials():
