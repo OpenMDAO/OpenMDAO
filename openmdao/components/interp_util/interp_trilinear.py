@@ -261,6 +261,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
         z = x_vec[:, 2]
         grid = self.grid
         vec_size = len(x)
+        i_x, i_y, i_z = idx
 
         # Complex Step
         if self.values.dtype == complex:
@@ -268,27 +269,39 @@ class InterpTrilinear(InterpAlgorithmFixed):
         else:
             dtype = x.dtype
 
-        for j, i_n in enumerate(idx):
+        # extrapolate low
+        extrap_idx = np.where(i_x == -1)[0]
+        if len(extrap_idx) > 0:
+            i_x[extrap_idx] = 0
 
-            # extrapolate low
-            if -1 in i_n:
-                extrap_idx = np.where(i_n == -1)[0]
-                if len(extrap_idx) > 0:
-                    i_n[extrap_idx] = 0
+        extrap_idx = np.where(i_y == -1)[0]
+        if len(extrap_idx) > 0:
+            i_y[extrap_idx] = 0
 
-            # extrapolate high
-            ngrid = len(grid[j])
-            if ngrid - 1 in i_n:
-                extrap_idx = np.where(i_n == ngrid - 1)[0]
-                if len(extrap_idx) > 0:
-                    i_n[extrap_idx] = ngrid - 2
+        extrap_idx = np.where(i_z == -1)[0]
+        if len(extrap_idx) > 0:
+            i_z[extrap_idx] = 0
+
+        # extrapolate high
+        nx, ny, nz = self.values.shape
+        extrap_idx = np.where(i_x == nx - 1)[0]
+        if len(extrap_idx) > 0:
+            i_x[extrap_idx] = nx - 2
+
+        extrap_idx = np.where(i_y == ny - 1)[0]
+        if len(extrap_idx) > 0:
+            i_y[extrap_idx] = ny - 2
+
+        extrap_idx = np.where(i_z == nz - 1)[0]
+        if len(extrap_idx) > 0:
+            i_z[extrap_idx] = nz - 2
 
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
-            self.vec_coeff = np.empty((len(grid[0]), len(grid[1]), len(grid[2]), 8))
+            self.vec_coeff = np.empty((nx, ny, nz, 8))
 
-        needed = set([item for item in zip(idx[0], idx[1], idx[2])])
+        needed = set([item for item in zip(i_x, i_y, i_z)])
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
@@ -296,7 +309,7 @@ class InterpTrilinear(InterpAlgorithmFixed):
             a = self.compute_coeffs_vectorized(uncached_idx)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
             self.coeffs = self.coeffs.union(uncached)
-        a = self.vec_coeff[idx[0], idx[1], idx[2], :]
+        a = self.vec_coeff[i_x, i_y, i_z, :]
 
         val = a[:, 0] + \
             (a[:, 1] + (a[:, 4] + a[:, 7] * z) * y) * x + \
