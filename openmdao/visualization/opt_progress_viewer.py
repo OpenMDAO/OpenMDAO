@@ -59,7 +59,7 @@ class VarOptViewer(object):
             if len(self.case[variable].flatten()) == len(self.case[var_to_comp].flatten()):
                 var_list.append(variable)
 
-        return var_list
+        return sorted(var_list)
 
     def _parse(self):
         """
@@ -94,6 +94,7 @@ class VarOptViewer(object):
         for key in self.io_options_x:
             self.io_options_x[key].append("Number of Points")
             self.io_options_x[key].append("Case Iterations")
+            self.io_options_x[key] = sorted(self.io_options_x[key])
 
         for val in self.io_options_x.values():
             for i in val:
