@@ -666,31 +666,15 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         i_x, i_y, i_z = idx
 
         # extrapolate low
-        extrap_idx = np.where(i_x < 1)[0]
-        if len(extrap_idx):
-            i_x[extrap_idx] = 1
-
-        extrap_idx = np.where(i_y < 1)[0]
-        if len(extrap_idx):
-            i_y[extrap_idx] = 1
-
-        extrap_idx = np.where(i_z < 1)[0]
-        if len(extrap_idx):
-            i_z[extrap_idx] = 1
+        i_x[i_x < 1] = 1
+        i_y[i_y < 1] = 1
+        i_z[i_z < 1] = 1
 
         # extrapolate high
         nx, ny, nz = self.values.shape
-        extrap_idx = np.where(i_x > nx - 3)[0]
-        if len(extrap_idx):
-            i_x[extrap_idx] = nx - 3
-
-        extrap_idx = np.where(i_y > ny - 3)[0]
-        if len(extrap_idx):
-            i_y[extrap_idx] = ny - 3
-
-        extrap_idx = np.where(i_z > nz - 3)[0]
-        if len(extrap_idx):
-            i_z[extrap_idx] = nz - 3
+        i_x[i_x > nx - 3] = nx - 3
+        i_y[i_y > ny - 3] = ny - 3
+        i_z[i_z > nz - 3] = nz - 3
 
         if self.vec_coeff is None:
             self.coeffs = set()

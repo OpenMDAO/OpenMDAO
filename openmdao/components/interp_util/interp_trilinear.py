@@ -270,31 +270,15 @@ class InterpTrilinear(InterpAlgorithmFixed):
             dtype = x.dtype
 
         # extrapolate low
-        extrap_idx = np.where(i_x == -1)[0]
-        if len(extrap_idx) > 0:
-            i_x[extrap_idx] = 0
-
-        extrap_idx = np.where(i_y == -1)[0]
-        if len(extrap_idx) > 0:
-            i_y[extrap_idx] = 0
-
-        extrap_idx = np.where(i_z == -1)[0]
-        if len(extrap_idx) > 0:
-            i_z[extrap_idx] = 0
+        i_x[i_x == -1] = 0
+        i_y[i_y == -1] = 0
+        i_z[i_z == -1] = 0
 
         # extrapolate high
         nx, ny, nz = self.values.shape
-        extrap_idx = np.where(i_x == nx - 1)[0]
-        if len(extrap_idx) > 0:
-            i_x[extrap_idx] = nx - 2
-
-        extrap_idx = np.where(i_y == ny - 1)[0]
-        if len(extrap_idx) > 0:
-            i_y[extrap_idx] = ny - 2
-
-        extrap_idx = np.where(i_z == nz - 1)[0]
-        if len(extrap_idx) > 0:
-            i_z[extrap_idx] = nz - 2
+        i_x[i_x == nx - 1] = nx - 2
+        i_y[i_y == ny - 1] = ny - 2
+        i_z[i_z == nz - 1] = nz - 2
 
         if self.vec_coeff is None:
             self.coeffs = set()
