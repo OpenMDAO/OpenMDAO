@@ -12,6 +12,13 @@ import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring
 
 
+try:
+    import jax
+    from jax import jvp, vjp, vmap, random, jit, jacfwd, jacrev
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
+
 class TestFuncCompNoWrap(unittest.TestCase):
 
     def test_scalar_function(self):
@@ -1020,19 +1027,61 @@ class TestJax(unittest.TestCase):
             y = 5. * a * c - 2.5 * b
             return x, y
 
-        f = omf.wrap(func).defaults(shape=(3,2))
+        f = omf.wrap(func).defaults(shape=(3,2)).declare_partials(of='*', wrt='*', method='jax')
         p = om.Problem()
         p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        assert_near_equal(J['comp.x', 'comp.a'], np.eye(6) * 2.)
-        assert_near_equal(J['comp.x', 'comp.b'], np.eye(6) * 2.)
-        assert_near_equal(J['comp.x', 'comp.c'], np.eye(6) * 3.)
-        assert_near_equal(J['comp.y', 'comp.a'], np.eye(6) * 5.)
-        assert_near_equal(J['comp.y', 'comp.b'], np.eye(6) * -2.5)
-        assert_near_equal(J['comp.y', 'comp.c'], np.eye(6) * 5.)
+        I = np.eye(6)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True)
+
+
+class TestJaxNonDifferentiableArgs(unittest.TestCase):
+    def check_derivs(self, mode, use_jit):
+        def func(a, b, c, ex1, ex2):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = (omf.wrap(func)
+                .defaults(shape=3)
+                .declare_option('ex1', default='foo')
+                .declare_option('ex2', default='bar')
+                .declare_partials(of='*', wrt='*', method='jax')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(3)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
 
     def test_fwd(self):
         self.check_derivs('fwd', use_jit=False)

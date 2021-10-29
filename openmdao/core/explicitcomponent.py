@@ -239,23 +239,23 @@ class ExplicitComponent(Component):
         """
         Call compute based on the value of the "run_root_only" option.
         """
-        with self._call_user_function('compute'):
-            args = [self._inputs, self._outputs]
-            if self._discrete_inputs or self._discrete_outputs:
-                args += [self._discrete_inputs, self._discrete_outputs]
+        #with self._call_user_function('compute'):
+        args = [self._inputs, self._outputs]
+        if self._discrete_inputs or self._discrete_outputs:
+            args += [self._discrete_inputs, self._discrete_outputs]
 
-            if self._run_root_only():
-                if self.comm.rank == 0:
-                    self.compute(*args)
-                    self.comm.bcast([self._outputs.asarray(), self._discrete_outputs], root=0)
-                else:
-                    new_outs, new_disc_outs = self.comm.bcast(None, root=0)
-                    self._outputs.set_val(new_outs)
-                    if new_disc_outs:
-                        for name, val in new_disc_outs.items():
-                            self._discrete_outputs[name] = val
-            else:
+        if self._run_root_only():
+            if self.comm.rank == 0:
                 self.compute(*args)
+                self.comm.bcast([self._outputs.asarray(), self._discrete_outputs], root=0)
+            else:
+                new_outs, new_disc_outs = self.comm.bcast(None, root=0)
+                self._outputs.set_val(new_outs)
+                if new_disc_outs:
+                    for name, val in new_disc_outs.items():
+                        self._discrete_outputs[name] = val
+        else:
+            self.compute(*args)
 
     def _apply_nonlinear(self):
         """

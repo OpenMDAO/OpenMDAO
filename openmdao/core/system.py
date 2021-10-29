@@ -53,7 +53,8 @@ _asm_jac_types = {
 _supported_methods = {
     'fd': FiniteDifference,
     'cs': ComplexStep,
-    'exact': None
+    'exact': None,
+    'jax': None
 }
 
 _DEFAULT_COLORING_META = {

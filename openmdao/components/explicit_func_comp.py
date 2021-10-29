@@ -11,7 +11,7 @@ from openmdao.components.func_comp_common import _check_var_name, _copy_with_ign
 
 try:
     import jax
-    from jax import jvp, vjp, vmap, random, jit
+    from jax import jvp, vjp, vmap, random, jit, jacfwd, jacrev
     import jax.numpy as jnp
 except ImportError:
     jax = None
@@ -44,12 +44,19 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         super().__init__(**kwargs)
         self._compute = omf.wrap(compute)
+        # in case we're doing jit, force setup of wrapped func because we compute output shapes during
+        # setup and that won't work on a jit compiled function
+        if self._compute._call_setup:
+            self._compute._setup()
+
         if self._compute._use_jax:
             self.options['use_jax'] = True
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
+            static_argnums = np.where(np.array(['is_option' in m for m in
+                                                self._compute._inputs.values()], dtype=bool))[0]
             try:
-                self._compute._f = jit(self._compute._f)
+                self._compute._f = jit(self._compute._f, static_argnums=static_argnums)
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: failed jit compile of compute function: {err}")
 
@@ -88,26 +95,30 @@ class ExplicitFuncComp(ExplicitComponent):
 
     def _linearize(self, jac=None, sub_do_ln=False):
         if self.options['use_jax']:
-            # self._jvp = functools.partial(jvp, self._compute._f, tuple(self._inputs.values()))
-            # self._jvp((jnp.eye(N)[:, 2],))[1]
-            # y, out_tangents = vmap(self._jvp, out_axes=(None, 0))((jnp.eye(N),))
-
-            # force _jvp and _vjp to be re-initialized the next time compute_jacvec_product
+            # force _jvp and/or _vjp to be re-initialized the next time they are needed
             # is called
             self._jvp = None
             self._vjp = None
+            # argnums specifies which position args are to be differentiated
+            argnums = np.where(np.array(['is_option' not in m for m in self._compute._inputs.values()], dtype=bool))[0]
+            jf = jacfwd(self._compute._f, argnums)(*self._func_values(self._inputs))
+            for row, out in enumerate(self._compute.get_output_names()):
+                for col, inp in enumerate(self._compute.get_input_names()):
+                    if col in argnums:
+                        self._jacobian[out, inp] = np.asarray(jf[row][col])
         else:
             super()._linearize(jac, sub_do_ln)
 
     def _setup_jax(self):
-        self.matrix_free = True
+        # self.matrix_free = True
         self.compute_jacvec_product = self._compute_jacvec_product_
 
     def _compute_jacvec_product_(self, inputs, dinputs, doutputs, mode):
         if mode == 'fwd':
-            if self._jvp is None:
-                self._jvp = jax.linearize(self._compute._f, *inputs.values())[1]
-            doutputs.set_vals(self._jvp(*dinputs.values()))
+            # if self._jvp is None:
+            #     self._jvp = jax.linearize(self._compute._f, *inputs.values())[1]
+            # doutputs.set_vals(self._jvp(*dinputs.values()))
+            doutputs.set_val(self._jacfwd.dot(dinputs.asarray()))
         else:  # rev
             if self._vjp is None:
                 self._vjp = vjp(self._compute._f, *inputs.values())[1]
@@ -124,7 +135,7 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        outputs.set_vals(self._compute(*inputs.values()))
+        outputs.set_vals(self._compute(*self._func_values(inputs)))
 
     def declare_partials(self, *args, **kwargs):
         """
@@ -155,13 +166,13 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         if self.options['use_jax']:
             self._setup_jax()
-        else:
-            for kwargs in self._compute.get_declare_partials():
-                self.declare_partials(**kwargs)
 
-            kwargs = self._compute.get_declare_coloring()
-            if kwargs is not None:
-                self.declare_coloring(**kwargs)
+        for kwargs in self._compute.get_declare_partials():
+            self.declare_partials(**kwargs)
+
+        kwargs = self._compute.get_declare_coloring()
+        if kwargs is not None:
+            self.declare_coloring(**kwargs)
 
         super()._setup_partials()
 
@@ -179,4 +190,28 @@ class ExplicitFuncComp(ExplicitComponent):
         if self._compute_partials is None:
             return
 
-        self._compute_partials(*chain(inputs.values(), (partials,)))
+        self._compute_partials(*self._func_values(inputs), partials)
+
+    def _func_values(self, inputs):
+        """
+        Yield current function input args.
+
+        Parameters
+        ----------
+        inputs : Vector
+            The input vector.
+        outputs : Vector
+            The output vector (contains the states).
+
+        Yields
+        ------
+        object
+            Value of current function input variable.
+        """
+        inps = inputs.values()
+
+        for name, meta in self._compute._inputs.items():
+            if 'is_option' in meta:
+                yield self.options[name]
+            else:
+                yield next(inps)

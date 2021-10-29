@@ -516,7 +516,8 @@ class OMWrappedFunc(object):
                 need_shape.append(name)
 
         args = []
-        for name, meta in ins.items():
+        static_argnums = []
+        for i, (name, meta) in enumerate(ins.items()):
             if 'is_option' in meta and meta['is_option']:
                 if 'default' in meta:
                     val = meta['default']
@@ -525,6 +526,7 @@ class OMWrappedFunc(object):
                 else:
                     val = None
                 args.append(val)
+                static_argnums.append(i)
                 continue
             if meta['val'] is not None:
                 args.append(meta['val'])
@@ -538,19 +540,19 @@ class OMWrappedFunc(object):
 
         # compute shapes as a check against annotated value (if any)
         if jax is not None:
-            # must replace numpy with jax numpy when making jaxpr.
-            with jax_context(self._f.__globals__):
                 try:
-                    v = jax.make_jaxpr(self._f)(*args)
+                    # must replace numpy with jax numpy when making jaxpr.
+                    with jax_context(self._f.__globals__):
+                        v = jax.make_jaxpr(self._f, static_argnums)(*args)
                 except Exception as err:
                     if need_shape:
                         raise RuntimeError(f"Failed to determine the output shapes "
                                            f"based on the input shapes. The error was: {err}.  To "
-                                           "avoid this error, add return value annotations that "
+                                           "avoid this error, add return value metadata that "
                                            "specify the shapes of the return values to the "
                                            "function.")
                     warnings.warn("Failed to determine the output shapes based on the input "
-                                  "shapes in order to check the provided annotated values. The"
+                                  "shapes in order to check the provided metadata values. The"
                                   f" error was: {err}.")
                 else:
                     for val, name in zip(v.out_avals, outs):
