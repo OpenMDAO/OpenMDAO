@@ -299,25 +299,17 @@ class SetValuesUI(object):
 
     def update_prob_val(self, change):
         if not self._refresh_in_progress: # no need to update problem since values from problem are being used to change the value in the widget
-            print("update_prob_val")
             # self._prob[change['owner'].description] = change['new']
-            print(f"change['new']: {change['new']}")
             val = float(change['new']) if change['new'] else 0.0;
-            # self._prob[change['owner'].description] = val
-
             self._prob.set_val(change['owner'].description, val)
 
     def update_prob_unit(self, change):
-        # self._prob[change['owner'].description] = change['new']
-        print(f"unit change['new']: {change['new']}")
-        # print(dir(change))
-        print(type(change['owner']))
-        print(change['owner'].description_tooltip)
-        print(f"change['owner'].description: {change['owner'].description}")
-        print(f"change['owner'].description_tooltip: {change['owner'].description_tooltip}")
-        print(f"change['owner']._var_name: {change['owner']._var_name}")
-        self._prob.model.set_input_defaults(change['owner'].description_tooltip, units=change['new'])
-        # self._prob[change['owner'].description] = float(change['new'])
+        var_name = change['owner']._var_name
+        units = change['new']
+        val = self._prob.get_val(var_name)
+        self._prob.set_val(var_name, val, units=units)
+
+        # self._prob.model.set_input_defaults(change['owner']._var_name, units=change['new'])
 
     def get_widget_var_names(self):
         var_names = []
@@ -333,3 +325,29 @@ def set_values_gui(prob, vars_to_set=None):
     ui = SetValuesUI(prob, vars_to_set=vars_to_set)
     ui.setup()
     return ui.ui_widget
+
+def get_var_names_at_this_level(model, sys):
+    var_names_at_this_level = set()
+    model_abs2prom = model._var_allprocs_abs2prom['input']
+    if isinstance(sys, Component):
+        for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
+            promoted_name_from_top_level = model_abs2prom[abs_name]
+            current_group_absolute_path = sys.pathname
+            current_group_var_promoted_name = prom_name
+            # if they're different you would know that someone above the current group promoted it
+            current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
+            if promoted_name_from_top_level == current_group_pathname:
+                var_names_at_this_level.add(prom_name)
+    else:
+        for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
+            promoted_name_from_top_level = model_abs2prom[abs_name]
+            current_group_absolute_path = sys.pathname
+            current_group_var_promoted_name = prom_name
+            # if they're different you would know that someone above the current group promoted it
+            current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
+            if "." in current_group_var_promoted_name:
+                continue
+            if promoted_name_from_top_level == current_group_pathname:
+                var_names_at_this_level.add(prom_name)
+
+    return var_names_at_this_level
