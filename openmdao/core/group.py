@@ -2932,7 +2932,7 @@ class Group(System):
                     dist_sizes = None
                 if of in approx_of_idx:
                     end += approx_of_idx[of].indexed_src_size
-                    yield of, start, end, approx_of_idx[of].shaped_array().flat[:], dist_sizes
+                    yield of, start, end, approx_of_idx[of].shaped_array().ravel(), dist_sizes
                 else:
                     end += abs2meta[of][szname]
                     yield of, start, end, _full_slice, dist_sizes
