@@ -6,7 +6,7 @@ Based on NPSS implementation.
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
-     InterpAlgorithmSemi, InterpAlgorithmFixed
+    InterpAlgorithmSemi, InterpAlgorithmFixed
 
 
 class InterpLinear(InterpAlgorithm):
