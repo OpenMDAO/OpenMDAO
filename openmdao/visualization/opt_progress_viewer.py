@@ -14,6 +14,7 @@ from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
 
 import numpy as np
+from numpy import linalg as LA
 
 
 class RecordViewer(object):
@@ -143,6 +144,10 @@ class RecordViewer(object):
                                   options=self.io_options_x)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
+        self.case_iter_options = ['Min/Max', "Norm", "Vector Lines"]
+        self.case_iter_select = Select(title="Case Iteration Plot Options", value="None")
+        self.case_iter_select.on_change('value', self._case_iter_select_update)
+
         self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = \
             io_starting_option
 
@@ -152,6 +157,7 @@ class RecordViewer(object):
                                                       self.case_select,
                                                       self.io_select_x,
                                                       self.io_select_y,
+                                                      self.case_iter_select,
                                                       self.warning_box
                                                       ))
 
@@ -180,10 +186,31 @@ class RecordViewer(object):
         """
         self._update()
 
+    def _case_iter_select_update(self, attr, old, new):
+        self._update()
+
+    def _case_plot_calc(self, data, case_array):
+        num_of_cases = data.shape[0]
+        if self.case_iter_select.value == "Norm":
+            norm_vector = LA.norm(data, axis=1).reshape(1, num_of_cases)
+            case_reshape = np.arange(num_of_cases).reshape(1, num_of_cases)
+            return norm_vector, case_reshape
+        elif self.case_iter_select.value == "Vector Lines":
+            norm_vector = data.T
+            case_reshape = case_array.T
+            return norm_vector, case_reshape
+        else:
+            return data, case_array
+
     def _io_var_select_y_update(self, attr, old, new):
         """
         Update function for when the source Y Value dropdown is updated.
         """
+        if self.io_select_y.value == "Case Iterations":
+            self.case_iter_select.options = self.case_iter_options
+        else:
+            self.case_iter_select.options = ["None"]
+
         self.variables_plot.yaxis.axis_label = new
         self._update()
 
@@ -194,11 +221,15 @@ class RecordViewer(object):
         if self.io_select_x.value == "Number of Points" or \
            self.io_select_x.value == "Case Iterations":
             self.io_select_y.options = self.io_select_x.options
+            self.case_iter_select.options = self.case_iter_options
+
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
+
         else:
             self.io_select_y.options = self._var_compatability_check(self.io_select_x.options, new)
             self.io_select_y.value = self.io_select_y.options[0]
+            self.case_iter_select.options = ["None"]
 
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
@@ -284,13 +315,13 @@ class RecordViewer(object):
                 if len(new_data['cases']) == 1:
                     self.warning_box.text = "NOTE: Select two or more cases"
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'] = new_data['y_vals']
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'], new_data['x_vals'])
 
             elif case_iter_y:
                 if len(new_data['cases']) == 1:
                     self.warning_box.text = "NOTE: Select two or more cases"
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'] = new_data['x_vals']
+                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'], new_data['y_vals'])
 
             if isinstance(new_data['x_vals'], np.ndarray):
                 new_data['x_vals'] = new_data['x_vals'].tolist()
