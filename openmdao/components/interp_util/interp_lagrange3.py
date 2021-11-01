@@ -363,7 +363,7 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
             derivs, d_value, extrap
 
 
-class InterpLagrange3D(InterpAlgorithmFixed):
+class Interp3DLagrange3(InterpAlgorithmFixed):
     """
     Interpolate on a fixed 3D grid using a third order Lagrange polynomial.
 
@@ -396,7 +396,7 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         self.k = 4
         self.dim = 3
         self.last_index = [0] * self.dim
-        self._name = 'lagrange3D'
+        self._name = '3D-lagrange3'
         self._vectorized = False
 
     def vectorized(self, x):

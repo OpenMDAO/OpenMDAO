@@ -9,7 +9,8 @@ import numpy as np
 from openmdao.components.interp_util.interp import InterpND, SPLINE_METHODS, TABLE_METHODS
 from openmdao.components.interp_util.interp_semi import InterpNDSemi
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays
+from openmdao.utils.assert_utils import assert_near_equal, assert_equal_arrays, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 
 def rel_error(actual, computed):
     return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
@@ -159,7 +160,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             if method.startswith('scipy'):
                 continue
 
-            if method in ['akima1D']:
+            if method in ['1D-akima']:
                 # These methods are for fixed grids other than 3d.
                 continue
 
@@ -842,19 +843,19 @@ class TestInterpNDFixedPython(unittest.TestCase):
         f = 2.0 * np.array([0, 1, 2])
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='akima1D', points=p, values=f)
+            interp = InterpND(method='1D-akima', points=p, values=f)
 
-        msg = "There are 3 points in a data dimension, but method 'akima1D' requires at least 4 points per dimension."
+        msg = "There are 3 points in a data dimension, but method '1D-akima' requires at least 4 points per dimension."
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = InterpND(method='trilinear', points=p, values=f)
+            interp = InterpND(method='3D-slinear', points=p, values=f)
 
-        msg = "There are 1 dimensions, but method 'trilinear' only works with a fixed table dimension of 3."
+        msg = "There are 1 dimensions, but method '3D-slinear' only works with a fixed table dimension of 3."
         self.assertTrue(str(cm.exception).startswith(msg))
 
     def test_trilinear(self):
-        # Test trilinear vs 3d slinear.
+        # Test fixed 3D-slinear vs general equivalent.
 
         p1 = np.linspace(0, 100, 25)
         p2 = np.linspace(-10, 10, 15)
@@ -873,7 +874,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
         x[:, 1] = X2.ravel()
         x[:, 2] = X3.ravel()
 
-        interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-slinear', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='slinear', extrapolate=True)
@@ -884,20 +885,20 @@ class TestInterpNDFixedPython(unittest.TestCase):
 
         # Test non-vectorized.
         for j, x_i in enumerate(x):
-            interp = InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+            interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-slinear', extrapolate=True)
             f, df_dx = interp.interpolate(x_i, compute_derivative=True)
 
             assert_near_equal(f, f_base[j], 1e-11)
             assert_near_equal(df_dx[0], df_dx_base[j, :], 1e-11)
 
-    def test_akima1D(self):
-        # Test akima1D vs 1D akima.
+    def test_1Dakima(self):
+        # Test 1D-akima vs general equivalent.
 
         p = np.linspace(0, 100, 25)
         f_p = np.cos(p * np.pi * 0.5)
         x = np.linspace(-1, 101, 33)
 
-        interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
+        interp = InterpND(points=p, values=f_p, method='1D-akima', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=p, values=f_p, method='akima', extrapolate=True)
@@ -908,7 +909,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
 
         # Test non-vectorized.
         for j, x_i in enumerate(x):
-            interp = InterpND(points=p, values=f_p, method='akima1D', extrapolate=True)
+            interp = InterpND(points=p, values=f_p, method='1D-akima', extrapolate=True)
             f, df_dx = interp.interpolate(x_i, compute_derivative=True)
 
             assert_near_equal(f, f_base[j], 1e-13)
@@ -917,8 +918,8 @@ class TestInterpNDFixedPython(unittest.TestCase):
             abs_err = np.abs(df_dx[0] -  df_dx_base[j])
             assert_near_equal(abs_err, 0.0, 1e-13)
 
-    def test_lagrange3D(self):
-        # Test lagrange3D vs 3d lagrange3.
+    def test_3Dlagrange3(self):
+        # Test 3D=lagrange3 vs general equivalent.
 
         p1 = np.linspace(0, 100, 25)
         p2 = np.linspace(-10, 10, 15)
@@ -937,7 +938,7 @@ class TestInterpNDFixedPython(unittest.TestCase):
         x[:, 1] = X2.ravel()
         x[:, 2] = X3.ravel()
 
-        interp = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3D', extrapolate=True)
+        interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-lagrange3', extrapolate=True)
         f, df_dx = interp.interpolate(x, compute_derivative=True)
 
         interp_base = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3', extrapolate=True)
@@ -948,11 +949,38 @@ class TestInterpNDFixedPython(unittest.TestCase):
 
         # Test non-vectorized.
         for j, x_i in enumerate(x):
-            interp = InterpND(points=(p1, p2, p3), values=f_p, method='lagrange3D', extrapolate=True)
+            interp = InterpND(points=(p1, p2, p3), values=f_p, method='3D-lagrange3', extrapolate=True)
             f, df_dx = interp.interpolate(x_i, compute_derivative=True)
 
             assert_near_equal(f, f_base[j], 2e-10)
             assert_near_equal(df_dx[0], df_dx_base[j, :], 2e-10)
+
+    def test_deprecated_methods(self):
+
+        p1 = np.linspace(0, 100, 5)
+        p2 = np.linspace(-10, 10, 3)
+        p3 = np.linspace(0, 1, 3)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f_p = np.sqrt(P1) + P2 * P3
+
+        x1 = np.linspace(-2, 101, 5)
+        x2 = np.linspace(-10.5, 11, 5)
+        x3 = np.linspace(-0.2, 1.1, 5)
+        X1, X2, X3 = np.meshgrid(x1, x2, x3, indexing='ij')
+        x = np.zeros((125, 3))
+        x[:, 0] = X1.ravel()
+        x[:, 1] = X2.ravel()
+        x[:, 2] = X3.ravel()
+
+        msg = "The 'trilinear' method has been renamed to '3D-slinear'."
+        with assert_warning(OMDeprecationWarning, msg):
+            InterpND(points=(p1, p2, p3), values=f_p, method='trilinear', extrapolate=True)
+
+        msg = "The 'akima1D' method has been renamed to '1D-akima'."
+        with assert_warning(OMDeprecationWarning, msg):
+            InterpND(points=p1, values=p1, method='akima1D')
 
 
 if __name__ == '__main__':
