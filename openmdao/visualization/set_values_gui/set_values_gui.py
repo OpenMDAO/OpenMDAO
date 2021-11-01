@@ -40,7 +40,7 @@ class SetValuesUI(object):
         # self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'60%'})
         self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'30%'})
         self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'50'})
-        self.set_vars_from_model_with_initial_list(self._prob.model, self._tree,
+        self.set_vars_from_model_with_initial_list_v2(self._prob.model, self._tree, 0,
                                                    vars_to_set=self._vars_to_set )
         # if self._vars_to_set:
         #     self.set_vars_from_user_input(self._vars_to_set, self._tree)
@@ -79,7 +79,73 @@ class SetValuesUI(object):
     #         for s in sys._subsystems_myproc:
     #             self.set_vars_from_model(s, new_node)
 
-    def set_vars_from_model_with_initial_list(self, sys, node, vars_to_set=None):
+    def set_vars_from_model_with_initial_list_v2(self, sys, node, depth, vars_to_set=None):
+        # Create the model tree selector widget
+        # Can use icons from here https://fontawesome.com/v5.15/icons?d=gallery&p=2&m=free
+        if sys.name == '_auto_ivc':
+            return
+
+
+        name = sys.name if sys.name else 'root'
+        new_node = Node(name)
+        node.add_node(new_node)
+
+        if depth > 1:
+            new_node.opened = False
+
+        model = sys._problem_meta['model_ref']()
+
+        var_names_at_this_level = get_var_names_at_this_level(model, sys)
+
+
+        if isinstance(sys, Component):
+            # input_varnames = list(sys._var_allprocs_prom2abs_list['input'].keys())
+            input_varnames = var_names_at_this_level
+            new_node.icon = 'plug'
+
+
+            for input_varname in input_varnames:
+                input_node = Node(input_varname)
+                input_node._comp = sys
+                input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
+                new_node.add_node(input_node)
+
+                if vars_to_set and input_varname in vars_to_set:
+                    input_node.icon_style = 'success'
+                    self.add_value_widget_with_component(sys, input_varname, input_node)
+                else:
+                    input_node.icon_style = 'success'
+                    self.add_value_widget_with_component(sys, input_varname, input_node)
+
+        else:
+
+            input_varnames = var_names_at_this_level
+            new_node.icon = 'plug'
+            for input_varname in input_varnames:
+                input_node = Node(input_varname)
+                input_node._comp = sys
+                input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
+                new_node.add_node(input_node)
+
+                if vars_to_set and input_varname in vars_to_set:
+                        input_node.icon_style = 'success'
+                        self.add_value_widget_with_component(sys, input_varname, input_node)
+                else:
+                    input_node.icon_style = 'success'
+                    self.add_value_widget_with_component(sys, input_varname, input_node)
+
+
+
+            new_node.icon = 'envelope-open'
+            for s in sys._subsystems_myproc:
+                self.set_vars_from_model_with_initial_list_v2(s, new_node, depth + 1, vars_to_set )
+
+        # Add initial value widgets if given by user
+        # if vars_to_set:
+        #     for var_name in vars_to_set:
+        #         self.add_value_widget(var_name)
+
+    def set_vars_from_model_with_initial_list_v1(self, sys, node, vars_to_set=None):
         # Create the model tree selector widget
         # Can use icons from here https://fontawesome.com/v5.15/icons?d=gallery&p=2&m=free
         if sys.name == '_auto_ivc':
@@ -107,13 +173,13 @@ class SetValuesUI(object):
         else:
             new_node.icon = 'envelope-open'
             for s in sys._subsystems_myproc:
-                self.set_vars_from_model_with_initial_list(s, new_node, vars_to_set)
+                self.set_vars_from_model_with_initial_list_v1(s, new_node, vars_to_set)
 
-        # Add initial value widgets if given by user
-        # if vars_to_set:
-        #     for var_name in vars_to_set:
-        #         self.add_value_widget(var_name)
-
+    #     # Add initial value widgets if given by user
+    #     # if vars_to_set:
+    #     #     for var_name in vars_to_set:
+    #     #         self.add_value_widget(var_name)
+    #
 
     # def set_vars_from_user_input(self, vars_to_set, node):
     #     for var_name in vars_to_set:
@@ -126,7 +192,9 @@ class SetValuesUI(object):
         # val = self._prob[var_name]
 
         # val = self._prob.get_val(var_name, units=units)
-        val = self._prob.get_val(var_name)
+        # print(f"get_val of {var_name} in component: {comp.name}")
+        # val = self._prob.get_val(var_name)
+        val = comp.get_val(var_name)
 
         # Rob used
         #     meta = {opts['prom_name']: opts for (_, opts) in prob.model.get_io_metadata().items()}
@@ -134,7 +202,23 @@ class SetValuesUI(object):
                                      get_remote=True,
                                      return_rel_names=False)
 
-        full_var_name = f"{comp.pathname}.{var_name}"
+        # print(f"inputs_metadata: {inputs_metadata}")
+
+        prom2abs_list = comp._var_allprocs_prom2abs_list['input']
+
+
+        # from openmdao.utils.name_maps import name2abs_names
+        # abs_names = name2abs_names(comp, var_name)
+
+        # full_var_name = abs_names[0]
+
+
+        # print(f"prom2abs_list: {prom2abs_list}")
+        full_var_name = prom2abs_list[var_name][0]
+
+        # print(f"full_var_name: {full_var_name}")
+
+        # full_var_name = f"{comp.pathname}.{var_name}"
 
         metadata = inputs_metadata[full_var_name]
         units = metadata['units']
@@ -326,7 +410,13 @@ def set_values_gui(prob, vars_to_set=None):
     ui.setup()
     return ui.ui_widget
 
+
+
 def get_var_names_at_this_level(model, sys):
+
+    if 'DESIGN.inlet.real_flow' == sys.pathname:
+        print(sys)
+
     var_names_at_this_level = set()
     model_abs2prom = model._var_allprocs_abs2prom['input']
     if isinstance(sys, Component):
@@ -338,13 +428,15 @@ def get_var_names_at_this_level(model, sys):
             current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
             if promoted_name_from_top_level == current_group_pathname:
                 var_names_at_this_level.add(prom_name)
-    else:
+    else: # Group
         for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
             promoted_name_from_top_level = model_abs2prom[abs_name]
             current_group_absolute_path = sys.pathname
             current_group_var_promoted_name = prom_name
             # if they're different you would know that someone above the current group promoted it
             current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
+            # if "." not in current_group_var_promoted_name:
+            #     var_names_at_this_level.add(prom_name)
             if "." in current_group_var_promoted_name:
                 continue
             if promoted_name_from_top_level == current_group_pathname:
