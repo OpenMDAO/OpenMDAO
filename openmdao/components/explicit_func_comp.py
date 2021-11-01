@@ -44,8 +44,8 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         super().__init__(**kwargs)
         self._compute = omf.wrap(compute)
-        # in case we're doing jit, force setup of wrapped func because we compute output shapes during
-        # setup and that won't work on a jit compiled function
+        # in case we're doing jit, force setup of wrapped func because we compute output shapes
+        # during setup and that won't work on a jit compiled function
         if self._compute._call_setup:
             self._compute._setup()
 
@@ -100,7 +100,9 @@ class ExplicitFuncComp(ExplicitComponent):
             self._jvp = None
             self._vjp = None
             # argnums specifies which position args are to be differentiated
-            argnums = np.where(np.array(['is_option' not in m for m in self._compute._inputs.values()], dtype=bool))[0]
+            argnums = np.where(
+                np.array(['is_option' not in m for m in self._compute._inputs.values()],
+                         dtype=bool))[0]
             jf = jacfwd(self._compute._f, argnums)(*self._func_values(self._inputs))
             for row, out in enumerate(self._compute.get_output_names()):
                 for col, inp in enumerate(self._compute.get_input_names()):

@@ -540,29 +540,28 @@ class OMWrappedFunc(object):
 
         # compute shapes as a check against annotated value (if any)
         if jax is not None:
-                try:
-                    # must replace numpy with jax numpy when making jaxpr.
-                    with jax_context(self._f.__globals__):
-                        v = jax.make_jaxpr(self._f, static_argnums)(*args)
-                except Exception as err:
-                    if need_shape:
-                        raise RuntimeError(f"Failed to determine the output shapes "
-                                           f"based on the input shapes. The error was: {err}.  To "
-                                           "avoid this error, add return value metadata that "
-                                           "specify the shapes of the return values to the "
-                                           "function.")
-                    warnings.warn("Failed to determine the output shapes based on the input "
-                                  "shapes in order to check the provided metadata values. The"
-                                  f" error was: {err}.")
-                else:
-                    for val, name in zip(v.out_avals, outs):
-                        oldshape = outs[name].get('shape')
-                        if oldshape is not None and _shape2tuple(oldshape) != val.shape:
-                            raise RuntimeError(f"Annotated shape for return value "
-                                               f"'{name}' of {oldshape} doesn't match computed "
-                                               f"shape of {val.shape}.")
-                        outs[name]['shape'] = val.shape
-                    need_shape = []
+            try:
+                # must replace numpy with jax numpy when making jaxpr.
+                with jax_context(self._f.__globals__):
+                    v = jax.make_jaxpr(self._f, static_argnums)(*args)
+            except Exception as err:
+                if need_shape:
+                    raise RuntimeError(f"Failed to determine the output shapes "
+                                       f"based on the input shapes. The error was: {err}.  To "
+                                       "avoid this error, add return value metadata that "
+                                       "specify the shapes of the return values to the function.")
+                warnings.warn("Failed to determine the output shapes based on the input "
+                              "shapes in order to check the provided metadata values. The"
+                              f" error was: {err}.")
+            else:
+                for val, name in zip(v.out_avals, outs):
+                    oldshape = outs[name].get('shape')
+                    if oldshape is not None and _shape2tuple(oldshape) != val.shape:
+                        raise RuntimeError(f"Annotated shape for return value "
+                                           f"'{name}' of {oldshape} doesn't match computed "
+                                           f"shape of {val.shape}.")
+                    outs[name]['shape'] = val.shape
+                need_shape = []
 
         if need_shape:  # output shapes weren't provided by user or by jax
             shape = self._output_defaults['shape']
