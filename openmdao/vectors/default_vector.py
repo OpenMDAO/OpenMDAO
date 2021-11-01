@@ -280,8 +280,7 @@ class DefaultVector(Vector):
         vec : <Vector>
             The vector whose values self is set to.
         """
-        data = self.asarray()
-        data[:] = vec.asarray()
+        self.set_val(vec.asarray())
 
     def set_val(self, val, idxs=_full_slice):
         """
@@ -294,8 +293,9 @@ class DefaultVector(Vector):
         idxs : int or slice or tuple of ints and/or slices
             The locations where the data array should be updated.
         """
-        data = self.asarray()
-        data[idxs] = val
+        # we use _data here specifically so that imaginary part
+        # will get properly reset, e.g. when the array is zeroed out.
+        self._data[idxs] = val
 
     def scale_to_norm(self, mode='fwd'):
         """
