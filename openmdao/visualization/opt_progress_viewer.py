@@ -16,20 +16,24 @@ import openmdao.api as om
 import numpy as np
 
 
-class VarOptViewer(object):
+class RecordViewer(object):
+    """
+    Initialize threading.
+
+    Parameters
+    ----------
+    port : int
+        What port to host Bokeh server on.
+    data : CaseRecorder or str
+        A path to the recorder file or CaseRecorder.
+        Currently only sqlite database files recorded via SqliteRecorder are supported.
+    """
 
     def __init__(self, data, port=8888):
         """
-        Initialize threading.
-
-        Parameters
-        ----------
-        port : int
-            What port to host Bokeh server on.
-        data : CaseRecorder or str
-            A path to the recorder file or CaseRecorder.
-            Currently only sqlite database files recorded via SqliteRecorder are supported.
+        Initialize attributes.
         """
+
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
@@ -112,8 +116,8 @@ class VarOptViewer(object):
                                      y_axis_label="Variable X")
         self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
 
-        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2, line_color='color',
-                                                   source=self.multi_line_data)
+        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
+                                                   line_color='color', source=self.multi_line_data)
         ht = HoverTool(renderers=[line_plot],
             tooltips=[
                 ( 'Case',  '@cases')
@@ -130,14 +134,17 @@ class VarOptViewer(object):
         self.case_select.on_change('value', self._case_select_update)
         self.case_select.height = 300
 
-        self.io_select_x = Select(title="X Value:", value=io_starting_option, options=self.io_options_x)
+        self.io_select_x = Select(title="X Value:", value=io_starting_option,
+                                  options=self.io_options_x)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
         self.io_options_y = self.io_options_x
-        self.io_select_y = Select(title="Y Value:", value=io_starting_option, options=self.io_options_x)
+        self.io_select_y = Select(title="Y Value:", value=io_starting_option,
+                                  options=self.io_options_x)
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
-        self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = io_starting_option
+        self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = \
+            io_starting_option
 
         self.warning_box = Paragraph(text="""""", width=350, height=100)
 
@@ -150,7 +157,8 @@ class VarOptViewer(object):
 
         self._update()
 
-        self.io_select_y.options = self._var_compatability_check(self.io_options_x, self.io_select_x.value)
+        self.io_select_y.options = self._var_compatability_check(self.io_options_x,
+                                                                 self.io_select_x.value)
         for key, val in self.io_select_x.options.items():
             self.io_select_x.options[key] = val + ["Number of Points"] + ["Case Iterations"]
 
@@ -184,7 +192,7 @@ class VarOptViewer(object):
         Update function for when the X Value dropdown is updated.
         """
         if self.io_select_x.value == "Number of Points" or \
-            self.io_select_x.value == "Case Iterations":
+           self.io_select_x.value == "Case Iterations":
             self.io_select_y.options = self.io_select_x.options
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
@@ -197,11 +205,9 @@ class VarOptViewer(object):
 
         self._update()
 
-    def flatten_list(self, list_to_flatten):
-        return reduce(operator.concat, list_to_flatten)
-
     def _update(self):
         """
+        Function to update plot based on source, case, or variable changes.
         """
         new_data = dict(
             x_vals=[],
@@ -263,8 +269,8 @@ class VarOptViewer(object):
             new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
 
         if new_data['x_vals'].shape[1] > 1:
-            if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1,1) and \
-                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
+            if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
+               (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
                 self.warning_box.text = """NOTE: Both X and Y values contain zeros for values,
                                         unable to plot"""
 
@@ -306,11 +312,13 @@ class VarOptViewer(object):
 
 
     def _line_color_list(self, x_var_vals):
-
+        """
+        Function to create list of colors for multi line plots.
+        """
         length = len(x_var_vals)
         if length <= 3:
             colors = list(Category20[3])
-            while len(colors)>length:
+            while len(colors) > length:
                 colors.pop()
         else:
             if length > 20:
