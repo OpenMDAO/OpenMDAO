@@ -1,6 +1,6 @@
+"""Define the RecordViewer class."""
+
 import json
-import operator
-from functools import reduce
 import warnings
 
 from bokeh.io import show, output_notebook
@@ -19,12 +19,22 @@ from numpy import linalg as LA
 
 class RecordViewer(object):
     """
-    Initialize threading.
+    Visualizer to plot variables vs cases, variables vs variables, and more.
 
     Parameters
     ----------
+    data : CaseRecorder or str
+        A path to the recorder file or CaseRecorder.
+        Currently only sqlite database files recorded via SqliteRecorder are supported.
     port : int
         What port to host Bokeh server on.
+
+    Attributes
+    ----------
+    circle_data : ColumnDataSource
+        A Bokeh ColumnDataSource for non vectorized cases.
+    multi_line_data : ColumnDataSource
+        A Bokeh ColumnDataSource for vectorized cases.
     data : CaseRecorder or str
         A path to the recorder file or CaseRecorder.
         Currently only sqlite database files recorded via SqliteRecorder are supported.
@@ -34,7 +44,6 @@ class RecordViewer(object):
         """
         Initialize attributes.
         """
-
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
@@ -62,7 +71,8 @@ class RecordViewer(object):
         var_list = []
 
         for variable in variables:
-            if variable in self.case.outputs and len(self.case[variable].flatten()) == len(self.case[var_to_compare].flatten()):
+            if variable in self.case.outputs and \
+                    len(self.case[variable].flatten()) == len(self.case[var_to_compare].flatten()):
                 var_list.append(variable)
 
         if var_list:
@@ -104,7 +114,7 @@ class RecordViewer(object):
 
         self.doc = doc
         source_options = self.cr.list_sources(out_stream=None)
-        self.case_options = [(str(i), case) for i, case in \
+        self.case_options = [(str(i), case) for i, case in
                              enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
 
@@ -119,12 +129,8 @@ class RecordViewer(object):
 
         line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
                                                    line_color='color', source=self.multi_line_data)
-        ht = HoverTool(renderers=[line_plot],
-            tooltips=[
-                ( 'Case',  '@cases')
-            ],
-            mode = 'mouse'
-        )
+        ht = HoverTool(renderers=[line_plot], tooltips=[('Case', '@cases')], mode='mouse')
+
         self.variables_plot.add_tools(ht)
 
         self.source_select = Select(title="Source:", value=source_options[0],
@@ -174,7 +180,7 @@ class RecordViewer(object):
         """
         Update function for when the source dropdown is updated.
         """
-        self.case_select.options = [(str(i), case) for i, case in \
+        self.case_select.options = [(str(i), case) for i, case in
                                     enumerate(self.cr.list_cases(new, out_stream=None))]
         self.source_select.value = new
         self.case_select.value = ['0']
@@ -238,7 +244,7 @@ class RecordViewer(object):
 
     def _update(self):
         """
-        Function to update plot based on source, case, or variable changes.
+        Change plot based on source, case, or variable changes.
         """
         new_data = dict(
             x_vals=[],
@@ -317,10 +323,12 @@ class RecordViewer(object):
 
             if case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'], new_data['x_vals'])
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
+                                                                              new_data['x_vals'])
             elif case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'], new_data['y_vals'])
+                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
+                                                                              new_data['y_vals'])
 
             new_data['x_vals'] = new_data['x_vals'].tolist()
             new_data['y_vals'] = new_data['y_vals'].tolist()
@@ -331,10 +339,12 @@ class RecordViewer(object):
 
             if case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
-                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'], new_data['x_vals'])
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
+                                                                              new_data['x_vals'])
             elif case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
-                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'], new_data['y_vals'])
+                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
+                                                                              new_data['y_vals'])
 
             new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
             new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
@@ -342,10 +352,9 @@ class RecordViewer(object):
             self.circle_data.data = new_data
             self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
 
-
     def _line_color_list(self, x_var_vals):
         """
-        Function to create list of colors for multi line plots.
+        Create list of colors for multi line plots.
         """
         length = len(x_var_vals)
         if length <= 3:
