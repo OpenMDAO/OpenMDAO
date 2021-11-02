@@ -387,7 +387,13 @@ class N2Diagram {
                 else { self.ui.nodeInfoBox.pin(); } // Create a persistent panel
             })
             .on("contextmenu", function (d) {
-                self.ui.rightClick(d, this);
+                if (d3.event.shiftKey) {
+                    const color = d3.select(this).select('rect').style('fill');
+                    self.ui.shiftRightClick(d, color);
+                }
+                else {
+                    self.ui.rightClick(d, this);
+                }
             })
             .on("mouseover", function (d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));

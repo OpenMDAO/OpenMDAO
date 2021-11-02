@@ -320,6 +320,16 @@ class N2UserInterface {
         }
     }
 
+    shiftRightClick(node, color) {
+        testThis(this, 'N2UserInterface', 'shiftRightClick');
+        d3.event.preventDefault();
+        d3.event.stopPropagation();
+
+        if (this.isCollapsible(node)) {
+            const csd = new ChildSelectDialog(node, color)
+        }
+    }
+
     /**
      * Update states as if a left-click was performed, which may or may not have
      * actually happened.
@@ -861,6 +871,48 @@ class N2UserInterface {
     /** Load the model state to a file. */
     loadState() {
         document.getElementById('state-file-input').click();
+    }
+}
+
+class ChildSelectDialog extends N2WindowDraggable {
+    /**
+     * Build a list of the properties we care about and set up
+     * references to the HTML elements.
+     * @param {String} name Variable name.
+     * @param {Number} val Variable value.
+     */
+     constructor(node, color) {
+        super('childSelect-' + uuidv4());
+
+        this.minWidth = 300;
+        this.minHeight = 100;
+        this.theme('child-select');
+        
+        this.title(node.name);
+        this.table = this.body.append('table');
+        this.tbody = this.table.append('tbody');
+        this.ribbonColor(color);
+        this.populate(node);
+    }
+
+    populate(node) {
+        const topRow = this.tbody.append('tr');
+        ['Child Name', 'Normal', 'Enlarge', 'Collapse'].forEach(function(i) {
+            topRow.append('th').text(i);
+        })
+        for (const child of node.children) {
+            const row = this.tbody.append('tr');
+            const radioName = child.name + '-view-radio';
+            row.append('td').text(child.name);
+            row.append('td').append('input').attr('type', 'radio').attr('name', radioName).attr('checked', 'checked');
+            row.append('td').append('input').attr('type', 'radio').attr('name', radioName);
+            row.append('td').append('input').attr('type', 'radio').attr('name', radioName);
+        }
+
+        this.sizeToContent(19, 19) // TODO: Properly find size of scrollbar + 2
+        .title(node.name)
+        .moveNearMouse(d3.event)
+        .show();
     }
 
 
