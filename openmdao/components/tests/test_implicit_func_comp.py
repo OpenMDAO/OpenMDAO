@@ -279,3 +279,90 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+
+class TestJax(unittest.TestCase):
+    def check_derivs(self, mode, use_jit):
+        def apply_nl(a, b, c, x):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        def solve_nl(a, b, c, x):
+            x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+            return x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*', method='jax')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f, solve_nonlinear=solve_nl))
+
+        # need this since comp is implicit and doesn't have a solve_linear
+        p.model.comp.linear_solver = om.DirectSolver()
+
+        p.setup(check=True, mode=mode)
+
+        p.set_val('comp.a', 1.)
+        p.set_val('comp.b', -4.)
+        p.set_val('comp.c', 3.)
+        p.run_model()
+
+        J = p.compute_totals(wrt=['comp.a', 'comp.b', 'comp.c'], of=['comp.x', 'comp.x'])
+        assert_near_equal(J['comp.x', 'comp.a'], [[-4.5]])
+        assert_near_equal(J['comp.x', 'comp.b'], [[-1.5]])
+        assert_near_equal(J['comp.x', 'comp.c'], [[-0.5]])
+
+    def test_fwd(self):
+        self.check_derivs('fwd', use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True)
+
+
+class TestJaxNonDifferentiableArgs(unittest.TestCase):
+    def check_derivs(self, mode, use_jit):
+        def func(a, b, c, ex1, ex2):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = (omf.wrap(func)
+                .defaults(shape=3)
+                .declare_option('ex1', default='foo')
+                .declare_option('ex2', default='bar')
+                .declare_partials(of='*', wrt='*', method='jax')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(3)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', use_jit=True)

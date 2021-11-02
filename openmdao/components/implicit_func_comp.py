@@ -7,7 +7,15 @@ from itertools import chain
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
+
+
+try:
+    import jax
+    from jax import jvp, vjp, vmap, random, jit, jacfwd, jacrev
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
 
 
 class ImplicitFuncComp(ImplicitComponent):
@@ -64,6 +72,26 @@ class ImplicitFuncComp(ImplicitComponent):
             self.linearize = self._linearize_
         if solve_linear:
             self.solve_linear = self._solve_linear_
+
+        if self._apply_nonlinear_func._use_jax:
+            self.options['use_jax'] = True
+        if self.options['use_jax'] and self.options['use_jit']:
+            static_argnums = np.where(np.array(['is_option' in m for m in
+                                                self._apply_nonlinear_func._inputs.values()],
+                                               dtype=bool))[0]
+            try:
+                self._apply_nonlinear_func._f = jit(self._apply_nonlinear_func._f,
+                                                    static_argnums=static_argnums)
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: failed jit compile of solve_nonlinear "
+                                   f"function: {err}")
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        _add_options(self)
 
     def setup(self):
         """
@@ -152,6 +180,44 @@ class ImplicitFuncComp(ImplicitComponent):
         Compute outputs. The model is assumed to be in a scaled state.
         """
         self._outputs.set_vals(self._solve_nonlinear_func(*self._ordered_values(inputs, outputs)))
+
+    def _linearize(self, jac=None, sub_do_ln=False):
+        """
+        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+
+        Parameters
+        ----------
+        jac : Jacobian or None
+            If None, use local jacobian, else use assembled jacobian jac.
+        sub_do_ln : bool
+            Flag indicating if the children should call linearize on their linear solvers.
+        """
+        if self.options['use_jax']:
+            # force _jvp and/or _vjp to be re-initialized the next time they are needed
+            # is called
+            self._jvp = None
+            self._vjp = None
+            func = self._apply_nonlinear_func
+            # argnums specifies which position args are to be differentiated
+            argnums = np.where(
+                np.array(['is_option' not in m for m in func._inputs.values()],
+                         dtype=bool))[0]
+
+            onames = list(func.get_output_names())
+            nouts = len(onames)
+            jf = jacfwd(func._f, argnums)(*self._ordered_values(self._inputs, self._outputs))
+            for col, inp in enumerate(chain(func.get_input_names(), onames)):
+                if col in argnums:
+                    if nouts == 1:
+                        self._jacobian[onames[0], inp] = np.asarray(jf[col])
+                    else:
+                        for row, out in enumerate(onames):
+                            self._jacobian[out, inp] = np.asarray(jf[row][col])
+
+            if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
+                self._assembled_jac._update(self)
+        else:
+            super()._linearize(jac, sub_do_ln)
 
     def _linearize_(self, inputs, outputs, jacobian):
         """

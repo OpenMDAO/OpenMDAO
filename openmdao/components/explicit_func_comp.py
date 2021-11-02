@@ -103,28 +103,34 @@ class ExplicitFuncComp(ExplicitComponent):
             argnums = np.where(
                 np.array(['is_option' not in m for m in self._compute._inputs.values()],
                          dtype=bool))[0]
+            onames = list(self._compute.get_output_names())
+            nouts = len(onames)
             jf = jacfwd(self._compute._f, argnums)(*self._func_values(self._inputs))
-            for row, out in enumerate(self._compute.get_output_names()):
-                for col, inp in enumerate(self._compute.get_input_names()):
-                    if col in argnums:
-                        self._jacobian[out, inp] = np.asarray(jf[row][col])
+            for col, inp in enumerate(self._compute.get_input_names()):
+                if col in argnums:
+                    if nouts == 1:
+                        self._jacobian[onames[0], inp] = np.asarray(jf[col])
+                    else:
+                        for row, out in enumerate(onames):
+                            self._jacobian[out, inp] = np.asarray(jf[row][col])
         else:
             super()._linearize(jac, sub_do_ln)
 
     def _setup_jax(self):
+        pass
         # self.matrix_free = True
-        self.compute_jacvec_product = self._compute_jacvec_product_
+        # self.compute_jacvec_product = self._compute_jacvec_product_
 
-    def _compute_jacvec_product_(self, inputs, dinputs, doutputs, mode):
-        if mode == 'fwd':
-            # if self._jvp is None:
-            #     self._jvp = jax.linearize(self._compute._f, *inputs.values())[1]
-            # doutputs.set_vals(self._jvp(*dinputs.values()))
-            doutputs.set_val(self._jacfwd.dot(dinputs.asarray()))
-        else:  # rev
-            if self._vjp is None:
-                self._vjp = vjp(self._compute._f, *inputs.values())[1]
-            dinputs.set_vals(self._vjp(tuple(doutputs.values())))
+    # def _compute_jacvec_product_(self, inputs, dinputs, doutputs, mode):
+    #     if mode == 'fwd':
+    #         # if self._jvp is None:
+    #         #     self._jvp = jax.linearize(self._compute._f, *inputs.values())[1]
+    #         # doutputs.set_vals(self._jvp(*dinputs.values()))
+    #         doutputs.set_val(self._jacfwd.dot(dinputs.asarray()))
+    #     else:  # rev
+    #         if self._vjp is None:
+    #             self._vjp = vjp(self._compute._f, *inputs.values())[1]
+    #         dinputs.set_vals(self._vjp(tuple(doutputs.values())))
 
     def compute(self, inputs, outputs):
         """
@@ -202,8 +208,6 @@ class ExplicitFuncComp(ExplicitComponent):
         ----------
         inputs : Vector
             The input vector.
-        outputs : Vector
-            The output vector (contains the states).
 
         Yields
         ------

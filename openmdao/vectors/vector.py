@@ -550,7 +550,10 @@ class Vector(object):
         arr = self.asarray()
 
         if self.nvars() == 1:
-            arr[:] = vals
+            if isscalar(vals):
+                arr[:] = vals
+            else:
+                arr[:] = vals.ravel()
         else:
             start = end = 0
             for v in vals:

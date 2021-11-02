@@ -1021,20 +1021,63 @@ class TestComputePartials(unittest.TestCase):
 
 
 class TestJax(unittest.TestCase):
-    def check_derivs(self, mode, use_jit):
+    def check_derivs(self, mode, shape, use_jit):
+        def func(a, b, c):
+            x = 2. * a * b + 3. * c
+            return x
+
+        f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(np.product(shape)) if shape else np.eye(1)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', (), use_jit=False)
+
+    def test_fwd_jit(self):
+        self.check_derivs('fwd', (), use_jit=True)
+
+    def test_rev(self):
+        self.check_derivs('rev', (), use_jit=False)
+
+    def test_rev_jit(self):
+        self.check_derivs('rev', (), use_jit=True)
+
+
+class TestJax2retvals(unittest.TestCase):
+    def check_derivs(self, mode, shape, use_jit):
         def func(a, b, c):
             x = 2. * a * b + 3. * c
             y = 5. * a * c - 2.5 * b
             return x, y
 
-        f = omf.wrap(func).defaults(shape=(3,2)).declare_partials(of='*', wrt='*', method='jax')
+        f = omf.wrap(func).defaults(shape=shape).declare_partials(of='*', wrt='*', method='jax')
         p = om.Problem()
         p.model.add_subsystem('comp', om.ExplicitFuncComp(f, use_jax=True, use_jit=use_jit))
         p.setup(mode=mode)
         p.run_model()
         J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
-        I = np.eye(6)
+        I = np.eye(np.product(shape)) if shape else np.eye(1)
         assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
@@ -1042,17 +1085,29 @@ class TestJax(unittest.TestCase):
         assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
         assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
 
+    def test_fwd3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=False)
+
+    def test_fwd_jit3x2(self):
+        self.check_derivs('fwd', (3,2), use_jit=True)
+
+    def test_rev3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=False)
+
+    def test_rev_jit3x2(self):
+        self.check_derivs('rev', (3,2), use_jit=True)
+
     def test_fwd(self):
-        self.check_derivs('fwd', use_jit=False)
+        self.check_derivs('fwd', (), use_jit=False)
 
     def test_fwd_jit(self):
-        self.check_derivs('fwd', use_jit=True)
+        self.check_derivs('fwd', (), use_jit=True)
 
     def test_rev(self):
-        self.check_derivs('rev', use_jit=False)
+        self.check_derivs('rev', (), use_jit=False)
 
     def test_rev_jit(self):
-        self.check_derivs('rev', use_jit=True)
+        self.check_derivs('rev', (), use_jit=True)
 
 
 class TestJaxNonDifferentiableArgs(unittest.TestCase):

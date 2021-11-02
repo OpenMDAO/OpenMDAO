@@ -4,7 +4,7 @@ Define functions and objects common to the ExplicitFuncComp and ImplicitFuncComp
 
 try:
     import jax
-    from jax import jvp, vjp, vmap, random, jit
+    from jax import jvp, vjp, vmap, random, jit, jacfwd
     import jax.numpy as jnp
 except ImportError:
     jax = None

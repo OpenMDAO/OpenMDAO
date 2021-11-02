@@ -413,16 +413,18 @@ class OMWrappedFunc(object):
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
-            if name in outs:  # skip if this is a state
-                continue
-
             meta = ins[name]
 
             if meta.get('is_option'):
                 continue
 
-            self._default_to_shape(name, meta, self._input_defaults)
-            _update_from_defaults(meta, self._input_defaults)
+            if name in outs:  # skip if this is a state
+                defaults = self._output_defaults
+            else:
+                defaults = self._input_defaults
+
+            self._default_to_shape(name, meta, defaults)
+            _update_from_defaults(meta, defaults)
 
     def _setup_outputs(self):
         """
@@ -534,9 +536,11 @@ class OMWrappedFunc(object):
                 try:
                     shp = meta['shape']
                 except KeyError:
-                    raise RuntimeError(f"Can't determine shape of input '{name}'.")
-                if jax is not None:
-                    args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
+                    if 'resid' not in meta:  # this is an input, not a state
+                        raise RuntimeError(f"Can't determine shape of input '{name}'.")
+                else:
+                    if jax is not None:
+                        args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
         # compute shapes as a check against annotated value (if any)
         if jax is not None:
