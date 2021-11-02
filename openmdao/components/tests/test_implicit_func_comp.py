@@ -2,7 +2,7 @@ import unittest
 import math
 
 import numpy as np
-from scipy import linalg
+from scipy.optimize import newton
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
@@ -366,3 +366,86 @@ class TestJaxNonDifferentiableArgs(unittest.TestCase):
 
     def test_rev_jit(self):
         self.check_derivs('rev', use_jit=True)
+
+
+# try:
+#     from pycycle.thermo.cea import species_data
+#     from pycycle import constants
+# except ImportError:
+#     species_data = constants = None
+
+
+# def _resid_weighting(n):
+#     np.seterr(under='ignore')
+#     return (1 / (1 + np.exp(-1e5 * n)) - .5) * 2
+
+
+# # residual function
+# # n_pi is the state
+# # composition, T, P are all inputs (this is the order that is demanded by scipy's solvers)
+# # thermo is like an option (constant value, never changes, would be passed in during instantiation)
+# def chem_eq_resid(n_pi, composition, T, P, thermo):
+
+#         # 1000 is scaling for dumb newton solver
+
+#         n = n_pi[:thermo.num_prod]/1000
+#         pi = n_pi[thermo.num_prod:]/1000
+
+#         resids = np.zeros(thermo.num_prod+thermo.num_element)
+
+#         n_moles = np.sum(n)
+
+#         H0_T = thermo.H0([T])
+#         S0_T = thermo.S0([T])
+
+#         mu = H0_T - S0_T + np.log(n) + np.log(P) - np.log(n_moles)
+
+#         resids[:thermo.num_prod] = (mu - np.sum(pi * thermo.aij.T, axis=1))
+
+#         # trace damping
+#         weights = _resid_weighting(n * n_moles)
+#         resids[:thermo.num_prod] *= weights
+
+#         if np.linalg.norm(resids[:thermo.num_prod]) < 1e-4:
+#             _trace = np.where(n <= constants.MIN_VALID_CONCENTRATION+1e-20)
+#             resids[:thermo.num_prod][_trace] = 0.
+
+#         # residuals from the conservation of mass
+#         resids[thermo.num_prod:] = np.sum(thermo.aij * n, axis=1) - composition
+
+#         print('resids', resids, np.linalg.norm(resids))
+
+#         return resids
+
+
+# def solve_nl_chem_eq(composition, T, P, thermo):
+
+#     # initial guess
+#     n_pi_init = np.zeros(thermo.num_prod+thermo.num_element)
+
+#     n_pi_init[:thermo.num_prod] = np.ones(thermo.num_prod) / thermo.num_prod / 10  * 1000 # initial guess for n
+#     n_pi_init[thermo.num_prod:] = np.ones(thermo.num_element) * 1000
+
+#     # NOTE: newton can't actually solve this, but it works for an example
+#     result = newton(chem_eq_resid, n_pi_init, args=(thermo.b0, T, P, thermo))
+
+#     return result
+
+
+# def linearize(n_pi, composition, T, P, thermo, J):
+#     # matfree components will just not populate J here...
+#     return (obj1, obj2) # this will get passed as `lin_data` to the linear operators
+
+
+
+# @unittest.skipIf(species_data is None)
+# class TestPyCycleFuncComp(unittest.TestCase):
+#     def build_model(self):
+#         pass
+
+#     def test_pycycle_cs(self):
+#         pass
+
+#     def test_pycycle_jax(self):
+#         pass
+
