@@ -1,13 +1,10 @@
 """Define the ImplicitFuncComp class."""
 
-
-import numpy as np
-from numpy import asarray, isscalar
 from itertools import chain
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
-import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore
+import openmdao.func_api as omf
 
 
 class ImplicitFuncComp(ImplicitComponent):
@@ -67,7 +64,7 @@ class ImplicitFuncComp(ImplicitComponent):
 
     def setup(self):
         """
-        Define out inputs and outputs.
+        Define our inputs and outputs.
         """
         optignore = {'is_option'}
 
