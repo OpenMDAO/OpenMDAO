@@ -14,8 +14,6 @@ from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
 
 import numpy as np
-from numpy import linalg as LA
-
 
 class RecordViewer(object):
     """
@@ -60,7 +58,7 @@ class RecordViewer(object):
     def _parse_cases(self):
         if isinstance(self.data, str):
             self.cr = om.CaseReader(self.data)
-        if isinstance(self.data, om.SqliteRecorder):
+        elif isinstance(self.data, om.SqliteRecorder):
             self.cr = self.data
 
     def _var_compatability_check(self, variables, var_to_compare):
@@ -198,13 +196,15 @@ class RecordViewer(object):
     def _case_plot_calc(self, data, case_array):
         num_of_cases = data.shape[0]
         if self.case_iter_select.value == "Norm":
-            norm_vector = LA.norm(data, axis=1).reshape(1, num_of_cases)
+            norm_vector = np.linalg.norm(data, axis=1).reshape(1, num_of_cases)
             case_reshape = np.arange(num_of_cases).reshape(1, num_of_cases)
             return norm_vector, case_reshape
+
         elif self.case_iter_select.value == "Vector Lines":
             norm_vector = data.T
             case_reshape = case_array.T
             return norm_vector, case_reshape
+
         else:
             return data, case_array
 
