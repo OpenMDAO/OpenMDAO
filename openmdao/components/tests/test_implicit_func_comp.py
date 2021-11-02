@@ -96,10 +96,9 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         p_opt = om.Problem()
 
-        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize) #, solve_nonlinear=solve_nonlinear)
+        p_opt.model = om.ImplicitFuncComp(f, linearize=linearize)
 
-        newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        newton.options['iprint'] = 0
+        newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         p_opt.driver = om.ScipyOptimizeDriver()
@@ -140,8 +139,7 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         # need this since comp is implicit and doesn't have a solve_linear
         p.model.linear_solver = om.DirectSolver()
-        newton = p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        newton.options['iprint'] = 0
+        newton = p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
 
         p.setup()
 

@@ -311,8 +311,8 @@ class OMWrappedFunc(object):
 
         Returns
         -------
-        iter of (str, dict)
-            Iterator of (name, metdata_dict) for each input variable.
+        list of (str, dict)
+            List containing (name, metdata_dict) for each input variable.
         """
         if self._call_setup:
             self._setup()
@@ -570,6 +570,18 @@ class OMWrappedFunc(object):
                 outs[name]['shape'] = shape
 
     def _default_to_shape(self, name, meta, defaults_dict):
+        """
+        Set shape based on default value or various metadata.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        meta : dict
+            Variable metadata dict.
+        defaults_dict : dict
+            Function defaults dict.
+        """
         if 'val' in meta and meta['val'] is not None:
             valshape = np.asarray(meta['val']).shape
         else:

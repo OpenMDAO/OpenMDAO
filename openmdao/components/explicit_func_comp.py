@@ -93,11 +93,6 @@ class ExplicitFuncComp(ExplicitComponent):
         dict
             Metadata dict for the specified partial(s).
         """
-        if self._compute_partials is None and ('method' not in kwargs or
-                                               kwargs['method'] == 'exact'):
-            raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method equal "
-                               "to 'cs', 'fd', or 'jax'.")
-
         return super().declare_partials(*args, **kwargs)
 
     def _setup_partials(self):
