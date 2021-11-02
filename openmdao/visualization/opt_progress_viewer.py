@@ -260,10 +260,13 @@ class RecordViewer(object):
         if self.io_select_x.value == "Case Iterations":
             case_iter_x = True
 
-        if case_iter_x or case_iter_y:
+        if len(self.case_options) != 1 and (case_iter_x or case_iter_y):
             if len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
                 self.case_select.value.append(str(current_val + 1))
+        elif case_iter_x or case_iter_y:
+            self.warning_box.text = ("NOTE: Only one case found. Unable to view case iterations vs "
+                                     "variable")
 
         for i in self.case_select.value:
             self.case = self.cr.get_case(self.case_options[int(i)][1])
@@ -281,7 +284,7 @@ class RecordViewer(object):
             elif (num_points_x and case_iter_y) or (num_points_y and case_iter_x):
                 x_variable = np.zeros(1)
                 y_variable = np.zeros(1)
-                print("Cannot compare Number of Points to Case Iterations")
+                self.warning_box.text = "NOTE: Cannot compare Number of Points to Case Iterations"
             elif num_points_y or case_iter_y:
                 x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = np.arange(len(x_variable))
@@ -299,44 +302,42 @@ class RecordViewer(object):
             new_data['x_vals'] = np.vstack((new_data['x_vals'], x_variable))
             new_data['y_vals'] = np.vstack((new_data['y_vals'], y_variable))
 
+        x_len = new_data['x_vals'].shape[1]
+        y_len = new_data['y_vals'].shape[1]
+        new_data['color'] = self._line_color_list(new_data['x_vals'])
+        new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+        case_len = len(new_data['cases'])
+
         if new_data['x_vals'].shape[1] > 1:
+            print("here")
             if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
                 self.warning_box.text = """NOTE: Both X and Y values contain zeros for values,
                                         unable to plot"""
 
-            x_len = new_data['x_vals'].shape[1]
-            y_len = new_data['y_vals'].shape[1]
-            new_data['color'] = self._line_color_list(new_data['x_vals'])
-            new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
-            case_len = len(new_data['cases'])
-
             if case_iter_x:
-                if len(new_data['cases']) == 1:
-                    self.warning_box.text = "NOTE: Select two or more cases"
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'], new_data['x_vals'])
-
             elif case_iter_y:
-                if len(new_data['cases']) == 1:
-                    self.warning_box.text = "NOTE: Select two or more cases"
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'], new_data['y_vals'])
 
-            if isinstance(new_data['x_vals'], np.ndarray):
-                new_data['x_vals'] = new_data['x_vals'].tolist()
-            if isinstance(new_data['y_vals'], np.ndarray):
-                new_data['y_vals'] = new_data['y_vals'].tolist()
+            new_data['x_vals'] = new_data['x_vals'].tolist()
+            new_data['y_vals'] = new_data['y_vals'].tolist()
 
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
-            if isinstance(new_data['x_vals'], np.ndarray):
-                new_data['x_vals'] = new_data['x_vals'].tolist()
-            if isinstance(new_data['y_vals'], np.ndarray):
-                new_data['y_vals'] = new_data['y_vals'].tolist()
-            new_data['color'] = self._line_color_list(new_data['x_vals'])
-            new_data['cases'] = [self.case_options[int(case)][1] for case in self.case_select.value]
+
+            if case_iter_x:
+                new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
+                new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'], new_data['x_vals'])
+            elif case_iter_y:
+                new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
+                new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'], new_data['y_vals'])
+
+            new_data['x_vals'] = new_data['x_vals'].flatten().tolist()
+            new_data['y_vals'] = new_data['y_vals'].flatten().tolist()
 
             self.circle_data.data = new_data
             self.multi_line_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}

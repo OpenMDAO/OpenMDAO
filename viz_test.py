@@ -20,7 +20,6 @@ tf = np.float128(10)
 
 # Initialize the problem and assign the driver
 p = om.Problem(model=om.Group())
-p.options['opt_dashboard'] = True
 p.driver = om.pyOptSparseDriver()
 p.driver.options['optimizer'] = 'SNOPT'
 p.driver.opt_settings['iSumm'] = 6
@@ -66,86 +65,42 @@ p.set_val('traj.phase0.controls:u', phase.interp('u', [-0.6, 2.4]))
 #
 
 dm.run_problem(p)
-# om.OptViewer("cases.sql")
 
-# import numpy as np
 
 # import openmdao.api as om
 
-
-# from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
-
-# # check that pyoptsparse is installed. if it is, try to use SLSQP.
-# from openmdao.utils.general_utils import set_pyoptsparse_opt
-
-# OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
-
-# class Cycle(om.Group):
-
-#     def setup(self):
-#         self.add_subsystem('d1', SellarDis1())
-#         self.add_subsystem('d2', SellarDis2())
-#         self.connect('d1.y1', 'd2.y1')
-
-#         self.nonlinear_solver = om.NonlinearBlockGS()
-#         self.nonlinear_solver.options['iprint'] = 2
-#         self.nonlinear_solver.options['maxiter'] = 20
-#         self.linear_solver = om.DirectSolver()
-
-#         # paths are relative, not absolute like for Driver and Problem
-#         self.nonlinear_solver.recording_options['includes'] = ['d1*']
-#         self.nonlinear_solver.recording_options['excludes'] = ['*z']
-
-
-# class SellarMDAConnect(om.Group):
-
-#     def setup(self):
-#         indeps = self.add_subsystem('indeps', om.IndepVarComp())
-#         indeps.add_output('x', 1.0)
-#         indeps.add_output('z', np.array([5.0, 2.0]))
-
-#         self.add_subsystem('cycle', Cycle())
-
-#         self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-#                                                   z=np.array([0.0, 0.0]), x=0.0))
-
-#         self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
-#         self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
-
-#         self.connect('indeps.x', ['cycle.d1.x', 'obj_cmp.x'])
-#         self.connect('indeps.z', ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
-#         self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])
-#         self.connect('cycle.d2.y2', ['obj_cmp.y2', 'con_cmp2.y2'])
-
-
+# # build the model
 # prob = om.Problem()
 
-# prob.model = SellarMDAConnect()
+# prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
+# # setup the optimization
 # prob.driver = om.ScipyOptimizeDriver()
 # prob.driver.options['optimizer'] = 'SLSQP'
-# prob.driver.options['tol'] = 1e-8
 
-# prob.set_solver_print(level=0)
+# prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+# prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+# prob.model.add_objective('paraboloid.f')
 
-# prob.model.add_design_var('indeps.x', lower=0, upper=10)
-# prob.model.add_design_var('indeps.z', lower=0, upper=10)
-# prob.model.add_objective('obj_cmp.obj')
-# prob.model.add_constraint('con_cmp1.con1', upper=0)
-# prob.model.add_constraint('con_cmp2.con2', upper=0)
+# recorder = om.SqliteRecorder('parab.sql')
+# prob.driver.add_recorder(recorder)
+
+# prob.driver.recording_options['record_objectives'] = True
+# prob.driver.recording_options['record_constraints'] = True
+# prob.driver.recording_options['record_desvars'] = True
 
 # prob.setup()
 
-# nl = prob.model._get_subsystem('cycle').nonlinear_solver
-# # Default includes and excludes
-# nl.recording_options['includes'] = ['*']
-# nl.recording_options['excludes'] = []
+# # Set initial values.
+# prob.set_val('paraboloid.x', 3.0)
+# prob.set_val('paraboloid.y', -4.0)
 
-# filename = "sqlite2"
-# recorder = om.SqliteRecorder('cases3.sql', record_viewer_data=False)
-# nl.add_recorder(recorder)
-
-# prob['indeps.x'] = 2.
-# prob['indeps.z'] = [-1., -1.]
-
+# # run the optimization
 # prob.run_driver()
+
+# # minimum value
+# print(prob.get_val('paraboloid.f'))
+
+# # location of the minimum
+# print(prob.get_val('paraboloid.x'))
+# print(prob.get_val('paraboloid.y'))
