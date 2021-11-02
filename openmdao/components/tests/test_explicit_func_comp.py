@@ -838,7 +838,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
                 .declare_partials(of='*', wrt='*', method='cs'))
 
         p = om.Problem()
-        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+        p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
 
         p.setup(mode='fwd')
         p.run_model()
@@ -859,7 +859,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
                                   rows=np.arange(5), cols=np.arange(5)))
 
         p = om.Problem()
-        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+        p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
 
         p.setup(mode='fwd')
         p.run_driver()

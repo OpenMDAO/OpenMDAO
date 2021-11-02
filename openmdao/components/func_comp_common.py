@@ -18,11 +18,6 @@ _disallowed_varnames = {
 }
 
 
-def _check_units_option(option, value):
-    if value is not None and not valid_units(value):
-        raise ValueError(f"The units '{value}' are invalid.")
-
-
 def _copy_with_ignore(dct, keepers, ignore=()):
     """
     Copy the entries in the given dict whose keys are in keepers.
