@@ -900,8 +900,6 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2prom = self._var_abs2prom['input']
-        src_sizes = self._var_sizes['output']
-        src_size_idxs = self._var_allprocs_abs2idx
 
         tdict = {}
         for tgt, src in self._conn_global_abs_in2out.items():
@@ -1484,8 +1482,6 @@ class Group(System):
 
                 if inparts[:nparts] == outparts[:nparts]:
                     global_abs_in2out[abs_in] = abs_out
-
-                    gmeta_in = all_abs2meta_in[abs_in]
 
                     # if connection is contained in a subgroup, add to conns
                     # to pass down to subsystems.

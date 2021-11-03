@@ -2,17 +2,7 @@
 Define functions and objects common to the ExplicitFuncComp and ImplicitFuncComp classes.
 """
 
-try:
-    import jax
-    from jax import jvp, vjp, vmap, random, jit, jacfwd
-    import jax.numpy as jnp
-except ImportError:
-    jax = None
-
 import re
-import numpy as np
-from openmdao.utils.units import valid_units
-from openmdao.func_api import _shape2tuple
 from openmdao.utils.om_warnings import issue_warning
 
 
@@ -23,11 +13,6 @@ namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
 _disallowed_varnames = {
     'units', 'shape', 'shape_by_conn', 'run_root_only', 'distributed', 'assembled_jac_type'
 }
-
-
-def _check_units_option(option, value):
-    if value is not None and not valid_units(value):
-        raise ValueError(f"The units '{value}' are invalid.")
 
 
 def _copy_with_ignore(dct, keepers, ignore=()):

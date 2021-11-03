@@ -638,7 +638,6 @@ class System(object):
         sizes_out = self._var_sizes['output']
 
         tometa_in = self._var_allprocs_abs2meta['input']
-        tometa_out = self._var_allprocs_abs2meta['output']
 
         local_ins = self._var_abs2meta['input']
         local_outs = self._var_abs2meta['output']

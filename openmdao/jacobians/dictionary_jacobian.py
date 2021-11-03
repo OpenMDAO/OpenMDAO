@@ -201,12 +201,15 @@ class _CheckingJacobian(DictionaryJacobian):
         for of, start, end, _, _ in system._jac_of_iter():
             nrows = end - start
             for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
-                ncols = wend - wstart
-                loc_wrt = wrt.rsplit('.', 1)[-1]
-                directional = (local_opts is not None and loc_wrt in local_opts and
-                               local_opts[loc_wrt]['directional'])
+                if local_opts:
+                    loc_wrt = wrt.rsplit('.', 1)[-1]
+                    directional = (loc_wrt in local_opts and
+                                   local_opts[loc_wrt]['directional'])
+                else:
+                    directional = False
                 key = (of, wrt)
                 if key not in self._subjacs_info:
+                    ncols = wend - wstart
                     # create subjacs_info objects for matrix_free systems that don't have them
                     self._subjacs_info[key] = {
                         'rows': None,
@@ -240,12 +243,11 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
-        if self._colnames is None:
+        if self._col_varnames is None:
             self._setup_index_maps(system)
 
-        wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _, _, _ = self._col_var_info[wrt]
-        loc_idx = icol - offset  # local col index into subjacs
+        wrt = self._col_varnames[self._col2name_ind[icol]]
+        loc_idx = icol - self._col_var_offset[wrt]  # local col index into subjacs
 
         scratch = np.zeros(column.shape)
 

@@ -1,14 +1,11 @@
 """Define the ImplicitFuncComp class."""
 
-
-import numpy as np
-from numpy import asarray, isscalar
 from itertools import chain
+import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
-
 
 try:
     import jax
@@ -75,6 +72,12 @@ class ImplicitFuncComp(ImplicitComponent):
 
         if self._apply_nonlinear_func._use_jax:
             self.options['use_jax'] = True
+
+        # in case we're doing jit, force setup of wrapped func because we compute output shapes
+        # during setup and that won't work on a jit compiled function
+        if self._apply_nonlinear_func._call_setup:
+            self._apply_nonlinear_func._setup()
+
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
                                                 self._apply_nonlinear_func._inputs.values()],
@@ -95,7 +98,7 @@ class ImplicitFuncComp(ImplicitComponent):
 
     def setup(self):
         """
-        Define out inputs and outputs.
+        Define our inputs and outputs.
         """
         optignore = {'is_option'}
 
@@ -110,11 +113,6 @@ class ImplicitFuncComp(ImplicitComponent):
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._apply_nonlinear_func.get_output_meta()):
-            if name is None:
-                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
-                                   f"value in position {i} because it has no name.  Specify the "
-                                   "name by returning a variable, for example 'return myvar', or "
-                                   "include the name in the function's metadata.")
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)
@@ -206,13 +204,15 @@ class ImplicitFuncComp(ImplicitComponent):
             onames = list(func.get_output_names())
             nouts = len(onames)
             jf = jacfwd(func._f, argnums)(*self._ordered_values(self._inputs, self._outputs))
-            for col, inp in enumerate(chain(func.get_input_names(), onames)):
+            for col, inp in enumerate(chain(func._inputs.keys(), onames)):
                 if col in argnums:
                     if nouts == 1:
-                        self._jacobian[onames[0], inp] = np.asarray(jf[col])
+                        if (onames[0], inp) in self._jacobian:
+                            self._jacobian[onames[0], inp] = np.asarray(jf[col])
                     else:
                         for row, out in enumerate(onames):
-                            self._jacobian[out, inp] = np.asarray(jf[row][col])
+                            if (out, inp) in self._jacobian:
+                                self._jacobian[out, inp] = np.asarray(jf[row][col])
 
             if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
                 self._assembled_jac._update(self)
@@ -278,8 +278,10 @@ class ImplicitFuncComp(ImplicitComponent):
         inps = inputs.values()
         outs = outputs.values()
 
-        for meta in self._apply_nonlinear_func._inputs.values():
-            if 'resid' in meta:  # it's a state
+        for name, meta in self._apply_nonlinear_func._inputs.items():
+            if 'is_option' in meta:  # it's an option
+                yield self.options[name]
+            elif 'resid' in meta:  # it's a state
                 yield next(outs)
             else:
                 yield next(inps)

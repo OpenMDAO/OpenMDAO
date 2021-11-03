@@ -84,11 +84,6 @@ class ExplicitFuncComp(ExplicitComponent):
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._compute.get_output_meta()):
-            if name is None:
-                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
-                                   f"value in position {i} because it has no name.  Specify the "
-                                   "name by returning a variable, for example 'return myvar', or "
-                                   "include the name in the function's metadata.")
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)
@@ -161,11 +156,6 @@ class ExplicitFuncComp(ExplicitComponent):
         dict
             Metadata dict for the specified partial(s).
         """
-        if self._compute_partials is None and ('method' not in kwargs or
-                                               kwargs['method'] == 'exact'):
-            raise RuntimeError(f"{self.msginfo}: declare_partials must be called with method equal "
-                               "to 'cs', 'fd', or 'jax'.")
-
         return super().declare_partials(*args, **kwargs)
 
     def _setup_partials(self):

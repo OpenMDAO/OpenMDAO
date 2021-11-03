@@ -311,8 +311,8 @@ class OMWrappedFunc(object):
 
         Returns
         -------
-        iter of (str, dict)
-            Iterator of (name, metdata_dict) for each input variable.
+        list of (str, dict)
+            List containing (name, metdata_dict) for each input variable.
         """
         if self._call_setup:
             self._setup()
@@ -542,7 +542,7 @@ class OMWrappedFunc(object):
                     if jax is not None:
                         args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
-        # compute shapes as a check against annotated value (if any)
+        # compute shapes as a check against shapes in metadata (if any)
         if jax is not None:
             try:
                 # must replace numpy with jax numpy when making jaxpr.
@@ -553,7 +553,7 @@ class OMWrappedFunc(object):
                     raise RuntimeError(f"Failed to determine the output shapes "
                                        f"based on the input shapes. The error was: {err}.  To "
                                        "avoid this error, add return value metadata that "
-                                       "specify the shapes of the return values to the function.")
+                                       "specifies the shapes of the return values to the function.")
                 warnings.warn("Failed to determine the output shapes based on the input "
                               "shapes in order to check the provided metadata values. The"
                               f" error was: {err}.")
@@ -561,7 +561,7 @@ class OMWrappedFunc(object):
                 for val, name in zip(v.out_avals, outs):
                     oldshape = outs[name].get('shape')
                     if oldshape is not None and _shape2tuple(oldshape) != val.shape:
-                        raise RuntimeError(f"Annotated shape for return value "
+                        raise RuntimeError(f"shape from metadata for return value "
                                            f"'{name}' of {oldshape} doesn't match computed "
                                            f"shape of {val.shape}.")
                     outs[name]['shape'] = val.shape
@@ -575,6 +575,18 @@ class OMWrappedFunc(object):
                 outs[name]['shape'] = shape
 
     def _default_to_shape(self, name, meta, defaults_dict):
+        """
+        Set shape based on default value or various metadata.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        meta : dict
+            Variable metadata dict.
+        defaults_dict : dict
+            Function defaults dict.
+        """
         if 'val' in meta and meta['val'] is not None:
             valshape = np.asarray(meta['val']).shape
         else:
