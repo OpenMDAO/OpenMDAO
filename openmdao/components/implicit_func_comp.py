@@ -79,11 +79,6 @@ class ImplicitFuncComp(ImplicitComponent):
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._apply_nonlinear_func.get_output_meta()):
-            if name is None:
-                raise RuntimeError(f"{self.msginfo}: Can't add output corresponding to return "
-                                   f"value in position {i} because it has no name.  Specify the "
-                                   "name by returning a variable, for example 'return myvar', or "
-                                   "include the name in the function's metadata.")
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)

@@ -53,6 +53,45 @@ class TestImplicitFuncComp(unittest.TestCase):
             val = model.lingrp.lin._residuals['x']
             assert_near_equal(val, np.zeros((3, )), tolerance=1e-8)
 
+    def test_apply_nonlinear_linsys_coloring(self):
+
+        x_=np.array([1, 2, -3])
+        A = np.array([[5.0, 0., 2.0], [1.0, 7.0, 0.], [1.0, 0.0, 0.]])
+        b = A.dot(x_)
+
+        def resid_func(A, b, x):
+            rx = A.dot(x) - b
+            return rx
+
+        f = (omf.wrap(resid_func)
+                .add_input('A', shape=A.shape)
+                .add_input('b', shape=b.shape)
+                .add_output('x', resid='rx', val=x_)
+                .declare_coloring(wrt='*', method='cs')
+                )
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
+
+        comp = model.add_subsystem('comp', om.ImplicitFuncComp(f))
+
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+        comp.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.connect('p1.A', 'comp.A')
+        model.connect('p2.b', 'comp.b')
+
+        prob.setup()
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_check_partials(prob.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(prob.check_totals(of=['comp.x'], wrt=['comp.A', 'comp.b'], out_stream=None), atol=3e-5, rtol=3e-5)
+
     def test_component_model_w_linearize(self):
 
         def apply_nonlinear(z, x, y1, y2, R_y1, R_y2):
@@ -98,7 +137,7 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         p_opt.model = om.ImplicitFuncComp(f, linearize=linearize)
 
-        newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+        p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
         p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         p_opt.driver = om.ScipyOptimizeDriver()
@@ -107,7 +146,6 @@ class TestImplicitFuncComp(unittest.TestCase):
         p_opt.model.add_design_var('y1', lower=-10, upper=10)
         p_opt.model.add_constraint('R_y1', equals=0)
 
-        # this objective doesn't really matter... just need something there
         p_opt.model.add_objective('y2')
 
         p_opt.setup()
@@ -139,7 +177,7 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         # need this since comp is implicit and doesn't have a solve_linear
         p.model.linear_solver = om.DirectSolver()
-        newton = p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
 
         p.setup()
 
@@ -150,6 +188,28 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_apply_nonlinear_no_method(self):
+
+        def apply_nl(a, b, c, x):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f))
+
+        p.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.run_model()
+
+        self.assertEqual(cm.exception.args[0],
+                         "'comp' <class ImplicitFuncComp>: declare_partials must be called with method equal to 'cs', 'fd', or 'jax'.")
 
     def test_solve_nonlinear(self):
 
@@ -182,7 +242,7 @@ class TestImplicitFuncComp(unittest.TestCase):
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
-    def test_solve_lin_nl_linearize(self):
+    def _solve_lin_nl_linearize(self, mode):
 
         def apply_nl(a, b, c, x):
             R_x = a * x ** 2 + b * x + c
@@ -220,7 +280,7 @@ class TestImplicitFuncComp(unittest.TestCase):
                                                           linearize=linearize,
                                                           solve_nonlinear=solve_nl))
 
-        p.setup()
+        p.setup(mode=mode)
 
         p.set_val('comp.a', 2.)
         p.set_val('comp.b', -8.)
@@ -229,3 +289,12 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_solve_lin_nl_linearize_fwd(self):
+        self._solve_lin_nl_linearize('fwd')
+
+    def test_solve_lin_nl_linearize_rev(self):
+        self._solve_lin_nl_linearize('rev')
+
+if __name__ == "__main__":
+    unittest.main()
