@@ -1,6 +1,6 @@
 import numpy as np
 from ipytree import Tree, Node
-from ipywidgets import Label, FloatText, HBox, VBox, Output, Button, Dropdown, Text
+from ipywidgets import Label, HBox, VBox, Output, Button, Text
 
 from openmdao.core.component import Component
 from openmdao.core.constants import _SetupStatus
@@ -29,62 +29,28 @@ class SetValuesUI(object):
         self._output = Output(layout={'border': '1px solid black', 'width': '35%'})
 
     def setup(self):
-        # output = Output(layout={'border': '1px solid black', 'width': '60%'})
-        print('setup with autoreload 2', self._output)
-        # self._output.append_stdout('gleep\n')
-
         if not (self._prob._metadata and self._prob._metadata['setup_status'] > _SetupStatus.PRE_SETUP):
             raise RuntimeError(f"The problem set values "
                                 "GUI cannot be created before Problem.setup is called.")
 
-        # self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'60%'})
         self._tree = Tree(stripes=True, multiple_selection=True, layout={'border': '1px solid black', 'width' :'30%'})
         self._value_widget_box = VBox([Label("Model Variables") ,], layout={'border': '1px solid black', 'width' :'50'})
         self.set_vars_from_model_with_initial_list_v2(self._prob.model, self._tree, 0,
                                                    vars_to_set=self._vars_to_set )
-        # if self._vars_to_set:
-        #     self.set_vars_from_user_input(self._vars_to_set, self._tree)
-        # else:
-        #     self.set_vars_from_model(self._prob.model, self._tree)
         self._tree.observe(self.on_selected_change, names='selected_nodes')
-        # self.ui_widget = HBox([self._tree, self._value_widget_box, self._output])
 
         refresh_button = Button(description="Refresh", layout={'border': '1px solid black',
                                                         'width' :'80px',
                                                         'display':'flex',
                                                         'justify_content':'center'})
-        # associated with
         refresh_button.on_click(self.refresh_ui_with_problem_data)
-
-        # self.ui_widget = HBox([self._tree, self._value_widget_box])
-        # self.ui_widget = HBox([self._tree, self._value_widget_box, refresh_button])
         self.ui_widget = HBox([self._tree, self._value_widget_box, refresh_button,self._output])
-
-    # def set_vars_from_model(self, sys, node):
-    #     if sys.name == '_auto_ivc':
-    #         return
-    #     name = sys.name if sys.name else 'root'
-    #     new_node = Node(name)
-    #     node.add_node(new_node)
-    #
-    #     if isinstance(sys, Component):
-    #         input_varnames = list(sys._var_allprocs_prom2abs_list['input'].keys())
-    #         new_node.icon = 'plug'
-    #         for input_varname in input_varnames:
-    #             input_node = Node(input_varname)
-    #             input_node.icon = 'signal'
-    #             new_node.add_node(input_node)
-    #     else:
-    #         new_node.icon = 'envelope-open'
-    #         for s in sys._subsystems_myproc:
-    #             self.set_vars_from_model(s, new_node)
 
     def set_vars_from_model_with_initial_list_v2(self, sys, node, depth, vars_to_set=None):
         # Create the model tree selector widget
         # Can use icons from here https://fontawesome.com/v5.15/icons?d=gallery&p=2&m=free
         if sys.name == '_auto_ivc':
             return
-
 
         name = sys.name if sys.name else 'root'
         new_node = Node(name)
@@ -97,9 +63,7 @@ class SetValuesUI(object):
 
         var_names_at_this_level = get_var_names_at_this_level(model, sys)
 
-
         if isinstance(sys, Component):
-            # input_varnames = list(sys._var_allprocs_prom2abs_list['input'].keys())
             input_varnames = var_names_at_this_level
             new_node.icon = 'plug'
 
@@ -110,10 +74,14 @@ class SetValuesUI(object):
                 input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
                 new_node.add_node(input_node)
 
-                if vars_to_set and input_varname in vars_to_set:
-                    input_node.icon_style = 'success'
-                    self.add_value_widget_with_component(sys, input_varname, input_node)
+                if vars_to_set is not None:
+                    # print("Component vars_to_set is not None")
+                    if input_varname in vars_to_set:
+                        # print(f"Component input_varname in vars_to_set for {input_varname}")
+                        input_node.icon_style = 'success'
+                        self.add_value_widget_with_component(sys, input_varname, input_node)
                 else:
+                    # print("Component vars_to_set is None")
                     input_node.icon_style = 'success'
                     self.add_value_widget_with_component(sys, input_varname, input_node)
 
@@ -127,23 +95,23 @@ class SetValuesUI(object):
                 input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
                 new_node.add_node(input_node)
 
-                if vars_to_set and input_varname in vars_to_set:
+                if vars_to_set is not None:
+                    # print("Group vars_to_set is not None")
+                    if input_varname in vars_to_set:
+                        # print(f"Group input_varname in vars_to_set for {input_varname}")
                         input_node.icon_style = 'success'
                         self.add_value_widget_with_component(sys, input_varname, input_node)
                 else:
+                    # print("Group vars_to_set is None")
                     input_node.icon_style = 'success'
                     self.add_value_widget_with_component(sys, input_varname, input_node)
 
-
-
             new_node.icon = 'envelope-open'
             for s in sys._subsystems_myproc:
+                import time
+                time.sleep(0.1) # To slow down the messages which cause issue with ipwidgets
                 self.set_vars_from_model_with_initial_list_v2(s, new_node, depth + 1, vars_to_set )
 
-        # Add initial value widgets if given by user
-        # if vars_to_set:
-        #     for var_name in vars_to_set:
-        #         self.add_value_widget(var_name)
 
     def set_vars_from_model_with_initial_list_v1(self, sys, node, vars_to_set=None):
         # Create the model tree selector widget
@@ -160,7 +128,7 @@ class SetValuesUI(object):
             for input_varname in input_varnames:
                 input_node = Node(input_varname)
                 input_node._comp = sys
-                input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
+                input_node.icon = 'eye-slash'
                 new_node.add_node(input_node)
 
                 if vars_to_set and input_varname in vars_to_set:
@@ -175,50 +143,18 @@ class SetValuesUI(object):
             for s in sys._subsystems_myproc:
                 self.set_vars_from_model_with_initial_list_v1(s, new_node, vars_to_set)
 
-    #     # Add initial value widgets if given by user
-    #     # if vars_to_set:
-    #     #     for var_name in vars_to_set:
-    #     #         self.add_value_widget(var_name)
-    #
-
-    # def set_vars_from_user_input(self, vars_to_set, node):
-    #     for var_name in vars_to_set:
-    #         self.add_value_widget(var_name)
-    #
     def add_value_widget_with_component(self, comp, var_name, tree_node):
-        # self._output.append_stdout(f'add_value_widget_with_component: {var_name}\n')
         if var_name in self.get_widget_var_names():
             return # already there
-        # val = self._prob[var_name]
-
-        # val = self._prob.get_val(var_name, units=units)
-        # print(f"get_val of {var_name} in component: {comp.name}")
-        # val = self._prob.get_val(var_name)
         val = comp.get_val(var_name)
 
-        # Rob used
-        #     meta = {opts['prom_name']: opts for (_, opts) in prob.model.get_io_metadata().items()}
         inputs_metadata = comp.get_io_metadata(('input',), ['units', ],
                                      get_remote=True,
                                      return_rel_names=False)
 
-        # print(f"inputs_metadata: {inputs_metadata}")
-
         prom2abs_list = comp._var_allprocs_prom2abs_list['input']
 
-
-        # from openmdao.utils.name_maps import name2abs_names
-        # abs_names = name2abs_names(comp, var_name)
-
-        # full_var_name = abs_names[0]
-
-
-        # print(f"prom2abs_list: {prom2abs_list}")
         full_var_name = prom2abs_list[var_name][0]
-
-        # print(f"full_var_name: {full_var_name}")
-
-        # full_var_name = f"{comp.pathname}.{var_name}"
 
         metadata = inputs_metadata[full_var_name]
         units = metadata['units']
@@ -233,8 +169,6 @@ class SetValuesUI(object):
         # Value widget
         # val_widget = FloatText(
         val_widget = Text(
-            # value=self._prob[var_name],
-            # value=str(self._prob[var_name]),
             value=str(val),
             description=var_name,
             disabled=False,
@@ -247,13 +181,6 @@ class SetValuesUI(object):
         )
         val_widget.observe(self.update_prob_val, 'value')
 
-
-        # # Units label
-        # units_label = Label(units, layout={'border': '1px solid black',
-        #                                                 'width' :'60px',
-        #                                                 'display':'flex',
-        #                                                 'justify_content':'center'})
-        # Units text box
         units_widget = Text(units,
                             continuous_update=False,
                             description_tooltip=var_name,
@@ -264,21 +191,6 @@ class SetValuesUI(object):
         units_widget._var_name = var_name
         units_widget.observe(self.update_prob_unit, 'value')
 
-        # if units != "None":
-        #     compatible_units = find_compatible_units(units)
-        #     compatible_units.append(units)
-        #     units_default_value = units
-        # else:
-        #     compatible_units = ['None']
-        #     units_default_value = "None"
-        # units_menu = Dropdown(options=compatible_units, value=units_default_value,
-        #                                   description='',
-        #                       layout={'border': '1px solid black',
-        #                               'width': '50px',
-        #                               'display': 'flex',
-        #                               'justify_content': 'center'}
-        #                       )
-
         # remove button widget
         remove_button = Button(description="X", layout={'border': '1px solid black',
                                                         'width' :'20px',
@@ -288,56 +200,19 @@ class SetValuesUI(object):
         # associated with
         remove_button.on_click(self.remove_val_widget)
 
-        # Put them all together
-        # val_and_remove_widget = HBox([val_widget, remove_button])
-        # val_and_remove_widget = HBox([val_widget, units_label, units_menu, remove_button])
-        # val_and_remove_widget = HBox([val_widget, units_label, remove_button])
         val_and_remove_widget = HBox([val_widget, units_widget, remove_button])
 
         val_and_remove_widget._tree_node = tree_node
 
-        # tree_node.icon_style = 'warning'
         tree_node.icon = 'eye'
-
 
         self._value_widget_box.children += (val_and_remove_widget,)
 
-    # def add_value_widget(self, var_name):
-    #     if var_name in self.get_widget_var_names():
-    #         return # already there
-    #     val = self._prob[var_name]
-    #
-    #     if isinstance(val, np.ndarray):
-    #         if val.size > 1:
-    #             return # skip arrays for now
-    #         val = val.item()
-    #     val_widget = FloatText(
-    #         value=self._prob[var_name],
-    #         description=var_name,
-    #         disabled=False
-    #     )
-    #     val_widget.observe(self.update_prob_val, 'value')
-    #     remove_button = Button(description="X", layout={'border': '1px solid black',
-    #                                                     'width' :'20px',
-    #                                                     'display':'flex',
-    #                                                     'justify_content':'center'})
-    #     remove_button._var_name = var_name # so each Button instance know what variable it is
-    #     # associated with
-    #     remove_button.on_click(self.remove_val_widget)
-    #     val_widget.observe(self.update_prob_val, 'value')
-    #     val_and_remove_widget = HBox([val_widget, remove_button])
-    #     self._value_widget_box.children += (val_and_remove_widget,)
-
-
     def on_selected_change(self, change):
-        # self._output.append_stdout(f"on_selected_change\n")
-        # self._output.append_stdout(f"change['new'][0]: {change['new'][0]}\n")
-        # self._output.append_stdout(f"change['new'][0]._comp: {change['new'][0]._comp}\n")
         comp = change['new'][0]._comp
         change['new'][0].icon_style = 'info' # also try danger, success, info
         change['new'][0].icon = 'eye'
         var_name = change['new'][0].name
-        # self._output.append_stdout(f"{self.get_widget_var_names()}\n")
         if var_name in self.get_widget_var_names():
             change['new'][0].selected = False
             return
@@ -384,7 +259,7 @@ class SetValuesUI(object):
     def update_prob_val(self, change):
         if not self._refresh_in_progress: # no need to update problem since values from problem are being used to change the value in the widget
             # self._prob[change['owner'].description] = change['new']
-            val = float(change['new']) if change['new'] else 0.0;
+            val = float(change['new']) if change['new'] else 0.0
             self._prob.set_val(change['owner'].description, val)
 
     def update_prob_unit(self, change):
@@ -435,8 +310,6 @@ def get_var_names_at_this_level(model, sys):
             current_group_var_promoted_name = prom_name
             # if they're different you would know that someone above the current group promoted it
             current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
-            # if "." not in current_group_var_promoted_name:
-            #     var_names_at_this_level.add(prom_name)
             if "." in current_group_var_promoted_name:
                 continue
             if promoted_name_from_top_level == current_group_pathname:
