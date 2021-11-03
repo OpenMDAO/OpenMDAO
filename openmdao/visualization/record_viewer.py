@@ -3,12 +3,16 @@
 import json
 import warnings
 
-from bokeh.io import show, output_notebook
-from bokeh.models import Select, HoverTool, MultiSelect, Paragraph
-from bokeh.layouts import row, column
-from bokeh.plotting import figure, ColumnDataSource
-from bokeh.palettes import Category20, Turbo256
-from bokeh.util.warnings import BokehUserWarning
+try:
+    from bokeh.io import show, output_notebook
+    from bokeh.models import Select, HoverTool, MultiSelect, Paragraph
+    from bokeh.layouts import row, column
+    from bokeh.plotting import figure, ColumnDataSource
+    from bokeh.palettes import Category20, Turbo256
+    from bokeh.util.warnings import BokehUserWarning
+except ImportError:
+    bokeh = None
+    print("Bokeh not found")
 
 from openmdao.utils.notebook_utils import notebook
 import openmdao.api as om
