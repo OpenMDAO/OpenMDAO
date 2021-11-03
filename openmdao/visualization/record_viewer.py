@@ -15,6 +15,7 @@ import openmdao.api as om
 
 import numpy as np
 
+
 class RecordViewer(object):
     """
     Visualizer to plot variables vs cases, variables vs variables, and more.
@@ -212,7 +213,7 @@ class RecordViewer(object):
         """
         Update function for when the source Y Value dropdown is updated.
         """
-        if self.io_select_y.value == "Case Iterations":
+        if self._case_iter_x or self._case_iter_y:
             self.case_iter_select.options = self.case_iter_options
         else:
             self.case_iter_select.options = ["None"]
@@ -224,8 +225,7 @@ class RecordViewer(object):
         """
         Update function for when the X Value dropdown is updated.
         """
-        if self.io_select_x.value == "Number of Points" or \
-           self.io_select_x.value == "Case Iterations":
+        if self.io_select_x.value == "Number of Points" or self._case_iter_x or self._case_iter_y:
             self.io_select_y.options = self.io_select_x.options
             self.case_iter_select.options = self.case_iter_options
 
@@ -254,7 +254,7 @@ class RecordViewer(object):
         )
         self.warning_box.text = ""
         num_points_x = num_points_y = False
-        case_iter_x = case_iter_y = False
+        self._case_iter_x = self._case_iter_y = False
 
         if self.io_select_y.value == "Number of Points":
             num_points_y = True
@@ -262,15 +262,15 @@ class RecordViewer(object):
             num_points_x = True
 
         if self.io_select_y.value == "Case Iterations":
-            case_iter_y = True
+            self._case_iter_y = True
         if self.io_select_x.value == "Case Iterations":
-            case_iter_x = True
+            self._case_iter_x = True
 
-        if len(self.case_options) != 1 and (case_iter_x or case_iter_y):
+        if len(self.case_options) != 1 and (self._case_iter_x or self._case_iter_y):
             if len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
                 self.case_select.value.append(str(current_val + 1))
-        elif case_iter_x or case_iter_y:
+        elif self._case_iter_x or self._case_iter_y:
             self.warning_box.text = ("NOTE: Only one case found. Unable to view case iterations vs "
                                      "variable")
 
@@ -284,17 +284,17 @@ class RecordViewer(object):
                 if self.io_select_x.value in val:
                     x_io = getattr(self.case, key)
 
-            if (num_points_y and num_points_x) or (case_iter_x and case_iter_y):
+            if (num_points_y and num_points_x) or (self._case_iter_x and self._case_iter_y):
                 x_variable = np.zeros(1)
                 y_variable = np.zeros(1)
-            elif (num_points_x and case_iter_y) or (num_points_y and case_iter_x):
+            elif (num_points_x and self._case_iter_y) or (num_points_y and self._case_iter_x):
                 x_variable = np.zeros(1)
                 y_variable = np.zeros(1)
                 self.warning_box.text = "NOTE: Cannot compare Number of Points to Case Iterations"
-            elif num_points_y or case_iter_y:
+            elif num_points_y or self._case_iter_y:
                 x_variable = x_io[self.io_select_x.value].flatten()
                 y_variable = np.arange(len(x_variable))
-            elif num_points_x or case_iter_x:
+            elif num_points_x or self._case_iter_x:
                 y_variable = y_io[self.io_select_y.value].flatten()
                 x_variable = np.arange(len(y_variable))
             else:
@@ -315,17 +315,16 @@ class RecordViewer(object):
         case_len = len(new_data['cases'])
 
         if new_data['x_vals'].shape[1] > 1:
-            print("here")
             if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
                 self.warning_box.text = """NOTE: Both X and Y values contain zeros for values,
                                         unable to plot"""
 
-            if case_iter_x:
+            if self._case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
                                                                               new_data['x_vals'])
-            elif case_iter_y:
+            elif self._case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
                                                                               new_data['y_vals'])
@@ -337,11 +336,11 @@ class RecordViewer(object):
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
 
-            if case_iter_x:
+            if self._case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
                                                                               new_data['x_vals'])
-            elif case_iter_y:
+            elif self._case_iter_y:
                 new_data['y_vals'] = np.full((y_len, case_len), [list(range(0, case_len))]).T
                 new_data['x_vals'], new_data['y_vals'] = self._case_plot_calc(new_data['x_vals'],
                                                                               new_data['y_vals'])
