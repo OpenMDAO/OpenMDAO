@@ -289,7 +289,7 @@ class TestFuncAPI(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             outvar_meta = list(f.get_output_meta())
 
-        msg = "Annotated shape for return value 'y' of (3, 3) doesn't match computed shape of (3, 2)."
+        msg = "shape from metadata for return value 'y' of (3, 3) doesn't match computed shape of (3, 2)."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_bad_args(self):

@@ -46,9 +46,9 @@ class Jacobian(object):
         A cache dict for key to absolute key.
     _randomize : bool
         If True, sparsity is being computed for simultaneous derivative coloring.
-    _col_var_info : dict
-        Maps column name to start, end, and slice/indices into the result array.
-    _colnames : list
+    _col_var_offset : dict
+        Maps column name to offset into the result array.
+    _col_varnames : list
         List of column var names.
     _col2name_ind : ndarray
         Array that maps jac col index to index of column name.
@@ -63,8 +63,8 @@ class Jacobian(object):
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
-        self._col_var_info = None
-        self._colnames = None
+        self._col_var_offset = None
+        self._col_varnames = None
         self._col2name_ind = None
 
     def _get_abs_key(self, key):
@@ -321,16 +321,16 @@ class Jacobian(object):
         self._under_complex_step = active
 
     def _setup_index_maps(self, system):
-        self._col_var_info = col_var_info = {
-            t[0]: t for t in system._jac_wrt_iter()
-        }
-        self._colnames = list(col_var_info)   # map var id to varname
+        self._col_var_offset = {}
+        col_var_info = []
+        for wrt, start, end, _, _, _ in system._jac_wrt_iter():
+            self._col_var_offset[wrt] = start
+            col_var_info.append(end)
 
-        ncols = np.sum(end - start for _, start, end, _, _, _ in col_var_info.values())
-        self._col2name_ind = np.empty(ncols, dtype=INT_DTYPE)  # jac col to var id
-        start = end = 0
-        for i, (wrt, _start, _end, _, _, _) in enumerate(col_var_info.values()):
-            end += _end - _start
+        self._col_varnames = list(self._col_var_offset)
+        self._col2name_ind = np.empty(end, dtype=INT_DTYPE)  # jac col to var id
+        start = 0
+        for i, end in enumerate(col_var_info):
             self._col2name_ind[start:end] = i
             start = end
 
@@ -408,12 +408,11 @@ class Jacobian(object):
         column : ndarray
             Column value.
         """
-        if self._colnames is None:
+        if self._col_varnames is None:
             self._setup_index_maps(system)
 
-        wrt = self._colnames[self._col2name_ind[icol]]
-        _, offset, _, _, _, _ = self._col_var_info[wrt]
-        loc_idx = icol - offset  # local col index into subjacs
+        wrt = self._col_varnames[self._col2name_ind[icol]]
+        loc_idx = icol - self._col_var_offset[wrt]  # local col index into subjacs
 
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
@@ -431,4 +430,4 @@ class Jacobian(object):
         Revert all subjacs back to the way they were as declared by the user.
         """
         self._subjacs_info = self._system()._subjacs_info
-        self._colnames = None  # force recompute of internal index maps on next set_col
+        self._col_varnames = None  # force recompute of internal index maps on next set_col

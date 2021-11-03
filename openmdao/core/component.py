@@ -1256,6 +1256,8 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc,
             minimum_step, directional)
         """
+        if not self._declared_partial_checks:
+            return {}
         opts = {}
         of, wrt = self._get_partials_varlists()
         invalid_wrt = []

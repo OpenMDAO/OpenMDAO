@@ -326,7 +326,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
 
-    def test_units_decorator(self):
+    def test_units_meta(self):
 
         def func(x=2.0, z=2.0):
             y=x+z+1.

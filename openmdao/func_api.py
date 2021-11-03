@@ -536,7 +536,7 @@ class OMWrappedFunc(object):
                 if jax is not None:
                     args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
-        # compute shapes as a check against annotated value (if any)
+        # compute shapes as a check against shapes in metadata (if any)
         if jax is not None:
             # must replace numpy with jax numpy when making jaxpr.
             with jax_context(self._f.__globals__):
@@ -546,17 +546,17 @@ class OMWrappedFunc(object):
                     if need_shape:
                         raise RuntimeError(f"Failed to determine the output shapes "
                                            f"based on the input shapes. The error was: {err}.  To "
-                                           "avoid this error, add return value annotations that "
-                                           "specify the shapes of the return values to the "
+                                           "avoid this error, add return value metadata that "
+                                           "specifies the shapes of the return values to the "
                                            "function.")
                     warnings.warn("Failed to determine the output shapes based on the input "
-                                  "shapes in order to check the provided annotated values. The"
+                                  "shapes in order to check the provided metadata values. The"
                                   f" error was: {err}.")
                 else:
                     for val, name in zip(v.out_avals, outs):
                         oldshape = outs[name].get('shape')
                         if oldshape is not None and _shape2tuple(oldshape) != val.shape:
-                            raise RuntimeError(f"Annotated shape for return value "
+                            raise RuntimeError(f"shape from metadata for return value "
                                                f"'{name}' of {oldshape} doesn't match computed "
                                                f"shape of {val.shape}.")
                         outs[name]['shape'] = val.shape
