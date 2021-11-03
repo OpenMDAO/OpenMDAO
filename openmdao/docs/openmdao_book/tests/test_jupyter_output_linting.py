@@ -164,8 +164,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                         continue
 
                     code = ''.join(block['source'])
-                    if 'automethod' in code and '{eval-rst}' not in code:
-                        msg = f"'automethod' found in {file} without 'eval_rst'."
+                    if 'automethod::' in code and '{eval-rst}' not in code:
                         files.add(file)
 
         if files:
