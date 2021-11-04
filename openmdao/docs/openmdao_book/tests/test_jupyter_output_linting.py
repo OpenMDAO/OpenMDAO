@@ -167,8 +167,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                         files.add(file)
 
         if files:
-            self.fail("'automethod' directive found in the following {} files"
-                      " without 'eval_rst':\n{}.".format(len(files), '\n'.join(files)))
+            self.fail("'automethod' directive found in the following {} files without"
+                      "'eval-rst':\n{}".format(len(files), '\n'.join(files)))
 
 
 if __name__ == '__main__':
