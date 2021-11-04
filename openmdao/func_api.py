@@ -247,6 +247,7 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         _check_kwargs(kwargs, _allowed_declare_options_args, 'declare_option')
+        del self._inputs[name]['val']  # 'val' isn't a valid arg to declare_option
         self._inputs[name].update(kwargs)
         self._inputs[name]['is_option'] = True
         return self
@@ -413,16 +414,18 @@ class OMWrappedFunc(object):
 
         # first, retrieve inputs from the function signature
         for name in inspect.signature(self._f).parameters:
-            if name in outs:  # skip if this is a state
-                continue
-
             meta = ins[name]
 
             if meta.get('is_option'):
                 continue
 
-            self._default_to_shape(name, meta, self._input_defaults)
-            _update_from_defaults(meta, self._input_defaults)
+            if name in outs:  # skip if this is a state
+                defaults = self._output_defaults
+            else:
+                defaults = self._input_defaults
+
+            self._default_to_shape(name, meta, defaults)
+            _update_from_defaults(meta, defaults)
 
     def _setup_outputs(self):
         """
@@ -516,7 +519,8 @@ class OMWrappedFunc(object):
                 need_shape.append(name)
 
         args = []
-        for name, meta in ins.items():
+        static_argnums = []
+        for i, (name, meta) in enumerate(ins.items()):
             if 'is_option' in meta and meta['is_option']:
                 if 'default' in meta:
                     val = meta['default']
@@ -525,6 +529,7 @@ class OMWrappedFunc(object):
                 else:
                     val = None
                 args.append(val)
+                static_argnums.append(i)
                 continue
             if meta['val'] is not None:
                 args.append(meta['val'])
@@ -532,35 +537,36 @@ class OMWrappedFunc(object):
                 try:
                     shp = meta['shape']
                 except KeyError:
-                    raise RuntimeError(f"Can't determine shape of input '{name}'.")
-                if jax is not None:
-                    args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
+                    if 'resid' not in meta:  # this is an input, not a state
+                        raise RuntimeError(f"Can't determine shape of input '{name}'.")
+                else:
+                    if jax is not None:
+                        args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
 
         # compute shapes as a check against shapes in metadata (if any)
         if jax is not None:
-            # must replace numpy with jax numpy when making jaxpr.
-            with jax_context(self._f.__globals__):
-                try:
-                    v = jax.make_jaxpr(self._f)(*args)
-                except Exception as err:
-                    if need_shape:
-                        raise RuntimeError(f"Failed to determine the output shapes "
-                                           f"based on the input shapes. The error was: {err}.  To "
-                                           "avoid this error, add return value metadata that "
-                                           "specifies the shapes of the return values to the "
-                                           "function.")
-                    warnings.warn("Failed to determine the output shapes based on the input "
-                                  "shapes in order to check the provided metadata values. The"
-                                  f" error was: {err}.")
-                else:
-                    for val, name in zip(v.out_avals, outs):
-                        oldshape = outs[name].get('shape')
-                        if oldshape is not None and _shape2tuple(oldshape) != val.shape:
-                            raise RuntimeError(f"shape from metadata for return value "
-                                               f"'{name}' of {oldshape} doesn't match computed "
-                                               f"shape of {val.shape}.")
-                        outs[name]['shape'] = val.shape
-                    need_shape = []
+            try:
+                # must replace numpy with jax numpy when making jaxpr.
+                with jax_context(self._f.__globals__):
+                    v = jax.make_jaxpr(self._f, static_argnums)(*args)
+            except Exception as err:
+                if need_shape:
+                    raise RuntimeError(f"Failed to determine the output shapes "
+                                       f"based on the input shapes. The error was: {err}.  To "
+                                       "avoid this error, add return value metadata that "
+                                       "specifies the shapes of the return values to the function.")
+                warnings.warn("Failed to determine the output shapes based on the input "
+                              "shapes in order to check the provided metadata values. The"
+                              f" error was: {err}.")
+            else:
+                for val, name in zip(v.out_avals, outs):
+                    oldshape = outs[name].get('shape')
+                    if oldshape is not None and _shape2tuple(oldshape) != val.shape:
+                        raise RuntimeError(f"shape from metadata for return value "
+                                           f"'{name}' of {oldshape} doesn't match computed "
+                                           f"shape of {val.shape}.")
+                    outs[name]['shape'] = val.shape
+                need_shape = []
 
         if need_shape:  # output shapes weren't provided by user or by jax
             shape = self._output_defaults['shape']

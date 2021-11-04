@@ -3,9 +3,6 @@ Define functions and objects common to the ExplicitFuncComp and ImplicitFuncComp
 """
 
 import re
-import numpy as np
-from openmdao.utils.units import valid_units
-from openmdao.func_api import _shape2tuple
 from openmdao.utils.om_warnings import issue_warning
 
 
@@ -58,3 +55,19 @@ def _check_var_name(comp, name):
     if name in _disallowed_varnames:
         raise NameError(f"{comp.msginfo}: cannot use variable name '{name}' because "
                         "it's a reserved keyword.")
+
+
+def _add_options(comp):
+    """
+    Add function component specific options to the given component.
+
+    Parameters
+    ----------
+    comp : ImplicitFuncComp or ExplicitFuncComp
+        The function component having options added.
+    """
+    comp.options.declare('use_jax', types=bool, default=False,
+                         desc='If True, use jax to compute derivatives.')
+    comp.options.declare('use_jit', types=bool, default=False,
+                         desc='If True, attempt to use jit on the function. This is ignored if '
+                              'use_jax is False.')

@@ -1,12 +1,13 @@
 """Define the FuncComponent class."""
 
+import functools
 import numpy as np
 from numpy import asarray, isscalar
 from itertools import chain
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
-from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore
+from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
 
 
 class ExplicitFuncComp(ExplicitComponent):
@@ -36,7 +37,19 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         super().__init__(**kwargs)
         self._compute = omf.wrap(compute)
+        # in case we're doing jit, force setup of wrapped func because we compute output shapes
+        # during setup and that won't work on a jit compiled function
+        if self._compute._call_setup:
+            self._compute._setup()
+
         self._compute_partials = compute_partials
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        _add_options(self)
 
     def setup(self):
         """
@@ -70,7 +83,7 @@ class ExplicitFuncComp(ExplicitComponent):
         outputs : Vector
             Unscaled, dimensional output variables.
         """
-        outputs.set_vals(self._compute(*inputs.values()))
+        outputs.set_vals(self._compute(*self._func_values(inputs)))
 
     def declare_partials(self, *args, **kwargs):
         """
@@ -94,12 +107,12 @@ class ExplicitFuncComp(ExplicitComponent):
         """
         Check that all partials are declared.
         """
+        for kwargs in self._compute.get_declare_partials():
+            self.declare_partials(**kwargs)
+
         kwargs = self._compute.get_declare_coloring()
         if kwargs is not None:
             self.declare_coloring(**kwargs)
-
-        for kwargs in self._compute.get_declare_partials():
-            self.declare_partials(**kwargs)
 
         super()._setup_partials()
 
@@ -117,4 +130,26 @@ class ExplicitFuncComp(ExplicitComponent):
         if self._compute_partials is None:
             return
 
-        self._compute_partials(*chain(inputs.values(), (partials,)))
+        self._compute_partials(*self._func_values(inputs), partials)
+
+    def _func_values(self, inputs):
+        """
+        Yield current function input args.
+
+        Parameters
+        ----------
+        inputs : Vector
+            The input vector.
+
+        Yields
+        ------
+        object
+            Value of current function input variable.
+        """
+        inps = inputs.values()
+
+        for name, meta in self._compute._inputs.items():
+            if 'is_option' in meta:
+                yield self.options[name]
+            else:
+                yield next(inps)

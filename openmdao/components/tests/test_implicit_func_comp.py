@@ -2,11 +2,60 @@ import unittest
 import math
 
 import numpy as np
-from scipy import linalg
+from scipy.optimize import newton
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.func_api as omf
+
+from openmdao.core.tests.test_fd_color import _check_partial_matrix
+
+
+def _partials_implicit_2in2out(mode, method, use_jit):
+
+    def apply_nl(x1, x2, y1, y2):
+        mat = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                        [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                        [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                        [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                        [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+        vec = np.hstack((x1 - y1, x2 - y2))
+        result = mat.dot(vec)
+        return result[:3], result[3:]
+
+    f = (omf.wrap(apply_nl)
+            .add_input('x1', shape=3)
+            .add_input('x2', shape=2)
+            .add_output('y1', resid='R_y1', shape=3)
+            .add_output('y2', resid='R_y2', shape=2)
+            .declare_partials(of='*', wrt='*', method=method)
+        )
+
+    prob = om.Problem()
+    model = prob.model
+
+    comp = model.add_subsystem('comp', om.ImplicitFuncComp(f, use_jit=use_jit))
+    comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+    comp.linear_solver = om.DirectSolver()
+
+    prob.setup(check=False, mode=mode)
+
+    prob['comp.y1'] = -3.
+    prob['comp.y2'] = 3
+    prob.set_solver_print(level=0)
+    prob.run_model()
+
+    jac = comp._jacobian._subjacs_info
+    # redefining the same mat as used above here because mat above needs to be
+    # internal to the func in order to be contained in a jax_context (which converts
+    # np to jnp and numpy to jnp to make jax happy but allowing user to define the function
+    # using normal numpy)
+    check = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                        [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                        [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                        [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                        [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+    _check_partial_matrix(comp, jac, check, method)
 
 
 class TestImplicitFuncComp(unittest.TestCase):
@@ -99,7 +148,7 @@ class TestImplicitFuncComp(unittest.TestCase):
             z0 = z[0]
             z1 = z[1]
 
-            return 0, (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
+            return 0., (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
 
         f = (omf.wrap(apply_nonlinear)
                 .add_input('z', val=np.array([-1., -1.]))
@@ -169,6 +218,37 @@ class TestImplicitFuncComp(unittest.TestCase):
 
         f = (omf.wrap(apply_nl)
                 .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*', method='cs')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f))
+
+        # need this since comp is implicit and doesn't have a solve_linear
+        p.model.linear_solver = om.DirectSolver()
+        p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+
+        p.setup()
+
+        p.set_val('comp.a', 2.)
+        p.set_val('comp.b', -8.)
+        p.set_val('comp.c', 6.)
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_apply_nonlinear_option(self):
+
+        def apply_nl(a, b, c, x, opt):
+            R_x = a * x ** 2 + b * x + c
+            if opt == 'foo':
+                R_x = -R_x
+            return R_x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_option('opt', default='foo')
                 .declare_partials(of='*', wrt='*', method='cs')
                 )
 
@@ -295,6 +375,58 @@ class TestImplicitFuncComp(unittest.TestCase):
 
     def test_solve_lin_nl_linearize_rev(self):
         self._solve_lin_nl_linearize('rev')
+
+    def test_solve_lin_nl_linearize_reordered_args(self):
+
+        def apply_nl(x, a, b, c):
+            R_x = a * x ** 2 + b * x + c
+            return R_x
+
+        def solve_nl(x, a, b, c):
+            x = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
+            return x
+
+        def linearize(x, a, b, c, partials):
+            partials['x', 'a'] = x ** 2
+            partials['x', 'b'] = x
+            partials['x', 'c'] = 1.0
+            partials['x', 'x'] = 2 * a * x + b
+
+            inv_jac = 1.0 / (2 * a * x + b)
+            return inv_jac
+
+        def solve_linear(d_x, mode, inv_jac):
+            if mode == 'fwd':
+                d_x = inv_jac * d_x
+                return d_x
+            elif mode == 'rev':
+                dR_x = inv_jac * d_x
+                return dR_x
+
+        f = (omf.wrap(apply_nl)
+                .add_output('x', resid='R_x', val=0.0)
+                .declare_partials(of='*', wrt='*')
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ImplicitFuncComp(f,
+                                                          solve_linear=solve_linear,
+                                                          linearize=linearize,
+                                                          solve_nonlinear=solve_nl))
+
+        p.setup()
+
+        p.set_val('comp.a', 2.)
+        p.set_val('comp.b', -8.)
+        p.set_val('comp.c', 6.)
+        p.run_model()
+
+        assert_check_partials(p.check_partials(includes=['comp'], out_stream=None), atol=1e-5)
+        assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
+
+    def test_partials_implicit_2in2out_fwd_cs_nojit(self):
+        _partials_implicit_2in2out(mode='fwd', method='cs', use_jit=False)
+
 
 if __name__ == "__main__":
     unittest.main()
