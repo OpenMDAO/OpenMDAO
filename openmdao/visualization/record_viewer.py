@@ -15,7 +15,8 @@ except ImportError:
     print("Bokeh not found")
 
 from openmdao.utils.notebook_utils import notebook
-import openmdao.api as om
+from openmdao.recorders.case_reader import CaseReader
+from openmdao.recorders.sqlite_recorder import SqliteRecorder
 
 import numpy as np
 
@@ -50,7 +51,7 @@ class RecordViewer(object):
         if not notebook:
             raise RuntimeError("OptView must be run in a notebook environment")
 
-        warnings.simplefilter(action='ignore', category=BokehUserWarning)
+        # warnings.simplefilter(action='ignore', category=BokehUserWarning)
         self.data = data
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
@@ -62,8 +63,8 @@ class RecordViewer(object):
 
     def _parse_cases(self):
         if isinstance(self.data, str):
-            self.cr = om.CaseReader(self.data)
-        elif isinstance(self.data, om.SqliteRecorder):
+            self.cr = CaseReader(self.data)
+        elif isinstance(self.data, SqliteRecorder):
             self.cr = self.data
 
     def _var_compatability_check(self, variables, var_to_compare):
@@ -72,11 +73,20 @@ class RecordViewer(object):
         """
         variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
         var_list = []
+        case_vars = []
+        special_case_vars = ["Number of Points", "Case Iterations"]
+
+        for i in [self.case.outputs, self.case.inputs, self.case.residuals]:
+            if i is not None:
+                case_vars += list(i.keys())
+
+        if var_to_compare in special_case_vars:
+            return self._all_variables
 
         for variable in variables:
-            if variable in self.case.outputs and \
-                    len(self.case[variable].flatten()) == len(self.case[var_to_compare].flatten()):
-                var_list.append(variable)
+            if variable in case_vars and variable not in special_case_vars:
+                if len(self.case[variable].flatten()) == len(self.case[var_to_compare].flatten()):
+                    var_list.append(variable)
 
         if var_list:
             return sorted(var_list) + ["Number of Points"] + ["Case Iterations"]
@@ -154,7 +164,8 @@ class RecordViewer(object):
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
         self.case_iter_options = ['Min/Max', "Norm", "Vector Lines"]
-        self.case_iter_select = Select(title="Case Iteration Plot Options", value="None")
+        self.case_iter_select = Select(title="Case Iteration Plot Options", value="N/A",
+                                       options=["N/A"])
         self.case_iter_select.on_change('value', self._case_iter_select_update)
 
         self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = \
@@ -172,6 +183,7 @@ class RecordViewer(object):
 
         self._update()
 
+        self._all_variables = self.io_options_x
         self.io_select_y.options = self._var_compatability_check(self.io_options_x,
                                                                  self.io_select_x.value)
         for key, val in self.io_select_x.options.items():
@@ -210,6 +222,10 @@ class RecordViewer(object):
             case_reshape = case_array.T
             return norm_vector, case_reshape
 
+        elif set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}:
+            self.warning_box.text = ("NOTE: One or more variables are 0 arrays. Select a different "
+                                     "case or variable")
+            return data, case_array
         else:
             return data, case_array
 
@@ -217,29 +233,39 @@ class RecordViewer(object):
         """
         Update function for when the source Y Value dropdown is updated.
         """
-        if self._case_iter_x or self._case_iter_y:
+        if new == "Case Iterations" or self.io_select_x.value == "Case Iterations":
             self.case_iter_select.options = self.case_iter_options
         else:
-            self.case_iter_select.options = ["None"]
+            self.case_iter_select.options = ["N/A"]
 
-        self.variables_plot.yaxis.axis_label = new
+        if self.io_select_x.value == "Number of Points" or new == "Case Iterations":
+            self.variables_plot.yaxis.axis_label = new
+            self.variables_plot.xaxis.axis_label = self.io_select_x.value
+        else:
+            self.io_select_x.options = self._var_compatability_check(self._all_variables, new)
+            # self.io_select_x.value = self.io_select_x.options[0]
+
+            self.variables_plot.yaxis.axis_label = new
+            self.variables_plot.xaxis.axis_label = self.io_select_x.value
+
         self._update()
 
     def _io_var_select_x_update(self, attr, old, new):
         """
         Update function for when the X Value dropdown is updated.
         """
-        if self.io_select_x.value == "Number of Points" or self._case_iter_x or self._case_iter_y:
+        if new == "Case Iterations" or self.io_select_y.value == "Case Iterations":
             self.io_select_y.options = self.io_select_x.options
             self.case_iter_select.options = self.case_iter_options
+        else:
+            self.case_iter_select.options = ["N/A"]
 
+        if self.io_select_x.value == "Number of Points" or new == "Case Iterations":
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
-
         else:
-            self.io_select_y.options = self._var_compatability_check(self.io_select_x.options, new)
-            self.io_select_y.value = self.io_select_y.options[0]
-            self.case_iter_select.options = ["None"]
+            self.io_select_y.options = self._var_compatability_check(self._all_variables, new)
+            # self.io_select_y.value = self.io_select_y.options[0]
 
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
