@@ -105,9 +105,9 @@ class CaseViewer(object):
                     var_list.append(variable)
 
         if var_list:
-            return sorted(var_list) + [self._num_points_str] + [self._case_iter_str]
-        elif variables != [self._num_points_str, self._case_iter_str]:
-            return [self._num_points_str, self._case_iter_str]
+            return sorted(var_list) + special_case_vars
+        elif variables != special_case_vars:
+            return special_case_vars
 
     def _make_plot(self, doc):
         """
