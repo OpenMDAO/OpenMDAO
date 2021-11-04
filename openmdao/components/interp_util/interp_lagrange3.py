@@ -363,7 +363,7 @@ class InterpLagrange3Semi(InterpAlgorithmSemi):
             derivs, d_value, extrap
 
 
-class InterpLagrange3D(InterpAlgorithmFixed):
+class Interp3DLagrange3(InterpAlgorithmFixed):
     """
     Interpolate on a fixed 3D grid using a third order Lagrange polynomial.
 
@@ -396,7 +396,7 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         self.k = 4
         self.dim = 3
         self.last_index = [0] * self.dim
-        self._name = 'lagrange3D'
+        self._name = '3D-lagrange3'
         self._vectorized = False
 
     def vectorized(self, x):
@@ -495,26 +495,14 @@ class InterpLagrange3D(InterpAlgorithmFixed):
 
         # Compute derivatives using the 64 coefficients.
 
-        a = np.empty((4, 4, 4, 3), dtype=dtype)
-        a[..., 0] = self.coeffs[idx]
-        a[..., 1] = self.coeffs[idx]
-        a[..., 2] = self.coeffs[idx]
+        dx = np.array([0.0, 1.0, 2.0 * x, 3.0 * x * x])
+        dy = np.array([0.0, 1.0, 2.0 * y, 3.0 * y * y])
+        dz = np.array([0.0, 1.0, 2.0 * z, 3.0 * z * z])
 
-        dx = np.empty((4, 3), dtype=dtype)
-        dy = np.empty((4, 3), dtype=dtype)
-        dz = np.empty((4, 3), dtype=dtype)
-        dx[:, 0] = np.array([0.0, 1.0, 2.0 * x, 3.0 * x * x])
-        dy[:, 1] = np.array([0.0, 1.0, 2.0 * y, 3.0 * y * y])
-        dz[:, 2] = np.array([0.0, 1.0, 2.0 * z, 3.0 * z * z])
-
-        dx[:, 1] = xx
-        dx[:, 2] = xx
-        dy[:, 0] = yy
-        dy[:, 2] = yy
-        dz[:, 0] = zz
-        dz[:, 1] = zz
-
-        d_x = np.einsum('im,jm,km,ijkm->m', dx, dy, dz, a)
+        d_x = np.empty((3, ), dtype=dtype)
+        d_x[0] = np.einsum('i,j,k,ijk->', dx, yy, zz, a)
+        d_x[1] = np.einsum('i,j,k,ijk->', xx, dy, zz, a)
+        d_x[2] = np.einsum('i,j,k,ijk->', xx, yy, dz, a)
 
         return val, d_x, None, None
 
@@ -675,26 +663,25 @@ class InterpLagrange3D(InterpAlgorithmFixed):
             Derivative of interpolated values with respect to grid.
         """
         grid = self.grid
+        i_x, i_y, i_z = idx
 
-        for j, i_n in enumerate(idx):
+        # extrapolate low
+        i_x[i_x < 1] = 1
+        i_y[i_y < 1] = 1
+        i_z[i_z < 1] = 1
 
-            # extrapolate low
-            if -1 in i_n or 0 in i_n:
-                extrap_idx = np.where(i_n < 1)[0]
-                i_n[extrap_idx] = 1
-
-            # extrapolate high
-            ngrid = len(grid[j])
-            if ngrid - 1 in i_n or ngrid - 2 in i_n:
-                extrap_idx = np.where(i_n > ngrid - 3)[0]
-                i_n[extrap_idx] = ngrid - 3
+        # extrapolate high
+        nx, ny, nz = self.values.shape
+        i_x[i_x > nx - 3] = nx - 3
+        i_y[i_y > ny - 3] = ny - 3
+        i_z[i_z > nz - 3] = nz - 3
 
         if self.vec_coeff is None:
             self.coeffs = set()
             grid = self.grid
-            self.vec_coeff = np.empty((len(grid[0]), len(grid[1]), len(grid[2]), 4, 4, 4))
+            self.vec_coeff = np.empty((nx, ny, nz, 4, 4, 4))
 
-        needed = set(zip(idx[0], idx[1], idx[2]))
+        needed = set(zip(i_x, i_y, i_z))
         uncached = needed.difference(self.coeffs)
         if len(uncached) > 0:
             unc = np.array(list(uncached))
@@ -702,11 +689,10 @@ class InterpLagrange3D(InterpAlgorithmFixed):
             a = self.compute_coeffs_vectorized(uncached_idx)
             self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
             self.coeffs = self.coeffs.union(uncached)
-        a = self.vec_coeff[idx[0], idx[1], idx[2], :]
+        a = self.vec_coeff[i_x, i_y, i_z, :]
 
         # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
         # problems that arise from the scaling of each axis.
-        i_x, i_y, i_z = idx
         x = x_vec[:, 0] - grid[0][i_x - 1]
         y = x_vec[:, 1] - grid[1][i_y - 1]
         z = x_vec[:, 2] - grid[2][i_z - 1]
@@ -738,40 +724,29 @@ class InterpLagrange3D(InterpAlgorithmFixed):
         zz[:, 2] = zz[:, 1] * z
         zz[:, 3] = zz[:, 2] * z
 
-        val = np.einsum('qijk,qi,qj,qk->q', a, xx, yy, zz)
+        val = np.einsum('qi,qj,qk,qijk->q', xx, yy, zz, a)
 
         # Compute derivatives using the 64 coefficients.
 
-        a = np.empty((vec_size, 4, 4, 4, 3), dtype=dtype)
-        a[..., 0] = self.vec_coeff[idx[0], idx[1], idx[2], :]
-        a[..., 1] = self.vec_coeff[idx[0], idx[1], idx[2], :]
-        a[..., 2] = self.vec_coeff[idx[0], idx[1], idx[2], :]
+        dx = np.empty((vec_size, 3), dtype=dtype)
+        dx[:, 0] = 1.0
+        dx[:, 1] = 2.0 * x
+        dx[:, 2] = 3.0 * xx[:, 2]
 
-        dx = np.empty((vec_size, 4, 3), dtype=dtype)
-        dx[:, 0, 0] = 0.0
-        dx[:, 1, 0] = 1.0
-        dx[:, 2, 0] = 2.0 * x
-        dx[:, 3, 0] = 3.0 * x * x
-        dx[:, :, 1] = xx
-        dx[:, :, 2] = xx
+        dy = np.empty((vec_size, 3), dtype=dtype)
+        dy[:, 0] = 1.0
+        dy[:, 1] = 2.0 * y
+        dy[:, 2] = 3.0 * yy[:, 2]
 
-        dy = np.empty((vec_size, 4, 3), dtype=dtype)
-        dy[:, 0, 1] = 0.0
-        dy[:, 1, 1] = 1.0
-        dy[:, 2, 1] = 2.0 * y
-        dy[:, 3, 1] = 3.0 * y * y
-        dy[:, :, 0] = yy
-        dy[:, :, 2] = yy
+        dz = np.empty((vec_size, 3), dtype=dtype)
+        dz[:, 0] = 1.0
+        dz[:, 1] = 2.0 * z
+        dz[:, 2] = 3.0 * zz[:, 2]
 
-        dz = np.empty((vec_size, 4, 3), dtype=dtype)
-        dz[:, 0, 2] = 0.0
-        dz[:, 1, 2] = 1.0
-        dz[:, 2, 2] = 2.0 * z
-        dz[:, 3, 2] = 3.0 * z * z
-        dz[:, :, 0] = zz
-        dz[:, :, 1] = zz
-
-        d_x = np.einsum('qim,qjm,qkm,qijkm->qm', dx, dy, dz, a)
+        d_x = np.empty((vec_size, 3), dtype=dtype)
+        d_x[:, 0] = np.einsum('qi,qj,qk,qijk->q', dx, yy, zz, a[:, 1:, ...])
+        d_x[:, 1] = np.einsum('qi,qj,qk,qijk->q', xx, dy, zz, a[:, :, 1:, :])
+        d_x[:, 2] = np.einsum('qi,qj,qk,qijk->q', xx, yy, dz, a[:, :, :, 1:])
 
         return val, d_x, None, None
 
