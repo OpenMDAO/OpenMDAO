@@ -1,6 +1,5 @@
 import unittest
 import os.path
-import pathlib
 import json
 import sys
 
@@ -168,9 +167,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                         files.add(file)
 
         if files:
-            files_str = '\n'.join(files)
-            msg = f"'automethod' directive found in the following {len(files)} files without 'eval_rst':\n{files_str}."
-            self.fail(msg)
+            self.fail("'automethod' directive found in the following {} files"
+                      " without 'eval_rst':\n{}.".format(len(files), '\n'.join(files)))
 
 
 if __name__ == '__main__':
