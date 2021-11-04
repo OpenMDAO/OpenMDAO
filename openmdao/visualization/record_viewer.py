@@ -1,4 +1,4 @@
-"""Define the RecordViewer class."""
+"""Define the CaseViewer class."""
 
 import json
 import warnings
@@ -21,7 +21,7 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 import numpy as np
 
 
-class RecordViewer(object):
+class CaseViewer(object):
     """
     Visualizer to plot variables vs cases, variables vs variables, and more.
 
@@ -39,6 +39,12 @@ class RecordViewer(object):
         A Bokeh ColumnDataSource for non vectorized cases.
     multi_line_data : ColumnDataSource
         A Bokeh ColumnDataSource for vectorized cases.
+    cr : CaseReader
+        Recorded data.
+    _case_iter_str : str
+        Frequently used string.
+    _num_points_str : str
+        Frequently used string.
     """
 
     def __init__(self, data, port=8888):
