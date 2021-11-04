@@ -81,7 +81,7 @@ class RecordViewer(object):
                 case_vars += list(i.keys())
 
         if var_to_compare in special_case_vars:
-            return self._all_variables
+            return self.io_options_x
 
         for variable in variables:
             if variable in case_vars and variable not in special_case_vars:
@@ -140,11 +140,12 @@ class RecordViewer(object):
                                      y_axis_label="Variable X")
         self.variables_plot.circle(x="x_vals", y="y_vals", source=self.circle_data)
 
-        line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
-                                                   line_color='color', source=self.multi_line_data)
-        ht = HoverTool(renderers=[line_plot], tooltips=[('Case', '@cases')], mode='mouse')
+        self.line_plot = self.variables_plot.multi_line(xs="x_vals", ys="y_vals", line_width=2,
+                                                        line_color='color',
+                                                        source=self.multi_line_data)
+        self.ht = HoverTool(renderers=[self.line_plot], tooltips=[('Case', '@cases')], mode='mouse')
 
-        self.variables_plot.add_tools(ht)
+        self.variables_plot.add_tools(self.ht)
 
         self.source_select = Select(title="Source:", value=source_options[0],
                                     options=source_options)
@@ -158,9 +159,8 @@ class RecordViewer(object):
                                   options=self.io_options_x)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
-        self.io_options_y = self.io_options_x
-        self.io_select_y = Select(title="Y Value:", value=io_starting_option,
-                                  options=self.io_options_x)
+        self.io_select_y = Select(title="Y Value:", value="Number of Points",
+                                  options=["Number of Points"])
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
         self.case_iter_options = ['Min/Max', "Norm", "Vector Lines"]
@@ -168,8 +168,8 @@ class RecordViewer(object):
                                        options=["N/A"])
         self.case_iter_select.on_change('value', self._case_iter_select_update)
 
-        self.variables_plot.yaxis.axis_label = self.variables_plot.xaxis.axis_label = \
-            io_starting_option
+        self.variables_plot.yaxis.axis_label = self.io_select_y.value
+        self.variables_plot.xaxis.axis_label = self.io_select_x.value
 
         self.warning_box = Paragraph(text="""""", width=350, height=100)
 
@@ -183,7 +183,6 @@ class RecordViewer(object):
 
         self._update()
 
-        self._all_variables = self.io_options_x
         self.io_select_y.options = self._var_compatability_check(self.io_options_x,
                                                                  self.io_select_x.value)
         for key, val in self.io_select_x.options.items():
@@ -210,29 +209,41 @@ class RecordViewer(object):
     def _case_iter_select_update(self, attr, old, new):
         self._update()
 
+    def _tooltip_management(self, pop=True):
+        if isinstance(self.variables_plot.tools[-1], HoverTool) and pop:
+            self.variables_plot.tools.pop(-1)
+        elif not isinstance(self.variables_plot.tools[-1], HoverTool) and not pop:
+            self.variables_plot.add_tools(self.ht)
+
     def _case_plot_calc(self, data, case_array):
         num_of_cases = data.shape[0]
         if self.case_iter_select.value == "Norm":
             norm_vector = np.linalg.norm(data, axis=1).reshape(1, num_of_cases)
             case_reshape = np.arange(num_of_cases).reshape(1, num_of_cases)
+            self._tooltip_management()
             return norm_vector, case_reshape
 
         elif self.case_iter_select.value == "Vector Lines":
             norm_vector = data.T
             case_reshape = case_array.T
+            self._tooltip_management()
+            # list(self.variables_plot.tools).pop(-1)
             return norm_vector, case_reshape
 
         elif set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}:
             self.warning_box.text = ("NOTE: One or more variables are 0 arrays. Select a different "
                                      "case or variable")
+            self._tooltip_management(False)
             return data, case_array
         else:
+            self._tooltip_management(False)
             return data, case_array
 
     def _io_var_select_y_update(self, attr, old, new):
         """
         Update function for when the source Y Value dropdown is updated.
         """
+        print(new)
         if new == "Case Iterations" or self.io_select_x.value == "Case Iterations":
             self.case_iter_select.options = self.case_iter_options
         else:
@@ -242,9 +253,6 @@ class RecordViewer(object):
             self.variables_plot.yaxis.axis_label = new
             self.variables_plot.xaxis.axis_label = self.io_select_x.value
         else:
-            self.io_select_x.options = self._var_compatability_check(self._all_variables, new)
-            # self.io_select_x.value = self.io_select_x.options[0]
-
             self.variables_plot.yaxis.axis_label = new
             self.variables_plot.xaxis.axis_label = self.io_select_x.value
 
@@ -264,8 +272,7 @@ class RecordViewer(object):
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
         else:
-            self.io_select_y.options = self._var_compatability_check(self._all_variables, new)
-            # self.io_select_y.value = self.io_select_y.options[0]
+            self.io_select_y.options = self._var_compatability_check(self.io_options_x, new)
 
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
@@ -282,6 +289,7 @@ class RecordViewer(object):
             color=[],
             cases=[]
         )
+        self._tooltip_management(False)
         self.warning_box.text = ""
         num_points_x = num_points_y = False
         self._case_iter_x = self._case_iter_y = False
