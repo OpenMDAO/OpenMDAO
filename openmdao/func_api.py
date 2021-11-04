@@ -247,6 +247,7 @@ class OMWrappedFunc(object):
             Keyword args to store.
         """
         _check_kwargs(kwargs, _allowed_declare_options_args, 'declare_option')
+        del self._inputs[name]['val']  # 'val' isn't a valid arg to declare_option
         self._inputs[name].update(kwargs)
         self._inputs[name]['is_option'] = True
         return self
