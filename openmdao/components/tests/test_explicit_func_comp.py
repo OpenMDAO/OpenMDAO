@@ -13,8 +13,6 @@ from openmdao.utils.coloring import compute_total_coloring
 
 
 try:
-    import jax
-    from jax import jvp, vjp, vmap, random, jit, jacfwd, jacrev
     import jax.numpy as jnp
 except ImportError:
     jax = None
@@ -806,7 +804,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         model.connect("quad_1.y", "balance.lhs:x_1")
 
         prob.model.linear_solver = om.ScipyKrylov()
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
         prob.model.nonlinear_solver.options["maxiter"] = 0

@@ -73,18 +73,22 @@ class ImplicitFuncComp(ImplicitComponent):
         if self._apply_nonlinear_func._use_jax:
             self.options['use_jax'] = True
 
-        # in case we're doing jit, force setup of wrapped func because we compute output shapes
-        # during setup and that won't work on a jit compiled function
+        # setup requires an undecorated, unjitted function, so do it now
         if self._apply_nonlinear_func._call_setup:
             self._apply_nonlinear_func._setup()
+
+        if self.options['use_jax']:
+            self._apply_nonlinear_func._f = omf.jax_decorate(self._apply_nonlinear_func._f)
+
 
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
                                                 self._apply_nonlinear_func._inputs.values()],
                                                dtype=bool))[0]
             try:
-                self._apply_nonlinear_func._f = jit(self._apply_nonlinear_func._f,
-                                                    static_argnums=static_argnums)
+                with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
+                    self._apply_nonlinear_func._f = jit(self._apply_nonlinear_func._f,
+                                                        static_argnums=static_argnums)
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: failed jit compile of solve_nonlinear "
                                    f"function: {err}")
@@ -171,7 +175,13 @@ class ImplicitFuncComp(ImplicitComponent):
         discrete_outputs : _DictValues or None
             Dict-like object containing discrete outputs.
         """
-        residuals.set_vals(self._apply_nonlinear_func(*self._ordered_values(inputs, outputs)))
+        if self.options['use_jax'] and not self.options['use_jit']:
+            with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
+                results = self._ordered_values(inputs, outputs)
+        else:
+            results = self._ordered_values(inputs, outputs)
+
+        residuals.set_vals(self._apply_nonlinear_func(*results))
 
     def _solve_nonlinear_(self, inputs, outputs):
         """
@@ -204,8 +214,8 @@ class ImplicitFuncComp(ImplicitComponent):
             onames = list(func.get_output_names())
             nouts = len(onames)
             jf = jacfwd(func._f, argnums)(*self._ordered_values(self._inputs, self._outputs))
-            for col, inp in enumerate(chain(func._inputs.keys(), onames)):
-                if col in argnums:
+            for col, (inp, meta) in enumerate(func._inputs.items()):
+                if 'is_option' not in meta:
                     if nouts == 1:
                         if (onames[0], inp) in self._jacobian:
                             self._jacobian[onames[0], inp] = np.asarray(jf[col])

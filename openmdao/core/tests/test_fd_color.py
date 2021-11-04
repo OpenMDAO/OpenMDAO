@@ -181,6 +181,7 @@ class SparseCompExplicit(ExplicitComponent):
 _TOLS = {
     'fd': 1e-6,
     'cs': 1e-12,
+    'jax': 1e-7
 }
 
 def _check_partial_matrix(system, jac, expected, method):

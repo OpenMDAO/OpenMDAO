@@ -713,6 +713,60 @@ def jax_context(globals):
             globals['numpy'] = savenumpy
 
 
+def jax_decorate(func):
+    """
+    Decorate a function to use jax version of numpy if the function uses normal numpy.
+
+    Parameters
+    ----------
+    func : function
+        The function to be decorated.
+
+    Returns
+    -------
+    function
+        The wrapped function.
+    """
+    g = func.__globals__
+    savenp = savenumpy = False
+
+    try:
+        src = inspect.getsource(func)
+    except OSError:
+        src = None
+
+    if 'np' in g and g['np'] is np:
+        if src is None or 'np.' in src:
+            savenp = g['np']
+        else:
+            savenp = False
+    if 'numpy' in g:
+        if src is None or 'numpy' in src:
+            savenumpy = g['numpy']
+        else:
+            savenumpy = False
+
+    if savenp or savenumpy:
+        def _wrap(*args, **kwargs):
+            if savenp:
+                g['np'] = jnp
+            if savenumpy:
+                g['numpy'] = jnp
+            try:
+                ret = func(*args, **kwargs)
+            finally:
+                if savenp:
+                    g['np'] = savenp
+                if savenumpy:
+                    g['numpy'] = savenumpy
+
+            return ret
+
+        return _wrap
+    else:
+        return func  # no wrapping needed
+
+
 def _get_long_name(node):
     """
     Return a name (possibly dotted) corresponding to the give node or None.

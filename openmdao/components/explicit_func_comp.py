@@ -104,10 +104,12 @@ class ExplicitFuncComp(ExplicitComponent):
             for col, inp in enumerate(self._compute.get_input_names()):
                 if col in argnums:
                     if nouts == 1:
-                        self._jacobian[onames[0], inp] = np.asarray(jf[col])
+                        if (onames[0], inp) in self._jacobian:
+                            self._jacobian[onames[0], inp] = np.asarray(jf[col])
                     else:
                         for row, out in enumerate(onames):
-                            self._jacobian[out, inp] = np.asarray(jf[row][col])
+                            if (out, inp) in self._jacobian:
+                                self._jacobian[out, inp] = np.asarray(jf[row][col])
         else:
             super()._linearize(jac, sub_do_ln)
 

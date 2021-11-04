@@ -8,6 +8,11 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import openmdao.func_api as omf
 
+try:
+    import jax.numpy as jnp
+except ImportError:
+    jax = None
+
 
 class TestImplicitFuncComp(unittest.TestCase):
     def test_apply_nonlinear_linsys(self):
@@ -99,7 +104,7 @@ class TestImplicitFuncComp(unittest.TestCase):
             z0 = z[0]
             z1 = z[1]
 
-            return 0, (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
+            return 0., (y1**.5 + z0 + z1) - y2, (z0**2 + z1 + x - 0.2*y2) - y1 - R_y1, (y1**.5 + z0 + z1) - y2 - R_y2
 
         f = (omf.wrap(apply_nonlinear)
                 .add_input('z', val=np.array([-1., -1.]))
@@ -376,6 +381,10 @@ class TestImplicitFuncComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'], out_stream=None))
 
 
+from openmdao.core.tests.test_fd_color import _check_partial_matrix
+
+
+@unittest.skipIf(omf.jax is None, "jax is not installed")
 class TestJax(unittest.TestCase):
     def check_derivs(self, mode, use_jit, nondiff):
         if nondiff:
@@ -449,87 +458,66 @@ class TestJax(unittest.TestCase):
     def test_rev_jit_nondiff(self):
         self.check_derivs('rev', use_jit=True, nondiff=True)
 
+    def _partials_implicit_2in2out(self, mode, method, use_jit):
 
-# try:
-#     from pycycle.thermo.cea import species_data
-#     from pycycle import constants
-# except ImportError:
-#     species_data = constants = None
+        def apply_nl(x1, x2, y1, y2):
+            mat = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                            [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                            [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                            [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                            [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+            vec = np.hstack((x1 - y1, x2 - y2))
+            result = mat.dot(vec)
+            return result[:3], result[3:]
 
+        f = (omf.wrap(apply_nl)
+             .add_input('x1', shape=3)
+             .add_input('x2', shape=2)
+             .add_output('y1', resid='R_y1', shape=3)
+             .add_output('y2', resid='R_y2', shape=2)
+             .declare_partials(of='*', wrt='*', method=method)
+            )
 
-# def _resid_weighting(n):
-#     np.seterr(under='ignore')
-#     return (1 / (1 + np.exp(-1e5 * n)) - .5) * 2
+        prob = om.Problem()
+        model = prob.model
 
+        comp = model.add_subsystem('comp', om.ImplicitFuncComp(f, use_jit=use_jit))
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+        comp.linear_solver = om.DirectSolver()
 
-# # residual function
-# # n_pi is the state
-# # composition, T, P are all inputs (this is the order that is demanded by scipy's solvers)
-# # thermo is like an option (constant value, never changes, would be passed in during instantiation)
-# def chem_eq_resid(n_pi, composition, T, P, thermo):
+        prob.setup(check=False, mode=mode)
 
-#         # 1000 is scaling for dumb newton solver
+        prob['comp.y1'] = -3.
+        prob['comp.y2'] = 3
+        prob.set_solver_print(level=0)
+        prob.run_model()
 
-#         n = n_pi[:thermo.num_prod]/1000
-#         pi = n_pi[thermo.num_prod:]/1000
+        jac = comp._jacobian._subjacs_info
+        # redefining the same mat as used above here because mat above needs to be
+        # internal to the func in order to be contained in a jax_context (which converts
+        # np to jnp and numpy to jnp to make jax happy but allowing user to define the function
+        # using normal numpy)
+        check = np.array([[0.11534105, 0.9799784 , 0.        , 0.86227559, 0.        ],
+                            [0.        , 0.20731316, 0.89688114, 0.96884353, 0.        ],
+                            [0.        , 0.        , 0.97299632, 0.68203646, 0.75099805],
+                            [0.42413042, 0.7716147 , 0.        , 0.        , 0.        ],
+                            [0.        , 0.        , 0.51819104, 0.        , 0.43046408]])
+        _check_partial_matrix(comp, jac, check, method)
 
-#         resids = np.zeros(thermo.num_prod+thermo.num_element)
+    def test_partials_implicit_2in2out_fwd_jax_nojit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='jax', use_jit=False)
 
-#         n_moles = np.sum(n)
+    def test_partials_implicit_2in2out_fwd_jax_jit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='jax', use_jit=True)
 
-#         H0_T = thermo.H0([T])
-#         S0_T = thermo.S0([T])
+    def test_partials_implicit_2in2out_rev_jax_nojit(self):
+        self._partials_implicit_2in2out(mode='rev', method='jax', use_jit=False)
 
-#         mu = H0_T - S0_T + np.log(n) + np.log(P) - np.log(n_moles)
+    def test_partials_implicit_2in2out_rev_jax_jit(self):
+        self._partials_implicit_2in2out(mode='rev', method='jax', use_jit=True)
 
-#         resids[:thermo.num_prod] = (mu - np.sum(pi * thermo.aij.T, axis=1))
-
-#         # trace damping
-#         weights = _resid_weighting(n * n_moles)
-#         resids[:thermo.num_prod] *= weights
-
-#         if np.linalg.norm(resids[:thermo.num_prod]) < 1e-4:
-#             _trace = np.where(n <= constants.MIN_VALID_CONCENTRATION+1e-20)
-#             resids[:thermo.num_prod][_trace] = 0.
-
-#         # residuals from the conservation of mass
-#         resids[thermo.num_prod:] = np.sum(thermo.aij * n, axis=1) - composition
-
-#         print('resids', resids, np.linalg.norm(resids))
-
-#         return resids
-
-
-# def solve_nl_chem_eq(composition, T, P, thermo):
-
-#     # initial guess
-#     n_pi_init = np.zeros(thermo.num_prod+thermo.num_element)
-
-#     n_pi_init[:thermo.num_prod] = np.ones(thermo.num_prod) / thermo.num_prod / 10  * 1000 # initial guess for n
-#     n_pi_init[thermo.num_prod:] = np.ones(thermo.num_element) * 1000
-
-#     # NOTE: newton can't actually solve this, but it works for an example
-#     result = newton(chem_eq_resid, n_pi_init, args=(thermo.b0, T, P, thermo))
-
-#     return result
-
-
-# def linearize(n_pi, composition, T, P, thermo, J):
-#     # matfree components will just not populate J here...
-#     return (obj1, obj2) # this will get passed as `lin_data` to the linear operators
-
-
-
-# @unittest.skipIf(species_data is None)
-# class TestPyCycleFuncComp(unittest.TestCase):
-#     def build_model(self):
-#         pass
-
-#     def test_pycycle_cs(self):
-#         pass
-
-#     def test_pycycle_jax(self):
-#         pass
+    def test_partials_implicit_2in2out_fwd_cs_nojit(self):
+        self._partials_implicit_2in2out(mode='fwd', method='cs', use_jit=False)
 
 if __name__ == "__main__":
     unittest.main()
