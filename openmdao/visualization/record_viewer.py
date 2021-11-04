@@ -16,7 +16,7 @@ except ImportError:
 
 from openmdao.utils.notebook_utils import notebook
 from openmdao.recorders.case_reader import CaseReader
-from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 import numpy as np
 
@@ -29,7 +29,7 @@ class RecordViewer(object):
     ----------
     data : CaseRecorder or str
         A path to the recorder file or CaseRecorder.
-        Currently only sqlite database files recorded via SqliteRecorder are supported.
+        Currently only sqlite database files recorded via SqliteCaseReader are supported.
     port : int
         What port to host Bokeh server on.
 
@@ -39,9 +39,6 @@ class RecordViewer(object):
         A Bokeh ColumnDataSource for non vectorized cases.
     multi_line_data : ColumnDataSource
         A Bokeh ColumnDataSource for vectorized cases.
-    data : CaseRecorder or str
-        A path to the recorder file or CaseRecorder.
-        Currently only sqlite database files recorded via SqliteRecorder are supported.
     """
 
     def __init__(self, data, port=8888):
@@ -49,32 +46,45 @@ class RecordViewer(object):
         Initialize attributes.
         """
         if not notebook:
-            raise RuntimeError("OptView must be run in a notebook environment")
+            raise RuntimeError(f"{self.__class__.__name__} must be run in a notebook environment")
 
-        # warnings.simplefilter(action='ignore', category=BokehUserWarning)
-        self.data = data
+        warnings.simplefilter(action='ignore', category=BokehUserWarning)
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
         self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
+
+        if isinstance(data, str):
+            self.cr = CaseReader(data)
+        elif isinstance(data, SqliteCaseReader):
+            self.cr = data
+
+        self._case_iter_str = "Case Iterations"
+        self._num_points_str = "Number of Points"
 
         output_notebook()
 
         show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" + str(port)))
 
-    def _parse_cases(self):
-        if isinstance(self.data, str):
-            self.cr = CaseReader(self.data)
-        elif isinstance(self.data, SqliteRecorder):
-            self.cr = self.data
-
     def _var_compatability_check(self, variables, var_to_compare):
         """
         Check and filter variables with same vector length as var_to_compare.
+
+        Parameters
+        ----------
+        variables : dict
+            Dictionary of variables to check the vector length.
+        var_to_compare : str
+            String to compare variable vector lengths for compatibility.
+
+        Returns
+        -------
+        List
+            List of variables with identical variable vector lengths.
         """
         variables = list(set(variables['inputs'] + variables['outputs'] + variables['residuals']))
         var_list = []
         case_vars = []
-        special_case_vars = ["Number of Points", "Case Iterations"]
+        special_case_vars = [self._num_points_str, self._case_iter_str]
 
         for i in [self.case.outputs, self.case.inputs, self.case.residuals]:
             if i is not None:
@@ -89,30 +99,9 @@ class RecordViewer(object):
                     var_list.append(variable)
 
         if var_list:
-            return sorted(var_list) + ["Number of Points"] + ["Case Iterations"]
-        elif variables != ["Number of Points", "Case Iterations"]:
-            return ["Number of Points", "Case Iterations"]
-
-    def _parse(self):
-        """
-        Parse the case recorder.
-        """
-        opt_data = None
-
-        self._parse_cases()
-        cases = self.cr.get_cases()
-
-        opt_data = {}
-        for case in cases:
-            if hasattr(case, 'opt_progress') and "{}" not in case.opt_progress:
-                data = json.loads(case.opt_progress)
-                for key, val in data.items():
-                    if key not in opt_data:
-                        opt_data[key] = [val]
-                    else:
-                        opt_data[key].append(val)
-
-        return opt_data
+            return sorted(var_list) + [self._num_points_str] + [self._case_iter_str]
+        elif variables != [self._num_points_str, self._case_iter_str]:
+            return [self._num_points_str, self._case_iter_str]
 
     def _make_plot(self, doc):
         """
@@ -123,8 +112,6 @@ class RecordViewer(object):
         doc : Document
             The bokeh document to build.
         """
-        self._parse()
-
         self.doc = doc
         source_options = self.cr.list_sources(out_stream=None)
         self.case_options = [(str(i), case) for i, case in
@@ -159,8 +146,8 @@ class RecordViewer(object):
                                   options=self.io_options_x)
         self.io_select_x.on_change('value', self._io_var_select_x_update)
 
-        self.io_select_y = Select(title="Y Value:", value="Number of Points",
-                                  options=["Number of Points"])
+        self.io_select_y = Select(title="Y Value:", value=self._num_points_str,
+                                  options=[self._num_points_str])
         self.io_select_y.on_change('value', self._io_var_select_y_update)
 
         self.case_iter_options = ['Min/Max', "Norm", "Vector Lines"]
@@ -186,7 +173,7 @@ class RecordViewer(object):
         self.io_select_y.options = self._var_compatability_check(self.io_options_x,
                                                                  self.io_select_x.value)
         for key, val in self.io_select_x.options.items():
-            self.io_select_x.options[key] = val + ["Number of Points"] + ["Case Iterations"]
+            self.io_select_x.options[key] = val + [self._num_points_str] + [self._case_iter_str]
 
         self.doc.add_root(self.layout)
 
@@ -216,19 +203,35 @@ class RecordViewer(object):
             self.variables_plot.add_tools(self.ht)
 
     def _case_plot_calc(self, data, case_array):
+        """
+        Convert input arrays into correct format for case iterations.
+
+        Parameters
+        ----------
+        data : np.array
+            Array of variable data.
+        case_array : np.array
+            Aranged array of selected cases for multi_line plot.
+
+        Returns
+        -------
+        np.array
+            Array of variable data.
+        np.array
+            Aranged array of selected cases for multi_line plot
+        """
         num_of_cases = data.shape[0]
         if self.case_iter_select.value == "Norm":
-            norm_vector = np.linalg.norm(data, axis=1).reshape(1, num_of_cases)
-            case_reshape = np.arange(num_of_cases).reshape(1, num_of_cases)
+            data = np.linalg.norm(data, axis=1).reshape(1, num_of_cases)
+            case_array = np.arange(num_of_cases).reshape(1, num_of_cases)
             self._tooltip_management()
-            return norm_vector, case_reshape
+            return data, case_array
 
         elif self.case_iter_select.value == "Vector Lines":
-            norm_vector = data.T
-            case_reshape = case_array.T
+            data = data.T
+            case_array = case_array.T
             self._tooltip_management()
-            # list(self.variables_plot.tools).pop(-1)
-            return norm_vector, case_reshape
+            return data, case_array
 
         elif set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}:
             self.warning_box.text = ("NOTE: One or more variables are 0 arrays. Select a different "
@@ -243,13 +246,12 @@ class RecordViewer(object):
         """
         Update function for when the source Y Value dropdown is updated.
         """
-        print(new)
-        if new == "Case Iterations" or self.io_select_x.value == "Case Iterations":
+        if new == self._case_iter_str or self.io_select_x.value == self._case_iter_str:
             self.case_iter_select.options = self.case_iter_options
         else:
             self.case_iter_select.options = ["N/A"]
 
-        if self.io_select_x.value == "Number of Points" or new == "Case Iterations":
+        if self.io_select_x.value == self._num_points_str or new == self._case_iter_str:
             self.variables_plot.yaxis.axis_label = new
             self.variables_plot.xaxis.axis_label = self.io_select_x.value
         else:
@@ -262,13 +264,13 @@ class RecordViewer(object):
         """
         Update function for when the X Value dropdown is updated.
         """
-        if new == "Case Iterations" or self.io_select_y.value == "Case Iterations":
+        if new == self._case_iter_str or self.io_select_y.value == self._case_iter_str:
             self.io_select_y.options = self.io_select_x.options
             self.case_iter_select.options = self.case_iter_options
         else:
             self.case_iter_select.options = ["N/A"]
 
-        if self.io_select_x.value == "Number of Points" or new == "Case Iterations":
+        if self.io_select_x.value == self._num_points_str or new == self._case_iter_str:
             self.variables_plot.xaxis.axis_label = new
             self.variables_plot.yaxis.axis_label = self.io_select_y.value
         else:
@@ -294,14 +296,14 @@ class RecordViewer(object):
         num_points_x = num_points_y = False
         self._case_iter_x = self._case_iter_y = False
 
-        if self.io_select_y.value == "Number of Points":
+        if self.io_select_y.value == self._num_points_str:
             num_points_y = True
-        if self.io_select_x.value == "Number of Points":
+        if self.io_select_x.value == self._num_points_str:
             num_points_x = True
 
-        if self.io_select_y.value == "Case Iterations":
+        if self.io_select_y.value == self._case_iter_str:
             self._case_iter_y = True
-        if self.io_select_x.value == "Case Iterations":
+        if self.io_select_x.value == self._case_iter_str:
             self._case_iter_x = True
 
         if len(self.case_options) != 1 and (self._case_iter_x or self._case_iter_y):
@@ -355,8 +357,8 @@ class RecordViewer(object):
         if new_data['x_vals'].shape[1] > 1:
             if (new_data['x_vals'].shape[0], new_data['y_vals'].shape[0]) == (1, 1) and \
                (set(new_data['x_vals'][0]), set(new_data['y_vals'][0])) == ({0.}, {0.}):
-                self.warning_box.text = """NOTE: Both X and Y values contain zeros for values,
-                                        unable to plot"""
+                self.warning_box.text = ("NOTE: Both X and Y values contain zeros for values, "
+                                         "unable to plot")
 
             if self._case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
@@ -392,6 +394,16 @@ class RecordViewer(object):
     def _line_color_list(self, x_var_vals):
         """
         Create list of colors for multi line plots.
+
+        Parameters
+        ----------
+        x_var_vals : np.array
+            Array of x_vals to find number of colors.
+
+        Returns
+        -------
+        list
+            List of colors for multi_line or circle data.
         """
         length = len(x_var_vals)
         if length <= 3:
