@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 import openmdao.func_api as omf
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 
 class TestFuncAPI(unittest.TestCase):
@@ -249,6 +250,20 @@ class TestFuncAPI(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
 
+    def test_declare_partials_jax_mixed2(self):
+        def func(a, b):
+            x = a * b
+            y = a / b
+            return x, y
+
+        with self.assertRaises(Exception) as cm:
+            f = (omf.wrap(func)
+                 .declare_partials(of='y', wrt=['a', 'b'], method='fd')
+                 .declare_partials(of='x', wrt=['a', 'b'], method='jax'))
+
+        self.assertEqual(cm.exception.args[0],
+                         "If multiple calls to declare_partials() are made on the same function object and any set method='jax', then all must set method='jax'.")
+
     def test_declare_coloring(self):
         def func(a, b):
             x = a * b
@@ -260,6 +275,15 @@ class TestFuncAPI(unittest.TestCase):
 
         meta = f.get_declare_coloring()
         self.assertEqual(meta, {'wrt': '*', 'method': 'cs'})
+
+        with self.assertRaises(Exception) as cm:
+            f2 = (omf.wrap(func)
+                    .declare_coloring(wrt='a', method='cs')
+                    .declare_coloring(wrt='b', method='cs'))
+
+        self.assertEqual(str(cm.exception),
+                         "declare_coloring has already been called.")
+
 
     @unittest.skipIf(omf.jax is None, "jax is not installed")
     def test_jax_out_shape_compute(self):
@@ -292,8 +316,8 @@ class TestFuncAPI(unittest.TestCase):
         msg = "shape from metadata for return value 'y' of (3, 3) doesn't match computed shape of (3, 2)."
         self.assertEqual(cm.exception.args[0], msg)
 
-    def test_bad_args(self):
-        def func(a, opt):
+    def test_errors_and_warnings(self):
+        def func(a=7., opt='foo'):
             if opt == 'foo':
                 x = a * 2.0
             else:
@@ -321,10 +345,16 @@ class TestFuncAPI(unittest.TestCase):
                          "In declare_coloring, metadata names ['wrrt'] are not allowed.")
 
         with self.assertRaises(Exception) as context:
-            f.add_input('a', shepe=4, val=3.)
+            f.add_input('a', shepe=4, units='m')
 
         self.assertEqual(context.exception.args[0],
                          "In add_input, metadata names ['shepe'] are not allowed.")
+
+        with self.assertRaises(Exception) as context:
+            f.add_input('a', val=4, units='m')
+
+        self.assertEqual(context.exception.args[0],
+                         "In add_input, metadata 'val' has already been added to function for input 'a'.")
 
         with self.assertRaises(Exception) as context:
             f.add_output('x', shepe=4, val=3.)
@@ -339,6 +369,12 @@ class TestFuncAPI(unittest.TestCase):
                          "In defaults, metadata names ['shepe'] are not allowed.")
 
         with self.assertRaises(Exception) as context:
+            f.add_input('aa', shape=4, val=3.)
+
+        self.assertEqual(context.exception.args[0],
+                         "In add_input, 'aa' is not an input to this function.")
+
+        with self.assertRaises(Exception) as context:
             f.add_output('a', shape=4, val=3.)
 
         self.assertEqual(context.exception.args[0],
@@ -350,6 +386,99 @@ class TestFuncAPI(unittest.TestCase):
 
         self.assertEqual(context.exception.args[0],
                          "In add_output, 'x' already registered as an output.")
+
+        # multiple returns, but neither gives the name, so raise exception
+        def func2(a):
+            if a < 1.:
+                return a + 1
+            return None
+
+        f = omf.wrap(func2)
+
+        with self.assertRaises(Exception) as context:
+            f._setup()
+
+        self.assertEqual(context.exception.args[0],
+                         "0 output names are specified in the metadata but there are 1 unnamed return values in the function.")
+
+        # this func defines the same name in both returns, which is ok
+        def func3(a):
+            if a < 1.:
+                bb = a + 1
+                return bb
+            bb = 8.
+            return bb
+
+        f = omf.wrap(func3)
+
+        with assert_no_warning(UserWarning):
+            f._setup()
+
+        # this func defines the name in one return but not the other, which is ok
+        def func4(a):
+            if a < 1.:
+                bb = a + 1
+                return bb
+            return a - 1
+
+        f = omf.wrap(func4)
+
+        with assert_no_warning(UserWarning):
+            f._setup()
+
+        # different numbers of return values, which isn't allowed
+        def func5(a):
+            if a < 1.:
+                b = a + 1
+                c = a * 2.
+                return b, c
+            return None
+
+        f = omf.wrap(func5)
+
+        with self.assertRaises(Exception) as context:
+            f._setup()
+
+        self.assertEqual(context.exception.args[0],
+                         "During AST processing to determine the number and name of return values, the following error occurred: Function has multiple return statements with differing numbers of return values.")
+
+        # different return value names. not allowed
+        def func6(a):
+            b = a + 1
+            c = a * 2.
+            x = c
+            if a < 1.:
+                return b, c
+            return b, x
+
+        f = omf.wrap(func6)
+
+        with self.assertRaises(Exception) as context:
+            f._setup()
+
+        self.assertEqual(context.exception.args[0],
+                         "During AST processing to determine the number and name of return values, the following error occurred: Function has multiple return statements with different return value names of ['c', 'x'] for return value 1.")
+
+        def func7(a):
+            b = a + 1
+            c = a * 2.
+            return b, c
+
+        f = omf.wrap(func7).add_input('a', val=np.ones(2), shape=(2,2))
+
+        with self.assertRaises(Exception) as context:
+            f._setup()
+
+        self.assertEqual(context.exception.args[0],
+                         "Input 'a' value has shape (2,), but shape was specified as (2, 2).")
+        
+    def test_return_names(self):
+        def func(a):
+            b = a + 1
+            # no return statement
+            
+        f = omf.wrap(func)
+        self.assertEqual(f.get_return_names(), [])
 
 if __name__ == '__main__':
     unittest.main()

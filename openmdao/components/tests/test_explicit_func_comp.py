@@ -6,7 +6,8 @@ from numpy.testing import assert_almost_equal
 from io import StringIO
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals, \
+    assert_warning
 from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring
@@ -366,6 +367,26 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
+
+    def test_bad_varname(self):
+
+        def func(x=2.0):
+            return x+1.
+
+        f = (omf.wrap(func)
+                .add_input('x', units='m')
+                .add_output('foo:bar'))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "'C1' <class ExplicitFuncComp>: 'foo:bar' is not a valid variable name.")
 
     def test_common_units(self):
 

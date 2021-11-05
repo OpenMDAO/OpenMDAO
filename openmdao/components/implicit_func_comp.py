@@ -86,7 +86,7 @@ class ImplicitFuncComp(ImplicitComponent):
                                            ignore=optignore)
                 self.options.declare(name, **kwargs)
             else:
-                kwargs = _copy_with_ignore(meta, omf._allowed_add_input_args)
+                kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._apply_nonlinear_func.get_output_meta()):
