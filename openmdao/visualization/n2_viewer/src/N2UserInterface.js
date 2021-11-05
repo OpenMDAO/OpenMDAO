@@ -883,12 +883,17 @@ class N2UserInterface {
     }
 }
 
+/**
+ * Manage a window that allows the user to select which variables to display.
+ * TODO: Make variable names sortable, make column headers sticky, improve autosizing
+ * without using sizeToContent(3,30)
+ * @typedef ChildSelectDialog
+ */
 class ChildSelectDialog extends N2WindowDraggable {
     /**
-     * Build a list of the properties we care about and set up
-     * references to the HTML elements.
-     * @param {String} name Variable name.
-     * @param {Number} val Variable value.
+     * Setup the basic structure of the variable selection dialog.
+     * @param {N2TreeNode} node The node to examine the variables of.
+     * @param {String} color The color to make the window header/footer ribbons.
      */
      constructor(node, color) {
         super('childSelect-' + node.toId());
@@ -910,21 +915,30 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.populate(node);
     }
 
+    /**
+     * Add all the variables, their display status, and the control buttons.
+     * @param {N2TreeNode} node The node to operate on.
+     */
     populate(node) {
         const self = this;
         const topRow = this.thead.append('tr');
         topRow.append('th').text('Child Name');
         topRow.append('th').text('Visible');
-        let foundVariables = false;
 
+        // Only add children that are variables.
+        let foundVariables = false;
         let isEven = true;
         for (const child of node.children) {
             if (!child.isInputOrOutput()) { continue; }
-            const row = this.tbody.append('tr')
-                .attr('class', isEven? 'even' : 'odd');
+            // Alternate row colors:
+            const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
             isEven = !isEven;
+
+            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
             row.append('td').text(n2Diag.layout.getText(child));
             const checkId = `${child.toId()}-visible-check`
+
+            // Add a checkbox. When checked, the variable will be displayed.
             row.append('td')
                 .append('input')
                 .attr('type', 'checkbox')
@@ -936,8 +950,10 @@ class ChildSelectDialog extends N2WindowDraggable {
             foundVariables = true;
         }
 
+        // No variables were found so there's nothing to do.
         if (!foundVariables) { this.close(); }
 
+        // The Select All button makes all variables visible.
         this.buttonContainer.append('button')
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
@@ -948,6 +964,7 @@ class ChildSelectDialog extends N2WindowDraggable {
             })
             .text('Select All');
 
+        // The Select None button hides all variables.
         this.buttonContainer.append('button')
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
@@ -958,6 +975,7 @@ class ChildSelectDialog extends N2WindowDraggable {
             })
             .text('Select None');
 
+        // Hitting Apply closes the dialog and updates the diagram.
         this.buttonContainer.append('button')
             .on('click', e => {
                 n2Diag.update();
@@ -969,6 +987,4 @@ class ChildSelectDialog extends N2WindowDraggable {
             .moveNearMouse(d3.event)
             .show();
     }
-
-
 }
