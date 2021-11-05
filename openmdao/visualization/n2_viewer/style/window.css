@@ -873,7 +873,7 @@ i.help-text-icon {
 }
 
 .window-theme-child-select .window-header .window-title::after {
-    content: ' Child View Selection';
+    content: ' Children';
 }
 
 .window-theme-child-select .window-body {
@@ -886,7 +886,7 @@ i.help-text-icon {
     left: 0;
     right: 0;
     bottom: var(--footer-height);
-    overflow: scroll;
+    overflow: hidden;
     visibility: visible;
     border: 1px solid gray;
 
@@ -904,10 +904,16 @@ i.help-text-icon {
 }
 
 /* Child select window table */
-.window-theme-child-select .window-body table {
+.window-theme-child-select .window-body .table-container {
+    max-height: 280px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.window-theme-child-select .table-container table {
 	overflow: hidden;
 	background-color: white;
-    min-width: 200px;
+    min-width: 250px;
     border-collapse: separate;
     border-spacing: 0;
     margin: 0;
@@ -915,7 +921,7 @@ i.help-text-icon {
     border: 0;
 }
 
-.window-theme-child-select .window-body table tbody tr th {
+.window-theme-child-select thead th {
     text-align: center;
     font-size: 8pt;
     margin: 0;
@@ -925,24 +931,25 @@ i.help-text-icon {
     background-color: #c0c0c0;
     padding: 3px;
     white-space: nowrap;
+    position: sticky;
+    top: 0px;
 
     color: #202020;
     min-width: 30px;
     font-weight: 300;
 }
 
-.window-theme-child-select .window-body table tbody tr th:last-child,
-.window-theme-child-select .window-body table tbody tr td:last-child {
+.window-theme-child-select tbody tr th:last-child,
+.window-theme-child-select tbody tr td:last-child {
     border-right: 0;
 }
 
-.window-theme-child-select .window-body table tbody tr:last-child th,
-.window-theme-child-select .window-body table tbody tr:last-child td {
+.window-theme-child-select tbody tr:last-child th,
+.window-theme-child-select tbody tr:last-child td {
     border-bottom: 0;
 }
 
-.window-theme-child-select .window-body table tbody tr td {
-    text-align: left;
+.window-theme-child-select tbody td {
     font-size: 9pt;
     margin: 0;    
     border-top: 0;
@@ -953,12 +960,35 @@ i.help-text-icon {
     white-space: nowrap;
 }
 
-.window-theme-child-select .window-body table tbody tr.even td {
+.window-theme-child-select tbody tr td:first-child {
+    text-align: left;
+}
+
+.window-theme-child-select tbody tr td:not(first-child) {
+    text-align: center;
+}
+
+.window-theme-child-select tbody tr.even td {
     background-color:white;
 }
 
-.window-theme-child-select .window-body table tbody tr.odd td {
-    background-color: #e8ffe8;
+.window-theme-child-select tbody tr.odd td {
+    background-color: #d8ffff;
+}
+
+.window-theme-child-select .button-container {
+    height: 21px;
+    width: 100%;
+    bottom: 2px;
+    text-align: center;
+}
+
+.window-theme-child-select .button-container:not(:first-child) button {
+    margin-left: 5px;
+}
+
+.window-theme-child-select .button-container button {
+    font-size: 8pt;
 }
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */

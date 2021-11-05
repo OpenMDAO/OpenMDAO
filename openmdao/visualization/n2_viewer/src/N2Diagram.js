@@ -388,8 +388,10 @@ class N2Diagram {
             })
             .on("contextmenu", function (d) {
                 if (d3.event.shiftKey) {
-                    const color = d3.select(this).select('rect').style('fill');
-                    self.ui.shiftRightClick(d, color);
+                    if (!d.isMinimized) {
+                        const color = d3.select(this).select('rect').style('fill');
+                        self.ui.shiftRightClick(d, color);
+                    }
                 }
                 else {
                     self.ui.rightClick(d, this);

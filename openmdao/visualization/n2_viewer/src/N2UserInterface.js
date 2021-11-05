@@ -201,7 +201,7 @@ class N2UserInterface {
                         .on('mousemove', null)
                         .on('mouseup', null);
                 })
-                .on('input', e => {
+                .on('mousemove', e => {
                     const newHeight = d3.event.clientY - offset.y;
                     if (newHeight + n2Diag.layout.gapDist * 2 >= window.innerHeight * .5) {
                         newDims = {
@@ -324,8 +324,10 @@ class N2UserInterface {
         testThis(this, 'N2UserInterface', 'shiftRightClick');
         d3.event.preventDefault();
         d3.event.stopPropagation();
+        window.getSelection().empty();
 
-        if (this.isCollapsible(node)) {
+        // Make sure node is collapsible and window doesn't exist yet.
+        if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
             const csd = new ChildSelectDialog(node, color)
         }
     }
@@ -882,37 +884,83 @@ class ChildSelectDialog extends N2WindowDraggable {
      * @param {Number} val Variable value.
      */
      constructor(node, color) {
-        super('childSelect-' + uuidv4());
+        super('childSelect-' + node.toId());
 
         this.minWidth = 300;
         this.minHeight = 100;
         this.theme('child-select');
         
         this.title(node.name);
-        this.table = this.body.append('table');
+        this.tableContainer = this.body.append('div').attr('class', 'table-container');
+        this.table = this.tableContainer.append('table');
+
+        this.thead = this.table.append('thead');
         this.tbody = this.table.append('tbody');
+
+        this.buttonContainer = this.body.append('div').attr('class', 'button-container');
+
         this.ribbonColor(color);
         this.populate(node);
     }
 
     populate(node) {
-        const topRow = this.tbody.append('tr');
-        ['Child Name', 'Normal', 'Enlarge', 'Collapse'].forEach(function(i) {
-            topRow.append('th').text(i);
-        })
+        const self = this;
+        const topRow = this.thead.append('tr');
+        topRow.append('th').text('Child Name');
+        topRow.append('th').text('Visible');
+        let foundVariables = false;
+
+        let isEven = true;
         for (const child of node.children) {
-            const row = this.tbody.append('tr');
-            const radioName = child.name + '-view-radio';
-            row.append('td').text(child.name);
-            row.append('td').append('input').attr('type', 'radio').attr('name', radioName).attr('checked', 'checked');
-            row.append('td').append('input').attr('type', 'radio').attr('name', radioName);
-            row.append('td').append('input').attr('type', 'radio').attr('name', radioName);
+            if (!child.isInputOrOutput()) { continue; }
+            const row = this.tbody.append('tr')
+                .attr('class', isEven? 'even' : 'odd');
+            isEven = !isEven;
+            row.append('td').text(n2Diag.layout.getText(child));
+            const checkId = `${child.toId()}-visible-check`
+            row.append('td')
+                .append('input')
+                .attr('type', 'checkbox')
+                .property('checked', !child.varIsHidden)
+                .attr('id', checkId)
+                .on('change', e => {
+                    child.varIsHidden = !d3.select(`#${checkId}`).property('checked');
+                })
+            foundVariables = true;
         }
 
-        this.sizeToContent(19, 19) // TODO: Properly find size of scrollbar + 2
-        .title(node.name)
-        .moveNearMouse(d3.event)
-        .show();
+        if (!foundVariables) { this.close(); }
+
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+                    .property('checked', true);
+                for (const child of node.children) {
+                    child.varIsHidden = false;
+                }
+            })
+            .text('Select All');
+
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                d3.selectAll('.window-theme-child-select input[type="checkbox"]')
+                    .property('checked', false);
+                for (const child of node.children) {
+                    child.varIsHidden = true;
+                }
+            })
+            .text('Select None');
+
+        this.buttonContainer.append('button')
+            .on('click', e => {
+                n2Diag.update();
+                this.close();
+            })
+            .text('Apply');
+
+        this.sizeToContent(3,30)
+            .moveNearMouse(d3.event)
+            .show();
     }
 
 

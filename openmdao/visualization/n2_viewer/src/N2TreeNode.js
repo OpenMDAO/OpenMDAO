@@ -26,6 +26,7 @@ class N2TreeNode {
         this.nameWidthPx = 1; // Set by N2Layout
         this.numLeaves = 0; // Set by N2Layout
         this.isMinimized = false;
+        this.isEnlarged = false;
         this.manuallyExpanded = false;
         this.childNames = new Set(); // Set by ModelData
         this.depth = -1; // Set by ModelData
@@ -73,6 +74,16 @@ class N2TreeNode {
     /** Run when a node is restored. */
     expand() {
         this.isMinimized = false;
+    }
+
+    /** Run when a node is to be displayed with a larger minimum height then normal. */
+    enlarge() {
+        this.isEnlarged = true;
+    }
+
+    /** Run when a node is to be displayed with the normal minimum height. */
+    shrink() {
+        this.isEnlarged = false;
     }
 
     /**
@@ -279,4 +290,6 @@ class N2TreeNode {
             }[c];
         })
     }
+
+    toId() { return N2TreeNode.absPathToId(this.absPathName); }
 }
