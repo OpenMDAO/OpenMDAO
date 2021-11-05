@@ -1236,6 +1236,10 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         actual_msg = str(cm.exception)
         self.assertTrue(actual_msg.endswith(msg))
 
+    def test_deprecated(self):
+        # Make sure deprecated methods are still in the table_methods list.
+        om.MetaModelStructuredComp(method='trilinear')
+        om.MetaModelStructuredComp(method='akima1D')
 
 @use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

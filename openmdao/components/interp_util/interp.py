@@ -37,6 +37,7 @@ INTERP_METHODS = {
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima',
                  'scipy_cubic', 'scipy_slinear', 'scipy_quintic',
+                 'trilinear', 'akima1D',  # all Deprecated
                  '3D-slinear', '1D-akima', '3D-lagrange3']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
