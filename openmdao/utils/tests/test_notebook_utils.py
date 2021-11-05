@@ -29,6 +29,25 @@ class StateOptionsDictionary(om.OptionsDictionary):
         self.declare(name='name', types=str,
                      desc='name of ODE state variable')
 
+
+class _TestComp(om.ExplicitComponent):
+    """
+    A simple test component to test show_options_table.
+    """
+
+    def __init__(self, required_arg, **kwargs):
+        super().__init__(**kwargs)
+
+        assert(required_arg == 1)
+
+    def initialize(self):
+        self.options.declare('required_kwarg', types=(int,))
+
+    def setup(self):
+        foo = self.options['required_kwarg']
+        assert(foo == 2)
+
+
 @unittest.skipUnless(tabulate and IPython, "Tabulate and IPython are required")
 class TestNotebookUtils(unittest.TestCase):
 
@@ -45,6 +64,15 @@ class TestNotebookUtils(unittest.TestCase):
         notebook_utils.ipy = True
 
         options = om.show_options_table("openmdao.components.balance_comp.BalanceComp")
+
+        self.assertEqual(options, None)
+
+    def test_show_options_with_kwargs(self):
+        from openmdao.utils import notebook_utils
+        notebook_utils.ipy = True
+
+        options = om.show_options_table('openmdao.utils.tests.test_notebook_utils._TestComp',
+                                        init_args=(1,), init_kwargs={'required_kwarg': 2})
 
         self.assertEqual(options, None)
 

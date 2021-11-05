@@ -94,27 +94,31 @@ def display_source(reference, hide_doc_string=False):
         display(get_code(reference, hide_doc_string))
 
 
-def show_options_table(reference, recording_options=False):
+def show_options_table(reference, recording_options=False, init_args=None, init_kwargs=None):
     """
     Return the options table of the given reference path.
 
     Parameters
     ----------
-    reference : str or object
-        Dot path of desired class or function or an instance.
+    reference : str
+        Dot path of desired class or function.
 
     recording_options : bool
         If True, display recording options instead of options.
+    init_args : list or None
+        Arguments to be passed to the initialization of the referenced object.
+    init_kwargs : dict or None
+        Keyword arguments to be passed to the initialization of the referenced object.
 
     Returns
     -------
     IPython.display
         Options table of the given class or function.
     """
-    if isinstance(reference, str):
-        obj = _get_object_from_reference(reference)()
-    else:
-        obj = reference
+    _init_args = init_args if init_args is not None else []
+    _init_kwargs = init_kwargs if init_kwargs is not None else {}
+
+    obj = _get_object_from_reference(reference)(*_init_args, **_init_kwargs)
 
     if ipy:
         if not hasattr(obj, "options"):
