@@ -6,34 +6,38 @@ implementations.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_akima import InterpAkima, InterpAkima1D
+from openmdao.components.interp_util.interp_akima import InterpAkima, Interp1DAkima
 from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
-from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, InterpLagrange3D
+from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3, Interp3DLagrange3
 from openmdao.components.interp_util.interp_scipy import InterpScipy
-from openmdao.components.interp_util.interp_slinear import InterpLinear
-from openmdao.components.interp_util.interp_trilinear import InterpTrilinear
+from openmdao.components.interp_util.interp_slinear import InterpLinear, Interp3DSlinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
+from openmdao.utils.om_warnings import warn_deprecation
+
 
 INTERP_METHODS = {
     'slinear': InterpLinear,
     'lagrange2': InterpLagrange2,
     'lagrange3': InterpLagrange3,
-    'lagrange3D': InterpLagrange3D,
     'cubic': InterpCubic,
     'akima': InterpAkima,
-    'akima1D': InterpAkima1D,
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
     'bsplines': InterpBSplines,
-    'trilinear': InterpTrilinear,
+    '3D-slinear': Interp3DSlinear,
+    '3D-lagrange3': Interp3DLagrange3,
+    '1D-akima': Interp1DAkima,
+    'trilinear': Interp3DSlinear,  # Deprecated
+    'akima1D': Interp1DAkima,  # Deprecated
 }
 
-TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
-                 'scipy_slinear', 'scipy_quintic', 'trilinear', 'akima1D', 'lagrange3D']
+TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima',
+                 'scipy_cubic', 'scipy_slinear', 'scipy_quintic',
+                 '3D-slinear', '1D-akima', '3D-lagrange3']
 SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
                   'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
@@ -128,6 +132,11 @@ class InterpND(object):
             all_m = ', '.join(['"' + m + '"' for m in INTERP_METHODS])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
                              '%s.' % (method, all_m))
+        elif method == 'akima1D':
+            warn_deprecation("The 'akima1D' method has been renamed to '1D-akima'.")
+        elif method == 'trilinear':
+            warn_deprecation("The 'trilinear' method has been renamed to '3D-slinear'.")
+
         self.extrapolate = extrapolate
 
         # The table points are always defined, by specifying either the points directly, or num_cp.

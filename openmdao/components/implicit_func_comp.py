@@ -80,7 +80,6 @@ class ImplicitFuncComp(ImplicitComponent):
         if self.options['use_jax']:
             self._apply_nonlinear_func._f = omf.jax_decorate(self._apply_nonlinear_func._f)
 
-
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
                                                 self._apply_nonlinear_func._inputs.values()],
@@ -113,7 +112,7 @@ class ImplicitFuncComp(ImplicitComponent):
                                            ignore=optignore)
                 self.options.declare(name, **kwargs)
             else:
-                kwargs = _copy_with_ignore(meta, omf._allowed_add_input_args)
+                kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._apply_nonlinear_func.get_output_meta()):

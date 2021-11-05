@@ -162,8 +162,6 @@ class OMWrappedFunc(object):
             if kw in meta and meta[kw] is not None:
                 raise RuntimeError(f"In add_input, metadata '{kw}' has already been added to "
                                    f"function for input '{name}'.")
-        if meta.get('val') is not None and kwargs.get('val') is not None:
-            self._check_vals_equal(name, meta['val'], kwargs['val'])
         _check_kwargs(kwargs, _allowed_add_input_args, 'add_input')
         meta.update(kwargs)
         return self
@@ -328,8 +326,7 @@ class OMWrappedFunc(object):
         str
             Name of each input variable.
         """
-        for name, _ in self.get_input_meta():
-            yield name
+        yield from inspect.signature(self._f).parameters
 
     def get_output_meta(self):
         """
@@ -378,24 +375,6 @@ class OMWrappedFunc(object):
         """
         return self._declare_coloring
 
-    def _check_vals_equal(self, name, val1, val2):
-        """
-        Compare two values that could be a mix of ndarray and other types.
-
-        Parameters
-        ----------
-        name : str
-            Name of the variable (for error reporting).
-        val1 : object
-            First value.
-        val2 : object
-            Second value.
-        """
-        # == is more prone to raise exceptions when ndarrays are involved, so use !=
-        neq = val1 != val2
-        if (isinstance(neq, np.ndarray) and np.any(neq)) or neq:
-            raise RuntimeError(f"Conflicting metadata entries for '{name}'.")
-
     def _setup(self):
         """
         Set up input and output variable metadata dicts.
@@ -436,14 +415,16 @@ class OMWrappedFunc(object):
         outlist = []
         try:
             outlist = [(n, {}) for n in self.get_return_names()]
-        except RuntimeError:
-            #  this could happen if function is compiled or has multiple return lines
+        except RuntimeError as err:
+            # this could happen if function is compiled or has multiple return lines that are
+            # not all consistent
+            msg = (f"During AST processing to determine the number and name of return values, the "
+                   f"following error occurred: {err}")
             if not self._outputs:
-                raise RuntimeError(f"Couldn't determine function return names or "
-                                   "number of return values based on AST and no return value "
-                                   "metadata was supplied.")
-            warnings.warn("Couldn't determine function return names based on AST.  Assuming number "
-                          "of return values matches number of outputs defined in the metadata.")
+                raise RuntimeError(msg)
+            warnings.warn(f"{msg}\nError was ignored and will proceed assuming that the number "
+                          f"of return values matches the number of outputs ({len(self._outputs)}) "
+                          "defined in the metadata.")
             outlist = list(self._outputs.items())
 
         residmap = {n: n for n, _ in outlist}
@@ -459,8 +440,14 @@ class OMWrappedFunc(object):
             else:  # didn't find oname
                 notfound.append(oname)
 
+        inones = [i for i, t in enumerate(outlist) if t[0] is None]  # indices with no name
+
+        if len(inones) > len(self._outputs):
+            raise RuntimeError(f"{len(self._outputs)} output names are specified in the metadata "
+                               f"but there are {len(inones)} unnamed return values in the "
+                               "function.")
+
         if notfound:  # try to fill in the unnamed slots with user-supplied output data
-            inones = [i for i, t in enumerate(outlist) if t[0] is None]  # indices with no name
             if len(notfound) != len(inones):
                 raise RuntimeError(f"There must be an unnamed return value for every unmatched "
                                    f"output name {notfound} but only found {len(inones)}.")
@@ -498,7 +485,7 @@ class OMWrappedFunc(object):
         """
         input_names = set(self.get_input_names())
         return [n if n not in input_names else None
-                for n in _FuncRetNameCollector(self._f)._ret_info]
+                for n in _FuncRetNameCollector(self._f).get_return_names()]
 
     def _compute_out_shapes(self, ins, outs):
         """
@@ -541,7 +528,8 @@ class OMWrappedFunc(object):
                         raise RuntimeError(f"Can't determine shape of input '{name}'.")
                 else:
                     if jax is not None:
-                        args.append(jax.ShapedArray(_shape2tuple(shp), dtype=np.float64))
+                        shp = None if shp is None else _shape2tuple(shp)
+                        args.append(jax.ShapedArray(shp, dtype=np.float64))
 
         # compute shapes as a check against shapes in metadata (if any)
         if jax is not None:
@@ -604,7 +592,7 @@ class OMWrappedFunc(object):
         if not valshape:  # val is a scalar so reshape with the given meta['shape']
             meta['val'] = np.ones(meta['shape']) * meta['val']
         elif valshape != meta['shape']:
-            raise ValueError(f"Input '{name}' default value has shape "
+            raise ValueError(f"Input '{name}' value has shape "
                              f"{valshape}, but shape was specified as {meta['shape']}.")
 
 
@@ -645,8 +633,23 @@ def _update_from_defaults(meta, defaults):
             meta[key] = val
 
 
-def _filter_dict(kwargs, allowed):
-    return {k: v for k, v in kwargs.items() if k in allowed}
+def _filter_dict(dct, allowed):
+    """
+    Copy the dict, keeping only values corresponding to allowed.
+
+    Parameters
+    ----------
+    dct : dict
+       Dictionary to copy.
+    allowed : set or dict
+       Only values matching these keys will be copied.
+
+    Returns
+    -------
+    dict
+       A copy of the dict containing only allowed values.
+    """
+    return {k: v for k, v in dct.items() if k in allowed}
 
 
 def _check_kwargs(kwargs, allowed, fname):
@@ -683,8 +686,6 @@ def _shape2tuple(shape):
     """
     if isinstance(shape, Number):
         return (shape,)
-    elif shape is None:
-        return shape
     return tuple(shape)
 
 
@@ -768,42 +769,6 @@ def jax_decorate(func):
         return func  # no wrapping needed
 
 
-def _get_long_name(node):
-    """
-    Return a name (possibly dotted) corresponding to the give node or None.
-
-    If the node is a Name node or an Attribute node that is composed only of other Attribute or
-    Name nodes, then return the full dotted name for this node. Otherwise, i.e., if this node
-    contains other expressions.
-
-    Parameters
-    ----------
-    node : ASTnode
-        A node of an abstract syntax tree.
-
-    Returns
-    -------
-    str or None
-        Name corresponding to the given node.
-    """
-    if isinstance(node, ast.Name):
-        return node.id
-    elif not isinstance(node, ast.Attribute):
-        return None
-    val = node.value
-    parts = [node.attr]
-    while True:
-        if isinstance(val, ast.Attribute):
-            parts.append(val.attr)
-            val = val.value
-        elif isinstance(val, ast.Name):
-            parts.append(val.id)
-            break
-        else:  # it's more than just a simple dotted name
-            return None
-    return '.'.join(parts[::-1])
-
-
 class _FuncRetNameCollector(ast.NodeVisitor):
     """
     An ast.NodeVisitor that records return value names.
@@ -814,20 +779,56 @@ class _FuncRetNameCollector(ast.NodeVisitor):
 
     Attributes
     ----------
-    _ret_info : list
-        List containing name (or None) for each function return value.
+    _ret_infos : list
+        List containing one entry for each return statement, with each entry containing a list of
+        name (or None) for each function return value.
     """
 
     def __init__(self, func):
         super().__init__()
-        self._ret_info = []
+        self._ret_infos = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
+
+    def get_return_names(self):
+        """
+        Return a list of (name or None) for each return value.
+
+        If there are multiple returns that differ by name or number of return values, an exception
+        will be raised.  If one entry in one return list has a name and another is None, the name
+        will take precedence and no exception will be raised.
+
+        Returns
+        -------
+        list
+            The list of return names.  Some entries will be None if there was no simple name
+            associated with a given return value.
+        """
+        if len(self._ret_infos) == 0:
+            return []
+        if len(self._ret_infos) == 1:
+            return self._ret_infos[0]
+
+        names = self._ret_infos[0].copy()
+        length = len(names)
+        for lst in self._ret_infos:
+            if len(lst) != length:
+                raise RuntimeError("Function has multiple return statements with differing numbers "
+                                   "of return values.")
+
+            for i, (name, newname) in enumerate(zip(names, lst)):
+                if name is None:
+                    names[i] = newname
+                elif newname is not None and name != newname:
+                    raise RuntimeError("Function has multiple return statements with different "
+                                       f"return value names of {sorted((name, newname))} for "
+                                       f"return value {i}.")
+        return names
 
     def _get_return_attrs(self, node):
         if isinstance(node, ast.Name):
-            self._ret_info.append(node.id)
+            self._ret_infos[-1].append(node.id)
         else:
-            self._ret_info.append(None)
+            self._ret_infos[-1].append(None)
 
     def visit_Return(self, node):
         """
@@ -838,11 +839,7 @@ class _FuncRetNameCollector(ast.NodeVisitor):
         node : ASTnode
             The return node being visited.
         """
-        if self._ret_info:
-            raise RuntimeError("_FuncDepCollector does not support multiple returns in a "
-                               "single function.  Either the given function contains multiple "
-                               "returns or this _FuncDepCollector instance has been used "
-                               "more than once, which is unsupported.")
+        self._ret_infos.append([])
 
         if isinstance(node.value, ast.Tuple):
             for n in node.value.elts:

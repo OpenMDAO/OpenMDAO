@@ -12,6 +12,7 @@ try:
     import jax.numpy as jnp
 except ImportError:
     jax = None
+from openmdao.core.tests.test_fd_color import _check_partial_matrix
 
 
 class TestImplicitFuncComp(unittest.TestCase):

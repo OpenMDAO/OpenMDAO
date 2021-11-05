@@ -15,15 +15,15 @@ _disallowed_varnames = {
 }
 
 
-def _copy_with_ignore(dct, keepers, ignore=()):
+def _copy_with_ignore(dct, keep, ignore=()):
     """
-    Copy the entries in the given dict whose keys are in keepers.
+    Copy the entries in the given dict whose keys are in keep.
 
     Parameters
     ----------
     dct : dict
         The dictionary to be copied.
-    keepers : set-like
+    keep : set-like
         Set of keys for entries we want to keep.
     ignore : set or tuple
         Don't issue a warning for these non-keeper keys.
@@ -31,20 +31,9 @@ def _copy_with_ignore(dct, keepers, ignore=()):
     Returns
     -------
     dict
-        A new dict containing 'keepers' entries.
+        A new dict containing 'keep' entries.
     """
-    kept = {}
-    warn = set()
-    for k, v in dct.items():
-        if k in keepers and k not in ignore:
-            kept[k] = v
-        elif k not in ignore:
-            warn.add(k)
-
-    if warn:
-        issue_warning(f"The following metadata entries were ignored: {sorted(warn)}.")
-
-    return kept
+    return {k: v for k, v in dct.items() if k in keep and k not in ignore}
 
 
 def _check_var_name(comp, name):

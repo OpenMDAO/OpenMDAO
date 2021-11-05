@@ -281,8 +281,7 @@ class Vector(object):
         arrs = self._views_flat if flat else self._views
 
         if self._under_complex_step:
-            for tup in arrs.items():
-                yield tup
+            yield from arrs.items()
         else:
             for name, val in arrs.items():
                 yield name, val.real

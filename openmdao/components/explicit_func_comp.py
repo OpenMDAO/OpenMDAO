@@ -67,6 +67,13 @@ class ExplicitFuncComp(ExplicitComponent):
         super()._declare_options()
         _add_options(self)
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        _add_options(self)
+
     def setup(self):
         """
         Define out inputs and outputs.
@@ -80,7 +87,7 @@ class ExplicitFuncComp(ExplicitComponent):
                                            ignore=optignore)
                 self.options.declare(name, **kwargs)
             else:
-                kwargs = _copy_with_ignore(meta, omf._allowed_add_input_args)
+                kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._compute.get_output_meta()):
