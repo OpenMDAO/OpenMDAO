@@ -320,6 +320,12 @@ class N2UserInterface {
         }
     }
 
+    /**
+     * When a node with variables is shift-right-clicked, present a dialog with the
+     * list of variables and allow the user to select which ones should be displayed.
+     * @param {N2TreeNode} node The node that was shift-right-clicked.
+     * @param {String} color The color of the clicked node, to use for the dialog ribbons.
+     */
     shiftRightClick(node, color) {
         testThis(this, 'N2UserInterface', 'shiftRightClick');
         d3.event.preventDefault();
@@ -328,7 +334,8 @@ class N2UserInterface {
 
         // Make sure node is collapsible and window doesn't exist yet.
         if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
-            const csd = new ChildSelectDialog(node, color)
+            this.addBackButtonHistory();
+            new ChildSelectDialog(node, color); // Create the modal dialog
         }
     }
 
