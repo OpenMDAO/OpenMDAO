@@ -985,6 +985,7 @@ class ChildSelectDialog extends N2WindowDraggable {
 
         this.sizeToContent(3,30)
             .moveNearMouse(d3.event)
+            .modal(true)
             .show();
     }
 }
