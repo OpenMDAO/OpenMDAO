@@ -1,6 +1,5 @@
 import unittest
 import os.path
-import pathlib
 import json
 import sys
 
@@ -146,6 +145,30 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
 
                         msg = f"Assert found in a code block in {file}. "
                         self.fail(msg)
+
+    def test_eval_rst(self):
+        """
+        Make sure any automethod calls are bracketed with {eval-rst}.
+        """
+        files = set()
+
+        for file in FILES:
+            with open(file) as f:
+                json_data = json.load(f)
+                blocks = json_data['cells']
+                for block in blocks[1:]:
+
+                    # check only markdown cells
+                    if block['cell_type'] != 'markdown':
+                        continue
+
+                    code = ''.join(block['source'])
+                    if 'automethod::' in code and '{eval-rst}' not in code:
+                        files.add(file)
+
+        if files:
+            self.fail("'automethod' directive found in the following {} files without"
+                      "'eval-rst':\n{}".format(len(files), '\n'.join(files)))
 
 
 if __name__ == '__main__':
