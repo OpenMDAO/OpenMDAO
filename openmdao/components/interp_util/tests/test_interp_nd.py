@@ -160,7 +160,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
             if method.startswith('scipy'):
                 continue
 
-            if method in ['1D-akima']:
+            if method in ['1D-akima', 'akima1D']:
                 # These methods are for fixed grids other than 3d.
                 continue
 
