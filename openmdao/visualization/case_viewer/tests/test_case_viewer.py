@@ -44,7 +44,7 @@ class TestCaseViewer(unittest.TestCase):
 
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename)
+        cv = om.CaseViewer(self.filename, testing=True)
 
         circ_data = cv.circle_data.data
 
@@ -111,7 +111,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename)
+        cv = om.CaseViewer(self.filename, testing=True)
 
         cv.io_select_x.value = 'v'
         cv.io_select_y.value = 'd'
@@ -158,7 +158,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename)
+        cv = om.CaseViewer(self.filename, testing=True)
 
         cv._case_plot_calc(np.array([[0., 0, 0]]), np.array([[1, 2, 3]]))
 
@@ -171,7 +171,7 @@ class TestCaseViewer(unittest.TestCase):
         self.assertEqual(cv.warning_box.text, "NOTE: Cannot compare Number of Points to Case "
                          "Iterations")
 
-        cv = om.CaseViewer(self.filename)
+        cv = om.CaseViewer(self.filename, testing=True)
         cv.io_select_x.value = 'Number of Points'
         cv.io_select_y.value = 'Case Iterations'
 
@@ -200,9 +200,9 @@ class TestCaseViewer(unittest.TestCase):
         prob.model.add_objective('d', index=-1, scaler=-1)
         prob.model.add_design_var('v0', lower=0, upper=0)
         prob.model.add_constraint('v', indices=[-1], equals=0)
-        recorder = om.SqliteRecorder('cases.sql')
-        prob.driver.add_recorder(recorder)
-        prob.add_recorder(recorder)
+
+        prob.driver.add_recorder(self.recorder)
+        prob.add_recorder(self.recorder)
 
         prob.driver.recording_options['includes'] = []
         prob.driver.recording_options['record_objectives'] = True
@@ -214,7 +214,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer('cases.sql')
+        cv = om.CaseViewer(self.filename, testing=True)
 
         cv.io_select_x.value = 'd'
         cv.io_select_y.value = 'd'

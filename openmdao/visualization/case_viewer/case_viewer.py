@@ -32,6 +32,8 @@ class CaseViewer(object):
         Currently only sqlite database files recorded via SqliteCaseReader are supported.
     port : int
         What port to host Bokeh server on.
+    testing : bool
+        Flag for unit testing to get past the raise error.
 
     Attributes
     ----------
@@ -47,13 +49,10 @@ class CaseViewer(object):
         Frequently used string.
     """
 
-    def __init__(self, data, port=8888):
+    def __init__(self, data, port=8888, testing=False):
         """
         Initialize attributes.
         """
-        # if not notebook:
-        #     raise RuntimeError(f"{self.__class__.__name__} must be run in a notebook environment")
-
         warnings.simplefilter(action='ignore', category=BokehUserWarning)
 
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
@@ -69,10 +68,15 @@ class CaseViewer(object):
 
         if notebook:
             output_notebook()
-            show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" + str(port)))
+            show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" +
+                                                                      str(port)))
         else:
-            doc = curdoc()
-            self._make_plot(doc)
+            if not testing:
+                raise RuntimeError(f"{self.__class__.__name__} must be run in a "
+                                   f"notebook environment")
+            else:
+                doc = curdoc()
+                self._make_plot(doc)
 
     def _var_compatability_check(self, variables, var_to_compare):
         """
@@ -420,13 +424,10 @@ class CaseViewer(object):
                 colors.pop()
         else:
             if length > 20 and length < 256:
-                print(1)
                 colors = list(Turbo256[:length])
             elif length < 20:
-                print(2)
                 colors = list(Category20[length])
             else:
-                print(3)
                 self.warning_box.text = "NOTE: Cannot compare more than 256 cases"
                 colors = list(Turbo256)
 
