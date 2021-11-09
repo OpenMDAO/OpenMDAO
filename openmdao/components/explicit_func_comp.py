@@ -1,18 +1,13 @@
 """Define the FuncComponent class."""
 
-import functools
 import numpy as np
-from numpy import asarray, isscalar
-from itertools import chain
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.constants import INT_DTYPE
 import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
 
 try:
-    import jax
-    from jax import jvp, vjp, vmap, random, jit, jacfwd, jacrev
-    import jax.numpy as jnp
+    from jax import jit, jacfwd
 except ImportError:
     jax = None
 
