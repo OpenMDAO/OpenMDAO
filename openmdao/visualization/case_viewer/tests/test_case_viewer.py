@@ -2,17 +2,17 @@ import unittest
 
 import numpy as np
 
-try:
-    import bokeh
-except ImportError:
-    bokeh = None
-
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 
+try:
+    import bokeh
+except ModuleNotFoundError:
+    bokeh = None
 
 @use_tempdirs
+@unittest.skipIf(bokeh is None, "Bokeh is required")
 class TestCaseViewer(unittest.TestCase):
 
     def setUp(self):

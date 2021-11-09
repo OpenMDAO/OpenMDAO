@@ -1,6 +1,5 @@
 """Define the CaseViewer class."""
 
-import json
 import warnings
 
 try:
@@ -12,7 +11,6 @@ try:
     from bokeh.util.warnings import BokehUserWarning
 except ImportError:
     bokeh = None
-    print("Bokeh not found")
 
 from openmdao.utils.notebook_utils import notebook
 from openmdao.recorders.case_reader import CaseReader
@@ -53,8 +51,6 @@ class CaseViewer(object):
         """
         Initialize attributes.
         """
-        warnings.simplefilter(action='ignore', category=BokehUserWarning)
-
         self.circle_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
         self.multi_line_data = ColumnDataSource(dict(x_vals=[], y_vals=[], color=[], cases=[]))
 
@@ -68,6 +64,7 @@ class CaseViewer(object):
 
         if notebook:
             output_notebook()
+            warnings.simplefilter(action='ignore', category=BokehUserWarning)
             show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" +
                                                                       str(port)))
         else:
