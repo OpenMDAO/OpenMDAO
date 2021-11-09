@@ -4,7 +4,7 @@ import json
 import warnings
 
 try:
-    from bokeh.io import show, output_notebook
+    from bokeh.io import show, output_notebook, curdoc
     from bokeh.models import Select, HoverTool, MultiSelect, Paragraph
     from bokeh.layouts import row, column
     from bokeh.plotting import figure, ColumnDataSource
@@ -51,8 +51,8 @@ class CaseViewer(object):
         """
         Initialize attributes.
         """
-        if not notebook:
-            raise RuntimeError(f"{self.__class__.__name__} must be run in a notebook environment")
+        # if not notebook:
+        #     raise RuntimeError(f"{self.__class__.__name__} must be run in a notebook environment")
 
         warnings.simplefilter(action='ignore', category=BokehUserWarning)
 
@@ -67,9 +67,12 @@ class CaseViewer(object):
         self._case_iter_str = "Case Iterations"
         self._num_points_str = "Number of Points"
 
-        output_notebook()
-
-        show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" + str(port)))
+        if notebook:
+            output_notebook()
+            show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" + str(port)))
+        else:
+            doc = curdoc()
+            self._make_plot(doc)
 
     def _var_compatability_check(self, variables, var_to_compare):
         """
@@ -227,6 +230,8 @@ class CaseViewer(object):
             Aranged array of selected cases for multi_line plot
         """
         num_of_cases = data.shape[0]
+        _num_case_check_x = (self.io_select_x.value in [self._case_iter_str, self._num_points_str])
+        _num_case_check_y = (self.io_select_y.value in [self._case_iter_str, self._num_points_str])
         if self.case_iter_select.value == "Norm":
             data = np.linalg.norm(data, axis=1).reshape(1, num_of_cases)
             case_array = np.arange(num_of_cases).reshape(1, num_of_cases)
@@ -239,7 +244,8 @@ class CaseViewer(object):
             self._tooltip_management()
             return data, case_array
 
-        elif set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}:
+        elif (set(case_array.flatten()) == {0.} or set(data.flatten()) == {0.}) and \
+                not (_num_case_check_x and _num_case_check_y):
             self.warning_box.text = ("NOTE: One or more variables are 0 arrays. Select a different "
                                      "case or variable")
             self._tooltip_management(False)
@@ -316,9 +322,6 @@ class CaseViewer(object):
             if len(self.case_select.value) == 1:
                 current_val = int(self.case_select.value[0])
                 self.case_select.value.append(str(current_val + 1))
-        elif self._case_iter_x or self._case_iter_y:
-            self.warning_box.text = ("NOTE: Only one case found. Unable to view case iterations vs "
-                                     "variable")
 
         for i in self.case_select.value:
             self.case = self.cr.get_case(self.case_options[int(i)][1])
@@ -381,7 +384,6 @@ class CaseViewer(object):
             self.multi_line_data.data = new_data
             self.circle_data.data = {"x_vals": [], "y_vals": [], "color": [], "cases": []}
         else:
-
             if self._case_iter_x:
                 new_data['x_vals'] = np.full((x_len, case_len), [list(range(0, case_len))]).T
                 new_data['y_vals'], new_data['x_vals'] = self._case_plot_calc(new_data['y_vals'],
@@ -417,11 +419,15 @@ class CaseViewer(object):
             while len(colors) > length:
                 colors.pop()
         else:
-            if length > 20:
+            if length > 20 and length < 256:
+                print(1)
                 colors = list(Turbo256[:length])
             elif length < 20:
+                print(2)
                 colors = list(Category20[length])
             else:
+                print(3)
                 self.warning_box.text = "NOTE: Cannot compare more than 256 cases"
+                colors = list(Turbo256)
 
         return colors
