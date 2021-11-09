@@ -334,7 +334,6 @@ class N2UserInterface {
 
         // Make sure node is collapsible and window doesn't exist yet.
         if (this.isCollapsible(node) && d3.select('#childSelect-' + node.toId()).empty()) {
-            this.addBackButtonHistory();
             new ChildSelectDialog(node, color); // Create the modal dialog
         }
     }
@@ -928,6 +927,7 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     _initialSetup() {
         const self = this;
+        this.hiddenVars = [];
 
         this.minWidth = 300;
         this.minHeight = 100;
@@ -969,9 +969,7 @@ class ChildSelectDialog extends N2WindowDraggable {
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', true);
-                for (const child of self.node.children) {
-                    child.varIsHidden = false;
-                }
+                this.hiddenVars = [];
             })
             .text('Select All');
 
@@ -980,8 +978,9 @@ class ChildSelectDialog extends N2WindowDraggable {
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', false);
+                this.hiddenVars = [];
                 for (const child of self.node.children) {
-                    child.varIsHidden = true;
+                    this.hiddenVars.push(child);
                 }
             })
             .text('Select None');
@@ -989,13 +988,22 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Hitting Apply closes the dialog and updates the diagram.
         this.buttonContainer.append('button')
             .on('click', e => {
-                if (self.node.isMinimized) { // If node itself is collapsed, expand it
-                    n2Diag.ui.rightClickedNode = self.node;
-                    self.node.manuallyExpanded = true;
-                    self.node.expand();
-                    self.node.varIsHidden = false;
+                if (self.hiddenVars.length == self.node.children.length) { // If everything was hidden, just collapse the node
+                    n2Diag.ui.rightClick(self.node);
                 }
-                n2Diag.update();
+                else {
+                    n2Diag.ui.rightClickedNode = self.node;
+                    if (self.node.isMinimized) { // If node itself is collapsed, expand it
+                        self.node.manuallyExpanded = true;
+                        self.node.expand();
+                        self.node.varIsHidden = false;
+                    }
+                    for (const child of self.hiddenVars) {
+                        child.varIsHidden = true;
+                    }
+                    n2Diag.ui.addBackButtonHistory();
+                    n2Diag.update();
+                }
                 self.close();
             })
             .text('Apply');
@@ -1025,7 +1033,8 @@ class ChildSelectDialog extends N2WindowDraggable {
 
             // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
             row.append('td').text(varName);
-            const checkId = `${child.toId()}-visible-check`
+            const checkId = `${child.toId()}-visible-check`;
+            if (child.varIsHidden) { this.hiddenVars.push(child); }
 
             // Add a checkbox. When checked, the variable will be displayed.
             row.append('td')
@@ -1034,7 +1043,13 @@ class ChildSelectDialog extends N2WindowDraggable {
                 .property('checked', !child.varIsHidden)
                 .attr('id', checkId)
                 .on('change', e => {
-                    child.varIsHidden = !d3.select(`#${checkId}`).property('checked');
+                    const isVisible = d3.select(`#${checkId}`).property('checked');
+                    if (!isVisible) { this.hiddenVars.push(child); }
+                    else { 
+                        const idx = this.hiddenVars.indexOf(child);
+                        if (idx > -1 ) { this.hiddenVars.splice(idx, 1); }
+                        else { console.warning("Could not find child in hiddenVars array."); }
+                    }
                 })
         }
 
