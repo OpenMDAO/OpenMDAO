@@ -47,7 +47,7 @@ class CaseViewer(object):
         Frequently used string.
     """
 
-    def __init__(self, data, port=8888, testing=False):
+    def __init__(self, data, port=8888, doc=None):
         """
         Initialize attributes.
         """
@@ -65,15 +65,11 @@ class CaseViewer(object):
         if notebook:
             output_notebook()
             warnings.simplefilter(action='ignore', category=BokehUserWarning)
-            show(self._make_plot, notebook_handle=True, notebook_url=("http://localhost:" +
-                                                                      str(port)))
+            show(self._make_plot, notebook_handle=True, notebook_url=f"http://localhost:{port}")
         else:
-            if not testing:
-                raise RuntimeError(f"{self.__class__.__name__} must be run in a "
-                                   f"notebook environment")
-            else:
+            if not doc:
                 doc = curdoc()
-                self._make_plot(doc)
+            self._make_plot(doc)
 
     def _var_compatability_check(self, variables, var_to_compare):
         """
@@ -429,3 +425,60 @@ class CaseViewer(object):
                 colors = list(Turbo256)
 
         return colors
+
+
+def view_cases(cases, port_number=8989, browser=True):
+    """
+    Visualize a metamodel.
+
+    Parameters
+    ----------
+    cases : str or CaseReader 
+        Filename of SQL recording or a CaseReader instance.
+    port_number : int
+        Bokeh plot port number.
+    browser : bool
+        If True, show the browser.
+    """
+    from bokeh.application.application import Application
+    from bokeh.application.handlers import FunctionHandler
+    from bokeh.server.server import Server
+
+    def make_doc(doc):
+        CaseViewer(cases, port=port_number, doc=doc)
+
+    server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
+    if browser:
+        server.io_loop.add_callback(server.show, "/")
+    else:
+        print('Server started, to view go to http://localhost:{}/'.format(port_number))
+
+    server.io_loop.start()
+
+
+def view_cases_cmd():
+    """
+    View cases in a recording file.
+    """
+    import os
+    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(description='View cases in a recording file.')
+    parser.add_argument('filename', help='case recording file.')
+    parser.add_argument('-p', '--port_number', default=8989, action='store', dest='port_number',
+                        help='Port number to open viewer')
+    parser.add_argument('--no_browser', action='store_false', dest='browser',
+                        help='Bokeh server will start server without browser')
+    args = parser.parse_args()
+
+    filename = args.filename
+    if not os.path.isfile(filename):
+        print(f"Can't find file '{filename}'.")
+        sys.exit(-1)
+
+    view_cases(filename, args.port_number, args.browser)
+
+
+if __name__ == "__main__":
+    view_cases_cmd()

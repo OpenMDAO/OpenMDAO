@@ -44,7 +44,7 @@ class TestCaseViewer(unittest.TestCase):
 
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename, testing=True)
+        cv = om.CaseViewer(self.filename)
 
         circ_data = cv.circle_data.data
 
@@ -111,7 +111,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename, testing=True)
+        cv = om.CaseViewer(self.filename)
 
         cv.io_select_x.value = 'v'
         cv.io_select_y.value = 'd'
@@ -158,7 +158,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename, testing=True)
+        cv = om.CaseViewer(self.filename)
 
         cv._case_plot_calc(np.array([[0., 0, 0]]), np.array([[1, 2, 3]]))
 
@@ -171,7 +171,7 @@ class TestCaseViewer(unittest.TestCase):
         self.assertEqual(cv.warning_box.text, "NOTE: Cannot compare Number of Points to Case "
                          "Iterations")
 
-        cv = om.CaseViewer(self.filename, testing=True)
+        cv = om.CaseViewer(self.filename)
         cv.io_select_x.value = 'Number of Points'
         cv.io_select_y.value = 'Case Iterations'
 
@@ -214,7 +214,7 @@ class TestCaseViewer(unittest.TestCase):
         prob.set_val('v0', 100)
         prob.run_driver()
 
-        cv = om.CaseViewer(self.filename, testing=True)
+        cv = om.CaseViewer(self.filename)
 
         cv.io_select_x.value = 'd'
         cv.io_select_y.value = 'd'

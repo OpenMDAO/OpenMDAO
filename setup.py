@@ -180,6 +180,7 @@ setup(
             'webview=openmdao.utils.webview:webview_argv',
             'run_om_test=openmdao.devtools.run_test:run_test',
             'reset_notebook=openmdao.devtools.docutils:reset_notebook_cmd',
+            'view_cases=openmdao.visualization.case_viewer.case_viewer:view_cases_cmd',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_case_reader': [
