@@ -178,7 +178,6 @@ class Jacobian(object):
                         raise ValueError(msg.format(self.msginfo, abs_key,
                                                     subjac.shape, rows.shape))
 
-
         else:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
