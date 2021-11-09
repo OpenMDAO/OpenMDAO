@@ -365,7 +365,7 @@ class N2Diagram {
     }
 
     _createPartitionCells() {
-        let self = this; // For callbacks that change "this". Alternative to using .bind().
+        const self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.dom.pTreeGroup.selectAll(".partition_group")
             .data(this.layout.zoomedNodes, function (node) {
@@ -388,10 +388,8 @@ class N2Diagram {
             })
             .on("contextmenu", function (d) {
                 if (d3.event.shiftKey) {
-                    if (!d.isMinimized) {
-                        const color = d3.select(this).select('rect').style('fill');
-                        self.ui.shiftRightClick(d, color);
-                    }
+                    const color = d3.select(this).select('rect').style('fill');
+                    self.ui.shiftRightClick(d, color);
                 }
                 else {
                     self.ui.rightClick(d, this);
@@ -400,7 +398,7 @@ class N2Diagram {
             .on("mouseover", function (d) {
                 self.ui.nodeInfoBox.update(d3.event, d, d3.select(this).select('rect').style('fill'));
             })
-            .on("mouseleave", function (d) {
+            .on("mouseleave", function () {
                 self.ui.nodeInfoBox.clear();
             })
             .on("mousemove", function () {

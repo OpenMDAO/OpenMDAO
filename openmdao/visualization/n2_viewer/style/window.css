@@ -873,7 +873,7 @@ i.help-text-icon {
 }
 
 .window-theme-child-select .window-header .window-title::after {
-    content: ' Children';
+    content: ' Variables';
 }
 
 .window-theme-child-select .window-body {
@@ -989,6 +989,23 @@ i.help-text-icon {
 
 .window-theme-child-select .button-container button {
     font-size: 8pt;
+}
+
+.window-theme-child-select .sort-up,
+.window-theme-child-select .sort-down {
+    padding-right: 3px;
+    padding-left: 3px;
+    color: #404040;
+    font-size: 8pt;
+}
+
+.window-theme-child-select .sort-up:hover,
+.window-theme-child-select .sort-up:focus,
+.window-theme-child-select .sort-down:hover,
+.window-theme-child-select .sort-down:focus {
+    color:blue;
+    text-decoration: none;
+    cursor: pointer;
 }
 
 /* ^^^^^^^^^^ End Child Select Window theme ^^^^^^^^^^ */

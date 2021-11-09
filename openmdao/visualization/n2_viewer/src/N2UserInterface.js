@@ -897,6 +897,7 @@ class ChildSelectDialog extends N2WindowDraggable {
      */
      constructor(node, color) {
         super('childSelect-' + node.toId());
+        this.node = node;
 
         this.minWidth = 300;
         this.minHeight = 100;
@@ -912,46 +913,28 @@ class ChildSelectDialog extends N2WindowDraggable {
         this.buttonContainer = this.body.append('div').attr('class', 'button-container');
 
         this.ribbonColor(color);
-        this.populate(node);
-    }
 
-    /**
-     * Add all the variables, their display status, and the control buttons.
-     * @param {N2TreeNode} node The node to operate on.
-     */
-    populate(node) {
-        const self = this;
         const topRow = this.thead.append('tr');
-        topRow.append('th').text('Child Name');
+        const childName = topRow.append('th');
+        childName.append('span')
+            .attr('class', 'sort-up')
+            .html('&#9650;') // Up-arrow
+            .on('click', e => {
+                self.varNameArr.sort();
+                self.repopulate();
+            })
+        childName.append('span').text('Child Name');
+        childName.append('span')
+            .attr('class', 'sort-down')
+            .html('&#9660;') // Down-arrow
+            .on('click', e => {
+                self.varNameArr.sort();
+                self.varNameArr.reverse();
+                self.repopulate();
+            })
         topRow.append('th').text('Visible');
 
-        // Only add children that are variables.
-        let foundVariables = false;
-        let isEven = true;
-        for (const child of node.children) {
-            if (!child.isInputOrOutput()) { continue; }
-            // Alternate row colors:
-            const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
-            isEven = !isEven;
-
-            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
-            row.append('td').text(n2Diag.layout.getText(child));
-            const checkId = `${child.toId()}-visible-check`
-
-            // Add a checkbox. When checked, the variable will be displayed.
-            row.append('td')
-                .append('input')
-                .attr('type', 'checkbox')
-                .property('checked', !child.varIsHidden)
-                .attr('id', checkId)
-                .on('change', e => {
-                    child.varIsHidden = !d3.select(`#${checkId}`).property('checked');
-                })
-            foundVariables = true;
-        }
-
-        // No variables were found so there's nothing to do.
-        if (!foundVariables) { this.close(); }
+        const self = this;
 
         // The Select All button makes all variables visible.
         this.buttonContainer.append('button')
@@ -978,14 +961,79 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Hitting Apply closes the dialog and updates the diagram.
         this.buttonContainer.append('button')
             .on('click', e => {
+                if (node.isMinimized) { // If node itself is collapsed, expand it
+                    n2Diag.ui.rightClickedNode = node;
+                    node.manuallyExpanded = true;
+                    node.expand();
+                    node.varIsHidden = false;
+                }
                 n2Diag.update();
-                this.close();
+                self.close();
             })
             .text('Apply');
+        
+        this._fetchVarNames();
 
-        this.sizeToContent(3,30)
-            .moveNearMouse(d3.event)
+        this.repopulate()
+            .sizeToContent(3,30)
             .modal(true)
+            .moveNearMouse(d3.event)
             .show();
+    }
+
+    _fetchVarNames() {
+        // Only add children that are variables.
+        let foundVariables = false;
+
+        this.varNames = {};
+        this.varNameArr = []; // For sorting purposes
+
+        for (const child of this.node.children) {
+            if (!child.isInputOrOutput()) { continue; }
+            foundVariables = true;
+
+            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
+            const varName = n2Diag.layout.getText(child);
+            this.varNames[varName] = child;
+            this.varNameArr.push(varName)
+
+        }
+
+        // No variables were found so there's nothing to do.
+        if (!foundVariables) { this.close(); }        
+    }
+
+    /**
+     * Add all the variables, their display status, and the control buttons.
+     * @param {N2TreeNode} node The node to operate on.
+     */
+    repopulate() {
+        const self = this;
+        this.tbody.html('');
+
+        let isEven = true;
+        for (const varName of this.varNameArr) {
+            const child = this.varNames[varName];
+
+            // Alternate row colors:
+            const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
+            isEven = !isEven;
+
+            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
+            row.append('td').text(varName);
+            const checkId = `${child.toId()}-visible-check`
+
+            // Add a checkbox. When checked, the variable will be displayed.
+            row.append('td')
+                .append('input')
+                .attr('type', 'checkbox')
+                .property('checked', !child.varIsHidden)
+                .attr('id', checkId)
+                .on('change', e => {
+                    child.varIsHidden = !d3.select(`#${checkId}`).property('checked');
+                })
+        }
+
+        return this;
     }
 }
