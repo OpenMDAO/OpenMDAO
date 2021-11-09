@@ -898,12 +898,42 @@ class ChildSelectDialog extends N2WindowDraggable {
      constructor(node, color) {
         super('childSelect-' + node.toId());
         this.node = node;
+        this.nodeColor = color;
+        
+        // Don't do anything else if the node has no variables
+        if ( ! this._fetchVarNames() ) { this.close(); }
+        else { this._initialSetup(); }
+    }
+    
+    _fetchVarNames() {
+        // Only add children that are variables.
+        let foundVariables = false;
+
+        this.varNames = {};
+        this.varNameArr = []; // For sorting purposes
+
+        for (const child of this.node.children) {
+            if (!child.isInputOrOutput()) { continue; }
+            foundVariables = true;
+
+            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
+            const varName = n2Diag.layout.getText(child);
+            this.varNames[varName] = child;
+            this.varNameArr.push(varName)
+
+        }
+
+        return foundVariables;
+    }
+
+    _initialSetup() {
+        const self = this;
 
         this.minWidth = 300;
         this.minHeight = 100;
         this.theme('child-select');
         
-        this.title(node.name);
+        this.title(this.node.name);
         this.tableContainer = this.body.append('div').attr('class', 'table-container');
         this.table = this.tableContainer.append('table');
 
@@ -912,7 +942,7 @@ class ChildSelectDialog extends N2WindowDraggable {
 
         this.buttonContainer = this.body.append('div').attr('class', 'button-container');
 
-        this.ribbonColor(color);
+        this.ribbonColor(this.nodeColor);
 
         const topRow = this.thead.append('tr');
         const childName = topRow.append('th');
@@ -934,14 +964,12 @@ class ChildSelectDialog extends N2WindowDraggable {
             })
         topRow.append('th').text('Visible');
 
-        const self = this;
-
         // The Select All button makes all variables visible.
         this.buttonContainer.append('button')
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', true);
-                for (const child of node.children) {
+                for (const child of self.node.children) {
                     child.varIsHidden = false;
                 }
             })
@@ -952,7 +980,7 @@ class ChildSelectDialog extends N2WindowDraggable {
             .on('click', e => {
                 d3.selectAll('.window-theme-child-select input[type="checkbox"]')
                     .property('checked', false);
-                for (const child of node.children) {
+                for (const child of self.node.children) {
                     child.varIsHidden = true;
                 }
             })
@@ -961,46 +989,22 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Hitting Apply closes the dialog and updates the diagram.
         this.buttonContainer.append('button')
             .on('click', e => {
-                if (node.isMinimized) { // If node itself is collapsed, expand it
-                    n2Diag.ui.rightClickedNode = node;
-                    node.manuallyExpanded = true;
-                    node.expand();
-                    node.varIsHidden = false;
+                if (self.node.isMinimized) { // If node itself is collapsed, expand it
+                    n2Diag.ui.rightClickedNode = self.node;
+                    self.node.manuallyExpanded = true;
+                    self.node.expand();
+                    self.node.varIsHidden = false;
                 }
                 n2Diag.update();
                 self.close();
             })
             .text('Apply');
         
-        this._fetchVarNames();
-
         this.repopulate()
             .sizeToContent(3,30)
             .modal(true)
             .moveNearMouse(d3.event)
             .show();
-    }
-
-    _fetchVarNames() {
-        // Only add children that are variables.
-        let foundVariables = false;
-
-        this.varNames = {};
-        this.varNameArr = []; // For sorting purposes
-
-        for (const child of this.node.children) {
-            if (!child.isInputOrOutput()) { continue; }
-            foundVariables = true;
-
-            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
-            const varName = n2Diag.layout.getText(child);
-            this.varNames[varName] = child;
-            this.varNameArr.push(varName)
-
-        }
-
-        // No variables were found so there's nothing to do.
-        if (!foundVariables) { this.close(); }        
     }
 
     /**
