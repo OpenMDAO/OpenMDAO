@@ -158,11 +158,6 @@ class Jacobian(object):
             if issparse(subjac):
                 subjacs_info['val'] = subjac
             else:
-                # np.promote_types will choose the smallest dtype that can contain both arguments
-                subjac = np.atleast_1d(subjac)
-                safe_dtype = np.promote_types(subjac.dtype, float)
-                subjac = subjac.astype(safe_dtype, copy=False)
-
                 rows = subjacs_info['rows']
 
                 if rows is None:
@@ -171,14 +166,18 @@ class Jacobian(object):
                     if subjac.shape != (1, 1):
                         shape = self._abs_key2shape(abs_key)
                         subjac = subjac.reshape(shape)
+
+                    subjacs_info['val'][:] = subjac
+
                 else:
-                    # Sparse subjac
-                    if subjac.shape != (1,) and subjac.shape != rows.shape:
+                    try:
+                        subjacs_info['val'][:] = subjac
+                    except ValueError:
+                        subjac = np.atleast_1d(subjac)
                         msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
                         raise ValueError(msg.format(self.msginfo, abs_key,
                                                     subjac.shape, rows.shape))
 
-                subjacs_info['val'][:] = subjac
 
         else:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
