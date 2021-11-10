@@ -904,6 +904,10 @@ class ChildSelectDialog extends N2WindowDraggable {
         else { this._initialSetup(); }
     }
     
+    /**
+     * Find all the children of the node that are variables.
+     * @returns {Boolean} True if any variables were found, otherwise false.
+     */
     _fetchVarNames() {
         // Only add children that are variables.
         let foundVariables = false;
@@ -925,6 +929,9 @@ class ChildSelectDialog extends N2WindowDraggable {
         return foundVariables;
     }
 
+    /**
+     * Configure the window structure, then call repopulate() to list the variable names.
+     */
     _initialSetup() {
         const self = this;
         this.hiddenVars = [];
@@ -988,20 +995,23 @@ class ChildSelectDialog extends N2WindowDraggable {
         // Hitting Apply closes the dialog and updates the diagram.
         this.buttonContainer.append('button')
             .on('click', e => {
-                if (self.hiddenVars.length == self.node.children.length) { // If everything was hidden, just collapse the node
-                    n2Diag.ui.rightClick(self.node);
+                if (self.hiddenVars.length == self.node.children.length ) {
+                    // If every variable was hidden, just collapse the node if it's expanded
+                    if (! self.node.isMinimized) { n2Diag.ui.rightClick(self.node); }
                 }
                 else {
                     n2Diag.ui.rightClickedNode = self.node;
-                    if (self.node.isMinimized) { // If node itself is collapsed, expand it
+                    n2Diag.ui.addBackButtonHistory();
+                    
+                    if (self.node.isMinimized) {
+                        // If node itself is collapsed, expand it
                         self.node.manuallyExpanded = true;
                         self.node.expand();
                         self.node.varIsHidden = false;
                     }
-                    for (const child of self.hiddenVars) {
-                        child.varIsHidden = true;
+                    for (const child of self.node.children) {
+                        child.varIsHidden = (self.hiddenVars.indexOf(child) >= 0);
                     }
-                    n2Diag.ui.addBackButtonHistory();
                     n2Diag.update();
                 }
                 self.close();
@@ -1017,7 +1027,6 @@ class ChildSelectDialog extends N2WindowDraggable {
 
     /**
      * Add all the variables, their display status, and the control buttons.
-     * @param {N2TreeNode} node The node to operate on.
      */
     repopulate() {
         const self = this;
