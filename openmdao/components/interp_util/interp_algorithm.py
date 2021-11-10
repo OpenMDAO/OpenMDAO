@@ -533,6 +533,32 @@ class InterpAlgorithmFixed(object):
         """
         raise NotImplementedError()
 
+    def interpolate_vectorized(self, x_vec, idx):
+        """
+        Compute the interpolated value for multiple points.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x_vec : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        raise NotImplementedError()
+
 
 class InterpAlgorithmSemi(object):
     """

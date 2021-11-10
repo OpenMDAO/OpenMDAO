@@ -1300,7 +1300,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
         return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, extrap
 
 
-class InterpAkima1D(InterpAlgorithmFixed):
+class Interp1DAkima(InterpAlgorithmFixed):
     """
     Interpolate on a 1D grid using Akima.
 
@@ -1333,7 +1333,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
         self.k = 4
         self.dim = 1
         self.last_index = [0]
-        self._name = 'akima1D'
+        self._name = '1D-akima'
         self._vectorized = False
 
     def initialize(self):
@@ -1430,7 +1430,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
     def compute_coeffs(self, idx, extrap):
         """
-        Compute the trilinear interpolation coefficients for this block.
+        Compute the interpolation coefficients for this block.
 
         Parameters
         ----------
@@ -1533,7 +1533,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
     def interpolate_vectorized(self, x, idx):
         """
-        Compute the interpolated value.
+        Compute the interpolated value at all requested points.
 
         Parameters
         ----------
@@ -1621,7 +1621,7 @@ class InterpAkima1D(InterpAlgorithmFixed):
 
     def compute_coeffs_vectorized(self, idx):
         """
-        Compute the trilinear interpolation coefficients for requested blocks.
+        Compute the interpolation coefficients for the requested blocks.
 
         Parameters
         ----------

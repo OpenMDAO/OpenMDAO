@@ -1219,7 +1219,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         outs = mapdata.output_data
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True, extrapolate=True,
-                                          method='akima1D', vec_size=1)
+                                          method='1D-akima', vec_size=1)
         comp.add_input('x', 0.0, np.array([.1, .2, .3, .4, .5, .6, .7]))
         comp.add_output('f', 0.0, np.array([.3, .7, .5, .6, .3, .4, .2]))
 
@@ -1232,10 +1232,14 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = 'Method akima1D does not support the "training_data_gradients" option.'
+        msg = 'Method 1D-akima does not support the "training_data_gradients" option.'
         actual_msg = str(cm.exception)
         self.assertTrue(actual_msg.endswith(msg))
 
+    def test_deprecated(self):
+        # Make sure deprecated methods are still in the table_methods list.
+        om.MetaModelStructuredComp(method='trilinear')
+        om.MetaModelStructuredComp(method='akima1D')
 
 @use_tempdirs
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
