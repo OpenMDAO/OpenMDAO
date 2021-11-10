@@ -236,12 +236,10 @@ class MetaModelStructuredComp(ExplicitComponent):
         partials : Jacobian
             Sub-jac components written to partials[output_name, input_name].
         """
-        pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
-
         for out_name, interp in self.interps.items():
-            dval = interp.gradient(pt).T
+            dval = interp._gradient()
             for i, p in enumerate(self.pnames):
-                partials[out_name, p] = dval[i, :]
+                partials[out_name, p] = dval[:, i]
 
             if self.options['training_data_gradients']:
 
@@ -252,6 +250,8 @@ class MetaModelStructuredComp(ExplicitComponent):
                     dy_ddata[:] = interp._d_dvalues
 
                 else:
+                    pt = np.array([inputs[pname].ravel() for pname in self.pnames]).T
+
                     # This way works for most of the interpolation methods.
                     for j in range(self.options['vec_size']):
                         val = interp.training_gradients(pt[j, :])
