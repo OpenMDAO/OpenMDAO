@@ -211,15 +211,21 @@ class ImplicitFuncComp(ImplicitComponent):
             onames = list(func.get_output_names())
             nouts = len(onames)
             jf = jacfwd(func._f, argnums)(*self._ordered_values(self._inputs, self._outputs))
-            for col, (inp, meta) in enumerate(func._inputs.items()):
-                if 'is_option' not in meta:
-                    if nouts == 1:
-                        if (onames[0], inp) in self._jacobian:
-                            self._jacobian[onames[0], inp] = np.asarray(jf[col])
-                    else:
-                        for row, out in enumerate(onames):
-                            if (out, inp) in self._jacobian:
-                                self._jacobian[out, inp] = np.asarray(jf[row][col])
+            if nouts == 1:
+                for col, (inp, meta) in enumerate(func._inputs.items()):
+                    if 'is_option' in meta:
+                        continue
+                    abs_key = self._jacobian._get_abs_key((onames[0], inp))
+                    if abs_key in self._jacobian:
+                        self._jacobian[abs_key] = np.asarray(jf[col])
+            else:
+                for col, (inp, meta) in enumerate(func._inputs.items()):
+                    if 'is_option' in meta:
+                        continue
+                    for row, out in enumerate(onames):
+                        abs_key = self._jacobian._get_abs_key((out, inp))
+                        if abs_key in self._jacobian:
+                            self._jacobian[abs_key] = np.asarray(jf[row][col])
 
             if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
                 self._assembled_jac._update(self)
