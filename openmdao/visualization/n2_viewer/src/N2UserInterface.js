@@ -604,7 +604,8 @@ class N2UserInterface {
         node.varIsHidden = false;
 
         if (node.hasChildren()) {
-            for (let child of node.children) {
+            for (const child of node.children) {
+                if ('hiddenVars' in node && node.hiddenVars.indexOf(child) == -1)
                 this._uncollapse(child);
             }
         }
@@ -884,7 +885,7 @@ class N2UserInterface {
 
 /**
  * Manage a window that allows the user to select which variables to display.
- * TODO: Make variable names sortable, make column headers sticky, improve autosizing
+ * TODO: Make column headers sticky, improve autosizing
  * without using sizeToContent(3,30)
  * @typedef ChildSelectDialog
  */
@@ -934,7 +935,14 @@ class ChildSelectDialog extends N2WindowDraggable {
      */
     _initialSetup() {
         const self = this;
-        this.hiddenVars = [];
+        if ('hiddenVars' in this.node) {
+            this.hiddenVars = this.node.hiddenVars;
+            this.existingHiddenVars = true;
+        }
+        else {
+            this.hiddenVars = [];
+            this.existingHiddenVars = false;
+        }
 
         this.minWidth = 300;
         this.minHeight = 100;
@@ -1002,6 +1010,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                 else {
                     n2Diag.ui.rightClickedNode = self.node;
                     n2Diag.ui.addBackButtonHistory();
+                    self.node.hiddenVars = self.hiddenVars;
                     
                     if (self.node.isMinimized) {
                         // If node itself is collapsed, expand it
@@ -1010,6 +1019,7 @@ class ChildSelectDialog extends N2WindowDraggable {
                         self.node.varIsHidden = false;
                     }
                     for (const child of self.node.children) {
+                        // Need to check every child because some may be newly visible
                         child.varIsHidden = (self.hiddenVars.indexOf(child) >= 0);
                     }
                     n2Diag.update();
@@ -1040,10 +1050,9 @@ class ChildSelectDialog extends N2WindowDraggable {
             const row = this.tbody.append('tr').attr('class', isEven? 'even' : 'odd');
             isEven = !isEven;
 
-            // Use N2Layout.getText() because Auto-IVC variable names are not usually descriptive.
             row.append('td').text(varName);
             const checkId = `${child.toId()}-visible-check`;
-            if (child.varIsHidden) { this.hiddenVars.push(child); }
+            if (child.varIsHidden && ! this.existingHiddenVars) { this.hiddenVars.push(child); }
 
             // Add a checkbox. When checked, the variable will be displayed.
             row.append('td')

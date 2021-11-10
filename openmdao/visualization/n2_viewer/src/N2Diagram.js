@@ -936,6 +936,10 @@ class N2Diagram {
 
         const foundEntry = hiddenList.find(item => item.node === node);
 
+        // If variables were selectively hidden, force the variable selection
+        // dialog to rebuild the hiddenVars array.
+        if ('hiddenVars' in node) { delete node.hiddenVars; }
+
         if (!foundEntry) { // Not found, reset values to default
             node.isMinimized = false;
             node.varIsHidden = false;
