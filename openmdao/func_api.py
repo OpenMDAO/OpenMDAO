@@ -23,7 +23,7 @@ _allowed_add_input_args = {
 }
 
 _allowed_add_output_args = {
-    'val', 'shape', 'units', 'res_units', 'desc' 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
+    'val', 'shape', 'units', 'res_units', 'desc', 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
     'shape_by_conn', 'copy_shape', 'distributed', 'resid'
 }
 
@@ -288,12 +288,14 @@ class OMWrappedFunc(object):
 
         return self
 
-    def declare_coloring(self, **kwargs):
+    def declare_coloring(self, wrt=('*',), **kwargs):
         r"""
         Collect args to be passed to declare_coloring on an OpenMDAO component.
 
         Parameters
         ----------
+        wrt : str or iter of str
+            Patterns or names matching 'with repect to' variables.
         **kwargs : dict
             Keyword args to store.
         """
@@ -301,6 +303,7 @@ class OMWrappedFunc(object):
             _check_kwargs(kwargs, _allowed_declare_coloring_args, 'declare_coloring')
             _update_from_defaults(kwargs, self._coloring_defaults)
             self._declare_coloring = kwargs.copy()
+            self._declare_coloring['wrt'] = wrt
             return self
         raise RuntimeError("declare_coloring has already been called.")
 
@@ -326,7 +329,7 @@ class OMWrappedFunc(object):
         str
             Name of each input variable.
         """
-        yield from inspect.signature(self._f).parameters
+        yield from self._inputs
 
     def get_output_meta(self):
         """

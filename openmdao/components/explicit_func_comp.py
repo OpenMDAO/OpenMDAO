@@ -46,6 +46,10 @@ class ExplicitFuncComp(ExplicitComponent):
 
         if self._compute._use_jax:
             self.options['use_jax'] = True
+
+        if self.options['use_jax']:
+            self._compute._f = omf.jax_decorate(self._compute._f)
+
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
@@ -101,17 +105,20 @@ class ExplicitFuncComp(ExplicitComponent):
                 np.array(['is_option' not in m for m in self._compute._inputs.values()],
                          dtype=bool))[0]
             onames = list(self._compute.get_output_names())
+            inames = list(self._compute.get_input_names())
             nouts = len(onames)
             jf = jacfwd(self._compute._f, argnums)(*self._func_values(self._inputs))
-            for col, inp in enumerate(self._compute.get_input_names()):
-                if col in argnums:
-                    if nouts == 1:
-                        if (onames[0], inp) in self._jacobian:
-                            self._jacobian[onames[0], inp] = np.asarray(jf[col])
-                    else:
-                        for row, out in enumerate(onames):
-                            if (out, inp) in self._jacobian:
-                                self._jacobian[out, inp] = np.asarray(jf[row][col])
+            if nouts == 1:
+                for col, inp in zip(argnums, inames):
+                    abs_key = self._jacobian._get_abs_key((onames[0], inp))
+                    if abs_key in self._jacobian:
+                        self._jacobian[abs_key] = np.asarray(jf[col])
+            else:
+                for col, inp in zip(argnums, inames):
+                    for row, out in enumerate(onames):
+                        abs_key = self._jacobian._get_abs_key((out, inp))
+                        if abs_key in self._jacobian:
+                            self._jacobian[abs_key] = np.asarray(jf[row][col])
         else:
             super()._linearize(jac, sub_do_ln)
 
