@@ -1011,6 +1011,30 @@ class TestJacobian(unittest.TestCase):
         arr[subinfo['rows'], subinfo['cols']] = subinfo['val']
         assert_near_equal(arr[:, 0], comp.sparsity[8:, 5] * 99)
 
+    def test_jacsize_error_message(self):
+
+        class MyComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(2))
+                self.add_output('y', np.ones(3))
+
+                self.declare_partials('y', 'x', rows=np.array([0, 1]), cols=np.array([1, 0]))
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = np.ones((3, ))
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', MyComp())
+
+        prob.setup()
+        prob.run_model()
+
+        msg = "'comp' \<class MyComp\>: Error calling compute_partials\(\), DictionaryJacobian in 'comp' \<class MyComp\>: Sub-jacobian for key \('comp.y', 'comp.x'\) has the wrong shape \(\(3,\)\), expected \(\(2,\)\)."
+        with self.assertRaisesRegex(ValueError, msg):
+            prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
+
 
 class MySparseComp(ExplicitComponent):
     def setup(self):
