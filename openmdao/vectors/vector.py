@@ -560,7 +560,7 @@ class Vector(object):
             raise ValueError(f"{self._system().msginfo}: Attempt to set value of '{name}' in "
                              f"{self._kind} vector when it is read only.")
 
-        if idxs == _full_slice:
+        if idxs is _full_slice:
             idxs = _full_slice_indexer_flat if flat else _full_slice_indexer
         elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
