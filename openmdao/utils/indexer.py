@@ -775,7 +775,7 @@ class ShapedArrayIndexer(Indexer):
             The index array.
         """
         if flat:
-            arr = self._arr.flat[:]
+            arr = self._arr.ravel()
         else:
             arr = self._arr
         if copy:
@@ -797,8 +797,8 @@ class ShapedArrayIndexer(Indexer):
             The index into a flat array.
         """
         if copy:
-            return self._arr.flat[:].copy()
-        return self._arr.flat[:]
+            return self._arr.ravel().copy()
+        return self._arr.ravel()
 
     def _check_bounds(self):
         """

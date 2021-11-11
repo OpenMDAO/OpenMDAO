@@ -3,39 +3,47 @@ import os.path
 import json
 import sys
 
-exclude = [
+exclude = {
     'tests',
     'test',
     '_build',
     '.ipynb_checkpoints',
     '_srcdocs',
     '__pycache__'
-]
+}
 
-directories = []
+directories = None
 
 top = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-for root, dirs, files in os.walk(top, topdown=True):
-    # do not bother looking further down in excluded dirs
-    dirs[:] = [d for d in dirs if d not in exclude]
-    for di in dirs:
-        directories.append(os.path.join(root, di))
+def _get_dirs():
+    global directories
+    if directories is None:
+        directories = []
+        for root, dirs, files in os.walk(top, topdown=True):
+            # do not bother looking further down in excluded dirs
+            dirs[:] = [d for d in dirs if d not in exclude]
+            for di in dirs:
+                directories.append(os.path.join(root, di))
+    return directories
+
+FILES = None
 
 def _get_files():
+    global FILES
+    if FILES is None:
+        FILES = []
+        for dir_name in _get_dirs():
+            dirpath = os.path.join(top, dir_name)
 
-    for dir_name in directories:
-        dirpath = os.path.join(top, dir_name)
+            # Loop over files
+            for file_name in os.listdir(dirpath):
+                if not file_name.startswith('_') and file_name.endswith('.ipynb'):
+                    FILES.append(dirpath + "/" + file_name)
 
-        # Loop over files
-        for file_name in os.listdir(dirpath):
-            if not file_name.startswith('_') and file_name[-6:] == '.ipynb':
-                yield dirpath + "/" + file_name
-
-
-FILES = list(_get_files())
-if len(FILES) < 1:
-    raise RuntimeError(f"No notebooks found. Top directory is {top}.")
+        if len(FILES) < 1:
+            raise RuntimeError(f"No notebooks found. Top directory is {top}.")
+    return FILES
 
 
 @unittest.skipIf(sys.platform =='win32', "Tests don't work in Windows")
@@ -48,7 +56,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         """
         Check that output has been cleaned out of all cells.
         """
-        for file in FILES:
+        for file in _get_files():
             with self.subTest(file):
                 with open(file) as f:
                     json_data = json.load(f)
@@ -75,7 +83,7 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                       '\n']
         mpi_header.extend(header)
 
-        for file in FILES:
+        for file in _get_files():
             with open(file) as f:
 
                 # This one is exempt from these lint rules.
@@ -84,10 +92,11 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
 
                 json_data = json.load(f)
 
-                code_cells = ['code' for cell in json_data['cells'] \
-                              if cell['cell_type'] == 'code']
-                if len(code_cells) < 1:
-                    continue
+                for cell in json_data['cells']:
+                    if cell['cell_type'] == 'code':
+                        break
+                else:
+                    continue  # no code cells found
 
                 first_block = json_data['cells'][0]['source']
                 if first_block != header and first_block != mpi_header:
@@ -119,11 +128,10 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         """
         Make sure any code cells with asserts are hidden.
         """
-        for file in FILES:
+        for file in _get_files():
             with open(file) as f:
                 json_data = json.load(f)
-                blocks = json_data['cells']
-                for block in blocks[1:]:
+                for block in json_data['cells'][1:]:
 
                     # Don't check markup cells
                     if block['cell_type'] != 'code':
@@ -140,11 +148,9 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                         if "allow-assert" in tags:
                             continue
 
-                    code = ''.join(block['source'])
-                    if 'assert' in code:
-
-                        msg = f"Assert found in a code block in {file}. "
-                        self.fail(msg)
+                    for line in block['source']:
+                        if 'assert' in line:
+                            self.fail(f"Assert found in a code block in {file}. ")
 
     def test_eval_rst(self):
         """
