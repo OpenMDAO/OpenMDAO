@@ -23,8 +23,8 @@ _allowed_add_input_args = {
 }
 
 _allowed_add_output_args = {
-    'val', 'shape', 'units', 'res_units', 'desc', 'lower', 'upper', 'ref', 'ref0', 'res_ref', 'tags',
-    'shape_by_conn', 'copy_shape', 'distributed', 'resid'
+    'val', 'shape', 'units', 'res_units', 'desc', 'lower', 'upper', 'ref', 'ref0', 'res_ref',
+    'tags', 'shape_by_conn', 'copy_shape', 'distributed', 'resid'
 }
 
 _allowed_declare_options_args = {

@@ -34,6 +34,8 @@ class ImplicitFuncComp(ImplicitComponent):
     ----------
     _apply_nonlinear_func : callable
         The function wrapper used by this component.
+    _apply_nonlinear_func_jax : callable
+        Function decorated to ensure use of jax numpy.
     _solve_nonlinear_func : function or None
         Optional function to do a nonlinear solve.
     solve_nonlinear : method
@@ -76,7 +78,7 @@ class ImplicitFuncComp(ImplicitComponent):
             self._apply_nonlinear_func._setup()
 
         if self.options['use_jax']:
-            self._apply_nonlinear_func._f = omf.jax_decorate(self._apply_nonlinear_func._f)
+            self._apply_nonlinear_func_jax = omf.jax_decorate(self._apply_nonlinear_func._f)
 
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
@@ -84,8 +86,8 @@ class ImplicitFuncComp(ImplicitComponent):
                                                dtype=bool))[0]
             try:
                 with omf.jax_context(self._apply_nonlinear_func._f.__globals__):
-                    self._apply_nonlinear_func._f = jit(self._apply_nonlinear_func._f,
-                                                        static_argnums=static_argnums)
+                    self._apply_nonlinear_func_jax = jit(self._apply_nonlinear_func_jax,
+                                                         static_argnums=static_argnums)
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: failed jit compile of solve_nonlinear "
                                    f"function: {err}")
@@ -210,7 +212,8 @@ class ImplicitFuncComp(ImplicitComponent):
 
             onames = list(func.get_output_names())
             nouts = len(onames)
-            jf = jacfwd(func._f, argnums)(*self._ordered_values(self._inputs, self._outputs))
+            jf = jacfwd(self._apply_nonlinear_func_jax, argnums)(
+                *self._ordered_values(self._inputs, self._outputs))
             if nouts == 1:
                 for col, (inp, meta) in enumerate(func._inputs.items()):
                     if 'is_option' in meta:

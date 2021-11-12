@@ -7,7 +7,9 @@ import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, _add_options
 
 try:
+    import jax
     from jax import jit, jacfwd
+    from jax.numpy import DeviceArray
 except ImportError:
     jax = None
 
@@ -29,6 +31,8 @@ class ExplicitFuncComp(ExplicitComponent):
     ----------
     _compute : callable
         The function wrapper used by this component.
+    _compute_jax : callable
+        Function decorated to ensure use of jax numpy.
     _compute_partials : function or None
         If not None, call this function when computing partials.
     """
@@ -48,14 +52,14 @@ class ExplicitFuncComp(ExplicitComponent):
             self.options['use_jax'] = True
 
         if self.options['use_jax']:
-            self._compute._f = omf.jax_decorate(self._compute._f)
+            self._compute_jax = omf.jax_decorate(self._compute._f)
 
         self._compute_partials = compute_partials
         if self.options['use_jax'] and self.options['use_jit']:
             static_argnums = np.where(np.array(['is_option' in m for m in
                                                 self._compute._inputs.values()], dtype=bool))[0]
             try:
-                self._compute._f = jit(self._compute._f, static_argnums=static_argnums)
+                self._compute_jax = jit(self._compute_jax, static_argnums=static_argnums)
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: failed jit compile of compute function: {err}")
 
@@ -78,6 +82,7 @@ class ExplicitFuncComp(ExplicitComponent):
         Define out inputs and outputs.
         """
         optignore = {'is_option'}
+        use_jax = self.options['use_jax'] and jax is not None
 
         for name, meta in self._compute.get_input_meta():
             _check_var_name(self, name)
@@ -87,12 +92,23 @@ class ExplicitFuncComp(ExplicitComponent):
                 self.options.declare(name, **kwargs)
             else:
                 kwargs = omf._filter_dict(meta, omf._allowed_add_input_args)
+                if use_jax:
+                    # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                    self._dev_arrays_to_np_arrays(kwargs)
                 self.add_input(name, **kwargs)
 
         for i, (name, meta) in enumerate(self._compute.get_output_meta()):
             _check_var_name(self, name)
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
+            if use_jax:
+                # make sure internal openmdao values are numpy arrays and not DeviceArrays
+                self._dev_arrays_to_np_arrays(kwargs)
             self.add_output(name, **kwargs)
+
+    def _dev_arrays_to_np_arrays(self, meta):
+        if 'val' in meta:
+            if isinstance(meta['val'], DeviceArray):
+                meta['val'] = np.asarray(meta['val'])
 
     def _linearize(self, jac=None, sub_do_ln=False):
         if self.options['use_jax']:
@@ -107,7 +123,7 @@ class ExplicitFuncComp(ExplicitComponent):
             onames = list(self._compute.get_output_names())
             inames = list(self._compute.get_input_names())
             nouts = len(onames)
-            jf = jacfwd(self._compute._f, argnums)(*self._func_values(self._inputs))
+            jf = jacfwd(self._compute_jax, argnums)(*self._func_values(self._inputs))
             if nouts == 1:
                 for col, inp in zip(argnums, inames):
                     abs_key = self._jacobian._get_abs_key((onames[0], inp))
