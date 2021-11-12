@@ -910,50 +910,6 @@ def env_truthy(env_var):
     return os.environ.get(env_var, '0').lower() not in _falsey
 
 
-def dbgprint(*args, **kwargs):
-    """
-    Print only when OM_DEBUG is 'truthy' in the environment.
-
-    Parameters
-    ----------
-    *args : tuple
-        Positional arguments.
-    **kwargs : dict
-        Keyword arguments.
-    """
-    if env_truthy('OM_DEBUG'):
-        print(*args, **kwargs)
-
-
-_env_bool = {True: '1', False: '0'}
-
-
-@contextmanager
-def om_debug(active=True):
-    """
-    Context manager that sets the OM_DEBUG environment variable.
-
-    This is useful for making dbgprint statements active only within a specific context.
-
-    Parameters
-    ----------
-    active : bool
-        If True (the default), then OM_DEBUG will be True within the context.
-        Otherwise it will be False within the context.
-
-    Yields
-    ------
-    nothing
-    """
-    active = bool(active)
-    os.environ['OM_DEBUG'] = _env_bool[active]
-
-    try:
-        yield
-    finally:
-        os.environ['OM_DEBUG'] = _env_bool[not active]
-
-
 def common_subpath(pathnames):
     """
     Return the common dotted subpath found in all of the given dotted pathnames.

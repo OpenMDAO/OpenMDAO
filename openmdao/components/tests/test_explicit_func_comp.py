@@ -6,7 +6,8 @@ from numpy.testing import assert_almost_equal
 from io import StringIO
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals, \
+    assert_warning
 from openmdao.utils.cs_safe import abs, arctan2
 import openmdao.func_api as omf
 from openmdao.utils.coloring import compute_total_coloring
@@ -326,7 +327,7 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         assert_near_equal(C1._outputs['y'], 4.0, 0.00001)
 
-    def test_units_decorator(self):
+    def test_units_meta(self):
 
         def func(x=2.0, z=2.0):
             y=x+z+1.
@@ -366,6 +367,26 @@ class TestFuncCompWrapped(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
                          "'C1' <class ExplicitFuncComp>: cannot use variable name 'units' because it's a reserved keyword.")
+
+    def test_bad_varname(self):
+
+        def func(x=2.0):
+            return x+1.
+
+        f = (omf.wrap(func)
+                .add_input('x', units='m')
+                .add_output('foo:bar'))
+
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0))
+        C1 = prob.model.add_subsystem('C1', om.ExplicitFuncComp(f))
+        prob.model.connect('indep.x', 'C1.x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "'C1' <class ExplicitFuncComp>: 'foo:bar' is not a valid variable name.")
 
     def test_common_units(self):
 
@@ -799,7 +820,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         model.connect("quad_1.y", "balance.lhs:x_1")
 
         prob.model.linear_solver = om.ScipyKrylov()
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
         prob.model.nonlinear_solver.options["maxiter"] = 0
@@ -838,7 +859,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
                 .declare_partials(of='*', wrt='*', method='cs'))
 
         p = om.Problem()
-        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+        p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
 
         p.setup(mode='fwd')
         p.run_model()
@@ -859,7 +880,7 @@ class TestFuncCompUserPartials(unittest.TestCase):
                                   rows=np.arange(5), cols=np.arange(5)))
 
         p = om.Problem()
-        comp = p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
+        p.model.add_subsystem('comp', ExplicitFuncCompCountRuns(f))
 
         p.setup(mode='fwd')
         p.run_driver()
@@ -877,8 +898,8 @@ def mat_factory(ninputs, noutputs):
     inshapes = list(zip(np.random.randint(1, 4, ninputs), np.random.randint(1, 4, ninputs)))
     outshapes = list(zip(np.random.randint(1, 4, noutputs), np.random.randint(1, 4, noutputs)))
 
-    nrows = np.sum(np.product(shp) for shp in outshapes)
-    ncols = np.sum(np.product(shp) for shp in inshapes)
+    nrows = np.sum([np.product(shp) for shp in outshapes])
+    ncols = np.sum([np.product(shp) for shp in inshapes])
 
     # create a sparse matrix
     mat = np.random.random((nrows, ncols)) < 0.2
@@ -1011,6 +1032,41 @@ class TestComputePartials(unittest.TestCase):
         p.setup(force_alloc_complex=True)
         p.run_model()
         assert_check_totals(p.check_totals(of=['comp.foo', 'comp.bar'], wrt=['comp.x', 'comp.y', 'comp.z'], method='cs'))
+
+
+class TestNonDifferentiableArgs(unittest.TestCase):
+    def check_derivs(self, mode, method):
+        def func(a, b, c, ex1, ex2):
+            x = 2. * a * b + 3. * c
+            y = 5. * a * c - 2.5 * b
+            return x, y
+
+        f = (omf.wrap(func)
+                .defaults(shape=3)
+                .declare_option('ex1', default='foo')
+                .declare_option('ex2', default='bar')
+                .declare_partials(of='*', wrt='*', method=method)
+                )
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', om.ExplicitFuncComp(f))
+        p.setup(mode=mode)
+        p.run_model()
+        J = p.compute_totals(of=['comp.x', 'comp.y'], wrt=['comp.a', 'comp.b', 'comp.c'])
+
+        I = np.eye(3)
+        assert_near_equal(J['comp.x', 'comp.a'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.b'], I * 2.)
+        assert_near_equal(J['comp.x', 'comp.c'], I * 3.)
+        assert_near_equal(J['comp.y', 'comp.a'], I * 5.)
+        assert_near_equal(J['comp.y', 'comp.b'], I * -2.5)
+        assert_near_equal(J['comp.y', 'comp.c'], I * 5.)
+
+    def test_fwd(self):
+        self.check_derivs('fwd', method='cs')
+
+    def test_rev(self):
+        self.check_derivs('rev', method='cs')
 
 if __name__ == "__main__":
     unittest.main()

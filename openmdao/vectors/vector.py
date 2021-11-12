@@ -4,14 +4,16 @@ import os
 import weakref
 
 import numpy as np
+from numpy import isscalar
 
 from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
 
 
 _full_slice = slice(None)
-_full_slice_indexer = indexer(_full_slice, flat_src=False)
-_full_slice_indexer_flat = indexer(_full_slice, flat_src=True)
+_flat_full_indexer = indexer(_full_slice, flat_src=True)
+_full_indexer = indexer(_full_slice, flat_src=False)
+
 _type_map = {
     'input': 'input',
     'output': 'output',
@@ -167,6 +169,17 @@ class Vector(object):
         """
         return self._len
 
+    def nvars(self):
+        """
+        Return the number of variables in this Vector.
+
+        Returns
+        -------
+        int
+            Number of variables in this Vector.
+        """
+        return len(self._views)
+
     def _copy_views(self):
         """
         Return a dictionary containing just the views.
@@ -198,21 +211,14 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        flat = self._views_flat
         if self._under_complex_step:
             for n, v in self._views.items():
                 if n in self._names:
-                    if v.shape:
-                        yield v
-                    else:
-                        yield flat[n][0]
+                    yield v
         else:
             for n, v in self._views.items():
                 if n in self._names:
-                    if v.shape:
-                        yield v.real
-                    else:
-                        yield flat[n][0].real
+                    yield v.real
 
     def _name2abs_name(self, name):
         """
@@ -275,18 +281,10 @@ class Vector(object):
         arrs = self._views_flat if flat else self._views
 
         if self._under_complex_step:
-            for tup in arrs.items():
-                if flat or tup[1].shape:
-                    yield tup
-                else:
-                    name, _ = tup
-                    yield name, self._views_flat[name][0]
+            yield from arrs.items()
         else:
             for name, val in arrs.items():
-                if flat or val.shape:
-                    yield name, val.real
-                else:
-                    yield name, self._views_flat[name][0].real
+                yield name, val.real
 
     def _abs_iter(self):
         """
@@ -537,6 +535,35 @@ class Vector(object):
         raise NotImplementedError('set_arr not defined for vector type %s' %
                                   type(self).__name__)
 
+    def set_vals(self, vals):
+        """
+        Set the data array of this vector using a value or iter of values, one for each variable.
+
+        The values must be in the same order as the variables appear in this Vector.
+
+        Parameters
+        ----------
+        vals : ndarray, float, or iter of ndarrays and/or floats
+            Values for each variable contained in this vector, in the proper order.
+        """
+        arr = self.asarray()
+
+        if self.nvars() == 1:
+            if isscalar(vals):
+                arr[:] = vals
+            else:
+                arr[:] = vals.ravel()
+        else:
+            start = end = 0
+            for v in vals:
+                if isscalar(v):
+                    end += 1
+                    arr[start] = v
+                else:
+                    end += v.size
+                    arr[start:end] = v.ravel()
+                start = end
+
     def set_var(self, name, val, idxs=_full_slice, flat=False):
         """
         Set the array view corresponding to the named variable, with optional indexing.
@@ -561,7 +588,11 @@ class Vector(object):
                              f"{self._kind} vector when it is read only.")
 
         if idxs is _full_slice:
-            idxs = _full_slice_indexer_flat if flat else _full_slice_indexer
+            if flat:
+                idxs = _flat_full_indexer
+            else:
+                idxs = _full_indexer
+
         elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
 
@@ -577,8 +608,9 @@ class Vector(object):
                 if view.shape:
                     view[idxs()] = value
                 else:
-                    # view is a scalar (so not really a view), so set the value into the
-                    # array using the flat view (which is actually a view)
+                    # view is a scalar so we can't update it without breaking its connection
+                    # to the underlying array, so set the value into the
+                    # array using the flat view, which is an array of size 1.
                     self._views_flat[abs_name][0] = value
             except Exception as err:
                 try:
