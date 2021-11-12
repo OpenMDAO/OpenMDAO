@@ -10,6 +10,8 @@ try:
     import jax
     from jax import jit, jacfwd
     from jax.numpy import DeviceArray
+    from jax.config import config
+    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except ImportError:
     jax = None
 

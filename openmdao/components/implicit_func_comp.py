@@ -9,6 +9,8 @@ from openmdao.components.func_comp_common import _check_var_name, _copy_with_ign
 
 try:
     from jax import jit, jacfwd
+    from jax.config import config
+    config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except ImportError:
     jax = None
 
