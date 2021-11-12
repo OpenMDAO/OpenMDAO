@@ -227,6 +227,38 @@ n2_gui_test_scripts = {
             "test": "count",
             "selector": "g#n2arrows > g",
             "count": 0
+        },
+        { "test": "root" },
+        {
+            "desc": "Shift-right-click the n1 component",
+            "test": "click",
+            "selector": "rect#circuit_n1",
+            "button": "right",
+            "modifiers": [ "Shift" ]
+        },
+        {
+            "desc": "Check that variable selection dialog appears",
+            "test": "count",
+            "selector": "#childSelect-circuit_n1",
+            "count": 1
+        },
+        {
+            "desc": "Select a variable to hide",
+            "test": "click",
+            "selector": "input#circuit_n1_V-visible-check",
+            "button": "left"
+        },
+        {
+            "desc": "Click the Apply button",
+            "test": "click",
+            "selector": ".button-container button:last-child",
+            "button": "left"
+        },
+        {
+            "desc": "Check that the V variable is no longer displayed",
+            "test": "count",
+            "selector": "rect#circuit_n1_V",
+            "count": 0
         }
     ],
     "bug_arrow": [
@@ -449,7 +481,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Value Info window to new location",
             "test": "drag",
-            "selector": '[id^="persistentNodeInfo"]  .window-draggable-header',
+            "selector": '[id^="persistentNodeInfo"]  .window-draggable-ribbon:first-child',
             "x": 700, "y": 700
         },
         {
@@ -571,7 +603,7 @@ n2_gui_test_scripts = {
         {
             "desc": "Drag Legend to new location",
             "test": "drag",
-            "selector": "#n2win-legend .window-draggable-header",
+            "selector": "#n2win-legend .window-draggable-ribbon:first-child",
             "x": 700, "y": 500
         },
         {
