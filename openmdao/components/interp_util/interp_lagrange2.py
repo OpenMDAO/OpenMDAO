@@ -5,7 +5,8 @@ Based on NPSS implementation.
 """
 import numpy as np
 
-from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, InterpAlgorithmSemi
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm, \
+    InterpAlgorithmSemi, InterpAlgorithmFixed
 
 
 class InterpLagrange2(InterpAlgorithm):
@@ -294,3 +295,464 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
             q3 * (xx1 + xx2)
 
         return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs, d_value, extrap
+
+
+class Interp3DLagrange2(InterpAlgorithmFixed):
+    """
+    Interpolate on a fixed 3D grid using a second order Lagrange polynomial.
+
+    Parameters
+    ----------
+    grid : tuple(ndarray)
+        Tuple containing x grid locations for this dimension and all subtable dimensions.
+    values : ndarray
+        Array containing the table values for all dimensions.
+    interp : class
+        Interpolation class to be used for subsequent table dimensions.
+    **kwargs : dict
+        Interpolator-specific options to pass onward.
+
+    Attributes
+    ----------
+    coeffs : dict of ndarray
+        Cache of all computed coefficients.
+    vec_coeff : None or ndarray
+        Cache of all computed coefficients when running vectorized.
+    """
+
+    def __init__(self, grid, values, interp, **kwargs):
+        """
+        Initialize table and subtables.
+        """
+        super().__init__(grid, values, interp)
+        self.coeffs = {}
+        self.vec_coeff = None
+        self.k = 3
+        self.dim = 3
+        self.last_index = [0] * self.dim
+        self._name = '3D-lagrange2'
+        self._vectorized = False
+
+    def vectorized(self, x):
+        """
+        Return whether this table will be run vectorized for the given requested input.
+
+        Parameters
+        ----------
+        x : float
+            Value of new independent to interpolate.
+
+        Returns
+        -------
+        bool
+            Returns True if this table can be run vectorized.
+        """
+        # If we only have 1 point, use the non-vectorized implementation, which has faster
+        # bracketing than the numpy version.
+        return x.shape[0] > 1
+
+    def interpolate(self, x, idx):
+        """
+        Compute the interpolated value.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : int
+            Interval index for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
+        """
+        grid = self.grid
+        i_x, i_y, i_z = idx
+
+        # Extrapolation
+        # Shift if we don't have 2 points on each side.
+        n = len(grid[0])
+        if i_x > n - 3:
+            i_x = n - 3
+        elif i_x < 0:
+            i_x = 0
+
+        n = len(grid[1])
+        if i_y > n - 3:
+            i_y = n - 3
+        elif i_y < 0:
+            i_y = 0
+
+        n = len(grid[2])
+        if i_z > n - 3:
+            i_z = n - 3
+        elif i_z < 0:
+            i_z = 0
+
+        idx = (i_x, i_y, i_z)
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        if idx not in self.coeffs:
+            self.coeffs[idx] = self.compute_coeffs(idx)
+        a = self.coeffs[idx]
+
+        x, y, z = x
+
+        # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
+        # problems that arise from the scaling of each axis.
+        x = x - grid[0][i_x]
+        y = y - grid[1][i_y]
+        z = z - grid[2][i_z]
+
+        # Compute interpolated value using the 16 coefficients.
+
+        xx = np.array([1.0, x, x * x], dtype=dtype)
+        yy = np.array([1.0, y, y * y], dtype=dtype)
+        zz = np.array([1.0, z, z * z], dtype=dtype)
+        val = np.einsum('ijk,i,j,k->', a, xx, yy, zz)
+
+        # Compute derivatives using the 16 coefficients.
+
+        dx = np.array([0.0, 1.0, 2.0 * x])
+        dy = np.array([0.0, 1.0, 2.0 * y])
+        dz = np.array([0.0, 1.0, 2.0 * z])
+
+        d_x = np.empty((3, ), dtype=dtype)
+        d_x[0] = np.einsum('i,j,k,ijk->', dx, yy, zz, a)
+        d_x[1] = np.einsum('i,j,k,ijk->', xx, dy, zz, a)
+        d_x[2] = np.einsum('i,j,k,ijk->', xx, yy, dz, a)
+
+        return val, d_x, None, None
+
+    def compute_coeffs(self, idx):
+        """
+        Compute the tri-lagrange3 interpolation coefficients for this block.
+
+        Parameters
+        ----------
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolation coefficients.
+        """
+        grid = self.grid
+        values = self.values
+
+        i_x, i_y, i_z = idx
+
+        x = grid[0]
+        y = grid[1]
+        z = grid[2]
+        x1, x2, x3 = x[i_x:i_x + 3]
+        y1, y2, y3 = y[i_y:i_y + 3]
+        z1, z2, z3 = z[i_z:i_z + 3]
+
+        cx12 = x1 - x2
+        cx13 = x1 - x3
+        cx23 = x2 - x3
+
+        cy12 = y1 - y2
+        cy13 = y1 - y3
+        cy23 = y2 - y3
+
+        cz12 = z1 - z2
+        cz13 = z1 - z3
+        cz23 = z2 - z3
+
+        # Normalize for numerical stability
+        x2 -= x1
+        x3 -= x1
+
+        y2 -= y1
+        y3 -= y1
+
+        z2 -= z1
+        z3 -= z1
+
+        termx = np.array([[x2 * x3,
+                          0.0,
+                          0.0],
+                          [x2 + x3,
+                           x3,
+                           x2],
+                          [1.0 / (cx12 * cx13),
+                           -1.0 / (cx12 * cx23),
+                           1.0 / (cx13 * cx23)]])
+
+        termy = np.array([[y2 * y3,
+                          0.0,
+                          0.0],
+                          [y2 + y3,
+                           y3,
+                           y2],
+                          [1.0 / (cy12 * cy13),
+                           -1.0 / (cy12 * cy23),
+                           1.0 / (cy13 * cy23)]])
+
+        termz = np.array([[z2 * z3,
+                          0.0,
+                          0.0],
+                          [z2 + z3,
+                           z3,
+                           z2],
+                          [1.0 / (cz12 * cz13),
+                           -1.0 / (cz12 * cz23),
+                           1.0 / (cz13 * cz23)]])
+
+        termx[1, :] *= -termx[2, :]
+        termy[1, :] *= -termy[2, :]
+        termz[1, :] *= -termz[2, :]
+
+        termx[0, :] *= termx[2, :]
+        termy[0, :] *= termy[2, :]
+        termz[0, :] *= termz[2, :]
+
+        all_val = values[i_x: i_x + 3, i_y: i_y + 3, i_z: i_z + 3]
+
+        # There are 16 coefficients to compute, and each of them is a sum of 16 terms. These come
+        # from multiplying the expression for lagrange interpolation, the  core of which is:
+        # (x-x1)(x-x2)(x-x3)(y-y1)(y-y2)(y-y3)(z-z1)(z-z2)(z-z3)
+        # and expressing it in terms of powers of x, y, and z.
+        # This can efficiently be done in a single call to einsum.
+        a = np.einsum("mi,nj,pk,ijk->mnp", termx, termy, termz, all_val)
+
+        return a
+
+    def interpolate_vectorized(self, x_vec, idx):
+        """
+        Compute the interpolated value.
+
+        Parameters
+        ----------
+        x_vec : ndarray
+            The coordinates to interpolate on this grid.
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
+        """
+        grid = self.grid
+        i_x, i_y, i_z = idx
+
+        # extrapolate low
+        i_x[i_x < 0] = 0
+        i_y[i_y < 0] = 0
+        i_z[i_z < 0] = 0
+
+        # extrapolate high
+        nx, ny, nz = self.values.shape
+        i_x[i_x > nx - 3] = nx - 3
+        i_y[i_y > ny - 3] = ny - 3
+        i_z[i_z > nz - 3] = nz - 3
+
+        if self.vec_coeff is None:
+            self.coeffs = set()
+            grid = self.grid
+            self.vec_coeff = np.empty((nx, ny, nz, 3, 3, 3))
+
+        needed = set(zip(i_x, i_y, i_z))
+        uncached = needed.difference(self.coeffs)
+        if len(uncached) > 0:
+            unc = np.array(list(uncached))
+            uncached_idx = (unc[:, 0], unc[:, 1], unc[:, 2])
+            a = self.compute_coeffs_vectorized(uncached_idx)
+            self.vec_coeff[unc[:, 0], unc[:, 1], unc[:, 2], ...] = a
+            self.coeffs = self.coeffs.union(uncached)
+        a = self.vec_coeff[i_x, i_y, i_z, :]
+
+        # Taking powers of the "deltas" instead of the actual table inputs eliminates numerical
+        # problems that arise from the scaling of each axis.
+        x = x_vec[:, 0] - grid[0][i_x]
+        y = x_vec[:, 1] - grid[1][i_y]
+        z = x_vec[:, 2] - grid[2][i_z]
+
+        # Complex Step
+        if self.values.dtype == complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
+        # Compute interpolated value using the 16 coefficients.
+
+        vec_size = len(i_x)
+        xx = np.empty((vec_size, 3), dtype=dtype)
+        xx[:, 0] = 1.0
+        xx[:, 1] = x
+        xx[:, 2] = x * x
+
+        yy = np.empty((vec_size, 3), dtype=dtype)
+        yy[:, 0] = 1.0
+        yy[:, 1] = y
+        yy[:, 2] = y * y
+
+        zz = np.empty((vec_size, 3), dtype=dtype)
+        zz[:, 0] = 1.0
+        zz[:, 1] = z
+        zz[:, 2] = z * z
+
+        val = np.einsum('qijk,qi,qj,qk->q', a, xx, yy, zz)
+
+        # Compute derivatives using the 16 coefficients.
+
+        dx = np.empty((vec_size, 2), dtype=dtype)
+        dx[:, 0] = 1.0
+        dx[:, 1] = 2.0 * x
+
+        dy = np.empty((vec_size, 2), dtype=dtype)
+        dy[:, 0] = 1.0
+        dy[:, 1] = 2.0 * y
+
+        dz = np.empty((vec_size, 2), dtype=dtype)
+        dz[:, 0] = 1.0
+        dz[:, 1] = 2.0 * z
+
+        d_x = np.empty((vec_size, 3), dtype=dtype)
+        d_x[:, 0] = np.einsum('qijk,qi,qj,qk->q', a[:, 1:, ...], dx, yy, zz)
+        d_x[:, 1] = np.einsum('qijk,qi,qj,qk->q', a[:, :, 1:, :], xx, dy, zz)
+        d_x[:, 2] = np.einsum('qijk,qi,qj,qk->q', a[:, :, :, 1:], xx, yy, dz)
+
+        return val, d_x, None, None
+
+    def compute_coeffs_vectorized(self, idx):
+        """
+        Compute the tri-lagrange3 interpolation coefficients for this block.
+
+        Parameters
+        ----------
+        idx : int
+            List of interval indices for x.
+
+        Returns
+        -------
+        ndarray
+            Interpolation coefficients.
+        """
+        grid = self.grid
+        values = self.values
+        a = np.zeros((3, 3, 3))
+
+        i_x, i_y, i_z = idx
+        vec_size = len(i_x)
+
+        x = grid[0]
+        y = grid[1]
+        z = grid[2]
+
+        x1 = x[i_x]
+        x2 = x[i_x + 1]
+        x3 = x[i_x + 2]
+        y1 = y[i_y]
+        y2 = y[i_y + 1]
+        y3 = y[i_y + 2]
+        z1 = z[i_z]
+        z2 = z[i_z + 1]
+        z3 = z[i_z + 2]
+
+        cx12 = x1 - x2
+        cx13 = x1 - x3
+        cx23 = x2 - x3
+
+        cy12 = y1 - y2
+        cy13 = y1 - y3
+        cy23 = y2 - y3
+
+        cz12 = z1 - z2
+        cz13 = z1 - z3
+        cz23 = z2 - z3
+
+        # Normalize for numerical stability
+        x2 -= x1
+        x3 -= x1
+
+        y2 -= y1
+        y3 -= y1
+
+        z2 -= z1
+        z3 -= z1
+
+        termx = np.empty((vec_size, 3, 3))
+        termx[:, 0, 0] = x2 * x3
+        termx[:, 0, 1] = 0.0
+        termx[:, 0, 2] = 0.0
+        termx[:, 1, 0] = x2 + x3
+        termx[:, 1, 1] = x3
+        termx[:, 1, 2] = x2
+        termx[:, 2, 0] = 1.0 / (cx12 * cx13)
+        termx[:, 2, 1] = -1.0 / (cx12 * cx23)
+        termx[:, 2, 2] = 1.0 / (cx13 * cx23)
+
+        termy = np.empty((vec_size, 3, 3))
+        termy[:, 0, 0] = y2 * y3
+        termy[:, 0, 1] = 0.0
+        termy[:, 0, 2] = 0.0
+        termy[:, 1, 0] = y2 + y3
+        termy[:, 1, 1] = y3
+        termy[:, 1, 2] = y2
+        termy[:, 2, 0] = 1.0 / (cy12 * cy13)
+        termy[:, 2, 1] = -1.0 / (cy12 * cy23)
+        termy[:, 2, 2] = 1.0 / (cy13 * cy23)
+
+        termz = np.empty((vec_size, 3, 3))
+        termz[:, 0, 0] = z2 * z3
+        termz[:, 0, 1] = 0.0
+        termz[:, 0, 2] = 0.0
+        termz[:, 1, 0] = z2 + z3
+        termz[:, 1, 1] = z3
+        termz[:, 1, 2] = z2
+        termz[:, 2, 0] = 1.0 / (cz12 * cz13)
+        termz[:, 2, 1] = -1.0 / (cz12 * cz23)
+        termz[:, 2, 2] = 1.0 / (cz13 * cz23)
+
+        termx[:, 1, :] *= -termx[:, 2, :]
+        termy[:, 1, :] *= -termy[:, 2, :]
+        termz[:, 1, :] *= -termz[:, 2, :]
+
+        termx[:, 0, :] *= termx[:, 2, :]
+        termy[:, 0, :] *= termy[:, 2, :]
+        termz[:, 0, :] *= termz[:, 2, :]
+
+        all_val = np.empty((vec_size, 3, 3, 3))
+        # The only loop in this algorithm, but it doesn't seem to have much impact on time.
+        # Broadcasting out the index slices would be a bit complicated.
+        for j in range(vec_size):
+            all_val[j, ...] = values[i_x[j]: i_x[j] + 3,
+                                     i_y[j]: i_y[j] + 3,
+                                     i_z[j]: i_z[j] + 3]
+
+        # There are 16 coefficients to compute, and each of them is a sum of 16 terms. These come
+        # from multiplying the expression for lagrange interpolation, the  core of which is:
+        # (x-x1)(x-x2)(x-x3)(y-y1)(y-y2)(y-y3)(z-z1)(z-z2)(z-z3)
+        # and expressing it in terms of powers of x, y, and z.
+        # This can efficiently be done in a single call to einsum for all requested cells
+        # simultaneously.
+        a = np.einsum("qmi,qnj,qpk,qijk->qmnp", termx, termy, termz, all_val)
+
+        return a

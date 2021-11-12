@@ -592,6 +592,7 @@ class Vector(object):
                 idxs = _flat_full_indexer
             else:
                 idxs = _full_indexer
+
         elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
 
