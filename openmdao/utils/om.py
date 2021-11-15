@@ -13,6 +13,7 @@ except ImportError:
     pkg_resources = None
 
 import openmdao.utils.hooks as hooks
+from openmdao.visualization.case_viewer.case_viewer import CaseViewer
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_parser, \
@@ -265,6 +266,59 @@ def _meta_model_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
+def _view_cases_parser(parser):
+    """
+    View cases in a recording file.
+    """
+    parser.add_argument('filename', help='case recording file.')
+    parser.add_argument('-p', '--port_number', default=8989, action='store', dest='port_number',
+                        help='Port number to open viewer')
+    parser.add_argument('--no_browser', action='store_false', dest='browser',
+                        help='Bokeh server will start server without browser')
+
+
+    # args = parser.parse_args()
+
+    # filename = args.filename
+    # # if not os.path.isfile(filename):
+    # #     print(f"Can't find file '{filename}'.")
+    # #     sys.exit(-1)
+
+def _view_cases_cmd(options, user_args):
+    """
+    Visualize a metamodel.
+
+    Parameters
+    ----------
+    cases : str or CaseReader
+        Filename of SQL recording or a CaseReader instance.
+    port_number : int
+        Bokeh plot port number.
+    browser : bool
+        If True, show the browser.
+    """
+    from bokeh.application.application import Application
+    from bokeh.application.handlers import FunctionHandler
+    from bokeh.server.server import Server
+
+    filename = options.filename
+    port_number = options.port_number
+    browser = options.browser
+
+    if not os.path.isfile(filename):
+        print(f"Can't find file '{filename}'.")
+        sys.exit(-1)
+    def make_doc(doc):
+        CaseViewer(filename, port=port_number, doc=doc)
+
+    server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
+    if browser:
+        server.io_loop.add_callback(server.show, "/")
+    else:
+        print('Server started, to view go to http://localhost:{}/'.format(port_number))
+
+    server.io_loop.start()
+
 
 def _config_summary_setup_parser(parser):
     """
@@ -495,6 +549,7 @@ _command_map = {
     'view_dyn_shapes': (_view_dyn_shapes_setup_parser, _view_dyn_shapes_cmd,
                         'View the dynamic shape dependency graph.'),
     'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'view_cases': (_view_cases_parser, _view_cases_cmd, "View case recorder."),
     'scaling': (_scaling_setup_parser, _scaling_cmd, 'View driver scaling report.'),
 }
 

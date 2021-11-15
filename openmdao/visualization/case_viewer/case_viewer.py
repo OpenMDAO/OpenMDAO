@@ -18,7 +18,6 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 import numpy as np
 
-
 class CaseViewer(object):
     """
     Visualizer to plot variables vs cases, variables vs variables, and more.
@@ -71,6 +70,15 @@ class CaseViewer(object):
                 doc = curdoc()
             self._make_plot(doc)
 
+    def _case_reader_to_dict(self):
+        self.case_dict = {}
+        if self.case.outputs is not None:
+            self.case_dict.update(self.case.outputs)
+        if self.case.inputs is not None:
+            self.case_dict.update(self.case.inputs)
+        if self.case.residuals is not None:
+            self.case_dict.update(self.case.residuals)
+
     def _var_compatability_check(self, variables, var_to_compare):
         """
         Check and filter variables with same vector length as var_to_compare.
@@ -99,15 +107,39 @@ class CaseViewer(object):
         if var_to_compare in special_case_vars:
             return self.io_options_x
 
+        self._case_reader_to_dict()
+
         for variable in variables:
+            vars_are_arrays = isinstance(variable, np.ndarray) and \
+                isinstance(var_to_compare, np.ndarray)
             if variable in case_vars and variable not in special_case_vars:
-                if self.case[variable].size == self.case[var_to_compare].size:
+                if vars_are_arrays and self.case_dict[variable].size == \
+                        self.case_dict[var_to_compare].size:
                     var_list.append(variable)
 
         if var_list:
             return sorted(var_list) + special_case_vars
         elif variables != special_case_vars:
             return special_case_vars
+
+    def _case_options(self, source):
+        cases = self.cr.list_cases(source, out_stream=None)
+        case_select = []
+        if source == 'driver':
+            case_num = 0
+            for case in cases:
+                pipe_count = 0
+                for letter in case:
+                    if letter == "|":
+                        pipe_count += 1
+                if pipe_count <= 1:
+                    case_select.append((str(case_num), case))
+                    case_num += 1
+
+            return case_select
+        else:
+            return [(str(i), case) for i, case in
+                    enumerate(self.cr.list_cases(source, out_stream=None))]
 
     def _make_plot(self, doc):
         """
@@ -120,8 +152,7 @@ class CaseViewer(object):
         """
         self.doc = doc
         source_options = self.cr.list_sources(out_stream=None)
-        self.case_options = [(str(i), case) for i, case in
-                             enumerate(self.cr.list_cases(source_options[0], out_stream=None))]
+        self.case_options = self._case_options(source_options[0])
         self.io_options_x = self.cr.list_source_vars(source_options[0], out_stream=None)
 
         for key in self.io_options_x:
@@ -187,8 +218,13 @@ class CaseViewer(object):
         """
         Update function for when the source dropdown is updated.
         """
-        self.case_select.options = [(str(i), case) for i, case in
-                                    enumerate(self.cr.list_cases(new, out_stream=None))]
+        self.case_select.options = self._case_options(new)
+
+        self.io_select_x.options = self.cr.list_source_vars(new, out_stream=None)
+        for key in self.io_select_x.options:
+            if self.io_select_x.options[key]:
+                self.io_select_x.value = self.io_select_x.options[key][0]
+
         self.source_select.value = new
         self.case_select.value = ['0']
         self._update()
@@ -321,14 +357,11 @@ class CaseViewer(object):
                 self.case_select.value.append(str(current_val + 1))
 
         for i in self.case_select.value:
-            self.case = self.cr.get_case(self.case_options[int(i)][1])
+            self.case = self.cr.get_case(self.case_select.options[int(i)][1])
 
-            for key, val in self.io_options_x.items():
-                if self.io_select_y.value in val:
-                    y_io = getattr(self.case, key)
+            self._case_reader_to_dict()
 
-                if self.io_select_x.value in val:
-                    x_io = getattr(self.case, key)
+            x_io = y_io = self.case_dict
 
             if (num_points_y and num_points_x) or (self._case_iter_x and self._case_iter_y):
                 x_variable = np.zeros(1)
@@ -338,10 +371,19 @@ class CaseViewer(object):
                 y_variable = np.zeros(1)
                 self.warning_box.text = "NOTE: Cannot compare Number of Points to Case Iterations"
             elif num_points_y or self._case_iter_y:
-                x_variable = x_io[self.io_select_x.value].flatten()
+                print(x_io)
+                if isinstance(x_io[self.io_select_x.value], (np.ndarray, list, float)):
+                    x_variable = x_io[self.io_select_x.value].flatten()
+                else:
+                    x_variable = np.zeros(1)
+                    print(f"X is a non compatible type")
                 y_variable = np.arange(len(x_variable))
             elif num_points_x or self._case_iter_x:
-                y_variable = y_io[self.io_select_y.value].flatten()
+                if isinstance(y_io[self.io_select_y.value], (np.ndarray, list, float)):
+                    y_variable = y_io[self.io_select_y.value].flatten()
+                else:
+                    y_variable = np.zeros(1)
+                    print(f"Y is a non compatible type")
                 x_variable = np.arange(len(y_variable))
             else:
                 x_variable = x_io[self.io_select_x.value].flatten()
@@ -426,59 +468,3 @@ class CaseViewer(object):
 
         return colors
 
-
-def view_cases(cases, port_number=8989, browser=True):
-    """
-    Visualize a metamodel.
-
-    Parameters
-    ----------
-    cases : str or CaseReader 
-        Filename of SQL recording or a CaseReader instance.
-    port_number : int
-        Bokeh plot port number.
-    browser : bool
-        If True, show the browser.
-    """
-    from bokeh.application.application import Application
-    from bokeh.application.handlers import FunctionHandler
-    from bokeh.server.server import Server
-
-    def make_doc(doc):
-        CaseViewer(cases, port=port_number, doc=doc)
-
-    server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
-    if browser:
-        server.io_loop.add_callback(server.show, "/")
-    else:
-        print('Server started, to view go to http://localhost:{}/'.format(port_number))
-
-    server.io_loop.start()
-
-
-def view_cases_cmd():
-    """
-    View cases in a recording file.
-    """
-    import os
-    import sys
-    import argparse
-
-    parser = argparse.ArgumentParser(description='View cases in a recording file.')
-    parser.add_argument('filename', help='case recording file.')
-    parser.add_argument('-p', '--port_number', default=8989, action='store', dest='port_number',
-                        help='Port number to open viewer')
-    parser.add_argument('--no_browser', action='store_false', dest='browser',
-                        help='Bokeh server will start server without browser')
-    args = parser.parse_args()
-
-    filename = args.filename
-    if not os.path.isfile(filename):
-        print(f"Can't find file '{filename}'.")
-        sys.exit(-1)
-
-    view_cases(filename, args.port_number, args.browser)
-
-
-if __name__ == "__main__":
-    view_cases_cmd()
