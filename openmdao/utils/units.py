@@ -889,7 +889,7 @@ def _find_unit(unit, error=False):
 
                 # First character of a unit is always alphabet or $.
                 # Remaining characters may include numbers.
-                regex = re.compile('[A-Z,a-z]{1}[A-Z,a-z,0-9]*')
+                regex = re.compile('[A-Z,a-z,%]{1}[A-Z,a-z,0-9,%]*')
 
                 for item in regex.findall(name):
                     item = re.sub(reg1, 'as_', item)
