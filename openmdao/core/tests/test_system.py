@@ -380,8 +380,8 @@ class TestSystem(unittest.TestCase):
 
         prob.set_val('distance', 1.0, units='m')
 
-        msg = ("Calling `list_inputs` before `final_setup` or `run_model` will only "
-              "display the default values variables and will not show the result of "
+        msg = ("Calling `list_inputs` before `final_setup` will only "
+              "display the default values of variables and will not show the result of "
               "any `set_val` calls.")
 
         with assert_warning(UserWarning, msg):

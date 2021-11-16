@@ -3490,8 +3490,8 @@ class System(object):
             values = val
 
         if self._problem_meta['setup_status'] == 2:
-            issue_warning("Calling `list_inputs` before `final_setup` or `run_model` will only "
-                          "display the default values variables and will not show the result of "
+            issue_warning("Calling `list_inputs` before `final_setup` will only "
+                          "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
 
         metavalues = values and self._inputs is None
