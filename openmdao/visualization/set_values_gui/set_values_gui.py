@@ -1,32 +1,35 @@
+import sys
+import time
+
+
+
 import numpy as np
 from ipytree import Tree, Node
 from ipywidgets import Label, HBox, VBox, Output, Button, Text
 
 from openmdao.core.component import Component
 from openmdao.core.constants import _SetupStatus
-
-from openmdao.utils.units import _find_unit, _UNIT_LIB
-def find_compatible_units(input_units_string):
-    input_units = _find_unit(input_units_string)
-    compatible_units = list()
-    for units_string in _UNIT_LIB.unit_table.keys():
-        units = _find_unit(units_string)
-        if input_units.is_compatible(units):
-            compatible_units.append(units_string)
-    return compatible_units
+from openmdao.core.indepvarcomp import IndepVarComp
 
 class SetValuesUI(object):
-    def __init__(self, prob, vars_to_set=None):
+    def __init__(self, prob, vars_to_set=None, initial_depth = None, ivc_only = True, pause_time=0.0):
         """
         Initialize attributes.
         """
         self._prob = prob
         self._vars_to_set = vars_to_set
+        if initial_depth is None:
+            self._initial_depth = sys.maxsize
+        else:
+            self._initial_depth = initial_depth
+        self._ivc_only = ivc_only
+        self._pause_time = pause_time
         self._value_widget_box = None
         self._tree = None
         self.ui_widget = None
         self._refresh_in_progress = False
         self._output = Output(layout={'border': '1px solid black', 'width': '35%'})
+        self._inputs_connected_to_ivc = self.get_inputs_connected_to_ivc()
 
     def setup(self):
         if not (self._prob._metadata and self._prob._metadata['setup_status'] > _SetupStatus.PRE_SETUP):
@@ -49,101 +52,83 @@ class SetValuesUI(object):
     def set_vars_from_model_with_initial_list_v2(self, sys, node, depth, vars_to_set=None):
         # Create the model tree selector widget
         # Can use icons from here https://fontawesome.com/v5.15/icons?d=gallery&p=2&m=free
-        if sys.name == '_auto_ivc':
+        if sys.name == '_auto_ivc': #   _AutoIndepVarComp
             return
+            # pass
+
+        if sys.pathname == 'DESIGN.fc.conv.fs.exit_static.flow_static':
+            print(sys.name)
+
+        if sys.pathname == 'DESIGN.fc.conv.fs.exit_static':
+            print(sys.name)
+
+        if sys.pathname == 'DESIGN.fc.conv.fs':
+            print(sys.name)
+
 
         name = sys.name if sys.name else 'root'
         new_node = Node(name)
         node.add_node(new_node)
 
-        if depth > 1:
+        if depth > self._initial_depth - 1:
             new_node.opened = False
 
         model = sys._problem_meta['model_ref']()
 
         var_names_at_this_level = get_var_names_at_this_level(model, sys)
 
+        for input_varname in var_names_at_this_level:
+            full_varname = f"{sys.pathname}.{input_varname}"
+            if self._ivc_only and (full_varname not in self._inputs_connected_to_ivc):
+                continue
+            input_node = Node(input_varname)
+            input_node._comp = sys
+            input_node.icon = 'eye-slash'
+            time.sleep(self._pause_time)  # To slow down the messages which cause issue with ipwidgets
+            new_node.add_node(input_node)
+
+            if vars_to_set is not None:
+                if input_varname in vars_to_set:
+                    input_node.icon_style = 'success' # green
+                    self.add_value_widget_with_component(sys, input_varname, input_node)
+            else:
+                input_node.icon_style = 'success' # green
+                self.add_value_widget_with_component(sys, input_varname, input_node)
+
         if isinstance(sys, Component):
-            input_varnames = var_names_at_this_level
             new_node.icon = 'plug'
-
-
-            for input_varname in input_varnames:
-                input_node = Node(input_varname)
-                input_node._comp = sys
-                input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
-                new_node.add_node(input_node)
-
-                if vars_to_set is not None:
-                    # print("Component vars_to_set is not None")
-                    if input_varname in vars_to_set:
-                        # print(f"Component input_varname in vars_to_set for {input_varname}")
-                        input_node.icon_style = 'success'
-                        self.add_value_widget_with_component(sys, input_varname, input_node)
-                else:
-                    # print("Component vars_to_set is None")
-                    input_node.icon_style = 'success'
-                    self.add_value_widget_with_component(sys, input_varname, input_node)
-
         else:
-
-            input_varnames = var_names_at_this_level
-            new_node.icon = 'plug'
-            for input_varname in input_varnames:
-                input_node = Node(input_varname)
-                input_node._comp = sys
-                input_node.icon = 'eye-slash'  # far fa-eye    OR eye  OR eye-slash or square OR square-full OR toggle-off toggle-on
-                new_node.add_node(input_node)
-
-                if vars_to_set is not None:
-                    # print("Group vars_to_set is not None")
-                    if input_varname in vars_to_set:
-                        # print(f"Group input_varname in vars_to_set for {input_varname}")
-                        input_node.icon_style = 'success'
-                        self.add_value_widget_with_component(sys, input_varname, input_node)
-                else:
-                    # print("Group vars_to_set is None")
-                    input_node.icon_style = 'success'
-                    self.add_value_widget_with_component(sys, input_varname, input_node)
-
             new_node.icon = 'envelope-open'
             for s in sys._subsystems_myproc:
-                import time
-                time.sleep(0.1) # To slow down the messages which cause issue with ipwidgets
                 self.set_vars_from_model_with_initial_list_v2(s, new_node, depth + 1, vars_to_set )
 
+    def get_inputs_connected_to_ivc(self):
+        '''
+            That sounds like a reasonable approach.  You could also loop over the
+        top level var_allprocs_prom2abs_list['input'] entries and do a lookup
+        in the top level _conn_global_abs_in2out using the first entry of
+        the 'abs list' from your var_allprocs_prom2abs_list lookup since you
+        need an absolute input name to lookup the connected source
+        from _conn_global_abs_in2out.  If you determine that the parent of that
+        source var is an IVC, then put it in the tree using the parent name of
+        the promoted input var (the key from var_allprocs_prom2abs_list
+        ['input']).
+        '''
 
-    def set_vars_from_model_with_initial_list_v1(self, sys, node, vars_to_set=None):
-        # Create the model tree selector widget
-        # Can use icons from here https://fontawesome.com/v5.15/icons?d=gallery&p=2&m=free
-        if sys.name == '_auto_ivc':
-            return
-        name = sys.name if sys.name else 'root'
-        new_node = Node(name)
-        node.add_node(new_node)
+        inputs_connected_to_ivc = []
+        for prom, alist in self._prob.model._var_allprocs_prom2abs_list['input'].items():
+            var = alist[0]
+            connected_source = self._prob.model._conn_global_abs_in2out[var]
+            compname = connected_source.rsplit('.', 1)[0]
+            comp = self._prob.model._get_subsystem(compname)
+            if isinstance(comp, IndepVarComp):  # _AutoIndepVarComp is subclass so those caught too
+                inputs_connected_to_ivc.append(var)
 
-        if isinstance(sys, Component):
-            input_varnames = list(sys._var_allprocs_prom2abs_list['input'].keys())
-            new_node.icon = 'plug'
-            for input_varname in input_varnames:
-                input_node = Node(input_varname)
-                input_node._comp = sys
-                input_node.icon = 'eye-slash'
-                new_node.add_node(input_node)
+        return inputs_connected_to_ivc
 
-                if vars_to_set and input_varname in vars_to_set:
-                        input_node.icon_style = 'success'
-                        self.add_value_widget_with_component(sys, input_varname, input_node)
-                else:
-                    input_node.icon_style = 'success'
-                    self.add_value_widget_with_component(sys, input_varname, input_node)
-
-        else:
-            new_node.icon = 'envelope-open'
-            for s in sys._subsystems_myproc:
-                self.set_vars_from_model_with_initial_list_v1(s, new_node, vars_to_set)
 
     def add_value_widget_with_component(self, comp, var_name, tree_node):
+
         if var_name in self.get_widget_var_names():
             return # already there
         val = comp.get_val(var_name)
@@ -167,7 +152,6 @@ class SetValuesUI(object):
             val = val.item()
 
         # Value widget
-        # val_widget = FloatText(
         val_widget = Text(
             value=str(val),
             description=var_name,
@@ -188,6 +172,7 @@ class SetValuesUI(object):
                                                         'width' :'60px',
                                                         'display':'flex',
                                                         'justify_content':'center'})
+        units_widget._var_name = var_name
         units_widget._var_name = var_name
         units_widget.observe(self.update_prob_unit, 'value')
 
@@ -210,7 +195,7 @@ class SetValuesUI(object):
 
     def on_selected_change(self, change):
         comp = change['new'][0]._comp
-        change['new'][0].icon_style = 'info' # also try danger, success, info
+        change['new'][0].icon_style = 'success' # also try danger, success, info
         change['new'][0].icon = 'eye'
         var_name = change['new'][0].name
         if var_name in self.get_widget_var_names():
@@ -238,11 +223,10 @@ class SetValuesUI(object):
                 (box for box in self._value_widget_box.children if box != box_to_remove)
             box_to_remove.close()
             associated_tree_node = box_to_remove._tree_node
-            # associated_tree_node.icon_style = 'default'
             associated_tree_node.icon = 'eye-slash'
+            associated_tree_node.icon_style = 'default' # grey
 
     def refresh_ui_with_problem_data(self, button):
-        print("refresh_ui_with_problem_data")
         self._refresh_in_progress = True
         # loop through self._value_widget_box.children
         for box in self._value_widget_box.children[1:]:
@@ -258,8 +242,10 @@ class SetValuesUI(object):
 
     def update_prob_val(self, change):
         if not self._refresh_in_progress: # no need to update problem since values from problem are being used to change the value in the widget
-            # self._prob[change['owner'].description] = change['new']
             val = float(change['new']) if change['new'] else 0.0
+
+            #   TODO !!!!! Need to use units here
+
             self._prob.set_val(change['owner'].description, val)
 
     def update_prob_unit(self, change):
@@ -267,8 +253,6 @@ class SetValuesUI(object):
         units = change['new']
         val = self._prob.get_val(var_name)
         self._prob.set_val(var_name, val, units=units)
-
-        # self._prob.model.set_input_defaults(change['owner']._var_name, units=change['new'])
 
     def get_widget_var_names(self):
         var_names = []
@@ -280,39 +264,79 @@ class SetValuesUI(object):
     def display(self):
         return self.ui_widget
 
-def set_values_gui(prob, vars_to_set=None):
-    ui = SetValuesUI(prob, vars_to_set=vars_to_set)
+def set_values_gui(prob, vars_to_set=None, initial_depth = None, ivc_only = True, pause_time=0.0):
+    ui = SetValuesUI(prob, vars_to_set=vars_to_set, initial_depth = initial_depth, ivc_only = ivc_only, pause_time=pause_time)
     ui.setup()
     return ui.ui_widget
 
-
-
 def get_var_names_at_this_level(model, sys):
-
-    if 'DESIGN.inlet.real_flow' == sys.pathname:
-        print(sys)
 
     var_names_at_this_level = set()
     model_abs2prom = model._var_allprocs_abs2prom['input']
+    current_group_absolute_path = sys.pathname
+    if current_group_absolute_path == 'DESIGN.fc.conv.fs.exit_static':
+        a = 1
+    if current_group_absolute_path == 'DESIGN.fc.conv.fs.exit_static.flow_static':
+        a = 1
+    if sys.pathname.endswith("DESIGN"):
+        c = 1
+    if sys.name == '':
+        d = 1
     if isinstance(sys, Component):
         for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
             promoted_name_from_top_level = model_abs2prom[abs_name]
-            current_group_absolute_path = sys.pathname
             current_group_var_promoted_name = prom_name
             # if they're different you would know that someone above the current group promoted it
             current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
-            if promoted_name_from_top_level == current_group_pathname:
-                var_names_at_this_level.add(prom_name)
+            # if promoted_name_from_top_level == current_group_pathname:
+            #     var_names_at_this_level.add(prom_name)
+
+            # testing = does_parent_sys_have_this_var_promoted(model, sys, abs_name)
+            # b = 1
+
+            if "." not in current_group_var_promoted_name:  # this seems sufficient
+                # if promoted_name_from_top_level.endswith(f"{sys.name}.{prom_name}"):
+                if not does_parent_sys_have_this_var_promoted(model, sys, abs_name):
+                        var_names_at_this_level.add(prom_name)
     else: # Group
         for abs_name, prom_name in sys._var_allprocs_abs2prom['input'].items():
             promoted_name_from_top_level = model_abs2prom[abs_name]
-            current_group_absolute_path = sys.pathname
             current_group_var_promoted_name = prom_name
             # if they're different you would know that someone above the current group promoted it
             current_group_pathname = f"{current_group_absolute_path}.{current_group_var_promoted_name}"
-            if "." in current_group_var_promoted_name:
-                continue
-            if promoted_name_from_top_level == current_group_pathname:
-                var_names_at_this_level.add(prom_name)
+
+            testing = does_parent_sys_have_this_var_promoted(model, sys, abs_name)
+            b = 1
+
+            if sys.pathname == '':  # root
+                if not "." in prom_name:
+                    var_names_at_this_level.add(prom_name)
+            else:
+                if "." not in current_group_var_promoted_name:  # this seems sufficient
+                    # WHAT IF a group higher up has the same name and the var is promoted to that level?
+                    # if promoted_name_from_top_level.endswith(f"{sys.name}.{prom_name}"):
+                    if not does_parent_sys_have_this_var_promoted(model, sys, abs_name):
+                            var_names_at_this_level.add(prom_name)
+                # if promoted_name_from_top_level == current_group_pathname:   # DO I really need this?
+                #     var_names_at_this_level.add(prom_name)
 
     return var_names_at_this_level
+
+def does_parent_sys_have_this_var_promoted(model, sys, abs_name): # so not at this level
+    #  TODO. It works for when sys is model, but should really handle that explicitly
+    # parent_pathname = sys.pathname.rsplit('.', 1)[0]
+    parent_pathname_and_child = sys.pathname.rsplit('.', 1)
+    if len(parent_pathname_and_child) > 1:
+        parent_pathname = parent_pathname_and_child[0]
+    else:
+        parent_pathname = ''
+    parent = model._get_subsystem(parent_pathname)
+    parent_vars = parent._var_allprocs_abs2prom['input']
+    if abs_name in parent_vars:
+        if "." in parent_vars[abs_name]:
+            return False # so it is at this level
+        else:
+            return True  # parent has same var and it's promoted name in that group has no .
+                         # so it has it at that level at least. Definitely not at this sys level
+    else:
+        raise(f"shouldn't happen! {abs_name} not found in var for {parent_pathname}")
