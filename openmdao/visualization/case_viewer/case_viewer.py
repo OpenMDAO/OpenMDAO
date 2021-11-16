@@ -18,6 +18,7 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 
 import numpy as np
 
+
 class CaseViewer(object):
     """
     Visualizer to plot variables vs cases, variables vs variables, and more.
@@ -29,8 +30,8 @@ class CaseViewer(object):
         Currently only sqlite database files recorded via SqliteCaseReader are supported.
     port : int
         What port to host Bokeh server on.
-    testing : bool
-        Flag for unit testing to get past the raise error.
+    doc : Document or None
+        The Bokeh document to build.
 
     Attributes
     ----------
@@ -467,4 +468,3 @@ class CaseViewer(object):
                 colors = list(Turbo256)
 
         return colors
-

@@ -266,6 +266,7 @@ def _meta_model_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
+
 def _view_cases_parser(parser):
     """
     View cases in a recording file.
@@ -276,13 +277,6 @@ def _view_cases_parser(parser):
     parser.add_argument('--no_browser', action='store_false', dest='browser',
                         help='Bokeh server will start server without browser')
 
-
-    # args = parser.parse_args()
-
-    # filename = args.filename
-    # # if not os.path.isfile(filename):
-    # #     print(f"Can't find file '{filename}'.")
-    # #     sys.exit(-1)
 
 def _view_cases_cmd(options, user_args):
     """
@@ -308,6 +302,7 @@ def _view_cases_cmd(options, user_args):
     if not os.path.isfile(filename):
         print(f"Can't find file '{filename}'.")
         sys.exit(-1)
+
     def make_doc(doc):
         CaseViewer(filename, port=port_number, doc=doc)
 
