@@ -378,8 +378,6 @@ class TestSystem(unittest.TestCase):
 
         prob.setup()
 
-        prob.set_val('distance', 1.0, units='m')
-
         msg = ("Calling `list_inputs` before `final_setup` will only "
               "display the default values of variables and will not show the result of "
               "any `set_val` calls.")

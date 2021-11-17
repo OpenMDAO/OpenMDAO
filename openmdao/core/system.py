@@ -18,7 +18,8 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND
+from openmdao.core.constants import _DEFAULT_OUT_STREAM, _UNDEFINED, INT_DTYPE, INF_BOUND, \
+    _SetupStatus
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -3489,7 +3490,7 @@ class System(object):
         else:
             values = val
 
-        if self._problem_meta['setup_status'] == 2:
+        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             issue_warning("Calling `list_inputs` before `final_setup` will only "
                           "display the default values of variables and will not show the result of "
                           "any `set_val` calls.")
